@@ -14,13 +14,17 @@ globalThis.localStorage = new MemoryStorage();
 
 const { coreOrchestratorService } = await import('../src/miki/core/services/coreOrchestratorService.ts');
 let e2eSequence = 0;
+const fakeTask = (taskId, goal, source) => {
+  const now = Date.now();
+  return { taskId, title: goal, goal, source, status: 'COMPLETED', revision: 1, createdAt: now, updatedAt: now, visitedDomains: [source], pendingDomains: [], entries: [], resumeCount: 0, lastCycle: 1 };
+};
 coreOrchestratorService.run = async (goal, source) => ({
-  task:{taskId:`p215-ui-${++e2eSequence}`,goal,source,status:'COMPLETED',entries:[],createdAt:Date.now(),updatedAt:Date.now(),cycleCount:1,maxCycles:10},
-  cycles:[], stoppedBy:'COMPLETED'
+  task: fakeTask(`p215-ui-${++e2eSequence}`, goal, source),
+  cycles: [], stoppedBy: 'COMPLETED'
 });
 coreOrchestratorService.finalizeConversationResponse = taskId => ({
-  task:{taskId,goal:'p215',source:'conversation',status:'COMPLETED',entries:[],createdAt:Date.now(),updatedAt:Date.now(),cycleCount:1,maxCycles:10},
-  cycles:[], stoppedBy:'CONVERSATION_COMPLETED'
+  task: fakeTask(taskId, 'p215', 'conversation'),
+  cycles: [], stoppedBy: 'CONVERSATION_COMPLETED'
 });
 const { typedCoreUiGatewayService } = await import('../src/miki/core/ui/typedCoreUiGatewayService.ts');
 const { conversationGraphRuntimeP212Service } = await import('../src/miki/conversation/services/conversationGraphRuntimeP212Service.ts');

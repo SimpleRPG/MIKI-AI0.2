@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-19
-正本Revision：2026-10-20-P294
+基準日：2026-10-21
+正本Revision：2026-10-21-P295
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-20-P294
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-21-P295
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -163,7 +163,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - 監査で検出した高類似候補は、特に双方が静的到達可能な37組をP1として優先確認する。これは今後の確認キューであり、重複実装と確定した結果ではない。P287ではruntimeソースの削除・統合を行っていない。
 - パス/静的importの静的証拠は、実行時呼出しの証明ではない。パス分類・キーワード分類に強い根拠がない記録は未確定のまま残す。GitHub main同期、commit/PUSH、CI、型検査、Android build/APK、実機E2Eは未実施。
 
-■ 自己能力台帳グラフ（現行・P276 / P277 / P294編集継続）
+■ 自己能力台帳グラフ（現行・P276 / P277 / P294 / P295編集継続）
 
 - 自己能力台帳の関係グラフは、既存Component Registry・Artifact・Capability Confidence・Knowledge Gapの事実を変更しない編集用オーバーレイとして扱う。
 - グラフ専用キー`miki_capability_ledger_graph_v1`へノード・エッジ・更新時刻を保存する。ノード削除時は接続エッジを同時に削除し、存在しない端点・自己接続・空のノード名を拒否する。ノード2,000件、エッジ8,000件を上限とする。
@@ -174,6 +174,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - 隔離先への書き込み後にRawの完全一致を読み戻し確認する。確認できなければ書き込みをfail-closedにし、元のGraphキーを上書きしない。
 - 隔離成功時は原文が隔離済みであることをストレージ状態（RECOVERED_QUARANTINED）として公開し、新規Graphの編集を許可する。書き込み失敗・隔離失敗・読取失敗はWRITE_BLOCKEDとして変更を拒否する。
 - 正常なGraphの保存でも直後のRaw readbackが直列化文字列と一致するまではService cacheを更新しない。getStorageState()で状態と診断理由を参照できる。
+- P295では空文字Rawを欠落キーと同一視せず、不正Snapshotとして隔離する。`updateEdge()`は既存エッジと同じ(from,to,label)になる編集を保存前に拒否し、`commit()`も保存前にSnapshot全体をparseSnapshot()で再検証する。
+- CapabilityLedgerScreenはRECOVERED_QUARANTINEDとWRITE_BLOCKEDの状態および理由を表示する。`scripts/verify_capability_ledger_graph_storage_p295.mjs`は重複編集拒否、commitの全体検証、破損Rawの完全隔離、空文字Raw隔離、隔離失敗時の書込禁止、保存読み戻し失敗を検証する。
 
 ■ メモリ利用方針（現行）
 
@@ -258,7 +260,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] UI | src/components/GitHubHub.tsx | lines=510 | symbols=GitHubHub, GitHubHubProps | callers=1 | deps=3
 - [USED] UI | src/components/Header.tsx | lines=275 | symbols=Header | callers=1 | deps=1
 - [USED] UI | src/components/HomeDashboard.tsx | lines=41 | symbols=HomeDashboard | callers=1 | deps=0
-- [USED] UI | src/components/CapabilityLedgerScreen.tsx | lines=292 | symbols=CapabilityLedgerScreen, CapabilityLedgerScreenProps | callers=1 | deps=1
+- [USED] UI | src/components/CapabilityLedgerScreen.tsx | lines=313 | symbols=CapabilityLedgerScreen, CapabilityLedgerScreenProps | callers=1 | deps=1
 - [REMOVED-P106] UI | src/components/InventoryModal.tsx | 旧RPG試作UI。現行用途外かつcallers=0のため削除済み。再追加禁止。
 - [USED] UI | src/components/LibraryHub.tsx | lines=18 | symbols=LibraryHub | callers=1 | deps=1
 - [USED] UI | src/components/MemoryModal.tsx | lines=3754 | symbols=MemoryModal, MemoryModalProps | callers=1 | deps=5 | Tests=2 / Markers=3
@@ -319,7 +321,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] capability | src/miki/capability/services/capabilityCompositionProofService.ts | lines=13 | symbols=CompositionProof, capabilityCompositionProofService | callers=1 | deps=1
 - [USED] capability | src/miki/capability/services/capabilityConfidenceService.ts | lines=147 | symbols=CapabilityConfidence, CapabilityConfidenceService, capabilityConfidenceService | callers=9 | deps=4 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] capability | src/miki/capability/services/capabilityLedgerService.ts | lines=428 | symbols=CapabilityLedgerService, capabilityLedgerService | callers=3 | deps=5
-- [USED] capability | src/miki/capability/services/capabilityLedgerGraphService.ts | lines=300 | symbols=CapabilityLedgerGraphService, capabilityLedgerGraphService, LedgerGraphNode, LedgerGraphEdge, LedgerGraphSnapshot, LedgerGraphStorageStatus, LedgerGraphStorageState | callers=2 | deps=1 | Storage=miki_capability_ledger_graph_v1
+- [USED] capability | src/miki/capability/services/capabilityLedgerGraphService.ts | lines=309 | symbols=CapabilityLedgerGraphService, capabilityLedgerGraphService, LedgerGraphNode, LedgerGraphEdge, LedgerGraphSnapshot, LedgerGraphStorageStatus, LedgerGraphStorageState | callers=2 | deps=1 | Storage=miki_capability_ledger_graph_v1
 - [USED] capability | src/miki/capability/services/capabilityCouncilService.ts | lines=1 | symbols= capabilityCouncilService  | callers=1 | deps=1
 - [USED] capability | src/miki/capability/services/capabilityDependencyService.ts | lines=1 | symbols= capabilityDependencyService  | callers=1 | deps=1
 - [USED] capability | src/miki/capability/services/capabilityGapService.ts | lines=604 | symbols=INITIAL_GAPS, INITIAL_MASTERY_PROFILES, capabilityGapService | callers=26 | deps=6 | Storage=miki_capability_gaps_v32,miki_capability_mastery_profiles_v32 / Tests=1 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
@@ -12051,3 +12053,13 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - 隔離失敗やストレージ読取／書込検証失敗はWRITE_BLOCKEDとし、編集APIをfail-closedにする。隔離成功後はRECOVERED_QUARANTINEDを公開し、保存原文を残したまま新しいGraphを作成できる。
 - 正常Snapshotの保存後もRaw readbackが直列化文字列と一致するまでin-memory cacheを差し替えない。`getStorageState()`で状態と診断理由を取得できる。
 - 現行実装索引では対象Serviceの行数・追加exportを更新した。完全再帰インベントリ、実行テスト、lint、build、Actions、APK、実機動作は本編集コマンドでは実行していない。
+============================================================
+【2026-10-21-P295 台帳グラフ整合性とCI停止要因の一括修正】
+============================================================
+
+- P294の追跡で判明した重複エッジ編集・commit前の全体検証欠落を修正した。`updateEdge()`は重複を保存前に拒否し、`commit()`はSnapshot全体を再検証してから永続化する。空文字Rawも破損として隔離し、隔離状態と書込停止状態を台帳画面へ表示する。
+- 台帳グラフの専用回帰検証を追加し、重複編集の非変更性、不正な直接commitの拒否、Rawの完全隔離、空文字Raw、隔離失敗時のfail-closed、保存読み戻し不一致を確認する検査をbuild前Workflowへ接続した。
+- P215 E2EのCore Task fixtureへBlackboardTask必須フィールドを追加し、`visitedDomains`未定義による`.map()`例外を修正した。相対import監査はquery/hashを実ファイル解決前に除外する。
+- `coreOrchestratorService`の失敗・待機結果は実行payloadを`CoreResult.result`へ設定する契約に修正した。`verify_runtime_failure_fixes.mjs`の現行Revision期待値をP295へ同期した。
+- P289で退役済みとしたLoRA仮想訓練実装`src/services/virtualTrainingService.ts`が現行mainに残って型検査を失敗させていたため、参照元がないことを確認したうえで削除した。LoRA経路・モデル重み変更機能は再導入しない。
+- 正本Revision・現行Revision・対象ソース行数索引と本履歴を更新した。全再帰tree件数は再集計していない。Termuxでのtest/lint/build、GitHub Actions、APK、実機動作はこの編集コマンドの時点では未実行・未確認として扱う。

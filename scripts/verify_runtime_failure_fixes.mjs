@@ -726,11 +726,11 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P273/P274/P279 history under current P292 revision',
+  'Canonical design retains P273/P274/P279 history under current P295 revision',
   design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正') &&
     design.includes('2026-10-16-P274 実行イベント由来の反実仮想測定と独立レビュー') &&
-    design.includes('正本Revision：2026-10-19-P292') &&
-    design.includes('現行Revision: 2026-10-19-P292') &&
+    design.includes('正本Revision：2026-10-21-P295') &&
+    design.includes('現行Revision: 2026-10-21-P295') &&
     design.includes('2026-10-17-P276 自己台帳グラフ編集レイヤー') &&
     design.includes('2026-10-18-P277 認知状態の継続性・自律実行接続') &&
     design.includes('2026-10-18-P278 自律実行完了Receipt・Checkpoint復元境界') &&

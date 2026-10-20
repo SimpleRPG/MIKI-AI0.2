@@ -48,6 +48,7 @@ jobs:
           npm run verify:conversation-graph-completion:p214
           npm run verify:conversation-ui-graph-e2e:p215
           npm run verify:graph-answer-pipeline:p216
+          npx tsx scripts/verify_capability_ledger_graph_storage_p295.mjs
 
       - name: Build Web Application
         env:

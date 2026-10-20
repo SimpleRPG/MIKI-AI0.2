@@ -435,13 +435,13 @@ class CoreOrchestratorService {
   if(!validation.passed){
    taskBlackboardService.setStatus(taskId,'FAILED');
    const finalTask=taskBlackboardService.get(taskId)!;
-   const coreResult=coreResultService.fail(reqId,`CONVERSATION_ANSWER_VALIDATION_FAILED:${validation.failedReasons.join('|')||'UNKNOWN'}`,payload);
+   const coreResult=coreResultService.fail(reqId,`CONVERSATION_ANSWER_VALIDATION_FAILED:${validation.failedReasons.join('|')||'UNKNOWN'}`,{result:payload,route:['core'],processedCategories:['conversation']});
    this.recordTaskMemoryOutcome(finalTask,'FAILURE');
    return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
   }
   taskBlackboardService.pause(taskId,`CONVERSATION_COMPLETION_GATE_FAILED:${completion.reasons.join('|')||'UNKNOWN'}`);
   const finalTask=taskBlackboardService.get(taskId)!;
-  const coreResult=coreResultService.waiting(reqId,{...payload,error:'CONVERSATION_COMPLETION_GATE_FAILED'});
+  const coreResult=coreResultService.waiting(reqId,{result:payload,route:['core'],processedCategories:['conversation'],error:'CONVERSATION_COMPLETION_GATE_FAILED'});
   return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
  }
 

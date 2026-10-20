@@ -54,7 +54,7 @@ class CapabilityLedgerGraphService {
       return JSON.parse(JSON.stringify(this.cache)) as LedgerGraphSnapshot;
     }
 
-    if (raw === null || raw === '') {
+    if (raw === null) {
       this.cache = this.emptySnapshot();
       return JSON.parse(JSON.stringify(this.cache)) as LedgerGraphSnapshot;
     }
@@ -206,7 +206,8 @@ class CapabilityLedgerGraphService {
 
   private commit(next: LedgerGraphSnapshot): LedgerGraphSnapshot {
     this.assertWritable();
-    const persisted: LedgerGraphSnapshot = { version: 1, updatedAt: Date.now(), nodes: next.nodes, edges: next.edges };
+    const candidate: LedgerGraphSnapshot = { version: 1, updatedAt: Date.now(), nodes: next.nodes, edges: next.edges };
+    const persisted = this.parseSnapshot(JSON.stringify(candidate));
     const serialized = JSON.stringify(persisted);
     try {
       storageService.setItem(GRAPH_KEY, serialized);
@@ -272,8 +273,16 @@ class CapabilityLedgerGraphService {
     const from = patch.from ?? edge.from; const to = patch.to ?? edge.to;
     if (from === to) throw new Error('GRAPH_SELF_EDGE_NOT_ALLOWED');
     const ids = new Set(g.nodes.map(n => n.id)); if (!ids.has(from) || !ids.has(to)) throw new Error('GRAPH_EDGE_ENDPOINT_NOT_FOUND');
-    edge.from = from; edge.to = to; if (patch.label !== undefined) edge.label = clean(patch.label, 120) || '関連';
-    edge.updatedAt = Date.now(); this.commit(g); return edge;
+    const label = patch.label === undefined ? edge.label : clean(patch.label, 120) || '関連';
+    if (g.edges.some(candidate => candidate.id !== id && candidate.from === from && candidate.to === to && candidate.label === label)) {
+      throw new Error('GRAPH_DUPLICATE_EDGE_NOT_ALLOWED');
+    }
+    edge.from = from;
+    edge.to = to;
+    edge.label = label;
+    edge.updatedAt = Date.now();
+    this.commit(g);
+    return edge;
   }
 
   deleteEdge(id: string): void {

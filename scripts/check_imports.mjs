@@ -33,7 +33,10 @@ function resolveImportPath(dir, importPath) {
     return true;
   }
 
-  const absoluteTarget = path.resolve(dir, importPath);
+  // Node/TypeScriptのcache-busting queryやfragmentは、実ファイルの解決対象ではない。
+  const normalizedImportPath = importPath.split(/[?#]/, 1)[0];
+  if (!normalizedImportPath) return false;
+  const absoluteTarget = path.resolve(dir, normalizedImportPath);
 
   // 1. 直接一致
   if (fs.existsSync(absoluteTarget) && fs.statSync(absoluteTarget).isFile()) {
@@ -57,7 +60,7 @@ function resolveImportPath(dir, importPath) {
   }
 
   // 4. .js 拡張子が .ts / .tsx を指すケース (TypeScript ESM)
-  if (importPath.endsWith('.js')) {
+  if (normalizedImportPath.endsWith('.js')) {
     const baseWithoutJs = absoluteTarget.slice(0, -3);
     for (const ext of ['.ts', '.tsx', '.d.ts']) {
       const candidate = baseWithoutJs + ext;

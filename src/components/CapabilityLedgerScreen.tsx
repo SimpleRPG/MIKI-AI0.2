@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { capabilityLedgerGraphService, type LedgerGraphNode, type LedgerGraphEdge } from '../miki/capability/services/capabilityLedgerGraphService';
+import { capabilityLedgerGraphService, type LedgerGraphNode, type LedgerGraphEdge, type LedgerGraphStorageState } from '../miki/capability/services/capabilityLedgerGraphService';
 import {
   capabilityLedgerService,
   type CapabilityLedgerAssessment,
@@ -33,6 +33,7 @@ export const CapabilityLedgerScreen: React.FC<CapabilityLedgerScreenProps> = ({ 
   );
   const [goal, setGoal] = useState('');
   const [assessment, setAssessment] = useState<CapabilityLedgerAssessment | null>(null);
+  const [graphStorageState, setGraphStorageState] = useState<LedgerGraphStorageState>(() => capabilityLedgerGraphService.getStorageState());
   const [graph, setGraph] = useState(() => capabilityLedgerGraphService.getSnapshot());
   const [nodeLabel, setNodeLabel] = useState('');
   const [nodeDetail, setNodeDetail] = useState('');
@@ -42,8 +43,18 @@ export const CapabilityLedgerScreen: React.FC<CapabilityLedgerScreenProps> = ({ 
   const [editingNode, setEditingNode] = useState<string | null>(null);
   const [editingEdge, setEditingEdge] = useState<string | null>(null);
   const [graphError, setGraphError] = useState('');
-  const refreshGraph = () => { setGraph(capabilityLedgerGraphService.getSnapshot()); setGraphError(''); };
-  const graphAction = (action: () => unknown) => { try { action(); refreshGraph(); } catch (error) { setGraphError(String(error instanceof Error ? error.message : error)); } };
+  const refreshGraph = () => {
+    setGraph(capabilityLedgerGraphService.getSnapshot());
+    setGraphStorageState(capabilityLedgerGraphService.getStorageState());
+    setGraphError('');
+  };
+  const graphAction = (action: () => unknown) => {
+    try { action(); refreshGraph(); }
+    catch (error) {
+      setGraphStorageState(capabilityLedgerGraphService.getStorageState());
+      setGraphError(String(error instanceof Error ? error.message : error));
+    }
+  };
 
   const refresh = () => {
     setSnapshot(capabilityLedgerService.getSnapshot());
@@ -197,6 +208,16 @@ export const CapabilityLedgerScreen: React.FC<CapabilityLedgerScreenProps> = ({ 
           <div><h2 className="text-lg font-bold">自己台帳グラフ</h2><p className="text-xs text-slate-400">編集用の関係レイヤー。能力Registryや実行根拠の内容は変更しない。</p></div>
           <button type="button" onClick={refreshGraph} className="rounded-xl border border-slate-700 px-3 py-2 text-sm">再読込</button>
         </div>
+        {graphStorageState.status === 'RECOVERED_QUARANTINED' && (
+          <p role="status" className="mb-3 break-words rounded-lg border border-amber-700 bg-amber-950/30 p-2 text-sm text-amber-200">
+            以前の不正なグラフSnapshotを隔離先に保全しました。表示中のグラフは新規のグラフで、元データは隔離先に保持されています。{graphStorageState.reason ? ` 理由: ${graphStorageState.reason}` : ''}
+          </p>
+        )}
+        {graphStorageState.status === 'WRITE_BLOCKED' && (
+          <p role="alert" className="mb-3 break-words rounded-lg border border-red-800 bg-red-950/40 p-2 text-sm text-red-200">
+            読取・隔離・保存の確認に失敗したため、元データを上書きしないよう編集を停止しています。{graphStorageState.reason ? ` 理由: ${graphStorageState.reason}` : ''}
+          </p>
+        )}
         {graphError && <p role="alert" className="mb-3 break-words rounded-lg border border-red-800 bg-red-950/40 p-2 text-sm text-red-200">保存できませんでした: {graphError}</p>}
         <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <form className="space-y-2 rounded-xl border border-slate-800 p-3" onSubmit={(event) => { event.preventDefault(); graphAction(() => capabilityLedgerGraphService.addNode(nodeLabel, nodeDetail)); setNodeLabel(''); setNodeDetail(''); }}>
