@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-21
-正本Revision：2026-10-21-P295
+正本Revision：2026-10-21-P296
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-21-P295
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-21-P296
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
 - 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
 - Production静的到達: 714ソースファイル。
@@ -191,6 +191,14 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - SelfImprovement Preflightは`storageService.ready`完了後に永続Backendを評価し、初期化途中の`memory`既定値を永続Backend不足と誤判定しない。真に`PERSISTENT_BACKEND_REQUIRED`の場合はEvidence調査に誤分類せず、resource waitとして記録する。
 - 自律改善Queueは各Requestの`nextAttemptAt`を次回タイマーへ直接反映する。5秒等のEvidence waitを60秒ポーリングの次回tickまで遅らせず、Resourceが未充足の場合は既存の60秒フォールバック再確認を維持する。
 - RequiredAssetは元の理由だけをEvidence/Capability分類へ渡し、`RECOVERY_ACTION_REQUIRED`の各計画アクション文字列をEvidence要求として再分類しない。SYNTHESIZE_*はdraft要求として明示し、実Evidence IDがない場合は`RESEARCH_RETURNED_NO_EVIDENCE_ID`とする。Candidate draftの存在のみで検証済み能力・実装Artifactの成立とは扱わない。
+
+■ 自律エージェント永続状態の保全（現行・P296）
+
+- 自律Issue Discovery台帳、CORE Self-Improvement Queue、Failure Understanding記録は、欠損キー(null)だけを未作成として扱う。空文字・不正JSON・不正shape・重複識別子・不正フィールドが1件でもあればSnapshot全体を採用せず、部分的に捨てて続行しない。
+- 破損した元Rawは専用quarantineキーへ完全保存し、読み戻したsourceKeyとRawの完全一致を確認する。既存の異なる隔離記録は上書きしない。
+- 通常の状態保存も読み戻し一致を確認する。読取・隔離・保存確認に失敗したServiceはWRITE_BLOCKEDとなり、Issue scan、Failure eventの後続処理、Improvement enqueue/dispatch/retryを停止する。
+- Autonomous Issue DiscoveryはCORE改善要求を送る前に`DISPATCH_PENDING`とqueuedAtを永続化する。プロセス終了時にpendingだけが残った場合は既存のreconcileQueuedIssues()が既存Runとの相関を探し、Run不在は上限時間後にのみ再試行する。
+- RECOVERED_QUARANTINEDは元Rawの隔離を確認した状態であり、隔離元の情報を新しい空の状態で上書きしない。障害の根拠はstatus/reason APIから診断可能にする。
 
 ■ Domain別実装集計
 
@@ -402,8 +410,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/actionLineageService.ts | lines=45 | symbols=ActionLineageService, ActionLineageSummary, actionLineageService | callers=1 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/adaptiveRoutePlannerService.ts | lines=3064 | symbols=CoreGoalCandidate, GoalConflictDecision, ImprovementReadiness, PlannedRoute, adaptiveRoutePlannerService | callers=2 | deps=14 | Tests=2
 - [USED] CORE | src/miki/core/services/autonomousCandidatePreparationService.ts | lines=215 | symbols=AutonomousImplementationPlan, CandidateDraft, TargetResolution, autonomousCandidatePreparationService | callers=3 | deps=4
-- [USED] CORE | src/miki/core/services/autonomousIssueDiscoveryService.ts | lines=341 | symbols=DiscoveredIssue, DiscoveredIssueKind, DiscoveryConfig, DiscoveryScanMode, DiscoveryScanResult | callers=5 | deps=13 | Storage=miki_autonomous_issue_discovery_config_v1,miki_autonomous_issue_discovery_v1
-- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=863 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
+- [USED] CORE | src/miki/core/services/autonomousIssueDiscoveryService.ts | lines=361 | symbols=DiscoveredIssue, DiscoveredIssueKind, DiscoveryConfig, DiscoveryScanMode, DiscoveryScanResult, DiscoveryPersistenceStatus, DiscoveryPersistenceState | callers=5 | deps=13 | Storage=miki_autonomous_issue_discovery_config_v1,miki_autonomous_issue_discovery_v1
+- [USED] CORE | src/miki/core/services/autonomousSelfImprovementLoopService.ts | lines=870 | symbols=AutonomousImprovementRequest, AutonomousLoopState, AutonomousLoopStatus, autonomousSelfImprovementLoopService, AutonomousLoopPersistenceStatus, AutonomousLoopPersistenceState | callers=7 | deps=11 | Storage=miki_autonomous_self_improvement_loop_v1,miki_autonomous_self_improvement_loop_v2
 - [USED] CORE | src/miki/core/services/blackboardRecoveryService.ts | lines=6 | symbols=RecoverySummary, blackboardRecoveryService | callers=2 | deps=1
 - [USED] CORE | src/miki/core/services/candidateAutoRebaseService.ts | lines=14 | symbols=CandidateRebaseResult, RebaseConflict, RebaseFileInput, RebaseFileResult, candidateAutoRebaseService | callers=2 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/candidateCodeGenerationService.ts | lines=1588 | symbols=CandidateGenerationFile, CandidateGenerationOutcome, candidateCodeGenerationService | callers=2 | deps=27 | Tests=5
@@ -605,7 +613,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] memory | src/miki/memory/services/evidenceService.ts | lines=449 | symbols=EvidenceKind, EvidenceRecord, EvidenceService, EvidenceStatus, evidenceService | callers=16 | deps=4 | Storage=miki_evidence_db_v1
 - [USED] memory | src/miki/memory/services/failureCatalogService.ts | lines=482 | symbols=INITIAL_FAILURE_SIGNATURES, failureCatalogService | callers=4 | deps=3 | Storage=miki_failure_signatures_v51
 - [USED] memory | src/miki/memory/services/failureMemoryService.ts | lines=122 | symbols=FailureMemoryRecord, FailureMemoryService, FailureRiskAssessment, failureMemoryService | callers=14 | deps=3 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
-- [USED] memory | src/miki/memory/services/failureUnderstandingService.ts | lines=137 | symbols=FailureUnderstandingRecord, FailureUnderstandingService, failureUnderstandingService | callers=4 | deps=3
+- [USED] memory | src/miki/memory/services/failureUnderstandingService.ts | lines=140 | symbols=FailureUnderstandingRecord, FailureUnderstandingService, failureUnderstandingService, FailureUnderstandingPersistenceStatus, FailureUnderstandingPersistenceState | callers=4 | deps=3
 - [USED] memory | src/miki/memory/services/knowledgeHalfLifeService.ts | lines=21 | symbols=HalfLifeRecord, KnowledgeStability, knowledgeHalfLifeService | callers=2 | deps=1 | Storage=miki_knowledge_half_life_v1
 - [USED] memory | src/miki/memory/services/longTermMemoryService.ts | lines=1123 | symbols=longTermMemoryService | callers=9 | deps=4 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] memory | src/miki/memory/services/memoryAuditService.ts | lines=397 | symbols=EpistemicStatusAuditResult, MemoryAuditCycleRecord, memoryAuditService | callers=3 | deps=7 | Storage=miki_memory_audit_logs
@@ -12063,3 +12071,13 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - `coreOrchestratorService`の失敗・待機結果は実行payloadを`CoreResult.result`へ設定する契約に修正した。`verify_runtime_failure_fixes.mjs`の現行Revision期待値をP295へ同期した。
 - P289で退役済みとしたLoRA仮想訓練実装`src/services/virtualTrainingService.ts`が現行mainに残って型検査を失敗させていたため、参照元がないことを確認したうえで削除した。LoRA経路・モデル重み変更機能は再導入しない。
 - 正本Revision・現行Revision・対象ソース行数索引と本履歴を更新した。全再帰tree件数は再集計していない。Termuxでのtest/lint/build、GitHub Actions、APK、実機動作はこの編集コマンドの時点では未実行・未確認として扱う。
+============================================================
+【2026-10-21-P296 自律エージェント永続状態の自己保全】
+============================================================
+
+- コード調査で、Autonomous Issue Discovery、Self-Improvement Queue、Failure Understandingの3つが破損Snapshotを空状態へフォールバックし、元Rawを保全せず次の保存で上書きし得る同型の不具合を確認した。
+- 3サービスで全体shape・必須フィールド・数値範囲・重複IDを検証し、不正Recordを部分破棄しない。破損Rawを隔離先へ保存後、sourceKeyとRawの読み戻し一致を検証する。
+- DiscoveryはCORE intakeの外部副作用より先に`DISPATCH_PENDING`を保存し、既存`reconcileQueuedIssues()`を使って再起動後のRun相関と時間上限付き再試行を行う。独立Outbox/Queue/Orchestratorは追加しない。
+- 通常保存でも読み戻し一致を必須とし、読取・隔離・保存確認に失敗した場合はWRITE_BLOCKEDとして、自律scan・失敗イベント後続処理・改善要求のenqueue/dispatch/retryを停止する。失敗した保存を成功扱いにせず、イベント購読処理の例外反復も防ぐ。
+- `scripts/verify_autonomous_state_integrity_p296.mjs`を追加し、3つの破損Snapshotの完全隔離、隔離後の安全な再開、隔離不能時の停止、読み戻し不一致、DiscoveryのOutbox intent先行保存、正本の行数索引・Revision整合を検証する。GitHub Actionsのビルド前検証へ接続する。
+- 正本Revision・現行Revision・3つの対象ソース行数および公開状態APIを索引へ反映した。全再帰tree件数は再集計していない。Termuxでtest/lint/buildを実行せず、CI、APK、実機挙動はPUSH後の実際の結果で判断する。

@@ -66,6 +66,8 @@ export interface AutonomousLoopState {
   retryAt?: number;
   updatedAt: number;
 }
+export type AutonomousLoopPersistenceStatus='READY'|'RECOVERED_QUARANTINED'|'WRITE_BLOCKED';
+export interface AutonomousLoopPersistenceState { status:AutonomousLoopPersistenceStatus; reason?:string; }
 
 const KEY = 'miki_autonomous_self_improvement_loop_v2';
 const LEGACY_KEY = 'miki_autonomous_self_improvement_loop_v1';
@@ -92,17 +94,21 @@ class AutonomousSelfImprovementLoopService {
   private sequence = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
+  private persistenceStatus:AutonomousLoopPersistenceStatus='READY';
+  private persistenceReason?:string;
+  private writesBlocked=false;
 
   public constructor() {
     this.load();
   }
 
   public initialize(): void {
+    if(this.writesBlocked){systemLogger.error('PERSISTENCE','[AutonomousLoop] initialization blocked because queued requests could not be preserved',{reason:this.persistenceReason});return;}
     if (this.state.status === 'RUNNING') {
       this.state.status = 'PAUSED';
       this.state.lastReason = 'APPLICATION_RESTART_RECOVERY';
       this.state.retryAt = Date.now();
-      this.save();
+      try{this.save();}catch(error){systemLogger.error('PERSISTENCE','[AutonomousLoop] restart recovery stopped because state could not be verified',{error:String(error)});return;}
     }
     this.disposed = false;
     this.scheduleRecovery();
@@ -121,6 +127,7 @@ class AutonomousSelfImprovementLoopService {
     source: AutonomousImprovementRequest['source'],
     meta: Partial<AutonomousImprovementRequest> = {}
   ): AutonomousImprovementRequest {
+    this.assertWritable();
     const duplicate = this.state.queue.find(item =>
       item.trigger === trigger &&
       item.source === source &&
@@ -179,7 +186,10 @@ class AutonomousSelfImprovementLoopService {
     return JSON.parse(JSON.stringify(this.state));
   }
 
+  public getPersistenceState():AutonomousLoopPersistenceState{return {status:this.persistenceStatus,...(this.persistenceReason?{reason:this.persistenceReason}:{})};}
+
   public cancelByRunId(runId: string): { cancelled: boolean; active: boolean } {
+    this.assertWritable();
     const active = this.state.queue.find((item) => item.runId === runId && item.id === this.state.activeRequestId);
     if (active) return { cancelled: false, active: true };
     const before = this.state.queue.length;
@@ -207,6 +217,7 @@ class AutonomousSelfImprovementLoopService {
   }
 
   public resume(): void {
+    this.assertWritable();
     if (!['PAUSED', 'WAITING_RESOURCE', 'WAITING_EVIDENCE', 'FAILED'].includes(this.state.status)) {
       return;
     }
@@ -220,7 +231,7 @@ class AutonomousSelfImprovementLoopService {
   private scheduleRecovery(delayOverrideMs?: number): void {
     if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
     this.recoveryTimer = null;
-    if (this.disposed || this.running || this.state.queue.length === 0) return;
+    if (this.writesBlocked || this.disposed || this.running || this.state.queue.length === 0) return;
 
     const now = Date.now();
     const nextAttemptAtValues = this.state.queue
@@ -247,7 +258,7 @@ class AutonomousSelfImprovementLoopService {
   }
 
   private async recoverIfReady(): Promise<void> {
-    if (this.running || this.state.queue.length === 0) {
+    if (this.writesBlocked || this.running || this.state.queue.length === 0) {
       return;
     }
     if (this.state.status === 'WAITING_RESOURCE') {
@@ -272,7 +283,7 @@ class AutonomousSelfImprovementLoopService {
   }
 
   private async drain(): Promise<void> {
-    if (this.running || this.state.queue.length === 0) {
+    if (this.writesBlocked || this.running || this.state.queue.length === 0) {
       return;
     }
     this.running = true;
@@ -443,7 +454,7 @@ class AutonomousSelfImprovementLoopService {
       this.state.status = 'FAILED';
       this.state.lastReason = String(error);
       this.state.retryAt = undefined;
-      this.save();
+      if(!this.writesBlocked){try{this.save();}catch(persistenceError){systemLogger.error('PERSISTENCE','[AutonomousLoop] failed to persist failure state',{error:String(persistenceError)});}}
 
       const task = activeRequest?.taskId
         ? taskBlackboardService.get(activeRequest.taskId)
@@ -830,33 +841,29 @@ class AutonomousSelfImprovementLoopService {
     this.save();
   }
 
+  private assertWritable():void{if(this.writesBlocked)throw new Error('AUTONOMOUS_LOOP_STORE_WRITE_BLOCKED');}
+
+  private blockPersistence(reason:string):void{this.writesBlocked=true;this.persistenceStatus='WRITE_BLOCKED';this.persistenceReason=reason.slice(0,700);if(this.recoveryTimer)clearTimeout(this.recoveryTimer);this.recoveryTimer=null;}
+
+  private quarantine(sourceKey:string,raw:string,reason:string):boolean{const base=`${sourceKey}_quarantine_v1`;const envelope={version:1,sourceKey,quarantinedAt:Date.now(),reason:reason.slice(0,500),raw};try{let destination=base;const existing=storageService.getItem(base);if(existing!==null){try{const parsed=JSON.parse(existing) as Record<string,unknown>;if(parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw)return true;}catch{}let suffix=0;do{destination=`${base}_${Date.now()}_${suffix++}`;if(suffix>1000)return false;}while(storageService.getItem(destination)!==null);}storageService.setItem(destination,JSON.stringify(envelope));const saved=storageService.getItem(destination);if(saved===null)return false;const parsed=JSON.parse(saved) as Record<string,unknown>;return parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw;}catch{return false;}}
+
+  private parseState(raw:string):AutonomousLoopState{const value:unknown=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_ROOT');const parsed=value as Record<string,unknown>;const validStatuses:AutonomousLoopStatus[]=['IDLE','RUNNING','WAITING_RESOURCE','WAITING_EVIDENCE','PAUSED','FAILED'];if(typeof parsed.status!=='string'||!validStatuses.includes(parsed.status as AutonomousLoopStatus)||!Array.isArray(parsed.queue)||parsed.queue.length>10000||typeof parsed.updatedAt!=='number'||!Number.isFinite(parsed.updatedAt)||parsed.updatedAt<0)throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_SHAPE');const ids=new Set<string>();for(const item of parsed.queue){if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID');const request=item as Record<string,unknown>;if(typeof request.id!=='string'||!request.id.trim()||ids.has(request.id)||typeof request.trigger!=='string'||!request.trigger.trim()||!['AUTOPILOT','UI','EXECUTION','SYSTEM'].includes(String(request.source))||typeof request.createdAt!=='number'||!Number.isFinite(request.createdAt)||request.createdAt<0||typeof request.attempts!=='number'||!Number.isInteger(request.attempts)||request.attempts<0)throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_FIELDS');ids.add(request.id);for(const key of ['runId','strategyId','strategyName','runType','sourceId','taskId','workspaceId','waitReason','changeSetId'])if(request[key]!==undefined&&typeof request[key]!=='string')throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_STRING');for(const key of ['priority','resourceWaitCount','evidenceWaitCount','nextAttemptAt'])if(request[key]!==undefined&&(typeof request[key]!=='number'||!Number.isFinite(request[key])||(request[key] as number)<0))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_NUMBER');for(const key of ['resourceWaitCount','evidenceWaitCount'])if(request[key]!==undefined&&!Number.isInteger(request[key]))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_COUNT');if(request.waitKind!==undefined&&!['RESOURCE','EVIDENCE','RETRY'].includes(String(request.waitKind)))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_KIND');if(request.payload!==undefined&&(!request.payload||typeof request.payload!=='object'||Array.isArray(request.payload)))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_PAYLOAD');}for(const key of ['activeRequestId','lastTaskId','lastReason'])if(parsed[key]!==undefined&&typeof parsed[key]!=='string')throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_OPTIONAL_STRING');if(parsed.retryAt!==undefined&&(typeof parsed.retryAt!=='number'||!Number.isFinite(parsed.retryAt)||(parsed.retryAt as number)<0))throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_RETRY_AT');return parsed as unknown as AutonomousLoopState;}
+
   private save(): void {
-    this.state.updatedAt = Date.now();
-    storageService.setItem(KEY, JSON.stringify(this.state));
+    this.assertWritable();
+    const next:AutonomousLoopState={...this.state,updatedAt:Date.now()};
+    const serialized=JSON.stringify(next);
+    try{storageService.setItem(KEY,serialized);if(storageService.getItem(KEY)!==serialized)throw new Error('STORE_READBACK_MISMATCH');this.state.updatedAt=next.updatedAt;}catch(error){this.blockPersistence(`AUTONOMOUS_LOOP_STORE_WRITE_VERIFY_FAILED:${String(error instanceof Error?error.message:error)}`);throw new Error('AUTONOMOUS_LOOP_STORE_WRITE_VERIFY_FAILED');}
   }
 
   private load(): void {
-    try {
-      const raw = storageService.getItem(KEY) || storageService.getItem(LEGACY_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<AutonomousLoopState>;
-        const loadedQueue = Array.isArray(parsed.queue) ? parsed.queue : [];
-        const activeQueue = loadedQueue.filter((item) =>
-          item && Number.isFinite(item.attempts) && item.attempts >= 0 && item.attempts < MAX_ATTEMPTS
-        );
-        const purgedCount = loadedQueue.length - activeQueue.length;
-        this.state = { ...this.state, ...parsed, queue: activeQueue };
-        if (purgedCount > 0) {
-          this.state.status = activeQueue.length > 0 ? 'IDLE' : 'IDLE';
-          this.state.activeRequestId = undefined;
-          this.state.retryAt = undefined;
-          this.state.lastReason = `EXHAUSTED_REQUESTS_PURGED:${purgedCount}`;
-          this.save();
-        }
-      }
-    } catch {
-      this.state = { status: 'IDLE', queue: [], updatedAt: 0 };
-    }
+    let sourceKey=KEY;let raw:string|null;
+    try{raw=storageService.getItem(KEY);if(raw===null){sourceKey=LEGACY_KEY;raw=storageService.getItem(LEGACY_KEY);}}catch(error){this.blockPersistence(`AUTONOMOUS_LOOP_STORE_READ_FAILED:${String(error instanceof Error?error.message:error)}`);return;}
+    if(raw===null)return;
+    let parsed:AutonomousLoopState;
+    try{parsed=this.parseState(raw);}catch(error){const reason=String(error instanceof Error?error.message:error).slice(0,500);this.state={status:'IDLE',queue:[],updatedAt:0};if(this.quarantine(sourceKey,raw,reason)){this.persistenceStatus='RECOVERED_QUARANTINED';this.persistenceReason=`${sourceKey}_QUARANTINED:${reason}`;}else this.blockPersistence(`${sourceKey}_QUARANTINE_FAILED:${reason}`);return;}
+    const activeQueue=parsed.queue.filter(item=>item.attempts<MAX_ATTEMPTS);const purgedCount=parsed.queue.length-activeQueue.length;this.state={...parsed,queue:activeQueue};
+    if(purgedCount>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;this.state.lastReason=`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`;try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
   }
 }
 

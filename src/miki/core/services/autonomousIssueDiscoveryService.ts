@@ -38,19 +38,25 @@ export interface DiscoveredIssue {
 export interface DiscoveryConfig { enabled:boolean; intervalMinutes:number; maxIssuesPerScan:number; minimumPriority:number; }
 export type DiscoveryScanMode='AUTONOMOUS'|'DIAGNOSTIC';
 export interface DiscoveryScanResult { scannedAt:number; mode:DiscoveryScanMode; discovered:number; queued:number; skipped:number; issues:DiscoveredIssue[]; }
+export type DiscoveryPersistenceStatus='READY'|'RECOVERED_QUARANTINED'|'WRITE_BLOCKED';
+export interface DiscoveryPersistenceState { status:DiscoveryPersistenceStatus; reason?:string; }
+const ISSUE_KINDS:DiscoveredIssueKind[]=['EXECUTION_FAILURE','KNOWLEDGE_GAP','CAPABILITY_GAP','STALLED_TASK','DOMAIN_DISCONNECTED','CLAIM_CONTRADICTION','IMPROVEMENT_DEBT'];
 const KEY='miki_autonomous_issue_discovery_v1';
 const CONFIG_KEY='miki_autonomous_issue_discovery_config_v1';
 const DEFAULT_CONFIG:DiscoveryConfig={enabled:true,intervalMinutes:180,maxIssuesPerScan:5,minimumPriority:40};
 class AutonomousIssueDiscoveryService{
  private issues=new Map<string,DiscoveredIssue>();private config:DiscoveryConfig={...DEFAULT_CONFIG};private timer:ReturnType<typeof setInterval>|null=null;private scanning=false;
+ private persistenceStatus:DiscoveryPersistenceStatus='READY';private persistenceReason?:string;private writesBlocked=false;
  constructor(){this.load();}
- initialize():void{this.configureTimer();if(this.config.enabled)void this.scan();}
+ initialize():void{if(this.writesBlocked){systemLogger.error('PERSISTENCE','[IssueDiscovery] initialization blocked because state could not be preserved',{reason:this.persistenceReason});return;}this.configureTimer();if(this.config.enabled)this.runScheduledScan();}
  dispose():void{if(this.timer)clearInterval(this.timer);this.timer=null;}
- setConfig(input:Partial<DiscoveryConfig>):DiscoveryConfig{this.config={enabled:input.enabled??this.config.enabled,intervalMinutes:Math.max(15,Math.min(10080,input.intervalMinutes??this.config.intervalMinutes)),maxIssuesPerScan:Math.max(1,Math.min(20,input.maxIssuesPerScan??this.config.maxIssuesPerScan)),minimumPriority:Math.max(0,Math.min(100,input.minimumPriority??this.config.minimumPriority))};storageService.setItem(CONFIG_KEY,JSON.stringify(this.config));this.configureTimer();return {...this.config};}
+ setConfig(input:Partial<DiscoveryConfig>):DiscoveryConfig{this.assertWritable();const interval=input.intervalMinutes??this.config.intervalMinutes;const batch=input.maxIssuesPerScan??this.config.maxIssuesPerScan;const priority=input.minimumPriority??this.config.minimumPriority;const next:DiscoveryConfig={enabled:input.enabled??this.config.enabled,intervalMinutes:Math.max(15,Math.min(10080,Math.floor(Number.isFinite(interval)?interval:this.config.intervalMinutes))),maxIssuesPerScan:Math.max(1,Math.min(20,Number.isFinite(batch)?Math.floor(batch):this.config.maxIssuesPerScan)),minimumPriority:Math.max(0,Math.min(100,Math.floor(Number.isFinite(priority)?priority:this.config.minimumPriority)))};this.writeRaw(CONFIG_KEY,JSON.stringify(next),'CONFIG');this.config=next;this.configureTimer();return {...this.config};}
  getConfig():DiscoveryConfig{return {...this.config};}
+ getPersistenceState():DiscoveryPersistenceState{return {status:this.persistenceStatus,...(this.persistenceReason?{reason:this.persistenceReason}:{})};}
  list(limit=100):DiscoveredIssue[]{return [...this.issues.values()].sort((a,b)=>b.priority-a.priority||b.lastSeenAt-a.lastSeenAt||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,limit).map(x=>({...x}));}
- recordContradiction(claimId:string,detail:string):DiscoveredIssue{return this.upsert('CLAIM_CONTRADICTION',claimId,`Claim矛盾: ${claimId}`,detail,95);}
+ recordContradiction(claimId:string,detail:string):DiscoveredIssue{this.assertWritable();const previous=new Map(this.issues);const issue=this.upsert('CLAIM_CONTRADICTION',claimId,`Claim矛盾: ${claimId}`,detail,95);try{this.save();return issue;}catch(error){this.issues=previous;throw error;}}
  async scan(mode:DiscoveryScanMode='AUTONOMOUS'):Promise<DiscoveryScanResult>{
+  this.assertWritable();
   if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;
   try{
    this.reconcileQueuedIssues();
@@ -87,6 +93,11 @@ class AutonomousIssueDiscoveryService{
       errorMessage:String(record.error_message||'').slice(0,240),
       updatedAt:record.updated_at
      }));
+     issue.queuedAt=Date.now();
+     issue.nextRetryAt=undefined;
+     issue.lastOutcome='DISPATCH_PENDING';
+     this.issues.set(issue.fingerprint,issue);
+     this.save();
      const queuedRun=await improvementIntakeRouterService.receive({
       runType:'AUTONOMOUS_DISCOVERY',
       sourceId:issue.id,
@@ -103,10 +114,11 @@ class AutonomousIssueDiscoveryService{
      issue.changeSetId=queuedRun.changeSetId;
      issue.improvementRunId=queuedRun.runId;
      issue.taskId=queuedRun.taskId;
-     issue.queuedAt=Date.now();
+     issue.queuedAt=issue.queuedAt||Date.now();
      issue.nextRetryAt=undefined;
      issue.lastOutcome='QUEUED';
      this.issues.set(issue.fingerprint,issue);
+     this.save();
      queued+=1;
     }
    }
@@ -333,9 +345,17 @@ class AutonomousIssueDiscoveryService{
   return {...issue};
  }
 
- private configureTimer():void{if(this.timer)clearInterval(this.timer);this.timer=null;if(this.config.enabled)this.timer=setInterval(()=>{void this.scan();},this.config.intervalMinutes*60*1000);}
+ private runScheduledScan():void{void this.scan().catch(error=>systemLogger.error('SELF_IMPROVEMENT','[IssueDiscovery] autonomous scan stopped before unsafe follow-up',{error:String(error instanceof Error?error.message:error),persistence:this.getPersistenceState()}));}
+ private configureTimer():void{if(this.timer)clearInterval(this.timer);this.timer=null;if(this.config.enabled&&!this.writesBlocked)this.timer=setInterval(()=>this.runScheduledScan(),this.config.intervalMinutes*60*1000);}
  private fingerprint(raw:string):string{let h=2166136261;for(const ch of raw.toLowerCase()){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return `ISS-${(h>>>0).toString(16).padStart(8,'0')}`;}
- private save():void{storageService.setItem(KEY,JSON.stringify(this.list(500)));}
- private load():void{try{const raw=storageService.getItem(KEY);const all=raw?JSON.parse(raw):[];if(Array.isArray(all))for(const item of all)this.issues.set(item.fingerprint,item);const configRaw=storageService.getItem(CONFIG_KEY);if(configRaw)this.config={...DEFAULT_CONFIG,...JSON.parse(configRaw)};}catch{this.issues.clear();this.config={...DEFAULT_CONFIG};}}
+ private assertWritable():void{if(this.writesBlocked)throw new Error('AUTONOMOUS_DISCOVERY_STORE_WRITE_BLOCKED');}
+ private blockStore(reason:string):void{this.writesBlocked=true;this.persistenceStatus='WRITE_BLOCKED';this.persistenceReason=reason.slice(0,700);if(this.timer)clearInterval(this.timer);this.timer=null;}
+ private writeRaw(key:string,raw:string,context:string):void{this.assertWritable();try{storageService.setItem(key,raw);if(storageService.getItem(key)!==raw)throw new Error('STORE_READBACK_MISMATCH');}catch(error){this.blockStore(`${context}:${String(error instanceof Error?error.message:error)}`);throw new Error('AUTONOMOUS_DISCOVERY_STORE_WRITE_VERIFY_FAILED');}}
+ private quarantine(sourceKey:string,raw:string,reason:string):boolean{const base=`${sourceKey}_quarantine_v1`;const envelope={version:1,sourceKey,quarantinedAt:Date.now(),reason:reason.slice(0,500),raw};try{let destination=base;const existing=storageService.getItem(base);if(existing!==null){try{const parsed=JSON.parse(existing) as Record<string,unknown>;if(parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw)return true;}catch{}let suffix=0;do{destination=`${base}_${Date.now()}_${suffix++}`;if(suffix>1000)return false;}while(storageService.getItem(destination)!==null);}storageService.setItem(destination,JSON.stringify(envelope));const saved=storageService.getItem(destination);if(saved===null)return false;const parsed=JSON.parse(saved) as Record<string,unknown>;return parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw;}catch{return false;}}
+ private recoverCorruptSnapshot(sourceKey:string,raw:string,error:unknown):void{const reason=String(error instanceof Error?error.message:error).slice(0,500);if(this.quarantine(sourceKey,raw,reason)){if(this.writesBlocked)return;this.persistenceStatus='RECOVERED_QUARANTINED';this.persistenceReason=`${sourceKey}_QUARANTINED:${reason}`;if(sourceKey===KEY)this.issues.clear();}else this.blockStore(`${sourceKey}_QUARANTINE_FAILED:${reason}`);}
+ private parseIssueSnapshot(raw:string):DiscoveredIssue[]{const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed)||parsed.length>500)throw new Error('DISCOVERY_SNAPSHOT_INVALID_ROOT_OR_LIMIT');const ids=new Set<string>();const fingerprints=new Set<string>();for(const item of parsed){if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('DISCOVERY_SNAPSHOT_INVALID_RECORD');const row=item as Record<string,unknown>;if(typeof row.id!=='string'||!row.id.trim()||typeof row.fingerprint!=='string'||!row.fingerprint.trim()||typeof row.kind!=='string'||!ISSUE_KINDS.includes(row.kind as DiscoveredIssueKind)||typeof row.title!=='string'||!row.title.trim()||typeof row.detail!=='string'||typeof row.sourceId!=='string'||!row.sourceId.trim()||typeof row.priority!=='number'||!Number.isFinite(row.priority)||row.priority<0||row.priority>100||typeof row.discoveredAt!=='number'||!Number.isFinite(row.discoveredAt)||row.discoveredAt<0||typeof row.lastSeenAt!=='number'||!Number.isFinite(row.lastSeenAt)||row.lastSeenAt<0||typeof row.occurrences!=='number'||!Number.isInteger(row.occurrences)||row.occurrences<1)throw new Error('DISCOVERY_SNAPSHOT_INVALID_FIELDS');if(ids.has(row.id)||fingerprints.has(row.fingerprint))throw new Error('DISCOVERY_SNAPSHOT_DUPLICATE_IDENTITY');ids.add(row.id);fingerprints.add(row.fingerprint);for(const key of ['changeSetId','requirementContractId','improvementRunId','taskId','lastOutcome'])if(row[key]!==undefined&&typeof row[key]!=='string')throw new Error('DISCOVERY_SNAPSHOT_INVALID_OPTIONAL_STRING');for(const key of ['queuedAt','resolvedAt','nextRetryAt'])if(row[key]!==undefined&&(typeof row[key]!=='number'||!Number.isFinite(row[key])||(row[key] as number)<0))throw new Error('DISCOVERY_SNAPSHOT_INVALID_OPTIONAL_TIME');if(row.retryCount!==undefined&&(typeof row.retryCount!=='number'||!Number.isInteger(row.retryCount)||row.retryCount<0))throw new Error('DISCOVERY_SNAPSHOT_INVALID_RETRY_COUNT');if(row.exhausted!==undefined&&typeof row.exhausted!=='boolean')throw new Error('DISCOVERY_SNAPSHOT_INVALID_EXHAUSTED_FLAG');}return parsed as DiscoveredIssue[];}
+ private parseConfig(raw:string):DiscoveryConfig{const value:unknown=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('DISCOVERY_CONFIG_INVALID_ROOT');const merged={...DEFAULT_CONFIG,...value as Partial<DiscoveryConfig>};if(typeof merged.enabled!=='boolean'||typeof merged.intervalMinutes!=='number'||!Number.isInteger(merged.intervalMinutes)||merged.intervalMinutes<15||merged.intervalMinutes>10080||typeof merged.maxIssuesPerScan!=='number'||!Number.isInteger(merged.maxIssuesPerScan)||merged.maxIssuesPerScan<1||merged.maxIssuesPerScan>20||typeof merged.minimumPriority!=='number'||!Number.isInteger(merged.minimumPriority)||merged.minimumPriority<0||merged.minimumPriority>100)throw new Error('DISCOVERY_CONFIG_INVALID_FIELDS');return merged;}
+ private save():void{this.writeRaw(KEY,JSON.stringify(this.list(500)),'DISCOVERY_SNAPSHOT');}
+ private load():void{try{const raw=storageService.getItem(KEY);if(raw!==null){try{this.issues.clear();for(const item of this.parseIssueSnapshot(raw))this.issues.set(item.fingerprint,{...item});}catch(error){this.recoverCorruptSnapshot(KEY,raw,error);}}const configRaw=storageService.getItem(CONFIG_KEY);if(configRaw!==null){try{this.config=this.parseConfig(configRaw);}catch(error){this.recoverCorruptSnapshot(CONFIG_KEY,configRaw,error);this.config={...DEFAULT_CONFIG};}}}catch(error){this.blockStore(`DISCOVERY_STORE_READ_FAILED:${String(error instanceof Error?error.message:error)}`);}}
 }
 export const autonomousIssueDiscoveryService=new AutonomousIssueDiscoveryService();
