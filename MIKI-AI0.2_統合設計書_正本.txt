@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-21
-正本Revision：2026-10-21-P298
+正本Revision：2026-10-21-P299
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,13 +119,11 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-21-P298
+- 現行Revision: 2026-10-21-P299
 - 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
-- 実装索引: CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json
-- 索引対象: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル。
-- Production静的到達: 714ソースファイル。
-- 検査Script: 179ファイル。
-- 同名ファイル組: 147組。
+- 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
+- P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
+- 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
 
 ■ 不変条件
 - 一般Knowledge Gapは既存CORE TaskIngress／TaskBlackboardを使って調査する。通常周期は最大1件、深いスリープ周期は最大3件とし、指数バックオフと既存Task照合で重複投入を抑える。
@@ -153,9 +151,16 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - NATIVE_SOURCE: Android/Rust Nativeソース。実機成功を意味しない。
 - PARTIAL / NOT_CONNECTED / CONTRACT_READY / DEVICE_VERIFIEDは機能単位の状態として使用する。
 
-■ ファイル関係台帳（P287・能力細分類／重複Authority監査1789ファイル）
+■ 現行追跡ソースインベントリ（P299・Git追跡パス基準）
 
-- 現行正本は`SOURCE_FILE_RELATION_LEDGER_P287.json`、閲覧用の対応表は`SOURCE_FILE_RELATION_LEDGER_P287.md`。F001〜F1789の1,789レコードを単一JSONへ収録し、Markdownは同じ記録の閲覧版とする。
+- 現行スナップショットは`CURRENT_SOURCE_INVENTORY_P299.json`、閲覧用一覧は`CURRENT_SOURCE_INVENTORY_P299.md`。生成器は`scripts/audit_current_source_inventory_p299.py`。
+- P299生成結果：ソースファイル1386件、対象追跡パス1841件（監査制御ファイルを除外）。ECMAScriptの相対import候補3894件のうち、追跡パスへ解決された候補3875件、未解決候補19件。
+- ソース対象拡張子、SHA-256、バイト数、行数、および相対import候補の抽出方法はJSONのscopeに記録する。追加した生成器・JSON・Markdown自身は対象から除外するため、commit前後で件数が変動しない。
+- 相対importは字句的候補であり、未解決候補を自動的に不具合と判定しない。alias・条件付きimport・動的に生成される参照・実行時呼出し・意味上のAuthorityは証明しない。P97/P222の到達性指標とは別の集計である。
+- P287～P293の過去監査台帳は削除・上書きしない。現行一覧と過去のAuthority/重複監査根拠を分離して保持する。
+■ 過去スナップショット：ファイル関係台帳（P287・能力細分類／重複Authority監査1789ファイル）
+
+- P287当時の監査スナップショットは`SOURCE_FILE_RELATION_LEDGER_P287.json`、閲覧用の対応表は`SOURCE_FILE_RELATION_LEDGER_P287.md`。F001〜F1789の1,789レコードを単一JSONへ収録し、Markdownは同じ記録の閲覧版とする。これらの件数・判定はP287当時の基準であり、現行mainのファイル数や最新Authority状態を示すものではない。
 - P285 ZIP由来の基準スナップショット1,789ファイルを保全し、P286の全ファイル分類・重複監査を引き継いだうえで、`primaryFunctionalCapability`、`functionalCapabilityTags`、分類確度、分類根拠を追加した。能力細分類の語彙分類は、パス・purpose・export名の重み付きキーワードに基づく調査支援であり、実装の意味や実行時責務の証明とは扱わない。
 - 能力分類は、CORE＋17Domainの`architectureDomain`、技術/成果物カテゴリ`capabilityCategory`、成果物種別`artifactKind`、実装役割`implementationRole`、機能タグ`functionalCapabilityTags`の別軸で管理する。UI、Native、共有基盤、資料、設定、検証ツール、監査レポート、資産、参照プロジェクトは追加Domainとして数えない。
 - 重複・Authority監査では、バイト一致グループ4組、正規化ソース一致候補2組、同名basenameグループ156組／349レコード、`src/miki/`対`src/services/`同名ペア138組を個別管理する。クロス層ペアは純転送Facade 28組、高類似実装候補 91組、中類似 15組、低類似 4組。高類似候補のうち37組は双方がCORE/UIの静的import到達集合に含まれる。
@@ -12102,3 +12107,14 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - P297 PUSH後のGitHub Actions #887を確認し、ビルド前検証が`verify_autonomous_state_integrity_p296.mjs`内の「正本RevisionはP296固定」という古いassertionで止まることを確認した。P296検証は固定Revisionではなく、正本Revisionと現行Revisionの相互一致およびP296履歴の保持を検証するよう変更する。
 - `verify_runtime_failure_fixes.mjs`も固定Revision値への依存を外し、正本Revisionと現行Revisionの相互一致、およびP273/P274/P276-P279履歴の保持を検証する。次回Revision更新時にも同じ古いassertionが再発しないようにする。
 - P297取消復旧専用VerifierはWorkflowに接続されているが、#887ではP296検証が先に失敗したため未実行である。P298 PUSH後のActionsでP296復旧・P297取消復旧・Runtime検証を再確認する。Termuxではtest/lint/buildを実行せず、完全再帰tree件数も再集計していない。
+
+============================================================
+【2026-10-21-P299 現行追跡ソースインベントリの分離】
+============================================================
+
+- 現行追跡パスから定義済みソース拡張子の一覧を作り、パス・バイト数・行数・SHA-256を再集計する`scripts/audit_current_source_inventory_p299.py`を追加した。出力は`CURRENT_SOURCE_INVENTORY_P299.json`と閲覧版Markdownである。
+- 生成時点の集計：ソースファイル1386件、対象追跡パス1841件、相対import候補3894件、解決候補3875件、未解決候補19件。これは定義済み拡張子による現行一覧であり、P97/P222の分類・到達性基準と同じ母集団ではない。
+- 生成器・2つの出力ファイルは自身を集計から除外し、同じGit追跡パス・ファイル内容から決定論的に生成する。Workflowに`--check`を追加し、PUSH後CIでコミット済み一覧と再計算結果の一致を検査する。
+- P287の見出しと説明を過去スナップショットに改め、P287～P293の履歴台帳の内容・監査値は削除・上書きしない。P97実装索引とP222の分類値も歴史的基準と明示し、P299一覧を現行追跡パスの入口として追加する。
+- 相対import解析は字句的候補抽出であり、runtimeの呼出し、semantics、Authorityの証明ではない。未解決候補は自動的に不具合を意味しない。runtimeソース挙動は変更していない。
+- Termuxではtest/lint/buildを実行しない。CI、APK成果物、実機動作はPUSH後に実際の結果を確認して判定する。

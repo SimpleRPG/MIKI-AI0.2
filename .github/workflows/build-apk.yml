@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Verify current tracked source inventory P299
+        run: python scripts/audit_current_source_inventory_p299.py --check
+
       - name: Verify cognitive graph node identity and conversation edges
         timeout-minutes: 10
         run: |
