@@ -725,12 +725,13 @@ check(
   autonomousRevalidationIndexRow?.includes(`lines=${autonomousRevalidationLoop.split(/\r?\n/).length - 1}`) &&
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
+const canonicalHeaderRevision = design.match(/^正本Revision：(\d{4}-\d{2}-\d{2}-P\d+)$/m)?.[1];
+const canonicalCurrentRevision = design.match(/^- 現行Revision: (\d{4}-\d{2}-\d{2}-P\d+)$/m)?.[1];
 check(
-  'Canonical design retains P273/P274/P279 history under current P297 revision',
-  design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正') &&
+  'Canonical design revisions stay synchronized and retain P273/P274/P279 history',
+  Boolean(canonicalHeaderRevision && canonicalHeaderRevision === canonicalCurrentRevision) &&
+    design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正') &&
     design.includes('2026-10-16-P274 実行イベント由来の反実仮想測定と独立レビュー') &&
-    design.includes('正本Revision：2026-10-21-P297') &&
-    design.includes('現行Revision: 2026-10-21-P297') &&
     design.includes('2026-10-17-P276 自己台帳グラフ編集レイヤー') &&
     design.includes('2026-10-18-P277 認知状態の継続性・自律実行接続') &&
     design.includes('2026-10-18-P278 自律実行完了Receipt・Checkpoint復元境界') &&

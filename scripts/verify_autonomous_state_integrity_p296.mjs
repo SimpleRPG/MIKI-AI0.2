@@ -120,6 +120,8 @@ for (const [path, source] of [
   const lineCount = source.split(/\r?\n/).length - (source.endsWith('\n') ? 1 : 0);
   check(Boolean(row && row.includes(`lines=${lineCount}`)), `design line-count index matches ${path}`);
 }
-check(design.includes('正本Revision：2026-10-21-P296') && design.includes('現行Revision: 2026-10-21-P296'), 'canonical design revision is P296');
+const revisionHeader = design.match(/^正本Revision：(\d{4}-\d{2}-\d{2}-P\d+)$/m)?.[1];
+const currentRevision = design.match(/^- 現行Revision: (\d{4}-\d{2}-\d{2}-P\d+)$/m)?.[1];
+check(Boolean(revisionHeader && revisionHeader === currentRevision && design.includes('【2026-10-21-P296 自律エージェント永続状態の自己保全】')), 'canonical design revisions stay synchronized and P296 history remains');
 pass('canonical design line-count and revision contract');
 console.log(JSON.stringify({ phase: 'P296', status: 'PASS', checks: checks.length, checks }, null, 2));
