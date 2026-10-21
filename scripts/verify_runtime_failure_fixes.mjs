@@ -248,7 +248,7 @@ check(
     autonomousLoop.includes('private disposed = false;') &&
     autonomousLoop.includes('this.disposed = false;') &&
     autonomousLoop.includes('this.disposed = true;') &&
-    autonomousLoop.includes('if (this.disposed || this.running || this.state.queue.length === 0) return;') &&
+    autonomousLoop.includes('if (this.writesBlocked || this.disposed || this.running || this.state.queue.length === 0) return;') &&
     autonomousLoop.includes('private scheduleRecovery(delayOverrideMs?: number): void') &&
     autonomousLoop.includes('this.recoveryTimer = setTimeout(() => {') &&
     autonomousLoop.includes('Math.min(...nextAttemptAtValues)') &&
@@ -726,11 +726,11 @@ check(
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
 check(
-  'Canonical design retains P273/P274/P279 history under current P295 revision',
+  'Canonical design retains P273/P274/P279 history under current P297 revision',
   design.includes('2026-10-16-P273 反実仮想スコアの実測境界修正') &&
     design.includes('2026-10-16-P274 実行イベント由来の反実仮想測定と独立レビュー') &&
-    design.includes('正本Revision：2026-10-21-P295') &&
-    design.includes('現行Revision: 2026-10-21-P295') &&
+    design.includes('正本Revision：2026-10-21-P297') &&
+    design.includes('現行Revision: 2026-10-21-P297') &&
     design.includes('2026-10-17-P276 自己台帳グラフ編集レイヤー') &&
     design.includes('2026-10-18-P277 認知状態の継続性・自律実行接続') &&
     design.includes('2026-10-18-P278 自律実行完了Receipt・Checkpoint復元境界') &&

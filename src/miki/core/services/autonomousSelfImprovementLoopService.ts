@@ -30,6 +30,8 @@ export interface AutonomousImprovementRequest {
   createdAt: number;
   attempts: number;
   taskId?: string;
+  /** Durable cancel intent; must be reconciled before this request can execute. */
+  cancelRequested?: boolean;
   workspaceId?: string;
   resourceWaitCount?: number;
   evidenceWaitCount?: number;
@@ -111,6 +113,7 @@ class AutonomousSelfImprovementLoopService {
       try{this.save();}catch(error){systemLogger.error('PERSISTENCE','[AutonomousLoop] restart recovery stopped because state could not be verified',{error:String(error)});return;}
     }
     this.disposed = false;
+    try{this.reconcileCancellationRequests();}catch(error){systemLogger.warn('PERSISTENCE','[AutonomousLoop] durable cancellation intent remains pending after restart',{error:String(error instanceof Error?error.message:error)});this.scheduleRecovery(RECOVERY_POLL_MS);return;}
     this.scheduleRecovery();
   }
 
@@ -188,32 +191,69 @@ class AutonomousSelfImprovementLoopService {
 
   public getPersistenceState():AutonomousLoopPersistenceState{return {status:this.persistenceStatus,...(this.persistenceReason?{reason:this.persistenceReason}:{})};}
 
-  public cancelByRunId(runId: string): { cancelled: boolean; active: boolean } {
+  public cancelByRunId(runId: string): { cancelled: boolean; active: boolean; pending?: boolean } {
     this.assertWritable();
     const active = this.state.queue.find((item) => item.runId === runId && item.id === this.state.activeRequestId);
     if (active) return { cancelled: false, active: true };
-    const before = this.state.queue.length;
-    const cancelledTasks = this.state.queue
-      .filter((item) => item.runId === runId && item.taskId)
-      .map((item) => item.taskId as string);
-    this.state.queue = this.state.queue.filter((item) => item.runId !== runId);
-    for (const taskId of cancelledTasks) {
-      const task = taskBlackboardService.get(taskId);
-      if (task && !['COMPLETED', 'CANCELLED'].includes(task.status)) {
-        taskBlackboardService.cancel(taskId);
-      }
+    const selected = this.state.queue.filter(item => item.runId === runId);
+    if (selected.length === 0) return { cancelled: false, active: false };
+
+    // Persist intent before TaskBlackboard side effects so restart recovery can replay it safely.
+    const previousState = JSON.parse(JSON.stringify(this.state)) as AutonomousLoopState;
+    for (const request of this.state.queue) {
+      if (request.runId === runId) request.cancelRequested = true;
     }
-    const cancelled = before !== this.state.queue.length;
-    if (cancelled) {
-      if (this.state.queue.length === 0) {
-        this.state.status = 'IDLE';
-        this.state.activeRequestId = undefined;
-        this.state.retryAt = undefined;
-      }
-      this.state.lastReason = `DIRECTIVE_CANCELLED:${runId}`;
+    this.state.lastReason = 'CANCELLATION_INTENT_PERSISTED:' + runId;
+    try {
       this.save();
+    } catch (error) {
+      this.state = previousState;
+      throw error;
     }
-    return { cancelled, active: false };
+
+    try {
+      this.reconcileCancellationRequests();
+      return { cancelled: true, active: false };
+    } catch (error) {
+      systemLogger.warn('PERSISTENCE', '[AutonomousLoop] cancellation intent remains durable; reconciliation will retry', {
+        runId, error: String(error instanceof Error ? error.message : error),
+      });
+      this.scheduleRecovery(RECOVERY_POLL_MS);
+      return { cancelled: true, active: false, pending: true };
+    }
+  }
+
+  private reconcileCancellationRequests(): void {
+    this.assertWritable();
+    const pending = this.state.queue.filter(item => item.cancelRequested === true);
+    if (pending.length === 0) return;
+    const priorState = JSON.parse(JSON.stringify(this.state)) as AutonomousLoopState;
+    const pendingIds = new Set(pending.map(item => item.id));
+
+    // Repeated reconciliation is idempotent: terminal tasks are never reopened.
+    for (const request of pending) {
+      if (!request.taskId) continue;
+      const task = taskBlackboardService.get(request.taskId);
+      if (task && !['COMPLETED', 'CANCELLED'].includes(task.status)) {
+        taskBlackboardService.cancel(request.taskId);
+      }
+    }
+
+    this.state.queue = this.state.queue.filter(item => !pendingIds.has(item.id));
+    if (this.state.queue.length === 0) {
+      this.state.status = 'IDLE';
+      this.state.activeRequestId = undefined;
+      this.state.retryAt = undefined;
+    }
+    const lineage = [...new Set(pending.map(item => item.runId || item.id))].join(',').slice(0, 180);
+    this.state.lastReason = 'DIRECTIVE_CANCELLED:' + lineage;
+    try {
+      this.save();
+    } catch (error) {
+      // Preserve the intent in memory when the durable queue cannot acknowledge completion.
+      this.state = priorState;
+      throw error;
+    }
   }
 
   public resume(): void {
@@ -261,6 +301,11 @@ class AutonomousSelfImprovementLoopService {
     if (this.writesBlocked || this.running || this.state.queue.length === 0) {
       return;
     }
+    if (this.state.queue.some(item => item.cancelRequested === true)) {
+      try { this.reconcileCancellationRequests(); }
+      catch (error) { systemLogger.warn('PERSISTENCE', '[AutonomousLoop] retrying durable cancellation reconciliation', { error: String(error instanceof Error ? error.message : error) }); this.scheduleRecovery(RECOVERY_POLL_MS); return; }
+      if (this.writesBlocked || this.state.queue.length === 0) return;
+    }
     if (this.state.status === 'WAITING_RESOURCE') {
       await resourceGovernanceService.refresh();
       if (!resourceGovernanceService.canRunComponentTests()) {
@@ -283,9 +328,12 @@ class AutonomousSelfImprovementLoopService {
   }
 
   private async drain(): Promise<void> {
-    if (this.writesBlocked || this.running || this.state.queue.length === 0) {
-      return;
+    if (this.writesBlocked || this.running) return;
+    if (this.state.queue.some(item => item.cancelRequested === true)) {
+      try { this.reconcileCancellationRequests(); }
+      catch (error) { systemLogger.warn('PERSISTENCE', '[AutonomousLoop] refusing dispatch while cancellation intent remains pending', { error: String(error instanceof Error ? error.message : error) }); this.scheduleRecovery(RECOVERY_POLL_MS); return; }
     }
+    if (this.writesBlocked || this.state.queue.length === 0) return;
     this.running = true;
     let activeRequest: AutonomousImprovementRequest | undefined;
     try {
@@ -847,7 +895,7 @@ class AutonomousSelfImprovementLoopService {
 
   private quarantine(sourceKey:string,raw:string,reason:string):boolean{const base=`${sourceKey}_quarantine_v1`;const envelope={version:1,sourceKey,quarantinedAt:Date.now(),reason:reason.slice(0,500),raw};try{let destination=base;const existing=storageService.getItem(base);if(existing!==null){try{const parsed=JSON.parse(existing) as Record<string,unknown>;if(parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw)return true;}catch{}let suffix=0;do{destination=`${base}_${Date.now()}_${suffix++}`;if(suffix>1000)return false;}while(storageService.getItem(destination)!==null);}storageService.setItem(destination,JSON.stringify(envelope));const saved=storageService.getItem(destination);if(saved===null)return false;const parsed=JSON.parse(saved) as Record<string,unknown>;return parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw;}catch{return false;}}
 
-  private parseState(raw:string):AutonomousLoopState{const value:unknown=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_ROOT');const parsed=value as Record<string,unknown>;const validStatuses:AutonomousLoopStatus[]=['IDLE','RUNNING','WAITING_RESOURCE','WAITING_EVIDENCE','PAUSED','FAILED'];if(typeof parsed.status!=='string'||!validStatuses.includes(parsed.status as AutonomousLoopStatus)||!Array.isArray(parsed.queue)||parsed.queue.length>10000||typeof parsed.updatedAt!=='number'||!Number.isFinite(parsed.updatedAt)||parsed.updatedAt<0)throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_SHAPE');const ids=new Set<string>();for(const item of parsed.queue){if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID');const request=item as Record<string,unknown>;if(typeof request.id!=='string'||!request.id.trim()||ids.has(request.id)||typeof request.trigger!=='string'||!request.trigger.trim()||!['AUTOPILOT','UI','EXECUTION','SYSTEM'].includes(String(request.source))||typeof request.createdAt!=='number'||!Number.isFinite(request.createdAt)||request.createdAt<0||typeof request.attempts!=='number'||!Number.isInteger(request.attempts)||request.attempts<0)throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_FIELDS');ids.add(request.id);for(const key of ['runId','strategyId','strategyName','runType','sourceId','taskId','workspaceId','waitReason','changeSetId'])if(request[key]!==undefined&&typeof request[key]!=='string')throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_STRING');for(const key of ['priority','resourceWaitCount','evidenceWaitCount','nextAttemptAt'])if(request[key]!==undefined&&(typeof request[key]!=='number'||!Number.isFinite(request[key])||(request[key] as number)<0))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_NUMBER');for(const key of ['resourceWaitCount','evidenceWaitCount'])if(request[key]!==undefined&&!Number.isInteger(request[key]))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_COUNT');if(request.waitKind!==undefined&&!['RESOURCE','EVIDENCE','RETRY'].includes(String(request.waitKind)))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_KIND');if(request.payload!==undefined&&(!request.payload||typeof request.payload!=='object'||Array.isArray(request.payload)))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_PAYLOAD');}for(const key of ['activeRequestId','lastTaskId','lastReason'])if(parsed[key]!==undefined&&typeof parsed[key]!=='string')throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_OPTIONAL_STRING');if(parsed.retryAt!==undefined&&(typeof parsed.retryAt!=='number'||!Number.isFinite(parsed.retryAt)||(parsed.retryAt as number)<0))throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_RETRY_AT');return parsed as unknown as AutonomousLoopState;}
+  private parseState(raw:string):AutonomousLoopState{const value:unknown=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_ROOT');const parsed=value as Record<string,unknown>;const validStatuses:AutonomousLoopStatus[]=['IDLE','RUNNING','WAITING_RESOURCE','WAITING_EVIDENCE','PAUSED','FAILED'];if(typeof parsed.status!=='string'||!validStatuses.includes(parsed.status as AutonomousLoopStatus)||!Array.isArray(parsed.queue)||parsed.queue.length>10000||typeof parsed.updatedAt!=='number'||!Number.isFinite(parsed.updatedAt)||parsed.updatedAt<0)throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_SHAPE');const ids=new Set<string>();for(const item of parsed.queue){if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID');const request=item as Record<string,unknown>;if(typeof request.id!=='string'||!request.id.trim()||ids.has(request.id)||typeof request.trigger!=='string'||!request.trigger.trim()||!['AUTOPILOT','UI','EXECUTION','SYSTEM'].includes(String(request.source))||typeof request.createdAt!=='number'||!Number.isFinite(request.createdAt)||request.createdAt<0||typeof request.attempts!=='number'||!Number.isInteger(request.attempts)||request.attempts<0)throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_FIELDS');ids.add(request.id);for(const key of ['runId','strategyId','strategyName','runType','sourceId','taskId','workspaceId','waitReason','changeSetId'])if(request[key]!==undefined&&typeof request[key]!=='string')throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_STRING');for(const key of ['priority','resourceWaitCount','evidenceWaitCount','nextAttemptAt'])if(request[key]!==undefined&&(typeof request[key]!=='number'||!Number.isFinite(request[key])||(request[key] as number)<0))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_NUMBER');for(const key of ['resourceWaitCount','evidenceWaitCount'])if(request[key]!==undefined&&!Number.isInteger(request[key]))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_COUNT');if(request.waitKind!==undefined&&!['RESOURCE','EVIDENCE','RETRY'].includes(String(request.waitKind)))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_KIND');if(request.cancelRequested!==undefined&&typeof request.cancelRequested!=='boolean')throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_CANCEL_REQUEST');if(request.payload!==undefined&&(!request.payload||typeof request.payload!=='object'||Array.isArray(request.payload)))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_PAYLOAD');}for(const key of ['activeRequestId','lastTaskId','lastReason'])if(parsed[key]!==undefined&&typeof parsed[key]!=='string')throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_OPTIONAL_STRING');if(parsed.retryAt!==undefined&&(typeof parsed.retryAt!=='number'||!Number.isFinite(parsed.retryAt)||(parsed.retryAt as number)<0))throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_RETRY_AT');return parsed as unknown as AutonomousLoopState;}
 
   private save(): void {
     this.assertWritable();

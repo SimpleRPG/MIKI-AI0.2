@@ -50,6 +50,7 @@ jobs:
           npm run verify:graph-answer-pipeline:p216
           npx tsx scripts/verify_capability_ledger_graph_storage_p295.mjs
           npx tsx scripts/verify_autonomous_state_integrity_p296.mjs
+          npx tsx scripts/verify_autonomous_cancel_recovery_p297.mjs
 
       - name: Build Web Application
         env:
