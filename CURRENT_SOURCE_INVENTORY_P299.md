@@ -12,8 +12,8 @@
 | 対象追跡パス（監査制御ファイルを除く） | 1841 |
 | ソースファイル | 1386 |
 | 相対import候補を字句走査したECMAScriptファイル | 1299 |
-| 相対import候補 | 3894 |
-| 追跡パスへ解決できた候補 | 3875 |
+| 相対import候補 | 3898 |
+| 追跡パスへ解決できた候補 | 3879 |
 | 未解決候補（即不具合判定ではない） | 19 |
 
 ## ファイル一覧
@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 76923 | 1141 | `7218c028e9caad96c4a990aa706e44628f8b48d075728380a7f856d9f7578dae` | 5 | 0 | 5 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 80962 | 1192 | `46f881b890c54cfcd2aefbe52afab1059514e2fe121ae22779808a748a5f129c` | 5 | 0 | 5 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -623,7 +623,7 @@
 | `src/miki/core/services/blackboardRecoveryService.ts` | 809 | 6 | `997dc830c65b6d4eb613e4f5e896b6e5a73280825799f542408f1e78297ada8f` | 1 | 1 | 0 |
 | `src/miki/core/services/bodyTypeTrendService.ts` | 3381 | 14 | `ec7b217df647446c94fc89e3359eda56588cd56bb5962921558a5073a2506914` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateAutoRebaseService.ts` | 2849 | 14 | `b5affca11da61a5b228a5cdef665265b6542eedc66f5204bbdbdf220d851447d` | 1 | 1 | 0 |
-| `src/miki/core/services/candidateCodeGenerationService.ts` | 64910 | 1588 | `06f75483ea677d1af9672e624e67e47d216d7c7d34d4ec83f1aab9fea00d6a26` | 27 | 27 | 0 |
+| `src/miki/core/services/candidateCodeGenerationService.ts` | 65103 | 1590 | `b1d777e0c93cd58887d5b1243a3aaa6bcdc78700c3348776beb7c2a9b03c8d1b` | 27 | 27 | 0 |
 | `src/miki/core/services/candidateCommitTransactionService.ts` | 8546 | 45 | `dd728868bf808fbc399d5203fd8e50d0661103323641b9d6ebfe2d55dc62c32e` | 2 | 2 | 0 |
 | `src/miki/core/services/candidateConstraintValidationService.ts` | 3013 | 9 | `917b44e4bf12c864b2694cd9be514f6e4780ef875462d3ab526a69f84cb36b06` | 3 | 3 | 0 |
 | `src/miki/core/services/candidateEditCollisionService.ts` | 1693 | 10 | `357bc26fc788fe39fd004c26bf410c0e043ef8a30bf32cd6f280fdeac404a12b` | 1 | 1 | 0 |
@@ -944,7 +944,7 @@
 | `src/miki/research/services/researchQueryOutcomeLearningService.ts` | 7408 | 174 | `543efdc6ea5bb29aa75d25a17ef0852f9071b23c18fb9db340406b4149990345` | 4 | 4 | 0 |
 | `src/miki/research/services/researchQueryPlanningService.ts` | 11855 | 45 | `8c32e10dbc345b638a64b1825a34f78f675b8665eec349b7f331a8a1831e17d6` | 4 | 4 | 0 |
 | `src/miki/research/services/researchRustKernelService.ts` | 743 | 1 | `1c5a5779394b2d6cec5c45272f6b45c5e545839941698f57ef12b1c6b105dd26` | 0 | 0 | 0 |
-| `src/miki/research/services/researchService.ts` | 33791 | 689 | `a67b5f56da79d4c59d1159431f16fe5ac149ac3e84316724a72202ca5dac82ff` | 13 | 13 | 0 |
+| `src/miki/research/services/researchService.ts` | 36493 | 766 | `a5b5ad2ea58f6d23628b943a3fdcb1ebe4292316e6b7499414c40eb14766190d` | 13 | 13 | 0 |
 | `src/miki/research/services/researchStrategyService.ts` | 7383 | 158 | `88dd12e1c20638c1f2226a95baf76ddf73bbfb7d3de5febd18df8faba89cfb40` | 2 | 2 | 0 |
 | `src/miki/research/services/researchToRemediationService.ts` | 9504 | 160 | `ae43b1232c993a77e121d3a9d0acd531464b5abb03c9ff34cde470372815bdf6` | 11 | 11 | 0 |
 | `src/miki/research/services/scienceExperimentService.ts` | 91 | 1 | `fc0d87a8a20d520482fb266f36bb9036f47e052a07084de6bb1fd4c78213c908` | 1 | 1 | 0 |
@@ -963,7 +963,7 @@
 | `src/miki/safety/services/bannedTopicsConfigService.ts` | 4950 | 154 | `16d1067ee9262d20600582a6047d7ee217b8fa6dc2cc90781093f37191d9241b` | 2 | 2 | 0 |
 | `src/miki/safety/services/canaryDeploymentSafetyService.ts` | 6373 | 169 | `df6bd5d5c2f14f3ee57872e4183ca12e305c330b52e8f25ebda9f57ba8a1a427` | 2 | 2 | 0 |
 | `src/miki/safety/services/cloudAiRestrictedGatewayService.ts` | 10085 | 260 | `cabb2587743a9accdff5a6355074b3b149436d04802ff45359a49c6a0877c749` | 5 | 5 | 0 |
-| `src/miki/safety/services/conversationCoreService.ts` | 44821 | 754 | `12fdd0871d12b47dfe09c64010007ad15490dd38d141cc47551fa87efec5e9be` | 46 | 46 | 0 |
+| `src/miki/safety/services/conversationCoreService.ts` | 47850 | 823 | `93598819beb673a397f0557b2129cf1c3c0726f3a5d727a6d528e20d6541b94d` | 48 | 48 | 0 |
 | `src/miki/safety/services/deterministicRuntimePolicyService.ts` | 1844 | 51 | `7f804d9cb8eca28a98971c8eb9f7ddfb695be9472419795a63afa9841bd69371` | 0 | 0 | 0 |
 | `src/miki/safety/services/deterministicRuntimeService.ts` | 5479 | 93 | `79701428e5328e2764e2d249d97f21f03a7b76dcf301a16cd9319d25aaf6b5d8` | 2 | 2 | 0 |
 | `src/miki/safety/services/failureRecoveryService.ts` | 3866 | 75 | `8b67f07f1f88425654fb84f478a46fe8a251b81fe01ab0e21117776b2877f86f` | 5 | 5 | 0 |
@@ -1248,7 +1248,7 @@
 | `src/miki/verification/services/userFeedbackGovernanceService.ts` | 1556 | 51 | `d80e440f465746b386938ab96e4ff18c538174c7ad071934991cd784104f7e96` | 1 | 1 | 0 |
 | `src/miki/verification/services/vbaStaticVerifierService.ts` | 24756 | 638 | `3f0cd3b2a8d9932e7898105b1f6a4169ee495f7bf753d2893faf326d0af9072d` | 1 | 1 | 0 |
 | `src/miki/verification/services/verificationGraphConnectorP211Service.ts` | 538 | 6 | `fc3c6b3bf508fc9e5c3354600a4e16af25307d39c9f557aa4ac7206f99d9b29e` | 2 | 2 | 0 |
-| `src/miki/verification/services/verifierService.ts` | 6589 | 174 | `49bada1efa56880d115d943b9a6432c8da0f7572b548b7b60d311fc36250a830` | 5 | 5 | 0 |
+| `src/miki/verification/services/verifierService.ts` | 6647 | 174 | `0a14920b0d65d1c497119c6d016c3e26d714f341a15fe7256598902d3e0b0c42` | 5 | 5 | 0 |
 | `src/services/abstractSanitizerService.ts` | 264 | 6 | `235bcac1db7b4a79176502d385c5a92b81c8108e9fd6fede556cd9207891f101` | 1 | 1 | 0 |
 | `src/services/affectionDynamicsService.ts` | 278 | 6 | `a673276fab51b45c20c8159165a3739b89bc465fcc753eea7098f80edd4ec1a1` | 1 | 1 | 0 |
 | `src/services/androidNativeRunnerAdapterService.ts` | 5649 | 119 | `a2ff48eae613287473b41fc214a2e2970a6615533bce5817ef96da2a38735a7e` | 2 | 2 | 0 |
@@ -1347,7 +1347,7 @@
 | `src/services/nativeWorkManagerService.ts` | 4141 | 140 | `955c36b0091932eaa0f5c3b0ad6fa4ad60cd74a322c25522766843676c85d1fa` | 1 | 1 | 0 |
 | `src/services/nonBlockingStartupP156Service.ts` | 924 | 3 | `bdc8d46356d3e4326400f133da31f302766522931e84b5c1cbe98095aa820bb2` | 0 | 0 | 0 |
 | `src/services/nonLlmCodeSynthesisService.ts` | 1761 | 27 | `a971e4f3eb5704f8df5cdbcb2ba8eba826127a8e9e5d1d3c9f3e32c8322ea8ac` | 4 | 4 | 0 |
-| `src/services/nonLlmCoreService.ts` | 24526 | 491 | `11ba8f1bc652d07b4b57e039f365a4720d716b060787ffb6d729ca9a8f25bd4c` | 29 | 29 | 0 |
+| `src/services/nonLlmCoreService.ts` | 27559 | 560 | `85727b459b3d1262fbf1d3c036a088c04f28dd09d5e146eafd861067d9dcfece` | 31 | 31 | 0 |
 | `src/services/nonLlmHardwarePipelineService.ts` | 274 | 6 | `a50a3d2ee3db5528e201170046ad77d9332056c2768acd5b08eb1cbda6be8d8a` | 1 | 1 | 0 |
 | `src/services/nonLlmRuntimeService.ts` | 5398 | 93 | `22f89789cebf455df5ee46e366e4f973188939d7cbbfcc5c8bab6121d9e99571` | 2 | 2 | 0 |
 | `src/services/operationalConformanceService.ts` | 77 | 1 | `11cd98cfdc4bddcb9333c76b167d9aef3fcb5e22042a4ba7dade720dcabd93f5` | 1 | 1 | 0 |

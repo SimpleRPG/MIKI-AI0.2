@@ -48,6 +48,7 @@ export interface ResearchResult {
   continuationRound?: number;
   routes?: ResearchRoute[];
   localClaimIds?: string[];
+  learnedTermComponentClaims?: Array<{ componentId: string; claimId: string }>;
 }
 
 /**
@@ -154,6 +155,31 @@ export class ResearchService {
     const claimIds: string[] = [];
     const requiredResearchClaimIds: string[] = [];
     const learnedTermComponentIds: string[] = [];
+    const learnedTermComponentClaims: Array<{ componentId: string; claimId: string }> = [];
+    const claimIdByNormalizedStatement = new Map<string, string>();
+    const reusablePriorClaimStatuses = new Set(['UNVERIFIED', 'SUPPORTED']);
+
+    for (const existingClaim of claimDatabaseService.listClaims({
+      world: 'REAL',
+      kind: 'FACT_CLAIM',
+      excludeSuperseded: true,
+    })) {
+      const normalized = this.normalizeClaimStatement(existingClaim.statement);
+
+      if (
+        existingClaim.source !== 'web_search' ||
+        normalized.length < 15 ||
+        !reusablePriorClaimStatuses.has(String(existingClaim.status)) ||
+        Object.keys(existingClaim.scope || {}).length !== 0 ||
+        claimDatabaseService.getBeliefStatus(existingClaim.claim_id) !== 'ACTIVE'
+      ) {
+        continue;
+      }
+
+      if (!claimIdByNormalizedStatement.has(normalized)) {
+        claimIdByNormalizedStatement.set(normalized, existingClaim.claim_id);
+      }
+    }
     const searchResults: ResearchSearchResult[] = [];
 
     knowledgeGapService.buildResolutionPlan(gap);
@@ -330,6 +356,9 @@ export class ResearchService {
         const readResults = await unifiedWebResearchService.readSearchResultPages(passQuery, results, {
           maxPages: maxPagesPerPass,
         });
+        const isCounterEvidencePass =
+          queryPlan.status === 'READY' &&
+          queryPlan.queries[pass]?.intentType === 'COUNTEREVIDENCE';
 
         for (const page of readResults) {
           if (!page.success || !page.text.trim()) continue;
@@ -370,35 +399,54 @@ export class ResearchService {
           });
           evidence.push(pageEvidence);
 
-          if (pageEvidence.status !== 'REJECTED') {
+          if (pageEvidence.status === 'REJECTED') continue;
+
+          // Page Evidence can support a snippet Claim only when the normalized
+          // statement is actually present in the fetched page text.
+          const pageClaimStatement = (page.result.claimText || page.result.snippet || content.slice(0, 1000)).trim();
+          const normalizedPageStatement = this.normalizeClaimStatement(pageClaimStatement);
+          const normalizedPageContent = this.normalizeClaimStatement(content);
+          let pageClaimId: string | undefined;
+
+          if (
+            normalizedPageStatement.length >= 15 &&
+            normalizedPageContent.includes(normalizedPageStatement)
+          ) {
+            pageClaimId = this.linkResearchEvidenceToClaim(
+              pageEvidence.evidence_id,
+              pageClaimStatement,
+              claimIdByNormalizedStatement,
+              !isCounterEvidencePass,
+            );
+            if (pageClaimId && !claimIds.includes(pageClaimId)) {
+              claimIds.push(pageClaimId);
+            }
+          }
+
+          // Page-derived term knowledge retains Claim lineage. No linked Claim
+          // means no term component is presented as research-backed knowledge.
+          if (pageClaimId && pageEvidence.status !== 'REJECTED') {
             const termLearning = webTermLearningService.learnPage({
               text: content,
               url: page.url,
               evidenceId: pageEvidence.evidence_id,
+              claimIds: [pageClaimId],
               sourceTitle: page.result.title,
             });
+
             for (const componentId of termLearning.componentIds) {
               if (!learnedTermComponentIds.includes(componentId)) {
                 learnedTermComponentIds.push(componentId);
               }
+              if (!learnedTermComponentClaims.some(
+                item => item.componentId === componentId && item.claimId === pageClaimId
+              )) {
+                learnedTermComponentClaims.push({ componentId, claimId: pageClaimId });
+              }
             }
-          }
-
-          if (pageEvidence.status === 'REJECTED') continue;
-          // The page itself is evidence; keep the claim conservative by using the
-          // original search snippet when available rather than treating the whole page as one fact.
-          const pageClaimStatement = (page.result.claimText || page.result.snippet || content.slice(0, 1000)).trim();
-          const normalizedPageStatement = this.normalizeClaimStatement(pageClaimStatement);
-          if (!pageClaimStatement) continue;
-          let pageClaimId = evidenceService.registerUnverifiedClaim(pageEvidence.evidence_id, pageClaimStatement);
-          if (pageClaimId && !claimIds.includes(pageClaimId)) claimIds.push(pageClaimId);
-          if (!pageClaimId && normalizedPageStatement) {
-            // Claim linkage is intentionally deferred to the normal search-evidence pass below.
           }
         }
 
-        let canonicalClaimId: string | undefined;
-        let canonicalStatement = '';
 
         for (const result of results) {
         const record = evidenceService.recordWebEvidence({
@@ -431,21 +479,14 @@ export class ResearchService {
         const statement = (result.claimText || result.snippet).trim();
         const normalizedStatement = this.normalizeClaimStatement(statement);
 
-        // Conservative grouping: only evidence with the same normalized statement
-        // is attached to one Claim. Different wording creates a separate Claim,
-        // so the verifier never assumes semantic agreement from mere co-occurrence.
-        let claimId: string | undefined;
-        if (canonicalClaimId && normalizedStatement === canonicalStatement) {
-          if (evidenceService.attachEvidenceToClaim(record.evidence_id, canonicalClaimId)) {
-            claimId = canonicalClaimId;
-          }
-        } else {
-          claimId = evidenceService.registerUnverifiedClaim(record.evidence_id, statement);
-          if (claimId && !canonicalClaimId) {
-            canonicalClaimId = claimId;
-            canonicalStatement = normalizedStatement;
-          }
-        }
+        // Only exact normalized statement matches may share a Claim. Explicit
+        // counterevidence runs are isolated from positive-source Claim pooling.
+        const claimId = this.linkResearchEvidenceToClaim(
+          record.evidence_id,
+          statement,
+          claimIdByNormalizedStatement,
+          !isCounterEvidencePass,
+        );
 
         if (claimId && !claimIds.includes(claimId)) claimIds.push(claimId);
 
@@ -540,14 +581,20 @@ export class ResearchService {
         key: `knowledge-gap:${gap.id}`,
         action: 'adaptive_research_round',
         input: baseQuery,
-        outcome: resolved ? 'SUCCESS' : 'FAILURE',
+        outcome: resolved
+          ? 'SUCCESS'
+          : evidence.some(item => item.status !== 'REJECTED')
+            ? 'BLOCKED'
+            : 'FAILURE',
         verified: resolved,
         concepts: [gap.type, continuationReason || 'INSUFFICIENT_VERIFICATION'],
         lesson: resolved
           ? 'Research evidence was independently verified and promoted.'
-          : continuationAvailable
-            ? 'Research requires another CORE cycle with a new evidence query.'
-            : continuationReason || 'Research stopped without sufficient verification.'
+          : evidence.some(item => item.status !== 'REJECTED')
+            ? 'Evidence was collected; explicit CORE verification is still required.'
+            : continuationAvailable
+              ? 'Research requires another CORE cycle with a new evidence query.'
+              : continuationReason || 'Research stopped without sufficient verification.'
       });
 
       if (searchResults.length > 0 || summary) {
@@ -582,13 +629,14 @@ export class ResearchService {
               ? (coverageSatisfied ? 'NOT_FOUND_AFTER_COVERAGE' : 'INSUFFICIENT_SEARCH')
               : (roundsCompleted > 0 ? 'NO_RESULT' : 'SOURCE_UNAVAILABLE');
 
-      researchStrategyService.recordOutcome(gap.type, 'WEB_SEARCH', resolved, Date.now() - startedAt);
+      researchStrategyService.recordOutcome(gap.type, 'WEB_SEARCH', evidence.some(item => item.status !== 'REJECTED'), Date.now() - startedAt);
       return {
         gapId: gap.id,
         results: [],
         route: 'WEB_SEARCH',
         routes: ['LOCAL_CLAIM', 'WEB_SEARCH'],
         localClaimIds,
+        learnedTermComponentClaims,
         performed: evidence.some((e) => e.status !== 'REJECTED'),
         evidence,
         claimIds,
@@ -639,6 +687,35 @@ export class ResearchService {
         reason: '調査中にエラーが発生したため、Knowledge GapをBLOCKEDにしました。',
       };
     }
+  }
+
+  private linkResearchEvidenceToClaim(
+    evidenceId: string,
+    statement: string,
+    claimIdByNormalizedStatement: Map<string, string>,
+    reuseExisting = true,
+  ): string | undefined {
+    const normalized = this.normalizeClaimStatement(statement);
+    if (normalized.length < 15) return undefined;
+
+    // Counterevidence remains a separately inspectable Claim; it must not
+    // silently join an existing positive-support Claim.
+    if (!reuseExisting) {
+      return evidenceService.registerUnverifiedClaim(evidenceId, statement);
+    }
+
+    const existingClaimId = claimIdByNormalizedStatement.get(normalized);
+    if (existingClaimId) {
+      return evidenceService.attachEvidenceToClaim(evidenceId, existingClaimId)
+        ? existingClaimId
+        : undefined;
+    }
+
+    const createdClaimId = evidenceService.registerUnverifiedClaim(evidenceId, statement);
+    if (createdClaimId) {
+      claimIdByNormalizedStatement.set(normalized, createdClaimId);
+    }
+    return createdClaimId;
   }
 
   private normalizeClaimStatement(text: string): string {

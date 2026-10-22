@@ -72,7 +72,7 @@ export class VerifierService {
     const executionEvidence = this.collectEvidence(params.claimId, params.executionEvidenceIds)
       .filter((e) => e.kind === 'EXECUTION');
 
-    const admissible = evidence.filter((e) => e.status === 'ADMISSIBLE');
+    const admissible = evidence.filter((e) => e.status === 'ADMISSIBLE' && e.metadata?.research_source_role !== 'COUNTEREVIDENCE');
     const independentClusters = new Set(admissible.map((e) => e.independence_cluster_id));
     const contradictionCount = (claim.contradicted_by || []).filter((id) => {
       const other = claimDatabaseService.getClaim(id);

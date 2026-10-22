@@ -19,6 +19,8 @@ import { systemLogger } from './systemLogger';
 import { unifiedWebResearchService } from '../miki/research/services/unifiedWebResearchService';
 import { knowledgeGapService } from './knowledgeGapService';
 import { researchService } from './researchService';
+import { verifierService } from '../miki/verification/services/verifierService';
+import { reusableComponentFactoryService } from '../miki/core/services/reusableComponentFactoryService';
 import { capabilityReuseService } from './capabilityReuseService';
 import { failureMemoryService } from './failureMemoryService';
 import { japaneseAnalysisService } from './japaneseAnalysisService';
@@ -315,23 +317,90 @@ export class NonLlmCoreService {
           researchEvidenceCount = research.evidence.length;
           researchSummary = research.summary;
           stages.research = Math.round(performance.now() - t);
-          const promoted = research.verification?.find((v) => v.promoted);
-          if (promoted) {
+          const requireFreshResearch = /(?:最新|今日|本日|現在|latest|today|current|recent)/i.test(prompt);
+          const verification = verifierService.verifyMany({
+            claimIds: research.claimIds,
+            requireFresh: requireFreshResearch,
+            maxAgeDays: requireFreshResearch ? 30 : undefined,
+          });
+          research.verification = verification;
+
+          const allResearchClaimsVerified =
+            research.claimIds.length > 0 &&
+            verification.length === research.claimIds.length &&
+            verification.every(result =>
+              result.outcome === 'SUPPORTED' || result.outcome === 'DEVICE_VERIFIED'
+            );
+
+          research.resolved = allResearchClaimsVerified;
+          const promoted = verification.find(result => result.promoted);
+
+          for (const verifiedClaim of verification.filter(result => result.promoted)) {
             verifiedKnowledgePromotionService.initialize();
-            const promotion = verifiedKnowledgePromotionService.promote({ gap, claimId: promoted.claimId, sourceRequestId: compiled.requestId });
+            const promotion = verifiedKnowledgePromotionService.promote({
+              gap,
+              claimId: verifiedClaim.claimId,
+              sourceRequestId: compiled.requestId,
+            });
             if (promotion) {
-              verifiedKnowledgePromotionService.recordIntoContinuum(promotion, mikiUnifiedLearningContinuumService);
-              // 検証済みClaimを実行可能Componentへ直接昇格させず、
-              // 次回計画で利用可能な「知識能力」へ安全に昇格する。
+              verifiedKnowledgePromotionService.recordIntoContinuum(
+                promotion,
+                mikiUnifiedLearningContinuumService
+              );
+              // Verified facts become reusable knowledge; they are not
+              // directly converted into executable code Components.
               verifiedCapabilityPromotionService.promote(promotion);
             }
           }
+          for (const term of research.learnedTermComponentClaims || []) {
+            const termClaimVerification = verification.find(
+              result => result.claimId === term.claimId
+            );
+            if (!termClaimVerification?.promoted) continue;
+
+            reusableComponentFactoryService.verifyResearchKnowledge(
+              term.componentId,
+              [term.claimId],
+              {
+                requireFresh: requireFreshResearch,
+                maxAgeDays: requireFreshResearch ? 30 : undefined,
+              }
+            );
+          }
+
+          // A single verified result can answer a question, but the whole Gap
+          // is resolved only when every Claim attached to it passes Verification.
+          if (allResearchClaimsVerified) {
+            knowledgeGapService.advanceResolutionPlan(gap.id, 'RESOLVE');
+            knowledgeGapService.markResolved(gap.id);
+          }
+
+          mikiUnifiedLearningContinuumService.observe({
+            domain: 'research',
+            key: `knowledge-gap:${gap.id}`,
+            action: 'core_research_verification',
+            input: prompt,
+            outcome: allResearchClaimsVerified ? 'SUCCESS' : promoted ? 'BLOCKED' : 'FAILURE',
+            verified: allResearchClaimsVerified,
+            concepts: [
+              `claims:${research.claimIds.length}`,
+              `promoted:${verification.filter(result => result.promoted).length}`,
+            ],
+            lesson: allResearchClaimsVerified
+              ? 'All linked research Claims passed CORE Verification.'
+              : promoted
+                ? 'Some Claims are reusable, but the overall Knowledge Gap remains open.'
+                : 'Collected web evidence did not meet CORE Verification requirements.',
+          });
+
           if (promoted) {
             verifiedResearchClaimId = promoted.claimId;
             verifiedResearchOutcome = promoted.outcome === 'DEVICE_VERIFIED' ? 'DEVICE_VERIFIED' : 'SUPPORTED';
             status = 'RESOLVED';
             reason = 'verified_after_research';
-            researchNextAction = 'Evidence検証を通過したClaimを保存しました。以後は検証状態とスコープを維持して再利用します。';
+            researchNextAction = allResearchClaimsVerified
+              ? 'Gapに紐づく全ClaimがVerifierを通過しました。検証状態とスコープを維持して再利用します。'
+              : '回答に使えるClaimは検証を通過しましたが、Gap全体は未解決のまま保持し、残りのClaimを調査します。';
           } else {
             researchNextAction = '検索結果は取得できましたが、検証条件を満たさないため、追加証拠・実験が必要です。';
             reason = `${reason}; research=${research.route}; evidence=${researchEvidenceCount}`;

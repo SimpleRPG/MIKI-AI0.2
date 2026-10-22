@@ -73,6 +73,14 @@ const requiredAssetAcquisition = read('src/miki/core/services/requiredAssetAcqui
 const missingAssetSynthesis = read('src/miki/core/services/missingAssetSynthesisService.ts');
 const autonomousRevalidationLoop = read('src/miki/autonomy/services/autonomousRevalidationLoopService.ts');
 const domainIntegrationBootstrap = read('src/miki/core/services/domainIntegrationBootstrapService.ts');
+const researchPipelineSource = read('src/miki/research/services/researchService.ts');
+const claimVerifierSource = read('src/miki/verification/services/verifierService.ts');
+const legacyConversationCoreSource = read('src/services/nonLlmCoreService.ts');
+const currentConversationCoreSource = read('src/miki/safety/services/conversationCoreService.ts');
+const researchServiceIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/research/services/researchService.ts |'));
+const claimVerifierIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/verification/services/verifierService.ts |'));
+const legacyConversationCoreIndexRow = design.split(/\r?\n/).find(line => line.includes('src/services/nonLlmCoreService.ts |'));
+const currentConversationCoreIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/safety/services/conversationCoreService.ts |'));
 const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
 const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
 const candidateCodeGeneration = read('src/miki/core/services/candidateCodeGenerationService.ts');
@@ -720,6 +728,37 @@ check(
     domainIntegrationBootstrap.includes("knowledgeGapService.advanceResolutionPlan(researchGapId, 'RESOLVE')") &&
     domainIntegrationBootstrap.includes('knowledgeGapService.markResolved(researchGapId)') &&
     domainIntegrationBootstrap.includes('knowledgeGapResolved')
+);
+check(
+  'Web Claims aggregate only exact normalized statements and verify fetched-page support conservatively',
+  researchPipelineSource.includes('const claimIdByNormalizedStatement = new Map<string, string>();') &&
+    researchPipelineSource.includes('this.linkResearchEvidenceToClaim(record.evidence_id, statement, claimIdByNormalizedStatement, !isCounterEvidencePass)') &&
+    researchPipelineSource.includes('normalizedPageContent.includes(normalizedPageStatement)') &&
+    researchPipelineSource.includes('claimIds: [pageClaimId]') &&
+    researchPipelineSource.includes('learnedTermComponentClaims')
+);
+check(
+  'Counterevidence is excluded from affirmative Claim promotion',
+  claimVerifierSource.includes("e.metadata?.research_source_role !== 'COUNTEREVIDENCE'") &&
+    researchPipelineSource.includes('!isCounterEvidencePass')
+);
+check(
+  'Normal CORE conversation paths explicitly verify web Claims before reusable promotion',
+  legacyConversationCoreSource.includes('verifierService.verifyMany({') &&
+    currentConversationCoreSource.includes('verifierService.verifyMany({') &&
+    legacyConversationCoreSource.includes('research.verification = verification;') &&
+    currentConversationCoreSource.includes('research.verification = verification;') &&
+    legacyConversationCoreSource.includes('reusableComponentFactoryService.verifyResearchKnowledge(') &&
+    currentConversationCoreSource.includes('reusableComponentFactoryService.verifyResearchKnowledge(') &&
+    legacyConversationCoreSource.includes("knowledgeGapService.advanceResolutionPlan(gap.id, 'RESOLVE')") &&
+    currentConversationCoreSource.includes("knowledgeGapService.advanceResolutionPlan(gap.id, 'RESOLVE')")
+);
+check(
+  'Research Claim/CORE source index line counts match the current implementation',
+  researchServiceIndexRow?.includes(`lines=${researchPipelineSource.split(/\r?\n/).length - 1}`) &&
+    claimVerifierIndexRow?.includes(`lines=${claimVerifierSource.split(/\r?\n/).length - 1}`) &&
+    legacyConversationCoreIndexRow?.includes(`lines=${legacyConversationCoreSource.split(/\r?\n/).length - 1}`) &&
+    currentConversationCoreIndexRow?.includes(`lines=${currentConversationCoreSource.split(/\r?\n/).length - 1}`)
 );
 check(
   'Canonical index counts match both changed CORE sources',
