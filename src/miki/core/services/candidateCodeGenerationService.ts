@@ -70,8 +70,10 @@ class CandidateCodeGenerationService {
   if(targetPaths.length===0)return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
   const sources=new Map(currentSourceFiles.map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
   if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
-  const implementationPlan=run.implementationPlan;
-  if(run.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};
+  const preparedRun=improvementIntakeRouterService.get(runId);
+  if(!preparedRun)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND_AFTER_PREPARATION']};
+  const implementationPlan=preparedRun.implementationPlan;
+  if(preparedRun.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};
   const failureFeedback =
     run.payload.failureFeedback &&
     typeof run.payload.failureFeedback === 'object'

@@ -75,6 +75,7 @@ const autonomousRevalidationLoop = read('src/miki/autonomy/services/autonomousRe
 const domainIntegrationBootstrap = read('src/miki/core/services/domainIntegrationBootstrapService.ts');
 const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
 const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
+const candidateCodeGeneration = read('src/miki/core/services/candidateCodeGenerationService.ts');
 const capabilityLedger = read('src/miki/capability/services/capabilityLedgerService.ts');
 const capabilityLedgerScreen = read('src/components/CapabilityLedgerScreen.tsx');
 const capabilityLedgerIngress = read('src/miki/core/services/coreTaskIngressService.ts');
@@ -813,6 +814,17 @@ check(
     issueDiscovery.includes("latestOutcome?.type==='execution.completed'&&latestOutcome.passed===true") &&
     issueDiscovery.includes("crossDomainCirculationService.getDisconnectedDomains().some(domain=>String(domain)===issue.sourceId)")
 );
+check(
+  'Autonomous candidate generation reloads the prepared IntakeRouter plan',
+  candidateCodeGeneration.includes('const preparedRun=improvementIntakeRouterService.get(runId);') &&
+    candidateCodeGeneration.indexOf('const preparedRun=improvementIntakeRouterService.get(runId);') >
+      candidateCodeGeneration.indexOf('const probe=await autonomousCandidatePreparationService.prepareForRun(runId,[]);') &&
+    candidateCodeGeneration.includes('const implementationPlan=preparedRun.implementationPlan;') &&
+    candidateCodeGeneration.indexOf('const implementationPlan=preparedRun.implementationPlan;') >
+      candidateCodeGeneration.indexOf('const preparedRun=improvementIntakeRouterService.get(runId);') &&
+    candidateCodeGeneration.includes("if(preparedRun.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)")
+);
+
 check(
   'Relevant verified success and failure Task Cases inform bounded autonomous planning',
   taskCaseMemory.includes('findRelevantCases(goal:string, environment?:string, limit=5)') &&
