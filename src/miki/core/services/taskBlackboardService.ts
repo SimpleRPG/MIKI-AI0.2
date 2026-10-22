@@ -44,6 +44,28 @@ export function unresolvedTaskErrors(task:BlackboardTask):BlackboardEntry[]{
  });
  return unresolved;
 }
+
+/**
+ * Only explicit positive validation results may feed verified cross-domain
+ * transfer and causal outcome measurements. Entry names alone are not proof.
+ */
+export function isVerifiedTaskOutcome(task:BlackboardTask):boolean{
+ if(task.status!=='COMPLETED'||unresolvedTaskErrors(task).length>0)return false;
+ return task.entries.some(entry=>{
+  if(entry.kind!=='RESULT'||entry.evidenceIds.length===0||
+     !/(?:verif|validation|regression|test|e2e|acceptance)/i.test(entry.key))return false;
+  const value=entryRecord(entry);
+  if(!value)return false;
+  const status=String(value.status??value.outcome??value.assertionStatus??'').trim().toUpperCase();
+  const explicitlyFailed=
+   value.passed===false||value.verified===false||value.failed===true||
+   ['FAIL','FAILED','ERROR','BLOCKED','UNRESOLVED','INCONCLUSIVE'].includes(status);
+  if(explicitlyFailed)return false;
+  return value.passed===true||value.verified===true||value.assertionStatus==='PASS'||
+   ['PASS','PASSED','SUCCESS','SUCCEEDED','VERIFIED','DEVICE_VERIFIED'].includes(status);
+ });
+}
+
 const KEY='miki_task_blackboard_v1';
 
 function summarizeTaskTitle(

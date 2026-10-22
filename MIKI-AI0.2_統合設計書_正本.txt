@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-21
-正本Revision：2026-10-23-P303
+正本Revision：2026-10-23-P304
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-23-P303
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-23-P304
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
 - 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
@@ -128,6 +128,10 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 ■ 不変条件
 - 一般Knowledge Gapは既存CORE TaskIngress／TaskBlackboardを使って調査する。通常周期は最大1件、深いスリープ周期は最大3件とし、指数バックオフと既存Task照合で重複投入を抑える。
 - 検索結果だけではKnowledge Gapを解決しない。VERIFY_RESEARCH_CLAIMSで全ClaimがSUPPORTEDまたはDEVICE_VERIFIEDになった場合だけ、対応GapをRESOLVEDへ遷移させる。
+- COREの検証済みOutcomeは、タスクがCOMPLETEDであることに加えて、未解決ERRORがなく、検証系RESULTの構造化payloadに明示的な成功値があり、証拠参照が存在する場合に限る。エントリ名や自由記述だけでverifiedへ昇格させない。
+- 作業指示書の実行例外はPROMOTION_FAILEDと失敗理由・時刻を返し、可能な場合は同状態を保存する。保存に失敗した場合も、未保存を隠して成功扱いにしない。
+- 作業指示書の保存Rawが不正なら、元Rawをハッシュ付き隔離キーへ保存し、完全一致の読み戻しを確認してから現行キーを初期化する。隔離または保存読み戻しに失敗した場合は元データを上書きしない。
+- PROMOTION_FAILEDからの回復はREQUEST_CHANGESの修正経路のみ許可し、直接ACCEPTして検証・レビューを迂回することは認めない。
 - Issue Discoveryは既存ImprovementIntakeRun／TaskBlackboardのterminal状態を再照合する。問題の解決は監視元の状態変化で確認し、単なるTask完了だけでは解決扱いしない。失敗・未解決完了は指数バックオフ付きで最大3回再試行し、取消済みTaskは自動再投入しない。
 - TaskCaseMemoryの関連失敗ケースを既存改善計画のrationaleへ診断情報として渡す。失敗ケースは観測事実として扱い、普遍的な法則や検証済み知識へ昇格させない。
 - Execution FailureのResearch／Promotionをイベントリスナーから直接実行せず、永続Knowledge Gap→AutonomousRevalidationLoop→既存CORE TaskIngress→Verification境界へ統一する。
@@ -450,7 +454,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/coreOrchestratorService.ts | lines=1956 | symbols=CoreImprovementDecision, CoreImprovementDecisionInput, CoreImprovementGateEvidence, CoreOrchestrationResult, UnifiedCognitiveStateSnapshot | callers=4 | deps=41 | Tests=17
 - [USED] CORE | src/miki/core/services/corePlanRevisionService.ts | lines=134 | symbols=CorePlanRevision, OperationInstanceStatus, RequiredBusinessOperation, corePlanRevisionService | callers=5 | deps=3
 - [USED] CORE | src/miki/core/services/coreResultService.ts | lines=383 | symbols=CoreRequest, CoreResult, CoreResultListener, CoreResultStatus, coreResultService | callers=10 | deps=6 | Storage=miki_core_results_v2
-- [USED] CORE | src/miki/core/services/coreTaskIngressService.ts | lines=144 | symbols=CoreTaskIngressRequest, CoreTaskKind, coreTaskIngressService | callers=12 | deps=15 | Tests=1
+- [USED] CORE | src/miki/core/services/coreTaskIngressService.ts | lines=144 | symbols=CoreTaskIngressRequest, CoreTaskKind, coreTaskIngressService | callers=12 | deps=15 | Tests=2
 - [USED] CORE | src/miki/core/services/cognitiveQualityService.ts | lines=115 | symbols=CognitiveQualityService, cognitiveQualityService, ClarificationPlan, ExplanationPlan | callers=1 | deps=4 | Tests=0
 - [USED] CORE | src/miki/core/services/coreWorldModelGatewayService.ts | lines=8 | symbols=coreWorldModelGatewayService | callers=1 | deps=2 | Tests=1
 - [USED] CORE | src/miki/core/services/crossDomainCirculationService.ts | lines=104 | symbols=DomainCoverage, DomainTransition, MikiDomain, crossDomainCirculationService | callers=23 | deps=2 | Storage=miki_cross_domain_circulation_v1
@@ -516,7 +520,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/shadowEvaluationService.ts | lines=8 | symbols=ShadowEvaluation, ShadowMeasurement, shadowEvaluationService | callers=5 | deps=1 | Storage=miki_shadow_evaluations_v1
 - [USED] CORE | src/miki/core/services/singlePromotionGateService.ts | lines=6 | symbols=PromotionDecision, singlePromotionGateService | callers=2 | deps=3
 - [USED] CORE | src/miki/core/services/storageAuthorityRegistryService.ts | lines=15 | symbols=StorageAuthorityEntry, storageAuthorityRegistryService | callers=1 | deps=0
-- [USED] CORE | src/miki/core/services/taskBlackboardService.ts | lines=270 | symbols=BlackboardEntry, BlackboardEntryKind, BlackboardStatus, BlackboardTask, taskBlackboardService, unresolvedTaskErrors | callers=20 | deps=2 | Storage=miki_task_blackboard_v1 / Tests=2
+- [USED] CORE | src/miki/core/services/taskBlackboardService.ts | lines=292 | symbols=BlackboardEntry, BlackboardEntryKind, BlackboardStatus, BlackboardTask, taskBlackboardService, unresolvedTaskErrors, isVerifiedTaskOutcome | callers=20 | deps=2 | Storage=miki_task_blackboard_v1 / Tests=2
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/unifiedCandidateLifecycleGraphService.ts | lines=17 | symbols=CandidateLifecycleNode, CandidateLifecycleState, CandidateLifecycleTransition, unifiedCandidateLifecycleGraphService | callers=1 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/unifiedDirectiveParser.ts | lines=174 | symbols=ParsedDirectiveText, parseDirectiveText | callers=2 | deps=0 | Tests=1
 - [USED] CORE | src/miki/core/services/universalSynthesisService.ts | lines=493 | symbols=SynthesisArtifact, SynthesisResult, SynthesisSelectionMode, UniversalSynthesisRequest, universalSynthesisService | callers=2 | deps=6
@@ -779,11 +783,11 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/developmentContinuityService.ts | lines=4 | symbols=ContinuityState, DevelopmentCheckpoint, developmentContinuityService | callers=1 | deps=2 | Storage=miki_development_continuity_v1 / Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/developmentFailureRoutingService.ts | lines=7 | symbols=FailureRoute, FailureRoutingDecision, developmentFailureRoutingService | callers=2 | deps=1 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/developmentGovernanceIntegrationService.ts | lines=17 | symbols=GovernancePreReviewInput, developmentGovernanceIntegrationService | callers=1 | deps=12 | Tests=1
-- [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/developmentLifecycleStateMachineService.ts | lines=4 | symbols=developmentLifecycleStateMachineService | callers=1 | deps=1 | Tests=1
+- [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/developmentLifecycleStateMachineService.ts | lines=36 | symbols=developmentLifecycleStateMachineService | callers=1 | deps=1 | Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/developmentOutcomeLearningService.ts | lines=4 | symbols=DevelopmentOutcome, developmentOutcomeLearningService | callers=2 | deps=2 | Storage=miki_development_outcome_learning_v1 / Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/developmentPreflightService.ts | lines=3 | symbols=developmentPreflightService | callers=1 | deps=4 | Tests=2
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/developmentResumeTokenService.ts | lines=4 | symbols=DevelopmentResumeToken, developmentResumeTokenService | callers=2 | deps=2 | Storage=miki_development_resume_tokens_v1 / Tests=1
-- [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/developmentReviewLifecycleService.ts | lines=31 | symbols=DevelopmentLifecycleResult, developmentReviewLifecycleService | callers=2 | deps=17 | Storage=miki_unified_development_requests_v1 / Tests=8
+- [AVAILABLE_EXPORT_ONLY] selfDevelopment | src/miki/selfDevelopment/services/developmentReviewLifecycleService.ts | lines=89 | symbols=DevelopmentLifecycleResult, developmentReviewLifecycleService | callers=2 | deps=17 | Storage=miki_unified_development_requests_v1 / Tests=9
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/developmentStrategyDecisionService.ts | lines=8 | symbols=DevelopmentStrategy, DevelopmentStrategyDecision, developmentStrategyDecisionService | callers=2 | deps=2 | Tests=2
 - [ORPHAN] selfDevelopment | src/miki/selfDevelopment/services/developmentStrategyExecutionDispatcherService.ts | lines=11 | symbols=StrategyExecutionRequest, StrategyExecutionResult, developmentStrategyExecutionDispatcherService | callers=0 | deps=5
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/diagnosticProgressRetryService.ts | lines=4 | symbols=QualityMetrics, diagnosticProgressRetryService | callers=2 | deps=3 | Storage=miki_diagnostic_progress_retry_v1 / Tests=1
@@ -12173,4 +12177,16 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - COREは意味候補のClaimを独立して検証する。これらをKnowledge Gap全体の必須Claim集合へ一律追加せず、未検証候補によってGap解決ゲートを誤って広げない。
 - P302回帰検証で呼び出しの空白・改行に依存していた単一行文字列検査を、構文の空白を許容する正規表現へ変更する。意味抽出専用の実行テストをWorkflowへ追加する。
 - 正本Revision・現行Revision・対象ソースの実測行数索引を更新した。P299の現行追跡ソースインベントリを再生成する。Termuxでテスト・lint・buildは実行しない。GitHub Actions、APK、実機動作はPUSH後の実結果で判定する。
+
+============================================================
+【2026-10-23-P304 会話Outcome判定と作業指示書の失敗復旧境界】
+============================================================
+
+- COREのOutcome測定はTask BlackBoardの名前付きRESULTだけでは検証済みと判定しない。COMPLETED状態、未解決ERRORの不存在、明示的成功値を持つ検証系RESULT、証拠IDをすべて要求する。失敗値がある結果は肯定条件より優先して拒否する。
+- 作業指示書の開始処理を例外境界で保護する。実行失敗はPROMOTION_FAILED・failureReason・failureAtとして返し、保存できない場合は`DEVELOPMENT_FAILURE_STATE_NOT_PERSISTED`を明示する。
+- 作業指示書の永続データを空配列へ黙ってフォールバックさせない。不正JSON／不正shape／重複IDは元Rawをハッシュ付き隔離キーへ書き、読戻し一致確認後に限り現行キーをリセットする。通常保存も読み戻し一致を必須とする。
+- PROMOTION_FAILEDからREQUEST_CHANGESによる修正経路を許可し、ACCEPTによる承認ゲートの迂回は引き続き拒否する。
+- P303 Actionsで失敗したWeb意味Serviceの索引行数検査を修正した。改行正規表現の二重エスケープを除去し、実ファイルの行数を検査する。
+- 検証テストを追加し、明示的成功・失敗・未完了タスク・未解決ERROR・回復Receipt・作業指示書の修正要求と承認拒否を確認する。Workflowで実行する。正本索引は変更ソースの実測行数へ更新し、P299インベントリを再生成する。
+- Termuxでテスト・lint・buildを実行しない。GitHub Actions、APK、実機動作はPUSH後の実結果で判定する。
 

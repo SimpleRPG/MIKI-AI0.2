@@ -5,7 +5,7 @@ import type { MikiDomain } from './crossDomainCirculationService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
 import { capabilityLedgerService } from '../../capability/services/capabilityLedgerService';
 import { decomposeMultiIntent } from '../../unknown/services/multiIntentDecompositionService';
-import { taskBlackboardService } from './taskBlackboardService';
+import { taskBlackboardService, isVerifiedTaskOutcome } from './taskBlackboardService';
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { canonicalSha256Object } from './canonicalSha256Service';
 import { claimEvidenceService } from '../../research/services/claimEvidenceService';
@@ -46,7 +46,7 @@ class CoreTaskIngressService {
   if(learningOpportunities.length)taskBlackboardService.post(task.taskId,'OBSERVATION','learning','learning:opportunityCandidates',{candidates:learningOpportunities,policy:'OUTCOME_EVALUATION_REQUIRED'},[]);
   const outcome=task.status==='COMPLETED'?'SUCCESS':task.status==='FAILED'?'FAILURE':'INCONCLUSIVE';
   const route=[...new Set(task.visitedDomains.filter(domain=>domain!=='core'))];
-  const verified=task.status==='COMPLETED'&&task.entries.some(entry=>entry.kind==='RESULT'&&entry.evidenceIds.length>0&&/verif|validation|passed|regression/i.test(entry.key));
+  const verified=isVerifiedTaskOutcome(task);
   const transferCandidates=cognitiveQualityService.crossDomainTransferCandidates(request.goal,task.visitedDomains,verified).map(candidate=>({...candidate,reusedInTask:task.entries.some(entry=>(entry.kind==='DECISION'||entry.kind==='RESULT')&&JSON.stringify(entry.value||{}).toLowerCase().includes(String(candidate.key).toLowerCase()))}));
   if(transferCandidates.length){
    taskBlackboardService.post(task.taskId,'OBSERVATION','learning','learning:crossDomainTransferCandidates',{candidates:transferCandidates,policy:'CAUSAL_CONFIRMATION_REQUIRED'},[]);

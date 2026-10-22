@@ -58,6 +58,9 @@ const planRevision = read('src/miki/core/services/corePlanRevisionService.ts');
 const routePlanner = read('src/miki/core/services/adaptiveRoutePlannerService.ts');
 const completionGate = read('src/miki/core/services/coreCompletionGateService.ts');
 const taskIngress = read('src/miki/core/services/coreTaskIngressService.ts');
+const taskBlackboard = read('src/miki/core/services/taskBlackboardService.ts');
+const developmentReviewLifecycle = read('src/miki/selfDevelopment/services/developmentReviewLifecycleService.ts');
+const developmentLifecycleStateMachine = read('src/miki/selfDevelopment/services/developmentLifecycleStateMachineService.ts');
 const issueDiscovery = read('src/miki/core/services/autonomousIssueDiscoveryService.ts');
 const autonomousLoop = read('src/miki/core/services/autonomousSelfImprovementLoopService.ts');
 const autonomousEvolution = read('src/miki/autonomy/services/autonomousEvolutionService.ts');
@@ -83,6 +86,11 @@ const claimVerifierIndexRow = design.split(/\r?\n/).find(line => line.includes('
 const legacyConversationCoreIndexRow = design.split(/\r?\n/).find(line => line.includes('src/services/nonLlmCoreService.ts |'));
 const currentConversationCoreIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/safety/services/conversationCoreService.ts |'));
 const webContentUnderstandingIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/research/services/webContentUnderstandingService.ts |'));
+const taskBlackboardIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/taskBlackboardService.ts |'));
+const taskIngressIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/coreTaskIngressService.ts |'));
+const developmentReviewLifecycleIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/developmentReviewLifecycleService.ts |'));
+const developmentStateMachineIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/developmentLifecycleStateMachineService.ts |'));
+const developmentRequestModelIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/unifiedDevelopmentRequestModel.ts |'));
 const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
 const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
 const candidateCodeGeneration = read('src/miki/core/services/candidateCodeGenerationService.ts');
@@ -758,7 +766,7 @@ check(
 );
 check(
   'Web semantic service source index line count matches the current implementation',
-  webContentUnderstandingIndexRow?.includes(`lines=${webContentUnderstandingSource.split(/\\r?\\n/).length - 1}`)
+  webContentUnderstandingIndexRow?.includes(`lines=${webContentUnderstandingSource.split(/\r?\n/).length - 1}`)
 );
 check(
   'Counterevidence is excluded from affirmative Claim promotion',
@@ -788,6 +796,44 @@ check(
   autonomousRevalidationIndexRow?.includes(`lines=${autonomousRevalidationLoop.split(/\r?\n/).length - 1}`) &&
     domainBootstrapIndexRow?.includes(`lines=${domainIntegrationBootstrap.split(/\r?\n/).length - 1}`)
 );
+check(
+  'CORE task verification requires an explicit successful result and no unresolved errors',
+  taskIngress.includes('const verified=isVerifiedTaskOutcome(task);') &&
+    taskBlackboard.includes('export function isVerifiedTaskOutcome') &&
+    taskBlackboard.includes('unresolvedTaskErrors(task).length>0') &&
+    taskBlackboard.includes('value.passed===false') &&
+    taskBlackboard.includes("entry.evidenceIds.length===0")
+);
+check(
+  'Work-instruction exceptions are returned and recorded as PROMOTION_FAILED',
+  developmentReviewLifecycle.includes('private async startInternal(') &&
+    developmentReviewLifecycle.includes('DEVELOPMENT_START_EXCEPTION:') &&
+    developmentReviewLifecycle.includes("state:'PROMOTION_FAILED'") &&
+    developmentReviewLifecycle.includes('failureAt:Date.now()') &&
+    developmentReviewLifecycle.includes('DEVELOPMENT_FAILURE_STATE_NOT_PERSISTED')
+);
+check(
+  'Corrupt work-instruction state is quarantined before reset and saves require readback',
+  developmentReviewLifecycle.includes('quarantineCorruptRaw(raw)') &&
+    developmentReviewLifecycle.includes('DEVELOPMENT_REQUEST_STORE_QUARANTINE_FAILED') &&
+    developmentReviewLifecycle.includes('DEVELOPMENT_REQUEST_STORE_RESET_FAILED') &&
+    developmentReviewLifecycle.includes('DEVELOPMENT_REQUEST_STORE_READBACK_MISMATCH')
+);
+check(
+  'Failed work instructions can enter the REQUEST_CHANGES recovery path without approving them',
+  developmentLifecycleStateMachine.includes("request.state === 'PROMOTION_FAILED' && decision === 'REQUEST_CHANGES'") &&
+    developmentLifecycleStateMachine.includes("PROMOTION_FAILED: ['REVISION_REQUESTED']") &&
+    developmentLifecycleStateMachine.includes("decision !== 'ACCEPT'")
+);
+check(
+  'Task and work-instruction source index line counts match the current files',
+  taskBlackboardIndexRow?.includes(`lines=${taskBlackboard.split(/\r?\n/).length - 1}`) &&
+    taskIngressIndexRow?.includes(`lines=${taskIngress.split(/\r?\n/).length - 1}`) &&
+    developmentReviewLifecycleIndexRow?.includes(`lines=${developmentReviewLifecycle.split(/\r?\n/).length - 1}`) &&
+    developmentStateMachineIndexRow?.includes(`lines=${developmentLifecycleStateMachine.split(/\r?\n/).length - 1}`) &&
+    developmentRequestModelIndexRow?.includes(`lines=${read('src/miki/selfDevelopment/services/unifiedDevelopmentRequestModel.ts').split(/\r?\n/).length - 1}`)
+);
+
 const canonicalHeaderRevision = design.match(/^正本Revision：(\d{4}-\d{2}-\d{2}-P\d+)$/m)?.[1];
 const canonicalCurrentRevision = design.match(/^- 現行Revision: (\d{4}-\d{2}-\d{2}-P\d+)$/m)?.[1];
 check(
