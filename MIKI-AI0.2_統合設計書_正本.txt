@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-21
-正本Revision：2026-10-23-P302
+正本Revision：2026-10-23-P303
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-23-P302
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-23-P303
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
 - 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
@@ -670,7 +670,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] research | src/miki/research/services/researchQueryOutcomeLearningService.ts | lines=174 | symbols=QueryOutcomeStatus, QueryRevisionRecommendation, ResearchQueryOutcome, researchQueryOutcomeLearningService | callers=3 | deps=4 | Storage=miki_research_query_outcome_v79
 - [USED] research | src/miki/research/services/researchQueryPlanningService.ts | lines=45 | symbols=CURRENT_MIKI_ENVIRONMENT, EnvironmentApplicability, EnvironmentFingerprint, QueryIntentType, QueryPlanningPolicy | callers=8 | deps=4 | Storage=miki_research_query_planning_policy_v1,miki_research_query_plans_v1,miki_research_query_revision_pairs_v1
 - [USED] research | src/miki/research/services/researchRustKernelService.ts | lines=1 | symbols=researchRustKernelService | callers=1 | deps=0 | Plugin=MIKINativeRunner
-- [USED] research | src/miki/research/services/researchService.ts | lines=766 | symbols=ResearchOutcomeState, ResearchResult, ResearchSearchResult, ResearchService, researchService | callers=10 | deps=13 | Tests=1
+- [USED] research | src/miki/research/services/researchService.ts | lines=810 | symbols=ResearchOutcomeState, ResearchResult, ResearchSearchResult, ResearchService, researchService | callers=10 | deps=14 | Tests=1
 - [USED] research | src/miki/research/services/researchStrategyService.ts | lines=158 | symbols=ResearchMeaningfulnessAssessment, ResearchRoute, ResearchStrategyDecision, ResearchStrategyService, researchStrategyService | callers=3 | deps=2 | Tests=1
 - [USED] research | src/miki/research/services/researchToRemediationService.ts | lines=160 | symbols=RemediationRecord, RemediationStatus, ResearchToRemediationService, researchToRemediationService | callers=6 | deps=11 | Storage=miki_research_to_remediation_v1
 - [USED] research | src/miki/research/services/scienceExperimentService.ts | lines=1 | symbols= scienceExperimentService  | callers=1 | deps=1
@@ -679,6 +679,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] research | src/miki/research/services/unifiedWebResearchService.ts | lines=91 | symbols=UnifiedWebResearchService, unifiedWebResearchService | callers=14 | deps=2
 - [USED] research | src/miki/research/services/unknownResearchControlService.ts | lines=2 | symbols=UnknownResearchChoice, decideUnknownResearch | callers=2 | deps=0
 - [USED] research | src/miki/research/services/virtualExpertService.ts | lines=1 | symbols= virtualExpertService  | callers=1 | deps=1
+- [USED] research | src/miki/research/services/webContentUnderstandingService.ts | lines=423 | symbols=WebSemanticKnowledgeKind, WebSemanticRelation, WebSemanticPolarity, WebSemanticUnit, WebSemanticComponentClaim, WebSemanticLearningResult, extractWebSemanticUnits, WebContentUnderstandingService, webContentUnderstandingService | callers=1 | deps=3 | Tests=1
 - [USED] research | src/miki/research/services/webMaterialPatternExtractor.ts | lines=412 | symbols=VALID_WEB_REAL_DATA_PROVIDERS, WebExtractedSkeletonPattern, WebExtractedSurfacePattern, WebImplementationCodeExample, WebImplementationMaterial | callers=8 | deps=2 | Tests=3
 - [USED] research | src/miki/research/services/webResearchPolicyService.ts | lines=54 | symbols=IndependentSourceTarget, SourceIndependenceMode, WebResearchPolicy, WebResearchPolicyReceipt, WebResearchProgress | callers=4 | deps=2 | Storage=miki_web_research_policy_v1
 - [USED] research | src/miki/research/services/webTermLearningService.ts | lines=153 | symbols=LearnedWebTerm, WebTermLearningInput, WebTermLearningResult, webTermLearningService | callers=2 | deps=3
@@ -692,7 +693,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] safety | src/miki/safety/services/failureRecoveryService.ts | lines=75 | symbols=FailureRecoveryService, RecoveryAction, RecoveryDecision, failureRecoveryService | callers=4 | deps=5 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] safety | src/miki/safety/services/failureToleranceKernelService.ts | lines=1 | symbols= failureToleranceKernelService  | callers=1 | deps=1
 - [USED] safety | src/miki/safety/services/featureFlagsService.ts | lines=157 | symbols=DEFAULT_FEATURE_FLAGS, FEATURE_FLAG_DESCRIPTIONS, featureFlagsService | callers=6 | deps=3 | Storage=miki_system_feature_flags_v32 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
-- [USED] safety | src/miki/safety/services/conversationCoreService.ts | lines=823 | symbols=ConversationCoreResult, ConversationCoreService, conversationCoreService | callers=4 | deps=45 | Tests=3
+- [USED] safety | src/miki/safety/services/conversationCoreService.ts | lines=855 | symbols=ConversationCoreResult, ConversationCoreService, conversationCoreService | callers=4 | deps=45 | Tests=3
 - [USED] safety | src/miki/safety/services/nonLlmHardwarePipelineService.ts | lines=261 | symbols=HardwareTelemetry, NonLlmHardwarePipelineService, NonLlmPipelineExecutionResult, nonLlmHardwarePipelineService | callers=2 | deps=8 | Markers=7 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [USED] safety | src/miki/safety/services/nonLlmRuntimePolicyService.ts | lines=51 | symbols=NonLlmRuntimeKind, NonLlmRuntimeStatus, nonLlmRuntimePolicyService | callers=2 | deps=0
 - [USED] safety | src/miki/safety/services/privacyGuardrailService.ts | lines=248 | symbols=privacyGuardrailService | callers=11 | deps=5 | Storage=miki_privacy_audit_logs_v5 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
@@ -1061,7 +1062,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/modelLifecycleService.ts | lines=48 | symbols=ModelDecommissionEvaluation, ModelDecommissionMetrics, modelLifecycleService | callers=1 | deps=1
 - [ORPHAN] LEGACY_OR_SHARED | src/services/nativeWorkManagerService.ts | lines=140 | symbols=NativeWorkManagerPluginInterface, nativeWorkManagerService | callers=0 | deps=1 | Tests=4
 - [USED] LEGACY_OR_SHARED | src/services/nonLlmCodeSynthesisService.ts | lines=27 | symbols=CodeSynthesisPlan, NonLlmCodeSynthesisService, nonLlmCodeSynthesisService | callers=1 | deps=4
-- [USED] LEGACY_OR_SHARED | src/services/nonLlmCoreService.ts | lines=560 | symbols=NonLlmCoreResult, NonLlmCoreService, nonLlmCoreService | callers=1 | deps=30 | Tests=3
+- [USED] LEGACY_OR_SHARED | src/services/nonLlmCoreService.ts | lines=592 | symbols=NonLlmCoreResult, NonLlmCoreService, nonLlmCoreService | callers=1 | deps=30 | Tests=3
 - [USED] LEGACY_OR_SHARED | src/services/nonLlmHardwarePipelineService.ts | lines=6 | symbols=HardwareTelemetry, NonLlmHardwarePipelineService, NonLlmPipelineExecutionResult, nonLlmHardwarePipelineService | callers=1 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/safety/services/nonLlmHardwarePipelineService.ts
 - [USED] LEGACY_OR_SHARED | src/services/nonLlmRuntimeService.ts | lines=93 | symbols=NativeDownloadedFile, NativeGpuInfo, NativeLlmChunkEvent, NativeLlmProgressEvent | callers=4 | deps=2
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/operationalConformanceService.ts | lines=1 | symbols=- | callers=1 | deps=1
@@ -9508,6 +9509,17 @@ Universal Synthesisを別の脳として新設しない。
 検索結果・Web本文・Research説明はEvidence / Implementation Materialであり、
 そのまま実行コードではない。
 
+【現行仕様：Web本文の意味構造理解と候補知識化】
+
+Web本文は、検索結果の根拠として保存するだけでなく、本文中の出典位置を特定できる文単位へ分け、構造化したKnowledge Candidateへ変換する。
+
+- 本文から、定義・一般関係・因果または説明・条件・必要条件・手順・例外・観察を抽出する。抽出文、条件、例外、否定極性、適用環境の手掛かり、本文内オフセット、断片SHA-256、URL、Evidence ID、Claim IDを保持する。
+- 各候補文は正規化後も取得本文に存在する場合に限り、対応するEvidenceを用いた個別Claimへ接続する。COUNTEREVIDENCEは正のClaimへ統合しない。
+- 構造化候補は `WEB_SEMANTIC_PROPOSITION` として `CANDIDATE` / `UNVERIFIED` のまま保存する。抽出信頼度は抽出規則への適合度であり、主張の真偽確率ではない。
+- P211認知グラフへ `SEMANTIC_CANDIDATE` として出典付き候補ノードを接続し、COREによるClaim検証後にのみKnowledge Componentの昇格を許す。抽出候補を追加したことだけでKnowledge Gap全体を解決済みにしない。
+- 本方式は規則ベースの部分的な意味抽出であり、曖昧な文章や抽出対象外の表現を完全に理解したとは扱わない。元ページ本文を実行コードとして扱わず、全文をKnowledge Componentへ複製しない。
+
+
 明示的なコード例をCandidate化した場合でも、
 
 Candidate
@@ -12150,3 +12162,15 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - Evidence収集をClaimの真偽検証と混同する自己学習を修正した。COREによる最終検証結果をLearning Continuumへ返し、裏付け未達のClaimやGapは失敗または保留として記録する。
 - 検索から得たコードや依存関係を直接実行しない。Web実装材料は引き続きCandidateとして扱い、別途Code Componentの出典・検証証拠・実行結果を連結する必要がある。
 - 現行実装索引の対象4ソースの行数とVerifier契約を更新した。完全再帰Git tree全体は再集計していない。
+
+============================================================
+【2026-10-23-P303 Web本文の意味構造化と候補知識グラフ接続】
+============================================================
+
+- Researchの本文読取後、検索スニペットとの一致に依存せず、取得本文から定義・関係・因果説明・条件・前提・手順・例外・観察の候補を抽出する。
+- 個々の構造化候補は、本文中に実在する断片であることを再確認したうえで独立Claimへ接続する。候補には条件・例外・否定極性・環境手掛かり・本文オフセット・断片SHA-256・URL・Evidence IDを保持する。
+- `WEB_SEMANTIC_PROPOSITION` を `CANDIDATE` / `UNVERIFIED` として保存し、P211の `SEMANTIC_CANDIDATE` ノードへ出典付きで接続する。グラフ接続が失敗した場合は失敗件数を返し、成功扱いにしない。
+- COREは意味候補のClaimを独立して検証する。これらをKnowledge Gap全体の必須Claim集合へ一律追加せず、未検証候補によってGap解決ゲートを誤って広げない。
+- P302回帰検証で呼び出しの空白・改行に依存していた単一行文字列検査を、構文の空白を許容する正規表現へ変更する。意味抽出専用の実行テストをWorkflowへ追加する。
+- 正本Revision・現行Revision・対象ソースの実測行数索引を更新した。P299の現行追跡ソースインベントリを再生成する。Termuxでテスト・lint・buildは実行しない。GitHub Actions、APK、実機動作はPUSH後の実結果で判定する。
+

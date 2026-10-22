@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1841,
-    "sourceFileCount": 1386,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1299,
-    "relativeImportCandidateCount": 3898,
-    "resolvedRelativeImportCandidateCount": 3879,
+    "trackedPathCountExcludingControlPaths": 1843,
+    "sourceFileCount": 1388,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1301,
+    "relativeImportCandidateCount": 3903,
+    "resolvedRelativeImportCandidateCount": 3884,
     "unresolvedRelativeImportCandidateCount": 19
   },
   "records": [
@@ -5157,32 +5157,32 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 80962,
-      "lines": 1192,
-      "sha256": "46f881b890c54cfcd2aefbe52afab1059514e2fe121ae22779808a748a5f129c",
+      "bytes": 82573,
+      "lines": 1215,
+      "sha256": "22513961ae171d27aa9e6726d69a77026bd3a286ac3529742e47e5941ce4e528",
       "relativeImportCandidates": [
         {
-          "line": 171,
+          "line": 173,
           "specifier": "../../safety/services/outboundPayloadSanitizer",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 190,
+          "line": 192,
           "specifier": "../miki/safety/services/privacyGuardrailService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 192,
+          "line": 194,
           "specifier": "../miki/safety/services/abstractSanitizerService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 193,
+          "line": 195,
           "specifier": "../miki/safety/services/abstractSanitizerService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 823,
+          "line": 846,
           "specifier": "../miki/unknown/services/counterfactualReasoningService",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -6210,6 +6210,23 @@
           "specifier": "../src/miki/core/services/visualOutputTruthAndSizeGateService.ts",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/visualOutputTruthAndSizeGateService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/verify_web_content_understanding.ts",
+      "bytes": 2432,
+      "lines": 46,
+      "sha256": "bd3561c89ff208978701d54338cc442ea6703b6f98c36d06c9d9c76b6407f02d",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../src/miki/research/services/webContentUnderstandingService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/webContentUnderstandingService.ts"
         }
       ],
       "relativeImportCandidateCount": 1,
@@ -24584,9 +24601,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 36493,
-      "lines": 766,
-      "sha256": "a5b5ad2ea58f6d23628b943a3fdcb1ebe4292316e6b7499414c40eb14766190d",
+      "bytes": 38594,
+      "lines": 810,
+      "sha256": "15eeeafafac82c5a18be7143a4438ad8f3634ca9de7f750b7123a4a8539fec27",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24632,43 +24649,49 @@
         },
         {
           "line": 8,
+          "specifier": "./webContentUnderstandingService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/webContentUnderstandingService.ts"
+        },
+        {
+          "line": 9,
           "specifier": "./researchQueryPlanningService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchQueryPlanningService.ts"
         },
         {
-          "line": 9,
+          "line": 10,
           "specifier": "../../verification/services/verifierService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verifierService.ts"
         },
         {
-          "line": 10,
+          "line": 11,
           "specifier": "./researchQueryOutcomeLearningService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchQueryOutcomeLearningService.ts"
         },
         {
-          "line": 11,
+          "line": 12,
           "specifier": "./webResearchPolicyService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webResearchPolicyService.ts"
         },
         {
-          "line": 12,
+          "line": 13,
           "specifier": "../../memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         },
         {
-          "line": 16,
+          "line": 17,
           "specifier": "./webMaterialPatternExtractor",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webMaterialPatternExtractor.ts"
         }
       ],
-      "relativeImportCandidateCount": 13,
-      "resolvedRelativeImportCount": 13,
+      "relativeImportCandidateCount": 14,
+      "resolvedRelativeImportCount": 14,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -24970,6 +24993,35 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/research/services/webContentUnderstandingService.ts",
+      "bytes": 15197,
+      "lines": 423,
+      "sha256": "390c1001f8a1791cc5f73f58432c2fcadbf060266f0391bb1d148e9ca80fe0ca",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        },
+        {
+          "line": 5,
+          "specifier": "../../core/services/reusableComponentFactoryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/reusableComponentFactoryService.ts"
+        },
+        {
+          "line": 6,
+          "specifier": "./researchGraphConnectorP211Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/researchGraphConnectorP211Service.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -25302,9 +25354,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 47850,
-      "lines": 823,
-      "sha256": "93598819beb673a397f0557b2129cf1c3c0726f3a5d727a6d528e20d6541b94d",
+      "bytes": 49392,
+      "lines": 855,
+      "sha256": "0fe5fc4dab60f81324b0fed087e804c59303769e594b295467fd05c62fc00fa4",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -36593,9 +36645,9 @@
     },
     {
       "path": "src/services/nonLlmCoreService.ts",
-      "bytes": 27559,
-      "lines": 560,
-      "sha256": "85727b459b3d1262fbf1d3c036a088c04f28dd09d5e146eafd861067d9dcfece",
+      "bytes": 29101,
+      "lines": 592,
+      "sha256": "15b4f28d6f52426be08a11ca08aff5e74d1a5c0a04a031dacc6a9445c9d696a2",
       "relativeImportCandidates": [
         {
           "line": 1,

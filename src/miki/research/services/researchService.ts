@@ -5,6 +5,7 @@ import { researchStrategyService, ResearchRoute } from './researchStrategyServic
 import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/services/cognitiveEvidenceIntegrationService';
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { webTermLearningService } from './webTermLearningService';
+import { webContentUnderstandingService } from './webContentUnderstandingService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
 import type { VerificationResult } from '../../verification/services/verifierService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
@@ -40,6 +41,7 @@ export interface ResearchResult {
   outcome: ResearchOutcomeState;
   summary?: string;
   verification?: VerificationResult[];
+  semanticVerification?: VerificationResult[];
   roundsCompleted?: number;
   continuationAvailable?: boolean;
   continuationReason?: string;
@@ -49,6 +51,7 @@ export interface ResearchResult {
   routes?: ResearchRoute[];
   localClaimIds?: string[];
   learnedTermComponentClaims?: Array<{ componentId: string; claimId: string }>;
+  learnedSemanticComponentClaims?: Array<{ componentId: string; claimId: string; unitId: string }>;
 }
 
 /**
@@ -156,6 +159,7 @@ export class ResearchService {
     const requiredResearchClaimIds: string[] = [];
     const learnedTermComponentIds: string[] = [];
     const learnedTermComponentClaims: Array<{ componentId: string; claimId: string }> = [];
+    const learnedSemanticComponentClaims: Array<{ componentId: string; claimId: string; unitId: string }> = [];
     const claimIdByNormalizedStatement = new Map<string, string>();
     const reusablePriorClaimStatuses = new Set(['UNVERIFIED', 'SUPPORTED']);
 
@@ -401,6 +405,45 @@ export class ResearchService {
 
           if (pageEvidence.status === 'REJECTED') continue;
 
+          // Understand page content independently from the search-result snippet.
+          // Every accepted sentence is checked against the fetched page before its
+          // own unverified Claim and structured semantic candidate are created.
+          if (learnedSemanticComponentClaims.length < 24) {
+            const semanticLearning = webContentUnderstandingService.learnPage({
+              text: content,
+              url: page.url,
+              evidenceId: pageEvidence.evidence_id,
+              sourceTitle: page.result.title,
+              maxUnits: Math.max(0, 24 - learnedSemanticComponentClaims.length),
+              registerClaim: (statement) => {
+                const normalizedPageStatement = this.normalizeClaimStatement(statement);
+                const normalizedPageContent = this.normalizeClaimStatement(content);
+                if (
+                  normalizedPageStatement.length < 15 ||
+                  !normalizedPageContent.includes(normalizedPageStatement)
+                ) {
+                  return undefined;
+                }
+                return this.linkResearchEvidenceToClaim(
+                  pageEvidence.evidence_id,
+                  statement,
+                  claimIdByNormalizedStatement,
+                  !isCounterEvidencePass,
+                );
+              },
+            });
+
+            for (const semantic of semanticLearning.componentClaims) {
+              if (!learnedSemanticComponentClaims.some(
+                item => item.componentId === semantic.componentId &&
+                  item.claimId === semantic.claimId
+              )) {
+                learnedSemanticComponentClaims.push(semantic);
+              }
+            }
+          }
+
+
           // Page Evidence can support a snippet Claim only when the normalized
           // statement is actually present in the fetched page text.
           const pageClaimStatement = (page.result.claimText || page.result.snippet || content.slice(0, 1000)).trim();
@@ -637,6 +680,7 @@ export class ResearchService {
         routes: ['LOCAL_CLAIM', 'WEB_SEARCH'],
         localClaimIds,
         learnedTermComponentClaims,
+        learnedSemanticComponentClaims,
         performed: evidence.some((e) => e.status !== 'REJECTED'),
         evidence,
         claimIds,

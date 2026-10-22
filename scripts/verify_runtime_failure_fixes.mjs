@@ -77,10 +77,12 @@ const researchPipelineSource = read('src/miki/research/services/researchService.
 const claimVerifierSource = read('src/miki/verification/services/verifierService.ts');
 const legacyConversationCoreSource = read('src/services/nonLlmCoreService.ts');
 const currentConversationCoreSource = read('src/miki/safety/services/conversationCoreService.ts');
+const webContentUnderstandingSource = read('src/miki/research/services/webContentUnderstandingService.ts');
 const researchServiceIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/research/services/researchService.ts |'));
 const claimVerifierIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/verification/services/verifierService.ts |'));
 const legacyConversationCoreIndexRow = design.split(/\r?\n/).find(line => line.includes('src/services/nonLlmCoreService.ts |'));
 const currentConversationCoreIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/safety/services/conversationCoreService.ts |'));
+const webContentUnderstandingIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/research/services/webContentUnderstandingService.ts |'));
 const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
 const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
 const candidateCodeGeneration = read('src/miki/core/services/candidateCodeGenerationService.ts');
@@ -732,10 +734,31 @@ check(
 check(
   'Web Claims aggregate only exact normalized statements and verify fetched-page support conservatively',
   researchPipelineSource.includes('const claimIdByNormalizedStatement = new Map<string, string>();') &&
-    researchPipelineSource.includes('this.linkResearchEvidenceToClaim(record.evidence_id, statement, claimIdByNormalizedStatement, !isCounterEvidencePass)') &&
+    /this\.linkResearchEvidenceToClaim\(\s*record\.evidence_id,\s*statement,\s*claimIdByNormalizedStatement,\s*!isCounterEvidencePass,\s*\)/.test(researchPipelineSource) &&
     researchPipelineSource.includes('normalizedPageContent.includes(normalizedPageStatement)') &&
     researchPipelineSource.includes('claimIds: [pageClaimId]') &&
     researchPipelineSource.includes('learnedTermComponentClaims')
+);
+check(
+  'Web page content creates structured, provenance-linked candidate knowledge',
+  researchPipelineSource.includes('webContentUnderstandingService.learnPage') &&
+    researchPipelineSource.includes('learnedSemanticComponentClaims') &&
+    webContentUnderstandingSource.includes('export function extractWebSemanticUnits') &&
+    webContentUnderstandingSource.includes('sourceFragmentSha256') &&
+    webContentUnderstandingSource.includes("verificationStatus: 'UNVERIFIED'") &&
+    webContentUnderstandingSource.includes('researchGraphConnectorP211Service.connect') &&
+    webContentUnderstandingSource.includes('requiresVerification: true')
+);
+check(
+  'Web semantic candidates are verified separately from Knowledge Gap-wide resolution',
+  legacyConversationCoreSource.includes('research.semanticVerification = semanticVerification;') &&
+    currentConversationCoreSource.includes('research.semanticVerification = semanticVerification;') &&
+    legacyConversationCoreSource.includes('research.learnedSemanticComponentClaims') &&
+    currentConversationCoreSource.includes('research.learnedSemanticComponentClaims')
+);
+check(
+  'Web semantic service source index line count matches the current implementation',
+  webContentUnderstandingIndexRow?.includes(`lines=${webContentUnderstandingSource.split(/\\r?\\n/).length - 1}`)
 );
 check(
   'Counterevidence is excluded from affirmative Claim promotion',

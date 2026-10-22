@@ -368,6 +368,38 @@ export class NonLlmCoreService {
             );
           }
 
+          // Semantic page candidates are verified independently of the Gap-wide
+          // Claim set: one weak extraction must not prevent an otherwise complete
+          // Gap from resolving, and an unverified candidate must never be promoted.
+          const semanticClaimIds = [...new Set(
+            (research.learnedSemanticComponentClaims || []).map(item => item.claimId)
+          )].filter(claimId => !verification.some(result => result.claimId === claimId));
+          const semanticVerification = semanticClaimIds.length > 0
+            ? verifierService.verifyMany({
+                claimIds: semanticClaimIds,
+                requireFresh: requireFreshResearch,
+                maxAgeDays: requireFreshResearch ? 30 : undefined,
+              })
+            : [];
+          research.semanticVerification = semanticVerification;
+          const allClaimVerification = [...verification, ...semanticVerification];
+
+          for (const semantic of research.learnedSemanticComponentClaims || []) {
+            const semanticClaimVerification = allClaimVerification.find(
+              result => result.claimId === semantic.claimId
+            );
+            if (!semanticClaimVerification?.promoted) continue;
+
+            reusableComponentFactoryService.verifyResearchKnowledge(
+              semantic.componentId,
+              [semantic.claimId],
+              {
+                requireFresh: requireFreshResearch,
+                maxAgeDays: requireFreshResearch ? 30 : undefined,
+              }
+            );
+          }
+
           // A single verified result can answer a question, but the whole Gap
           // is resolved only when every Claim attached to it passes Verification.
           if (allResearchClaimsVerified) {

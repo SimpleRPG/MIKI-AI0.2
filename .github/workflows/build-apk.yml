@@ -41,6 +41,9 @@ jobs:
       - name: Verify current tracked source inventory P299
         run: python scripts/audit_current_source_inventory_p299.py --check
 
+      - name: Verify web content understanding
+        run: npx tsx scripts/verify_web_content_understanding.ts
+
       - name: Verify cognitive graph node identity and conversation edges
         timeout-minutes: 10
         run: |
