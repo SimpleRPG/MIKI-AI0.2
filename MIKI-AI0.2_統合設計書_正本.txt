@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-21
-正本Revision：2026-10-23-P307
+正本Revision：2026-10-23-P308
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-23-P307
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-23-P308
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
 - 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
@@ -135,6 +135,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - Issue Discoveryは既存ImprovementIntakeRun／TaskBlackboardのterminal状態を再照合する。問題の解決は監視元の状態変化で確認し、単なるTask完了だけでは解決扱いしない。失敗・未解決完了は指数バックオフ付きで最大3回再試行し、取消済みTaskは自動再投入しない。
 - TaskCaseMemoryの関連失敗ケースを既存改善計画のrationaleへ診断情報として渡す。失敗ケースは観測事実として扱い、普遍的な法則や検証済み知識へ昇格させない。
 - Execution FailureのResearch／Promotionをイベントリスナーから直接実行せず、永続Knowledge Gap→AutonomousRevalidationLoop→既存CORE TaskIngress→Verification境界へ統一する。
+- DomainIntegrationBootstrapServiceのDomain監査・初期化が例外または不合格になった場合は、部分登録済みDomainと起動済みWorker／Loopをdisposeして例外を再送出する。AppRuntimeLifecycleServiceはBootstrapを最大2回試行し、最終失敗はRUNTIME_STAGE_FAILEDとして後続stageを実行しない。全体初期化が失敗した場合は初期化latchを解除し、成功した状態と誤認させない。UI_READYは画面操作可能を示すだけで、CORE／自律Loopの起動完了を意味しない。
 
 - CORE + 17分類 = 18構成。
 - 通常対話のCORE 18構成追跡は初期状態で折りたたみ、要約行へ処理状態を表示し、必要時に展開して詳細を確認できる。追跡情報・CORE処理経路・保存データは削減しない。
@@ -250,7 +251,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 記載形式: [状態] Domain | ファイル | 行数 | Export/Class/Function | 呼出元数 | 依存数 | Storage/Plugin/Test/Marker。詳細な全配列、SHA-256、全呼出元・依存先はJSON正本索引を参照する。
 
 - [USED] UI | src/App.tsx | lines=2041 | symbols=App | callers=1 | deps=113 | Tests=18
-- [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=161 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
+- [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=172 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
 - [ORPHAN] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=0 | deps=0 | Tests=2
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
 - [USED] OTHER | src/autonomous_modules/anaphora_resolver_sample.ts | lines=162 | symbols=PureAnaphoraResolutionResult, resolveAnaphoraPure | callers=2 | deps=0
@@ -464,7 +465,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/directiveReviewPackageCompletionService.ts | lines=5 | symbols=DirectiveCompletionState, DirectiveReviewCompletion, directiveReviewPackageCompletionService | callers=1 | deps=6 | Tests=1
 - [USED] CORE | src/miki/core/services/domainCatalogService.ts | lines=5 | symbols=MIKI_DOMAINS, MIKI_WORKER_DOMAINS, getMikiDomainOrder, isMikiDomain | callers=5 | deps=1 | Tests=1
 - [USED] CORE | src/miki/core/services/domainContractRegistryService.ts | lines=33 | symbols=DomainCapabilityManifest, DomainContractValidation, domainContractRegistryService | callers=1 | deps=3
-- [USED] CORE | src/miki/core/services/domainIntegrationBootstrapService.ts | lines=874 | symbols=domainIntegrationBootstrapService | callers=4 | deps=67 | Tests=10
+- [USED] CORE | src/miki/core/services/domainIntegrationBootstrapService.ts | lines=879 | symbols=domainIntegrationBootstrapService | callers=4 | deps=67 | Tests=10
 - [USED] CORE | src/miki/core/services/domainOperationalAdapterService.ts | lines=101 | symbols=DomainOperationalSnapshot, domainOperationalAdapterService | callers=2 | deps=20
 - [AVAILABLE_EXPORT_ONLY] CORE | src/miki/core/services/domainOwnershipCatalogService.ts | lines=30 | symbols=SourceOwnership, SourceOwnershipKind, getCoreCompatibilityGateways, getDomainOwnershipCatalog, resolveSourceOwnership | callers=1 | deps=2
 - [USED] CORE | src/miki/core/services/domainParticipationService.ts | lines=168 | symbols=DomainConnectivityAudit, DomainConnectivityAuditEntry, DomainParticipationAssessment, PARTICIPATING_DOMAINS, domainParticipationService | callers=3 | deps=4 | Storage=miki_domain_connectivity_audit_v1 / Tests=1
@@ -12220,4 +12221,11 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 
 - `verifyResearchKnowledge()` はComponentの検証状態をメモリ上で変更した後、古い保存Snapshotを再読込して書き戻していた。検索・更新・保存で同じ配列インスタンスを使い、VERIFIED/CONFLICTと更新時刻・反証参照を確実に保存する。
 - Web意味規則学習の回帰テストに、CORE検証の成功後、保存済みComponentの `verificationStatus` と `lifecycleStatus` がVERIFIEDであることの照合を追加する。戻り値と一時オブジェクトだけで永続化を推定しない。
-- 正本Revision・現行Revision・対象Serviceの行数索引を更新し、P299現行ソースインベントリを再生成する。Termuxでテスト・lint・buildは実行しない。GitHub Actions、APK Artifact、実機動作はPUSH後の実測結果で判定する。
+- 正本Revision・現行Revision・対象Serviceの行数索引を更新し、P299現行ソースインベントリを再生成する。Termuxでテスト・lint・buildは実行しない。GitHub Actions、APK Artifact、実機動作はPUSH後の実測結果で判定する。============================================================
+【2026-10-23-P308 自律ランタイムBootstrap失敗の回復と正しい状態判定】
+============================================================
+
+- AppRuntimeLifecycleServiceのDomainIntegrationBootstrap stageが例外を警告ログだけで握り潰し、stage成功として後続初期化へ進む問題を修正する。Bootstrapを最大2回試行し、2回とも失敗した場合は例外を親のstage失敗処理へ渡し、後続stageの成功扱いを禁止する。
+- DomainIntegrationBootstrapService.initialize()はDomain監査の不合格を例外として統一し、初期化途中で例外が発生した場合は登録・Worker・Loop・Schedulerをdisposeして初期化latchを解除してから再送出する。途中失敗後に次の呼出しがinitialized=trueで誤って早期returnする経路を閉じる。
+- AppRuntimeLifecycleServiceも全体初期化の失敗時に初期化latchを解除し、失敗したgenerationを無効化する。UI_READY／画面操作可能と自律Runtime初期化完了を混同しない。
+- `scripts/verify_runtime_failure_fixes.mjs`へ、Bootstrapのbounded retry、cleanupと例外伝播、失敗latch解除の回帰契約を追加する。正本Revisionと変更ソースの行数索引を同期し、P299追跡Source Inventoryを生成し直す。Termuxではtest/lint/buildを実行しない。PUSH後のActions・APK・実機状態は個別に実測して判定する。

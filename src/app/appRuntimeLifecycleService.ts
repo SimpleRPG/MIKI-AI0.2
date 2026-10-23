@@ -48,14 +48,23 @@ class AppRuntimeLifecycleService {
       {
         name: 'domainIntegrationBootstrapService.initialize',
         run: async () => {
-          try {
-            await domainIntegrationBootstrapService.initialize();
-          } catch (error) {
-            systemLogger.warn(
-              'SYSTEM',
-              `[DomainIntegration] bootstrap failed: ${error instanceof Error ? error.message : String(error)}`
-            );
+          let lastError: unknown;
+          for (let attempt = 1; attempt <= 2; attempt += 1) {
+            try {
+              await domainIntegrationBootstrapService.initialize();
+              return;
+            } catch (error) {
+              lastError = error;
+              systemLogger.warn(
+                'SYSTEM',
+                `[DomainIntegration] bootstrap attempt ${attempt}/2 failed: ${error instanceof Error ? error.message : String(error)}`
+              );
+              if (attempt < 2) {
+                await new Promise<void>((resolve) => window.setTimeout(resolve, 1000));
+              }
+            }
           }
+          throw lastError instanceof Error ? lastError : new Error(String(lastError));
         },
       },
       { name: 'capabilityLearningService.initialize', run: () => capabilityLearningService.initialize() },
@@ -135,6 +144,8 @@ class AppRuntimeLifecycleService {
         await this.yieldToBrowser();
       }
     } catch (error) {
+      this.initialized = false;
+      this.generation += 1;
       throw error;
     }
   }

@@ -57,14 +57,15 @@ class DomainIntegrationBootstrapService{
 
  async initialize():Promise<void>{
   if(this.initialized)return;
-  productionScaleWorkerService.initialize();
   this.initialized=true;
-  initializeResearchMemoryVerificationSubscriber();
+  try{
+   productionScaleWorkerService.initialize();
+   initializeResearchMemoryVerificationSubscriber();
   // Register every domain before the fail-closed audit. The previous order
   // audited an empty router on a cold start and could not prove connectivity.
   for(const domain of MIKI_DOMAINS)domainRouterService.register(domain,[...BASE_COMMANDS,...this.extraCommands(domain)],(envelope)=>this.handle(domain,envelope));
   const connectivityAudit=await domainParticipationService.auditAll();
-  if(!connectivityAudit.passed){this.dispose();throw new Error('DOMAIN_CONNECTIVITY_AUDIT_FAILED');}
+  if(!connectivityAudit.passed)throw new Error('DOMAIN_CONNECTIVITY_AUDIT_FAILED');
   autonomousSelfImprovementLoopService.initialize();
   autonomousIssueDiscoveryService.initialize();autonomousCapabilityInnovationService.initialize();
   conversationCompositionResearchSchedulerService.initialize();
@@ -76,7 +77,11 @@ class DomainIntegrationBootstrapService{
    claimVerificationEventService.subscribe(e=>{crossDomainCirculationService.record('verification',(e.outcome==='SUPPORTED'||e.outcome==='DEVICE_VERIFIED')?'promotion':'unknown',`CLAIM_${e.outcome}`,e.claimId);if(e.outcome==='CONTRADICTED'||e.outcome==='UNRESOLVED'){autonomousIssueDiscoveryService.recordContradiction(e.claimId,e.outcome);selfImprovementIngressService.submit({trigger:`claim.${e.outcome}:${e.claimId}`,source:'SYSTEM'});}}),
    selfImprovementRequestEventService.subscribe(e=>{const requestId=e.requestId||undefined;crossDomainCirculationService.record(e.source==='AUTOPILOT'?'autonomy':'conversation','improvement','SELF_IMPROVEMENT_REQUESTED',requestId||e.trigger);selfImprovementIngressService.submit({trigger:e.trigger,source:e.source,runId:requestId,sourceId:requestId,payload:requestId?{autopilotRequestId:requestId}:undefined});}),
   );
-  systemLogger.info('SELF_IMPROVEMENT',`[DomainIntegration] ${MIKI_DOMAINS.length} domains registered`);
+   systemLogger.info('SELF_IMPROVEMENT',`[DomainIntegration] ${MIKI_DOMAINS.length} domains registered`);
+  }catch(error){
+   this.dispose();
+   throw error;
+  }
  }
 
  dispose():void{

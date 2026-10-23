@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 86419 | 1267 | `ac4584bfd9ab1578d5532ac0a59b2ac27c7b938a899dfbb99d5c61eef29e714d` | 5 | 0 | 5 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 87285 | 1279 | `5464109bcc54a666521bc556c7bb06953ba8fa483ed81b882c245dfd578bd79a` | 5 | 0 | 5 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -461,7 +461,7 @@
 | `scripts/verify_world_patterns_p111.mjs` | 1554 | 1 | `7bbe0c27d4733c537e6a79b8ff81ec1d364e6936a6bcbe34714b679461e18f77` | 2 | 2 | 0 |
 | `server.ts` | 253983 | 5792 | `0431b612de24123d0092b18ef084b4c6da644a8c93eb4a5af261a1f3fed99828` | 42 | 40 | 2 |
 | `src/App.tsx` | 88486 | 2041 | `1b780617985e3659f160ae8accb63b5117e4d7a7eca92c42bf834addb175bd76` | 117 | 117 | 0 |
-| `src/app/appRuntimeLifecycleService.ts` | 9116 | 161 | `ecd8cd445fdcaeb61892c84b3d6941a5160d975af6925e2dc702a48758abdd64` | 31 | 31 | 0 |
+| `src/app/appRuntimeLifecycleService.ts` | 9600 | 172 | `878d3c181cd04bc815c6b6c360c2c568723258ca941f87d2d391e55bca094923` | 31 | 31 | 0 |
 | `src/app/startupPhaseSchedulerService.ts` | 706 | 3 | `bb8ce0bc1ef0201da3c50eb1f06ec8ad60edab97bfb54ad47b481004981b975c` | 0 | 0 | 0 |
 | `src/autonomous_modules/anaphora_history_stack.ts` | 2590 | 89 | `40d02342541b6b4562a2c2754dd9079b8a1cb8eaa3b3307b195b2af9e407c46c` | 0 | 0 | 0 |
 | `src/autonomous_modules/anaphora_resolver_sample.ts` | 5763 | 162 | `35d90ceee6a6a7543824c14e75fe74fe2b2bbcb786698feda72a55b6fbbe2569` | 0 | 0 | 0 |
@@ -679,7 +679,7 @@
 | `src/miki/core/services/domainCatalogService.ts` | 658 | 5 | `5971ed3ec9fd0e48a6b24ae20d471318dbc6d08a2473bea60ae54fbc2fea628f` | 1 | 1 | 0 |
 | `src/miki/core/services/domainContextProjectionP156Service.ts` | 3905 | 12 | `7acebc53c4b2a14b4f3adda68e51c5dab12de538412b94ceec61e69c8ac35626` | 5 | 5 | 0 |
 | `src/miki/core/services/domainContractRegistryService.ts` | 5274 | 34 | `77b3d6b8aa8aac5c6a4eb6eb33af5055e47fa6887552dcef30cae56763338bcd` | 3 | 3 | 0 |
-| `src/miki/core/services/domainIntegrationBootstrapService.ts` | 58791 | 874 | `eb5217f08efbc4cded94aba88795df57e746baedba0e9775c742c9484184a1b0` | 82 | 82 | 0 |
+| `src/miki/core/services/domainIntegrationBootstrapService.ts` | 58840 | 879 | `6775efd4f7cb43f43da87a886debb21f183dcad067df5d5bc0b71c58f594d3b0` | 82 | 82 | 0 |
 | `src/miki/core/services/domainOperationalAdapterService.ts` | 7273 | 101 | `21ebe793a6e78bb78fb2d274de296f2cf729045d4b73889d9d6b6d081c97187d` | 20 | 20 | 0 |
 | `src/miki/core/services/domainOwnershipCatalogService.ts` | 1626 | 30 | `63de9eaf7bfff9a3c8826c0bbb7069060b5db364410d1ccb4ab89c84f0f5ab19` | 2 | 2 | 0 |
 | `src/miki/core/services/domainParticipationService.ts` | 10196 | 168 | `0a72e559a63563823ed782418e4bb2b6e8fa56ce35c67ec16b406dcdb0d5f733` | 5 | 5 | 0 |

@@ -463,6 +463,18 @@ check(
     runtimeLifecycle.includes("nextStage: stages[stageIndex + 1]?.name || 'NONE'")
 );
 check(
+  'Critical domain bootstrap errors are retried once and are never swallowed as successful startup',
+  runtimeLifecycle.includes('for (let attempt = 1; attempt <= 2; attempt += 1)') &&
+    runtimeLifecycle.includes('await domainIntegrationBootstrapService.initialize();') &&
+    runtimeLifecycle.includes('throw lastError instanceof Error ? lastError : new Error(String(lastError));') &&
+    domainIntegrationBootstrap.includes("if(!connectivityAudit.passed)throw new Error('DOMAIN_CONNECTIVITY_AUDIT_FAILED');") &&
+    domainIntegrationBootstrap.includes('  }catch(error){\n   this.dispose();\n   throw error;\n  }')
+);
+check(
+  'Failed runtime initialization clears its latch and invalidates the failed generation',
+  runtimeLifecycle.includes('} catch (error) {\n      this.initialized = false;\n      this.generation += 1;\n      throw error;\n    }')
+);
+check(
   'Domain audit checkpoints include current step and previous/next operation',
   domainParticipation.includes("recordRuntimeBreadcrumb('DOMAIN_AUDIT_OPERATION_BEGIN'") &&
     domainParticipation.includes("recordRuntimeBreadcrumb('DOMAIN_AUDIT_OPERATION_COMPLETE'") &&
