@@ -748,6 +748,12 @@ check(
     researchPipelineSource.includes('learnedTermComponentClaims')
 );
 check(
+  'Page term learning uses the preceding accepted-evidence guard without a redundant rejected-status comparison',
+  researchPipelineSource.includes("if (pageEvidence.status === 'REJECTED') continue;") &&
+    researchPipelineSource.includes('if (pageClaimId) {') &&
+    !researchPipelineSource.includes("if (pageClaimId && pageEvidence.status !== 'REJECTED')")
+);
+check(
   'Web page content creates structured, provenance-linked candidate knowledge',
   researchPipelineSource.includes('webContentUnderstandingService.learnPage') &&
     researchPipelineSource.includes('learnedSemanticComponentClaims') &&

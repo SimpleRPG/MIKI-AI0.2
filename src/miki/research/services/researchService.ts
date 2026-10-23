@@ -468,7 +468,7 @@ export class ResearchService {
 
           // Page-derived term knowledge retains Claim lineage. No linked Claim
           // means no term component is presented as research-backed knowledge.
-          if (pageClaimId && pageEvidence.status !== 'REJECTED') {
+          if (pageClaimId) {
             const termLearning = webTermLearningService.learnPage({
               text: content,
               url: page.url,

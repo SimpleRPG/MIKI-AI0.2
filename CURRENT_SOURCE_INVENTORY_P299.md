@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 86049 | 1261 | `25628aef0333dda3ad7583c36d96adf12d79395f8ebea45f41c86c81ac684ebd` | 5 | 0 | 5 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 86419 | 1267 | `ac4584bfd9ab1578d5532ac0a59b2ac27c7b938a899dfbb99d5c61eef29e714d` | 5 | 0 | 5 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -946,7 +946,7 @@
 | `src/miki/research/services/researchQueryOutcomeLearningService.ts` | 7408 | 174 | `543efdc6ea5bb29aa75d25a17ef0852f9071b23c18fb9db340406b4149990345` | 4 | 4 | 0 |
 | `src/miki/research/services/researchQueryPlanningService.ts` | 11855 | 45 | `8c32e10dbc345b638a64b1825a34f78f675b8665eec349b7f331a8a1831e17d6` | 4 | 4 | 0 |
 | `src/miki/research/services/researchRustKernelService.ts` | 743 | 1 | `1c5a5779394b2d6cec5c45272f6b45c5e545839941698f57ef12b1c6b105dd26` | 0 | 0 | 0 |
-| `src/miki/research/services/researchService.ts` | 38594 | 810 | `15eeeafafac82c5a18be7143a4438ad8f3634ca9de7f750b7123a4a8539fec27` | 14 | 14 | 0 |
+| `src/miki/research/services/researchService.ts` | 38556 | 810 | `ac7af0ca7d5f376ff957005b754159f7288012d39f7f5749cd46e28eacdf7880` | 14 | 14 | 0 |
 | `src/miki/research/services/researchStrategyService.ts` | 7383 | 158 | `88dd12e1c20638c1f2226a95baf76ddf73bbfb7d3de5febd18df8faba89cfb40` | 2 | 2 | 0 |
 | `src/miki/research/services/researchToRemediationService.ts` | 9504 | 160 | `ae43b1232c993a77e121d3a9d0acd531464b5abb03c9ff34cde470372815bdf6` | 11 | 11 | 0 |
 | `src/miki/research/services/scienceExperimentService.ts` | 91 | 1 | `fc0d87a8a20d520482fb266f36bb9036f47e052a07084de6bb1fd4c78213c908` | 1 | 1 | 0 |
