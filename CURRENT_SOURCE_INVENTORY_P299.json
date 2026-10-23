@@ -6264,9 +6264,9 @@
     },
     {
       "path": "scripts/verify_web_semantic_rule_learning.ts",
-      "bytes": 8842,
-      "lines": 159,
-      "sha256": "a0cfe85d1262e83554897579119b5e78d2e721d1f5bcf1a805b827d7afaf5cae",
+      "bytes": 9492,
+      "lines": 167,
+      "sha256": "266a75df31c3f84035af3e8a30946f882ad74dc7dbe2fdf3e55e9316abeee273",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -17469,9 +17469,9 @@
     },
     {
       "path": "src/miki/core/services/reusableComponentFactoryService.ts",
-      "bytes": 72770,
-      "lines": 1735,
-      "sha256": "c9e12654e890cecd6f9a7a9262b53179824ea3237e050114473e26ca2dc17be5",
+      "bytes": 72750,
+      "lines": 1736,
+      "sha256": "94a55e3dd652e29d7902259ba8c0fcf9c64846802ea906554ebddca35708f7f1",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -396,7 +396,8 @@ class ReusableComponentFactoryService{
   return {component,created:true,updated:false};
  }
  verifyResearchKnowledge(componentId:string,claimIds:string[],options?:{requireFresh?:boolean;maxAgeDays?:number}):{component:KnowledgeComponentArtifact|undefined;verified:boolean;conflicted:boolean;verificationIds:string[];reasons:string[]}{
-  const item=this.read<AnyReusableComponent>(COMPONENT_KEY).find((x):x is KnowledgeComponentArtifact=>x.componentId===componentId&&x.componentKind==='KNOWLEDGE');
+  const items=this.read<AnyReusableComponent>(COMPONENT_KEY);
+  const item=items.find((x):x is KnowledgeComponentArtifact=>x.componentId===componentId&&x.componentKind==='KNOWLEDGE');
   if(!item||item.componentKind!=='KNOWLEDGE'){
     return {component:undefined,verified:false,conflicted:false,verificationIds:[],reasons:['KNOWLEDGE_COMPONENT_NOT_FOUND']};
   }
@@ -440,7 +441,7 @@ class ReusableComponentFactoryService{
   }
 
   item.updatedAt=Date.now();
-  storageService.setItem(COMPONENT_KEY,JSON.stringify(this.read<AnyReusableComponent>(COMPONENT_KEY)));
+  storageService.setItem(COMPONENT_KEY,JSON.stringify(items));
 
   if(verified&&item.componentType==='WEB_SEMANTIC_PROPOSITION'){
    try{

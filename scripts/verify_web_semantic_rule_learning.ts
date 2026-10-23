@@ -105,6 +105,14 @@ function verifyCandidate(index: number, statement: string): void {
   const { component, claimId } = createVerifiedCandidate(index, statement);
   const result = reusableComponentFactoryService.verifyResearchKnowledge(component.componentId, [claimId]);
   assert.equal(result.verified, true, `candidate ${index} must pass CORE's independent evidence verification: ${result.reasons.join('; ')}`);
+
+  const raw = storageService.getItem('miki_reusable_component_repository_v1');
+  assert.ok(raw, 'the reusable component repository must remain readable after verification');
+  const savedComponents = JSON.parse(raw) as KnowledgeComponentArtifact[];
+  const saved = savedComponents.find((item) => item.componentId === component.componentId);
+  assert.ok(saved, `candidate ${index} must still exist in the persisted repository`);
+  assert.equal(saved.verificationStatus, 'VERIFIED', 'successful verification must persist its status');
+  assert.equal(saved.lifecycleStatus, 'VERIFIED', 'successful verification must persist its lifecycle transition');
 }
 
 const unverifiedReceipt = webSemanticRuleLearningService.observeVerifiedComponent({
