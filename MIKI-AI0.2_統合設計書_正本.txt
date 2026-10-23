@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-21
-正本Revision：2026-10-23-P305
+正本Revision：2026-10-23-P306
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-23-P305
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-23-P306
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
 - 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
@@ -158,7 +158,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 ■ 現行追跡ソースインベントリ（P299・Git追跡パス基準）
 
 - 現行スナップショットは`CURRENT_SOURCE_INVENTORY_P299.json`、閲覧用一覧は`CURRENT_SOURCE_INVENTORY_P299.md`。生成器は`scripts/audit_current_source_inventory_p299.py`。
-- P299生成結果：ソースファイル1386件、対象追跡パス1841件（監査制御ファイルを除外）。ECMAScriptの相対import候補3894件のうち、追跡パスへ解決された候補3875件、未解決候補19件。
+- P299生成結果：ソースファイル1391件、対象追跡パス1846件（監査制御ファイルを除外）。ECMAScriptの相対import候補3919件のうち、追跡パスへ解決された候補3900件、未解決候補19件。
 - ソース対象拡張子、SHA-256、バイト数、行数、および相対import候補の抽出方法はJSONのscopeに記録する。追加した生成器・JSON・Markdown自身は対象から除外するため、commit前後で件数が変動しない。
 - 相対importは字句的候補であり、未解決候補を自動的に不具合と判定しない。alias・条件付きimport・動的に生成される参照・実行時呼出し・意味上のAuthorityは証明しない。P97/P222の到達性指標とは別の集計である。
 - P287～P293の過去監査台帳は削除・上書きしない。現行一覧と過去のAuthority/重複監査根拠を分離して保持する。
@@ -501,7 +501,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/requirementPriorityResolverService.ts | lines=11 | symbols=PrioritizedRequirement, requirementPriorityResolverService | callers=2 | deps=1 | Tests=1
 - [USED] CORE | src/miki/core/services/requirementTraceabilityMatrixService.ts | lines=5 | symbols=RequirementTraceRow, requirementTraceabilityMatrixService | callers=1 | deps=2 | Tests=1
 - [USED] CORE | src/miki/core/services/residualCapabilityIntegrationService.ts | lines=17 | symbols=ResidualIntegrationRequest, residualCapabilityIntegrationService | callers=2 | deps=6 | Tests=1
-- [USED] CORE | src/miki/core/services/reusableComponentFactoryService.ts | lines=1726 | symbols=AnyReusableComponent, CodeComponentArtifact, ComponentPack, ComponentSelectionMode, ComponentUsageReceipt | callers=8 | deps=25 | Storage=miki_component_usage_receipts_v1,miki_reusable_component_repository_v1
+- [USED] CORE | src/miki/core/services/reusableComponentFactoryService.ts | lines=1735 | symbols=AnyReusableComponent, CodeComponentArtifact, ComponentPack, ComponentSelectionMode, ComponentUsageReceipt | callers=8 | deps=26 | Storage=miki_component_usage_receipts_v1,miki_reusable_component_repository_v1
 - [USED] CORE | src/miki/core/services/reviewCandidateExportService.ts | lines=6 | symbols=ReviewCandidatePackage, reviewCandidateExportService | callers=3 | deps=3 | Tests=2
 - [USED] CORE | src/miki/core/services/reviewDecisionLearningService.ts | lines=110 | symbols=LearningSignal, ReviewLearningEpisode, reviewDecisionLearningService | callers=4 | deps=4 | Storage=miki_review_learning_episodes_v1,miki_review_learning_persistence_receipts_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/reviewLearningArtifactService.ts | lines=33 | symbols=AcceptedPattern, CandidateLearningContext, CorrectionPair, FailurePattern, HoldCondition | callers=5 | deps=4 | Storage=miki_review_learning_artifact_receipts_v1,miki_review_learning_artifacts_v1
@@ -683,9 +683,10 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] research | src/miki/research/services/unifiedWebResearchService.ts | lines=91 | symbols=UnifiedWebResearchService, unifiedWebResearchService | callers=14 | deps=2
 - [USED] research | src/miki/research/services/unknownResearchControlService.ts | lines=2 | symbols=UnknownResearchChoice, decideUnknownResearch | callers=2 | deps=0
 - [USED] research | src/miki/research/services/virtualExpertService.ts | lines=1 | symbols= virtualExpertService  | callers=1 | deps=1
-- [USED] research | src/miki/research/services/webContentUnderstandingService.ts | lines=423 | symbols=WebSemanticKnowledgeKind, WebSemanticRelation, WebSemanticPolarity, WebSemanticUnit, WebSemanticComponentClaim, WebSemanticLearningResult, extractWebSemanticUnits, WebContentUnderstandingService, webContentUnderstandingService | callers=1 | deps=3 | Tests=1
+- [USED] research | src/miki/research/services/webContentUnderstandingService.ts | lines=432 | symbols=WebSemanticKnowledgeKind, WebSemanticRelation, WebSemanticPolarity, WebSemanticUnit, WebSemanticComponentClaim, WebSemanticLearningResult, extractWebSemanticUnits, WebContentUnderstandingService, webContentUnderstandingService | callers=1 | deps=4 | Tests=2
 - [USED] research | src/miki/research/services/webMaterialPatternExtractor.ts | lines=412 | symbols=VALID_WEB_REAL_DATA_PROVIDERS, WebExtractedSkeletonPattern, WebExtractedSurfacePattern, WebImplementationCodeExample, WebImplementationMaterial | callers=8 | deps=2 | Tests=3
 - [USED] research | src/miki/research/services/webResearchPolicyService.ts | lines=54 | symbols=IndependentSourceTarget, SourceIndependenceMode, WebResearchPolicy, WebResearchPolicyReceipt, WebResearchProgress | callers=4 | deps=2 | Storage=miki_web_research_policy_v1
+- [USED] research | src/miki/research/services/webSemanticRuleLearningService.ts | lines=536 | symbols=WebSemanticRuleState, WebSemanticRuleObservation, WebSemanticLearnedRule, WebSemanticRuleLearningReceipt, WebSemanticRuleMatch, WebSemanticRuleLearningService, webSemanticRuleLearningService | callers=2 | deps=4 | Storage=miki_web_semantic_rule_learning_v1 / Tests=1
 - [USED] research | src/miki/research/services/webTermLearningService.ts | lines=153 | symbols=LearnedWebTerm, WebTermLearningInput, WebTermLearningResult, webTermLearningService | callers=2 | deps=3
 - [USED] OTHER | src/miki/safety.ts | lines=38 | symbols=safety | callers=1 | deps=21 | Tests=18 / Markers=2
 - [USED] safety | src/miki/safety/services/abstractSanitizerService.ts | lines=253 | symbols=abstractSanitizerService | callers=5 | deps=3 | Storage=miki_abstract_symbol_mappings_v5 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
@@ -9521,6 +9522,11 @@ Web本文は、検索結果の根拠として保存するだけでなく、本�
 - 各候補文は正規化後も取得本文に存在する場合に限り、対応するEvidenceを用いた個別Claimへ接続する。COUNTEREVIDENCEは正のClaimへ統合しない。
 - 構造化候補は `WEB_SEMANTIC_PROPOSITION` として `CANDIDATE` / `UNVERIFIED` のまま保存する。抽出信頼度は抽出規則への適合度であり、主張の真偽確率ではない。
 - P211認知グラフへ `SEMANTIC_CANDIDATE` として出典付き候補ノードを接続し、COREによるClaim検証後にのみKnowledge Componentの昇格を許す。抽出候補を追加したことだけでKnowledge Gap全体を解決済みにしない。
+- CORE検証済みの `WEB_SEMANTIC_PROPOSITION` だけを意味規則学習の入力にする。対象ClaimはREALかつSUPPORTED/DEVICE_VERIFIEDで、反証がなく、各ClaimにADMISSIBLEなWEB Evidenceが2つ以上の独立クラスターと2つ以上の異なるHTTP(S) URLから存在することを要求する。
+- 規則候補は既存のRELATION/OBSERVATION抽出で得た述語末尾の6/8/10/12/14文字の限定Cueから作る。同一Cueについて3つ以上の異なる検証済みClaim・3 URL・3独立クラスター・2種類以上の主語指紋がそろい、意味ラベルが1種類だけの場合にACTIVEとする。未達はCANDIDATE、異なるkind/relation/polarityの確認はSUSPENDEDとする。
+- 学習Cueは既存の強い抽出規則より後のフォールバックでのみ使い、極性が一致しない文章には適用しない。学習規則が解釈した出力から別の規則を学習する自己増幅を禁止し、抽出信頼度は0.60以下に抑える。
+- 規則スナップショットはSHA-256と保存読戻し一致を必須にする。不正shape/JSON/hashは元データをSHA-256付き隔離キーへ保存し、隔離保存の読戻し成功後だけ空スナップショットへ戻す。規則256件、1規則あたり観測24件で上限を設ける。
+- ACTIVEは意味抽出の再利用可否を表すだけで、抽出文の真偽やKnowledge Gapの解決を証明しない。新しく抽出された命題も通常のClaim/CORE検証を通す。
 - 本方式は規則ベースの部分的な意味抽出であり、曖昧な文章や抽出対象外の表現を完全に理解したとは扱わない。元ページ本文を実行コードとして扱わず、全文をKnowledge Componentへ複製しない。
 
 
@@ -12198,3 +12204,11 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - 先行するREJECTEDガードを維持し、後段はClaim IDの存在だけを条件にする。回帰Verifierには先行ガードの保持と重複比較の不在を検査する条件を追加する。
 - 正本Revision・現行Revision・ResearchServiceの実測行数索引を更新する。P299インベントリを再生成する。Termuxでtest/lint/buildは実行しない。Actions、APK、実機動作はPUSH後の実際の結果で判断する。
 
+============================================================
+【2026-10-23-P306 証拠裏付け付きWeb意味規則の増分学習】
+============================================================
+
+- 固定パターンで分類できなかった述語も再利用できるよう、CORE検証済みのWEB_SEMANTIC_PROPOSITIONから末尾Cueの規則候補を学習する。候補生成だけでは有効化せず、Claim状態、反証、ADMISSIBLE WEB Evidence、独立クラスター、異なるURL、主語指紋を照合する。
+- 3 Claim/3 URL/3独立クラスター/2主語指紋以上でラベルが一意なCueだけをACTIVEにする。極性の不一致や異なる意味ラベルが確認されたCueはSUSPENDEDにし、強い既存抽出規則は上書きしない。学習規則から別の規則を自己学習する経路を禁止する。
+- 規則状態にはSHA-256、保存読戻し確認、破損スナップショットの隔離、256規則・24観測の上限を設ける。Verifierで有効化・極性分離・矛盾停止を検証し、Workflowのビルド前に実行する。
+- 正本Revision・現行実装索引の変更対象行数・依存数・テスト数を更新する。P299現行ソースインベントリを再生成する。Termuxではtest/lint/buildを実行しない。GitHub Actions、APK Artifact、実機動作はPUSH後の実測結果で判定する。

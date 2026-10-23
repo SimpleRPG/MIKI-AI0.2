@@ -9,11 +9,11 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1844 |
-| ソースファイル | 1389 |
-| 相対import候補を字句走査したECMAScriptファイル | 1302 |
-| 相対import候補 | 3906 |
-| 追跡パスへ解決できた候補 | 3887 |
+| 対象追跡パス（監査制御ファイルを除く） | 1846 |
+| ソースファイル | 1391 |
+| 相対import候補を字句走査したECMAScriptファイル | 1304 |
+| 相対import候補 | 3919 |
+| 追跡パスへ解決できた候補 | 3900 |
 | 未解決候補（即不具合判定ではない） | 19 |
 
 ## ファイル一覧
@@ -453,6 +453,7 @@
 | `scripts/verify_visual_reference_research_p117.mjs` | 1709 | 1 | `7d37035744d7d91749c79999604679125dc191371365bbb9c8bfb81a75f341c1` | 1 | 1 | 0 |
 | `scripts/verify_visual_truth_size_p124.mjs` | 2477 | 2 | `3ffcc553bc957ec60a5d9049815fcfe725d754412128a7c1c15b7b5b84da06d0` | 1 | 1 | 0 |
 | `scripts/verify_web_content_understanding.ts` | 2432 | 46 | `bd3561c89ff208978701d54338cc442ea6703b6f98c36d06c9d9c76b6407f02d` | 1 | 1 | 0 |
+| `scripts/verify_web_semantic_rule_learning.ts` | 8842 | 159 | `a0cfe85d1262e83554897579119b5e78d2e721d1f5bcf1a805b827d7afaf5cae` | 7 | 7 | 0 |
 | `scripts/verify_worker_runtime_stage61.mjs` | 1547 | 1 | `338946fc800a923593751a883117336b239b44c7ed7f21eb1c3ed82a6e73e824` | 0 | 0 | 0 |
 | `scripts/verify_worker_transaction_executors_stage27.mjs` | 1531 | 2 | `a46fe0db24dfffa9abeba218a243a9df4460590d99578a9f3fd455218acc8771` | 0 | 0 | 0 |
 | `scripts/verify_workspace_completion_stage29.mjs` | 1402 | 2 | `b4176f66fa9ca552e14ea5c6d082f71b9672fd7ac37b5b61f92c33aca1c60334` | 0 | 0 | 0 |
@@ -750,7 +751,7 @@
 | `src/miki/core/services/requirementPriorityResolverService.ts` | 1456 | 11 | `bcad666662d92118cfbd7f472934b98ed5a02671452e8176c390d68521c7153c` | 1 | 1 | 0 |
 | `src/miki/core/services/requirementTraceabilityMatrixService.ts` | 1042 | 5 | `a19b2ed8e0a14f18f6d6108ce50064d7347ddf7e73ce055728987bc781bfa36c` | 2 | 2 | 0 |
 | `src/miki/core/services/residualCapabilityIntegrationService.ts` | 1966 | 17 | `f495e789efb0e179fbd0577c95a08fa22418c16cf681a40ec1a1fd84f3feeb41` | 6 | 6 | 0 |
-| `src/miki/core/services/reusableComponentFactoryService.ts` | 72433 | 1726 | `022bd7309bb73ced662101536f5580ad9b3115ac560f73be386a58e5bc4bb42e` | 25 | 25 | 0 |
+| `src/miki/core/services/reusableComponentFactoryService.ts` | 72770 | 1735 | `c9e12654e890cecd6f9a7a9262b53179824ea3237e050114473e26ca2dc17be5` | 26 | 26 | 0 |
 | `src/miki/core/services/reviewCandidateExportService.ts` | 1444 | 6 | `1b9095935bea3ba2e6bd8315116dd3928b51491323f3834ccdc21add1398d07e` | 3 | 3 | 0 |
 | `src/miki/core/services/reviewDecisionLearningService.ts` | 4446 | 110 | `078bd19e99a99bc7d9b9295b9ae3a68b41495c77a48504028cf4c9072e6079f8` | 5 | 5 | 0 |
 | `src/miki/core/services/reviewLearningArtifactService.ts` | 12547 | 33 | `af8fb0b1b10fec063506f37ceb96fd7baab69c5230b34b2a1ce257727b4f27d5` | 4 | 4 | 0 |
@@ -957,9 +958,10 @@
 | `src/miki/research/services/unknownResearchControlService.ts` | 237 | 2 | `3ba02e14fc8f8ca99ece7a1f47c418277aa90f30d5aef060bdfff806e3dd0b75` | 0 | 0 | 0 |
 | `src/miki/research/services/virtualExpertService.ts` | 87 | 1 | `282fd2d45201f3b7cfdaff01e4a195d24f9ffb586ec72a897d86c181b04003a0` | 1 | 1 | 0 |
 | `src/miki/research/services/visualReferenceResearchService.ts` | 4560 | 16 | `2da06fd555f961ac29aec7cf9091aeda64132508978f3ea9bb89cdd93d0237da` | 1 | 1 | 0 |
-| `src/miki/research/services/webContentUnderstandingService.ts` | 15197 | 423 | `390c1001f8a1791cc5f73f58432c2fcadbf060266f0391bb1d148e9ca80fe0ca` | 3 | 3 | 0 |
+| `src/miki/research/services/webContentUnderstandingService.ts` | 15622 | 432 | `2a7a2798e49da8474629b2966807eac44ef7c5778a6174803c01911482180a9b` | 4 | 4 | 0 |
 | `src/miki/research/services/webMaterialPatternExtractor.ts` | 15594 | 412 | `caff894195342520c351b6c14ee0f66846bbc99d43906922792ea93a00ffd0bc` | 2 | 2 | 0 |
 | `src/miki/research/services/webResearchPolicyService.ts` | 4718 | 54 | `ebf50682592aba1b26743d6b0f22295f27d08afe631b8fcfc85c90f71ee0f9ad` | 2 | 2 | 0 |
+| `src/miki/research/services/webSemanticRuleLearningService.ts` | 22966 | 536 | `45413a1f8e4b7f5c6d7aaf7e0b4a81bee1fbc824ccc985eaf3a47c064ffba09c` | 4 | 4 | 0 |
 | `src/miki/research/services/webTermLearningService.ts` | 4831 | 153 | `5871ccd84bae6725c928ac8221a3a98c29c5f3acad60412fb526dd44d69e301a` | 3 | 3 | 0 |
 | `src/miki/safety.ts` | 1783 | 38 | `e6d4255ed02e7676d91f0966c33d8e5282adcb8eb45995a84a93034707d53c38` | 21 | 21 | 0 |
 | `src/miki/safety/services/abstractSanitizerService.ts` | 8880 | 253 | `68d7948b40c721b28e08142c746ef8a1b02f1915b2304e79c48f333170d2ebae` | 3 | 3 | 0 |

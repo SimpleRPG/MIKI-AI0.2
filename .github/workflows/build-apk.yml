@@ -44,6 +44,9 @@ jobs:
       - name: Verify web content understanding
         run: npx tsx scripts/verify_web_content_understanding.ts
 
+      - name: Verify evidence-backed web semantic rule learning
+        run: npx tsx scripts/verify_web_semantic_rule_learning.ts
+
       - name: Verify conversation and work-instruction failure recovery
         run: npx tsx scripts/verify_task_route_failure_contracts.ts
 

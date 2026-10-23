@@ -4,6 +4,7 @@ import {
   type KnowledgeComponentArtifact,
 } from '../../core/services/reusableComponentFactoryService';
 import { researchGraphConnectorP211Service } from './researchGraphConnectorP211Service';
+import { webSemanticRuleLearningService } from './webSemanticRuleLearningService';
 
 export type WebSemanticKnowledgeKind =
   | 'DEFINITION'
@@ -150,6 +151,11 @@ export function extractWebSemanticUnits(
     if (statement.length < 15 || statement.length > 500 || isCodeLike(statement)) continue;
     if (/^(?:目次|参考文献|copyright|all rights reserved)\b/i.test(statement)) continue;
 
+    const polarity: WebSemanticPolarity =
+      /ない|ません|ではない|でない|なく|禁止|不可|\bnot\b|\bnever\b|\bcannot\b|\bcan't\b|\bno\b/i.test(statement)
+        ? 'NEGATIVE'
+        : 'AFFIRMATIVE';
+
     const japaneseDefinition = statement.match(
       /^(.{1,80}?)(?:とは|というのは)[、,\s]*(.{2,220}?)(?:です|である|を指す|をいう|という意味です)?[。！？!?]*$/,
     );
@@ -212,25 +218,28 @@ export function extractWebSemanticUnits(
       relation = 'ASSERTS';
       extractionRule = japaneseRelation ? 'JA_DECLARATIVE_RELATION' : 'EN_DECLARATIVE_RELATION';
       extractionConfidence = 0.64;
-    } else if (
-      /(?:です|ます|である|だ|する|している|できる|含む|持つ|発生する|停止する)[。！？!?]*$/.test(statement)
-      || /\b(?:is|are|has|have|uses|supports|contains|includes|provides|works|fails|stores|returns)\b[^.!?]*[.!?]*$/i.test(statement)
-    ) {
-      kind = 'OBSERVATION';
-      relation = 'OBSERVES';
-      extractionRule = 'DECLARATIVE_SENTENCE';
-      extractionConfidence = 0.48;
     } else {
-      continue;
+      const learnedRule = webSemanticRuleLearningService.match(statement, polarity);
+      if (learnedRule) {
+        kind = learnedRule.kind;
+        relation = learnedRule.relation;
+        extractionRule = `LEARNED_CUE_${learnedRule.ruleId}`;
+        extractionConfidence = learnedRule.confidence;
+      } else if (
+        /(?:です|ます|である|だ|する|している|できる|含む|持つ|発生する|停止する)[。！？!?]*$/.test(statement)
+        || /\b(?:is|are|has|have|uses|supports|contains|includes|provides|works|fails|stores|returns)\b[^.!?]*[.!?]*$/i.test(statement)
+      ) {
+        kind = 'OBSERVATION';
+        relation = 'OBSERVES';
+        extractionRule = 'DECLARATIVE_SENTENCE';
+        extractionConfidence = 0.48;
+      } else {
+        continue;
+      }
     }
 
     const conditionValues = extractConditions(statement);
     const exceptionValues = extractExceptions(statement);
-    const polarity: WebSemanticPolarity =
-      /ない|ません|ではない|でない|なく|禁止|不可|\bnot\b|\bnever\b|\bcannot\b|\bcan't\b|\bno\b/i.test(statement)
-        ? 'NEGATIVE'
-        : 'AFFIRMATIVE';
-
     const subject = definition
       ? stripTrailingPunctuation(definition[1])
       : relationMatch && kind !== 'CAUSE'

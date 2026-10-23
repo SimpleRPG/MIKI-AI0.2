@@ -4,6 +4,7 @@ import { canonicalSha256Object } from './canonicalSha256Service';
 import { reviewLearningArtifactService, type ReviewLearningArtifact } from './reviewLearningArtifactService';
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
+import { webSemanticRuleLearningService } from '../../research/services/webSemanticRuleLearningService';
 import { componentRegistryService } from '../../../services/componentRegistryService';
 import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile, type CodeComponentDefinition, type CodeKnowledgeDefinition, type CodeConstructionBinding, type CodeConstructionGraph, type CodeConstructionNode, isCompatibleConstructionKind } from '../data/codeKnowledge/common';
 import { javascriptCodeKnowledge, additionalJavascriptCodeKnowledge, additionalJavascriptCodeComponents } from '../data/codeKnowledge/javascript';
@@ -440,6 +441,14 @@ class ReusableComponentFactoryService{
 
   item.updatedAt=Date.now();
   storageService.setItem(COMPONENT_KEY,JSON.stringify(this.read<AnyReusableComponent>(COMPONENT_KEY)));
+
+  if(verified&&item.componentType==='WEB_SEMANTIC_PROPOSITION'){
+   try{
+    webSemanticRuleLearningService.observeVerifiedComponent(item,ids);
+   }catch{
+    reasons.push('WEB_SEMANTIC_RULE_LEARNING_PERSISTENCE_FAILED');
+   }
+  }
 
   return {component:item,verified,conflicted,verificationIds,reasons};
  }
