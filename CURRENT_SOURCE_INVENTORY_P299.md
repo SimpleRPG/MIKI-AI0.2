@@ -12,8 +12,8 @@
 | 対象追跡パス（監査制御ファイルを除く） | 1846 |
 | ソースファイル | 1391 |
 | 相対import候補を字句走査したECMAScriptファイル | 1304 |
-| 相対import候補 | 3919 |
-| 追跡パスへ解決できた候補 | 3900 |
+| 相対import候補 | 3920 |
+| 追跡パスへ解決できた候補 | 3901 |
 | 未解決候補（即不具合判定ではない） | 19 |
 
 ## ファイル一覧
@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 87285 | 1279 | `5464109bcc54a666521bc556c7bb06953ba8fa483ed81b882c245dfd578bd79a` | 5 | 0 | 5 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 88952 | 1300 | `fe5496a4bd40bf194bb1c69fe6f761dc29e0952391d0990c8c2287f3f12e4988` | 5 | 0 | 5 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -621,8 +621,8 @@
 | `src/miki/core/services/anatomicalProceduralPersonP198Service.ts` | 12529 | 85 | `cf4af2d33dc6d668d40a25fedfc9f1a3e1bde70171b7137a3be4a1dd96a4f35b` | 1 | 1 | 0 |
 | `src/miki/core/services/autonomousCandidatePreparationService.ts` | 14367 | 215 | `cdcc849ef21a94c31e0391324aa6fbda1c72008bedcf9618527cef6555a7bf44` | 6 | 6 | 0 |
 | `src/miki/core/services/autonomousImprovementTrajectoryService.ts` | 2861 | 15 | `c8e544ff51b2090c9aba19bc92f10fbba9382945835e28a5f8845ed657e4178c` | 1 | 1 | 0 |
-| `src/miki/core/services/autonomousIssueDiscoveryService.ts` | 22591 | 361 | `8d4947c647b73e0aafecbc9cd55f10423cf68d70d2aec1925663ac021edaad10` | 13 | 13 | 0 |
-| `src/miki/core/services/autonomousSelfImprovementLoopService.ts` | 42129 | 918 | `b7c6ded10e112560a20a6d8352895e958d41d8abfed37089bb1f296ff39762f2` | 11 | 11 | 0 |
+| `src/miki/core/services/autonomousIssueDiscoveryService.ts` | 32302 | 554 | `39dc91baf92cbaaf3f5feee79ef0c9ef51882d416a57603a2e4d1951722aebba` | 13 | 13 | 0 |
+| `src/miki/core/services/autonomousSelfImprovementLoopService.ts` | 43412 | 943 | `0068d70e0f2d322d24f301aa71846eae61ac668891c7fa4247f035ab45cb8b17` | 11 | 11 | 0 |
 | `src/miki/core/services/blackboardRecoveryService.ts` | 809 | 6 | `997dc830c65b6d4eb613e4f5e896b6e5a73280825799f542408f1e78297ada8f` | 1 | 1 | 0 |
 | `src/miki/core/services/bodyTypeTrendService.ts` | 3381 | 14 | `ec7b217df647446c94fc89e3359eda56588cd56bb5962921558a5073a2506914` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateAutoRebaseService.ts` | 2849 | 14 | `b5affca11da61a5b228a5cdef665265b6542eedc66f5204bbdbdf220d851447d` | 1 | 1 | 0 |
@@ -708,7 +708,7 @@
 | `src/miki/core/services/headPoseOcclusionP149Service.ts` | 2192 | 4 | `4860103c737cb48c6416b05c08e08384ebf6583c12408bb2ab322eb9b04b81fa` | 1 | 1 | 0 |
 | `src/miki/core/services/highFidelityPersonRendererP141Service.ts` | 7342 | 5 | `95fd1e21778d624486a08082f5db81daa384068b749062268b52347ef1ca6695` | 2 | 2 | 0 |
 | `src/miki/core/services/improvementDebtService.ts` | 1333 | 8 | `e6e6eb35723c7fbbd34ad5768c46f658d645210c51291a1d57b84a9fefbba308` | 1 | 1 | 0 |
-| `src/miki/core/services/improvementIntakeRouterService.ts` | 9613 | 111 | `7c80f522592971c65e580adf089fecb1face1bae3f5659c027cfb65ff8e6474d` | 6 | 6 | 0 |
+| `src/miki/core/services/improvementIntakeRouterService.ts` | 15801 | 218 | `2f5596496dd1270ba7e4be0be755395fff3ddc55ea1c3a88794dc7f4c79f755b` | 7 | 7 | 0 |
 | `src/miki/core/services/isolatedCandidateWorkspaceService.ts` | 7613 | 25 | `2d92c207aa3af8dd3b057380c1782fbcd55be92fcdb41bb5bfe2347eb315b494` | 3 | 3 | 0 |
 | `src/miki/core/services/iterativePersonQualityP181Service.ts` | 6418 | 30 | `b0ce2a03cb4ac582267b6a2f5eff63351e5cdc8847778e0642d8bcb47cb9fc50` | 1 | 1 | 0 |
 | `src/miki/core/services/layeredPerson25DModelP192Service.ts` | 8937 | 44 | `4567c5d99d0c2b04aa657b7f86a9939256e0c067afc153c9cd4f40d53625c4bc` | 2 | 2 | 0 |

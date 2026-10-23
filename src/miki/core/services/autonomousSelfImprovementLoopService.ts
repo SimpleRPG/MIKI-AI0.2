@@ -137,6 +137,8 @@ class AutonomousSelfImprovementLoopService {
       item.runId === meta.runId
     );
     if (duplicate) {
+      this.save();
+      void this.drain();
       return { ...duplicate };
     }
     const now = Date.now();
@@ -160,7 +162,8 @@ class AutonomousSelfImprovementLoopService {
       waitKind: undefined,
       waitReason: undefined,
     };
-    const task=taskBlackboardService.create(trigger,'core',{
+    const orphanedTask=this.findRecoverableAutonomousTask(trigger,meta);
+    const task=orphanedTask||taskBlackboardService.create(trigger,'core',{
       ...(normalizedPayload||{}),
       runId:meta.runId,
       changeSetId:meta.changeSetId,
@@ -170,7 +173,9 @@ class AutonomousSelfImprovementLoopService {
       orchestrationMode:'SELF_IMPROVEMENT_WORKER',
       kind:'SELF_IMPROVEMENT'
     });
-    taskBlackboardService.pause(task.taskId,'SELF_IMPROVEMENT_QUEUED');
+    if(!orphanedTask||task.status==='OPEN'){
+      taskBlackboardService.pause(task.taskId,'SELF_IMPROVEMENT_QUEUED');
+    }
     item.taskId=task.taskId;
     this.state.queue.push(item);
     this.state.queue.sort((left, right) =>
@@ -183,6 +188,26 @@ class AutonomousSelfImprovementLoopService {
     this.save();
     void this.drain();
     return { ...item };
+  }
+
+  private findRecoverableAutonomousTask(trigger:string,meta:Partial<AutonomousImprovementRequest>){
+    if(meta.runType!=='AUTONOMOUS_DISCOVERY'||typeof meta.runId!=='string'||!meta.runId)return undefined;
+    return taskBlackboardService.list(200).find(task=>{
+      if(task.goal.trim()!==trigger.trim())return false;
+      if(task.status!=='OPEN'&&task.status!=='PAUSED')return false;
+      if(task.status==='PAUSED'&&task.pausedReason!=='SELF_IMPROVEMENT_QUEUED')return false;
+      const payloadEntry=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload');
+      const value=payloadEntry?.value;
+      if(!value||typeof value!=='object'||Array.isArray(value))return false;
+      const payload=value as Record<string,unknown>;
+      return payload.runId===meta.runId&&
+        payload.runType===meta.runType&&
+        payload.sourceId===meta.sourceId&&
+        payload.orchestrationMode==='SELF_IMPROVEMENT_WORKER'&&
+        payload.kind==='SELF_IMPROVEMENT'&&
+        payload.issueId===meta.payload?.issueId&&
+        payload.fingerprint===meta.payload?.fingerprint;
+    });
   }
 
   public getState(): AutonomousLoopState {

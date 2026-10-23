@@ -45,11 +45,11 @@ const KEY='miki_autonomous_issue_discovery_v1';
 const CONFIG_KEY='miki_autonomous_issue_discovery_config_v1';
 const DEFAULT_CONFIG:DiscoveryConfig={enabled:true,intervalMinutes:180,maxIssuesPerScan:5,minimumPriority:40};
 class AutonomousIssueDiscoveryService{
- private issues=new Map<string,DiscoveredIssue>();private config:DiscoveryConfig={...DEFAULT_CONFIG};private timer:ReturnType<typeof setInterval>|null=null;private scanning=false;
+ private issues=new Map<string,DiscoveredIssue>();private config:DiscoveryConfig={...DEFAULT_CONFIG};private timer:ReturnType<typeof setInterval>|null=null;private retryTimer:ReturnType<typeof setTimeout>|null=null;private scanning=false;
  private persistenceStatus:DiscoveryPersistenceStatus='READY';private persistenceReason?:string;private writesBlocked=false;
  constructor(){this.load();}
  initialize():void{if(this.writesBlocked){systemLogger.error('PERSISTENCE','[IssueDiscovery] initialization blocked because state could not be preserved',{reason:this.persistenceReason});return;}this.configureTimer();if(this.config.enabled)this.runScheduledScan();}
- dispose():void{if(this.timer)clearInterval(this.timer);this.timer=null;}
+ dispose():void{if(this.timer)clearInterval(this.timer);this.timer=null;if(this.retryTimer)clearTimeout(this.retryTimer);this.retryTimer=null;}
  setConfig(input:Partial<DiscoveryConfig>):DiscoveryConfig{this.assertWritable();const interval=input.intervalMinutes??this.config.intervalMinutes;const batch=input.maxIssuesPerScan??this.config.maxIssuesPerScan;const priority=input.minimumPriority??this.config.minimumPriority;const next:DiscoveryConfig={enabled:input.enabled??this.config.enabled,intervalMinutes:Math.max(15,Math.min(10080,Math.floor(Number.isFinite(interval)?interval:this.config.intervalMinutes))),maxIssuesPerScan:Math.max(1,Math.min(20,Number.isFinite(batch)?Math.floor(batch):this.config.maxIssuesPerScan)),minimumPriority:Math.max(0,Math.min(100,Math.floor(Number.isFinite(priority)?priority:this.config.minimumPriority)))};this.writeRaw(CONFIG_KEY,JSON.stringify(next),'CONFIG');this.config=next;this.configureTimer();return {...this.config};}
  getConfig():DiscoveryConfig{return {...this.config};}
  getPersistenceState():DiscoveryPersistenceState{return {status:this.persistenceStatus,...(this.persistenceReason?{reason:this.persistenceReason}:{})};}
@@ -59,7 +59,7 @@ class AutonomousIssueDiscoveryService{
   this.assertWritable();
   if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;
   try{
-   this.reconcileQueuedIssues();
+   await this.reconcileQueuedIssues();
    const before=this.issues.size;
    for(const event of executionEventBusService.list('execution.failed').slice(0,50))this.upsert('EXECUTION_FAILURE',event.event_id,`実行失敗: ${event.component_id}`,`${event.test_case_id} / ${event.error_message||event.output_summary||event.type}`,90);
    for(const gap of knowledgeGapService.listOpen(50))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${gap.query}`,gap.reason||gap.query,70);
@@ -75,6 +75,7 @@ class AutonomousIssueDiscoveryService{
    if(mode==='AUTONOMOUS'){
     const candidates=this.list(200).filter(item=>this.isActionableIssue(item)&&!item.resolvedAt&&!item.queuedAt&&!item.exhausted&&(!item.nextRetryAt||item.nextRetryAt<=Date.now())&&item.priority>=this.config.minimumPriority).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
     for(const issue of candidates){
+     if(autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')break;
      const issueEnvironment=issue.kind==='EXECUTION_FAILURE'
       ? executionEventBusService.list('execution.failed').find(event=>event.event_id===issue.sourceId)?.environment
       : undefined;
@@ -98,28 +99,7 @@ class AutonomousIssueDiscoveryService{
      issue.lastOutcome='DISPATCH_PENDING';
      this.issues.set(issue.fingerprint,issue);
      this.save();
-     const queuedRun=await improvementIntakeRouterService.receive({
-      runType:'AUTONOMOUS_DISCOVERY',
-      sourceId:issue.id,
-      objective:issue.title,
-      priority:issue.priority,
-      payload:{
-       issueId:issue.id,
-       issueKind:issue.kind,
-       detail:issue.detail,
-       fingerprint:issue.fingerprint,
-       priorCases
-      }
-     });
-     issue.changeSetId=queuedRun.changeSetId;
-     issue.improvementRunId=queuedRun.runId;
-     issue.taskId=queuedRun.taskId;
-     issue.queuedAt=issue.queuedAt||Date.now();
-     issue.nextRetryAt=undefined;
-     issue.lastOutcome='QUEUED';
-     this.issues.set(issue.fingerprint,issue);
-     this.save();
-     queued+=1;
+     if(await this.dispatchDiscoveredIssue(issue,priorCases))queued+=1;
     }
    }
 
@@ -133,15 +113,22 @@ class AutonomousIssueDiscoveryService{
     skipped:Math.max(0,issues.filter(x=>!x.resolvedAt&&!x.queuedAt).length),
     issues
    };
-  }finally{this.scanning=false;}
+  }finally{this.scanning=false;this.scheduleRetryWakeup();}
  }
 
- private reconcileQueuedIssues():void{
+ private async reconcileQueuedIssues():Promise<void>{
   const now=Date.now();
   const runs=improvementIntakeRouterService.list(500);
+  const tasks=taskBlackboardService.list(200);
   for(const issue of this.issues.values()){
    const queuedAt=issue.queuedAt;
    if(!queuedAt)continue;
+   if(issue.lastOutcome==='AUTONOMOUS_QUEUE_WRITE_BLOCKED'&&autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')continue;
+   if(issue.lastOutcome==='ORPHAN_TASK_RECOVERY_UNVERIFIED'&&issue.exhausted)continue;
+   if(issue.lastOutcome==='ORPHAN_TASK_RECOVERY_PENDING'){
+    if(issue.nextRetryAt&&issue.nextRetryAt>now)continue;
+    issue.nextRetryAt=undefined;
+   }
 
    let run=issue.improvementRunId
     ? improvementIntakeRouterService.get(issue.improvementRunId)
@@ -152,17 +139,62 @@ class AutonomousIssueDiscoveryService{
      (item.sourceId===issue.id||String(item.payload.issueId||'')===issue.id)
     );
    }
+   let task=run?.taskId?taskBlackboardService.get(run.taskId)
+    :issue.taskId?taskBlackboardService.get(issue.taskId):undefined;
 
-   if(!run){
-    if(now-queuedAt>=30*60*1000){
-     this.releaseForRetry(issue,'INTAKE_RUN_MISSING');
+   if(!run||!run.taskId||!task||run.status==='VALIDATED'){
+    const orphanTask=this.findAutonomousDiscoveryTask(issue,tasks);
+    if(orphanTask){
+     let recovered:Awaited<ReturnType<typeof improvementIntakeRouterService.recoverAutonomousDiscoveryFromTask>>|undefined;
+     try{
+      recovered=await improvementIntakeRouterService.recoverAutonomousDiscoveryFromTask({
+       taskId:orphanTask.taskId,
+       issueId:issue.id,
+       issueKind:issue.kind,
+       fingerprint:issue.fingerprint,
+       objective:issue.title,
+       priority:issue.priority
+      });
+      if(!recovered){
+       issue.taskId=orphanTask.taskId;
+       issue.improvementRunId=this.autonomousDiscoveryRunId(orphanTask);
+       issue.nextRetryAt=undefined;
+       issue.exhausted=true;
+       issue.lastOutcome='ORPHAN_TASK_RECOVERY_UNVERIFIED';
+       this.issues.set(issue.fingerprint,issue);
+       systemLogger.error('SELF_IMPROVEMENT','[IssueDiscovery] found an orphan Task but its intake identity could not be proven',{issueId:issue.id,taskId:orphanTask.taskId});
+       continue;
+      }
+      run=recovered;
+      task=run.taskId?taskBlackboardService.get(run.taskId):undefined;
+      if(!task||task.taskId!==orphanTask.taskId)throw new Error('AUTONOMOUS_DISCOVERY_ORPHAN_TASK_ID_MISMATCH');
+     }catch(error){
+      issue.taskId=orphanTask.taskId;
+      issue.improvementRunId=this.autonomousDiscoveryRunId(orphanTask);
+      issue.nextRetryAt=Date.now()+15*60*1000;
+      issue.lastOutcome='ORPHAN_TASK_RECOVERY_PENDING';
+      this.issues.set(issue.fingerprint,issue);
+      systemLogger.warn('SELF_IMPROVEMENT','[IssueDiscovery] orphan Task recovery deferred for a bounded retry',{issueId:issue.id,taskId:orphanTask.taskId,error:String(error instanceof Error?error.message:error)});
+      continue;
+     }
+    }else if(!run){
+     if(now-queuedAt>=30*60*1000)this.releaseForRetry(issue,'INTAKE_RUN_MISSING');
+     continue;
     }
-    continue;
    }
 
+   if(!run){
+    if(now-queuedAt>=30*60*1000)this.releaseForRetry(issue,'INTAKE_RUN_MISSING');
+    continue;
+   }
    issue.improvementRunId=run.runId;
    issue.taskId=run.taskId||issue.taskId;
-   const task=issue.taskId?taskBlackboardService.get(issue.taskId):undefined;
+   task=issue.taskId?taskBlackboardService.get(issue.taskId):undefined;
+   if(!task&&run.status==='VALIDATED'){
+    improvementIntakeRouterService.reject(run.runId);
+    this.releaseForRetry(issue,'INTAKE_VALIDATED_WITHOUT_TASK');
+    continue;
+   }
    const terminalTask=Boolean(task&&
     ['COMPLETED','FAILED','CANCELLED'].includes(task.status)
    );
@@ -219,8 +251,169 @@ class AutonomousIssueDiscoveryService{
     continue;
    }
 
+   if(issue.lastOutcome==='ORPHAN_TASK_RECOVERY_PENDING')issue.nextRetryAt=undefined;
+   issue.exhausted=false;
+   issue.lastOutcome='QUEUED';
    this.issues.set(issue.fingerprint,issue);
   }
+ }
+
+ private findAutonomousDiscoveryTask(issue:DiscoveredIssue,tasks:ReturnType<typeof taskBlackboardService.list> = taskBlackboardService.list(200)){
+  const matches=tasks.filter(task=>{
+   const entry=task.entries.find(item=>item.kind==='INPUT'&&item.key==='payload');
+   const value=entry?.value;
+   if(!value||typeof value!=='object'||Array.isArray(value))return false;
+   const payload=value as Record<string,unknown>;
+   return payload.issueId===issue.id&&
+    payload.issueKind===issue.kind&&
+    payload.fingerprint===issue.fingerprint&&
+    payload.runType==='AUTONOMOUS_DISCOVERY'&&
+    payload.sourceId===issue.id;
+  });
+  if(issue.improvementRunId){
+   const linked=matches.find(task=>this.autonomousDiscoveryRunId(task)===issue.improvementRunId);
+   if(linked)return linked;
+  }
+  return matches[0];
+ }
+ private autonomousDiscoveryRunId(task:NonNullable<ReturnType<typeof taskBlackboardService.get>>):string|undefined{
+  const entry=task.entries.find(item=>item.kind==='INPUT'&&item.key==='payload');
+  const value=entry?.value;
+  if(!value||typeof value!=='object'||Array.isArray(value))return undefined;
+  const runId=(value as Record<string,unknown>).runId;
+  return typeof runId==='string'&&runId.trim()?runId:undefined;
+ }
+ private async dispatchDiscoveredIssue(issue:DiscoveredIssue,priorCases:unknown[]):Promise<boolean>{
+  let run:Awaited<ReturnType<typeof improvementIntakeRouterService.receive>>|undefined;
+  try{
+   run=await improvementIntakeRouterService.receive({
+    runType:'AUTONOMOUS_DISCOVERY',
+    sourceId:issue.id,
+    objective:issue.title,
+    priority:issue.priority,
+    payload:{
+     issueId:issue.id,
+     issueKind:issue.kind,
+     detail:issue.detail,
+     fingerprint:issue.fingerprint,
+     priorCases
+    }
+   });
+   if(!run.taskId||run.status==='VALIDATED'||!taskBlackboardService.get(run.taskId))throw new Error('INTAKE_ACCEPTED_WITHOUT_TASK');
+  }catch(error){
+   if(autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED'){
+    issue.nextRetryAt=undefined;
+    issue.lastOutcome='AUTONOMOUS_QUEUE_WRITE_BLOCKED';
+    this.issues.set(issue.fingerprint,issue);
+    this.save();
+    systemLogger.error('PERSISTENCE','[IssueDiscovery] CORE queue persistence is blocked; dispatch retry is stopped',{issueId:issue.id,error:String(error instanceof Error?error.message:error)});
+    return false;
+   }
+   const orphanTask=this.findAutonomousDiscoveryTask(issue);
+   if(!orphanTask){
+    this.releaseForRetry(issue,'INTAKE_DISPATCH_FAILED');
+    this.issues.set(issue.fingerprint,issue);
+    this.save();
+    systemLogger.error('SELF_IMPROVEMENT','[IssueDiscovery] intake dispatch failed; bounded retry scheduled',{issueId:issue.id,error:String(error instanceof Error?error.message:error)});
+    return false;
+   }
+   try{
+    run=await improvementIntakeRouterService.recoverAutonomousDiscoveryFromTask({
+     taskId:orphanTask.taskId,
+     issueId:issue.id,
+     issueKind:issue.kind,
+     fingerprint:issue.fingerprint,
+     objective:issue.title,
+     priority:issue.priority
+    });
+    if(!run){
+     issue.taskId=orphanTask.taskId;
+     issue.improvementRunId=this.autonomousDiscoveryRunId(orphanTask);
+     issue.nextRetryAt=undefined;
+     issue.exhausted=true;
+     issue.lastOutcome='ORPHAN_TASK_RECOVERY_UNVERIFIED';
+     this.issues.set(issue.fingerprint,issue);
+     this.save();
+     systemLogger.error('SELF_IMPROVEMENT','[IssueDiscovery] orphan Task identity is incomplete; duplicate dispatch blocked',{issueId:issue.id,taskId:orphanTask.taskId});
+     return false;
+    }
+    if(run.taskId!==orphanTask.taskId||!taskBlackboardService.get(run.taskId))throw new Error('AUTONOMOUS_DISCOVERY_ORPHAN_TASK_ID_MISMATCH');
+   }catch(recoveryError){
+    issue.taskId=orphanTask.taskId;
+    issue.improvementRunId=this.autonomousDiscoveryRunId(orphanTask);
+    issue.nextRetryAt=Date.now()+15*60*1000;
+    issue.lastOutcome='ORPHAN_TASK_RECOVERY_PENDING';
+    this.issues.set(issue.fingerprint,issue);
+    this.save();
+    systemLogger.warn('SELF_IMPROVEMENT','[IssueDiscovery] orphan Task recovery deferred for a bounded retry',{issueId:issue.id,taskId:orphanTask.taskId,error:String(recoveryError instanceof Error?recoveryError.message:recoveryError)});
+    return false;
+   }
+  }
+  if(run?.taskId){
+   const recoveredTask=taskBlackboardService.get(run.taskId);
+   if(recoveredTask&&(['COMPLETED','FAILED','CANCELLED'].includes(recoveredTask.status)||run.status==='REJECTED'||run.status==='COMPLETED')){
+    issue.changeSetId=run.changeSetId;
+    issue.improvementRunId=run.runId;
+    issue.taskId=run.taskId;
+    issue.queuedAt=issue.queuedAt||Date.now();
+    issue.nextRetryAt=undefined;
+    issue.lastOutcome='RECOVERED_ORPHAN_TASK_TERMINAL';
+    this.issues.set(issue.fingerprint,issue);
+    this.save();
+    return false;
+   }
+  }
+  if(!run||!run.taskId||!taskBlackboardService.get(run.taskId)){
+   this.releaseForRetry(issue,'INTAKE_DISPATCH_FAILED');
+   this.issues.set(issue.fingerprint,issue);
+   this.save();
+   return false;
+  }
+  issue.changeSetId=run.changeSetId;
+  issue.improvementRunId=run.runId;
+  issue.taskId=run.taskId;
+  issue.queuedAt=issue.queuedAt||Date.now();
+  issue.nextRetryAt=undefined;
+  issue.exhausted=false;
+  issue.lastOutcome='QUEUED';
+  this.issues.set(issue.fingerprint,issue);
+  this.save();
+  return true;
+ }
+ private scheduleRetryWakeup():void{
+  if(this.retryTimer)clearTimeout(this.retryTimer);
+  this.retryTimer=null;
+  if(!this.config.enabled||this.writesBlocked||autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')return;
+  const now=Date.now();
+  let earliest:number|undefined;
+  const consider=(deadline:number)=>{
+   if(Number.isFinite(deadline))earliest=earliest===undefined?deadline:Math.min(earliest,deadline);
+  };
+  const runs=improvementIntakeRouterService.list(500);
+  for(const issue of this.issues.values()){
+   if(issue.resolvedAt)continue;
+   if(typeof issue.nextRetryAt==='number'&&Number.isFinite(issue.nextRetryAt))consider(issue.nextRetryAt);
+   if(!issue.queuedAt||(issue.exhausted&&issue.lastOutcome==='ORPHAN_TASK_RECOVERY_UNVERIFIED'))continue;
+   if(issue.lastOutcome==='ORPHAN_TASK_RECOVERY_PENDING')continue;
+   let run=issue.improvementRunId?improvementIntakeRouterService.get(issue.improvementRunId):undefined;
+   if(!run)run=runs.find(item=>item.runType==='AUTONOMOUS_DISCOVERY'&&(item.sourceId===issue.id||String(item.payload.issueId||'')===issue.id));
+   if(!run){
+    consider(issue.queuedAt+30*60*1000);
+    continue;
+   }
+   const taskId=run.taskId||issue.taskId;
+   const task=taskId?taskBlackboardService.get(taskId):undefined;
+   if((run.status==='VALIDATED'||run.status==='REJECTED'||run.status==='COMPLETED')&&!task){
+    consider(now+1000);
+   }else if(!task){
+    consider(issue.queuedAt+6*60*60*1000);
+   }else if(['COMPLETED','FAILED','CANCELLED'].includes(task.status)||run.status==='REJECTED'||run.status==='COMPLETED'){
+    consider(now+1000);
+   }
+  }
+  if(earliest===undefined)return;
+  const delay=Math.max(25,Math.min(2147000000,earliest-Date.now()));
+  this.retryTimer=setTimeout(()=>{this.retryTimer=null;this.runScheduledScan();},delay);
  }
 
  private releaseForRetry(issue:DiscoveredIssue,outcome:string):void{
@@ -346,10 +539,10 @@ class AutonomousIssueDiscoveryService{
  }
 
  private runScheduledScan():void{void this.scan().catch(error=>systemLogger.error('SELF_IMPROVEMENT','[IssueDiscovery] autonomous scan stopped before unsafe follow-up',{error:String(error instanceof Error?error.message:error),persistence:this.getPersistenceState()}));}
- private configureTimer():void{if(this.timer)clearInterval(this.timer);this.timer=null;if(this.config.enabled&&!this.writesBlocked)this.timer=setInterval(()=>this.runScheduledScan(),this.config.intervalMinutes*60*1000);}
+ private configureTimer():void{if(this.timer)clearInterval(this.timer);this.timer=null;if(this.config.enabled&&!this.writesBlocked)this.timer=setInterval(()=>this.runScheduledScan(),this.config.intervalMinutes*60*1000);this.scheduleRetryWakeup();}
  private fingerprint(raw:string):string{let h=2166136261;for(const ch of raw.toLowerCase()){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return `ISS-${(h>>>0).toString(16).padStart(8,'0')}`;}
  private assertWritable():void{if(this.writesBlocked)throw new Error('AUTONOMOUS_DISCOVERY_STORE_WRITE_BLOCKED');}
- private blockStore(reason:string):void{this.writesBlocked=true;this.persistenceStatus='WRITE_BLOCKED';this.persistenceReason=reason.slice(0,700);if(this.timer)clearInterval(this.timer);this.timer=null;}
+ private blockStore(reason:string):void{this.writesBlocked=true;this.persistenceStatus='WRITE_BLOCKED';this.persistenceReason=reason.slice(0,700);if(this.timer)clearInterval(this.timer);this.timer=null;if(this.retryTimer)clearTimeout(this.retryTimer);this.retryTimer=null;}
  private writeRaw(key:string,raw:string,context:string):void{this.assertWritable();try{storageService.setItem(key,raw);if(storageService.getItem(key)!==raw)throw new Error('STORE_READBACK_MISMATCH');}catch(error){this.blockStore(`${context}:${String(error instanceof Error?error.message:error)}`);throw new Error('AUTONOMOUS_DISCOVERY_STORE_WRITE_VERIFY_FAILED');}}
  private quarantine(sourceKey:string,raw:string,reason:string):boolean{const base=`${sourceKey}_quarantine_v1`;const envelope={version:1,sourceKey,quarantinedAt:Date.now(),reason:reason.slice(0,500),raw};try{let destination=base;const existing=storageService.getItem(base);if(existing!==null){try{const parsed=JSON.parse(existing) as Record<string,unknown>;if(parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw)return true;}catch{}let suffix=0;do{destination=`${base}_${Date.now()}_${suffix++}`;if(suffix>1000)return false;}while(storageService.getItem(destination)!==null);}storageService.setItem(destination,JSON.stringify(envelope));const saved=storageService.getItem(destination);if(saved===null)return false;const parsed=JSON.parse(saved) as Record<string,unknown>;return parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw;}catch{return false;}}
  private recoverCorruptSnapshot(sourceKey:string,raw:string,error:unknown):void{const reason=String(error instanceof Error?error.message:error).slice(0,500);if(this.quarantine(sourceKey,raw,reason)){if(this.writesBlocked)return;this.persistenceStatus='RECOVERED_QUARANTINED';this.persistenceReason=`${sourceKey}_QUARANTINED:${reason}`;if(sourceKey===KEY)this.issues.clear();}else this.blockStore(`${sourceKey}_QUARANTINE_FAILED:${reason}`);}

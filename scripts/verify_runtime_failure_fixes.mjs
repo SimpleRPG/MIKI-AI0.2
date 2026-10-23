@@ -941,6 +941,27 @@ check(
     issueDiscovery.includes("crossDomainCirculationService.getDisconnectedDomains().some(domain=>String(domain)===issue.sourceId)")
 );
 check(
+  'Autonomous issue intake recovery reuses orphan Tasks and wakes at bounded deadlines',
+  issueDiscovery.includes('private async reconcileQueuedIssues():Promise<void>') &&
+    issueDiscovery.includes('private findAutonomousDiscoveryTask(issue:DiscoveredIssue') &&
+    issueDiscovery.includes('private scheduleRetryWakeup():void') &&
+    issueDiscovery.includes("this.releaseForRetry(issue,'INTAKE_DISPATCH_FAILED');") &&
+    issueDiscovery.includes("this.releaseForRetry(issue,'INTAKE_VALIDATED_WITHOUT_TASK');") &&
+    issueDiscovery.includes('queuedAt+30*60*1000') &&
+    issueDiscovery.includes('queuedAt+6*60*60*1000') &&
+    issueDiscovery.includes('ORPHAN_TASK_RECOVERY_PENDING') &&
+    issueDiscovery.includes('AUTONOMOUS_QUEUE_WRITE_BLOCKED') &&
+    issueDiscovery.includes('RECOVERED_ORPHAN_TASK_TERMINAL') &&
+    issueDiscovery.includes('retryTimer=setTimeout(') &&
+    autonomousLoop.includes('private findRecoverableAutonomousTask(') &&
+    autonomousLoop.includes('this.save();\n      void this.drain();\n      return { ...duplicate };') &&
+    autonomousLoop.includes("task.pausedReason!=='SELF_IMPROVEMENT_QUEUED'") &&
+    improvementIntakeRouter.includes('async recoverAutonomousDiscoveryFromTask(') &&
+    improvementIntakeRouter.includes('const queued=selfImprovementIngressService.submitRun({...run,changeSetId:input.changeSetId});') &&
+    improvementIntakeRouter.indexOf('const queued=selfImprovementIngressService.submitRun({...run,changeSetId:input.changeSetId});') <
+      improvementIntakeRouter.indexOf('this.runs.set(run.runId,run);try{this.save();}catch(error){this.runs.delete(run.runId);throw error;}return this.clone(run);')
+);
+check(
   'Autonomous candidate generation reloads the prepared IntakeRouter plan',
   candidateCodeGeneration.includes('const preparedRun=improvementIntakeRouterService.get(runId);') &&
     candidateCodeGeneration.indexOf('const preparedRun=improvementIntakeRouterService.get(runId);') >

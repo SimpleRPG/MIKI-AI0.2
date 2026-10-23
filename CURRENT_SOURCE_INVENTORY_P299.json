@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1846,
     "sourceFileCount": 1391,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1304,
-    "relativeImportCandidateCount": 3919,
-    "resolvedRelativeImportCandidateCount": 3900,
+    "relativeImportCandidateCount": 3920,
+    "resolvedRelativeImportCandidateCount": 3901,
     "unresolvedRelativeImportCandidateCount": 19
   },
   "records": [
@@ -5157,9 +5157,9 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 87285,
-      "lines": 1279,
-      "sha256": "5464109bcc54a666521bc556c7bb06953ba8fa483ed81b882c245dfd578bd79a",
+      "bytes": 88952,
+      "lines": 1300,
+      "sha256": "fe5496a4bd40bf194bb1c69fe6f761dc29e0952391d0990c8c2287f3f12e4988",
       "relativeImportCandidates": [
         {
           "line": 181,
@@ -12836,9 +12836,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousIssueDiscoveryService.ts",
-      "bytes": 22591,
-      "lines": 361,
-      "sha256": "8d4947c647b73e0aafecbc9cd55f10423cf68d70d2aec1925663ac021edaad10",
+      "bytes": 32302,
+      "lines": 554,
+      "sha256": "39dc91baf92cbaaf3f5feee79ef0c9ef51882d416a57603a2e4d1951722aebba",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12925,9 +12925,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 42129,
-      "lines": 918,
-      "sha256": "b7c6ded10e112560a20a6d8352895e958d41d8abfed37089bb1f296ff39762f2",
+      "bytes": 43412,
+      "lines": 943,
+      "sha256": "0068d70e0f2d322d24f301aa71846eae61ac668891c7fa4247f035ab45cb8b17",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -16410,9 +16410,9 @@
     },
     {
       "path": "src/miki/core/services/improvementIntakeRouterService.ts",
-      "bytes": 9613,
-      "lines": 111,
-      "sha256": "7c80f522592971c65e580adf089fecb1face1bae3f5659c027cfb65ff8e6474d",
+      "bytes": 15801,
+      "lines": 218,
+      "sha256": "2f5596496dd1270ba7e4be0be755395fff3ddc55ea1c3a88794dc7f4c79f755b",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -16440,19 +16440,25 @@
         },
         {
           "line": 5,
+          "specifier": "./taskBlackboardService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/taskBlackboardService.ts"
+        },
+        {
+          "line": 6,
           "specifier": "../../../types/evidenceSelfImprovementTypes",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types/evidenceSelfImprovementTypes.ts"
         },
         {
-          "line": 6,
+          "line": 7,
           "specifier": "./autonomousCandidatePreparationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/autonomousCandidatePreparationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {

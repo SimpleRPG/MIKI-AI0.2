@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 import { selfImprovementIngressService } from './selfImprovementIngressService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { canonicalSha256 } from './canonicalSha256Service';
+import { taskBlackboardService } from './taskBlackboardService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 import type { AutonomousImplementationPlan } from './autonomousCandidatePreparationService';
 export type ImprovementRunType='AUTONOMOUS_DISCOVERY'|'EXTERNAL_DIRECTIVE'|'USER_REQUEST'|'EXECUTION_FAILURE'|'REVALIDATION';
@@ -32,7 +33,45 @@ class ImprovementIntakeRouterService{
       ...(input.payload||{}),
       sourceSnapshotSha256
     };
-    const sourceHash=await this.sha(JSON.stringify({sourceId:input.sourceId,objective:input.objective,payload:payloadWithSourceSnapshot}));const duplicate=[...this.runs.values()].find(x=>x.runType===input.runType&&x.sourceHash===sourceHash&&x.status!=='COMPLETED'&&x.status!=='REJECTED');if(duplicate)return this.clone(duplicate);const run:ImprovementIntakeRun={runId:`RUN-${prefix}-${now}-${String(this.sequence).padStart(6,'0')}`,changeSetId:input.changeSetId,runType:input.runType,sourceId:input.sourceId,objective:input.objective.trim(),sourceHash,payload:payloadWithSourceSnapshot,priority:Math.max(0,Math.min(100,input.priority??50)),status:'VALIDATED',createdAt:now,updatedAt:now,relatedRunIds:[...(input.relatedRunIds||[])]};
+    const sourceHash=await this.sha(JSON.stringify({sourceId:input.sourceId,objective:input.objective,payload:payloadWithSourceSnapshot}));const duplicate=[...this.runs.values()].find(x=>x.runType===input.runType&&x.sourceHash===sourceHash&&x.status!=='COMPLETED'&&x.status!=='REJECTED');
+    if(duplicate){
+      if(duplicate.runType==='AUTONOMOUS_DISCOVERY'&&(duplicate.status==='VALIDATED'||(duplicate.status==='QUEUED'&&(!duplicate.taskId||!taskBlackboardService.get(duplicate.taskId))))){
+        const issueId=typeof duplicate.payload.issueId==='string'?duplicate.payload.issueId:'';
+        const matchingTask=issueId?this.findAutonomousDiscoveryTask(duplicate.runId,issueId):undefined;
+        if(matchingTask){
+          const recovered=await this.recoverAutonomousDiscoveryFromTask({
+            taskId:matchingTask.taskId,
+            issueId,
+            issueKind:String(duplicate.payload.issueKind||input.payload?.issueKind||''),
+            fingerprint:String(duplicate.payload.fingerprint||input.payload?.fingerprint||''),
+            objective:input.objective,
+            priority:duplicate.priority
+          });
+          if(recovered)return recovered;
+          throw new Error('AUTONOMOUS_DISCOVERY_ORPHAN_TASK_UNVERIFIED');
+        }
+        if(duplicate.taskId&&taskBlackboardService.get(duplicate.taskId)){
+          throw new Error('AUTONOMOUS_DISCOVERY_LINKED_TASK_UNVERIFIED');
+        }
+        if(duplicate.status==='QUEUED'){
+          const previous={...duplicate,payload:{...duplicate.payload},relatedRunIds:[...duplicate.relatedRunIds]};
+          duplicate.status='REJECTED';
+          duplicate.updatedAt=Date.now();
+          try{this.save();}catch(error){this.runs.set(duplicate.runId,previous);throw error;}
+        }else{
+          const previous={...duplicate,payload:{...duplicate.payload},relatedRunIds:[...duplicate.relatedRunIds]};
+          const queued=selfImprovementIngressService.submitRun({...duplicate,changeSetId:duplicate.changeSetId});
+          duplicate.status='QUEUED';
+          duplicate.changeSetId=queued.changeSetId||duplicate.changeSetId;
+          duplicate.taskId=queued.taskId;
+          duplicate.updatedAt=Date.now();
+          try{this.save();}catch(error){this.runs.set(duplicate.runId,previous);throw error;}
+          return this.clone(duplicate);
+        }
+      }else{
+        return this.clone(duplicate);
+      }
+    }const run:ImprovementIntakeRun={runId:`RUN-${prefix}-${now}-${String(this.sequence).padStart(6,'0')}`,changeSetId:input.changeSetId,runType:input.runType,sourceId:input.sourceId,objective:input.objective.trim(),sourceHash,payload:payloadWithSourceSnapshot,priority:Math.max(0,Math.min(100,input.priority??50)),status:'VALIDATED',createdAt:now,updatedAt:now,relatedRunIds:[...(input.relatedRunIds||[])]};
     if(input.runType==='REVALIDATION'){
       const p=input.payload||{};
       const targets=Array.isArray(p.targetFiles)?p.targetFiles.filter((x):x is string=>typeof x==='string'&&x.trim().length>0).map(x=>x.trim()):[];
@@ -53,7 +92,75 @@ class ImprovementIntakeRouterService{
         confidence:1
       };
     }
-    this.runs.set(run.runId,run);const queued=selfImprovementIngressService.submitRun({...run,changeSetId:input.changeSetId});run.status='QUEUED';run.taskId=queued.taskId;run.updatedAt=Date.now();this.save();return this.clone(run);}
+    const queued=selfImprovementIngressService.submitRun({...run,changeSetId:input.changeSetId});run.status='QUEUED';run.changeSetId=queued.changeSetId||run.changeSetId;run.taskId=queued.taskId;run.updatedAt=Date.now();this.runs.set(run.runId,run);try{this.save();}catch(error){this.runs.delete(run.runId);throw error;}return this.clone(run);}
+ async recoverAutonomousDiscoveryFromTask(input:{taskId:string;issueId:string;issueKind:string;fingerprint:string;objective:string;priority:number}):Promise<ImprovementIntakeRun|undefined>{
+  const task=taskBlackboardService.get(input.taskId);
+  if(!task)return undefined;
+  const payloadEntry=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload');
+  const value=payloadEntry?.value;
+  if(!value||typeof value!=='object'||Array.isArray(value))return undefined;
+  const raw=value as Record<string,unknown>;
+  if(raw.runType!=='AUTONOMOUS_DISCOVERY'||
+    raw.issueId!==input.issueId||
+    raw.issueKind!==input.issueKind||
+    raw.fingerprint!==input.fingerprint||
+    raw.sourceId!==input.issueId||
+    raw.orchestrationMode!=='SELF_IMPROVEMENT_WORKER'||
+    raw.kind!=='SELF_IMPROVEMENT'||
+    typeof raw.runId!=='string'||!raw.runId.trim()||
+    typeof raw.sourceSnapshotSha256!=='string'||!raw.sourceSnapshotSha256.trim()||
+    task.goal.trim()!==input.objective.trim())return undefined;
+  const runId=raw.runId;
+  const sourceId=input.issueId;
+  const recoveredPayload:Record<string,unknown>={...raw};
+  for(const key of ['runId','changeSetId','runType','sourceId','priority','orchestrationMode','kind'])delete recoveredPayload[key];
+  const computedSourceHash=await this.sha(JSON.stringify({sourceId,objective:input.objective,payload:recoveredPayload}));
+  const previous=this.runs.get(runId);
+  if(previous&&(previous.runType!=='AUTONOMOUS_DISCOVERY'||previous.sourceId!==sourceId||previous.payload.issueId!==input.issueId||previous.payload.issueKind!==input.issueKind||previous.payload.fingerprint!==input.fingerprint))return undefined;
+  if(task.status==='PAUSED'&&task.pausedReason!=='SELF_IMPROVEMENT_QUEUED')return undefined;
+  const payload=previous?{...previous.payload}:recoveredPayload;
+  const sourceHash=previous?.sourceHash||computedSourceHash;
+  const changeSetId=(typeof raw.changeSetId==='string'?raw.changeSetId:previous?.changeSetId) as ChangeSetID|undefined;
+  const priority=typeof raw.priority==='number'&&Number.isFinite(raw.priority)
+    ?Math.max(0,Math.min(100,raw.priority))
+    :input.priority;
+  const recoverable=task.status==='OPEN'||
+    (task.status==='PAUSED'&&task.pausedReason==='SELF_IMPROVEMENT_QUEUED');
+  let recovered:ImprovementIntakeRun={
+    runId,
+    changeSetId,
+    implementationPlan:previous?.implementationPlan,
+    runType:'AUTONOMOUS_DISCOVERY',
+    sourceId,
+    objective:previous?.objective||input.objective.trim(),
+    sourceHash,
+    payload,
+    priority:previous?.priority??priority,
+    status:recoverable?'QUEUED':task.status==='COMPLETED'?'COMPLETED':(task.status==='FAILED'||task.status==='CANCELLED')?'REJECTED':'IN_PROGRESS',
+    createdAt:previous?.createdAt||task.createdAt,
+    updatedAt:Date.now(),
+    taskId:task.taskId,
+    workspaceId:previous?.workspaceId,
+    relatedRunIds:previous?[...previous.relatedRunIds]:[]
+  };
+  if(recoverable){
+    const queued=selfImprovementIngressService.submitRun({...recovered,changeSetId:recovered.changeSetId});
+    if(queued.taskId!==task.taskId)throw new Error('AUTONOMOUS_DISCOVERY_ORPHAN_TASK_ID_MISMATCH');
+    recovered={...recovered,status:'QUEUED',changeSetId:queued.changeSetId||recovered.changeSetId,taskId:queued.taskId,updatedAt:Date.now()};
+  }
+  this.runs.set(runId,recovered);
+  try{this.save();}catch(error){if(previous)this.runs.set(runId,previous);else this.runs.delete(runId);throw error;}
+  return this.clone(recovered);
+ }
+ private findAutonomousDiscoveryTask(runId:string,issueId:string){
+  return taskBlackboardService.list(200).find(task=>{
+    const entry=task.entries.find(item=>item.kind==='INPUT'&&item.key==='payload');
+    const value=entry?.value;
+    if(!value||typeof value!=='object'||Array.isArray(value))return false;
+    const payload=value as Record<string,unknown>;
+    return payload.runId===runId&&payload.issueId===issueId&&payload.runType==='AUTONOMOUS_DISCOVERY';
+  });
+ }
  async ensureForCoreTask(input:{taskId:string;objective:string;payload?:Record<string,unknown>;sourceId?:string}):Promise<ImprovementIntakeRun>{
   const existing=[...this.runs.values()].find(run=>run.taskId===input.taskId);
   if(existing){
