@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 88952 | 1300 | `fe5496a4bd40bf194bb1c69fe6f761dc29e0952391d0990c8c2287f3f12e4988` | 5 | 0 | 5 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 89633 | 1310 | `ca2e7d38eb8a0094789c958195865de4950c505be298b8ee86685b87eedceda6` | 5 | 0 | 5 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -621,7 +621,7 @@
 | `src/miki/core/services/anatomicalProceduralPersonP198Service.ts` | 12529 | 85 | `cf4af2d33dc6d668d40a25fedfc9f1a3e1bde70171b7137a3be4a1dd96a4f35b` | 1 | 1 | 0 |
 | `src/miki/core/services/autonomousCandidatePreparationService.ts` | 14367 | 215 | `cdcc849ef21a94c31e0391324aa6fbda1c72008bedcf9618527cef6555a7bf44` | 6 | 6 | 0 |
 | `src/miki/core/services/autonomousImprovementTrajectoryService.ts` | 2861 | 15 | `c8e544ff51b2090c9aba19bc92f10fbba9382945835e28a5f8845ed657e4178c` | 1 | 1 | 0 |
-| `src/miki/core/services/autonomousIssueDiscoveryService.ts` | 32302 | 554 | `39dc91baf92cbaaf3f5feee79ef0c9ef51882d416a57603a2e4d1951722aebba` | 13 | 13 | 0 |
+| `src/miki/core/services/autonomousIssueDiscoveryService.ts` | 32442 | 555 | `b9c883b6a82b0762cde02622f5946f26287b67781ab609eed0d8216d820c9d3b` | 13 | 13 | 0 |
 | `src/miki/core/services/autonomousSelfImprovementLoopService.ts` | 43412 | 943 | `0068d70e0f2d322d24f301aa71846eae61ac668891c7fa4247f035ab45cb8b17` | 11 | 11 | 0 |
 | `src/miki/core/services/blackboardRecoveryService.ts` | 809 | 6 | `997dc830c65b6d4eb613e4f5e896b6e5a73280825799f542408f1e78297ada8f` | 1 | 1 | 0 |
 | `src/miki/core/services/bodyTypeTrendService.ts` | 3381 | 14 | `ec7b217df647446c94fc89e3359eda56588cd56bb5962921558a5073a2506914` | 1 | 1 | 0 |

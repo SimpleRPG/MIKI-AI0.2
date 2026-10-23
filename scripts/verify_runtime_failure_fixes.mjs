@@ -930,7 +930,7 @@ check(
 );
 check(
   'Autonomous Issue Discovery synchronizes terminal outcomes and permits three bounded retries',
-  issueDiscovery.includes('private reconcileQueuedIssues():void') &&
+  issueDiscovery.includes('private async reconcileQueuedIssues():Promise<void>') &&
     issueDiscovery.includes('private releaseForRetry(issue:DiscoveredIssue,outcome:string):void') &&
     issueDiscovery.includes('if(attempts>=4)') &&
     issueDiscovery.includes('nextRetryAt') &&
@@ -961,6 +961,16 @@ check(
     improvementIntakeRouter.indexOf('const queued=selfImprovementIngressService.submitRun({...run,changeSetId:input.changeSetId});') <
       improvementIntakeRouter.indexOf('this.runs.set(run.runId,run);try{this.save();}catch(error){this.runs.delete(run.runId);throw error;}return this.clone(run);')
 );
+check(
+  'Autonomous Issue Discovery does not resurrect timers after disposal',
+  issueDiscovery.includes('private disposed=false;') &&
+    issueDiscovery.includes('this.disposed=false;this.configureTimer();') &&
+    issueDiscovery.includes('dispose():void{this.disposed=true;') &&
+    issueDiscovery.includes("if(this.disposed||!this.config.enabled||this.writesBlocked||autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')return;") &&
+    issueDiscovery.includes('if(this.disposed||this.writesBlocked)return;') &&
+    issueDiscovery.includes('if(!this.disposed&&this.config.enabled&&!this.writesBlocked)this.timer=setInterval(')
+);
+
 check(
   'Autonomous candidate generation reloads the prepared IntakeRouter plan',
   candidateCodeGeneration.includes('const preparedRun=improvementIntakeRouterService.get(runId);') &&

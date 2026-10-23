@@ -5157,9 +5157,9 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 88952,
-      "lines": 1300,
-      "sha256": "fe5496a4bd40bf194bb1c69fe6f761dc29e0952391d0990c8c2287f3f12e4988",
+      "bytes": 89633,
+      "lines": 1310,
+      "sha256": "ca2e7d38eb8a0094789c958195865de4950c505be298b8ee86685b87eedceda6",
       "relativeImportCandidates": [
         {
           "line": 181,
@@ -12836,9 +12836,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousIssueDiscoveryService.ts",
-      "bytes": 32302,
-      "lines": 554,
-      "sha256": "39dc91baf92cbaaf3f5feee79ef0c9ef51882d416a57603a2e4d1951722aebba",
+      "bytes": 32442,
+      "lines": 555,
+      "sha256": "b9c883b6a82b0762cde02622f5946f26287b67781ab609eed0d8216d820c9d3b",
       "relativeImportCandidates": [
         {
           "line": 1,
