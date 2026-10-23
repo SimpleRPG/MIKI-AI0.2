@@ -964,6 +964,7 @@ check(
 check(
   'Autonomous Issue Discovery does not resurrect timers after disposal',
   issueDiscovery.includes('private disposed=false;') &&
+    issueDiscovery.includes("async scan(mode:DiscoveryScanMode='AUTONOMOUS'):Promise<DiscoveryScanResult>{\n  if(this.disposed)throw new Error('AUTONOMOUS_DISCOVERY_SERVICE_DISPOSED');\n  this.assertWritable();") &&
     issueDiscovery.includes('this.disposed=false;this.configureTimer();') &&
     issueDiscovery.includes('dispose():void{this.disposed=true;') &&
     issueDiscovery.includes("if(this.disposed||!this.config.enabled||this.writesBlocked||autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')return;") &&

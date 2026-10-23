@@ -57,6 +57,7 @@ class AutonomousIssueDiscoveryService{
  list(limit=100):DiscoveredIssue[]{return [...this.issues.values()].sort((a,b)=>b.priority-a.priority||b.lastSeenAt-a.lastSeenAt||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,limit).map(x=>({...x}));}
  recordContradiction(claimId:string,detail:string):DiscoveredIssue{this.assertWritable();const previous=new Map(this.issues);const issue=this.upsert('CLAIM_CONTRADICTION',claimId,`Claim矛盾: ${claimId}`,detail,95);try{this.save();return issue;}catch(error){this.issues=previous;throw error;}}
  async scan(mode:DiscoveryScanMode='AUTONOMOUS'):Promise<DiscoveryScanResult>{
+  if(this.disposed)throw new Error('AUTONOMOUS_DISCOVERY_SERVICE_DISPOSED');
   this.assertWritable();
   if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;
   try{
