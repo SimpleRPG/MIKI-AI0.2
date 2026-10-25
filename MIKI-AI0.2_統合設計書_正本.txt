@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-21
-正本Revision：2026-10-23-P311
+基準日：2026-10-25
+正本Revision：2026-10-25-P312
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -28,7 +28,7 @@ MIKI-AI0.2 統合設計書・実装正本
 - このファイルをMIKI-AI0.2の唯一の設計正本とする。新しい設計書を別に作って正本を分割しない。履歴欄は本リポジトリのP番号方式を維持できるが、現在の規範仕様と履歴上の記述を明確に区別し、履歴の古い仕様を現在仕様として再採用しない。
 - ChatGPTは最新main・正本全文・リポジトリ全体・対象責務・UI・runtime・保存・再描画・旧／重複／競合実装を調査し、正確なTermux実行コマンドを作成し、PUSH後にGitHub mainを再監査する。
 - ファイル編集・commit・PUSHはTermuxで実行する。ChatGPT側からGitHub API等でファイル更新・commit・branch更新・PUSHを行う運用へ置き換えない。ツール上の制約がある場合も本手順を変更せず、Termuxで実行できるコマンドを提示する。
-- 実作業を行う場合は、更新用の新規SHスクリプトや/tmp上の更新Scriptを作って後から実行する方式を使わない。ファイルをユーザーに手作業で編集させず、Termuxへ直接貼り付けて実行できる完全なコマンドをコードブロックで提示する。
+- 実作業を行う場合は、更新用の新規SHスクリプトや/tmp上の更新Scriptを作って後から実行する方式を使わない。ファイルをユーザーに手作業で編集させず、Termuxへ直接貼り付けて実行できる完全なコマンドをコードブロックで提示する。 コマンド本体をダウンロードファイルや添付スクリプトとして渡さず、チャット本文のコードブロック内に完全なコマンドを直接提示する。ユーザーにダウンロード・配置・別ファイルからの実行を求めない。
 
 ■ 2. 実装開始前の必須調査順序
 
@@ -101,7 +101,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 ■ 7. 独自判断による手順変更の禁止
 
 - ツールの制約・利便性・ChatGPT独自の考えを理由に、最新main・正本全文・Phase A/B・Termux実行・アンカー検査・PUSH後再監査を省略または別手順に置き換えない。
-- 手順にない固定SHA条件、推測した編集対象、手作業の編集要求、別のGitHub書き込み経路、更新用SH／/tmp Scriptを追加しない。
+- 手順にない固定SHA条件、推測した編集対象、手作業の編集要求、別のGitHub書き込み経路、更新用SH／/tmp Scriptを追加しない。 ダウンロード形式でコマンドを渡すことも禁止し、実行に必要なコマンドはチャット本文へ直接記載する。
 - 作業規則そのものの変更が必要な場合は、先にこの節へ正式に統合し、更新後の規則を基準にする。作業中に独自ルールを追加し、後から正当化しない。
 
 ■ 8. 一作業の完了条件
@@ -119,7 +119,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-23-P311
+- 現行Revision: 2026-10-25-P312
 - 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
@@ -12260,3 +12260,8 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - `scripts/verify_runtime_failure_fixes.mjs`でscan入口のdisposed判定が書込み確認より前にあることを検証する。
 - 正本Revision・現行Revision・Issue Discovery索引行数を同期し、`scripts/audit_current_source_inventory_p299.py --write`で追跡ソースインベントリを再生成する。全tree件数の再集計とは扱わない。Termuxでtest/lint/buildは実行しない。GitHub Actions、APK Artifact、実機動作はPUSH後の実測結果で判定する。
 
+【2026-10-25-P312 作業コマンドのチャット内直接提示を明文化】
+
+- 作業規則は、更新用SH／/tmp Scriptを作成して後から実行する方式を禁止し、Termuxへ直接貼り付けられる完全なコマンドをコードブロックで提示する方針を定めていた。ダウンロードファイル・添付スクリプトとして渡す方式の禁止が明記されていなかったため、作業規則へ追記した。
+- 今後、実行コマンドはチャット本文のコードブロックに直接記載し、ダウンロード・配置・別ファイルからの実行をユーザーへ要求しない。
+- このP312は作業手順の明文化のみであり、アプリのソースコード、実装機能、完全再帰インベントリの集計値は変更していない。PUSH後のActions・APK Artifactは別途実測確認する。
