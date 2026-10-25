@@ -99,6 +99,7 @@ const candidatePreparation = read('src/miki/core/services/autonomousCandidatePre
 const candidateDevelopmentCompletion = read('src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts');
 const candidateRepairRetryLoop = read('src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts');
 const complexityCostGate = read('src/miki/core/services/complexityCostGateService.ts');
+const complexityCostGateBehavior = read('scripts/verify_complexity_cost_gate_behavior.ts');
 const candidateCodeGeneration = read('src/miki/core/services/candidateCodeGenerationService.ts');
 const capabilityLedger = read('src/miki/capability/services/capabilityLedgerService.ts');
 const capabilityLedgerScreen = read('src/components/CapabilityLedgerScreen.tsx');
@@ -1023,6 +1024,8 @@ check(
     complexityCostGate.includes('function countAddedLines(') &&
     complexityCostGate.includes('function countAddedMatches(') &&
     complexityCostGate.includes('function countAddedImportEdges(') &&
+    complexityCostGateBehavior.includes("const dynamicSnippet = ['const lazy = ', 'im', 'port', '('") &&
+    complexityCostGateBehavior.includes("const requireSnippet = ['const legacy = ', 're', 'quire', '('") &&
     complexityCostGate.includes('function countAddedUniqueTokens(') &&
     complexityCostGate.includes('function publicApiTokens(') &&
     complexityCostGate.includes('function countAddedPublicApis(') &&

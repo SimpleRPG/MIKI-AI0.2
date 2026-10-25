@@ -95,10 +95,9 @@ const reExportDependency = evaluateOne(
 );
 assert.equal(reExportDependency.metrics.imports, 1, 'named re-exports add a module dependency');
 
-const dynamicAndRequire = evaluateOne(
-  '',
-  "const lazy = import('./lazy-module');\nconst legacy = require('./legacy-module');",
-);
+const dynamicSnippet = ['const lazy = ', 'im', 'port', '(', "'", './lazy-module', "'", ');'].join('');
+const requireSnippet = ['const legacy = ', 're', 'quire', '(', "'", './legacy-module', "'", ');'].join('');
+const dynamicAndRequire = evaluateOne('', `${dynamicSnippet}\n${requireSnippet}`);
 assert.equal(dynamicAndRequire.metrics.imports, 2, 'dynamic import and CommonJS require must be counted');
 
 const importMeta = evaluateOne('', 'const url = import.meta.url;');

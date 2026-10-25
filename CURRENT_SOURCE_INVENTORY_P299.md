@@ -12,9 +12,9 @@
 | 対象追跡パス（監査制御ファイルを除く） | 1847 |
 | ソースファイル | 1392 |
 | 相対import候補を字句走査したECMAScriptファイル | 1305 |
-| 相対import候補 | 3936 |
+| 相対import候補 | 3934 |
 | 追跡パスへ解決できた候補 | 3906 |
-| 未解決候補（即不具合判定ではない） | 30 |
+| 未解決候補（即不具合判定ではない） | 28 |
 
 ## ファイル一覧
 
@@ -245,7 +245,7 @@
 | `scripts/verify_closed_surface_p143.mjs` | 1966 | 1 | `14900087574646bc2a6b3bc64736136dfb4a424472ee0d021b6b3594ecc3c9fd` | 3 | 3 | 0 |
 | `scripts/verify_code_only_quality_v272.mjs` | 1455 | 5 | `abecb25fead46be927c66cea3e24373f9986cab0287878da9148ad9e658d20d0` | 0 | 0 | 0 |
 | `scripts/verify_completion_resilience_connection.mjs` | 1460 | 1 | `8ce997c86e1ca7b626bffd6aa9328078cb7370393b0d6545e6e168c66b60d767` | 0 | 0 | 0 |
-| `scripts/verify_complexity_cost_gate_behavior.ts` | 6711 | 155 | `e694e8c7950031a5ed37e48f43f119b3cfed41b714fd55a0e81c7148d33cbbef` | 12 | 2 | 10 |
+| `scripts/verify_complexity_cost_gate_behavior.ts` | 6870 | 154 | `0067605bb6776174c8a20bb8ec7197be17cb7ec4713ef9fe76a91a00b68f9486` | 10 | 2 | 8 |
 | `scripts/verify_comprehensive_visual_profile_p132.mjs` | 3590 | 1 | `fd52db57ff839f43b0c17284a644db8761ea1074f260f07ed71d6950ead1581c` | 2 | 2 | 0 |
 | `scripts/verify_context_closure_phase1.mjs` | 1118 | 11 | `67262973f1608351e215ab4ee4696360b1e7791c8d67d630a5d021c376c03a83` | 0 | 0 | 0 |
 | `scripts/verify_continuous_surface_p199.mjs` | 2685 | 1 | `720738c200a5c70ebe01ec1958c066b73d4609c4a89a201c4f46b64a00f36f0f` | 1 | 1 | 0 |
@@ -375,7 +375,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 97961 | 1395 | `8d0ef05a77a4b9a57689ff01e7f078467592083a42bedb64b6d977e2f1accd94` | 6 | 0 | 6 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 98266 | 1398 | `8a4d57d4ed613423ad253ed145a10b07292dd2ab98990e7b6cef80d91535bb63` | 6 | 0 | 6 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
