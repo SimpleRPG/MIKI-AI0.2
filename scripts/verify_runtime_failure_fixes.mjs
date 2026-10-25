@@ -32,6 +32,7 @@ const issueDiscoveryIndexRow = design.split(/\r?\n/).find(line => line.includes(
 const taskCaseMemoryIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/memory/services/taskCaseMemoryService.ts |'));
 const candidatePreparationIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousCandidatePreparationService.ts |'));
 const candidateDevelopmentCompletionIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts |'));
+const candidateRepairRetryLoopIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts |'));
 const complexityCostGateIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/complexityCostGateService.ts |'));
 const capabilityLedgerIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/capability/services/capabilityLedgerService.ts |'));
 const capabilityLedgerScreenIndexRow = design.split(/\r?\n/).find(line => line.includes('src/components/CapabilityLedgerScreen.tsx |'));
@@ -96,6 +97,7 @@ const developmentRequestModelIndexRow = design.split(/\r?\n/).find(line => line.
 const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
 const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
 const candidateDevelopmentCompletion = read('src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts');
+const candidateRepairRetryLoop = read('src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts');
 const complexityCostGate = read('src/miki/core/services/complexityCostGateService.ts');
 const candidateCodeGeneration = read('src/miki/core/services/candidateCodeGenerationService.ts');
 const capabilityLedger = read('src/miki/capability/services/capabilityLedgerService.ts');
@@ -1015,7 +1017,27 @@ check(
     complexityCostGate.includes("if(metrics.files>12)reasons.push('TOO_MANY_CHANGED_FILES')") &&
     candidateDevelopmentCompletionIndexRow?.includes(`lines=${candidateDevelopmentCompletion.split(/\r?\n/).length - 1}`) &&
     complexityCostGateIndexRow?.includes(`lines=${complexityCostGate.split(/\r?\n/).length - 1}`) &&
-    canonicalServiceAlias.includes("{service:'complexityCostGateService',path:'src/miki/core/services/complexityCostGateService.ts',classification:'CONNECTED_RUNTIME',action:'Candidate completion checks the isolated workspace complexity budget before repair validation and review-package creation.'}")
+    canonicalServiceAlias.includes("{service:'complexityCostGateService',path:'src/miki/core/services/complexityCostGateService.ts',classification:'CONNECTED_RUNTIME',action:'Candidate completion and each repair retry check the isolated workspace complexity budget before validation and review-package creation.'}")
+);
+
+
+check(
+  'Candidate repair retry rechecks complexity budget before validation and records rejection through Capability Gap',
+  candidateRepairRetryLoop.includes("import { complexityCostGateService } from '../../core/services/complexityCostGateService';") &&
+    candidateRepairRetryLoop.indexOf('for(let attempt=1;attempt<=limit;attempt+=1){') >= 0 &&
+    candidateRepairRetryLoop.indexOf('const workspace=isolatedCandidateWorkspaceService.get(workspaceId);') <
+      candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate(workspace);') &&
+    candidateRepairRetryLoop.indexOf('if(!workspace)return') <
+      candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate(workspace);') &&
+    candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate(workspace);') <
+      candidateRepairRetryLoop.indexOf('const validation=await candidateValidationRunnerService.run(workspaceId);') &&
+    candidateRepairRetryLoop.includes("stopReason:`COMPLEXITY_COST_GATE_REJECTED:${complexityDecision.reasons.join('|')}`") &&
+    candidateDevelopmentCompletion.includes('capabilityGapService.recordGap({') &&
+    candidateDevelopmentCompletion.includes('Candidate repair loop stopped: ${retryResult.stopReason}') &&
+    candidateDevelopmentCompletion.indexOf('if(retryResult.passed){') <
+      candidateDevelopmentCompletion.indexOf('reviewCandidateExportService.create(retryResult.finalWorkspaceId)') &&
+    candidateRepairRetryLoopIndexRow?.includes(`lines=${candidateRepairRetryLoop.split(/\r?\n/).length - 1}`) &&
+    candidateRepairRetryLoopIndexRow?.includes('deps=6')
 );
 
 check(

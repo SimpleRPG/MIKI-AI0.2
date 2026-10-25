@@ -39,9 +39,9 @@
     "trackedPathCountExcludingControlPaths": 1846,
     "sourceFileCount": 1391,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1304,
-    "relativeImportCandidateCount": 3922,
-    "resolvedRelativeImportCandidateCount": 3903,
-    "unresolvedRelativeImportCandidateCount": 19
+    "relativeImportCandidateCount": 3924,
+    "resolvedRelativeImportCandidateCount": 3904,
+    "unresolvedRelativeImportCandidateCount": 20
   },
   "records": [
     {
@@ -5157,39 +5157,44 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 94629,
-      "lines": 1357,
-      "sha256": "ab8d56b63b361d573b285db8254b12c7ea299a41f0f77cc0a6c722ecb67885d1",
+      "bytes": 96593,
+      "lines": 1379,
+      "sha256": "44793b9cae1f0f3c57d78ed12a7f41461dba6015d3bb1f1d86f11f122e27a2a0",
       "relativeImportCandidates": [
         {
-          "line": 185,
+          "line": 187,
           "specifier": "../../safety/services/outboundPayloadSanitizer",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 204,
+          "line": 206,
           "specifier": "../miki/safety/services/privacyGuardrailService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 206,
+          "line": 208,
           "specifier": "../miki/safety/services/abstractSanitizerService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 207,
+          "line": 209,
           "specifier": "../miki/safety/services/abstractSanitizerService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 916,
+          "line": 918,
           "specifier": "../miki/unknown/services/counterfactualReasoningService",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 1026,
+          "specifier": "../../core/services/complexityCostGateService",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
       ],
-      "relativeImportCandidateCount": 5,
+      "relativeImportCandidateCount": 6,
       "resolvedRelativeImportCount": 0,
-      "unresolvedRelativeImportCount": 5
+      "unresolvedRelativeImportCount": 6
     },
     {
       "path": "scripts/verify_runtime_logging_phase1.mjs",
@@ -13557,9 +13562,9 @@
     },
     {
       "path": "src/miki/core/services/canonicalServiceAliasRegistryService.ts",
-      "bytes": 6983,
+      "bytes": 6997,
       "lines": 35,
-      "sha256": "17792c84556861947480a7b295a4f80e1a205127b08c1557188769b51a271bf4",
+      "sha256": "f2a709e95a3d5ad746fe3d69c1b999cba710bd135aefce15af1e945307d0d404",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -27730,9 +27735,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts",
-      "bytes": 5132,
-      "lines": 74,
-      "sha256": "96fa3fc533b727a924f4203ee15e3c5c68a9696e3cc5eb490a1565ec75bf87a3",
+      "bytes": 5500,
+      "lines": 77,
+      "sha256": "ba46715d455c12d4fe51d4bd1b7acd3610ce50a1adec746bff97f41dfcda0073",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27754,19 +27759,25 @@
         },
         {
           "line": 4,
+          "specifier": "../../core/services/complexityCostGateService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/complexityCostGateService.ts"
+        },
+        {
+          "line": 5,
           "specifier": "./candidateRepairRevisionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/candidateRepairRevisionService.ts"
         },
         {
-          "line": 5,
+          "line": 6,
           "specifier": "./repairStrategySelectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/repairStrategySelectionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
+      "relativeImportCandidateCount": 6,
+      "resolvedRelativeImportCount": 6,
       "unresolvedRelativeImportCount": 0
     },
     {

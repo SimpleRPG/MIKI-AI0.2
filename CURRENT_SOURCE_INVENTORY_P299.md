@@ -12,9 +12,9 @@
 | 対象追跡パス（監査制御ファイルを除く） | 1846 |
 | ソースファイル | 1391 |
 | 相対import候補を字句走査したECMAScriptファイル | 1304 |
-| 相対import候補 | 3922 |
-| 追跡パスへ解決できた候補 | 3903 |
-| 未解決候補（即不具合判定ではない） | 19 |
+| 相対import候補 | 3924 |
+| 追跡パスへ解決できた候補 | 3904 |
+| 未解決候補（即不具合判定ではない） | 20 |
 
 ## ファイル一覧
 
@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 94629 | 1357 | `ab8d56b63b361d573b285db8254b12c7ea299a41f0f77cc0a6c722ecb67885d1` | 5 | 0 | 5 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 96593 | 1379 | `44793b9cae1f0f3c57d78ed12a7f41461dba6015d3bb1f1d86f11f122e27a2a0` | 6 | 0 | 6 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -638,7 +638,7 @@
 | `src/miki/core/services/candidateWriteGuardService.ts` | 4613 | 39 | `7c371c25fdbc06b69b8963afae8d6d9c0294d2868efbc8f99e85a38a085a183e` | 1 | 1 | 0 |
 | `src/miki/core/services/canonicalPersonSurfaceP171Service.ts` | 4387 | 7 | `c2b0e5f45c6869de3a5006b3b3a91a8c380ca1dfbe73183ccaa57ed960f43c61` | 1 | 1 | 0 |
 | `src/miki/core/services/canonicalProtectedInvariantRegistryService.ts` | 4008 | 29 | `97dead6e48b5e392fc731b75e3756584bc59b25c8ca83faba48350ccbcde20c6` | 1 | 1 | 0 |
-| `src/miki/core/services/canonicalServiceAliasRegistryService.ts` | 6983 | 35 | `17792c84556861947480a7b295a4f80e1a205127b08c1557188769b51a271bf4` | 0 | 0 | 0 |
+| `src/miki/core/services/canonicalServiceAliasRegistryService.ts` | 6997 | 35 | `f2a709e95a3d5ad746fe3d69c1b999cba710bd135aefce15af1e945307d0d404` | 0 | 0 | 0 |
 | `src/miki/core/services/canonicalSha256Service.ts` | 3432 | 61 | `c8b1b111992f71cb4443d9ff754881ccbaa53dab460ce7c0b507ceb42533dbcf` | 0 | 0 | 0 |
 | `src/miki/core/services/canvasSceneCandidateGeneratorService.ts` | 3409 | 7 | `af3e686c5fb179fa1a381ea2a53704cdff0fd74157d807ccae88830649f32bc7` | 1 | 1 | 0 |
 | `src/miki/core/services/changeScopeImpactService.ts` | 889 | 3 | `f9903309317cd9e9cf01742a86a02589605cf99eb6ad1079becf580a099d60bf` | 0 | 0 | 0 |
@@ -1034,7 +1034,7 @@
 | `src/miki/selfDevelopment/services/candidateAdoptionReadinessService.ts` | 3262 | 14 | `1dfa954d31812b6e8c6237970afc81cd189a4406e993d9a62fb85d34dc740535` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/candidateBrowserE2EOrchestratorService.ts` | 6285 | 16 | `8dbb19bb73c283cba3fc0b30ddcb11ce485edc48c1daf18b87df73988357fc49` | 5 | 5 | 0 |
 | `src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts` | 4430 | 62 | `38625f3adcbe487c0367288dfbd0f5584fe3916d33e8b1e1687af89593477a41` | 6 | 6 | 0 |
-| `src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts` | 5132 | 74 | `96fa3fc533b727a924f4203ee15e3c5c68a9696e3cc5eb490a1565ec75bf87a3` | 5 | 5 | 0 |
+| `src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts` | 5500 | 77 | `ba46715d455c12d4fe51d4bd1b7acd3610ce50a1adec746bff97f41dfcda0073` | 6 | 6 | 0 |
 | `src/miki/selfDevelopment/services/candidateRepairRevisionService.ts` | 2102 | 24 | `fd8b70c776f397a2a827cc35d8410fb2e6ec64344290d3a69d178f9fb5ae8e24` | 3 | 3 | 0 |
 | `src/miki/selfDevelopment/services/candidateStructuralAnalysisService.ts` | 347 | 1 | `9a0eda7c8d397672452b0b2de8be9e1052c9b96d86acb7ad7bb30e5c06d3d555` | 1 | 1 | 0 |
 | `src/miki/selfDevelopment/services/candidateTimelineReadModelService.ts` | 1999 | 7 | `28363f7e0491ba0e9c4f3604c2536370fdd78b44ab313e792edf1b62c2e235dc` | 4 | 4 | 0 |

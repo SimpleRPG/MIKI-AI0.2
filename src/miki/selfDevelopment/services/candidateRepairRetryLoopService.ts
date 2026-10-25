@@ -1,6 +1,7 @@
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 import { candidateValidationRunnerService, type ValidationRunnerResult } from '../../core/services/candidateValidationRunnerService';
 import { isolatedCandidateWorkspaceService } from '../../core/services/isolatedCandidateWorkspaceService';
+import { complexityCostGateService } from '../../core/services/complexityCostGateService';
 import { candidateRepairRevisionService } from './candidateRepairRevisionService';
 import { repairStrategySelectionService } from './repairStrategySelectionService';
 
@@ -32,6 +33,8 @@ class CandidateRepairRetryLoopService {
     for(let attempt=1;attempt<=limit;attempt+=1){
       const workspace=isolatedCandidateWorkspaceService.get(workspaceId);
       if(!workspace)return {passed:false,initialWorkspaceId,finalWorkspaceId:workspaceId,attempts,stopReason:'WORKSPACE_NOT_FOUND'};
+      const complexityDecision=complexityCostGateService.evaluate(workspace);
+      if(!complexityDecision.passed)return {passed:false,initialWorkspaceId,finalWorkspaceId:workspaceId,attempts,stopReason:`COMPLEXITY_COST_GATE_REJECTED:${complexityDecision.reasons.join('|')}`};
       const validation=await candidateValidationRunnerService.run(workspaceId);
       const repairPlans=validation.repairPlans||[];
       const signature=this.signature(validation);
