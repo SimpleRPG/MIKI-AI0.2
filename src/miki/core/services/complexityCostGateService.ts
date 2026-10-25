@@ -26,6 +26,30 @@ function countAddedMatches(
   return added;
 }
 
+function countAddedImportEdges(baseline: string, candidate: string): number {
+  const staticImports = countAddedMatches(
+    baseline,
+    candidate,
+    /\bimport(?!\s*\(|\s*\.)/g
+  );
+  const reExports = countAddedMatches(
+    baseline,
+    candidate,
+    /\bexport\s+(?:type\s+)?(?:\{[\s\S]*?\}|\*(?:\s+as\s+[\w$]+)?)[ \t\r\n]*from\b/g
+  );
+  const dynamicImports = countAddedMatches(
+    baseline,
+    candidate,
+    /\bimport(?=\s*\()/g
+  );
+  const commonJsRequires = countAddedMatches(
+    baseline,
+    candidate,
+    /\brequire(?=\s*\()/g
+  );
+  return staticImports + reExports + dynamicImports + commonJsRequires;
+}
+
 function countAddedUniqueTokens(
   baseline: string,
   candidate: string,
@@ -221,11 +245,7 @@ class ComplexityCostGateService {
       const candidate = file.candidateContent;
 
       addedLines += countAddedLines(baseline, candidate);
-      imports += countAddedMatches(
-        baseline,
-        candidate,
-        /^[ \t]*import\b[^\r\n]*/gm
-      );
+      imports += countAddedImportEdges(baseline, candidate);
       publicApis += countAddedPublicApis(baseline, candidate);
       storageKeys += countAddedUniqueTokens(
         baseline,

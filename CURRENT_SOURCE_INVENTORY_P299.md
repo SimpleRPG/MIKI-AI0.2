@@ -12,9 +12,9 @@
 | 対象追跡パス（監査制御ファイルを除く） | 1847 |
 | ソースファイル | 1392 |
 | 相対import候補を字句走査したECMAScriptファイル | 1305 |
-| 相対import候補 | 3931 |
+| 相対import候補 | 3936 |
 | 追跡パスへ解決できた候補 | 3906 |
-| 未解決候補（即不具合判定ではない） | 25 |
+| 未解決候補（即不具合判定ではない） | 30 |
 
 ## ファイル一覧
 
@@ -245,7 +245,7 @@
 | `scripts/verify_closed_surface_p143.mjs` | 1966 | 1 | `14900087574646bc2a6b3bc64736136dfb4a424472ee0d021b6b3594ecc3c9fd` | 3 | 3 | 0 |
 | `scripts/verify_code_only_quality_v272.mjs` | 1455 | 5 | `abecb25fead46be927c66cea3e24373f9986cab0287878da9148ad9e658d20d0` | 0 | 0 | 0 |
 | `scripts/verify_completion_resilience_connection.mjs` | 1460 | 1 | `8ce997c86e1ca7b626bffd6aa9328078cb7370393b0d6545e6e168c66b60d767` | 0 | 0 | 0 |
-| `scripts/verify_complexity_cost_gate_behavior.ts` | 5771 | 133 | `197c0c1b94524ed88cfc0eddb976c85e4b3b7cb90e9438a6162cae65f558de07` | 7 | 2 | 5 |
+| `scripts/verify_complexity_cost_gate_behavior.ts` | 6711 | 155 | `e694e8c7950031a5ed37e48f43f119b3cfed41b714fd55a0e81c7148d33cbbef` | 12 | 2 | 10 |
 | `scripts/verify_comprehensive_visual_profile_p132.mjs` | 3590 | 1 | `fd52db57ff839f43b0c17284a644db8761ea1074f260f07ed71d6950ead1581c` | 2 | 2 | 0 |
 | `scripts/verify_context_closure_phase1.mjs` | 1118 | 11 | `67262973f1608351e215ab4ee4696360b1e7791c8d67d630a5d021c376c03a83` | 0 | 0 | 0 |
 | `scripts/verify_continuous_surface_p199.mjs` | 2685 | 1 | `720738c200a5c70ebe01ec1958c066b73d4609c4a89a201c4f46b64a00f36f0f` | 1 | 1 | 0 |
@@ -375,7 +375,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 97891 | 1394 | `0d1d32e24ca6b84023822a08c190d84ac153b891d3c98a0217e40a1f4f0f97cb` | 6 | 0 | 6 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 97961 | 1395 | `8d0ef05a77a4b9a57689ff01e7f078467592083a42bedb64b6d977e2f1accd94` | 6 | 0 | 6 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -650,7 +650,7 @@
 | `src/miki/core/services/cognitiveQualityService.ts` | 8425 | 115 | `0e7033e79b65b67c31add7fb6f96091defd214dc75a9fe595ca71ff16403fe8a` | 4 | 4 | 0 |
 | `src/miki/core/services/collectionSourceRegistryService.ts` | 5761 | 24 | `1a8ec6b4a1fdb1620223793ad648943c5a11cb0407b48a0a7c7a149d26a66fbc` | 2 | 2 | 0 |
 | `src/miki/core/services/complexCapabilityContractService.ts` | 11964 | 34 | `f3467a531b7e02f4393890e6cfdc58cfefd9c1f181f6c2da1754dae11d7f1dbd` | 0 | 0 | 0 |
-| `src/miki/core/services/complexityCostGateService.ts` | 8658 | 263 | `3da31ccf8414b5d5d261a7c0f0609e794934266813fd4fb60a5f9837bccea8e5` | 1 | 1 | 0 |
+| `src/miki/core/services/complexityCostGateService.ts` | 9229 | 283 | `b12cc139d364a1418705b6acd8b8d2453c151dbc5780f55d47e5476f49a6fe8f` | 1 | 1 | 0 |
 | `src/miki/core/services/comprehensiveVisualProfileService.ts` | 12232 | 44 | `286e5553db0b3e286b994359308b1d8a4d2ea8af6f4110ff14d0345a8bafa471` | 4 | 4 | 0 |
 | `src/miki/core/services/contextClosureReceiptService.ts` | 2696 | 63 | `887c0bb228a23c0381c35c3e145223986f3d38dcb0d7a868a682c8018b1e8e48` | 3 | 3 | 0 |
 | `src/miki/core/services/continuousSurfacePersonP199Service.ts` | 11169 | 39 | `270ed105068867003988df566cc46cfb9cdd96da5e32a5ec9b737b8358850c1a` | 1 | 1 | 0 |

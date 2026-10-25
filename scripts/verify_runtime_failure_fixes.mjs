@@ -1022,6 +1022,7 @@ check(
     complexityCostGate.includes("if (metrics.events > 24) reasons.push('TOO_MANY_NEW_EVENTS')") &&
     complexityCostGate.includes('function countAddedLines(') &&
     complexityCostGate.includes('function countAddedMatches(') &&
+    complexityCostGate.includes('function countAddedImportEdges(') &&
     complexityCostGate.includes('function countAddedUniqueTokens(') &&
     complexityCostGate.includes('function publicApiTokens(') &&
     complexityCostGate.includes('function countAddedPublicApis(') &&

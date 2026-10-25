@@ -53,6 +53,7 @@ assert.equal(
 
 const wildcardDecision = evaluateOne('', "export * from './starred-module';");
 assert.equal(wildcardDecision.metrics.publicApis, 13, 'an unresolved wildcard must fail closed');
+assert.equal(wildcardDecision.metrics.imports, 1, 'a wildcard re-export is also a dependency edge');
 assert.ok(wildcardDecision.reasons.includes('TOO_MANY_NEW_PUBLIC_APIS'));
 
 const multipleVariables = evaluateOne('', 'export const firstApi = 1,\n  secondApi = 2;');
@@ -81,6 +82,27 @@ const imports25 = `${imports24}\nimport value24 from './module-24';`;
 assert.equal(evaluateOne('', imports24).metrics.imports, 24);
 assert.equal(evaluateOne('', imports24).passed, true, 'the import limit is inclusive at 24');
 assert.ok(evaluateOne('', imports25).reasons.includes('TOO_MANY_NEW_IMPORTS'));
+
+const sameLineImports = evaluateOne(
+  '',
+  "import first from './first'; import second from './second';",
+);
+assert.equal(sameLineImports.metrics.imports, 2, 'multiple imports on one line must be counted separately');
+
+const reExportDependency = evaluateOne(
+  '',
+  "export { exposed } from './re-exported-module';",
+);
+assert.equal(reExportDependency.metrics.imports, 1, 'named re-exports add a module dependency');
+
+const dynamicAndRequire = evaluateOne(
+  '',
+  "const lazy = import('./lazy-module');\nconst legacy = require('./legacy-module');",
+);
+assert.equal(dynamicAndRequire.metrics.imports, 2, 'dynamic import and CommonJS require must be counted');
+
+const importMeta = evaluateOne('', 'const url = import.meta.url;');
+assert.equal(importMeta.metrics.imports, 0, 'import.meta is not a module dependency');
 
 const events24 = Array.from(
   { length: 24 },
@@ -130,4 +152,4 @@ assert.equal(evaluateOne('', lines2000).metrics.addedLines, 2000);
 assert.equal(evaluateOne('', lines2000).passed, true, 'the added line limit is inclusive at 2000');
 assert.ok(evaluateOne('', lines2001).reasons.includes('TOO_MANY_ADDED_LINES'));
 
-console.log('PASS complexity-cost gate behavior: all six limits, inclusive boundaries, changed lines and export forms verified');
+console.log('PASS complexity-cost gate behavior: all six limits, import-edge forms, inclusive boundaries, changed lines and export forms verified');

@@ -39,9 +39,9 @@
     "trackedPathCountExcludingControlPaths": 1847,
     "sourceFileCount": 1392,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1305,
-    "relativeImportCandidateCount": 3931,
+    "relativeImportCandidateCount": 3936,
     "resolvedRelativeImportCandidateCount": 3906,
-    "unresolvedRelativeImportCandidateCount": 25
+    "unresolvedRelativeImportCandidateCount": 30
   },
   "records": [
     {
@@ -2860,9 +2860,9 @@
     },
     {
       "path": "scripts/verify_complexity_cost_gate_behavior.ts",
-      "bytes": 5771,
-      "lines": 133,
-      "sha256": "197c0c1b94524ed88cfc0eddb976c85e4b3b7cb90e9438a6162cae65f558de07",
+      "bytes": 6711,
+      "lines": 155,
+      "sha256": "e694e8c7950031a5ed37e48f43f119b3cfed41b714fd55a0e81c7148d33cbbef",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -2892,19 +2892,44 @@
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 78,
+          "line": 79,
           "specifier": "./module-${index}",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 80,
+          "line": 81,
           "specifier": "./module-24",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 88,
+          "specifier": "./first",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 88,
+          "specifier": "./second",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 94,
+          "specifier": "./re-exported-module",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 100,
+          "specifier": "./lazy-module",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 100,
+          "specifier": "./legacy-module",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
       ],
-      "relativeImportCandidateCount": 7,
+      "relativeImportCandidateCount": 12,
       "resolvedRelativeImportCount": 2,
-      "unresolvedRelativeImportCount": 5
+      "unresolvedRelativeImportCount": 10
     },
     {
       "path": "scripts/verify_comprehensive_visual_profile_p132.mjs",
@@ -5205,9 +5230,9 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 97891,
-      "lines": 1394,
-      "sha256": "0d1d32e24ca6b84023822a08c190d84ac153b891d3c98a0217e40a1f4f0f97cb",
+      "bytes": 97961,
+      "lines": 1395,
+      "sha256": "8d0ef05a77a4b9a57689ff01e7f078467592083a42bedb64b6d977e2f1accd94",
       "relativeImportCandidates": [
         {
           "line": 187,
@@ -5235,7 +5260,7 @@
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 1039,
+          "line": 1040,
           "specifier": "../../core/services/complexityCostGateService",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -13811,9 +13836,9 @@
     },
     {
       "path": "src/miki/core/services/complexityCostGateService.ts",
-      "bytes": 8658,
-      "lines": 263,
-      "sha256": "3da31ccf8414b5d5d261a7c0f0609e794934266813fd4fb60a5f9837bccea8e5",
+      "bytes": 9229,
+      "lines": 283,
+      "sha256": "b12cc139d364a1418705b6acd8b8d2453c151dbc5780f55d47e5476f49a6fe8f",
       "relativeImportCandidates": [
         {
           "line": 1,
