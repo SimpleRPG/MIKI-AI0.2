@@ -28,12 +28,14 @@ class CandidateRepairRetryLoopService {
     const limit=Math.max(1,Math.min(5,Math.floor(maxAttempts)));
     maxAttempts=Math.max(0,Math.min(maxAttempts,MAX_REPAIR_ATTEMPTS_HARD_LIMIT));const attempts:RepairRetryAttempt[]=[];
     const signatures=new Set<string>();
+    const initialWorkspace=isolatedCandidateWorkspaceService.get(initialWorkspaceId);
+    const initialBaselineByPath=new Map<string,string>((initialWorkspace?.files||[]).map(file=>[file.path,file.baselineContent] as [string,string]));
     let workspaceId=initialWorkspaceId;
 
     for(let attempt=1;attempt<=limit;attempt+=1){
       const workspace=isolatedCandidateWorkspaceService.get(workspaceId);
       if(!workspace)return {passed:false,initialWorkspaceId,finalWorkspaceId:workspaceId,attempts,stopReason:'WORKSPACE_NOT_FOUND'};
-      const complexityDecision=complexityCostGateService.evaluate(workspace);
+      const complexityDecision=complexityCostGateService.evaluate({...workspace,files:workspace.files.map(file=>({...file,baselineContent:initialBaselineByPath.get(file.path)??''}))});
       if(!complexityDecision.passed)return {passed:false,initialWorkspaceId,finalWorkspaceId:workspaceId,attempts,stopReason:`COMPLEXITY_COST_GATE_REJECTED:${complexityDecision.reasons.join('|')}`};
       const validation=await candidateValidationRunnerService.run(workspaceId);
       const repairPlans=validation.repairPlans||[];

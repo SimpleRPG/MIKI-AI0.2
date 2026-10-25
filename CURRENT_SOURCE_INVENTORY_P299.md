@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 96593 | 1379 | `44793b9cae1f0f3c57d78ed12a7f41461dba6015d3bb1f1d86f11f122e27a2a0` | 6 | 0 | 6 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 97484 | 1389 | `c35bbcca3f23d1751a3485352a8ff1843c4400dadbdec1da10ecfe1f339d024c` | 6 | 0 | 6 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -649,7 +649,7 @@
 | `src/miki/core/services/cognitiveQualityService.ts` | 8425 | 115 | `0e7033e79b65b67c31add7fb6f96091defd214dc75a9fe595ca71ff16403fe8a` | 4 | 4 | 0 |
 | `src/miki/core/services/collectionSourceRegistryService.ts` | 5761 | 24 | `1a8ec6b4a1fdb1620223793ad648943c5a11cb0407b48a0a7c7a149d26a66fbc` | 2 | 2 | 0 |
 | `src/miki/core/services/complexCapabilityContractService.ts` | 11964 | 34 | `f3467a531b7e02f4393890e6cfdc58cfefd9c1f181f6c2da1754dae11d7f1dbd` | 0 | 0 | 0 |
-| `src/miki/core/services/complexityCostGateService.ts` | 1768 | 4 | `8c4d8ef5e444e71b2d904963cd62d5bf8d2f1eb8c2a95faf61b795ab2073b582` | 1 | 1 | 0 |
+| `src/miki/core/services/complexityCostGateService.ts` | 3575 | 121 | `199ac0bdddee33ed9a09847bf4d70c8828ab3fb0882dd1bf4c2f8b83fb8674b3` | 1 | 1 | 0 |
 | `src/miki/core/services/comprehensiveVisualProfileService.ts` | 12232 | 44 | `286e5553db0b3e286b994359308b1d8a4d2ea8af6f4110ff14d0345a8bafa471` | 4 | 4 | 0 |
 | `src/miki/core/services/contextClosureReceiptService.ts` | 2696 | 63 | `887c0bb228a23c0381c35c3e145223986f3d38dcb0d7a868a682c8018b1e8e48` | 3 | 3 | 0 |
 | `src/miki/core/services/continuousSurfacePersonP199Service.ts` | 11169 | 39 | `270ed105068867003988df566cc46cfb9cdd96da5e32a5ec9b737b8358850c1a` | 1 | 1 | 0 |
@@ -1034,7 +1034,7 @@
 | `src/miki/selfDevelopment/services/candidateAdoptionReadinessService.ts` | 3262 | 14 | `1dfa954d31812b6e8c6237970afc81cd189a4406e993d9a62fb85d34dc740535` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/candidateBrowserE2EOrchestratorService.ts` | 6285 | 16 | `8dbb19bb73c283cba3fc0b30ddcb11ce485edc48c1daf18b87df73988357fc49` | 5 | 5 | 0 |
 | `src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts` | 4430 | 62 | `38625f3adcbe487c0367288dfbd0f5584fe3916d33e8b1e1687af89593477a41` | 6 | 6 | 0 |
-| `src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts` | 5500 | 77 | `ba46715d455c12d4fe51d4bd1b7acd3610ce50a1adec746bff97f41dfcda0073` | 6 | 6 | 0 |
+| `src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts` | 5843 | 79 | `3430926c50e758c54749fe6d69075f65cda4fef5604ca52402c2f8fdca68dbbd` | 6 | 6 | 0 |
 | `src/miki/selfDevelopment/services/candidateRepairRevisionService.ts` | 2102 | 24 | `fd8b70c776f397a2a827cc35d8410fb2e6ec64344290d3a69d178f9fb5ae8e24` | 3 | 3 | 0 |
 | `src/miki/selfDevelopment/services/candidateStructuralAnalysisService.ts` | 347 | 1 | `9a0eda7c8d397672452b0b2de8be9e1052c9b96d86acb7ad7bb30e5c06d3d555` | 1 | 1 | 0 |
 | `src/miki/selfDevelopment/services/candidateTimelineReadModelService.ts` | 1999 | 7 | `28363f7e0491ba0e9c4f3604c2536370fdd78b44ab313e792edf1b62c2e235dc` | 4 | 4 | 0 |

@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-25
-正本Revision：2026-10-25-P315
+正本Revision：2026-10-25-P316
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-25-P315
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-25-P316
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
 - 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
@@ -132,7 +132,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - 作業指示書の実行例外はPROMOTION_FAILEDと失敗理由・時刻を返し、可能な場合は同状態を保存する。保存に失敗した場合も、未保存を隠して成功扱いにしない。
 - 作業指示書の保存Rawが不正なら、元Rawをハッシュ付き隔離キーへ保存し、完全一致の読み戻しを確認してから現行キーを初期化する。隔離または保存読み戻しに失敗した場合は元データを上書きしない。
 - PROMOTION_FAILEDからの回復はREQUEST_CHANGESの修正経路のみ許可し、直接ACCEPTして検証・レビューを迂回することは認めない。
-- Candidate development completionは開始時にisolated workspaceを取得し、欠落は失敗として扱い、complexityCostGateServiceをRepair Validationより先に評価する。加えてCandidateRepairRetryLoopService.runは各attemptでworkspace取得直後・candidateValidationRunnerService.runより前に同じゲートを再評価する。不合格ならCOMPLEXITY_COST_GATE_REJECTEDを返し、追加修復・検証・Review Package作成を停止する。候補完了側は既存Capability Gap経路へ失敗を記録する。
+- Candidate development completionは開始時にisolated workspaceを取得し、欠落は失敗として扱い、complexityCostGateServiceをRepair Validationより先に評価する。CandidateRepairRetryLoopService.runは各attemptでworkspace取得直後・candidateValidationRunnerService.runより前に同じゲートを再評価する。各attemptの予算は初回workspaceのpath別baselineContentからの累積変更として判定する。累積比較は評価専用workspace viewで行い、保存済みworkspaceとValidationへ渡すbaselineは変更しない。初回workspaceに存在しないpathは空baselineとして評価する。不合格ならCOMPLEXITY_COST_GATE_REJECTEDを返し、追加修復・検証・Review Package作成を停止する。候補完了側は既存Capability Gap経路へ失敗を記録する。
 - Issue Discoveryは既存ImprovementIntakeRun／TaskBlackboardのterminal状態を再照合する。問題の解決は監視元の状態変化で確認し、単なるTask完了だけでは解決扱いしない。失敗・未解決完了は指数バックオフ付きで最大3回再試行し、取消済みTaskは自動再投入しない。
 - TaskCaseMemoryの関連失敗ケースを既存改善計画のrationaleへ診断情報として渡す。失敗ケースは観測事実として扱い、普遍的な法則や検証済み知識へ昇格させない。
 - Execution FailureのResearch／Promotionをイベントリスナーから直接実行せず、永続Knowledge Gap→AutonomousRevalidationLoop→既存CORE TaskIngress→Verification境界へ統一する。
@@ -446,7 +446,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [ORPHAN] CORE | src/miki/core/services/codeKnowledgeLoaderService.ts | lines=3 | symbols=CodeKnowledgeDomain, codeKnowledgeLoaderService | callers=0 | deps=3 | Tests=1
 - [ORPHAN] CORE | src/miki/core/services/collectionSourceRegistryService.ts | lines=24 | symbols=CollectionArtifactKind, CollectionPlan, CollectionReceipt, CollectionSourceDescriptor, collectionSourceRegistryService | callers=0 | deps=2
 - [USED] CORE | src/miki/core/services/complexCapabilityContractService.ts | lines=34 | symbols=ComplexCapabilityContract, complexCapabilityContractService | callers=2 | deps=0 | Tests=2
-- [USED] CORE | src/miki/core/services/complexityCostGateService.ts | lines=4 | symbols=ComplexityDecision, complexityCostGateService | callers=3 | deps=1 | Tests=2
+- [USED] CORE | src/miki/core/services/complexityCostGateService.ts | lines=121 | symbols=ComplexityDecision, complexityCostGateService | callers=3 | deps=1 | Tests=2
 - [USED] CORE | src/miki/core/services/contextClosureReceiptService.ts | lines=63 | symbols=ContextClosureReceipt, contextClosureReceiptService | callers=2 | deps=3 | Storage=miki_context_closure_receipts_v1 / Tests=1
 - [USED] CORE | src/miki/core/services/coreCompletionGateService.ts | lines=517 | symbols=CoreCompletionAssessment, coreCompletionGateService | callers=2 | deps=7
 - [USED] CORE | src/miki/core/services/coreCycleSettingsService.ts | lines=41 | symbols=CoreCycleSettings, coreCycleSettingsService | callers=5 | deps=1 | Storage=miki.core.cycle.settings.v1
@@ -757,7 +757,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/canaryPostReviewVerificationService.ts | lines=3 | symbols=canaryPostReviewVerificationService | callers=1 | deps=3 | Tests=3
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/candidateBrowserE2EOrchestratorService.ts | lines=16 | symbols=CandidateBrowserE2EEvidence, CandidateE2EScenario, CandidateE2EStep, candidateBrowserE2EOrchestratorService | callers=1 | deps=5 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts | lines=62 | symbols=CandidateDevelopmentCompletionResult, CandidateIntegrityEvidence, candidateDevelopmentCompletionService | callers=1 | deps=6 | Tests=5
-- [USED] selfDevelopment | src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts | lines=77 | symbols=RepairRetryAttempt, RepairRetryLoopResult, candidateRepairRetryLoopService | callers=4 | deps=6 | Tests=6
+- [USED] selfDevelopment | src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts | lines=79 | symbols=RepairRetryAttempt, RepairRetryLoopResult, candidateRepairRetryLoopService | callers=4 | deps=6 | Tests=6
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/candidateRepairRevisionService.ts | lines=24 | symbols=RepairRevisionFile, RepairRevisionResult, candidateRepairRevisionService | callers=1 | deps=3 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/candidateStructuralAnalysisService.ts | lines=1 | symbols=candidateStructuralAnalysisService | callers=1 | deps=0 | Tests=1
 - [USED] selfDevelopment | src/miki/selfDevelopment/services/capabilityContractSynthesisService.ts | lines=4 | symbols=CapabilityContract, capabilityContractSynthesisService | callers=2 | deps=2 | Tests=1
@@ -12295,3 +12295,13 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - `scripts/verify_runtime_failure_fixes.mjs`で、ゲートの実行順、拒否理由、Capability Gap経路、Review Packageの成功条件、正本索引の行数と依存数を検査する。Canonical Service Connectivityの説明も実際の接続範囲に同期する。
 - 変更ソースの索引行数・依存関係・呼出元数を更新し、`python scripts/audit_current_source_inventory_p299.py --write`でP299追跡Source Inventoryを再生成する。全treeの分類再集計とは扱わない。
 - Termuxではtest/lint/buildを実行しない。GitHub ActionsとAPK ArtifactはPUSH後の実際の結果で判定する。複雑度ゲートの実機性能・候補作成負荷は未測定であり、実機検証済みとは表現しない。
+
+【2026-10-25-P316 複雑度ゲートの累積予算・未使用メトリクス修正】
+
+- P315のGitHub Actions #905は成功し、APK Artifact `miki-ai-apk`（Artifact ID 12601763487）を確認した。実機動作は未確認。
+- P315の各attemptゲートは接続済みだったが、修復workspaceごとにbaselineContentが直前候補へ更新されるため、ゲートの追加量がattemptごとの差分に限定され、累積変更量を見落とし得た。
+- P316では初回workspaceのpath別baselineContentを保持し、complexityCostGateServiceへ渡す評価専用viewだけを累積比較へ変更する。保存済みworkspaceとValidationへの入力baselineは変更しない。初回workspaceにないpathは空baselineとして評価する。
+- 追加行数はベースラインと候補間の行内容出現数で計測する。importとevent接続は既存記述と照合して追加分を数え、storage keyは新規の一意トークン数を計測する。初期上限は変更ファイル12、追加行2000、import 24、公開API 12、保存キー8、event接続24であり、実機負荷の測定値ではない。
+- `scripts/verify_runtime_failure_fixes.mjs`で6上限、計測関数、累積baselineの採用、検証前のゲート順、正本索引行数を検査する。P299現行追跡ソースインベントリを再生成し、全treeの完全再帰分類再集計とは区別する。
+- Termuxでtest/lint/buildは実行しない。PUSH後のGitHub ActionsとAPK Artifactの実結果で判断する。実機動作は未確認として扱う。
+

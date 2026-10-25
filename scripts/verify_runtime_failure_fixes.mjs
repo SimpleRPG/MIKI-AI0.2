@@ -1014,7 +1014,15 @@ check(
     candidateDevelopmentCompletion.includes('complexityCostGateService.evaluate(workspace)') &&
     candidateDevelopmentCompletion.indexOf('complexityCostGateService.evaluate(workspace)') < candidateDevelopmentCompletion.indexOf('candidateRepairRetryLoopService.run(initialWorkspaceId,maxRepairAttempts)') &&
     candidateDevelopmentCompletion.includes('COMPLEXITY_COST_GATE_REJECTED:') &&
-    complexityCostGate.includes("if(metrics.files>12)reasons.push('TOO_MANY_CHANGED_FILES')") &&
+    complexityCostGate.includes("if (metrics.files > 12) reasons.push('TOO_MANY_CHANGED_FILES')") &&
+    complexityCostGate.includes("if (metrics.addedLines > 2000) reasons.push('TOO_MANY_ADDED_LINES')") &&
+    complexityCostGate.includes("if (metrics.imports > 24) reasons.push('TOO_MANY_NEW_IMPORTS')") &&
+    complexityCostGate.includes("if (metrics.publicApis > 12) reasons.push('TOO_MANY_NEW_PUBLIC_APIS')") &&
+    complexityCostGate.includes("if (metrics.storageKeys > 8) reasons.push('TOO_MANY_NEW_STORAGE_KEYS')") &&
+    complexityCostGate.includes("if (metrics.events > 24) reasons.push('TOO_MANY_NEW_EVENTS')") &&
+    complexityCostGate.includes('function countAddedLines(') &&
+    complexityCostGate.includes('function countAddedMatches(') &&
+    complexityCostGate.includes('function countAddedUniqueTokens(') &&
     candidateDevelopmentCompletionIndexRow?.includes(`lines=${candidateDevelopmentCompletion.split(/\r?\n/).length - 1}`) &&
     complexityCostGateIndexRow?.includes(`lines=${complexityCostGate.split(/\r?\n/).length - 1}`) &&
     canonicalServiceAlias.includes("{service:'complexityCostGateService',path:'src/miki/core/services/complexityCostGateService.ts',classification:'CONNECTED_RUNTIME',action:'Candidate completion and each repair retry check the isolated workspace complexity budget before validation and review-package creation.'}")
@@ -1026,12 +1034,14 @@ check(
   candidateRepairRetryLoop.includes("import { complexityCostGateService } from '../../core/services/complexityCostGateService';") &&
     candidateRepairRetryLoop.indexOf('for(let attempt=1;attempt<=limit;attempt+=1){') >= 0 &&
     candidateRepairRetryLoop.indexOf('const workspace=isolatedCandidateWorkspaceService.get(workspaceId);') <
-      candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate(workspace);') &&
+      candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate({') &&
     candidateRepairRetryLoop.indexOf('if(!workspace)return') <
-      candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate(workspace);') &&
-    candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate(workspace);') <
+      candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate({') &&
+    candidateRepairRetryLoop.indexOf('const complexityDecision=complexityCostGateService.evaluate({') <
       candidateRepairRetryLoop.indexOf('const validation=await candidateValidationRunnerService.run(workspaceId);') &&
     candidateRepairRetryLoop.includes("stopReason:`COMPLEXITY_COST_GATE_REJECTED:${complexityDecision.reasons.join('|')}`") &&
+    candidateRepairRetryLoop.includes('const initialBaselineByPath=new Map<string,string>(') &&
+    candidateRepairRetryLoop.includes('baselineContent:initialBaselineByPath.get(file.path)') &&
     candidateDevelopmentCompletion.includes('capabilityGapService.recordGap({') &&
     candidateDevelopmentCompletion.includes('Candidate repair loop stopped: ${retryResult.stopReason}') &&
     candidateDevelopmentCompletion.indexOf('if(retryResult.passed){') <

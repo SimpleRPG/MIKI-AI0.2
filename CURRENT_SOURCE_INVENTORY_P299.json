@@ -5157,9 +5157,9 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 96593,
-      "lines": 1379,
-      "sha256": "44793b9cae1f0f3c57d78ed12a7f41461dba6015d3bb1f1d86f11f122e27a2a0",
+      "bytes": 97484,
+      "lines": 1389,
+      "sha256": "c35bbcca3f23d1751a3485352a8ff1843c4400dadbdec1da10ecfe1f339d024c",
       "relativeImportCandidates": [
         {
           "line": 187,
@@ -5187,7 +5187,7 @@
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 1026,
+          "line": 1034,
           "specifier": "../../core/services/complexityCostGateService",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -13763,9 +13763,9 @@
     },
     {
       "path": "src/miki/core/services/complexityCostGateService.ts",
-      "bytes": 1768,
-      "lines": 4,
-      "sha256": "8c4d8ef5e444e71b2d904963cd62d5bf8d2f1eb8c2a95faf61b795ab2073b582",
+      "bytes": 3575,
+      "lines": 121,
+      "sha256": "199ac0bdddee33ed9a09847bf4d70c8828ab3fb0882dd1bf4c2f8b83fb8674b3",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27735,9 +27735,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts",
-      "bytes": 5500,
-      "lines": 77,
-      "sha256": "ba46715d455c12d4fe51d4bd1b7acd3610ce50a1adec746bff97f41dfcda0073",
+      "bytes": 5843,
+      "lines": 79,
+      "sha256": "3430926c50e758c54749fe6d69075f65cda4fef5604ca52402c2f8fdca68dbbd",
       "relativeImportCandidates": [
         {
           "line": 1,
