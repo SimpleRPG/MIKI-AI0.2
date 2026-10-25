@@ -44,6 +44,55 @@ function countAddedUniqueTokens(
   return added;
 }
 
+function publicApiTokens(source: string): string[] {
+  const tokens = new Set<string>();
+
+  const declarations =
+    /^[ \t]*export[ \t]+(?:(?:declare|abstract|async|default|const)[ \t]+)*(?:class|function|const|let|var|interface|type|enum|namespace)[ \t]+([A-Za-z_$][\w$]*)/gm;
+  for (const match of source.matchAll(declarations)) {
+    tokens.add(/\bdefault\b/.test(match[0]) ? 'default' : match[1]);
+  }
+
+  const exportLists =
+    /^[ \t]*export[ \t]+(?:type[ \t]+)?\{([^}]*)\}[ \t]*(?:from[ \t]+['"][^'"\r\n]+['"])?[ \t]*;?/gm;
+  for (const match of source.matchAll(exportLists)) {
+    for (const rawItem of match[1].split(',')) {
+      const item = rawItem.trim().replace(/^type[ \t]+/, '');
+      const parts = item.split(/[ \t]+as[ \t]+/);
+      const exportedName = parts[parts.length - 1].trim();
+      if (/^[A-Za-z_$][\w$]*$/.test(exportedName)) {
+        tokens.add(exportedName);
+      }
+    }
+  }
+
+  const namespaceExports =
+    /^[ \t]*export[ \t]+(?:type[ \t]+)?\*[ \t]+as[ \t]+([A-Za-z_$][\w$]*)[ \t]+from[ \t]+['"][^'"\r\n]+['"]/gm;
+  for (const match of source.matchAll(namespaceExports)) {
+    tokens.add(match[1]);
+  }
+
+  const wildcardExports =
+    /^[ \t]*export[ \t]+(?:type[ \t]+)?\*[ \t]+from[ \t]+['"]([^'"\r\n]+)['"]/gm;
+  for (const match of source.matchAll(wildcardExports)) {
+    tokens.add(`*:${match[1]}`);
+  }
+
+  if (/^[ \t]*export[ \t]+default\b/m.test(source)) {
+    tokens.add('default');
+  }
+  if (/^[ \t]*export[ \t]*=/m.test(source)) {
+    tokens.add('export=');
+  }
+
+  return [...tokens].sort();
+}
+
+function countAddedPublicApis(baseline: string, candidate: string): number {
+  const baselineTokens = new Set(publicApiTokens(baseline));
+  return publicApiTokens(candidate).filter(token => !baselineTokens.has(token)).length;
+}
+
 function countAddedLines(baseline: string, candidate: string): number {
   const remaining = new Map<string, number>();
   for (const line of baseline.split(/\r?\n/)) {
@@ -80,11 +129,7 @@ class ComplexityCostGateService {
         candidate,
         /^[ \t]*import\b[^\r\n]*/gm
       );
-      publicApis += countAddedMatches(
-        baseline,
-        candidate,
-        /^[ \t]*export[ \t]+(?:class|function|const|interface|type)[ \t]+[A-Za-z_$][\w$]*/gm
-      );
+      publicApis += countAddedPublicApis(baseline, candidate);
       storageKeys += countAddedUniqueTokens(
         baseline,
         candidate,

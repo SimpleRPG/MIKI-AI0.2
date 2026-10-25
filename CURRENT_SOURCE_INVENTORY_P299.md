@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 97484 | 1389 | `c35bbcca3f23d1751a3485352a8ff1843c4400dadbdec1da10ecfe1f339d024c` | 6 | 0 | 6 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 97704 | 1392 | `a0228e496819821fdfc7330199869f619c248ba925cc922c0413b8c1ac5466fa` | 6 | 0 | 6 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -649,7 +649,7 @@
 | `src/miki/core/services/cognitiveQualityService.ts` | 8425 | 115 | `0e7033e79b65b67c31add7fb6f96091defd214dc75a9fe595ca71ff16403fe8a` | 4 | 4 | 0 |
 | `src/miki/core/services/collectionSourceRegistryService.ts` | 5761 | 24 | `1a8ec6b4a1fdb1620223793ad648943c5a11cb0407b48a0a7c7a149d26a66fbc` | 2 | 2 | 0 |
 | `src/miki/core/services/complexCapabilityContractService.ts` | 11964 | 34 | `f3467a531b7e02f4393890e6cfdc58cfefd9c1f181f6c2da1754dae11d7f1dbd` | 0 | 0 | 0 |
-| `src/miki/core/services/complexityCostGateService.ts` | 3575 | 121 | `199ac0bdddee33ed9a09847bf4d70c8828ab3fb0882dd1bf4c2f8b83fb8674b3` | 1 | 1 | 0 |
+| `src/miki/core/services/complexityCostGateService.ts` | 5229 | 166 | `efb0480b538c23c613876bd3b2e3fa2760a6a508d9aa5234658af68da89f5c36` | 1 | 1 | 0 |
 | `src/miki/core/services/comprehensiveVisualProfileService.ts` | 12232 | 44 | `286e5553db0b3e286b994359308b1d8a4d2ea8af6f4110ff14d0345a8bafa471` | 4 | 4 | 0 |
 | `src/miki/core/services/contextClosureReceiptService.ts` | 2696 | 63 | `887c0bb228a23c0381c35c3e145223986f3d38dcb0d7a868a682c8018b1e8e48` | 3 | 3 | 0 |
 | `src/miki/core/services/continuousSurfacePersonP199Service.ts` | 11169 | 39 | `270ed105068867003988df566cc46cfb9cdd96da5e32a5ec9b737b8358850c1a` | 1 | 1 | 0 |

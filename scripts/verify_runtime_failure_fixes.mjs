@@ -1023,6 +1023,9 @@ check(
     complexityCostGate.includes('function countAddedLines(') &&
     complexityCostGate.includes('function countAddedMatches(') &&
     complexityCostGate.includes('function countAddedUniqueTokens(') &&
+    complexityCostGate.includes('function publicApiTokens(') &&
+    complexityCostGate.includes('function countAddedPublicApis(') &&
+    apkWorkflow.includes('npx tsx scripts/verify_complexity_cost_gate_behavior.ts') &&
     candidateDevelopmentCompletionIndexRow?.includes(`lines=${candidateDevelopmentCompletion.split(/\r?\n/).length - 1}`) &&
     complexityCostGateIndexRow?.includes(`lines=${complexityCostGate.split(/\r?\n/).length - 1}`) &&
     canonicalServiceAlias.includes("{service:'complexityCostGateService',path:'src/miki/core/services/complexityCostGateService.ts',classification:'CONNECTED_RUNTIME',action:'Candidate completion and each repair retry check the isolated workspace complexity budget before validation and review-package creation.'}")

@@ -5157,9 +5157,9 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 97484,
-      "lines": 1389,
-      "sha256": "c35bbcca3f23d1751a3485352a8ff1843c4400dadbdec1da10ecfe1f339d024c",
+      "bytes": 97704,
+      "lines": 1392,
+      "sha256": "a0228e496819821fdfc7330199869f619c248ba925cc922c0413b8c1ac5466fa",
       "relativeImportCandidates": [
         {
           "line": 187,
@@ -5187,7 +5187,7 @@
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 1034,
+          "line": 1037,
           "specifier": "../../core/services/complexityCostGateService",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -13763,9 +13763,9 @@
     },
     {
       "path": "src/miki/core/services/complexityCostGateService.ts",
-      "bytes": 3575,
-      "lines": 121,
-      "sha256": "199ac0bdddee33ed9a09847bf4d70c8828ab3fb0882dd1bf4c2f8b83fb8674b3",
+      "bytes": 5229,
+      "lines": 166,
+      "sha256": "efb0480b538c23c613876bd3b2e3fa2760a6a508d9aa5234658af68da89f5c36",
       "relativeImportCandidates": [
         {
           "line": 1,
