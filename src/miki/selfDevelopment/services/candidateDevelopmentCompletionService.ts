@@ -1,6 +1,8 @@
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 import { reviewCandidateExportService, type ReviewCandidatePackage } from '../../core/services/reviewCandidateExportService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
+import { isolatedCandidateWorkspaceService } from '../../core/services/isolatedCandidateWorkspaceService';
+import { complexityCostGateService } from '../../core/services/complexityCostGateService';
 import { candidateRepairRetryLoopService, type RepairRetryLoopResult } from './candidateRepairRetryLoopService';
 
 export interface CandidateIntegrityEvidence{contractPassed:boolean;semanticPassed:boolean;dependencyPassed:boolean;runtimePassed:boolean;resourcePassed:boolean;reasons:string[];}
@@ -18,7 +20,13 @@ export interface CandidateDevelopmentCompletionResult {
 class CandidateDevelopmentCompletionService {
   public async complete(initialWorkspaceId:string,maxRepairAttempts=3,integrity?:CandidateIntegrityEvidence):Promise<CandidateDevelopmentCompletionResult>{
     if(integrity && (!integrity.contractPassed || !integrity.semanticPassed || !integrity.dependencyPassed || !integrity.runtimePassed || !integrity.resourcePassed)){const retryResult={passed:false,finalWorkspaceId:initialWorkspaceId,attempts:[],stopReason:'INTEGRITY_GATE_REJECTED'} as RepairRetryLoopResult;return this.result(false,retryResult,undefined,undefined,['INTEGRITY_GATE_REJECTED',...(integrity?.reasons||[])]);}
-    const retryResult=await candidateRepairRetryLoopService.run(initialWorkspaceId,maxRepairAttempts);
+    const workspace=isolatedCandidateWorkspaceService.get(initialWorkspaceId);
+    const complexityDecision=workspace?complexityCostGateService.evaluate(workspace):undefined;
+    const retryResult:RepairRetryLoopResult=!workspace
+      ? {passed:false,initialWorkspaceId,finalWorkspaceId:initialWorkspaceId,attempts:[],stopReason:'WORKSPACE_NOT_FOUND'}
+      : complexityDecision&&!complexityDecision.passed
+        ? {passed:false,initialWorkspaceId,finalWorkspaceId:initialWorkspaceId,attempts:[],stopReason:`COMPLEXITY_COST_GATE_REJECTED:${complexityDecision.reasons.join('|')}`}
+        : await candidateRepairRetryLoopService.run(initialWorkspaceId,maxRepairAttempts);
     if(retryResult.passed){
       const reviewPackage=reviewCandidateExportService.create(retryResult.finalWorkspaceId);
       if(!reviewPackage){

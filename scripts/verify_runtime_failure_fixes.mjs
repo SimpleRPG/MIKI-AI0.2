@@ -31,6 +31,8 @@ const rustManifest = read('native/miki-native-core/Cargo.toml');
 const issueDiscoveryIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousIssueDiscoveryService.ts |'));
 const taskCaseMemoryIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/memory/services/taskCaseMemoryService.ts |'));
 const candidatePreparationIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/autonomousCandidatePreparationService.ts |'));
+const candidateDevelopmentCompletionIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts |'));
+const complexityCostGateIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/complexityCostGateService.ts |'));
 const capabilityLedgerIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/capability/services/capabilityLedgerService.ts |'));
 const capabilityLedgerScreenIndexRow = design.split(/\r?\n/).find(line => line.includes('src/components/CapabilityLedgerScreen.tsx |'));
 const improvementIntakeRouterIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/core/services/improvementIntakeRouterService.ts |'));
@@ -93,6 +95,8 @@ const developmentStateMachineIndexRow = design.split(/\r?\n/).find(line => line.
 const developmentRequestModelIndexRow = design.split(/\r?\n/).find(line => line.includes('src/miki/selfDevelopment/services/unifiedDevelopmentRequestModel.ts |'));
 const taskCaseMemory = read('src/miki/memory/services/taskCaseMemoryService.ts');
 const candidatePreparation = read('src/miki/core/services/autonomousCandidatePreparationService.ts');
+const candidateDevelopmentCompletion = read('src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts');
+const complexityCostGate = read('src/miki/core/services/complexityCostGateService.ts');
 const candidateCodeGeneration = read('src/miki/core/services/candidateCodeGenerationService.ts');
 const capabilityLedger = read('src/miki/capability/services/capabilityLedgerService.ts');
 const capabilityLedgerScreen = read('src/components/CapabilityLedgerScreen.tsx');
@@ -1000,6 +1004,18 @@ check(
     autonomousLoop.includes('private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string, generation: number): Promise<void>') &&
     autonomousLoop.includes('const acquired = await requiredAssetAcquisitionService.acquire({') &&
     autonomousLoop.includes('if (!this.isGenerationCurrent(generation)) return;\n\n    /*')
+);
+
+check(
+  'Candidate completion enforces complexity budget before repair validation and review export',
+  candidateDevelopmentCompletion.includes('isolatedCandidateWorkspaceService.get(initialWorkspaceId)') &&
+    candidateDevelopmentCompletion.includes('complexityCostGateService.evaluate(workspace)') &&
+    candidateDevelopmentCompletion.indexOf('complexityCostGateService.evaluate(workspace)') < candidateDevelopmentCompletion.indexOf('candidateRepairRetryLoopService.run(initialWorkspaceId,maxRepairAttempts)') &&
+    candidateDevelopmentCompletion.includes('COMPLEXITY_COST_GATE_REJECTED:') &&
+    complexityCostGate.includes("if(metrics.files>12)reasons.push('TOO_MANY_CHANGED_FILES')") &&
+    candidateDevelopmentCompletionIndexRow?.includes(`lines=${candidateDevelopmentCompletion.split(/\r?\n/).length - 1}`) &&
+    complexityCostGateIndexRow?.includes(`lines=${complexityCostGate.split(/\r?\n/).length - 1}`) &&
+    canonicalServiceAlias.includes("{service:'complexityCostGateService',path:'src/miki/core/services/complexityCostGateService.ts',classification:'CONNECTED_RUNTIME',action:'Candidate completion checks the isolated workspace complexity budget before repair validation and review-package creation.'}")
 );
 
 check(

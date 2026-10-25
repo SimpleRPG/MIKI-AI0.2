@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1846,
     "sourceFileCount": 1391,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1304,
-    "relativeImportCandidateCount": 3920,
-    "resolvedRelativeImportCandidateCount": 3901,
+    "relativeImportCandidateCount": 3922,
+    "resolvedRelativeImportCandidateCount": 3903,
     "unresolvedRelativeImportCandidateCount": 19
   },
   "records": [
@@ -5157,32 +5157,32 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 92869,
-      "lines": 1341,
-      "sha256": "5694ed7a25590674813e361dd4fa47fcd2390076fa47b8270eb4cb89b8a5fea1",
+      "bytes": 94629,
+      "lines": 1357,
+      "sha256": "ab8d56b63b361d573b285db8254b12c7ea299a41f0f77cc0a6c722ecb67885d1",
       "relativeImportCandidates": [
         {
-          "line": 181,
+          "line": 185,
           "specifier": "../../safety/services/outboundPayloadSanitizer",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 200,
+          "line": 204,
           "specifier": "../miki/safety/services/privacyGuardrailService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 202,
+          "line": 206,
           "specifier": "../miki/safety/services/abstractSanitizerService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 203,
+          "line": 207,
           "specifier": "../miki/safety/services/abstractSanitizerService",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 912,
+          "line": 916,
           "specifier": "../miki/unknown/services/counterfactualReasoningService",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -13557,9 +13557,9 @@
     },
     {
       "path": "src/miki/core/services/canonicalServiceAliasRegistryService.ts",
-      "bytes": 6907,
+      "bytes": 6983,
       "lines": 35,
-      "sha256": "204a17721ff9544106bd3cfd4140bd2ba37c1eb9c5497cddbaf7e663273045e9",
+      "sha256": "17792c84556861947480a7b295a4f80e1a205127b08c1557188769b51a271bf4",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -27683,9 +27683,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts",
-      "bytes": 3661,
-      "lines": 54,
-      "sha256": "bd96abbb7732d4842bd9895bd9d70768c788efeb87417ea0538c7f310c21ed86",
+      "bytes": 4430,
+      "lines": 62,
+      "sha256": "38625f3adcbe487c0367288dfbd0f5584fe3916d33e8b1e1687af89593477a41",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27707,13 +27707,25 @@
         },
         {
           "line": 4,
+          "specifier": "../../core/services/isolatedCandidateWorkspaceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
+        },
+        {
+          "line": 5,
+          "specifier": "../../core/services/complexityCostGateService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/complexityCostGateService.ts"
+        },
+        {
+          "line": 6,
           "specifier": "./candidateRepairRetryLoopService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts"
         }
       ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
+      "relativeImportCandidateCount": 6,
+      "resolvedRelativeImportCount": 6,
       "unresolvedRelativeImportCount": 0
     },
     {
