@@ -471,8 +471,10 @@ check(
     domainIntegrationBootstrap.includes('  }catch(error){\n   this.dispose();\n   throw error;\n  }')
 );
 check(
-  'Failed runtime initialization clears its latch and invalidates the failed generation',
-  runtimeLifecycle.includes('} catch (error) {\n      this.initialized = false;\n      this.generation += 1;\n      throw error;\n    }')
+  'Runtime initialization ignores stale completions and only invalidates its own failed generation',
+  runtimeLifecycle.includes('for (let attempt = 1; attempt <= 2; attempt += 1) {\n            if (generation !== this.generation) return;\n            try {\n              await domainIntegrationBootstrapService.initialize();\n              if (generation !== this.generation) return;') &&
+    runtimeLifecycle.includes('await stage.run();\n          if (generation !== this.generation) return;\n        } catch (error) {\n          if (generation !== this.generation) return;') &&
+    runtimeLifecycle.includes('} catch (error) {\n      if (generation !== this.generation) return;\n      this.initialized = false;\n      this.generation += 1;\n      throw error;\n    }')
 );
 check(
   'Domain audit checkpoints include current step and previous/next operation',
@@ -930,7 +932,7 @@ check(
 );
 check(
   'Autonomous Issue Discovery synchronizes terminal outcomes and permits three bounded retries',
-  issueDiscovery.includes('private async reconcileQueuedIssues():Promise<void>') &&
+  issueDiscovery.includes('private async reconcileQueuedIssues(generation:number):Promise<void>') &&
     issueDiscovery.includes('private releaseForRetry(issue:DiscoveredIssue,outcome:string):void') &&
     issueDiscovery.includes('if(attempts>=4)') &&
     issueDiscovery.includes('nextRetryAt') &&
@@ -942,7 +944,7 @@ check(
 );
 check(
   'Autonomous issue intake recovery reuses orphan Tasks and wakes at bounded deadlines',
-  issueDiscovery.includes('private async reconcileQueuedIssues():Promise<void>') &&
+  issueDiscovery.includes('private async reconcileQueuedIssues(generation:number):Promise<void>') &&
     issueDiscovery.includes('private findAutonomousDiscoveryTask(issue:DiscoveredIssue') &&
     issueDiscovery.includes('private scheduleRetryWakeup():void') &&
     issueDiscovery.includes("this.releaseForRetry(issue,'INTAKE_DISPATCH_FAILED');") &&
@@ -970,6 +972,34 @@ check(
     issueDiscovery.includes("if(this.disposed||!this.config.enabled||this.writesBlocked||autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')return;") &&
     issueDiscovery.includes('if(this.disposed||this.writesBlocked)return;') &&
     issueDiscovery.includes('if(!this.disposed&&this.config.enabled&&!this.writesBlocked)this.timer=setInterval(')
+);
+
+check(
+  'Issue Discovery abandons stale scan generations after disposal and never clears a newer scan',
+  issueDiscovery.includes('private lifecycleGeneration=0;') &&
+    issueDiscovery.includes('private isCurrentGeneration(generation:number):boolean{return !this.disposed&&generation===this.lifecycleGeneration;}') &&
+    issueDiscovery.includes('await this.reconcileQueuedIssues(generation);') &&
+    issueDiscovery.includes('private async reconcileQueuedIssues(generation:number):Promise<void>') &&
+    issueDiscovery.includes('private async dispatchDiscoveredIssue(issue:DiscoveredIssue,priorCases:unknown[],generation:number):Promise<boolean>') &&
+    issueDiscovery.includes('if(this.activeScanGeneration===generation){this.scanning=false;this.activeScanGeneration=null;}') &&
+    issueDiscovery.includes('if(this.isCurrentGeneration(generation))this.scheduleRetryWakeup();') &&
+    issueDiscovery.includes('if(!this.isCurrentGeneration(generation))return false;') &&
+    issueDiscovery.includes('const generation=this.lifecycleGeneration;\n  this.retryTimer=setTimeout(()=>{if(!this.isCurrentGeneration(generation))return;')
+);
+
+check(
+  'Autonomous Self-Improvement Loop ignores results from disposed lifecycle generations',
+  autonomousLoop.includes('private lifecycleGeneration = 0;') &&
+    autonomousLoop.includes('private isGenerationCurrent(generation: number): boolean') &&
+    autonomousLoop.includes('this.lifecycleGeneration += 1;') &&
+    autonomousLoop.includes('if (this.writesBlocked || this.disposed || this.running) return;') &&
+    autonomousLoop.includes('if (!this.isGenerationCurrent(generation)) return;\n      this.recoveryTimer = null;') &&
+    autonomousLoop.includes('await selfImprovementPreflightService.evaluate(request.runId);\n          if (!this.isGenerationCurrent(generation)) return;') &&
+    autonomousLoop.includes('await resourceGovernanceService.refresh();\n        if (!this.isGenerationCurrent(generation)) return;') &&
+    autonomousLoop.includes('if (!this.isGenerationCurrent(generation)) return;\n        if (!workflow) {') &&
+    autonomousLoop.includes('private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string, generation: number): Promise<void>') &&
+    autonomousLoop.includes('const acquired = await requiredAssetAcquisitionService.acquire({') &&
+    autonomousLoop.includes('if (!this.isGenerationCurrent(generation)) return;\n\n    /*')
 );
 
 check(

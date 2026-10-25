@@ -45,12 +45,14 @@ const KEY='miki_autonomous_issue_discovery_v1';
 const CONFIG_KEY='miki_autonomous_issue_discovery_config_v1';
 const DEFAULT_CONFIG:DiscoveryConfig={enabled:true,intervalMinutes:180,maxIssuesPerScan:5,minimumPriority:40};
 class AutonomousIssueDiscoveryService{
- private issues=new Map<string,DiscoveredIssue>();private config:DiscoveryConfig={...DEFAULT_CONFIG};private timer:ReturnType<typeof setInterval>|null=null;private retryTimer:ReturnType<typeof setTimeout>|null=null;private scanning=false;
+ private issues=new Map<string,DiscoveredIssue>();private config:DiscoveryConfig={...DEFAULT_CONFIG};private timer:ReturnType<typeof setInterval>|null=null;private retryTimer:ReturnType<typeof setTimeout>|null=null;private scanning=false;private activeScanGeneration:number|null=null;private lifecycleGeneration=0;
   private disposed=false;
  private persistenceStatus:DiscoveryPersistenceStatus='READY';private persistenceReason?:string;private writesBlocked=false;
  constructor(){this.load();}
+ private isCurrentGeneration(generation:number):boolean{return !this.disposed&&generation===this.lifecycleGeneration;}
+ private emptyScanResult(mode:DiscoveryScanMode):DiscoveryScanResult{return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};}
  initialize():void{if(this.writesBlocked){systemLogger.error('PERSISTENCE','[IssueDiscovery] initialization blocked because state could not be preserved',{reason:this.persistenceReason});return;}this.disposed=false;this.configureTimer();if(this.config.enabled)this.runScheduledScan();}
- dispose():void{this.disposed=true;if(this.timer)clearInterval(this.timer);this.timer=null;if(this.retryTimer)clearTimeout(this.retryTimer);this.retryTimer=null;}
+ dispose():void{this.disposed=true;this.lifecycleGeneration+=1;this.scanning=false;this.activeScanGeneration=null;if(this.timer)clearInterval(this.timer);this.timer=null;if(this.retryTimer)clearTimeout(this.retryTimer);this.retryTimer=null;}
  setConfig(input:Partial<DiscoveryConfig>):DiscoveryConfig{this.assertWritable();const interval=input.intervalMinutes??this.config.intervalMinutes;const batch=input.maxIssuesPerScan??this.config.maxIssuesPerScan;const priority=input.minimumPriority??this.config.minimumPriority;const next:DiscoveryConfig={enabled:input.enabled??this.config.enabled,intervalMinutes:Math.max(15,Math.min(10080,Math.floor(Number.isFinite(interval)?interval:this.config.intervalMinutes))),maxIssuesPerScan:Math.max(1,Math.min(20,Number.isFinite(batch)?Math.floor(batch):this.config.maxIssuesPerScan)),minimumPriority:Math.max(0,Math.min(100,Math.floor(Number.isFinite(priority)?priority:this.config.minimumPriority)))};this.writeRaw(CONFIG_KEY,JSON.stringify(next),'CONFIG');this.config=next;this.configureTimer();return {...this.config};}
  getConfig():DiscoveryConfig{return {...this.config};}
  getPersistenceState():DiscoveryPersistenceState{return {status:this.persistenceStatus,...(this.persistenceReason?{reason:this.persistenceReason}:{})};}
@@ -59,9 +61,11 @@ class AutonomousIssueDiscoveryService{
  async scan(mode:DiscoveryScanMode='AUTONOMOUS'):Promise<DiscoveryScanResult>{
   if(this.disposed)throw new Error('AUTONOMOUS_DISCOVERY_SERVICE_DISPOSED');
   this.assertWritable();
-  if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;
+  const generation=this.lifecycleGeneration;
+  if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;this.activeScanGeneration=generation;
   try{
-   await this.reconcileQueuedIssues();
+   await this.reconcileQueuedIssues(generation);
+   if(!this.isCurrentGeneration(generation))return this.emptyScanResult(mode);
    const before=this.issues.size;
    for(const event of executionEventBusService.list('execution.failed').slice(0,50))this.upsert('EXECUTION_FAILURE',event.event_id,`実行失敗: ${event.component_id}`,`${event.test_case_id} / ${event.error_message||event.output_summary||event.type}`,90);
    for(const gap of knowledgeGapService.listOpen(50))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${gap.query}`,gap.reason||gap.query,70);
@@ -101,10 +105,13 @@ class AutonomousIssueDiscoveryService{
      issue.lastOutcome='DISPATCH_PENDING';
      this.issues.set(issue.fingerprint,issue);
      this.save();
-     if(await this.dispatchDiscoveredIssue(issue,priorCases))queued+=1;
+     const dispatched=await this.dispatchDiscoveredIssue(issue,priorCases,generation);
+     if(!this.isCurrentGeneration(generation))return this.emptyScanResult(mode);
+     if(dispatched)queued+=1;
     }
    }
 
+   if(!this.isCurrentGeneration(generation))return this.emptyScanResult(mode);
    this.save();
    const issues=this.list(200);
    return {
@@ -115,14 +122,15 @@ class AutonomousIssueDiscoveryService{
     skipped:Math.max(0,issues.filter(x=>!x.resolvedAt&&!x.queuedAt).length),
     issues
    };
-  }finally{this.scanning=false;this.scheduleRetryWakeup();}
+  }finally{if(this.activeScanGeneration===generation){this.scanning=false;this.activeScanGeneration=null;}if(this.isCurrentGeneration(generation))this.scheduleRetryWakeup();}
  }
 
- private async reconcileQueuedIssues():Promise<void>{
+ private async reconcileQueuedIssues(generation:number):Promise<void>{
   const now=Date.now();
   const runs=improvementIntakeRouterService.list(500);
   const tasks=taskBlackboardService.list(200);
   for(const issue of this.issues.values()){
+   if(!this.isCurrentGeneration(generation))return;
    const queuedAt=issue.queuedAt;
    if(!queuedAt)continue;
    if(issue.lastOutcome==='AUTONOMOUS_QUEUE_WRITE_BLOCKED'&&autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')continue;
@@ -157,6 +165,7 @@ class AutonomousIssueDiscoveryService{
        objective:issue.title,
        priority:issue.priority
       });
+      if(!this.isCurrentGeneration(generation))return;
       if(!recovered){
        issue.taskId=orphanTask.taskId;
        issue.improvementRunId=this.autonomousDiscoveryRunId(orphanTask);
@@ -171,6 +180,7 @@ class AutonomousIssueDiscoveryService{
       task=run.taskId?taskBlackboardService.get(run.taskId):undefined;
       if(!task||task.taskId!==orphanTask.taskId)throw new Error('AUTONOMOUS_DISCOVERY_ORPHAN_TASK_ID_MISMATCH');
      }catch(error){
+      if(!this.isCurrentGeneration(generation))return;
       issue.taskId=orphanTask.taskId;
       issue.improvementRunId=this.autonomousDiscoveryRunId(orphanTask);
       issue.nextRetryAt=Date.now()+15*60*1000;
@@ -285,7 +295,7 @@ class AutonomousIssueDiscoveryService{
   const runId=(value as Record<string,unknown>).runId;
   return typeof runId==='string'&&runId.trim()?runId:undefined;
  }
- private async dispatchDiscoveredIssue(issue:DiscoveredIssue,priorCases:unknown[]):Promise<boolean>{
+ private async dispatchDiscoveredIssue(issue:DiscoveredIssue,priorCases:unknown[],generation:number):Promise<boolean>{
   let run:Awaited<ReturnType<typeof improvementIntakeRouterService.receive>>|undefined;
   try{
    run=await improvementIntakeRouterService.receive({
@@ -301,8 +311,10 @@ class AutonomousIssueDiscoveryService{
      priorCases
     }
    });
+   if(!this.isCurrentGeneration(generation))return false;
    if(!run.taskId||run.status==='VALIDATED'||!taskBlackboardService.get(run.taskId))throw new Error('INTAKE_ACCEPTED_WITHOUT_TASK');
   }catch(error){
+   if(!this.isCurrentGeneration(generation))return false;
    if(autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED'){
     issue.nextRetryAt=undefined;
     issue.lastOutcome='AUTONOMOUS_QUEUE_WRITE_BLOCKED';
@@ -328,6 +340,7 @@ class AutonomousIssueDiscoveryService{
      objective:issue.title,
      priority:issue.priority
     });
+    if(!this.isCurrentGeneration(generation))return false;
     if(!run){
      issue.taskId=orphanTask.taskId;
      issue.improvementRunId=this.autonomousDiscoveryRunId(orphanTask);
@@ -341,6 +354,7 @@ class AutonomousIssueDiscoveryService{
     }
     if(run.taskId!==orphanTask.taskId||!taskBlackboardService.get(run.taskId))throw new Error('AUTONOMOUS_DISCOVERY_ORPHAN_TASK_ID_MISMATCH');
    }catch(recoveryError){
+    if(!this.isCurrentGeneration(generation))return false;
     issue.taskId=orphanTask.taskId;
     issue.improvementRunId=this.autonomousDiscoveryRunId(orphanTask);
     issue.nextRetryAt=Date.now()+15*60*1000;
@@ -415,7 +429,8 @@ class AutonomousIssueDiscoveryService{
   }
   if(earliest===undefined)return;
   const delay=Math.max(25,Math.min(2147000000,earliest-Date.now()));
-  this.retryTimer=setTimeout(()=>{this.retryTimer=null;this.runScheduledScan();},delay);
+  const generation=this.lifecycleGeneration;
+  this.retryTimer=setTimeout(()=>{if(!this.isCurrentGeneration(generation))return;this.retryTimer=null;this.runScheduledScan();},delay);
  }
 
  private releaseForRetry(issue:DiscoveredIssue,outcome:string):void{
@@ -541,7 +556,7 @@ class AutonomousIssueDiscoveryService{
  }
 
  private runScheduledScan():void{if(this.disposed||this.writesBlocked)return;void this.scan().catch(error=>systemLogger.error('SELF_IMPROVEMENT','[IssueDiscovery] autonomous scan stopped before unsafe follow-up',{error:String(error instanceof Error?error.message:error),persistence:this.getPersistenceState()}));}
- private configureTimer():void{if(this.timer)clearInterval(this.timer);this.timer=null;if(!this.disposed&&this.config.enabled&&!this.writesBlocked)this.timer=setInterval(()=>this.runScheduledScan(),this.config.intervalMinutes*60*1000);this.scheduleRetryWakeup();}
+ private configureTimer():void{if(this.timer)clearInterval(this.timer);this.timer=null;const generation=this.lifecycleGeneration;if(!this.disposed&&this.config.enabled&&!this.writesBlocked)this.timer=setInterval(()=>{if(this.isCurrentGeneration(generation))this.runScheduledScan();},this.config.intervalMinutes*60*1000);this.scheduleRetryWakeup();}
  private fingerprint(raw:string):string{let h=2166136261;for(const ch of raw.toLowerCase()){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return `ISS-${(h>>>0).toString(16).padStart(8,'0')}`;}
  private assertWritable():void{if(this.writesBlocked)throw new Error('AUTONOMOUS_DISCOVERY_STORE_WRITE_BLOCKED');}
  private blockStore(reason:string):void{this.writesBlocked=true;this.persistenceStatus='WRITE_BLOCKED';this.persistenceReason=reason.slice(0,700);if(this.timer)clearInterval(this.timer);this.timer=null;if(this.retryTimer)clearTimeout(this.retryTimer);this.retryTimer=null;}

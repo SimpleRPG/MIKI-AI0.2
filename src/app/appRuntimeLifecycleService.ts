@@ -50,10 +50,13 @@ class AppRuntimeLifecycleService {
         run: async () => {
           let lastError: unknown;
           for (let attempt = 1; attempt <= 2; attempt += 1) {
+            if (generation !== this.generation) return;
             try {
               await domainIntegrationBootstrapService.initialize();
+              if (generation !== this.generation) return;
               return;
             } catch (error) {
+              if (generation !== this.generation) return;
               lastError = error;
               systemLogger.warn(
                 'SYSTEM',
@@ -118,7 +121,9 @@ class AppRuntimeLifecycleService {
         systemLogger.info('SYSTEM', '[RUNTIME_INIT] stage begin', { stage: stage.name });
         try {
           await stage.run();
+          if (generation !== this.generation) return;
         } catch (error) {
+          if (generation !== this.generation) return;
           const elapsedMs = Math.round(performance.now() - startedAt);
           systemLogger.recordRuntimeBreadcrumb('RUNTIME_STAGE_FAILED', {
             stage: stage.name, status: 'FAILED', lastCompleted: lastCompletedStage, elapsedMs,
@@ -144,6 +149,7 @@ class AppRuntimeLifecycleService {
         await this.yieldToBrowser();
       }
     } catch (error) {
+      if (generation !== this.generation) return;
       this.initialized = false;
       this.generation += 1;
       throw error;

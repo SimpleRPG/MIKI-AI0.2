@@ -96,6 +96,7 @@ class AutonomousSelfImprovementLoopService {
   private sequence = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
+  private lifecycleGeneration = 0;
   private persistenceStatus:AutonomousLoopPersistenceStatus='READY';
   private persistenceReason?:string;
   private writesBlocked=false;
@@ -119,10 +120,15 @@ class AutonomousSelfImprovementLoopService {
 
   public dispose(): void {
     this.disposed = true;
+    this.lifecycleGeneration += 1;
     if (this.recoveryTimer) {
       clearTimeout(this.recoveryTimer);
       this.recoveryTimer = null;
     }
+  }
+
+  private isGenerationCurrent(generation: number): boolean {
+    return !this.disposed && generation === this.lifecycleGeneration;
   }
 
   public enqueue(
@@ -316,16 +322,19 @@ class AutonomousSelfImprovementLoopService {
     const delay = delayOverrideMs === undefined
       ? Math.max(0, nextAt - now)
       : Math.max(0, delayOverrideMs);
+    const generation = this.lifecycleGeneration;
     this.recoveryTimer = setTimeout(() => {
+      if (!this.isGenerationCurrent(generation)) return;
       this.recoveryTimer = null;
       void this.recoverIfReady();
     }, delay);
   }
 
   private async recoverIfReady(): Promise<void> {
-    if (this.writesBlocked || this.running || this.state.queue.length === 0) {
+    if (this.writesBlocked || this.disposed || this.running || this.state.queue.length === 0) {
       return;
     }
+    const generation = this.lifecycleGeneration;
     if (this.state.queue.some(item => item.cancelRequested === true)) {
       try { this.reconcileCancellationRequests(); }
       catch (error) { systemLogger.warn('PERSISTENCE', '[AutonomousLoop] retrying durable cancellation reconciliation', { error: String(error instanceof Error ? error.message : error) }); this.scheduleRecovery(RECOVERY_POLL_MS); return; }
@@ -333,6 +342,7 @@ class AutonomousSelfImprovementLoopService {
     }
     if (this.state.status === 'WAITING_RESOURCE') {
       await resourceGovernanceService.refresh();
+      if (!this.isGenerationCurrent(generation)) return;
       if (!resourceGovernanceService.canRunComponentTests()) {
         this.scheduleRecovery(RECOVERY_POLL_MS);
         return;
@@ -353,7 +363,8 @@ class AutonomousSelfImprovementLoopService {
   }
 
   private async drain(): Promise<void> {
-    if (this.writesBlocked || this.running) return;
+    if (this.writesBlocked || this.disposed || this.running) return;
+    const generation = this.lifecycleGeneration;
     if (this.state.queue.some(item => item.cancelRequested === true)) {
       try { this.reconcileCancellationRequests(); }
       catch (error) { systemLogger.warn('PERSISTENCE', '[AutonomousLoop] refusing dispatch while cancellation intent remains pending', { error: String(error instanceof Error ? error.message : error) }); this.scheduleRecovery(RECOVERY_POLL_MS); return; }
@@ -363,6 +374,7 @@ class AutonomousSelfImprovementLoopService {
     let activeRequest: AutonomousImprovementRequest | undefined;
     try {
       while (this.state.queue.length > 0) {
+        if (!this.isGenerationCurrent(generation)) return;
         const now=Date.now();
         const eligibleIndex=this.state.queue.findIndex(item=>!item.nextAttemptAt||item.nextAttemptAt<=now);
         if(eligibleIndex<0){
@@ -403,18 +415,21 @@ class AutonomousSelfImprovementLoopService {
 
         if (request.runId) {
           const preflight = await selfImprovementPreflightService.evaluate(request.runId);
+          if (!this.isGenerationCurrent(generation)) return;
           if (!preflight.passed) {
             if (preflight.reasons.includes('PERSISTENT_BACKEND_REQUIRED')) {
               this.waitForResource(request, 'PERSISTENT_BACKEND_REQUIRED');
               continue;
             }
             improvementDebtService.record('UNEXECUTED_CHECK', `PREFLIGHT:${preflight.reasons.join(',')}`, request.runId);
-            await this.acquireThenWaitForEvidence(request, preflight.reasons.join(','));
+            await this.acquireThenWaitForEvidence(request, preflight.reasons.join(','), generation);
+            if (!this.isGenerationCurrent(generation)) return;
             continue;
           }
         }
 
         await resourceGovernanceService.refresh();
+        if (!this.isGenerationCurrent(generation)) return;
         if (!resourceGovernanceService.canRunComponentTests()) {
           this.waitForResource(request, 'RESOURCE_GOVERNANCE_BLOCKED');
           break;
@@ -441,6 +456,7 @@ class AutonomousSelfImprovementLoopService {
               kind: 'SELF_IMPROVEMENT',
               },
             });
+        if (!this.isGenerationCurrent(generation)) return;
         if (!workflow) {
           this.failOrRetry(request, 'BLACKBOARD_TASK_RESUME_FAILED');
           continue;
@@ -503,7 +519,8 @@ class AutonomousSelfImprovementLoopService {
             },
             quality.evidenceIds,
           );
-          await this.acquireThenWaitForEvidence(request, quality.reasons.join(','));
+          await this.acquireThenWaitForEvidence(request, quality.reasons.join(','), generation);
+          if (!this.isGenerationCurrent(generation)) return;
           continue;
         }
         const cycleBudgetPaused = workflow.task.status === 'PAUSED' && workflow.task.entries.some(entry => entry.kind === 'CHECKPOINT' && entry.key === 'coreCycleBudgetExhausted');
@@ -524,6 +541,7 @@ class AutonomousSelfImprovementLoopService {
         this.save();
       }
     } catch (error) {
+      if (!this.isGenerationCurrent(generation)) return;
       this.state.status = 'FAILED';
       this.state.lastReason = String(error);
       this.state.retryAt = undefined;
@@ -777,7 +795,7 @@ class AutonomousSelfImprovementLoopService {
     );
   }
 
-  private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string): Promise<void> {
+  private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string, generation: number): Promise<void> {
     const acquired = await requiredAssetAcquisitionService.acquire({
       runId: request.runId,
       taskId: request.taskId,
@@ -785,6 +803,7 @@ class AutonomousSelfImprovementLoopService {
       reasons: reason.split(',').filter(Boolean),
       objective: request.trigger,
     });
+    if (!this.isGenerationCurrent(generation)) return;
 
     /*
      * progressed !== acquired.

@@ -374,7 +374,7 @@
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 89849 | 1311 | `df2cad422efd26ad1db82f73aed66adfc0eb469349efbb706f91ea5f51baeecf` | 5 | 0 | 5 |
+| `scripts/verify_runtime_failure_fixes.mjs` | 92869 | 1341 | `5694ed7a25590674813e361dd4fa47fcd2390076fa47b8270eb4cb89b8a5fea1` | 5 | 0 | 5 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
@@ -461,7 +461,7 @@
 | `scripts/verify_world_patterns_p111.mjs` | 1554 | 1 | `7bbe0c27d4733c537e6a79b8ff81ec1d364e6936a6bcbe34714b679461e18f77` | 2 | 2 | 0 |
 | `server.ts` | 253983 | 5792 | `0431b612de24123d0092b18ef084b4c6da644a8c93eb4a5af261a1f3fed99828` | 42 | 40 | 2 |
 | `src/App.tsx` | 88486 | 2041 | `1b780617985e3659f160ae8accb63b5117e4d7a7eca92c42bf834addb175bd76` | 117 | 117 | 0 |
-| `src/app/appRuntimeLifecycleService.ts` | 9600 | 172 | `878d3c181cd04bc815c6b6c360c2c568723258ca941f87d2d391e55bca094923` | 31 | 31 | 0 |
+| `src/app/appRuntimeLifecycleService.ts` | 9930 | 178 | `c0b20a9b7cfd4fd3a9848bf775c25aaa4011b296dcb1c6cfb533e02d03626907` | 31 | 31 | 0 |
 | `src/app/startupPhaseSchedulerService.ts` | 706 | 3 | `bb8ce0bc1ef0201da3c50eb1f06ec8ad60edab97bfb54ad47b481004981b975c` | 0 | 0 | 0 |
 | `src/autonomous_modules/anaphora_history_stack.ts` | 2590 | 89 | `40d02342541b6b4562a2c2754dd9079b8a1cb8eaa3b3307b195b2af9e407c46c` | 0 | 0 | 0 |
 | `src/autonomous_modules/anaphora_resolver_sample.ts` | 5763 | 162 | `35d90ceee6a6a7543824c14e75fe74fe2b2bbcb786698feda72a55b6fbbe2569` | 0 | 0 | 0 |
@@ -621,8 +621,8 @@
 | `src/miki/core/services/anatomicalProceduralPersonP198Service.ts` | 12529 | 85 | `cf4af2d33dc6d668d40a25fedfc9f1a3e1bde70171b7137a3be4a1dd96a4f35b` | 1 | 1 | 0 |
 | `src/miki/core/services/autonomousCandidatePreparationService.ts` | 14367 | 215 | `cdcc849ef21a94c31e0391324aa6fbda1c72008bedcf9618527cef6555a7bf44` | 6 | 6 | 0 |
 | `src/miki/core/services/autonomousImprovementTrajectoryService.ts` | 2861 | 15 | `c8e544ff51b2090c9aba19bc92f10fbba9382945835e28a5f8845ed657e4178c` | 1 | 1 | 0 |
-| `src/miki/core/services/autonomousIssueDiscoveryService.ts` | 32519 | 556 | `3239f435c38f303ff3cc4301e26a94d4c36cbd2b77c195d89c1bb84b19abbbf7` | 13 | 13 | 0 |
-| `src/miki/core/services/autonomousSelfImprovementLoopService.ts` | 43412 | 943 | `0068d70e0f2d322d24f301aa71846eae61ac668891c7fa4247f035ab45cb8b17` | 11 | 11 | 0 |
+| `src/miki/core/services/autonomousIssueDiscoveryService.ts` | 34041 | 571 | `f66bce890221b7fc1fbc6eb1171c1c4ca5a70488897edc2c5459c4942cfedf4b` | 13 | 13 | 0 |
+| `src/miki/core/services/autonomousSelfImprovementLoopService.ts` | 44431 | 962 | `bdfc7f985b12e47026399a1793176e68e8c1922f7edd90842a8aac0a381abeb3` | 11 | 11 | 0 |
 | `src/miki/core/services/blackboardRecoveryService.ts` | 809 | 6 | `997dc830c65b6d4eb613e4f5e896b6e5a73280825799f542408f1e78297ada8f` | 1 | 1 | 0 |
 | `src/miki/core/services/bodyTypeTrendService.ts` | 3381 | 14 | `ec7b217df647446c94fc89e3359eda56588cd56bb5962921558a5073a2506914` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateAutoRebaseService.ts` | 2849 | 14 | `b5affca11da61a5b228a5cdef665265b6542eedc66f5204bbdbdf220d851447d` | 1 | 1 | 0 |

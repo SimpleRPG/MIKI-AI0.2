@@ -5157,9 +5157,9 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 89849,
-      "lines": 1311,
-      "sha256": "df2cad422efd26ad1db82f73aed66adfc0eb469349efbb706f91ea5f51baeecf",
+      "bytes": 92869,
+      "lines": 1341,
+      "sha256": "5694ed7a25590674813e361dd4fa47fcd2390076fa47b8270eb4cb89b8a5fea1",
       "relativeImportCandidates": [
         {
           "line": 181,
@@ -5182,7 +5182,7 @@
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 910,
+          "line": 912,
           "specifier": "../miki/unknown/services/counterfactualReasoningService",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -7354,9 +7354,9 @@
     },
     {
       "path": "src/app/appRuntimeLifecycleService.ts",
-      "bytes": 9600,
-      "lines": 172,
-      "sha256": "878d3c181cd04bc815c6b6c360c2c568723258ca941f87d2d391e55bca094923",
+      "bytes": 9930,
+      "lines": 178,
+      "sha256": "c0b20a9b7cfd4fd3a9848bf775c25aaa4011b296dcb1c6cfb533e02d03626907",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12836,9 +12836,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousIssueDiscoveryService.ts",
-      "bytes": 32519,
-      "lines": 556,
-      "sha256": "3239f435c38f303ff3cc4301e26a94d4c36cbd2b77c195d89c1bb84b19abbbf7",
+      "bytes": 34041,
+      "lines": 571,
+      "sha256": "f66bce890221b7fc1fbc6eb1171c1c4ca5a70488897edc2c5459c4942cfedf4b",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12925,9 +12925,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 43412,
-      "lines": 943,
-      "sha256": "0068d70e0f2d322d24f301aa71846eae61ac668891c7fa4247f035ab45cb8b17",
+      "bytes": 44431,
+      "lines": 962,
+      "sha256": "bdfc7f985b12e47026399a1793176e68e8c1922f7edd90842a8aac0a381abeb3",
       "relativeImportCandidates": [
         {
           "line": 1,
