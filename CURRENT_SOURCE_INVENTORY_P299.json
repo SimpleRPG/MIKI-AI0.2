@@ -36,12 +36,12 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1846,
-    "sourceFileCount": 1391,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1304,
-    "relativeImportCandidateCount": 3924,
-    "resolvedRelativeImportCandidateCount": 3904,
-    "unresolvedRelativeImportCandidateCount": 20
+    "trackedPathCountExcludingControlPaths": 1847,
+    "sourceFileCount": 1392,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1305,
+    "relativeImportCandidateCount": 3931,
+    "resolvedRelativeImportCandidateCount": 3906,
+    "unresolvedRelativeImportCandidateCount": 25
   },
   "records": [
     {
@@ -2859,6 +2859,54 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "scripts/verify_complexity_cost_gate_behavior.ts",
+      "bytes": 5771,
+      "lines": 133,
+      "sha256": "197c0c1b94524ed88cfc0eddb976c85e4b3b7cb90e9438a6162cae65f558de07",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../src/miki/core/services/complexityCostGateService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/complexityCostGateService.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../src/miki/core/services/isolatedCandidateWorkspaceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
+        },
+        {
+          "line": 44,
+          "specifier": "./internal",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 45,
+          "specifier": "./namespace",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 54,
+          "specifier": "./starred-module",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 78,
+          "specifier": "./module-${index}",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 80,
+          "specifier": "./module-24",
+          "resolution": "UNRESOLVED_CANDIDATE"
+        }
+      ],
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 2,
+      "unresolvedRelativeImportCount": 5
+    },
+    {
       "path": "scripts/verify_comprehensive_visual_profile_p132.mjs",
       "bytes": 3590,
       "lines": 1,
@@ -5157,9 +5205,9 @@
     },
     {
       "path": "scripts/verify_runtime_failure_fixes.mjs",
-      "bytes": 97704,
-      "lines": 1392,
-      "sha256": "a0228e496819821fdfc7330199869f619c248ba925cc922c0413b8c1ac5466fa",
+      "bytes": 97891,
+      "lines": 1394,
+      "sha256": "0d1d32e24ca6b84023822a08c190d84ac153b891d3c98a0217e40a1f4f0f97cb",
       "relativeImportCandidates": [
         {
           "line": 187,
@@ -5187,7 +5235,7 @@
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 1037,
+          "line": 1039,
           "specifier": "../../core/services/complexityCostGateService",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -13763,9 +13811,9 @@
     },
     {
       "path": "src/miki/core/services/complexityCostGateService.ts",
-      "bytes": 5229,
-      "lines": 166,
-      "sha256": "efb0480b538c23c613876bd3b2e3fa2760a6a508d9aa5234658af68da89f5c36",
+      "bytes": 8658,
+      "lines": 263,
+      "sha256": "3da31ccf8414b5d5d261a7c0f0609e794934266813fd4fb60a5f9837bccea8e5",
       "relativeImportCandidates": [
         {
           "line": 1,

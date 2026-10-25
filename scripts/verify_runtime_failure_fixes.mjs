@@ -1025,6 +1025,8 @@ check(
     complexityCostGate.includes('function countAddedUniqueTokens(') &&
     complexityCostGate.includes('function publicApiTokens(') &&
     complexityCostGate.includes('function countAddedPublicApis(') &&
+    complexityCostGate.includes('function variableExportTokens(') &&
+    complexityCostGate.includes("return unresolvedAdded ? Math.max(addedTokens.length, 13) : addedTokens.length;") &&
     apkWorkflow.includes('npx tsx scripts/verify_complexity_cost_gate_behavior.ts') &&
     candidateDevelopmentCompletionIndexRow?.includes(`lines=${candidateDevelopmentCompletion.split(/\r?\n/).length - 1}`) &&
     complexityCostGateIndexRow?.includes(`lines=${complexityCostGate.split(/\r?\n/).length - 1}`) &&

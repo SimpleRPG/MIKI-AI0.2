@@ -43,14 +43,24 @@ const exportForms = [
   'export enum PublicState { READY }',
   "export { internal as reexportedApi } from './internal';",
   "export * as namespaceApi from './namespace';",
-  "export * from './starred-module';",
 ].join('\n');
 const exportDecision = evaluateOne('', exportForms);
 assert.equal(
   exportDecision.metrics.publicApis,
-  6,
-  'async/default/enum/named/namespace/wildcard exports must be counted',
+  5,
+  'async/default/enum/named/namespace exports must be counted',
 );
+
+const wildcardDecision = evaluateOne('', "export * from './starred-module';");
+assert.equal(wildcardDecision.metrics.publicApis, 13, 'an unresolved wildcard must fail closed');
+assert.ok(wildcardDecision.reasons.includes('TOO_MANY_NEW_PUBLIC_APIS'));
+
+const multipleVariables = evaluateOne('', 'export const firstApi = 1,\n  secondApi = 2;');
+assert.equal(multipleVariables.metrics.publicApis, 2, 'each exported variable declarator must be counted');
+
+const destructuringExport = evaluateOne('', 'export const { firstApi, secondApi } = source;');
+assert.equal(destructuringExport.metrics.publicApis, 13, 'unresolved destructuring exports must fail closed');
+assert.ok(destructuringExport.reasons.includes('TOO_MANY_NEW_PUBLIC_APIS'));
 
 const api12 = Array.from(
   { length: 12 },

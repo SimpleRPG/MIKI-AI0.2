@@ -44,14 +44,117 @@ function countAddedUniqueTokens(
   return added;
 }
 
+function variableExportTokens(source: string): string[] {
+  const tokens = new Set<string>();
+  const prefixes = /^[ \t]*export[ \t]+(?:(?:declare)[ \t]+)?(?:const|let|var)[ \t]+/gm;
+
+  for (const match of source.matchAll(prefixes)) {
+    let cursor = (match.index ?? 0) + match[0].length;
+    let segmentStart = cursor;
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
+    let lineComment = false;
+    let blockComment = false;
+    const segments: string[] = [];
+
+    for (; cursor < source.length; cursor += 1) {
+      const character = source[cursor];
+      const next = source[cursor + 1];
+
+      if (lineComment) {
+        if (character !== '\n') continue;
+        lineComment = false;
+      }
+      if (blockComment) {
+        if (character === '*' && next === '/') {
+          blockComment = false;
+          cursor += 1;
+        }
+        continue;
+      }
+      if (quote) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (character === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (character === quote) quote = '';
+        continue;
+      }
+      if (character === '/' && next === '/') {
+        lineComment = true;
+        cursor += 1;
+        continue;
+      }
+      if (character === '/' && next === '*') {
+        blockComment = true;
+        cursor += 1;
+        continue;
+      }
+      if (character === '\'' || character === '"' || character === '`') {
+        quote = character;
+        continue;
+      }
+      if (character === '(' || character === '[' || character === '{') {
+        depth += 1;
+        continue;
+      }
+      if (character === ')' || character === ']' || character === '}') {
+        if (depth > 0) depth -= 1;
+        continue;
+      }
+      if (depth === 0 && character === ',') {
+        segments.push(source.slice(segmentStart, cursor));
+        segmentStart = cursor + 1;
+        continue;
+      }
+      if (depth === 0 && character === ';') {
+        segments.push(source.slice(segmentStart, cursor));
+        segmentStart = cursor + 1;
+        break;
+      }
+      if (depth === 0 && character === '\n') {
+        const previous = source.slice(0, cursor).trimEnd().slice(-1);
+        const nextLine = source.slice(cursor + 1).split(/\r?\n/, 1)[0].trim();
+        if (/[=,:?&|+\-*\/.>]/.test(previous) || /^[,.?&|+\-*\/]/.test(nextLine)) continue;
+        segments.push(source.slice(segmentStart, cursor));
+        segmentStart = cursor + 1;
+        break;
+      }
+    }
+    if (segmentStart < cursor) segments.push(source.slice(segmentStart, cursor));
+
+    for (const segment of segments) {
+      const trimmed = segment.trim();
+      if (!trimmed) continue;
+      if (trimmed[0] === '{' || trimmed[0] === '[') {
+        tokens.add('!unresolved-export-binding:' + trimmed.replace(/\s+/g, ' ').slice(0, 120));
+        continue;
+      }
+      const identifier = trimmed.match(/^([A-Za-z_$][\w$]*)\b/);
+      if (!identifier) {
+        tokens.add('!unresolved-export-binding:' + trimmed.replace(/\s+/g, ' ').slice(0, 120));
+        continue;
+      }
+      tokens.add(identifier[1]);
+    }
+  }
+  return [...tokens];
+}
+
 function publicApiTokens(source: string): string[] {
   const tokens = new Set<string>();
-
   const declarations =
     /^[ \t]*export[ \t]+(?:(?:declare|abstract|async|default|const)[ \t]+)*(?:class|function|const|let|var|interface|type|enum|namespace)[ \t]+([A-Za-z_$][\w$]*)/gm;
   for (const match of source.matchAll(declarations)) {
     tokens.add(/\bdefault\b/.test(match[0]) ? 'default' : match[1]);
   }
+
+  for (const token of variableExportTokens(source)) tokens.add(token);
 
   const exportLists =
     /^[ \t]*export[ \t]+(?:type[ \t]+)?\{([^}]*)\}[ \t]*(?:from[ \t]+['"][^'"\r\n]+['"])?[ \t]*;?/gm;
@@ -60,37 +163,31 @@ function publicApiTokens(source: string): string[] {
       const item = rawItem.trim().replace(/^type[ \t]+/, '');
       const parts = item.split(/[ \t]+as[ \t]+/);
       const exportedName = parts[parts.length - 1].trim();
-      if (/^[A-Za-z_$][\w$]*$/.test(exportedName)) {
-        tokens.add(exportedName);
-      }
+      if (/^[A-Za-z_$][\w$]*$/.test(exportedName)) tokens.add(exportedName);
     }
   }
 
   const namespaceExports =
     /^[ \t]*export[ \t]+(?:type[ \t]+)?\*[ \t]+as[ \t]+([A-Za-z_$][\w$]*)[ \t]+from[ \t]+['"][^'"\r\n]+['"]/gm;
-  for (const match of source.matchAll(namespaceExports)) {
-    tokens.add(match[1]);
-  }
+  for (const match of source.matchAll(namespaceExports)) tokens.add(match[1]);
 
   const wildcardExports =
     /^[ \t]*export[ \t]+(?:type[ \t]+)?\*[ \t]+from[ \t]+['"]([^'"\r\n]+)['"]/gm;
-  for (const match of source.matchAll(wildcardExports)) {
-    tokens.add(`*:${match[1]}`);
-  }
+  for (const match of source.matchAll(wildcardExports)) tokens.add(`*:${match[1]}`);
 
-  if (/^[ \t]*export[ \t]+default\b/m.test(source)) {
-    tokens.add('default');
-  }
-  if (/^[ \t]*export[ \t]*=/m.test(source)) {
-    tokens.add('export=');
-  }
-
+  if (/^[ \t]*export[ \t]+default\b/m.test(source)) tokens.add('default');
+  if (/^[ \t]*export[ \t]*=/m.test(source)) tokens.add('export=');
   return [...tokens].sort();
 }
 
 function countAddedPublicApis(baseline: string, candidate: string): number {
   const baselineTokens = new Set(publicApiTokens(baseline));
-  return publicApiTokens(candidate).filter(token => !baselineTokens.has(token)).length;
+  const candidateTokens = publicApiTokens(candidate);
+  const addedTokens = candidateTokens.filter(token => !baselineTokens.has(token));
+  const unresolvedAdded = addedTokens.some(
+    token => token.startsWith('*:') || token.startsWith('!unresolved-export-binding:')
+  );
+  return unresolvedAdded ? Math.max(addedTokens.length, 13) : addedTokens.length;
 }
 
 function countAddedLines(baseline: string, candidate: string): number {
