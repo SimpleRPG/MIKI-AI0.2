@@ -19,21 +19,22 @@ class CandidateValidationRunnerService {
   if(!candidateSha256)return this.rollbackFailure(workspaceId,workspace.writeGuardId,['CANDIDATE_HASH_MISSING']);
   const sourceFiles=selfCodeSpaceService.listSourceFiles();
   const run=workspace.runId?improvementIntakeRouterService.get(workspace.runId):undefined;
-  const validationRequirements=Array.isArray(run?.payload.validationRequirements)
-    ? run.payload.validationRequirements.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim()))
-    : [];
-  const testCommands=Array.isArray(run?.payload.testCommands)?run.payload.testCommands.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())):[];
-  const acceptanceCriterionIds=Array.isArray(run?.payload.acceptanceCriterionIds)?run.payload.acceptanceCriterionIds.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())):[];
+  const validationPlan=workspace.validationPlan;
+  const validationRequirements=validationPlan?[...validationPlan.validationRequirements]:(Array.isArray(run?.payload.validationRequirements)?run.payload.validationRequirements.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())):[]);
+  const testCommands=validationPlan?[...validationPlan.testCommands]:(Array.isArray(run?.payload.testCommands)?run.payload.testCommands.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())):[]);
+  const acceptanceCriterionIds=validationPlan?[...validationPlan.acceptanceCriterionIds]:(Array.isArray(run?.payload.acceptanceCriterionIds)?run.payload.acceptanceCriterionIds.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())):[]);
+  if(testCommands.length===0)return this.rollbackFailure(workspaceId,workspace.writeGuardId,['VALIDATION_TEST_COMMANDS_MISSING']);
+  if(validationPlan&&(!validationPlan.developmentPlanId.trim()||!validationPlan.testPlanId.trim()||testCommands.some(command=>!command.trim())))return this.rollbackFailure(workspaceId,workspace.writeGuardId,['VALIDATION_PLAN_INCOMPLETE']);
   const contractField=typeof run?.payload.contractFieldName==='string'?run.payload.contractFieldName.trim():'';
   const contractCondition=typeof run?.payload.contractValidationCondition==='string'?run.payload.contractValidationCondition.trim():undefined;
   const testIntents=contractField?contractTestIntentService.create(contractField,contractCondition):[];
   const executionRoutes=['STATIC','TYPECHECK','REGRESSION','COUNTEREXAMPLE','GENERALIZATION','PERSISTENCE','DEVICE'].map(stage=>executionEnvironmentRouterService.route(stage));
   if(executionRoutes.some(route=>route.environment==='MANUAL_REVIEW'))return this.rollbackFailure(workspaceId,workspace.writeGuardId,['VALIDATION_EXECUTION_ENVIRONMENT_MISSING']);
-  const validationCacheKey=canonicalSha256({candidateSha256,sourceSnapshot:sourceFiles.map(file=>({path:file.path,contentHash:file.contentHash})),validationRequirements,testCommands,acceptanceCriterionIds,testIntents});
+  const validationCacheKey=canonicalSha256({candidateSha256,sourceSnapshot:sourceFiles.map(file=>({path:file.path,contentHash:file.contentHash})),validationPlan:validationPlan||null,validationRequirements,testCommands,acceptanceCriterionIds,testIntents});
   let body:any=candidateValidationResultCacheService.get(validationCacheKey);
   if(!body){
     let response:Response;
-    try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles,validationRequirements,contractTestIntents:testIntents,testCommands,acceptanceCriterionIds,candidateFiles:workspace.files.map(file=>({path:file.path,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
+    try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles,validationRequirements,contractTestIntents:testIntents,testCommands,acceptanceCriterionIds,candidateFiles:workspace.files.map(file=>({path:file.path,isNewFile:file.isNewFile,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
     catch(error){return this.rollbackFailure(workspaceId,workspace.writeGuardId,[error instanceof Error?`VALIDATION_REQUEST_FAILED:${error.message}`:'VALIDATION_REQUEST_FAILED']);}
     if(!response.ok)return this.rollbackFailure(workspaceId,workspace.writeGuardId,[`VALIDATION_HTTP_${response.status}`]);
     body=await response.json() as Record<string,any>;

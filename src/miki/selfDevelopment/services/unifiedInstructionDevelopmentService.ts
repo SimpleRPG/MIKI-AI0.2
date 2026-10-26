@@ -13,9 +13,10 @@ class UnifiedInstructionDevelopmentService {
   const effectiveTargets=strategy.matchedPaths.length?strategy.matchedPaths:targetPaths;
   const plan=autonomousFeatureDevelopmentPlanService.plan(normalizedInstruction,effectiveTargets,packageScripts);
   if(!plan.ready)return {source,normalizedInstruction,strategy,plan,ready:false,reasons:[...plan.reasons]};
-  const construction=await autonomousFeatureConstructionExecutorService.execute(plan,runId);
+  const linkedRunId=runId||plan.developmentPlanId;
+   const construction=await autonomousFeatureConstructionExecutorService.execute(plan,linkedRunId);
   if(!construction.accepted)return {source,normalizedInstruction,strategy,plan,construction,ready:false,reasons:[...construction.reasons]};
-  const wiring=await autonomousFeatureWiringPipelineService.execute(plan,construction,runId);
+  const wiring=await autonomousFeatureWiringPipelineService.execute(plan,construction,linkedRunId);
   const prepared={source,normalizedInstruction,strategy,plan,construction,wiring,ready:wiring.accepted,reasons:[...wiring.reasons]};
   const completion=await unifiedDevelopmentCompletionService.complete(prepared,packageScripts);
   return {...prepared,completion,ready:completion.completed,reasons:[...new Set([...prepared.reasons,...completion.reasons])]};

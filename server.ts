@@ -9,6 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import { spawnSync, execFileSync } from 'child_process';
 import ts from 'typescript';
+import { candidateValidationPathPolicyService } from './src/miki/core/services/candidateValidationPathPolicyService';
 import vm from 'vm';
 import { GoogleGenAI } from '@google/genai';
 import JSZip from 'jszip';
@@ -1706,6 +1707,8 @@ app.post('/api/candidate-validation/run', async (req, res) => {
   try {
     const sourceFiles = Array.isArray(req.body?.sourceFiles) ? req.body.sourceFiles : [];
     const candidateFiles = Array.isArray(req.body?.candidateFiles) ? req.body.candidateFiles : [];
+    const sourceContentByPath = new Map<string,string>();
+    const candidatePathSet = new Set<string>();
     const validationRequirements = Array.isArray(req.body?.validationRequirements)
       ? req.body.validationRequirements.filter((value:any)=>typeof value === 'string' && value.trim())
       : [];
@@ -1722,9 +1725,12 @@ app.post('/api/candidate-validation/run', async (req, res) => {
 
     for (const file of sourceFiles) {
       const relative = safePath(file.path);
+      if (sourceContentByPath.has(relative)) throw new Error(`DUPLICATE_SOURCE_PATH:${relative}`);
+      const content = String(file.content || '');
+      sourceContentByPath.set(relative, content);
       const target = path.join(root, relative);
       fs.mkdirSync(path.dirname(target), {recursive:true});
-      fs.writeFileSync(target, String(file.content || ''), 'utf8');
+      fs.writeFileSync(target, content, 'utf8');
     }
 
     const packagePath = path.join(process.cwd(), 'package.json');
@@ -1745,11 +1751,20 @@ app.post('/api/candidate-validation/run', async (req, res) => {
 
     for (const file of candidateFiles) {
       const relative = safePath(file.path);
+      if (candidatePathSet.has(relative)) throw new Error(`DUPLICATE_CANDIDATE_PATH:${relative}`);
+      candidatePathSet.add(relative);
+      if (typeof file.isNewFile !== 'boolean') throw new Error(`CANDIDATE_OPERATION_REQUIRED:${relative}`);
       const target = path.join(root, relative);
-      if (!fs.existsSync(target)) {
-        throw new Error(`TARGET_NOT_IN_SNAPSHOT:${relative}`);
-      }
-      fs.writeFileSync(target, String(file.candidateContent || ''), 'utf8');
+      const baselineContent = typeof file.baselineContent === 'string' ? file.baselineContent : '';
+      const candidateContent = typeof file.candidateContent === 'string' ? file.candidateContent : '';
+      const sourceExists = sourceContentByPath.has(relative);
+      const decision = candidateValidationPathPolicyService.evaluate({path:relative,isNewFile:file.isNewFile,baselineContent,sourceContent:sourceContentByPath.get(relative),sourcePathExists:sourceExists,targetPathExists:fs.existsSync(target)});
+      if (!decision.allowed) throw new Error(`${decision.reason || 'CANDIDATE_PATH_REJECTED'}:${relative}`);
+      if (typeof file.candidateSha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(file.candidateSha256)) throw new Error(`CANDIDATE_CONTENT_HASH_REQUIRED:${relative}`);
+      const actualHash = crypto.createHash('sha256').update(candidateContent, 'utf8').digest('hex');
+      if (actualHash !== file.candidateSha256.toLowerCase()) throw new Error(`CANDIDATE_CONTENT_HASH_MISMATCH:${relative}`);
+      fs.mkdirSync(path.dirname(target), {recursive:true});
+      fs.writeFileSync(target, candidateContent, 'utf8');
     }
 
     // 1. STATIC
@@ -4697,7 +4712,21 @@ app.get('/api/self-code/teacher-skills', (req, res) => {
   res.json({ success: true, skills, includeQuarantined });
 });
 
-// 自律自己実装パイプライン (Prompt -> AST Plan -> Snapshot -> Verify -> Apply -> Commit)
+app.get('/api/self-code/package-scripts', (_req, res) => {
+  try {
+    const packagePath = path.join(process.cwd(), 'package.json');
+    if (!fs.existsSync(packagePath)) return res.status(404).json({ success:false, error:'PACKAGE_JSON_NOT_FOUND' });
+    const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+    const scripts: Record<string,string> = {};
+    for (const [name,value] of Object.entries(packageJson.scripts || {})) if (typeof value === 'string') scripts[name] = value;
+    if (Object.keys(scripts).length === 0) return res.status(500).json({ success:false, error:'PACKAGE_SCRIPTS_EMPTY' });
+    return res.json({ success:true, source:'package.json', scripts });
+  } catch (error:any) {
+    return res.status(500).json({ success:false, error:error?.message || 'PACKAGE_SCRIPTS_UNAVAILABLE' });
+  }
+});
+
+// UNIFIED_CANDIDATE_HANDOFF accepts only a plan-linked candidate receipt with successful validation evidence.
 app.post('/api/self-code/autonomous-implement', async (req, res) => {
   try {
     const { prompt, targetFileHint, autoApply = true, codeOverride } = req.body;
@@ -4706,6 +4735,25 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
     }
 
     const targetFile = typeof targetFileHint === 'string' ? targetFileHint : '';
+    const unifiedPlanId = String(req.body?.unifiedDevelopmentPlanId || '').trim();
+    const unified = req.body?.unifiedDevelopment;
+    if (unifiedPlanId || unified !== undefined) {
+      const fail = (reason:string) => res.status(409).json({success:false,applied:false,targetFile,code:'',linesCount:0,generationMethod:'unified_pipeline_candidate',failureStage:'UNIFIED_CANDIDATE_RECEIPT',isRequirementImplemented:false,error:reason,reasoning:reason});
+      const receipt = candidateValidationPathPolicyService.validateUnifiedReceipt(unifiedPlanId,unified,targetFile,typeof codeOverride==='string'?codeOverride:undefined);
+      if (!receipt.allowed) return fail(receipt.reason || 'UNIFIED_CANDIDATE_RECEIPT_REJECTED');
+      const normalizedFiles = receipt.files || [];
+      for (const file of normalizedFiles) {
+        if (typeof file.candidateSha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(file.candidateSha256)) return fail(`UNIFIED_CANDIDATE_HASH_REQUIRED:${file.path}`);
+        const actualHash = crypto.createHash('sha256').update(file.candidateContent, 'utf8').digest('hex');
+        if (actualHash !== file.candidateSha256.toLowerCase()) return fail(`UNIFIED_CANDIDATE_HASH_MISMATCH:${file.path}`);
+      }
+      if (!/^[a-f0-9]{64}$/i.test(String(unified.candidateSha256))) return fail('UNIFIED_CANDIDATE_REVISION_HASH_REQUIRED');
+      const aggregateHash = crypto.createHash('sha256').update(normalizedFiles.map(file=>`${file.path}\n${file.candidateContent}`).join('\n---\n'),'utf8').digest('hex');
+      if (aggregateHash !== String(unified.candidateSha256).toLowerCase()) return fail('UNIFIED_CANDIDATE_REVISION_HASH_MISMATCH');
+      const selected = receipt.selectedFile || normalizedFiles[0];
+      const results = unified.testResults;
+      return res.json({success:true,applied:false,targetFile:selected.path,isNewFile:selected.isNewFile,snapshotId:null,syntaxCheckPassed:true,reasoning:'統合開発計画に紐付く候補・検証結果を受け付けました。正式適用は行っていません。',code:selected.candidateContent,linesCount:selected.candidateContent.split(/\r?\n/).length,generationMethod:'unified_pipeline_candidate',isRequirementImplemented:true,qualityGatePassed:true,unifiedDevelopment:{source:unified.source,developmentPlanId:unifiedPlanId,workspaceId:unified.workspaceId,candidateSha256:unified.candidateSha256,reviewPackageId:unified.reviewPackageId,evaluationPackageId:unified.evaluationPackageId,ready:true,reasons:[]},candidateFiles:normalizedFiles.map(file=>({path:file.path,isNewFile:file.isNewFile,candidateSha256:file.candidateSha256})),validationResults:results});
+    }
     if (typeof codeOverride === 'string' && codeOverride.trim()) {
       return res.json({
         success: true,

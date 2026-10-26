@@ -4,6 +4,7 @@ import { callSelfCodeApi, isApiFailure } from './selfCodeApiClient';
 import { skillIrCompilerService } from './skillIrCompilerService';
 import { storageService } from '../../../services/storageService';
 import { unifiedInstructionDevelopmentService } from './unifiedInstructionDevelopmentService';
+import { isolatedCandidateWorkspaceService } from '../../core/services/isolatedCandidateWorkspaceService';
 
 export interface CouncilCheckItem {
   label: string;
@@ -147,7 +148,10 @@ export interface SelfImplementationResult {
   syntaxError?: string | null;
   reasoning: string;
   code: string;
-  generationMethod?: 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' | 'explicit_code_override' | 'llm' | 'virtual_sandbox';
+  generationMethod?: 'llm_gemini' | 'teacher_assisted_template' | 'fallback_template' | 'override' | 'explicit_code_override' | 'llm' | 'virtual_sandbox' | 'unified_pipeline_candidate';
+  failureStage?: string;
+  candidateFiles?: Array<{path:string;isNewFile:boolean;candidateSha256:string}>;
+  validationResults?: Array<{testId?:string;executionId:string;command:string;passed:boolean;exitCode:number;stdout:string;stderr:string;startedAt:number;completedAt:number}>;
   isRequirementImplemented?: boolean;
   teacherAssisted?: {
     templateAcquired: boolean;
@@ -378,12 +382,65 @@ class MikiSelfCodingSuperchargerService {
         error: 'CORE_PROMOTION_AUTHORITY_REQUIRED',
       };
     }
-    const packageScripts: Record<string,string> = {};
-    const unifiedDevelopment = await unifiedInstructionDevelopmentService.prepare(
-      prompt,
-      targetFileHint ? [targetFileHint] : [],
-      packageScripts,
-    );
+    const packageScriptsResponse = await callSelfCodeApi<{success:boolean;source?:string;scripts?:Record<string,string>}>('/api/self-code/package-scripts');
+    if (isApiFailure(packageScriptsResponse)) {
+      const reason = `PACKAGE_SCRIPTS_UNAVAILABLE:${packageScriptsResponse.reason}`;
+      return {success:false,prompt,targetFile:targetFileHint||'',isNewFile:false,snapshotId:null,applied:false,syntaxCheckPassed:false,reasoning:reason,code:'',linesCount:0,generationMethod:'unified_pipeline_candidate',failureStage:'PACKAGE_SCRIPTS',isRequirementImplemented:false,error:reason};
+    }
+    if (!packageScriptsResponse.success || !packageScriptsResponse.scripts || Object.keys(packageScriptsResponse.scripts).length===0) {
+      const reason = 'PACKAGE_SCRIPTS_UNAVAILABLE_OR_EMPTY';
+      return {success:false,prompt,targetFile:targetFileHint||'',isNewFile:false,snapshotId:null,applied:false,syntaxCheckPassed:false,reasoning:reason,code:'',linesCount:0,generationMethod:'unified_pipeline_candidate',failureStage:'PACKAGE_SCRIPTS',isRequirementImplemented:false,error:reason};
+    }
+    const packageScripts = packageScriptsResponse.scripts;
+    let unifiedDevelopment: Awaited<ReturnType<typeof unifiedInstructionDevelopmentService.prepare>>;
+    try {
+      unifiedDevelopment = await unifiedInstructionDevelopmentService.prepare(
+        prompt,
+        targetFileHint ? [targetFileHint] : [],
+        packageScripts,
+      );
+    } catch (error) {
+      const reason = `UNIFIED_DEVELOPMENT_PREPARE_FAILED:${error instanceof Error ? error.message : String(error)}`;
+      return {success:false,prompt,targetFile:targetFileHint||'',isNewFile:false,snapshotId:null,applied:false,syntaxCheckPassed:false,reasoning:reason,code:'',linesCount:0,generationMethod:'unified_pipeline_candidate',failureStage:'UNIFIED_DEVELOPMENT_PREPARE',isRequirementImplemented:false,error:reason};
+    }
+    const failUnified = (reason:string,failureStage='UNIFIED_CANDIDATE_HANDOFF'):SelfImplementationResult => ({
+      success:false,prompt,targetFile:targetFileHint||'',isNewFile:false,snapshotId:null,applied:false,
+      syntaxCheckPassed:false,reasoning:reason,code:'',linesCount:0,generationMethod:'unified_pipeline_candidate',failureStage,
+      isRequirementImplemented:false,error:reason,
+      unifiedDevelopment:{source:unifiedDevelopment.source,developmentPlanId:unifiedDevelopment.plan.developmentPlanId,workspaceId:unifiedDevelopment.completion?.workspaceId||unifiedDevelopment.wiring?.workspaceId||unifiedDevelopment.construction?.workspaceId,candidateSha256:unifiedDevelopment.completion?.candidateSha256,reviewPackageId:unifiedDevelopment.completion?.reviewPackageId,evaluationPackageId:unifiedDevelopment.completion?.storedPackage?.packageId,ready:false,reasons:[...new Set([...unifiedDevelopment.reasons,reason])]}
+    });
+    if (!unifiedDevelopment.ready || !unifiedDevelopment.completion?.completed) {
+      return failUnified(`UNIFIED_DEVELOPMENT_NOT_COMPLETED:${unifiedDevelopment.reasons.join('|')||'UNKNOWN_REASON'}`,'UNIFIED_PLAN_OR_COMPLETION');
+    }
+    const completion = unifiedDevelopment.completion;
+    const completedWorkspace = completion.workspaceId ? isolatedCandidateWorkspaceService.get(completion.workspaceId) : undefined;
+    if (!completedWorkspace || !completion.candidateSha256 || completedWorkspace.candidateRevisionSha256!==completion.candidateSha256) {
+      return failUnified('UNIFIED_COMPLETED_CANDIDATE_WORKSPACE_MISSING_OR_HASH_MISMATCH','CANDIDATE_WORKSPACE_INTEGRITY');
+    }
+    const validationPlan = completedWorkspace.validationPlan;
+    const expectedCommands = unifiedDevelopment.wiring?.testCommands || [];
+    const validationResults = completion.testResults || [];
+    if (!validationPlan || validationPlan.developmentPlanId!==unifiedDevelopment.plan.developmentPlanId || validationPlan.testPlanId!==unifiedDevelopment.plan.tests.testPlanId || validationPlan.testCommands.length===0 || expectedCommands.length!==validationPlan.testCommands.length || validationResults.length!==validationPlan.testCommands.length || validationResults.some((result,index)=>!result.passed || result.exitCode!==0 || result.command!==validationPlan.testCommands[index] || result.command!==expectedCommands[index])) {
+      return failUnified('UNIFIED_CANDIDATE_VALIDATION_EVIDENCE_INCOMPLETE','CANDIDATE_VALIDATION_EVIDENCE');
+    }
+    if (targetFileHint && !completedWorkspace.files.some(file=>file.path===targetFileHint)) {
+      return failUnified(`REQUESTED_TARGET_NOT_IN_COMPLETED_CANDIDATE:${targetFileHint}`,'TARGET_BINDING');
+    }
+    const candidateFiles = completedWorkspace.files.map(file=>({path:file.path,isNewFile:file.isNewFile,baselineContent:file.baselineContent,candidateContent:file.candidateContent,candidateSha256:file.candidateSha256}));
+    if (candidateFiles.length===0) return failUnified('UNIFIED_CANDIDATE_FILES_EMPTY','CANDIDATE_FILESET');
+    const unifiedReceipt = {
+      developmentPlanId:unifiedDevelopment.plan.developmentPlanId,
+      source:unifiedDevelopment.source,
+      completed:true,
+      validationPassed:true,
+      workspaceId:completedWorkspace.workspaceId,
+      candidateSha256:completedWorkspace.candidateRevisionSha256,
+      reviewPackageId:completion.reviewPackageId,
+      evaluationPackageId:completion.storedPackage?.packageId,
+      validationPlan,
+      testResults:validationResults,
+      candidateFiles
+    };
     const res = await callSelfCodeApi<SelfImplementationResult>('/api/self-code/autonomous-implement', {
       method: 'POST',
       body: {
@@ -394,6 +451,7 @@ class MikiSelfCodingSuperchargerService {
         authority,
         unifiedDevelopmentPlanId: unifiedDevelopment.plan.developmentPlanId,
         instructionSource: unifiedDevelopment.source,
+        unifiedDevelopment: unifiedReceipt,
       },
     });
     if (isApiFailure(res)) {
@@ -431,7 +489,9 @@ class MikiSelfCodingSuperchargerService {
         console.warn('Skill IR compilation warning:', e);
       }
     }
-    res.unifiedDevelopment={source:unifiedDevelopment.source,developmentPlanId:unifiedDevelopment.plan.developmentPlanId,workspaceId:unifiedDevelopment.wiring?.workspaceId||unifiedDevelopment.construction?.workspaceId,candidateSha256:unifiedDevelopment.completion?.candidateSha256,reviewPackageId:unifiedDevelopment.completion?.reviewPackageId,evaluationPackageId:unifiedDevelopment.completion?.storedPackage?.packageId,ready:unifiedDevelopment.ready,reasons:[...unifiedDevelopment.reasons]};
+    res.candidateFiles = candidateFiles.map(file=>({path:file.path,isNewFile:file.isNewFile,candidateSha256:file.candidateSha256}));
+    res.validationResults = validationResults;
+    res.unifiedDevelopment={source:unifiedDevelopment.source,developmentPlanId:unifiedDevelopment.plan.developmentPlanId,workspaceId:completedWorkspace.workspaceId,candidateSha256:completedWorkspace.candidateRevisionSha256,reviewPackageId:completion.reviewPackageId,evaluationPackageId:completion.storedPackage?.packageId,ready:true,reasons:[]};
     systemLogger.info('SELF_IMPROVEMENT', `[自律自己実装] ${res.targetFile} / UnifiedPlan ${unifiedDevelopment.plan.developmentPlanId} (Source: ${unifiedDevelopment.source})`);
     return res;
   }

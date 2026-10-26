@@ -125,6 +125,7 @@
     "verify:phase74": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs ./scripts/verify_phase74.mjs",
     "verify:phase75:e2e": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs ./scripts/run_autonomous_code_improvement_e2e_phase75.mjs",
     "verify:phase76:routes": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs ./scripts/run_uncovered_self_improvement_routes_phase76.mjs",
+    "verify:unified-candidate-pipeline:p321": "tsx scripts/verify_unified_candidate_pipeline_p321.mjs",
     "build:diagnostic": "node scripts/build_with_diagnostics.mjs 600",
     "build:diagnostic:900": "node scripts/build_with_diagnostics.mjs 900",
     "verify:build:diagnostic": "node scripts/verify_build_diagnostics_phase78.mjs",

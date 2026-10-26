@@ -9,11 +9,11 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1847 |
-| ソースファイル | 1392 |
-| 相対import候補を字句走査したECMAScriptファイル | 1305 |
-| 相対import候補 | 3934 |
-| 追跡パスへ解決できた候補 | 3906 |
+| 対象追跡パス（監査制御ファイルを除く） | 1849 |
+| ソースファイル | 1394 |
+| 相対import候補を字句走査したECMAScriptファイル | 1307 |
+| 相対import候補 | 3938 |
+| 追跡パスへ解決できた候補 | 3910 |
 | 未解決候補（即不具合判定ではない） | 28 |
 
 ## ファイル一覧
@@ -435,6 +435,7 @@
 | `scripts/verify_task_route_failure_contracts.ts` | 3414 | 99 | `b91d8af96a587150174acd13f01f7ee66a753326584f56b59f281b097b97963e` | 3 | 3 | 0 |
 | `scripts/verify_termux_build_v190.sh` | 645 | 13 | `ab340b08c770d9974c5977374a185221a37ed3f7be5d1aacd588bcf418845ce4` | 0 | 0 | 0 |
 | `scripts/verify_unified_autonomous_completion_stage17.mjs` | 1307 | 6 | `504600b36b1aedb99f02a6df1a0dd8fb93673a3381c60eb02dc770181bc60e79` | 0 | 0 | 0 |
+| `scripts/verify_unified_candidate_pipeline_p321.mjs` | 6536 | 61 | `92daf0ed8ef041fa20ad2b4f2f57cb3788863701aa3c3752b2401b3bfc99ede2` | 1 | 1 | 0 |
 | `scripts/verify_unified_graph_p151.mjs` | 2555 | 1 | `8ec223e3552a1f22ef247f8ead99d6dc9b7e1183b80e42312b93f74e9a16f903` | 1 | 1 | 0 |
 | `scripts/verify_unified_instruction_development_stage16.mjs` | 1090 | 6 | `89468fdb4f950bd5bf22652350b466f07b948515843007d0301f4ccc0d72e3e4` | 0 | 0 | 0 |
 | `scripts/verify_v13_surface_and_persona.ts` | 9502 | 192 | `1c0ef4f5898612e8eee35add5773527fae3fe253eb3d794092355e933a26f850` | 4 | 4 | 0 |
@@ -460,7 +461,7 @@
 | `scripts/verify_workspace_completion_stage29.mjs` | 1402 | 2 | `b4176f66fa9ca552e14ea5c6d082f71b9672fd7ac37b5b61f92c33aca1c60334` | 0 | 0 | 0 |
 | `scripts/verify_workspace_repository_stage33.mjs` | 915 | 1 | `2ff81e47175b1fdb73d88f7c63b14208e6f9907c7a5f6d5acff42011938f9494` | 0 | 0 | 0 |
 | `scripts/verify_world_patterns_p111.mjs` | 1554 | 1 | `7bbe0c27d4733c537e6a79b8ff81ec1d364e6936a6bcbe34714b679461e18f77` | 2 | 2 | 0 |
-| `server.ts` | 253983 | 5792 | `0431b612de24123d0092b18ef084b4c6da644a8c93eb4a5af261a1f3fed99828` | 42 | 40 | 2 |
+| `server.ts` | 259052 | 5840 | `7b01a794bd08e9018ed728990d4bac0b89931c4f036850cf6f6da54e2cb9a844` | 43 | 41 | 2 |
 | `src/App.tsx` | 88486 | 2041 | `1b780617985e3659f160ae8accb63b5117e4d7a7eca92c42bf834addb175bd76` | 117 | 117 | 0 |
 | `src/app/appRuntimeLifecycleService.ts` | 9930 | 178 | `c0b20a9b7cfd4fd3a9848bf775c25aaa4011b296dcb1c6cfb533e02d03626907` | 31 | 31 | 0 |
 | `src/app/startupPhaseSchedulerService.ts` | 706 | 3 | `bb8ce0bc1ef0201da3c50eb1f06ec8ad60edab97bfb54ad47b481004981b975c` | 0 | 0 | 0 |
@@ -634,8 +635,9 @@
 | `src/miki/core/services/candidateGovernanceCoordinatorService.ts` | 981 | 7 | `4a5e28b6a7ca39017129358d17c9683764755ec06e7552e92efef65709189845` | 2 | 2 | 0 |
 | `src/miki/core/services/candidateUnknownResolutionService.ts` | 11776 | 351 | `47879016c650a27fdf4c95d6ee597b129b50522938a7ab16c71fc28739bd3703` | 10 | 10 | 0 |
 | `src/miki/core/services/candidateValidationEvidenceService.ts` | 1861 | 13 | `03d1ceee035ac0de49544288a1c4740bd4672c41d1a0833ea9fcf44293059b9e` | 1 | 1 | 0 |
+| `src/miki/core/services/candidateValidationPathPolicyService.ts` | 7677 | 118 | `33ebe688e4a009738bc9847c38af12916b066970598f55cfe357076e4fd5601d` | 0 | 0 | 0 |
 | `src/miki/core/services/candidateValidationResultCacheService.ts` | 1228 | 14 | `2172d888a9e01b1b8a27ef9744265b5f30c11fe43923be8dc84661b5cad42b0a` | 1 | 1 | 0 |
-| `src/miki/core/services/candidateValidationRunnerService.ts` | 7291 | 68 | `acaf076ece3101b218e8410cff4669e921f8350362986a2c2a6965e46cb18b88` | 12 | 12 | 0 |
+| `src/miki/core/services/candidateValidationRunnerService.ts` | 7930 | 69 | `a5d09ca4477d352f006049c9e196032dfc1ffcf94ca442a922f422726b47dc99` | 12 | 12 | 0 |
 | `src/miki/core/services/candidateWriteGuardService.ts` | 4613 | 39 | `7c371c25fdbc06b69b8963afae8d6d9c0294d2868efbc8f99e85a38a085a183e` | 1 | 1 | 0 |
 | `src/miki/core/services/canonicalPersonSurfaceP171Service.ts` | 4387 | 7 | `c2b0e5f45c6869de3a5006b3b3a91a8c380ca1dfbe73183ccaa57ed960f43c61` | 1 | 1 | 0 |
 | `src/miki/core/services/canonicalProtectedInvariantRegistryService.ts` | 4008 | 29 | `97dead6e48b5e392fc731b75e3756584bc59b25c8ca83faba48350ccbcde20c6` | 1 | 1 | 0 |
@@ -671,7 +673,7 @@
 | `src/miki/core/services/crossDomainCirculationService.ts` | 3430 | 104 | `e24b026d10f19698a795f6213108b847575e42217389f4c4ce0b4e73c2c6666a` | 2 | 2 | 0 |
 | `src/miki/core/services/crossDomainGraphConnectionP211Service.ts` | 6409 | 46 | `1fa58261c7c72cd99ae0d6b35f971e80965d25ca68ac6d6d5b87f7bae3a6a257` | 5 | 5 | 0 |
 | `src/miki/core/services/crossPersonVisualPriorP159Service.ts` | 2509 | 6 | `315fa5e8d89036ad7b57daf6495c85a19b46bc3a5782308f1c54b84946b75fe0` | 1 | 1 | 0 |
-| `src/miki/core/services/cumulativeRevalidationService.ts` | 1889 | 7 | `2cd61ceb6bc0979c8d836831d6d98eb3a7ea66b1fcf8fc6c6e98ce6523e83c60` | 3 | 3 | 0 |
+| `src/miki/core/services/cumulativeRevalidationService.ts` | 3275 | 8 | `d24308a10962466a3301d2fe88954e279372f641805717f49dae33c91eebd20a` | 4 | 4 | 0 |
 | `src/miki/core/services/detailedFaceSurfaceP194Service.ts` | 3794 | 4 | `af62b7a9d0547c9a7493a75e8aa57ed81890559951fb7f62fc17255c21cc3f13` | 3 | 3 | 0 |
 | `src/miki/core/services/detailedHumanRuleLearningP194Service.ts` | 4136 | 11 | `dd5f5d93e6f31ec683845961a18216674e180370e70a44142976c96c4e725fa1` | 1 | 1 | 0 |
 | `src/miki/core/services/developmentWorldProjectionService.ts` | 2500 | 12 | `93609af1d4867859bac0b37adf21b1b82d9e70fe72445ab36b4f01ebb42d3fde` | 2 | 2 | 0 |
@@ -710,7 +712,7 @@
 | `src/miki/core/services/highFidelityPersonRendererP141Service.ts` | 7342 | 5 | `95fd1e21778d624486a08082f5db81daa384068b749062268b52347ef1ca6695` | 2 | 2 | 0 |
 | `src/miki/core/services/improvementDebtService.ts` | 1333 | 8 | `e6e6eb35723c7fbbd34ad5768c46f658d645210c51291a1d57b84a9fefbba308` | 1 | 1 | 0 |
 | `src/miki/core/services/improvementIntakeRouterService.ts` | 15801 | 218 | `2f5596496dd1270ba7e4be0be755395fff3ddc55ea1c3a88794dc7f4c79f755b` | 7 | 7 | 0 |
-| `src/miki/core/services/isolatedCandidateWorkspaceService.ts` | 7613 | 25 | `2d92c207aa3af8dd3b057380c1782fbcd55be92fcdb41bb5bfe2347eb315b494` | 3 | 3 | 0 |
+| `src/miki/core/services/isolatedCandidateWorkspaceService.ts` | 8912 | 27 | `7c6c805cd32ac0ef43f0a0d2098adb921f94da6de2f40262c953e5e8c27158ac` | 3 | 3 | 0 |
 | `src/miki/core/services/iterativePersonQualityP181Service.ts` | 6418 | 30 | `b0ce2a03cb4ac582267b6a2f5eff63351e5cdc8847778e0642d8bcb47cb9fc50` | 1 | 1 | 0 |
 | `src/miki/core/services/layeredPerson25DModelP192Service.ts` | 8937 | 44 | `4567c5d99d0c2b04aa657b7f86a9939256e0c067afc153c9cd4f40d53625c4bc` | 2 | 2 | 0 |
 | `src/miki/core/services/learnedPersonRendererP139Service.ts` | 8941 | 17 | `4f0b9c55ac0465f948bc63ed966749af551b8756bf4f6d326089a69185e73500` | 2 | 2 | 0 |
@@ -1035,7 +1037,7 @@
 | `src/miki/selfDevelopment/services/candidateAdoptionReadinessService.ts` | 3262 | 14 | `1dfa954d31812b6e8c6237970afc81cd189a4406e993d9a62fb85d34dc740535` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/candidateBrowserE2EOrchestratorService.ts` | 6285 | 16 | `8dbb19bb73c283cba3fc0b30ddcb11ce485edc48c1daf18b87df73988357fc49` | 5 | 5 | 0 |
 | `src/miki/selfDevelopment/services/candidateDevelopmentCompletionService.ts` | 4430 | 62 | `38625f3adcbe487c0367288dfbd0f5584fe3916d33e8b1e1687af89593477a41` | 6 | 6 | 0 |
-| `src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts` | 5843 | 79 | `3430926c50e758c54749fe6d69075f65cda4fef5604ca52402c2f8fdca68dbbd` | 6 | 6 | 0 |
+| `src/miki/selfDevelopment/services/candidateRepairRetryLoopService.ts` | 6176 | 80 | `bd116ad03985761deeaa1508bc59905bf8045ec1de4c3c6c62ed649bb46e3feb` | 6 | 6 | 0 |
 | `src/miki/selfDevelopment/services/candidateRepairRevisionService.ts` | 2102 | 24 | `fd8b70c776f397a2a827cc35d8410fb2e6ec64344290d3a69d178f9fb5ae8e24` | 3 | 3 | 0 |
 | `src/miki/selfDevelopment/services/candidateStructuralAnalysisService.ts` | 347 | 1 | `9a0eda7c8d397672452b0b2de8be9e1052c9b96d86acb7ad7bb30e5c06d3d555` | 1 | 1 | 0 |
 | `src/miki/selfDevelopment/services/candidateTimelineReadModelService.ts` | 1999 | 7 | `28363f7e0491ba0e9c4f3604c2536370fdd78b44ab313e792edf1b62c2e235dc` | 4 | 4 | 0 |
@@ -1109,7 +1111,7 @@
 | `src/miki/selfDevelopment/services/largeChangeWavePlannerService.ts` | 2232 | 4 | `a46b6a19eb2f864bb0a17c46bbc344781bc676c532eb5a02c5bd4f7bb7599228` | 1 | 1 | 0 |
 | `src/miki/selfDevelopment/services/migrationRepositoryIntegrationService.ts` | 785 | 3 | `20dce2f44cb80e6d9d6d46f6336ebda3679b8587dc5d6f2a3673e05bb3667f0a` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/mikiAutonomousDevStudioService.ts` | 41320 | 1022 | `6518e0a39c8e0eb88727e1358896372a764a3d248ad920b00723bdae7c3edd8a` | 7 | 6 | 1 |
-| `src/miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts` | 35626 | 1083 | `52362a1d2916e4dba6bc94b416bbe9f575b73e4db7975e2cb4865a1621a86d51` | 7 | 6 | 1 |
+| `src/miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts` | 41302 | 1143 | `0094c676a0b376891d62b554d9c62ec3713e096b95b24e736d354eb6b8ca8ac2` | 8 | 7 | 1 |
 | `src/miki/selfDevelopment/services/multiIntentAstMergeService.ts` | 1722 | 4 | `39cd07076656169237f74c13c73cc6f18203546b3b9caa09228533e0995ac264` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts` | 6374 | 9 | `35a1b48ea209c6b3c7274d2815f65d165fd51e0628b71b161034866359091199` | 16 | 16 | 0 |
 | `src/miki/selfDevelopment/services/multiIntentStructuralTransactionService.ts` | 1651 | 5 | `7d96e6f222bd5597ef5cbc7031507df034eeba0db6ebd53e8f8ed0f37976509a` | 2 | 2 | 0 |
@@ -1176,10 +1178,10 @@
 | `src/miki/selfDevelopment/services/testResultEvidenceRecorderService.ts` | 1094 | 7 | `65419d018d81a2214b62de4e435b79d5f0aea690ea003cf9a5eaa6e54584738f` | 3 | 3 | 0 |
 | `src/miki/selfDevelopment/services/typescriptCompilerLoaderService.ts` | 487 | 3 | `a665bed02ba84e3317b8cf7e6861514642a50a875dce2740a4971832490a84db` | 0 | 0 | 0 |
 | `src/miki/selfDevelopment/services/typescriptProgramGraphService.ts` | 3742 | 4 | `c0797d602e685892b1a9493bfaad330e675eb5092ad0ccd843246e6374663808` | 1 | 1 | 0 |
-| `src/miki/selfDevelopment/services/unifiedDevelopmentCompletionService.ts` | 15097 | 64 | `4093943fda8687b51e21f6aa2fdf1145e41d155232bfda58c4f6da39b83d6bf2` | 24 | 24 | 0 |
+| `src/miki/selfDevelopment/services/unifiedDevelopmentCompletionService.ts` | 15723 | 66 | `81cce7b9baff61508a13d1812c6b3c9f03f3234615ae262c30c86903f141d95c` | 24 | 24 | 0 |
 | `src/miki/selfDevelopment/services/unifiedDevelopmentRequestModel.ts` | 1437 | 6 | `a0afafd82b7217feb8703a24a55ce51763f808955a90217aeec183a92d37716f` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/unifiedFailureTaxonomyService.ts` | 6712 | 13 | `69cc7cbf119f25efa6c734b3ecb4a4c9ac32037df1ef0b001ee128d859491237` | 2 | 2 | 0 |
-| `src/miki/selfDevelopment/services/unifiedInstructionDevelopmentService.ts` | 2851 | 25 | `c633c54690445a2a452d6aeaf3e76a86652239c14538b0557f11de34e58078ae` | 5 | 5 | 0 |
+| `src/miki/selfDevelopment/services/unifiedInstructionDevelopmentService.ts` | 2915 | 26 | `e5cb7dc470c148be30340dce540f1555b504e58200ac162984619b09216cb37e` | 5 | 5 | 0 |
 | `src/miki/selfDevelopment/services/vbaDesignAssistantService.ts` | 11189 | 243 | `bc85be180d33da4ac07dc3b6549fdaeda397866e327019104970f832511575b3` | 3 | 3 | 0 |
 | `src/miki/selfDevelopment/services/workspaceRevisionHistoryService.ts` | 2026 | 20 | `4b6fdb6c04d8b01204226e922db55376c7b53ffdfd0a4541c74f3d3e9ed1937d` | 3 | 3 | 0 |
 | `src/miki/selfDevelopment/services/workspaceRollbackAuditService.ts` | 1754 | 4 | `611e59e22a64d83314e33641a8d89fc72a74a1b407bd1b1c6f8dfb9f36f1c6ac` | 3 | 3 | 0 |

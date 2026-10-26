@@ -50,6 +50,9 @@ jobs:
       - name: Verify conversation and work-instruction failure recovery
         run: npx tsx scripts/verify_task_route_failure_contracts.ts
 
+      - name: Verify unified self-coding candidate and file validation P321
+        run: npm run verify:unified-candidate-pipeline:p321
+
       - name: Verify cognitive graph node identity and conversation edges
         timeout-minutes: 10
         run: |

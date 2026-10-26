@@ -60,13 +60,14 @@ class CandidateRepairRetryLoopService {
       const repairedByPath=new Map(revision.files.map(file=>[file.path,file]));
       const nextFiles=workspace.files.map(file=>{
         const repaired=repairedByPath.get(file.path);
-        return {path:file.path,baselineContent:file.candidateContent,candidateContent:repaired?.candidateContent||file.candidateContent,evidenceIds:[...file.evidenceIds,...(repaired?.appliedRepairPlanIds||[])]};
+        return {path:file.path,baselineContent:initialBaselineByPath.get(file.path)??file.baselineContent,candidateContent:repaired?.candidateContent??file.candidateContent,isNewFile:file.isNewFile,evidenceIds:[...file.evidenceIds,...(repaired?.appliedRepairPlanIds||[])]};
       });
       const next=await isolatedCandidateWorkspaceService.create(
         `${workspace.issueId}:repair:${revision.revisionId}`,
         nextFiles,
         workspace.runId
       );
+      if(workspace.validationPlan&&!isolatedCandidateWorkspaceService.setValidationPlan(next.workspaceId,workspace.validationPlan))return {passed:false,initialWorkspaceId,finalWorkspaceId:next.workspaceId,attempts,stopReason:'REPAIR_VALIDATION_PLAN_PROPAGATION_FAILED'};
       workspaceId=next.workspaceId;
     }
     return {passed:false,initialWorkspaceId,finalWorkspaceId:workspaceId,attempts,stopReason:'REPAIR_LOOP_TERMINATED'};
