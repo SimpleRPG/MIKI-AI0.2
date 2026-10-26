@@ -14,7 +14,36 @@ assert.equal(allow(create('scripts/verify_new_feature.mjs')).allowed,true,'safe 
 for (const path of ['../escape.ts','src/../../escape.ts','/tmp/escape.ts','C:\\outside.ts','src//empty.ts','src/.//dot.ts']) {
   assert.equal(policy.normalize(path).allowed,false,`unsafe path must be rejected: ${path}`);
 }
-for (const path of ['.github/workflows/evil.yml','node_modules/pkg/index.js','dist/evil.js','package.json','tsconfig.json','src/secret.env']) {
+for (const path of [
+  '.github/workflows/evil.yml',
+  'node_modules/pkg/index.js',
+  'dist/evil.js',
+  'package.json',
+  'tsconfig.json',
+  'tsconfig.app.json',
+  'tsconfig.build.json',
+  'vite.config.ts',
+  'vite.config.mjs',
+  'capacitor.config.ts',
+  'capacitor.config.json',
+  'next.config.js',
+  'next.config.mjs',
+  'webpack.config.js',
+  'webpack.config.cjs',
+  'metro.config.js',
+  'gradle.properties',
+  'settings.gradle.kts',
+  'build.gradle.kts',
+  'Cargo.toml',
+  'Cargo.lock',
+  'android/AndroidManifest.xml',
+  '.env.production',
+  '.npmrc',
+  '.yarnrc.yml',
+  '.gitignore',
+  '.gitattributes',
+  'src/secret.env'
+]) {
   assert.equal(allow(create(path)).allowed,false,`protected new path must be rejected: ${path}`);
 }
 assert.match(allow({...create('src/generated/NewFeature.ts'),sourcePathExists:true}).reason,/SOURCE_PATH_ALREADY_EXISTS/);
@@ -24,18 +53,39 @@ assert.equal(allow(update({})).allowed,true,'existing file update with exact bas
 for (const path of [
   'package.json',
   'package-lock.json',
+  'npm-shrinkwrap.json',
+  'yarn.lock',
+  'pnpm-lock.yaml',
   'tsconfig.json',
   'tsconfig.app.json',
+  'tsconfig.build.json',
   'vite.config.ts',
+  'vite.config.mjs',
   'capacitor.config.ts',
-  '.github/workflows/build-apk.yml',
-  '.env',
-  '.env.production',
-  '.npmrc',
+  'capacitor.config.json',
+  'next.config.js',
+  'next.config.mjs',
+  'webpack.config.js',
+  'webpack.config.cjs',
+  'metro.config.js',
+  'gradle.properties',
+  'settings.gradle',
+  'settings.gradle.kts',
+  'build.gradle',
+  'build.gradle.kts',
   'Cargo.toml',
   'Cargo.lock',
+  'android/AndroidManifest.xml',
   'android/build.gradle',
-  'android/settings.gradle'
+  'android/settings.gradle',
+  '.env',
+  '.env.production',
+  '.env.local',
+  '.npmrc',
+  '.yarnrc.yml',
+  '.gitignore',
+  '.gitattributes',
+  '.github/workflows/build-apk.yml'
 ]) {
   const result = allow(update({path}));
   assert.equal(

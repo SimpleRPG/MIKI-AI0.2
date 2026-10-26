@@ -435,7 +435,7 @@
 | `scripts/verify_task_route_failure_contracts.ts` | 3414 | 99 | `b91d8af96a587150174acd13f01f7ee66a753326584f56b59f281b097b97963e` | 3 | 3 | 0 |
 | `scripts/verify_termux_build_v190.sh` | 645 | 13 | `ab340b08c770d9974c5977374a185221a37ed3f7be5d1aacd588bcf418845ce4` | 0 | 0 | 0 |
 | `scripts/verify_unified_autonomous_completion_stage17.mjs` | 1307 | 6 | `504600b36b1aedb99f02a6df1a0dd8fb93673a3381c60eb02dc770181bc60e79` | 0 | 0 | 0 |
-| `scripts/verify_unified_candidate_pipeline_p321.mjs` | 7114 | 85 | `f1ccb66e376f5a334c2bac868288cc67490da91c64b6b4106c62a62bdc6b1edd` | 1 | 1 | 0 |
+| `scripts/verify_unified_candidate_pipeline_p321.mjs` | 8057 | 135 | `1b50c3de92fb740e3136264ea36e280b80ace67b298ddd2df52ff17949133ed8` | 1 | 1 | 0 |
 | `scripts/verify_unified_graph_p151.mjs` | 2555 | 1 | `8ec223e3552a1f22ef247f8ead99d6dc9b7e1183b80e42312b93f74e9a16f903` | 1 | 1 | 0 |
 | `scripts/verify_unified_instruction_development_stage16.mjs` | 1090 | 6 | `89468fdb4f950bd5bf22652350b466f07b948515843007d0301f4ccc0d72e3e4` | 0 | 0 | 0 |
 | `scripts/verify_v13_surface_and_persona.ts` | 9502 | 192 | `1c0ef4f5898612e8eee35add5773527fae3fe253eb3d794092355e933a26f850` | 4 | 4 | 0 |
@@ -635,7 +635,7 @@
 | `src/miki/core/services/candidateGovernanceCoordinatorService.ts` | 981 | 7 | `4a5e28b6a7ca39017129358d17c9683764755ec06e7552e92efef65709189845` | 2 | 2 | 0 |
 | `src/miki/core/services/candidateUnknownResolutionService.ts` | 11776 | 351 | `47879016c650a27fdf4c95d6ee597b129b50522938a7ab16c71fc28739bd3703` | 10 | 10 | 0 |
 | `src/miki/core/services/candidateValidationEvidenceService.ts` | 1861 | 13 | `03d1ceee035ac0de49544288a1c4740bd4672c41d1a0833ea9fcf44293059b9e` | 1 | 1 | 0 |
-| `src/miki/core/services/candidateValidationPathPolicyService.ts` | 8992 | 160 | `c93dfcf40485aede9cd9b054a38600cbff110c079f02cd76eb2a7cbe02655c8b` | 0 | 0 | 0 |
+| `src/miki/core/services/candidateValidationPathPolicyService.ts` | 8968 | 160 | `5bda399263cdb07e9d732382390c326ebec87d297b3cc5f416707f0bb2e3a767` | 0 | 0 | 0 |
 | `src/miki/core/services/candidateValidationResultCacheService.ts` | 1228 | 14 | `2172d888a9e01b1b8a27ef9744265b5f30c11fe43923be8dc84661b5cad42b0a` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateValidationRunnerService.ts` | 7930 | 69 | `a5d09ca4477d352f006049c9e196032dfc1ffcf94ca442a922f422726b47dc99` | 12 | 12 | 0 |
 | `src/miki/core/services/candidateWriteGuardService.ts` | 4613 | 39 | `7c371c25fdbc06b69b8963afae8d6d9c0294d2868efbc8f99e85a38a085a183e` | 1 | 1 | 0 |

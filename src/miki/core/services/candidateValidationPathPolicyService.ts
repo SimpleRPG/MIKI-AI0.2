@@ -31,20 +31,20 @@ const PROTECTED_CREATE_NAMES = new Set([
   'build.gradle', 'build.gradle.kts', 'androidmanifest.xml'
 ]);
 const PROTECTED_CONFIGURATION_PATTERNS = [
-  /^tsconfig(?:\\..+)?\\.json$/,
-  /^vite\\.config\\..+$/,
-  /^capacitor\\.config\\..+$/,
-  /^next\\.config\\..+$/,
-  /^webpack\\.config\\..+$/,
-  /^metro\\.config\\..+$/,
-  /^gradle\\.properties$/,
-  /^settings\\.gradle(?:\\.kts)?$/,
-  /^build\\.gradle(?:\\.kts)?$/,
-  /^cargo\\.(?:toml|lock)$/,
-  /^androidmanifest\\.xml$/,
-  /^\\.env(?:\\..+)?$/,
-  /^\\.npmrc$/,
-  /^\\.yarnrc(?:\\.yml)?$/
+  /^tsconfig(?:\..+)?\.json$/,
+  /^vite\.config\..+$/,
+  /^capacitor\.config\..+$/,
+  /^next\.config\..+$/,
+  /^webpack\.config\..+$/,
+  /^metro\.config\..+$/,
+  /^gradle\.properties$/,
+  /^settings\.gradle(?:\.kts)?$/,
+  /^build\.gradle(?:\.kts)?$/,
+  /^cargo\.(?:toml|lock)$/,
+  /^androidmanifest\.xml$/,
+  /^\.env(?:\..+)?$/,
+  /^\.npmrc$/,
+  /^\.yarnrc(?:\.yml)?$/
 ];
 
 class CandidateValidationPathPolicyService {
