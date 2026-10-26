@@ -2,13 +2,13 @@ import { storageService } from '../../../services/storageService';
 import { persistenceReceiptLedgerService } from './persistenceReceiptLedgerService';
 
 export type CandidateTransactionStatus='STAGED'|'APPLYING'|'COMMITTED'|'ROLLED_BACK'|'RECOVERY_REQUIRED';
-export interface CandidateTransactionFile {path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string;evidenceIds:string[];}
+export interface CandidateTransactionFile {path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string;evidenceIds:string[];isNewFile?:boolean;}
 export interface CandidateCommitTransaction {schemaVersion:1;transactionId:string;issueId:string;workspaceId:string;guardId:string;revision:number;status:CandidateTransactionStatus;files:CandidateTransactionFile[];baselineSnapshotSha256:string;candidateManifestSha256:string;candidateRevisionSha256:string;receiptId?:string;previousTransactionId?:string;operationInstanceId:string;manifest:{schemaVersion:2;normalizationVersion:1;encoding:'UTF-8';newlinePolicy:'LF';orderedPaths:string[]};failure?:string;createdAt:number;updatedAt:number;}
 const KEY='miki_candidate_commit_transactions_v1';
 class CandidateCommitTransactionService{
  private rows=new Map<string,CandidateCommitTransaction>();private sequence=0;
  constructor(){this.load();this.recoverIncomplete();}
- async commit(input:{issueId:string;taskId:string;workspaceId:string;guardId:string;files:Array<{path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string;evidenceIds:string[]}>;receiptId:string;previousTransactionId?:string;operationInstanceId:string;}):Promise<CandidateCommitTransaction>{
+ async commit(input:{issueId:string;taskId:string;workspaceId:string;guardId:string;files:Array<{path:string;baselineContent:string;candidateContent:string;baselineSha256:string;candidateSha256:string;evidenceIds:string[];isNewFile:boolean}>;receiptId:string;previousTransactionId?:string;operationInstanceId:string;}):Promise<CandidateCommitTransaction>{
   if(!input.receiptId.trim())throw new Error('PERSISTENCE_RECEIPT_REQUIRED');
   if(!input.operationInstanceId.trim())throw new Error('OPERATION_INSTANCE_REQUIRED');
   if(!input.taskId.trim())throw new Error('TASK_ID_REQUIRED');
@@ -19,7 +19,7 @@ class CandidateCommitTransactionService{
   const baselineSnapshotSha256=await this.sha(input.files.map(file=>`${file.path}\n${file.baselineSha256}`).join('\n'));
   const candidateRevisionSha256=await this.sha(input.files.map(file=>`${file.path}\n${file.candidateSha256}`).join('\n'));
   const orderedPaths=[...input.files.map(file=>file.path)].sort();const manifest={schemaVersion:2 as const,normalizationVersion:1 as const,encoding:'UTF-8' as const,newlinePolicy:'LF' as const,orderedPaths};
-  const candidateManifestSha256=await this.sha(JSON.stringify({...manifest,issueId:input.issueId,workspaceId:input.workspaceId,guardId:input.guardId,revision,baselineSnapshotSha256,candidateRevisionSha256,files:input.files.slice().sort((a,b)=>a.path.localeCompare(b.path)).map(file=>({path:file.path,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256})),receiptId:input.receiptId,operationInstanceId:input.operationInstanceId}));
+  const candidateManifestSha256=await this.sha(JSON.stringify({...manifest,issueId:input.issueId,workspaceId:input.workspaceId,guardId:input.guardId,revision,baselineSnapshotSha256,candidateRevisionSha256,files:input.files.slice().sort((a,b)=>a.path.localeCompare(b.path)).map(file=>({path:file.path,isNewFile:file.isNewFile,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256})),receiptId:input.receiptId,operationInstanceId:input.operationInstanceId}));
   const row:CandidateCommitTransaction={schemaVersion:1,transactionId,issueId:input.issueId,workspaceId:input.workspaceId,guardId:input.guardId,revision,status:'STAGED',files:input.files.map(file=>({...file,evidenceIds:[...file.evidenceIds]})),baselineSnapshotSha256,candidateManifestSha256,candidateRevisionSha256,receiptId:input.receiptId,previousTransactionId:input.previousTransactionId,operationInstanceId:input.operationInstanceId,manifest,createdAt:now,updatedAt:now};
   this.rows.set(transactionId,row);this.persist();
   try{row.status='APPLYING';row.updatedAt=Date.now();this.persist();row.status='COMMITTED';row.updatedAt=Date.now();this.persist();return this.clone(row);}catch(error){row.status='RECOVERY_REQUIRED';row.failure=error instanceof Error?error.message:String(error);row.updatedAt=Date.now();this.safePersist();throw error;}

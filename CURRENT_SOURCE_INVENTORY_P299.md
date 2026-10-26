@@ -629,7 +629,7 @@
 | `src/miki/core/services/bodyTypeTrendService.ts` | 3381 | 14 | `ec7b217df647446c94fc89e3359eda56588cd56bb5962921558a5073a2506914` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateAutoRebaseService.ts` | 2849 | 14 | `b5affca11da61a5b228a5cdef665265b6542eedc66f5204bbdbdf220d851447d` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateCodeGenerationService.ts` | 65103 | 1590 | `b1d777e0c93cd58887d5b1243a3aaa6bcdc78700c3348776beb7c2a9b03c8d1b` | 27 | 27 | 0 |
-| `src/miki/core/services/candidateCommitTransactionService.ts` | 8546 | 45 | `dd728868bf808fbc399d5203fd8e50d0661103323641b9d6ebfe2d55dc62c32e` | 2 | 2 | 0 |
+| `src/miki/core/services/candidateCommitTransactionService.ts` | 8608 | 45 | `1a98649a03776da438f9736a0040228c95ddbf21c8496ee57e73548527950dd8` | 2 | 2 | 0 |
 | `src/miki/core/services/candidateConstraintValidationService.ts` | 3013 | 9 | `917b44e4bf12c864b2694cd9be514f6e4780ef875462d3ab526a69f84cb36b06` | 3 | 3 | 0 |
 | `src/miki/core/services/candidateEditCollisionService.ts` | 1693 | 10 | `357bc26fc788fe39fd004c26bf410c0e043ef8a30bf32cd6f280fdeac404a12b` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateGovernanceCoordinatorService.ts` | 981 | 7 | `4a5e28b6a7ca39017129358d17c9683764755ec06e7552e92efef65709189845` | 2 | 2 | 0 |
@@ -712,7 +712,7 @@
 | `src/miki/core/services/highFidelityPersonRendererP141Service.ts` | 7342 | 5 | `95fd1e21778d624486a08082f5db81daa384068b749062268b52347ef1ca6695` | 2 | 2 | 0 |
 | `src/miki/core/services/improvementDebtService.ts` | 1333 | 8 | `e6e6eb35723c7fbbd34ad5768c46f658d645210c51291a1d57b84a9fefbba308` | 1 | 1 | 0 |
 | `src/miki/core/services/improvementIntakeRouterService.ts` | 15801 | 218 | `2f5596496dd1270ba7e4be0be755395fff3ddc55ea1c3a88794dc7f4c79f755b` | 7 | 7 | 0 |
-| `src/miki/core/services/isolatedCandidateWorkspaceService.ts` | 8912 | 27 | `7c6c805cd32ac0ef43f0a0d2098adb921f94da6de2f40262c953e5e8c27158ac` | 3 | 3 | 0 |
+| `src/miki/core/services/isolatedCandidateWorkspaceService.ts` | 9022 | 27 | `e3e2b2cc90ce664cf50ce879774348b55638b2a6bdfc7f83b39da652d8d109bd` | 3 | 3 | 0 |
 | `src/miki/core/services/iterativePersonQualityP181Service.ts` | 6418 | 30 | `b0ce2a03cb4ac582267b6a2f5eff63351e5cdc8847778e0642d8bcb47cb9fc50` | 1 | 1 | 0 |
 | `src/miki/core/services/layeredPerson25DModelP192Service.ts` | 8937 | 44 | `4567c5d99d0c2b04aa657b7f86a9939256e0c067afc153c9cd4f40d53625c4bc` | 2 | 2 | 0 |
 | `src/miki/core/services/learnedPersonRendererP139Service.ts` | 8941 | 17 | `4f0b9c55ac0465f948bc63ed966749af551b8756bf4f6d326089a69185e73500` | 2 | 2 | 0 |
