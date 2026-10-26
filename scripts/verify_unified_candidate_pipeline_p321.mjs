@@ -21,6 +21,30 @@ assert.match(allow({...create('src/generated/NewFeature.ts'),sourcePathExists:tr
 assert.match(allow({...create('src/generated/NewFeature.ts'),targetPathExists:true}).reason,/TARGET_ALREADY_EXISTS/);
 assert.match(allow({...create('src/generated/NewFeature.ts'),baselineContent:'previous'}).reason,/BASELINE_MUST_BE_EMPTY/);
 assert.equal(allow(update({})).allowed,true,'existing file update with exact baseline must be accepted');
+for (const path of [
+  'package.json',
+  'package-lock.json',
+  'tsconfig.json',
+  'tsconfig.app.json',
+  'vite.config.ts',
+  'capacitor.config.ts',
+  '.github/workflows/build-apk.yml',
+  '.env',
+  '.env.production',
+  '.npmrc',
+  'Cargo.toml',
+  'Cargo.lock',
+  'android/build.gradle',
+  'android/settings.gradle'
+]) {
+  const result = allow(update({path}));
+  assert.equal(
+    result.allowed,
+    false,
+    `protected configuration update must be rejected even with matching baseline: ${path}`
+  );
+  assert.equal(result.reason, 'PROTECTED_CONFIGURATION_PATH_FORBIDDEN');
+}
 assert.match(allow(update({baselineContent:'stale baseline'})).reason,/BASELINE_MISMATCH/);
 assert.match(allow(update({sourcePathExists:false,targetPathExists:false})).reason,/NOT_IN_SOURCE_SNAPSHOT/);
 assert.match(allow(update({targetPathExists:false})).reason,/NOT_IN_SOURCE_SNAPSHOT/);

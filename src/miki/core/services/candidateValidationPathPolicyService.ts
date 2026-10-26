@@ -22,7 +22,30 @@ export interface CandidatePathValidationResult {
 
 const CREATE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'json', 'md', 'txt', 'java', 'rs', 'xml', 'css', 'html']);
 const BLOCKED_SEGMENTS = new Set(['.git', 'node_modules', '.miki-runtime', 'dist', 'build', 'target']);
-const PROTECTED_CREATE_NAMES = new Set(['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml', 'tsconfig.json', 'vite.config.ts', 'vite.config.js']);
+const PROTECTED_CREATE_NAMES = new Set([
+  'package.json', 'package-lock.json', 'npm-shrinkwrap.json',
+  'yarn.lock', 'pnpm-lock.yaml', 'tsconfig.json',
+  'vite.config.ts', 'vite.config.js', '.npmrc', '.gitignore',
+  '.gitattributes', 'cargo.toml', 'cargo.lock',
+  'gradle.properties', 'settings.gradle', 'settings.gradle.kts',
+  'build.gradle', 'build.gradle.kts', 'androidmanifest.xml'
+]);
+const PROTECTED_CONFIGURATION_PATTERNS = [
+  /^tsconfig(?:\\..+)?\\.json$/,
+  /^vite\\.config\\..+$/,
+  /^capacitor\\.config\\..+$/,
+  /^next\\.config\\..+$/,
+  /^webpack\\.config\\..+$/,
+  /^metro\\.config\\..+$/,
+  /^gradle\\.properties$/,
+  /^settings\\.gradle(?:\\.kts)?$/,
+  /^build\\.gradle(?:\\.kts)?$/,
+  /^cargo\\.(?:toml|lock)$/,
+  /^androidmanifest\\.xml$/,
+  /^\\.env(?:\\..+)?$/,
+  /^\\.npmrc$/,
+  /^\\.yarnrc(?:\\.yml)?$/
+];
 
 class CandidateValidationPathPolicyService {
   public normalize(value: string): NormalizedCandidatePath {
@@ -46,6 +69,25 @@ class CandidateValidationPathPolicyService {
     const segments = filePath.toLowerCase().split('/');
     if (segments.some(segment => BLOCKED_SEGMENTS.has(segment))) {
       return { allowed: false, normalizedPath: filePath, operation, reason: 'CANDIDATE_PATH_IN_BLOCKED_DIRECTORY' };
+    }
+
+    // Apply configuration protection before CREATE/UPDATE diverge.
+    // A matching baseline proves freshness, not that configuration edits are safe.
+    const baseName = segments[segments.length - 1];
+    const protectedConfiguration =
+      segments.includes('.github') ||
+      PROTECTED_CREATE_NAMES.has(baseName) ||
+      baseName === '.env' ||
+      baseName.startsWith('.env.') ||
+      PROTECTED_CONFIGURATION_PATTERNS.some(pattern => pattern.test(baseName));
+
+    if (protectedConfiguration) {
+      return {
+        allowed: false,
+        normalizedPath: filePath,
+        operation,
+        reason: 'PROTECTED_CONFIGURATION_PATH_FORBIDDEN'
+      };
     }
 
     if (input.isNewFile) {
