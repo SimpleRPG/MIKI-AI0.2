@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-26
-正本Revision：2026-10-26-P324
+正本Revision：2026-10-26-P325
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-26-P324
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-26-P325
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324/P325の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
 - 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
@@ -1775,6 +1775,69 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - 動的Import、Reflection、Android登録、実機のみの分岐は静的到達性だけで稼働判定せず、実行Evidenceを追加して状態を更新する。
 - 新規実装、Owner変更、呼出経路変更、Storage変更、Native移行、テスト追加時は、設計書とJSON索引を同じ納品で更新する。
 - 後続履歴本文は設計思想と変更系譜の保存領域であり、現在状態の検索には本節を使用する。
+
+■ 調査・実装予定一覧（P325 / 2026-10-26）
+
+- 本一覧は最新mainの実コードとCI結果を根拠にした現行課題である。P324でコード修正と関連CIの成功を確認したB-001は一覧から除外し、完了根拠をP325履歴へ保存する。
+- 状態は「調査中」「実装予定」「検証待ち」で管理する。完了条件をコード差分と関連CIで確認するまで項目を削除しない。独立実装は1バッチ最大2件とする。
+
+B-002
+状態：実装予定
+優先度：P0
+件名：候補受付でクライアント申告の検証結果をサーバー所有の実行証拠と照合する。
+根拠：`candidateValidationPathPolicyService.validateUnifiedReceipt()`は`completed`、`validationPassed`、`testResults[].passed`、`exitCode`等の構造を検査するが、値は受付要求のreceiptから渡される。確認した`/api/self-code/autonomous-implement`経路では、candidate hashを検査した後にクライアント申告の検証結果を返しており、plan/workspace/candidate hashに結び付くサーバー所有の実行証拠との照合が不足している。
+参照：
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/src/miki/core/services/candidateValidationPathPolicyService.ts
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/server.ts
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/scripts/verify_unified_candidate_pipeline_p321.mjs
+完了条件：サーバー所有の検証証拠をdevelopmentPlanId・workspaceId・candidate hashへ結び付けて照合する。成功フラグ、test result、exit code、候補hashを偽装・差し替えた回帰テストを追加し、関連CIの成功を確認する。
+
+B-003
+状態：実装予定
+優先度：P0
+件名：候補検証のコマンド供給元と実行環境を信頼境界内に固定する。
+根拠：`server.ts`の候補検証経路は要求の`sourceFiles`を一時rootへ書き出し、rootに`package.json`がなければリポジトリのものをコピーする。要求側に`package.json`があれば候補側scriptの影響を排除できない経路がある。`runAllowedCommandAsync()`はrootのpackage scriptsを参照し、子プロセス環境へ`process.env`を引き継ぎ、リポジトリの`node_modules`をsymlinkする。`/api/self-code/allowlist-test-run`にも一時workspaceと環境継承がある。これはソース上で確認した隔離境界の不足であり、悪用が成立したと断定するものではない。対象APIの認証・到達可能性も調査対象とする。
+参照：
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/server.ts
+完了条件：許可コマンドとpackage scriptsをサーバー側の信頼済み定義から固定し、要求から差し替えられないこと。最小環境変数、ネットワーク・ファイルシステム・秘密情報の隔離、依存モジュール境界、対象APIの認証・到達可能性を確認するテスト／CIを追加する。
+
+B-004
+状態：実装予定
+優先度：P1
+件名：component-worker-sandboxの重複ルートと呼び出し契約を一つにする。
+根拠：`server.ts`には`POST /api/self-code/component-worker-sandbox`が連続して2回登録されている。先行ルートは`exportName`必須だが、`generatedComponentWorkerSandboxService.executeAndPromote()`のbodyには`exportName`がない。その呼び出しは先行ルートの`INVALID_SANDBOX_REQUEST`に該当する。また、後続ルートの`deterministic`判定は反復出力値の一致を比較していない。
+参照：
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/server.ts
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/src/miki/selfDevelopment/services/generatedComponentWorkerSandboxService.ts
+完了条件：ルートを一つに統一し、共有契約でentry/export名を伝える。正常・不正入力・反復実行で異なる出力を返すケースのroute-level integration testを追加し、関連CIで確認する。
+
+B-005
+状態：実装予定
+優先度：P1
+件名：Review lifecycleへ正式なReview ZIP package IDを引き渡す。
+根拠：`unifiedDevelopmentCompletionService`はreviewPackageIdを`${workspaceId}:${generatedAt}`形式で組み立てる。`developmentReviewLifecycleService.startInternal()`のtransaction workspace分岐では`TX-${workspaceId}`を設定する一方、`decide()`は`reviewZipExportService.list()`内の`packageId`との完全一致で正式パッケージを検索する。`reviewZipExportService.create()`が生成する正式IDは`RPK-`接頭辞のhash由来であり、作成から承認までの実接続テストが不足している。
+参照：
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/src/miki/selfDevelopment/services/unifiedDevelopmentCompletionService.ts
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/src/miki/core/services/reviewZipExportService.ts
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/src/miki/selfDevelopment/services/developmentReviewLifecycleService.ts
+完了条件：正式Review ZIP作成の返却packageIdをlifecycleまで伝播・永続化し、IDが実在パッケージと一致することを検査する。Review Ready→外部review取込→ACCEPT/REJECT→CORE promotionの統合テストを通す。
+
+B-006
+状態：調査中
+優先度：P1
+件名：resume tokenの一回限りの消費とブロック済みタスク再開の接続を確認する。
+根拠：`developmentResumeTokenService`にはissue/consume/listと`consumedAt`による二重消費防止がある。`multiIntentDevelopmentTransactionCoordinatorService`と`clarificationLifecycleService`から発行され、token IDが結果・モデルへ渡る経路はあるが、現行コード検索では`consume()`を呼ぶ生産処理の再開経路を確認できていない。発行・保存・再開条件・hash同一性を追跡する必要がある。
+参照：
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/src/miki/selfDevelopment/services/developmentResumeTokenService.ts
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/src/miki/selfDevelopment/services/clarificationLifecycleService.ts
+完了条件：有効なtokenを一回だけconsumeしてブロック済みタスクを再開し、candidate hash一致と終端状態を検査するintegration testを追加する。再開機能が不要と確認された場合は発行・保存・参照を一貫して整理し、その判断と検証結果を履歴へ残す。
+
+運用ルール：
+- Termuxではtest/lint/buildを実行しない。
+- PUSH後に最新main、全tree、diff、関連呼出元／呼出先、GitHub Actions、APK ArtifactをChatGPTが確認する。
+- Workflow全体の成功、個別検査の成功、APK生成、実機検証は別々に記録し、未実施をPASS扱いしない。
+- 完了した課題は現行一覧から外し、完了Revision・コード根拠・CI結果をP番号履歴に残す。
 
 【0-B. 履歴本文（CURRENT判定には0-Aを優先）】
 
@@ -12379,3 +12442,11 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - 現行実装索引では`candidateValidationPathPolicyService.ts`の行数をソースから再計算して更新する。P299追跡ソースインベントリは変更済みソース・検証コード・正本を先にstageしてから再生成し、生成後にJSON/Markdownをstageする。P222基準の完全再帰インベントリは今回再集計していない。
 - P324はパス判定修正であり、クライアント送信の`testResults`をサーバー実行証拠と照合する問題、検証実行をworkspace／候補ハッシュ／plan IDに紐付ける問題、正式レビュー／評価パッケージIDの実在・承認照合、実行隔離の完了を意味しない。これらは別の後続バッチとして残す。
 - Termuxではtest/lint/buildを実行しない。PUSH後はChatGPTが最新main・全tree・差分・GitHub Actions・APK Artifactを確認する。実機動作および自律開発全体のE2Eは未確認として扱う。
+
+【2026-10-26-P325 調査・実装予定一覧の登録】
+
+- P325は最新main P324（`10810b90dd8387fe3e98a95148df669e40243dcc`）のコードとCIを再確認し、根拠・優先度・状態・完了条件を持つ現行課題一覧を正本の0-Aへ追加する文書更新である。履歴本文0-Bと現行仕様を分離する。
+- B-001「保護設定ファイルのUPDATE拒否」は現行一覧へ登録しない。P323のGitHub Actions #913（run ID `40300617185`）は`tsconfig.app.json`のUPDATE拒否テストで失敗した。P324で保護設定パターンの正規表現と回帰ケースを修正した。
+- P324のGitHub Actions #914（run ID `40311250618`、commit `10810b90dd8387fe3e98a95148df669e40243dcc`）はWorkflow全体が成功した。`miki-ai-apk` Artifact ID `12645017687`および`p258-regression-results` Artifact ID `12644828095`を確認したため、B-001は修正コードと関連CIの証拠に基づき完了として現行一覧から除外する。実機動作や自律開発全体のE2E完了を意味しない。
+- 現行の残課題はB-002～B-006。B-002/B-003をP0、B-004/B-005/B-006をP1として管理する。独立実装は一バッチ最大2件とし、コード差分と関連CIの結果を確認して状態を更新する。
+- この更新では正本のみを変更する。P299追跡ソースインベントリとP222基準の完全再帰インベントリは再生成・再集計していない。Termuxでtest/lint/buildは実行しない。PUSH後にChatGPTが最新main・全tree・差分・GitHub Actions・APK Artifactを確認する。
