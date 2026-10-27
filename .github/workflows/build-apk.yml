@@ -96,6 +96,7 @@ jobs:
         run: |
           npx tsx scripts/verify_complexity_cost_gate_behavior.ts
           node scripts/verify_runtime_failure_fixes.mjs
+          npx tsx scripts/verify_runtime_proof_workspace_policy_p328.ts
           npx tsx scripts/verify_android_native_contract.ts
           npx tsx scripts/verify_android_japanese_morphology_contract.ts
           node scripts/verify_rust_core_kernel_phase37.mjs

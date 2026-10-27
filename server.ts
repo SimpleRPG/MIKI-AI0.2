@@ -10,6 +10,7 @@ import os from 'os';
 import { spawnSync, execFileSync } from 'child_process';
 import ts from 'typescript';
 import { candidateValidationPathPolicyService } from './src/miki/core/services/candidateValidationPathPolicyService';
+import { isRuntimeProofCandidatePathForbidden, shouldCopyRuntimeProofSnapshotPath } from './src/miki/core/services/runtimeProofWorkspacePolicyService';
 import vm from 'vm';
 import { GoogleGenAI } from '@google/genai';
 import JSZip from 'jszip';
@@ -5802,13 +5803,18 @@ app.post('/api/self-code/runtime-proof', async (req, res) => {
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.cpSync(process.cwd(), workspaceRoot, { recursive: true, filter: (source) => {
       const relative = path.relative(process.cwd(), source).replace(/\\/g, '/');
-      return relative === '' || (!relative.startsWith('.miki-runtime') && !relative.startsWith('node_modules') && !relative.startsWith('dist') && !relative.startsWith('.git'));
+      try {
+        if (fs.lstatSync(source).isSymbolicLink()) return false;
+      } catch {
+        return false;
+      }
+      return shouldCopyRuntimeProofSnapshotPath(relative);
     }});
     const sourceModules = path.resolve(process.cwd(), 'node_modules');
     if (fs.existsSync(sourceModules)) fs.symlinkSync(sourceModules, path.join(workspaceRoot, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
     for (const file of files) {
       const relative = String(file?.path || '').replace(/\\/g, '/');
-      if (!relative || relative.startsWith('/') || relative.split('/').includes('..')) throw new Error('CANDIDATE_FILE_PATH_VIOLATION');
+      if (!relative || isRuntimeProofCandidatePathForbidden(relative)) throw new Error('CANDIDATE_FILE_PATH_VIOLATION');
       const target = path.resolve(workspaceRoot, relative);
       if (!target.startsWith(`${workspaceRoot}${path.sep}`)) throw new Error('CANDIDATE_FILE_PATH_VIOLATION');
       fs.mkdirSync(path.dirname(target), { recursive: true });

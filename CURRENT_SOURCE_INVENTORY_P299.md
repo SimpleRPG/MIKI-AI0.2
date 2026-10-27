@@ -9,11 +9,11 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1849 |
-| ソースファイル | 1394 |
-| 相対import候補を字句走査したECMAScriptファイル | 1307 |
-| 相対import候補 | 3938 |
-| 追跡パスへ解決できた候補 | 3910 |
+| 対象追跡パス（監査制御ファイルを除く） | 1851 |
+| ソースファイル | 1396 |
+| 相対import候補を字句走査したECMAScriptファイル | 1309 |
+| 相対import候補 | 3940 |
+| 追跡パスへ解決できた候補 | 3912 |
 | 未解決候補（即不具合判定ではない） | 28 |
 
 ## ファイル一覧
@@ -377,6 +377,7 @@
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
 | `scripts/verify_runtime_failure_fixes.mjs` | 98266 | 1398 | `8a4d57d4ed613423ad253ed145a10b07292dd2ab98990e7b6cef80d91535bb63` | 6 | 0 | 6 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
+| `scripts/verify_runtime_proof_workspace_policy_p328.ts` | 2260 | 61 | `79c4e9dd80ffe53984bccbe34fa0c9bfbf90d3cb507497ca45a1de0ec9b7393c` | 1 | 1 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
 | `scripts/verify_rust_compare_shadow_phase9.mjs` | 1420 | 2 | `39ba4c1570bfe9676ad22297e7a724a924c72cdda6205d940fda9d4c8da19094` | 0 | 0 | 0 |
@@ -461,7 +462,7 @@
 | `scripts/verify_workspace_completion_stage29.mjs` | 1402 | 2 | `b4176f66fa9ca552e14ea5c6d082f71b9672fd7ac37b5b61f92c33aca1c60334` | 0 | 0 | 0 |
 | `scripts/verify_workspace_repository_stage33.mjs` | 915 | 1 | `2ff81e47175b1fdb73d88f7c63b14208e6f9907c7a5f6d5acff42011938f9494` | 0 | 0 | 0 |
 | `scripts/verify_world_patterns_p111.mjs` | 1554 | 1 | `7bbe0c27d4733c537e6a79b8ff81ec1d364e6936a6bcbe34714b679461e18f77` | 2 | 2 | 0 |
-| `server.ts` | 259052 | 5840 | `7b01a794bd08e9018ed728990d4bac0b89931c4f036850cf6f6da54e2cb9a844` | 43 | 41 | 2 |
+| `server.ts` | 259193 | 5846 | `05c2b153295fbc0b6ff7726455771d91e433eb2b86b81c8306c10a08027613bb` | 44 | 42 | 2 |
 | `src/App.tsx` | 88486 | 2041 | `1b780617985e3659f160ae8accb63b5117e4d7a7eca92c42bf834addb175bd76` | 117 | 117 | 0 |
 | `src/app/appRuntimeLifecycleService.ts` | 9930 | 178 | `c0b20a9b7cfd4fd3a9848bf775c25aaa4011b296dcb1c6cfb533e02d03626907` | 31 | 31 | 0 |
 | `src/app/startupPhaseSchedulerService.ts` | 706 | 3 | `bb8ce0bc1ef0201da3c50eb1f06ec8ad60edab97bfb54ad47b481004981b975c` | 0 | 0 | 0 |
@@ -763,6 +764,7 @@
 | `src/miki/core/services/richVisualProductionRendererService.ts` | 8063 | 40 | `6160944b2c7c1da074a863d2cecae20a6a18470f198392ff99e217da655cc7ad` | 1 | 1 | 0 |
 | `src/miki/core/services/robustRegionEvidenceP148Service.ts` | 2826 | 5 | `fef3dc093bad60a08f71db8faa5e0693064668eb0be167ffee626c3d92f95f85` | 1 | 1 | 0 |
 | `src/miki/core/services/runIntegrityAuditorService.ts` | 1754 | 11 | `72bdff7db84b8f1f50c81d889cc51f7ed92da73bd2c83854ab9cdaee7af0c006` | 5 | 5 | 0 |
+| `src/miki/core/services/runtimeProofWorkspacePolicyService.ts` | 3112 | 80 | `e602468086751085133bde5a78879f028d4448c79bc54b9f9c168ccc5009f66a` | 0 | 0 | 0 |
 | `src/miki/core/services/rustCoreDecisionKernelService.ts` | 2290 | 14 | `ac7732d036cc7496388555765c09d2babf7e411b08ae965ea18d50ed6e0eaf20` | 2 | 2 | 0 |
 | `src/miki/core/services/rustDomainParticipationKernelService.ts` | 1362 | 6 | `6d80903429b451dda15e0539049bd0f399d22fbbb4d37ffc0b187c6fe1f1b00c` | 1 | 1 | 0 |
 | `src/miki/core/services/selfCodeSpaceService.ts` | 26842 | 806 | `8c70922937e48571c125b936262ae85e5296658ad309e996ae06c81fb38a60fd` | 6 | 6 | 0 |
