@@ -72,6 +72,20 @@ jobs:
           VITE_MIKI_BUILD_REVISION: ${{ github.sha }}
         run: npm run build
 
+      - name: Prepare Android web bundle without Node server
+        run: |
+          set -euo pipefail
+          test -f dist/index.html
+          test -f dist/server.cjs
+          rm -rf dist-apk
+          mkdir -p dist-apk
+          cp -a dist/. dist-apk/
+          rm -f dist-apk/server.cjs dist-apk/server.cjs.map
+          if find dist-apk -type f \( -name 'server.cjs' -o -name 'server.cjs.map' \) -print -quit | grep -q .; then
+            echo "::error::Node server bundle leaked into dist-apk"
+            exit 1
+          fi
+
       - name: Install Japanese morphology (Sudachi) dependency
         run: bash scripts/install_android_japanese_morphology.sh
 
@@ -87,7 +101,17 @@ jobs:
           node scripts/verify_rust_core_kernel_phase37.mjs
 
       - name: Sync Capacitor Android
-        run: npx cap sync android
+        env:
+          MIKI_CAPACITOR_WEB_DIR: dist-apk
+        run: |
+          set -euo pipefail
+          rm -rf android/app/src/main/assets/public
+          npx cap sync android
+          test -f android/app/src/main/assets/public/index.html
+          if find android/app/src/main/assets/public -type f \( -name 'server.cjs' -o -name 'server.cjs.map' \) -print -quit | grep -q .; then
+            echo "::error::Node server bundle leaked into synced Android assets"
+            exit 1
+          fi
 
       - name: Copy model manifest into assets
         run: |
@@ -121,6 +145,16 @@ jobs:
           MIKI_KEY_ALIAS: ${{ secrets.MIKI_KEY_ALIAS }}
           MIKI_KEY_PASSWORD: ${{ secrets.MIKI_KEY_PASSWORD }}
         run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Verify APK excludes unused Node server bundle
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$apk"
+          if unzip -Z1 "$apk" | grep -E '(^|/)(server\.cjs|server\.cjs\.map)$'; then
+            echo "::error::Node server bundle was included in the APK"
+            exit 1
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

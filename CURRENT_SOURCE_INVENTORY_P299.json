@@ -436,9 +436,9 @@
     },
     {
       "path": "capacitor.config.ts",
-      "bytes": 352,
-      "lines": 18,
-      "sha256": "33ef16e9e185231cb95e15b0a827c84533aa02c03e37cd06881908eb47e1b112",
+      "bytes": 487,
+      "lines": 19,
+      "sha256": "d791e85151e530556c95118a499bdde8ea3265400e85f860acc628d0a72bf26b",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,

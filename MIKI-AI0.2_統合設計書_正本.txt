@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-26
-正本Revision：2026-10-26-P326
+基準日：2026-10-28
+正本Revision：2026-10-28-P327
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-26-P326
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324/P325/P326の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-28-P327
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324/P325/P326/P327の対象ファイル変更後に全ファイル件数を再集計したものではない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
 - 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
@@ -1776,7 +1776,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - 新規実装、Owner変更、呼出経路変更、Storage変更、Native移行、テスト追加時は、設計書とJSON索引を同じ納品で更新する。
 - 後続履歴本文は設計思想と変更系譜の保存領域であり、現在状態の検索には本節を使用する。
 
-■ 調査・実装予定一覧（P326 / 2026-10-26）
+■ 調査・実装予定一覧（P327 / 2026-10-28）
 
 - 本一覧は最新mainの実コードとCI結果を根拠にした現行課題である。P324でコード修正と関連CIの成功を確認したB-001は一覧から除外し、完了根拠をP325履歴へ保存する。
 - 状態は「調査中」「実装予定」「検証待ち」で管理する。完了条件をコード差分と関連CIで確認するまで項目を削除しない。独立実装は1バッチ最大2件とする。
@@ -1797,9 +1797,17 @@ B-003
 優先度：P0
 件名：候補検証のコマンド供給元と実行環境を信頼境界内に固定する。
 根拠：`server.ts`の候補検証経路は要求の`sourceFiles`を一時rootへ書き出し、rootに`package.json`がなければリポジトリのものをコピーする。要求側に`package.json`があれば候補側scriptの影響を排除できない経路がある。`runAllowedCommandAsync()`はrootのpackage scriptsを参照し、子プロセス環境へ`process.env`を引き継ぎ、リポジトリの`node_modules`をsymlinkする。`/api/self-code/allowlist-test-run`にも一時workspaceと環境継承がある。これはソース上で確認した隔離境界の不足であり、悪用が成立したと断定するものではない。対象APIの認証・到達可能性も調査対象とする。
+追加調査（P327 / 2026-10-28）：
+- 最新mainの`server.ts`は`app.use(cors())`で全Originを許可し、`app.listen(PORT, '0.0.0.0', ...)`で全インターフェースへbindする。共通認証middlewareは確認できず、各routeの個別制御・実際の到達可能性は別々に確認する必要がある。これは悪用成立の証明ではない。
+- `/api/gemini/import-env-keys`はサーバー環境変数から抽出したAPI key値を`items[].key`としてJSON応答へ含める。`/api/gemini/save-env`は要求bodyから渡されたkeyを`process.cwd()/.env`へ書き込む。routeの認可と公開範囲を検証する必要がある。
+- `/api/self-code/runtime-proof`はcommand名を固定`scriptMap`から選ぶが、workspaceをリポジトリからコピーした後に要求`files`を書き込み、workspace内`package.json`のscript存在を確認して`npm run`する。候補が`package.json`のscript本体を差し替えられるため、コマンド名のallow-listだけでは実行内容を信頼済み定義へ固定できていない。
+- 子プロセスへ`MIKI_NETWORK_POLICY`は渡されるが、応答は`networkNamespaceEnforced: false`を明示する。ネットワークポリシー文字列の受け渡しをネットワーク遮断の証拠と扱わない。`node:vm`もNode公式資料上、信頼できないコードのセキュリティ機構ではない。
+
 参照：
 - https://github.com/SimpleRPG/MIKI-AI0.2/blob/10810b90dd8387fe3e98a95148df669e40243dcc/server.ts
-完了条件：許可コマンドとpackage scriptsをサーバー側の信頼済み定義から固定し、要求から差し替えられないこと。最小環境変数、ネットワーク・ファイルシステム・秘密情報の隔離、依存モジュール境界、対象APIの認証・到達可能性を確認するテスト／CIを追加する。
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/3a833365da50efa6ec6d2b8cbb7609c9d365e968/server.ts
+- https://nodejs.org/api/vm.html
+完了条件：許可コマンドだけでなく実行されるscriptの内容もサーバー側の信頼済み定義／hashで固定し、候補要求から差し替えられないこと。最小環境変数、ファイル／依存モジュール／ネットワークの実隔離をCIで確認する。秘密情報APIの認可、loopback限定または強い認証、実行証拠とcandidate/workspace/plan hashの照合を検証する。`node:vm`をセキュリティ境界として扱わない。
 
 B-004
 状態：実装予定
@@ -1838,7 +1846,15 @@ B-007
 優先度：P0
 件名：APK内を正規ランタイムに統一し、Node API依存と未使用サーバーバンドルを実証ベースで解消する。
 調査結果（2026-10-26、main `6029e4881ad0864cc561f180e561b07f402c1469` とGitHub Actions #915のAPK Artifactを直接調査）：
-- 最新mainの再帰Git treeは1,999 entries、`truncated=false`。`server.ts`は5,841行で、Node.jsの`fs`、`os`、`path`、`child_process`、`worker_threads`、`vm`、`dotenv`とExpress等に依存する。APIルート登録は71件、ユニークなmethod/pathは70件で、`POST /api/self-code/component-worker-sandbox`が2回登録されている（重複契約はB-004の対象）。
+追加調査・初回実装修正（P327、2026-10-28、最新main `3a833365da50efa6ec6d2b8cbb7609c9d365e968`）：
+- `server.ts`のroute宣言は73登録・72 unique method/path。P326の71/70集計は、`app.listen`後に登録される`POST /api/self-code/runtime-preflight`と`POST /api/self-code/runtime-proof`を数え漏らしていた。`POST /api/self-code/component-worker-sandbox`の二重登録も継続している。
+- GitHub Actions #916（run ID `40342977260`）のAPK Artifact IDは`12659792160`。前回取得したAPKでは未参照の`assets/public/server.cjs`（6,383,223 bytes）と`assets/public/server.cjs.map`（10,257,729 bytes）が同梱され、Node runtime／`node_modules`／Node起動処理は確認できなかった。
+- `capacitor.config.ts`では`webDir`を`MIKI_CAPACITOR_WEB_DIR`環境変数で上書き可能にし、既定値`dist`はTermux用に維持する。APK Workflowは`dist`から`dist-apk`を作成し`server.cjs`／`.map`を除外し、同期用`webDir`を`dist-apk`に変更する。同期後のAndroid assetsと、Gradle build後のAPK ZIP entryの双方でサーバーバンドル混入を拒否する回帰検査を追加する。
+- この変更は未使用NodeバンドルのAPK混入を防ぐビルド境界の最初の修正であり、APK内へのNode API移行やTermux API依存の解消そのものではない。GitHub Actionsの実行とAPK Artifactの直接検査が成功するまで検証待ちとする。
+- `capacitor.config.ts`は`server.cleartext=true`、`android.allowMixedContent=true`、`android.webContentsDebugEnabled=true`を設定する。debug/releaseの用途を分離し、WebView debuggingとcleartext/mixed-contentをproduction APKへ持ち込まない検査が必要。
+- API clientの空欄時defaultは`http://127.0.0.1:3000`のまま。設定UIは空欄なら「このアプリと同じサーバー」と説明し、Termux APIが停止した状態でAPK内の処理が直接動作する構成にはなっていない。
+- 70件だった過去の経路分類は無効として扱い、72 unique method/pathを最新コードから再列挙する。実呼出元・実呼出先・データ副作用・認証・Native代替・外部HTTPSをすべて追跡するまでは、routeを不要／削除対象と推測しない。
+- 最新mainの再帰Git treeは1,999 entries、`truncated=false`。`server.ts`は5,841行で、Node.jsの`fs`、`os`、`path`、`child_process`、`worker_threads`、`vm`、`dotenv`とExpress等に依存する。APIルート登録は73件、ユニークなmethod/pathは72件で、`POST /api/self-code/component-worker-sandbox`が2回登録されている（重複契約はB-004の対象）。
 - `package.json`の`dev`は`tsx server.ts`、`build`はVite生成に続いて`node build-server.mjs`を実行し、Node向けの`dist/server.cjs`を外部依存を残したCommonJSバンドルとして生成する。APK Workflowは`npm run build`のあと`npx cap sync android`を実行する。Capacitorの公式説明でも`sync`は`webDir`のWeb bundleをNative projectへコピーする仕様であり、この構成がサーバーバンドルのAPK混入原因となっている。
 - GitHub Actions #915（run ID `40315374245`、commit `6029e4881ad0864cc561f180e561b07f402c1469`）は成功し、APK Artifact ID `12646971600`を生成した。Artifactを直接取得・展開して中の`app-debug.apk`（115,633,095 bytes、SHA-256 `1e58dfc9d103ea581e148f445e30ccb2d597bdc67f66657e6837c4278e68c126`）を検査した結果、`assets/public/server.cjs`（6,383,223 bytes、APK内圧縮サイズ1,575,760 bytes）と`assets/public/server.cjs.map`（10,257,729 bytes、圧縮サイズ2,637,025 bytes）が実際に同梱されていた。APKの`assets/public/index.html`は`server.cjs`を参照していない。
 - 同じAPKのZIP entryを検査した範囲では、`node_modules`、`libnode`、`libuv`、`libv8`、`nodejs-mobile`等のNodeランタイム／依存パッケージは見つからなかった。Androidの`MainActivity.java`はWorkManager・形態素解析・`MIKINativeRunner`等のCapacitor pluginを登録して起動診断を行うが、Node runtimeや`server.cjs`を起動する処理はない。したがって、サーバーのコードがAPKに入っていることと、APIサーバーがAPK内で実行されることは別であり、現行APKでは後者を確認できない。これは実機動作を検証した結果ではなく、Artifactとソースの検査結果である。
@@ -1849,6 +1865,9 @@ B-007
 - 移行方針：通常のCORE／認知／記憶／ルール／タスク処理は既存TypeScriptサービスをAPK内の正規直接呼び出しへ接続し、ファイル走査・hash・ZIP等は既存Kotlin/Rust pluginを再利用する。Gemini／GitHub等の外部機能は、ユーザーが許可したHTTPS通信としてアプリから直接呼ぶ形を検討し、自前のクラウドサーバーを追加しない。Node backend依存の候補検証は単にクライアント申告を成功扱いにせず、plan/workspace/candidate hashへ紐付いた実行証拠と安全なNative実行境界を設計する。B-002/B-003は別のP0課題として維持する。
 - `dist/server.cjs`を単に削除してはならない。`package.json`の`build`／`build:verified`と`scripts/verify_production_artifacts.mjs`は現状`dist/server.cjs`の存在を明示的に要求している。Termux向けの開発／互換サーバーとAPKの`webDir`を分離し、build script・production artifact verifier・APK Workflowを一緒に更新する必要がある。移行完了まで`server.ts`を削除しない。
 参照：
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/3a833365da50efa6ec6d2b8cbb7609c9d365e968/capacitor.config.ts
+- https://github.com/SimpleRPG/MIKI-AI0.2/blob/3a833365da50efa6ec6d2b8cbb7609c9d365e968/.github/workflows/build-apk.yml
+- https://github.com/SimpleRPG/MIKI-AI0.2/actions/runs/40342977260
 - https://github.com/SimpleRPG/MIKI-AI0.2/blob/6029e4881ad0864cc561f180e561b07f402c1469/package.json
 - https://github.com/SimpleRPG/MIKI-AI0.2/blob/6029e4881ad0864cc561f180e561b07f402c1469/server.ts
 - https://github.com/SimpleRPG/MIKI-AI0.2/blob/6029e4881ad0864cc561f180e561b07f402c1469/src/services/api.ts
@@ -1861,7 +1880,7 @@ B-007
 - https://github.com/nodejs-mobile/nodejs-mobile/releases/latest
 - https://github.com/nodejs-mobile/nodejs-mobile/pulls/158
 - https://github.com/nodejs/Release
-完了条件：APIルート／実呼出元／Native代替／外部HTTPS通信の対応表を作り、70 unique route全てを「APK内へ移行」「外部HTTPS」「Termux開発限定」「不要・削除」のいずれかへ分類する。APK内で必要な機能が`miki_api_base_url`空欄・Termux停止時に直接動くことをWorkflowの回帰検査で確認し、APKに`server.cjs`／`.map`や未使用Node依存を含めない。候補検証の成功は実行証拠に紐付け、クライアント申告だけで昇格させない。CIのAPK内容検査とWorkflow成功を確認する。実機確認を行うまでは`DEVICE_VERIFIED`にしない。
+完了条件：72 unique method/pathすべてについて実呼出元／呼出先・認証・データ副作用・Native代替・外部HTTPSの対応表を作り、「APK内へ移行」「外部HTTPS」「Termux開発限定」「不要・削除」に分類する。`miki_api_base_url`空欄・Termux停止時にAPK内機能がHTTP 3000へ依存しないことをWorkflowで回帰検証する。APKに`server.cjs`／`.map`や未使用Node依存を含めない。候補検証を実行証拠に紐付ける。秘密情報APIの認可、server bind、WebView debugging／cleartext設定もCIで確認し、実機確認前に`DEVICE_VERIFIED`へ昇格させない。
 
 運用ルール：
 - Termuxではtest/lint/buildを実行しない。
@@ -12488,3 +12507,12 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - `apiUrl()`のlocalhost:3000 default、UI説明との不一致、71 route registrations／70 unique paths、Native Runnerのallow-list境界を記録した。既存Native／Rust基盤は活用できるがNode backendの丸ごと代替ではない。
 - Node.js Mobile latest release v18.20.4（2024-10-07）、Node 18 EOL（2025-04-30）、upstream main最終commit（2025-11-13）、Node 24.5.0更新PR #158がopenであることを確認し、現状公開版をそのまま採用する方式は未確定・未検証とした。
 - B-007を現行P0課題として追加した。今回の変更は調査結果と受け入れ条件の正本統合であり、コード移行・API削除・実機動作の完了を意味しない。P299追跡ソースインベントリとP222基準の完全再帰インベントリは再生成・再集計していない。`DEVICE_VERIFIED`は未達。
+
+【2026-10-28-P327 APK web資産分離・API呼出元と実行境界の追加調査】
+
+- 最新main `3a833365da50efa6ec6d2b8cbb7609c9d365e968`の正本全文・tree（1,999 entries、truncated=false）、API client、`server.ts`、`capacitor.config.ts`、APK Workflow、Native Runnerを再確認した。
+- `server.ts`のroute宣言を73 route registrations／72 unique method/pathへ訂正した。P326の71／70は、`runtime-preflight`と`runtime-proof`の2登録を見落としていた。`component-worker-sandbox`の重複登録も継続している。
+- P326のAPK Artifact検査で未参照の`server.cjs`／source mapがAPKへ混入し、Node runtimeと起動処理がないことを記録した。P327ではAPK専用webDir分離、同期先と最終APKに対するバンドル不在検査をWorkflowへ追加する。`dist/server.cjs`はTermux用に維持する。CIと新APKの検査はPUSH後に確認する。
+- CORS全Origin許可、`0.0.0.0` bind、Gemini keyのJSON返却／`.env`書込み、runtime-proofで候補側`package.json` scriptが上書き可能な経路、ネットワーク遮断未実装を記録した。ソース上の構造的リスクの記録であり、第三者の悪用を確認したものではない。
+- `capacitor.config.ts`のcleartext／mixed-content／WebView debugging設定と、API URL未設定時のlocalhost:3000依存を記録した。今回の実装はAPK内ランタイムへの移行全体を完了したものではない。P299追跡ソースインベントリは再生成するが、P222基準の完全再帰インベントリは再集計しない。Termuxではtest/lint/buildを実行しない。`DEVICE_VERIFIED`は未達。
+

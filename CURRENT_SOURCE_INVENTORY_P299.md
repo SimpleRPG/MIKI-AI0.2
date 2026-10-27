@@ -59,7 +59,7 @@
 | `android/settings.gradle` | 208 | 5 | `6ce098d15ebd69b44c4ecd786bca1bdc366340d2459b2af4d7bb0ab317aa9669` | 0 | 0 | 0 |
 | `android/variables.gradle` | 498 | 16 | `0ae4e96604b4768f907d6912f6ec81736ddeb68d2f73306325f1bbd83b84cc50` | 0 | 0 | 0 |
 | `build-server.mjs` | 320 | 17 | `9e20533577f1798b59dbfd9df72352bbdf069b0766c48d807a8c27e35a485e60` | 0 | 0 | 0 |
-| `capacitor.config.ts` | 352 | 18 | `33ef16e9e185231cb95e15b0a827c84533aa02c03e37cd06881908eb47e1b112` | 0 | 0 | 0 |
+| `capacitor.config.ts` | 487 | 19 | `d791e85151e530556c95118a499bdde8ea3265400e85f860acc628d0a72bf26b` | 0 | 0 | 0 |
 | `native/miki-native-core/src/cognitive_graph.rs` | 3975 | 20 | `8f5a8b8594586fcd38a78c656346b67b1460babbbf313edba86c61fc10f1f743` | 0 | 0 | 0 |
 | `native/miki-native-core/src/domains/autonomy/mod.rs` | 229 | 2 | `609ec504dea72518eb839767c3de1ffcbf339303e334d10dbef6478e377de831` | 0 | 0 | 0 |
 | `native/miki-native-core/src/domains/capability/mod.rs` | 239 | 2 | `423c8fab1c6afdaae98cb77def4a3e6206f4aa918409398c675fbc1e2ad76a82` | 0 | 0 | 0 |
