@@ -392,7 +392,9 @@ export class EvidenceService {
     url?: string;
   }): boolean {
     const text =
-      `${input.title} ${input.snippet} ${input.source} ${input.url || ''}`.toLowerCase();
+      `${input.title} ${input.snippet} ${input.source} ${input.url || ''}`
+        .normalize('NFKC')
+        .toLowerCase();
 
     return [
       'local synthetic fallback',
@@ -400,6 +402,11 @@ export class EvidenceService {
       'offline fallback',
       'fallback result',
       'synthetic result',
+      'mock (non-real)',
+      'mock_fallback',
+      'knowledge.local',
+      'テスト用モック',
+      '実データではありません',
     ].some((marker) => text.includes(marker));
   }
 

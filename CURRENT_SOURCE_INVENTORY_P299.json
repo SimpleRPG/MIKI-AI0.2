@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1852,
     "sourceFileCount": 1397,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1310,
-    "relativeImportCandidateCount": 3940,
-    "resolvedRelativeImportCandidateCount": 3912,
+    "relativeImportCandidateCount": 3941,
+    "resolvedRelativeImportCandidateCount": 3913,
     "unresolvedRelativeImportCandidateCount": 28
   },
   "records": [
@@ -10167,9 +10167,9 @@
     },
     {
       "path": "src/miki/capability/services/toolsService.ts",
-      "bytes": 60123,
+      "bytes": 60169,
       "lines": 1580,
-      "sha256": "dc4feaf421b5a145813fbc50070abb28dc9a492bd70e5428b150f4bbe8bcd88e",
+      "sha256": "360fb1089e49d58707deb0dc5fc50f7beba8c27a830a5f992d65a471045aff7f",
       "relativeImportCandidates": [
         {
           "line": 9,
@@ -23081,9 +23081,9 @@
     },
     {
       "path": "src/miki/memory/services/evidenceService.ts",
-      "bytes": 15576,
-      "lines": 449,
-      "sha256": "bdfdd2d5ea3e3d8601521171b787e58971d03c5a2d461cf134d4ff74b40ca987",
+      "bytes": 15759,
+      "lines": 456,
+      "sha256": "4a3d51059a0bd0010dc844dcb3d2a0ad7683834484d6c22e9214fd3d21c19c73",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24291,9 +24291,9 @@
     },
     {
       "path": "src/miki/research/services/autonomousSearchService.ts",
-      "bytes": 43136,
-      "lines": 1109,
-      "sha256": "64ccd81ff80f615e271022da563eb87f9f8091ad0bea606adee4f4f62175d7ec",
+      "bytes": 50662,
+      "lines": 1292,
+      "sha256": "9e80eac8faeb4e2a7fa07f0ed6a9e5ca144d9cc0dc51742b47aa866e6ebec112",
       "relativeImportCandidates": [
         {
           "line": 6,
@@ -24387,13 +24387,19 @@
         },
         {
           "line": 21,
-          "specifier": "../../core/services/evidenceIdentityService",
+          "specifier": "../../memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/core/services/evidenceIdentityService.ts"
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 22,
+          "specifier": "../../memory/services/evidenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/evidenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 16,
-      "resolvedRelativeImportCount": 16,
+      "relativeImportCandidateCount": 17,
+      "resolvedRelativeImportCount": 17,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -38170,9 +38176,9 @@
     },
     {
       "path": "src/services/toolsService.ts",
-      "bytes": 57847,
+      "bytes": 57893,
       "lines": 1549,
-      "sha256": "0fa8474921102790261e969537b7348db53160c2f2ef7e0816886a7b4bf09a4d",
+      "sha256": "c10a925b444eed33706e5b921b2ee0b9087b29b05fd4268942b68494e110d46e",
       "relativeImportCandidates": [
         {
           "line": 9,

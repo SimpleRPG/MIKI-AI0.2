@@ -1112,9 +1112,9 @@ export class ToolsService {
             provider: searchRes.provider,
             learnedKnowledge: record.extractedKnowledge,
           };
-          outputSummary = searchRes.summary
-            ? `🌐 Web検索完了 (${searchRes.provider}): ${searchRes.summary.slice(0, 80)}... (${searchRes.results.length}件のソースから知識抽出)`
-            : `🌐 Web検索完了: 「${query}」に関する${searchRes.results.length}件の情報を取得し学習定着しました`;
+          outputSummary = record.extractedKnowledge.length > 0
+            ? `🌐 Web検索完了 (${searchRes.provider || 'search'}): ${searchRes.summary || query} (${record.extractedKnowledge.length}件の学習候補を記録)`
+            : '🌐 検索結果は学習・記憶へ反映しませんでした（モックまたは実URL付きの実データを確認できません）。';
           break;
         }
 

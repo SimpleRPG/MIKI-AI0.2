@@ -12,8 +12,8 @@
 | 対象追跡パス（監査制御ファイルを除く） | 1852 |
 | ソースファイル | 1397 |
 | 相対import候補を字句走査したECMAScriptファイル | 1310 |
-| 相対import候補 | 3940 |
-| 追跡パスへ解決できた候補 | 3912 |
+| 相対import候補 | 3941 |
+| 追跡パスへ解決できた候補 | 3913 |
 | 未解決候補（即不具合判定ではない） | 28 |
 
 ## ファイル一覧
@@ -553,7 +553,7 @@
 | `src/miki/capability/services/deterministicCapabilityExecutionService.ts` | 4247 | 99 | `f796e6925d328e16ee3beb7c1a7e9a2da64ec944b14b80a661e7f80325bbdd62` | 6 | 6 | 0 |
 | `src/miki/capability/services/dynamicToolFactoryService.ts` | 5033 | 130 | `9965efa6fbe9806d10d7a952fd3a1608e577546db30af1af40f0744f314d5ce7` | 5 | 5 | 0 |
 | `src/miki/capability/services/skillsService.ts` | 41160 | 875 | `c0c6f3cc0ccb88322128f773fca607037248c8facafd381cace00e0b85de8419` | 6 | 6 | 0 |
-| `src/miki/capability/services/toolsService.ts` | 60123 | 1580 | `dc4feaf421b5a145813fbc50070abb28dc9a492bd70e5428b150f4bbe8bcd88e` | 11 | 11 | 0 |
+| `src/miki/capability/services/toolsService.ts` | 60169 | 1580 | `360fb1089e49d58707deb0dc5fc50f7beba8c27a830a5f992d65a471045aff7f` | 11 | 11 | 0 |
 | `src/miki/conversation.ts` | 2690 | 56 | `f45227ff0bd8ed2d699184eebd465ce75286c73818f64a9c18fe6dafdf64b30c` | 26 | 26 | 0 |
 | `src/miki/conversation/index.ts` | 499 | 12 | `fe2ad458e11db6fddb007f27657c70173343ec4574c79002438d26900074a6a9` | 8 | 8 | 0 |
 | `src/miki/conversation/services/answerContentIrService.ts` | 18016 | 404 | `25c4714fdd872cc31fbc409341710b887bb5bd86419f58081a45a2fb7fcdb167` | 8 | 8 | 0 |
@@ -898,7 +898,7 @@
 | `src/miki/memory/services/causalMemoryLedgerService.ts` | 2868 | 21 | `0d2bab6e1497ff54a7517e28a7680a38fc952d43a94078f933cbba70a96a1264` | 2 | 2 | 0 |
 | `src/miki/memory/services/claimDatabaseService.ts` | 35155 | 853 | `b1dbaf78f1a0fe0b0861cac880d6db5ab1f7ff034e8a88605debf419f9fc3b61` | 4 | 4 | 0 |
 | `src/miki/memory/services/evidenceLineageGraphService.ts` | 94 | 1 | `a77a4a7a0966685ccae7c5661654837f10f4b780463193ea02d92f0420d7a728` | 1 | 1 | 0 |
-| `src/miki/memory/services/evidenceService.ts` | 15576 | 449 | `bdfdd2d5ea3e3d8601521171b787e58971d03c5a2d461cf134d4ff74b40ca987` | 4 | 4 | 0 |
+| `src/miki/memory/services/evidenceService.ts` | 15759 | 456 | `4a3d51059a0bd0010dc844dcb3d2a0ad7683834484d6c22e9214fd3d21c19c73` | 4 | 4 | 0 |
 | `src/miki/memory/services/failureCatalogService.ts` | 22002 | 482 | `c702502837d7b8ef85e3fa69afd22c08981a415d573ef66a70303534774cb8b4` | 3 | 3 | 0 |
 | `src/miki/memory/services/failureMemoryService.ts` | 5930 | 122 | `82b4cbbdbe0cbee370ddfa53267d6ce2c25a447eeca2f748a3219d7d183d4132` | 3 | 3 | 0 |
 | `src/miki/memory/services/failureUnderstandingService.ts` | 10254 | 140 | `5ee8e11cbabe5a9c1b184ff9e5a14277883d05a25bdf6184537c4416ff35ec2b` | 5 | 5 | 0 |
@@ -934,7 +934,7 @@
 | `src/miki/promotion/services/verifiedKnowledgePromotionService.ts` | 6281 | 143 | `4d0f5265bc2aeaaceaeaf8a0eb8f28c8a81715a1efe6e9f0b77fca0266711896` | 4 | 4 | 0 |
 | `src/miki/research.ts` | 2410 | 45 | `186dc0343b6d0ef103f27ec701da93cb8d9ee7940441bd122aaa8b1083bf0224` | 26 | 26 | 0 |
 | `src/miki/research/index.ts` | 125 | 5 | `295995f684b2416b49e33fb614d608bfec23c7a77e40716b8d17e3524718369b` | 2 | 2 | 0 |
-| `src/miki/research/services/autonomousSearchService.ts` | 43136 | 1109 | `64ccd81ff80f615e271022da563eb87f9f8091ad0bea606adee4f4f62175d7ec` | 16 | 16 | 0 |
+| `src/miki/research/services/autonomousSearchService.ts` | 50662 | 1292 | `9e80eac8faeb4e2a7fa07f0ed6a9e5ca144d9cc0dc51742b47aa866e6ebec112` | 17 | 17 | 0 |
 | `src/miki/research/services/causalInvestigationService.ts` | 2635 | 22 | `0fa29b8c9bbe0242d348223a94af774349769b0cdbe5fdf8821594c117669210` | 1 | 1 | 0 |
 | `src/miki/research/services/claimEvidenceService.ts` | 2724 | 60 | `39a3107ae523bfa4bb0dd38e85e393615edcf7b7909d0e4750f8fe3ed2b6b98c` | 3 | 3 | 0 |
 | `src/miki/research/services/dataFactoryService.ts` | 85 | 1 | `ed3a21f79042b75fb5cdcc44dcb9827898f88a3d1d37426a89f414c3f0ce9194` | 1 | 1 | 0 |
@@ -1396,7 +1396,7 @@
 | `src/services/taskLineageService.ts` | 258 | 6 | `ce6b9933d590eb8ae34f19a39f6d01bcb8c15f730fff0f1dbb4e81877b0bf6ea` | 1 | 1 | 0 |
 | `src/services/teacherRequestService.ts` | 65198 | 1615 | `5f0993452d882a180e5b5e358839d838bca664c2a436a1c6babd24aba22dcb88` | 11 | 11 | 0 |
 | `src/services/testAssertionService.ts` | 268 | 6 | `a75b517b57ccdd71f0c1208842fba340d99ffecd5cb9dfa345beebad6bc872d0` | 1 | 1 | 0 |
-| `src/services/toolsService.ts` | 57847 | 1549 | `0fa8474921102790261e969537b7348db53160c2f2ef7e0816886a7b4bf09a4d` | 10 | 10 | 0 |
+| `src/services/toolsService.ts` | 57893 | 1549 | `c10a925b444eed33706e5b921b2ee0b9087b29b05fd4268942b68494e110d46e` | 10 | 10 | 0 |
 | `src/services/unifiedDecisionEngineService.ts` | 276 | 6 | `c0a73e19602eef2e999bd5ad08ba4fa11b0f7853226d33969e55a6ffa2b0f7a8` | 1 | 1 | 0 |
 | `src/services/unifiedMikiExperienceService.ts` | 8845 | 202 | `1ea40f12e2071e5e99ebc33925562e49f8439e7b6f5bbec2cc72a0205cd13faf` | 2 | 2 | 0 |
 | `src/services/unknownTaskDecompositionService.ts` | 5681 | 93 | `ba2d8341594c3ed5fef264fe905e6930210753e032b1bdd1d651015957ef1181` | 4 | 4 | 0 |

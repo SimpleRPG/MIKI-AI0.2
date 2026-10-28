@@ -18,7 +18,8 @@ import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
 import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { surfaceVariationGrowthService } from '../../conversation/services/surfaceVariationGrowthService';
 import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
-import { evidenceIdentityService } from '../../core/services/evidenceIdentityService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { evidenceService } from '../../memory/services/evidenceService';
 
 export interface AutonomousSearchConfig {
   enabled:boolean;
@@ -192,9 +193,44 @@ function createProviderStatuses(): Record<SearchProviderName, SearchProviderStat
   };
 }
 
+function isSyntheticSearchResult(result: WebSearchResultItem): boolean {
+  const sourceAndUrl = `${result.source || ''} ${result.url || ''}`
+    .normalize('NFKC')
+    .toLowerCase();
+  const titleAndSnippet = `${result.title || ''} ${result.snippet || ''}`
+    .normalize('NFKC')
+    .toLowerCase();
+
+  const mockProvenanceMarkers = [
+    'mock (non-real)',
+    'mock_fallback',
+    'knowledge.local',
+  ];
+  if (mockProvenanceMarkers.some(marker => sourceAndUrl.includes(marker))) {
+    return true;
+  }
+
+  const mockContentMarkers = [
+    '【テスト用モック】',
+    '【テスト用モックデータ】',
+    '実データではありません',
+  ].map(marker => marker.normalize('NFKC').toLowerCase());
+
+  return mockContentMarkers.some(marker => titleAndSnippet.includes(marker));
+}
+
+function isSourceBackedSearchResult(result: WebSearchResultItem): boolean {
+  return Boolean(
+    String(result.source || '').trim() &&
+    /^https?:\/\/\S+$/i.test(String(result.url || '').trim()) &&
+    !isSyntheticSearchResult(result)
+  );
+}
+
 const SEARCH_CONFIG_KEY='miki_autonomous_search_config_v1';
 const SEARCH_STATS_KEY='miki_autonomous_search_stats_v1';
 const SEARCH_RECORDS_KEY='miki_autonomous_search_records_v1';
+const UNVERIFIED_RESEARCH_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_CONFIG:AutonomousSearchConfig={
   enabled:true,autoSearchInChat:true,idleSearchEnabled:true,maxResults:4,allowFallbackMock:false,
   autoLearnToLongTermMemory:true,autoLearnToSyntheticData:false
@@ -284,6 +320,19 @@ export class AutonomousSearchService {
     } catch (e) {
       console.warn('Failed to save search record:', e);
     }
+  }
+
+  private hasRecentUnverifiedResearch(
+    query: string,
+    triggerType: 'working_agenda' | 'capability_gap',
+  ): boolean {
+    const now = Date.now();
+    return this.getRecentRecords(100).some(record =>
+      record.query === query &&
+      record.triggerType === triggerType &&
+      record.verificationStatus !== 'VERIFIED' &&
+      now - Number(record.timestamp || 0) < UNVERIFIED_RESEARCH_COOLDOWN_MS
+    );
   }
 
   /**
@@ -766,6 +815,34 @@ export class AutonomousSearchService {
    * 検索結果から知識を抽出し、長期記憶(Semantic Memory)や合成データセットへ能動的に還元・学習
    * 設計思想 Master v5.0 第13章 & 第2章・第9章連結
    */
+  private hasVerifiedResearchOutcome(options?: {
+    verificationStatus?: 'VERIFIED' | 'UNVERIFIED';
+    evidenceIds?: string[];
+    claimIds?: string[];
+  }): boolean {
+    if (options?.verificationStatus !== 'VERIFIED') return false;
+
+    const evidenceIds = [...new Set((options.evidenceIds || []).map(String).filter(Boolean))];
+    const claimIds = [...new Set((options.claimIds || []).map(String).filter(Boolean))];
+    if (evidenceIds.length === 0 || claimIds.length === 0) return false;
+
+    return claimIds.every(claimId => {
+      const claim = claimDatabaseService.getClaim(claimId);
+      if (!claim || (claim.status !== 'SUPPORTED' && claim.status !== 'DEVICE_VERIFIED')) {
+        return false;
+      }
+      return evidenceIds.some(evidenceId => {
+        const item = evidenceService.getEvidence(evidenceId);
+        return Boolean(
+          item &&
+          item.kind === 'WEB' &&
+          item.status === 'ADMISSIBLE' &&
+          item.claim_ids.includes(claimId)
+        );
+      });
+    });
+  }
+
   public learnFromSearch(
     query: string,
     results: WebSearchResultItem[],
@@ -782,13 +859,80 @@ export class AutonomousSearchService {
     }
   ): AutonomousSearchLearningRecord {
     const triggerType = options?.triggerType || 'in_conversation';
+    const sourceBackedResults = results.filter(isSourceBackedSearchResult);
+    const syntheticResult = results.find(isSyntheticSearchResult);
+
+    // モック、出典URLのない結果、失敗要約だけでは学習を実行しない。
+    if (syntheticResult || sourceBackedResults.length === 0) {
+      const rejectedRecord: AutonomousSearchLearningRecord = {
+        id: 'sr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        query,
+        triggerType,
+        timestamp: Date.now(),
+        results: [],
+        summary: syntheticResult
+          ? 'テスト用モックを検出したため、学習・記憶・回答パターンへの反映を拒否しました。'
+          : '実URL付きの検索結果がないため、学習・記憶・回答パターンへの反映を拒否しました。',
+        extractedKnowledge: [],
+        integratedToMemory: false,
+        integratedToSyntheticData: false,
+        verificationStatus: 'UNVERIFIED',
+      };
+      this.addRecord(rejectedRecord);
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        syntheticResult
+          ? '[Research Learning] mock result rejected; no learning side effects'
+          : '[Research Learning] source-less result rejected; no learning side effects',
+      );
+      return rejectedRecord;
+    }
+
+    const verifiedResearchOutcome = this.hasVerifiedResearchOutcome(options);
+    const effectiveVerificationStatus = verifiedResearchOutcome ? 'VERIFIED' : 'UNVERIFIED';
+
+    // 取得元URLごとに、実在するEvidence記録を再利用するか新規作成する。
+    const suppliedEvidenceIds = [...new Set((options?.evidenceIds || []).map(String).filter(Boolean))]
+      .filter(id => {
+        const item = evidenceService.getEvidence(id);
+        return Boolean(item && item.kind === 'WEB' && item.status !== 'REJECTED');
+      });
+    const sourceEvidenceIds = sourceBackedResults.slice(0, 3).map(result => {
+      const canonicalUrl = canonicalizeSearchUrl(String(result.url || ''));
+      const existingId = suppliedEvidenceIds.find(id => {
+        const item = evidenceService.getEvidence(id);
+        return Boolean(
+          item &&
+          canonicalizeSearchUrl(String(item.url || '')) === canonicalUrl
+        );
+      });
+      if (existingId) return existingId;
+
+      return evidenceService.recordWebEvidence({
+        title: String(result.title || query),
+        snippet: String(result.snippet || ''),
+        source: String(result.source || 'web_search'),
+        url: result.url,
+        publishedDate: result.publishedDate,
+        sourceId: result.sourceId,
+        independenceClusterId: result.independenceClusterId,
+        metadata: {
+          fetch_method: 'api',
+          trust_boundary: 'UNTRUSTED_EXTERNAL_WEB',
+          verification_status: 'UNVERIFIED',
+          observed_at: Date.now(),
+          result_summary: '検索素材を未検証Evidenceとして記録。Claimの独立検証が必要。',
+        },
+      }).evidence_id;
+    });
+
     const extractedKnowledge: string[] = [];
 
     // 重要スニペット・要点の抽出
     if (summary && summary.trim().length > 10) {
       extractedKnowledge.push(summary.trim());
     }
-    for (const r of results.slice(0, 3)) {
+    for (const r of sourceBackedResults.slice(0, 3)) {
       if (r.snippet && r.snippet.length > 15) {
         const cleaned = r.snippet.replace(/[\n\r]+/g, ' ').trim();
         if (!extractedKnowledge.some(k => k.includes(cleaned.slice(0, 30)))) {
@@ -803,7 +947,7 @@ export class AutonomousSearchService {
     // 1. 長期記憶 (Semantic Core / Procedural) への自動定着
     if (this.config.autoLearnToLongTermMemory && extractedKnowledge.length > 0) {
       try {
-        const knowledgeContent = `【自律Web学習知識: ${query}】\n要約: ${summary || results[0]?.title || ''}\n詳細知見:\n${extractedKnowledge.slice(0, 2).join('\n')}`;
+        const knowledgeContent = `【自律Web学習知識: ${query}】\n要約: ${summary || sourceBackedResults[0]?.title || ''}\n詳細知見:\n${extractedKnowledge.slice(0, 2).join('\n')}`;
         const memItem: MemoryItem = {
           id: 'mem_web_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
           category: 'code',
@@ -825,7 +969,7 @@ export class AutonomousSearchService {
           approved: false, // 未検証: 自動昇格防止
           verificationStatus: options?.verificationStatus || 'UNVERIFIED',
           researchGapId: options?.researchGapId,
-          evidenceIds: [...new Set((options?.evidenceIds || []).map(String).filter(Boolean))],
+          evidenceIds: sourceEvidenceIds,
           claimIds: [...new Set((options?.claimIds || []).map(String).filter(Boolean))],
         };
         storageService.saveMemoryItem(memItem);
@@ -840,23 +984,26 @@ export class AutonomousSearchService {
     if (this.config.autoLearnToSyntheticData && extractedKnowledge.length > 0) {
       try {
         const experienceId = `exp_search_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-        const evidenceId = evidenceIdentityService.create('search', `${query}|${extractedKnowledge.join('|')}|${Date.now()}`);
+        if (sourceEvidenceIds.length === 0) {
+          throw new Error('SOURCE_BACKED_EVIDENCE_REQUIRED');
+        }
         experienceLinkService.getOrCreateLink(experienceId, 'web_search', `Web検索知見獲得: ${query.slice(0, 40)}`);
-        experienceLinkService.linkEntity(experienceId, 'evidence', evidenceId);
+        for (const evidenceId of sourceEvidenceIds) {
+          experienceLinkService.linkEntity(experienceId, 'evidence', evidenceId);
+        }
 
-        // 検索結果は無条件で正解とせず、未検証の能力改善候補(approved: false)として記録し、
-        // 独立検証(Verification)を経てからCapability/骨格へ昇格させる
+        // 検索結果は無条件で正解とせず、実在するEvidence IDへ結び付けた未検証候補として保存する。
         selfImprovementService.registerCapabilityCandidate({
           instruction: `「${query}」についての最新情報や仕様、知見を説明してください。`,
           outputTarget: summary || extractedKnowledge.join('\n'),
           category: 'retrieval',
           reliability: 'medium',
           source: 'web_search',
-          approved: false, // 未検証: 自動昇格防止
+          approved: false,
           verifiedEffective: false,
           verificationNote: `Web検索未検証証拠: ${query.slice(0, 30)}`,
           experienceId,
-          evidenceIds: [evidenceId],
+          evidenceIds: sourceEvidenceIds,
         });
         integratedToSyntheticData = true;
       } catch (synErr) {
@@ -864,22 +1011,24 @@ export class AutonomousSearchService {
       }
     }
 
-    // 3. 中期記憶 (Working Agenda) の宿題があれば解決
-    if (options?.resolvedAgendaId) {
+    // 3. Working Agendaは検索件数では閉じない。保存済みEvidenceとClaimの検証を再照合する。
+    let resolvedAgendaId: string | undefined;
+    if (options?.resolvedAgendaId && verifiedResearchOutcome) {
       try {
         workingAgendaService.resolveAgenda(
           options.resolvedAgendaId,
-          `自律Web検索学習により解決: ${summary || extractedKnowledge[0] || '知見獲得完了'}`
+          `独立検証済みClaimに基づき解決: ${summary || extractedKnowledge[0] || '検証済み知見'}`
         );
+        resolvedAgendaId = options.resolvedAgendaId;
       } catch (agErr) {
-        console.warn('Failed to resolve agenda via search learning:', agErr);
+        console.warn('Failed to resolve verified research agenda:', agErr);
       }
     }
 
     // 4. 作業指示書 v19 第1.1節: 縦(骨格)への自律学習素材還元
     // 検索結果の受け答え構造・手順・FAQから骨格候補を抽出・登録 (WEB_OBSERVED, 3回観測昇格制)
     try {
-      for (const r of results.slice(0, 2)) {
+      for (const r of sourceBackedResults.slice(0, 2)) {
         const itemProvider = options?.provider ||
           (r.source?.includes('SearXNG') ? 'searxng' :
            r.source?.includes('Wikipedia') ? 'wikipedia_direct' :
@@ -906,20 +1055,20 @@ export class AutonomousSearchService {
     // 5. 作業指示書 v19 第1.2節 & 第1.3節: 横(言い回し)への自律学習素材還元
     // 検索結果から普遍的な言い回し・文頭・文末パターンを抽出し、弱点カテゴリの候補として検証・昇格
     try {
-      const combinedSnippets = results
+      const combinedSnippets = sourceBackedResults
         .map((r) => r.snippet)
         .filter(Boolean)
         .join('\n');
       if (combinedSnippets) {
         const topProvider = options?.provider ||
-          (results[0]?.source?.includes('SearXNG') ? 'searxng' :
-           results[0]?.source?.includes('Wikipedia') ? 'wikipedia_direct' :
-           results[0]?.source?.includes('DuckDuckGo') ? 'duckduckgo_direct' : undefined);
+          (sourceBackedResults[0]?.source?.includes('SearXNG') ? 'searxng' :
+           sourceBackedResults[0]?.source?.includes('Wikipedia') ? 'wikipedia_direct' :
+           sourceBackedResults[0]?.source?.includes('DuckDuckGo') ? 'duckduckgo_direct' : undefined);
 
         const surfacePatterns = WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({
           text: combinedSnippets,
           sourceQuery: query,
-          sourceUrl: results[0]?.url || '',
+          sourceUrl: sourceBackedResults[0]?.url || '',
           provider: topProvider,
           fetchMethod: 'api',
         });
@@ -944,12 +1093,13 @@ export class AutonomousSearchService {
       query,
       triggerType,
       timestamp: Date.now(),
-      results,
+      results: sourceBackedResults,
       summary,
       extractedKnowledge,
       integratedToMemory,
       integratedToSyntheticData,
-      resolvedAgendaId: options?.resolvedAgendaId,
+      resolvedAgendaId,
+      verificationStatus: effectiveVerificationStatus,
     };
 
     this.addRecord(record);
@@ -979,50 +1129,83 @@ export class AutonomousSearchService {
     const details: string[] = [];
     let learnedCount = 0;
 
-    // 1. Working Agenda の未解決宿題から検索トピックを探索
-    const homeworks = workingAgendaService.getHomeworkForAutonomousThought();
-    if (homeworks.length > 0) {
-      for (const hw of homeworks.slice(0, 2)) {
-        if (abortSignal?.aborted) break;
+    const allHomeworks = workingAgendaService.getHomeworkForAutonomousThought();
+    const homeworks = allHomeworks.filter(hw => {
+      const subQuery = hw.unresolvedQuestions[0] || hw.topic;
+      const searchQuery = `${hw.topic} ${subQuery}`.replace(/[\n\r]/g, ' ').slice(0, 50).trim();
+      return !this.hasRecentUnverifiedResearch(searchQuery, 'working_agenda');
+    });
 
-        // クエリを生成 (課題トピック + 未解決事項の先頭)
-        const subQuery = hw.unresolvedQuestions[0] || hw.topic;
-        const searchQuery = `${hw.topic} ${subQuery}`.replace(/[\n\r]/g, ' ').slice(0, 50).trim();
+    for (const hw of homeworks.slice(0, 2)) {
+      if (abortSignal?.aborted) break;
 
-        investigated.push(searchQuery);
-        details.push(`宿題「${hw.topic}」について自律Web検索開始: ${searchQuery}`);
+      const subQuery = hw.unresolvedQuestions[0] || hw.topic;
+      const searchQuery = `${hw.topic} ${subQuery}`.replace(/[\n\r]/g, ' ').slice(0, 50).trim();
 
-        const { results, summary, provider } = await this.executeSearch(searchQuery, { maxResults: 3 });
-        if (results.length > 0) {
-          this.learnFromSearch(searchQuery, results, summary, {
-            triggerType: 'working_agenda',
-            resolvedAgendaId: hw.id,
-          });
-          learnedCount++;
-          details.push(`宿題「${hw.topic}」の調査完了 (${provider}, ${results.length}件の知見)`);
-        }
+      investigated.push(searchQuery);
+      details.push(`宿題「${hw.topic}」について自律Web検索開始: ${searchQuery}`);
+
+      const { results, summary, provider } = await this.executeSearch(searchQuery, { maxResults: 3 });
+      if (results.length === 0) {
+        details.push(`宿題「${hw.topic}」は検索結果を取得できませんでした。未解決状態を維持します。`);
+        continue;
+      }
+
+      const record = this.learnFromSearch(searchQuery, results, summary, {
+        triggerType: 'working_agenda',
+        verificationStatus: 'UNVERIFIED',
+      });
+
+      if (record.extractedKnowledge.length > 0) {
+        learnedCount++;
+        details.push(`宿題「${hw.topic}」の検索素材を候補として記録しました (${provider})。独立検証まで未解決状態を維持します。`);
+      } else {
+        details.push(`宿題「${hw.topic}」の検索結果は学習条件を満たさなかったため反映しませんでした。`);
       }
     }
 
-    // 2. 宿題がない場合は Capability Gap (能力不足レジストリ) から探索
     if (learnedCount === 0 && !abortSignal?.aborted) {
-      const openGaps = capabilityGapService.getAllGaps().filter((g) => g.status === 'OPEN');
+      const allOpenGaps = capabilityGapService.getAllGaps().filter(g => g.status === 'OPEN');
+      const openGaps = allOpenGaps.filter(gap => {
+        const query = `${gap.capabilityId} ${gap.description || ''}`
+          .replace(/[\n\r]/g, ' ')
+          .slice(0, 40)
+          .trim();
+        return !this.hasRecentUnverifiedResearch(query, 'capability_gap');
+      });
+
       if (openGaps.length > 0) {
         const topGap = openGaps[0];
-        const gapQuery = `${topGap.capabilityId} ${topGap.description || ''}`.replace(/[\n\r]/g, ' ').slice(0, 40).trim();
+        const gapQuery = `${topGap.capabilityId} ${topGap.description || ''}`
+          .replace(/[\n\r]/g, ' ')
+          .slice(0, 40)
+          .trim();
+
         investigated.push(gapQuery);
         details.push(`能力ギャップ「${topGap.capabilityId}」について自律Web検索開始: ${gapQuery}`);
 
         const { results, summary } = await this.executeSearch(gapQuery, { maxResults: 3 });
-        if (results.length > 0) {
-          this.learnFromSearch(gapQuery, results, summary, {
+        if (results.length === 0) {
+          details.push(`能力ギャップ「${topGap.capabilityId}」は検索結果を取得できませんでした。OPENを維持します。`);
+        } else {
+          const record = this.learnFromSearch(gapQuery, results, summary, {
             triggerType: 'capability_gap',
+            verificationStatus: 'UNVERIFIED',
           });
-          learnedCount++;
-          capabilityGapService.updateGapStatus(topGap.gap_id, 'MITIGATED');
-          details.push(`能力ギャップ「${topGap.capabilityId}」の知見補完完了`);
+          if (record.extractedKnowledge.length > 0) {
+            learnedCount++;
+            details.push(`能力ギャップ「${topGap.capabilityId}」の調査素材を未検証候補として保存しました。独立検証までOPENを維持します。`);
+          } else {
+            details.push(`能力ギャップ「${topGap.capabilityId}」の検索結果は学習条件を満たしません。OPENを維持します。`);
+          }
         }
+      } else if (allOpenGaps.length > 0) {
+        details.push('未検証の検索記録がある能力ギャップは24時間再検索を抑制しています。ギャップ状態はOPENのまま維持します。');
       }
+    }
+
+    if (investigated.length === 0 && details.length === 0) {
+      details.push('未検証の同一クエリは24時間再検索を抑制し、宿題・能力ギャップは未解決状態で維持します。');
     }
 
     return {
