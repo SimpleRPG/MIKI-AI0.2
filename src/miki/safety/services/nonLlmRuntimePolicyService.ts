@@ -1,8 +1,8 @@
 /**
- * MIKI-AI non-LLM runtime boundary.
+ * MIKI-AI local runtime boundary.
  *
  * Local generative runtimes are retired. The application runtime must use the
- * deterministic non-LLM core; Gemini is an explicit external teacher path.
+ * Miki CORE basic processing; Gemini is an explicit optional external path.
  * This module never loads, calls, downloads, or streams a local model.
  */
 export type NonLlmRuntimeKind = 'NON_LLM_CORE' | 'EXTERNAL_TEACHER';
@@ -22,8 +22,8 @@ export const nonLlmRuntimePolicyService = {
       runtime,
       reason:
         runtime === 'NON_LLM_CORE'
-          ? 'Local generative model execution is retired. Use deterministic non-LLM components.'
-          : 'External teacher access is optional and is not an application runtime dependency.',
+          ? '端末内の生成モデル実行は終了しています。Miki COREの基本処理を利用してください。'
+          : '外部生成AIへの接続は任意であり、アプリの基本実行には必須ではありません。',
     };
   },
 
@@ -37,13 +37,13 @@ export const nonLlmRuntimePolicyService = {
   },
 
   assertNonLlmRuntime(): void {
-    // Intentionally a no-op: deterministic non-LLM execution is the normal path.
+    // Intentionally a no-op: Miki CORE basic processing is the normal path.
   },
 
   blockedOperation(operation: string): never {
     throw new Error(
-      `Blocked local generative runtime operation: ${operation}. ` +
-        'Implement or use a deterministic non-LLM component instead.'
+      `旧ローカル生成モデルの操作「${operation}」はブロックされました。` +
+        'Miki COREの基本処理として実装するか、既存部品を利用してください。'
     );
   },
 };

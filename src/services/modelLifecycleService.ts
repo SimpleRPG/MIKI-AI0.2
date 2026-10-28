@@ -33,7 +33,7 @@ class ModelLifecycleService {
   }
 
   public runDeepSleepModelReasoning() {
-    const thought = '[モデル退役] ローカル生成モデルの実行・保持・自動取得経路は退役済みです。Non-LLM Coreのみを維持します。';
+    const thought = '[モデル退役] ローカル生成モデルの実行・保持・自動取得経路は終了しています。Miki COREの基本処理を維持します。';
     systemLogger.info('SELF_IMPROVEMENT', thought);
     return { evaluatedCount: 0, protectedCount: 0, deletionCandidates: [], autonomousThought: thought };
   }

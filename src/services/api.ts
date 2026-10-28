@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import {
   ChatMessage,
   PersonaConfig,
@@ -18,14 +19,14 @@ import {
   HardwareTelemetry,
 } from './nonLlmHardwarePipelineService';
 
-// APKなど「フロントエンドだけが単体で動くビルド」では server.ts (Express) が
-// 同一オリジンに存在しないため、Termux等で起動したサーバーのアドレスを
-// 明示的に指定できるようにする。未設定なら従来通り同一オリジン(相対パス)。
-export const SERVER_UNAVAILABLE_MESSAGE = 'この機能は外部サーバーへの接続が必要です。現在未接続です。';
+// Android APKのWebViewとTermuxのNode APIサーバーは同じ端末上の別プロセス。
+// AndroidではTermuxのloopback APIを、ブラウザでは同一オリジンへの相対URLを既定にする。
+// miki_api_base_urlが設定されている場合は、その接続先を優先する。
+export const SERVER_UNAVAILABLE_MESSAGE = 'APIサーバーに接続できません。接続先URLとサーバーの起動状態を確認してください。';
 
 export function apiUrl(path: string): string {
   const configured = (storageService.getItem('miki_api_base_url') || '').trim().replace(/\/+$/, '');
-  const base = configured || 'http://127.0.0.1:3000';
+  const base = configured || (Capacitor.getPlatform() === 'android' ? 'http://127.0.0.1:3000' : '');
   return `${base}${path}`;
 }
 
@@ -479,21 +480,21 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     throw new DOMException('Aborted', 'AbortError');
   }
 
-  // 1. Non-LLM autonomous mode: deterministic CPU-first pipeline. Accelerators are optional and only reported when actually connected.
+  // 1. Miki CORE basic processing. Accelerators are optional and only reported when actually connected.
   if (params.engineMode === 'autonomous_rule') {
     const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
       prompt: params.prompt,
       persona: params.persona?.name,
       attachedFiles: params.attachedFiles,
     });
-    systemLogger.info('CHAT', `[非LLM決定論的処理完了] ${pipelineRes.telemetry.totalMs}ms (CPU: ${pipelineRes.telemetry.cpuMs}ms, 実行: ${pipelineRes.telemetry.executedBackends.join(',')})`, {
+    systemLogger.info('CHAT', `[Miki CORE基本処理完了] ${pipelineRes.telemetry.totalMs}ms (CPU: ${pipelineRes.telemetry.cpuMs}ms, 実行: ${pipelineRes.telemetry.executedBackends.join(',')})`, {
       usedComponents: pipelineRes.usedComponents,
       affectionScore: pipelineRes.affectionScore,
     });
     return {
       text: pipelineRes.replyText,
       engineMode: 'autonomous_rule',
-      model: `非LLM自律統合中核 (${pipelineRes.telemetry.executedBackends.join('+')})`,
+      model: `Miki CORE基本処理 (${pipelineRes.telemetry.executedBackends.join('+')})`,
       hardwareTelemetry: pipelineRes.telemetry,
     };
   }
@@ -502,7 +503,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   // ローカル推論 (webgpu, native_gpu, external_gpu 等) 指定時、勝手に外部クラウド (/api/chat / Gemini) に流れることを厳格に遮断。
   // クラウド送信はユーザーが明示的に engineMode === 'gemini_cloud' を選択した場合のみ許可される。
   if (params.engineMode && params.engineMode !== 'gemini_cloud') {
-    systemLogger.warn('CHAT', `[外部送信境界ガード] engineMode=${params.engineMode} のため、外部クラウド(/api/chat)への送信を完全遮断しました。非LLM自律統合パイプラインで安全に生成します。`);
+    systemLogger.warn('CHAT', `[外部送信境界ガード] engineMode=${params.engineMode} のため、外部クラウド(/api/chat)への送信を完全遮断しました。Miki COREの端末内基本処理で応答します。`);
     const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
       prompt: params.prompt,
       persona: params.persona?.name,
@@ -511,7 +512,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     return {
       text: pipelineRes.replyText,
       engineMode: params.engineMode,
-      model: `非LLM自律統合中核 (${pipelineRes.telemetry.executedBackends.join('+')} / 外部送信完全遮断)`,
+      model: `Miki CORE基本処理 (${pipelineRes.telemetry.executedBackends.join('+')} / 外部送信完全遮断)`,
       hardwareTelemetry: pipelineRes.telemetry,
     };
   }
@@ -590,7 +591,7 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   return {
     text: pipelineRes.replyText,
     engineMode: params.engineMode || "autonomous_rule",
-    model: "非LLM自律統合中核（フォールバック）",
+    model: "Miki CORE基本処理（フォールバック）",
     privacyAudit: payloadAudit.audit,
     hardwareTelemetry: pipelineRes.telemetry,
   };

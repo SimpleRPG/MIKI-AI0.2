@@ -36,9 +36,9 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1851,
-    "sourceFileCount": 1396,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1309,
+    "trackedPathCountExcludingControlPaths": 1852,
+    "sourceFileCount": 1397,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1310,
     "relativeImportCandidateCount": 3940,
     "resolvedRelativeImportCandidateCount": 3912,
     "unresolvedRelativeImportCandidateCount": 28
@@ -6001,6 +6001,16 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "scripts/verify_user_facing_runtime_language_p330.mjs",
+      "bytes": 4988,
+      "lines": 63,
+      "sha256": "798cacd8d9f71afbce0f124eff527e436b666200876da3965f5276a9dbdfad4e",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "scripts/verify_v13_surface_and_persona.ts",
       "bytes": 9502,
       "lines": 192,
@@ -6482,9 +6492,9 @@
     },
     {
       "path": "server.ts",
-      "bytes": 259193,
+      "bytes": 259250,
       "lines": 5846,
-      "sha256": "05c2b153295fbc0b6ff7726455771d91e433eb2b86b81c8306c10a08027613bb",
+      "sha256": "db2a5302f6d0108a7a2b476cc246808f77b3a8d4365acc5c682d404e85cda0f4",
       "relativeImportCandidates": [
         {
           "line": 12,
@@ -8171,9 +8181,9 @@
     },
     {
       "path": "src/components/GitHubHub.tsx",
-      "bytes": 27212,
+      "bytes": 27392,
       "lines": 510,
-      "sha256": "9d0f3a442f04f5e4fe0c737ba6b812f9e950cc9a8f27c61259ecf396a6ffad26",
+      "sha256": "3715dc154c78978bd2825025c3c888bd6e0c97d1756279363cf398c81039b5fd",
       "relativeImportCandidates": [
         {
           "line": 18,
@@ -8741,9 +8751,9 @@
     },
     {
       "path": "src/data/specificationRegistryData.ts",
-      "bytes": 120874,
+      "bytes": 120913,
       "lines": 3848,
-      "sha256": "3ae012c866f9062781c350539d44c9c5d1c771b14ff8ede9c7040af8135f1e45",
+      "sha256": "a37325f31e6d23f5eb4e5c4f931a1780b728051973e02627137b8f572defc1f4",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -9806,9 +9816,9 @@
     },
     {
       "path": "src/miki/capability/services/capabilityTraceabilityService.ts",
-      "bytes": 8242,
+      "bytes": 8236,
       "lines": 173,
-      "sha256": "10b72fcf6be89f8e4881768a4887538835a0620ec956f2419463a2a56de811fd",
+      "sha256": "e212f9bee78f1394a8efadfe4cf52783274c41185ff79fd1614206dac411c1b7",
       "relativeImportCandidates": [
         {
           "line": 9,
@@ -22233,9 +22243,9 @@
     },
     {
       "path": "src/miki/learning/services/capabilityEvaluationService.ts",
-      "bytes": 11307,
+      "bytes": 11331,
       "lines": 253,
-      "sha256": "ac2dbd5fb2c1bc73a7c84cd0634691a020da17800f9be88b2e5e16676aff91f1",
+      "sha256": "5d2d89c1477bdcaae9f14135b875f13137a14037485c01442db3662c074c137f",
       "relativeImportCandidates": [
         {
           "line": 4,
@@ -26048,9 +26058,9 @@
     },
     {
       "path": "src/miki/safety/services/nonLlmHardwarePipelineService.ts",
-      "bytes": 11348,
+      "bytes": 11321,
       "lines": 261,
-      "sha256": "8c39f637c5ac6c0a0402c784ee900af1a350855736c1abf2908462e396a71d86",
+      "sha256": "db1d0fbc62391d2d965a5e9d7967f6625abf61b7a76a21f995babafdbd27c46f",
       "relativeImportCandidates": [
         {
           "line": 5,
@@ -26107,9 +26117,9 @@
     },
     {
       "path": "src/miki/safety/services/nonLlmRuntimePolicyService.ts",
-      "bytes": 1683,
+      "bytes": 1801,
       "lines": 51,
-      "sha256": "c4b715490a8e6056d6240fdbbb95b04efa23f4eea71d0c868046a2f8387f1d3a",
+      "sha256": "7983712056a5d2dc913f96231d552e5464c5a112ed108bb29dc3826588fb334f",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -26919,9 +26929,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/whyAnswerInspectorService.ts",
-      "bytes": 5245,
+      "bytes": 5250,
       "lines": 131,
-      "sha256": "cbc09180dce3c3f6c18e9f3047ea74be340c268f397499fde412ac397dcd7519",
+      "sha256": "0ee198a199c0fbdff2c7420160b1ca75c451ae64aaea514cb6c1d35f25688540",
       "relativeImportCandidates": [
         {
           "line": 10,
@@ -31233,9 +31243,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/selfCodeArchitectService.ts",
-      "bytes": 67129,
+      "bytes": 67123,
       "lines": 1270,
-      "sha256": "748c63ab2edd1672e508cd462ae9f53c3d63c57f348e7908087d1e86cf6b1c22",
+      "sha256": "20d6377af088a2feb5b3cc5393e70441250f71f115c19563adcc2d4fc45eb540",
       "relativeImportCandidates": [
         {
           "line": 21,
@@ -32524,9 +32534,9 @@
     },
     {
       "path": "src/miki/strategy/services/answerPlanService.ts",
-      "bytes": 33898,
+      "bytes": 33905,
       "lines": 844,
-      "sha256": "c1c53b3cfb75f4d0d62d06a07a5ec129ca39deffda66186d2ce71de028db78d9",
+      "sha256": "85cde50be82465eb11fe74c12e3b350d99560c528ea9e9c23c6a3443600ce337",
       "relativeImportCandidates": [
         {
           "line": 7,
@@ -32786,9 +32796,9 @@
     },
     {
       "path": "src/miki/strategy/services/implementationSelectionService.ts",
-      "bytes": 1722,
+      "bytes": 1736,
       "lines": 34,
-      "sha256": "33b14b178cd56e2bdc1c26f3621e0de5721b9fca544c5b807b82a97015934e30",
+      "sha256": "c08651bdd16f186fe66bb0dd3587c556918f3cb05e8a27227f81d42375f08d2a",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -34103,9 +34113,9 @@
     },
     {
       "path": "src/miki/verification/services/deviceBenchmarkService.ts",
-      "bytes": 6669,
+      "bytes": 6645,
       "lines": 173,
-      "sha256": "d2c15fd946ae2f97378c99da32a08b974d86e16c1cb0ffc8a895324ddff2d003",
+      "sha256": "463f88652966a06026aa23fc8339946d3316a10f6552ca02929b7d63597660fd",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -34271,9 +34281,9 @@
     },
     {
       "path": "src/miki/verification/services/regressionBenchmarkService.ts",
-      "bytes": 29166,
+      "bytes": 29221,
       "lines": 725,
-      "sha256": "e59324ab3eb1b94d85aac964ae84abcf4db67f71f9b82267165075bd5023a824",
+      "sha256": "10e40c0d51c95a7a20474f5df8c47db1f8461f39f7407b40cb94181d0a508ff2",
       "relativeImportCandidates": [
         {
           "line": 9,
@@ -34627,9 +34637,9 @@
     },
     {
       "path": "src/services/answerPlanService.ts",
-      "bytes": 22170,
+      "bytes": 22177,
       "lines": 543,
-      "sha256": "be336e98bb911c38e5e1b4ed84616afcd1ecb8daff067850757a112fde4465e4",
+      "sha256": "abc67e53593b63b0ea1878e8d03a8768ae77bf3540de6683a0dd9e6469b6fa31",
       "relativeImportCandidates": [
         {
           "line": 6,
@@ -34662,48 +34672,48 @@
     },
     {
       "path": "src/services/api.ts",
-      "bytes": 31696,
-      "lines": 979,
-      "sha256": "8522407de4d16ac74dee2352a69b38bccb4973fabeb82aa442198f0d359de2d8",
+      "bytes": 31745,
+      "lines": 980,
+      "sha256": "2a82305e36fe4022c27f1b7370b2eb978647ff9d2a4bc2b3b916709ef335cc51",
       "relativeImportCandidates": [
         {
-          "line": 10,
+          "line": 11,
           "specifier": "../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 11,
+          "line": 12,
           "specifier": "./systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         },
         {
-          "line": 12,
+          "line": 13,
           "specifier": "./storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
         },
         {
-          "line": 13,
+          "line": 14,
           "specifier": "./githubSyncService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/githubSyncService.ts"
         },
         {
-          "line": 14,
+          "line": 15,
           "specifier": "./privacyGuardrailService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/privacyGuardrailService.ts"
         },
         {
-          "line": 15,
+          "line": 16,
           "specifier": "../miki/safety/services/outboundPayloadSanitizer",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/safety/services/outboundPayloadSanitizer.ts"
         },
         {
-          "line": 19,
+          "line": 20,
           "specifier": "./nonLlmHardwarePipelineService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/nonLlmHardwarePipelineService.ts"
@@ -36865,9 +36875,9 @@
     },
     {
       "path": "src/services/modelLifecycleService.ts",
-      "bytes": 1842,
+      "bytes": 1851,
       "lines": 48,
-      "sha256": "daf16ec0bd91f0d7ee8609028dcec6a9850a3894ed2cd63c78110e88686ec5b5",
+      "sha256": "9ea0295fe397d7e8a143cba040de34e0f40c1ed65a5b3a705d12a446fe0993d5",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -36944,9 +36954,9 @@
     },
     {
       "path": "src/services/nonLlmCoreService.ts",
-      "bytes": 29101,
+      "bytes": 29126,
       "lines": 592,
-      "sha256": "15b4f28d6f52426be08a11ca08aff5e74d1a5c0a04a031dacc6a9445c9d696a2",
+      "sha256": "aed98784b163b4a4bc616e3e0161f47a56dc65514aa4f980715752ed3860d9f9",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -37158,9 +37168,9 @@
     },
     {
       "path": "src/services/nonLlmRuntimeService.ts",
-      "bytes": 5398,
+      "bytes": 5897,
       "lines": 93,
-      "sha256": "22f89789cebf455df5ee46e366e4f973188939d7cbbfcc5c8bab6121d9e99571",
+      "sha256": "b7e5726174ad0dae4bcaf1ab133ce49fc576fbff5b1fe11206a8d86ad5e4168e",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -37974,9 +37984,9 @@
     },
     {
       "path": "src/services/systemLogger.ts",
-      "bytes": 42247,
-      "lines": 1033,
-      "sha256": "738753c16e69b197eceb676c81faef1746afc21e2bb0145008b9d7fb50666bd1",
+      "bytes": 41090,
+      "lines": 1020,
+      "sha256": "5042f48119cd8f282f18bd82ccc2a69ae00c4c73a74c00365062220d671ce4b3",
       "relativeImportCandidates": [
         {
           "line": 1,

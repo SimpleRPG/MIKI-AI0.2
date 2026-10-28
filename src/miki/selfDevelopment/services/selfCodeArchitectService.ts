@@ -231,7 +231,7 @@ export class SelfCodeArchitectService {
     const hasEnvKey = typeof process !== 'undefined' && Boolean(process.env?.GEMINI_API_KEY);
     const quotaPassed = keyCount > 0 || hasEnvKey;
     const quotaDetails = quotaPassed
-      ? `利用可能な推論リソースを実測検知 (${keyCount > 0 ? `${keyCount}件のカスタムAPIキー` : hasEnvKey ? '環境変数APIキー' : '決定論的Non-LLM Core'})。外部教師は任意、通常実行はNon-LLM Core。`
+      ? `利用可能な推論リソースを実測検知 (${keyCount > 0 ? `${keyCount}件のカスタムAPIキー` : hasEnvKey ? '環境変数APIキー' : 'Miki CORE基本処理'})。外部教師は任意、通常実行はMiki CORE。`
       : '⚠️ 利用可能なAPIキーまたは旧ローカル生成ランタイムエンドポイントが未登録です（推論リソース未設定）。';
 
     // 4. ロールバック保証: 登録された自己改善提案に構造化されたロールバック手順が付帯しているか実検査 (第2.2節)

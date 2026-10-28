@@ -8,11 +8,11 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
   {
     "chapterNumber": 0,
     "id": "chap_0",
-    "title": "基本方針・実行環境の確定 (非LLM実行アーキテクチャ)",
+    "title": "基本方針・実行環境の確定（Miki CORE実行アーキテクチャ）",
     "category": "CORE_FOUNDATION",
     "status": "COMPLETED",
     "versionAdded": "v1.0",
-    "summary": "非LLMコアを標準実行系とし、状態・記憶・要求コンパイル・判断・検証・回答表層を決定論的に処理する。外部LLMは交換可能な教師経路に限定。",
+    "summary": "Miki COREを端末内の標準実行系とし、状態・記憶・要求コンパイル・判断・検証・回答表層を処理する。外部生成AIは必要に応じた教師経路として利用する。",
     "keyRequirements": [
       "重み不変の原則",
       "8層記憶動的想起",
@@ -126,7 +126,7 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "category": "CORE_FOUNDATION",
     "status": "RETIRED",
     "versionAdded": "v1.0",
-    "summary": "旧ローカルLLM運用章。現行アーキテクチャでは旧ローカル生成ランタイム/モデル切替を実行経路から除去し、非LLMコアを標準とする。",
+    "summary": "旧ローカル生成AI運用章。現行アーキテクチャではローカル生成モデルの実行／切替を通常経路から除去し、Miki COREを標準とする。",
     "keyRequirements": [
       "ハートビート監視",
       "自動フェイルオーバー",
@@ -906,12 +906,12 @@ export const FULL_SPECIFICATION_REGISTRY: SpecificationChapterMeta[] = [
     "category": "DEEP_COGNITION",
     "status": "COMPLETED",
     "versionAdded": "v5.0",
-    "summary": "事実DBではなく主張(claim)DBとして、世界区分(REAL/FICTION/HYPOTHETICAL)・性質・検証状態・独立クラスター・成熟度を管理し、自己証明禁止や非LLM矛盾検出・改訂上書きを統制。",
+    "summary": "事実DBではなく主張(claim)DBとして、世界区分(REAL/FICTION/HYPOTHETICAL)・性質・検証状態・独立クラスター・成熟度を管理し、自己証明禁止やMiki COREによる矛盾検出・改訂上書きを統制。",
     "keyRequirements": [
       "主張(claim)DB構造化",
       "6.7 自己証明禁止ガード",
       "世界区分(REAL/FICTION)分離",
-      "非LLM矛盾検出・上書き改訂"
+      "Miki COREによる矛盾検出・上書き改訂"
     ],
     "responsibleServices": [
       "claimDatabaseService.ts"

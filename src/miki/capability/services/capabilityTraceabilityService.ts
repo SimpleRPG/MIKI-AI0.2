@@ -43,7 +43,7 @@ export const CORE_TRACEABILITY_MAPPINGS: TraceabilityMappingEntry[] = [
     responseSkeletonId: 'PATTERN-CORRECTION-01',
     executionLayer: 'NON_LLM_CORE_ROUTING',
     isActiveInRuntime: true,
-    actualImpactSummary: 'answerPlanService.matchSkeleton()経由でNon-LLM Coreが最優先適用。訂正認識・旧前提無効化を即座に遂行。',
+    actualImpactSummary: 'answerPlanService.matchSkeleton()経由でMiki COREが最優先適用。訂正認識・旧前提無効化を即座に遂行。',
   },
   {
     chapterNumber: 20,
@@ -156,7 +156,7 @@ export class CapabilityTraceabilityService {
       .map((c) => ({
         chapterNumber: c.chapterNumber,
         title: c.title,
-        note: `仕様書の概念としては定義済み（ステータス: ${c.status}）だが、端末内Non-LLM Coreの常時keywordルーティングテーブルへの直接配備は未完了。`,
+        note: `仕様書の概念としては定義済み（ステータス: ${c.status}）だが、端末内のMiki CORE常時keywordルーティングテーブルへの直接配備は未完了。`,
       }));
 
     return {

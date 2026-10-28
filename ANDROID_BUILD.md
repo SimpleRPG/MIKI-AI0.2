@@ -1,12 +1,12 @@
-# Miki AI - Android APK ビルド手順（Capacitor / Deterministic Non-LLM Core）
+# Miki AI - Android APK ビルド手順（Capacitor / Miki CORE）
 
-本プロジェクトの現行ランタイムは **CORE + 17分類の決定論的Non-LLMアーキテクチャ**です。Android版はCapacitor/WebViewを実行シェルとして利用し、ローカル生成LLM、retired model format、retired local runtime、retired local runtimeは実行しません。
+本プロジェクトの現行ランタイムは **Miki CORE + 17分類の端末内基本処理**です。Android版はCapacitor/WebViewを実行シェルとして利用します。APKにはNode.js APIサーバーは組み込まれないため、Termux APIが必要な機能では同じスマホ上でTermux側のサーバーを別途起動します。Miki COREの端末内基本処理はサーバーとは別の処理経路です。必要に応じてGemini等の外部生成AIも利用できます。
 
 ---
 
 ### 🌟 現在のAndroidランタイム方針
 1. UIとアプリ実行はCapacitor/WebViewを使用します。
-2. 通常処理は決定論的Non-LLM Coreと既存の検証済み部品で行います。
+2. 通常処理はMiki COREと既存の検証済み部品で行います。
 3. 外部Gemini等は必要時のみ教師/Evidence境界から利用し、端末内モデル推論は行いません。
 4. GPU/ネイティブ高速化が必要な個別処理は、その処理能力が実際に導入・検証されている場合だけ使用します。
 

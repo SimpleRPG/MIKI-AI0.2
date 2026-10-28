@@ -136,14 +136,14 @@ export class DeviceBenchmarkService {
     let performanceTier = 'medium';
     let tierLabel = 'ミドルレンジ端末 (バランス型)';
     const recommendedModelId = 'non-llm-core';
-    const recommendedModelName = 'Non-LLM Core';
-    const recommendationReason = '生成モデルを使用せず、決定論的な構文・検索・制約・検証パイプラインを端末資源に合わせて実行します。';
+    const recommendedModelName = 'Miki CORE';
+    const recommendationReason = '端末内の回答規則・検索・制約・検証を使う基本処理を端末資源に合わせて実行します。';
     const compatibleModels = [
       {
         id: 'non-llm-core',
-        name: 'Non-LLM Core',
+        name: 'Miki CORE',
         status: 'optimal',
-        reason: 'モデルダウンロード不要・ローカル生成ランタイム不要。',
+        reason: 'Miki COREの基本処理はモデルのダウンロード不要で利用できます。',
       },
     ];
 

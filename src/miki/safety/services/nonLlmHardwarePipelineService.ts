@@ -37,7 +37,7 @@ export interface NonLlmPipelineExecutionResult {
 }
 
 /**
- * 非LLM中心・自己成長型AIコンパニオン 設計思想指示書 第14章
+ * Miki CORE中心・自己成長型AIコンパニオン 設計思想指示書 第14章
  * ハードウェア・資源の使い分け (CPU-first / NPU・GPU optional)
  * 
  * - CPU: Sudachi形態素解析、SQLite/FTS5検索、VBA構文解析、部品合成、CSP無矛盾性検証、SHA-256
@@ -57,7 +57,7 @@ export class NonLlmHardwarePipelineService {
   }
 
   /**
-   * CPU・NPU・GPUを総動員して非LLM完全ローカル処理を実行するメインパイプライン
+   * CPU・NPU・GPUを総動員してMiki COREの端末内基本処理を実行するメインパイプライン
    */
   public async executePipeline(params: {
     prompt: string;
@@ -188,7 +188,7 @@ export class NonLlmHardwarePipelineService {
 
     if (isCodeGoal && assembledCode) {
       replyText = `${nameGreeting}
-非LLM中核（CPU決定論的経路）で、検証済み部品からコードを合成しました。未接続のNPU/GPUを実行済みとは扱っていません。
+Miki COREの端末内基本処理で、検証済み部品からコードを合成しました。未接続のNPU/GPUを実行済みとは扱っていません。
 
 ### 🛠️ 合成された安全なVBAコード
 \`\`\`vba
@@ -203,7 +203,7 @@ ${assembledCode}
 - **安全不変条件**: セル反復ループ禁止、先頭ゼロ保護、動的見出し検索を満たしています。`;
     } else {
       replyText = `${nameGreeting}
-「${normalizedPrompt}」について、端末内の非LLM知識ベース（CPU決定論的経路）で安全に解析しました。
+「${normalizedPrompt}」について、端末内のMiki CORE知識・規則で安全に解析しました。
 
 ${matchedClaims.length > 0 ? `### 📚 照合された知識主張 (${matchedClaims.length}件):\n` + matchedClaims.slice(0, 2).map((c: any) => `- **${c.claimText || c.statement}** (確信度: ${Math.round((c.confidence ?? c.confidence_score ?? 0.9) * 100)}%)`).join('\n') + '\n\n' : ''}### 💡 解析結果:
 - 要求型: \`${resolvedRequestType}\`
@@ -242,7 +242,7 @@ ${matchedClaims.length > 0 ? `### 📚 照合された知識主張 (${matchedCla
 
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `[非LLM決定論的経路完了] ${totalMs}ms (CPU: ${cpuElapsedTotal}ms) | 実行バックエンド: ${executedBackends.join(',')} | 外部送信: 0 bytes`
+      `[Miki CORE基本処理完了] ${totalMs}ms (CPU: ${cpuElapsedTotal}ms) | 実行バックエンド: ${executedBackends.join(',')} | 外部送信: 0 bytes`
     );
 
     return {

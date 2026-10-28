@@ -240,7 +240,7 @@ export class NonLlmCoreService {
       if (explicitChoice) {
         decisionText = `明示された選択「${explicitChoice}」を採用します。`;
       } else {
-        decisionText = '比較対象は見つかりましたが、評価軸ごとの確認済み根拠が不足しているため、非LLM中核では推奨を捏造して確定しません。';
+        decisionText = '比較対象は見つかりましたが、評価軸ごとの確認済み根拠が不足しているため、Miki COREでは、確認済み根拠のない推奨を捏造して確定しません。';
       }
     }
 
@@ -538,7 +538,7 @@ export class NonLlmCoreService {
     if (unifiedBefore.length > 0 || sharedConcepts.length > 0) {
       reason += `; unified_experience=${sharedConcepts.map(x => x.concept).join(',') || unifiedBefore.map(x => x.domain).join(',')}`;
     }
-    systemLogger.info('CHAT', `🧠 [非LLM Core/Unified] ${status} / ${reason} / ${totalMs}ms / intent=${dialogueAct}`);
+    systemLogger.info('CHAT', `🧠 [Miki CORE/Unified] ${status} / ${reason} / ${totalMs}ms / intent=${dialogueAct}`);
 
     return {
       replyText: surface.surfaceText,

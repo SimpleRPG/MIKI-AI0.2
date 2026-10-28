@@ -15,12 +15,12 @@ export class ImplementationSelectionService {
     const capabilityId = this.capabilityFor(request);
     const deterministic = request.canExecuteDeterministically;
     const candidate = capabilityImplementationRegistryService.select(capabilityId, { allowLlm: false, requireDeterministic: deterministic });
-    if (candidate) return { mode: candidate.mode, implementationId: candidate.implementationId, capabilityId, reason: '既知かつ機械検証可能な経路が存在するため非LLM実装を優先', fallbackAllowed: false };
+    if (candidate) return { mode: candidate.mode, implementationId: candidate.implementationId, capabilityId, reason: '既知かつ機械検証可能な経路が存在するため、Miki COREの実装を優先', fallbackAllowed: false };
     return {
       mode: 'NO_LLM',
       implementationId: 'deterministic_unknown_gate',
       capabilityId,
-      reason: '検証済みNon-LLM実装を特定できないため、推測生成せず未確定として停止する',
+      reason: '検証済みのMiki CORE実装を特定できないため、推測生成せず未確定として停止する',
       fallbackAllowed: false,
     };
   }

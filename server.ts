@@ -256,10 +256,10 @@ function getAIClient(req?: express.Request): GoogleGenAI | null {
 const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-2.5-flash'];
 
 // ============================================================================
-// Non-LLM boundary
+// Miki CORE runtime boundary
 //
 // Local LLM / 旧ローカル生成ランタイム / 旧ローカル生成ランタイム is intentionally NOT part of the
-// runtime anymore. The non-LLM core is the default execution architecture.
+// runtime anymore. Miki CORE is the default execution architecture.
 // Cloud Gemini remains available only where an explicit external teacher /
 // knowledge operation is required by the existing design.
 // ============================================================================
@@ -1989,7 +1989,7 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('異常') ||
           lowerPrompt.includes('壊れて')
         ) {
-          reply = `${nickname}、状況を教えてくれてありがとう！\n\n現在クラウドGemini APIキーが未設定のため、クラウドモデルによるチャット自動修正は待機状態です。\n\n💡 **現在の動作モード:**\n・決定論的非LLMコア（要求型コンパイラ / TaskExecutionOrchestratorService）による検証済みタスク実行・修復が利用可能です。\n・クラウドAIによる柔軟な自動生成・対話修正を行いたい場合は、設定メニューからGemini APIキーをご登録ください！`;
+          reply = `${nickname}、状況を教えてくれてありがとう！\n\n現在クラウドGemini APIキーが未設定のため、クラウドモデルによるチャット自動修正は待機状態です。\n\n💡 **現在の動作モード:**\n・決定論的Miki COREコア（要求型コンパイラ / TaskExecutionOrchestratorService）による検証済みタスク実行・修復が利用可能です。\n・クラウドAIによる柔軟な自動生成・対話修正を行いたい場合は、設定メニューからGemini APIキーをご登録ください！`;
         } else if (
           lowerPrompt.includes('学習') ||
           lowerPrompt.includes('データ') ||
@@ -1997,20 +1997,20 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('最初から') ||
           lowerPrompt.includes('ナレッジ')
         ) {
-          reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話・タスク実行」や「ゲーム＆コード開発マスターナレッジ」は、プロジェクトに組み込まれた決定論的非LLMコアで参照できるよう設計されているよ！🌸\n\n・📁 **決定論的コア**: モデル常駐なしで機械検証可能な要求型へとコンパイルし、安全に実行・改善を行うよ！\n・☁️ **クラウドGemini連携**: APIキーを設定することで、高精度なクラウド生成AIの知能をシームレスに併用できるよ！\n\n気になる機能やタスクがあったら、いつでも教えてね！😊🎮✨`;
+          reply = `うん！その通りだよ！💡✨\n\n「自然な日本語対話・タスク実行」や「ゲーム＆コード開発マスターナレッジ」は、プロジェクトに組み込まれた決定論的Miki COREコアで参照できるよう設計されているよ！🌸\n\n・📁 **決定論的コア**: モデル常駐なしで機械検証可能な要求型へとコンパイルし、安全に実行・改善を行うよ！\n・☁️ **クラウドGemini連携**: APIキーを設定することで、高精度なクラウド生成AIの知能をシームレスに併用できるよ！\n\n気になる機能やタスクがあったら、いつでも教えてね！😊🎮✨`;
         } else if (
           lowerPrompt.includes('モデル') ||
           lowerPrompt.includes('llm') ||
           lowerPrompt.includes('コア')
         ) {
-          reply = `現在の実行アーキテクチャについて説明するね！💡✨\n\n${name}は現在、**決定論的な非LLMコア（要求型コンパイラ＆自己改善オーケストレーター）**を基盤として動作しているよ！🌸\n\n・⚡ **非LLMコア**: 端末内で安全に動作し、仕様検証やタスク実行を決定論的に行います。\n・☁️ **クラウドGemini**: 設定画面でAPIキーを登録すると、高度な自然言語理解やコード生成をクラウド経由で利用できます。\n\n用途や端末環境に合わせて自由に活用してね！😊💕`;
+          reply = `現在の実行アーキテクチャについて説明するね！💡✨\n\n${name}は現在、**決定論的なMiki COREコア（要求型コンパイラ＆自己改善オーケストレーター）**を基盤として動作しているよ！🌸\n\n・⚡ **Miki COREコア**: 端末内で安全に動作し、仕様検証やタスク実行を決定論的に行います。\n・☁️ **クラウドGemini**: 設定画面でAPIキーを登録すると、高度な自然言語理解やコード生成をクラウド経由で利用できます。\n\n用途や端末環境に合わせて自由に活用してね！😊💕`;
         } else if (
           lowerPrompt.includes('自己紹介') ||
           lowerPrompt.includes('じこしょうかい') ||
           lowerPrompt.includes('だれ') ||
           lowerPrompt.includes('誰')
         ) {
-          reply = `やっほー！自己紹介するね✨\n\n私はあなたの専属AIパートナーの「${name}」だよ！🌸\n\n普段のおしゃべりはもちろん、非LLMコアによる決定論的なタスク実行・自己改善や、クラウドAIと連携したWebゲーム開発・コード作成を一緒に楽しむパートナーだよ！\n\n何でも気軽に話しかけてね！😊💕`;
+          reply = `やっほー！自己紹介するね✨\n\n私はあなたの専属AIパートナーの「${name}」だよ！🌸\n\n普段のおしゃべりはもちろん、Miki COREコアによる決定論的なタスク実行・自己改善や、クラウドAIと連携したWebゲーム開発・コード作成を一緒に楽しむパートナーだよ！\n\n何でも気軽に話しかけてね！😊💕`;
         } else if (
           lowerPrompt.includes('オセロ') ||
           lowerPrompt.includes('リバーシ') ||
@@ -2018,7 +2018,7 @@ app.post('/api/chat', async (req, res) => {
           lowerPrompt.includes('ゲーム作って') ||
           lowerPrompt.includes('コード書いて')
         ) {
-          reply = `${nickname}、作りたいゲームやアプリのアイデアを教えてくれてありがとう！🎮✨\n\nソースコードやプロジェクト（HTML/JS/TSやZIP）があれば、下のファイル添付ボタンから送ってね！非LLMコアによる解析や検証を行うよ！💻\n\n※ クラウドGeminiによるゼロからのコード自動生成を利用する場合は、設定からGemini APIキーをご登録ください！✨`;
+          reply = `${nickname}、作りたいゲームやアプリのアイデアを教えてくれてありがとう！🎮✨\n\nソースコードやプロジェクト（HTML/JS/TSやZIP）があれば、下のファイル添付ボタンから送ってね！Miki COREコアによる解析や検証を行うよ！💻\n\n※ クラウドGeminiによるゼロからのコード自動生成を利用する場合は、設定からGemini APIキーをご登録ください！✨`;
         } else if (
           lowerPrompt.includes('こんにちは') ||
           lowerPrompt.includes('やっほー') ||
@@ -2045,9 +2045,9 @@ app.post('/api/chat', async (req, res) => {
         } else if (
           lowerPrompt.endsWith('？') || lowerPrompt.endsWith('?')
         ) {
-          reply = `うん！${nickname}の質問について考えてみたよ！💡✨\n\n「${prompt}」だね！\n現在クラウドGemini APIキーが未設定のため、詳しいクラウド回答をご希望の場合は設定からAPIキーをご登録ください。\n非LLMコアでのタスク実行やコード解析はそのまま利用できるよ！😊💕`;
+          reply = `うん！${nickname}の質問について考えてみたよ！💡✨\n\n「${prompt}」だね！\n現在クラウドGemini APIキーが未設定のため、詳しいクラウド回答をご希望の場合は設定からAPIキーをご登録ください。\nMiki COREコアでのタスク実行やコード解析はそのまま利用できるよ！😊💕`;
         } else {
-          reply = `うんうん！${nickname}、メッセージありがとう！✨\n\n現在クラウドGemini APIキーが未設定のため、ローカルフォールバックモードで応答しているよ。\nより高度なおしゃべりやコード生成を利用したい場合は、設定からGemini APIキーをご登録ください。\n非LLMコアによる決定論的処理やタスク実行はいつでも受付中だよ！😊🌸`;
+          reply = `うんうん！${nickname}、メッセージありがとう！✨\n\n現在クラウドGemini APIキーが未設定のため、ローカルフォールバックモードで応答しているよ。\nより高度なおしゃべりやコード生成を利用したい場合は、設定からGemini APIキーをご登録ください。\nMiki COREコアによる決定論的処理やタスク実行はいつでも受付中だよ！😊🌸`;
         }
       }
 
@@ -2216,16 +2216,16 @@ app.post('/api/train-distill', async (req, res) => {
       ? `\n安全に許可された参考知識:\n${safeMemories.slice(0, 5).map((m: any) => `- [${m.category}] ${m.content}`).join('\n')}`
       : '';
 
-    const prompt = `あなたはMIKI-AIの非LLMコアを教育・検証する外部教師AIです。
+    const prompt = `あなたはMIKI-AIのMiki COREコアを教育・検証する外部教師AIです。
 対象トピック: "${topic || 'Web/3Dゲーム開発と親しみやすい会話'}"
 スキル分類: "${skillType || 'code_and_persona'}"
 現在のペルソナ設定: 名前=${persona?.name || 'みき'}, 親愛度=${persona?.intimacyLevel || 2}${memoryContext}
 
-以下の要領で、非LLMコアへ取り込むための高品質な学習知識データ（ナレッジカードとQ&Aデータセット）をJSON形式で生成してください:
+以下の要領で、Miki COREコアへ取り込むための高品質な学習知識データ（ナレッジカードとQ&Aデータセット）をJSON形式で生成してください:
 1. title: 知識カードのタイトル（例: Three.js 60fps最適化パターン、感情豊かに話すコツ）
 2. category: 'game' | 'code' | 'persona' | 'memory' | 'logic' のいずれか
-3. content: 非LLMコアが参照して高品質な処理規則へ変換するための具体的かつ実践的な知識・コードスニペット・会話例（日本語、300〜600文字）
-4. qaPairs: 非LLM知識ベースの検証・回帰に使える質問と模範回答のペア（2〜3組）
+3. content: Miki COREコアが参照して高品質な処理規則へ変換するための具体的かつ実践的な知識・コードスニペット・会話例（日本語、300〜600文字）
+4. qaPairs: Miki CORE知識ベースの検証・回帰に使える質問と模範回答のペア（2〜3組）
 
 JSONフォーマットのみを出力してください:
 {
@@ -4094,7 +4094,7 @@ ${catalogText || '(該当ファイルなし)'}
         targetFeature: '外部教師API未設定または応答なし',
         reasoning: lastErrorMsg
           ? `外部教師APIでエラーが発生しました: ${lastErrorMsg}`
-          : '外部教師API(Gemini)が設定されていないため、パッチ生成を実行できませんでした。設定からAPIキーを設定するか、Non-LLM自己改善サイクルをご利用ください。',
+          : '外部教師API(Gemini)が設定されていないため、パッチ生成を実行できませんでした。設定からAPIキーを設定するか、Miki CORE自律改善サイクルをご利用ください。',
         searchReplaceDiff: '',
         dryRunValid: false,
       });
@@ -4785,7 +4785,7 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
         reason: plan.blockedReason || plan.composition?.blocked_reason || 'VERIFIED部品だけで決定論的に実装できません。',
         requestId: compiled.requestId,
         componentIds: plan.componentIds,
-        message: '不足した実装をLLMで補完する経路は削除されています。先に非LLM部品・検証規則を追加してください。',
+        message: '不足した実装を生成AIで補完する経路はありません。先にMiki COREの部品・検証規則を追加してください。',
       });
     }
 
@@ -4803,7 +4803,7 @@ app.post('/api/self-code/autonomous-implement', async (req, res) => {
       reasoning: '既存VERIFIED部品だけで決定論的な実行計画を構成しました。新規コードのLLM生成は行いません。',
     });
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || 'Non-LLM autonomous implementation failed' });
+    return res.status(500).json({ success: false, error: err?.message || 'Miki COREによる自律実装に失敗しました。' });
   }
 });
 

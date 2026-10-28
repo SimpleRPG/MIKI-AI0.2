@@ -359,7 +359,7 @@ class AnswerPlanService {
   }
 
   /**
-   * Non-LLM能力パッチを実行時に使える回答骨格へ登録する。
+   * Miki COREの能力パッチを実行時に使える回答骨格へ登録する。
    * 外部生成物をそのまま採用せず、検証済みパッチだけを受け付ける。
    */
   public installDeterministicCapabilityPatch(params: {
@@ -380,7 +380,7 @@ class AnswerPlanService {
 
     return this.addSkeleton({
       pattern_id: params.patternId,
-      situation: `検証済みNon-LLM能力パッチ: ${params.capabilityId}`,
+      situation: `検証済みMiki CORE能力パッチ: ${params.capabilityId}`,
       triggerKeywords: params.triggerKeywords.slice(0, 12),
       stage,
       response_plan: [

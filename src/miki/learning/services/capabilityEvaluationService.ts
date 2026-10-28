@@ -11,7 +11,7 @@ const CAPABILITY_TRIALS_KEY = 'miki_capability_evaluation_trials_v33';
 const LEGACY_CAPABILITY_TRIALS_KEY = 'miki_virtual_training_trials_v32';
 
 /**
- * 非LLMアーキテクチャ: 決定論的能力検証・充足度評価サービス
+ * Miki COREアーキテクチャ: 決定論的能力検証・充足度評価サービス
  *
  * 目的:
  * - モデル重みを更新せず、回答骨格・検索・決定論的規則の組み合わせで能力充足度を判定・検証する。
@@ -125,7 +125,7 @@ export class CapabilityEvaluationService {
       recommendation = 'RECOMMEND_CAPABILITY_TRIAL';
     } else {
       reasons.push(
-        '現時点では検索・記憶・回答骨格・決定論的規則による非LLM制御が機能しています。'
+        '現時点では検索・記憶・回答骨格・決定論的規則によるMiki COREの基本処理が機能しています。'
       );
     }
 
@@ -141,7 +141,7 @@ export class CapabilityEvaluationService {
 
   /**
    * 決定論的能力検証試験のシミュレーション実行
-   * 候補教材を重み更新へ入れず、非LLM（回答骨格・検索注入）だけで解決可能かを6段階で厳格に検証
+   * 候補教材を重み更新へ入れず、Miki CORE（回答骨格・検索注入）だけで解決可能かを6段階で厳格に検証
    */
   public async runCapabilityEvaluationTrial(
     input:
@@ -195,7 +195,7 @@ export class CapabilityEvaluationService {
     const step6_regressionCheckPassed = hasObservedEvidence && Boolean(observedEvidence?.regressionCheckPassed);
 
     // 判定ロジック:
-    // 非LLM（骨格・検索注入）だけで改善した場合: VERIFIED_NON_LLM_CAPABILITY
+    // Miki CORE（骨格・検索注入）だけで改善した場合: VERIFIED_NON_LLM_CAPABILITY
     // 改善しなかった場合: REQUIRES_DECOMPOSITION (能力ギャップを再分解し、外部教師に対策骨格を作らせる)
     let verdict: CapabilityEvaluationTrial['verdict'] = 'VERIFIED_NON_LLM_CAPABILITY';
     let verdictDetails = '';
@@ -206,7 +206,7 @@ export class CapabilityEvaluationService {
     } else if (step3_sameProblemRetestPassed && step4_paraphraseRetestPassed && step5_crossDomainRetestPassed && step6_regressionCheckPassed) {
       verdict = 'VERIFIED_NON_LLM_CAPABILITY';
       verdictDetails =
-        '🎉 【判定: 非LLM能力検証合格】回答骨格・決定論的制御だけで言い換え試験・回帰試験ともに合格しました。重み更新を行わず、回答骨格として保存・再利用します。';
+        '🎉 【判定: Miki CORE能力検証合格】回答骨格・決定論的制御だけで言い換え試験・回帰試験ともに合格しました。重み更新を行わず、回答骨格として保存・再利用します。';
     } else if (!step4_paraphraseRetestPassed) {
       verdict = 'REQUIRES_DECOMPOSITION';
       verdictDetails =

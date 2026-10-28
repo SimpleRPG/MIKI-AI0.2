@@ -1,6 +1,6 @@
 {
   "name": "MIKI-AI Game Studio",
-  "description": "Miki AI Partner & deterministic non-LLM autonomous software system with local-first state, memory, planning, verification, code composition, and optional external teacher integration.",
+  "description": "Miki AI Partner & local-first AI companion and autonomous software studio with memory, planning, verification, code composition, and optional Gemini integration.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

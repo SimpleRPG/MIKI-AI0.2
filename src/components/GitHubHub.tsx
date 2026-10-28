@@ -290,17 +290,17 @@ export const GitHubHub: React.FC<GitHubHubProps> = ({
           <div className="space-y-3 text-xs">
             <div>
               <label className="block text-slate-400 mb-1">
-                APIサーバーURL [本体GPU(APK)モードでTermuxのサーバーを使う時のみ入力]
+                APIサーバーURL [Android APKからTermux APIへ接続する場合に設定]
               </label>
               <input
                 type="text"
                 value={apiBaseUrl}
                 onChange={(e) => setApiBaseUrl(e.target.value)}
-                placeholder="例: http://127.0.0.1:3000 (空欄ならこのアプリと同じサーバーを使う)"
+                placeholder="Android APK: 空欄で http://127.0.0.1:3000 ／ Web版: API同一オリジンなら空欄"
                 className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-sky-500"
               />
               <p className="text-[10px] text-slate-500 mt-1">
-                GoogleAIStudioのプレビューやWeb版ではこの欄は空のままでOKです。APK版で「Unexpected token &lt;」エラーが出る場合は、Termuxで`npm run dev`を起動した上でこのURLを設定してください。
+                Android APKとTermuxのNode APIサーバーは同じスマホ内の別プロセスで、APKから自動起動はしません。Termuxで`npm run dev`を起動すると、APKの空欄設定は`http://127.0.0.1:3000`へ接続します。ブラウザ／Web Previewでは、APIを同一オリジンで提供している場合は空欄で相対URLを使います。APIが別ホストならそのURLを入力してください。
               </p>
             </div>
 

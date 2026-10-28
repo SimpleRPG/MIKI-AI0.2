@@ -253,7 +253,7 @@ export class RegressionBenchmarkService {
 
     if (!isNativeReady && !isWebReady) {
       modelUnavailable = true;
-      generatedResponse = '⚠️ モデルが未ロードのため回帰テストを実行できませんでした。「Non-LLM Core設定」でモデルをロードしてから再実行してください。';
+      generatedResponse = '⚠️ 現行のMiki COREは端末内の生成モデルを使用しないため、モデル実行を前提とする回帰テストは利用できません。Miki CORE向けの回答・規則の回帰検証を使用してください。';
     } else {
       try {
         const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -389,7 +389,7 @@ export class RegressionBenchmarkService {
     const activeInfo = this.getActiveLoadedModelInfo();
     if (!activeInfo.isReady || !activeInfo.modelId) {
       throw new Error(
-        '【実行拒否】推論エンジンにモデルがロードされていません。Non-LLM Core設定(退役ローカル生成器または退役Web生成器)で評価対象モデルをロードしてから回帰テストを実行してください。'
+        '【実行拒否】このベンチマークは生成モデルのロードを必要としますが、現行のMiki COREは端末内の生成モデルを読み込みません。Miki CORE向けの回答・規則の回帰検証を使用してください。'
       );
     }
 
