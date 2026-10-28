@@ -971,7 +971,7 @@ class SystemLogger {
 現在のAndroid/Webランタイムでは、端末内の生成モデルをダウンロード／ロードして返答する方式を使用しません。通常の端末内応答はMiki COREの基本処理を利用します。サーバー側機能や外部生成AIの応答に問題がある場合は、次を確認してください。
 
 ①【Android APKからTermux APIを使う場合】
-   - APKとTermuxは同じスマホ内の別プロセスです。Termuxで`npm run dev`を起動し、APIが`http://127.0.0.1:3000`で待機していることを確認します。
+   - APKとTermuxは同じスマホ内の別プロセスです。Termuxで npm run dev を起動し、APIが http://127.0.0.1:3000 で待機していることを確認します。
    - Termuxサーバーが停止中なら、サーバーAPIに依存する機能は利用できません。サーバーを使わないMiki COREの端末内基本処理とは別の経路です。
 
 ②【ブラウザ／Web Preview】

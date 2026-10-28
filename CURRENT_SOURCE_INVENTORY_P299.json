@@ -36,9 +36,9 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1854,
-    "sourceFileCount": 1399,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1312,
+    "trackedPathCountExcludingControlPaths": 1855,
+    "sourceFileCount": 1400,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1313,
     "relativeImportCandidateCount": 3941,
     "resolvedRelativeImportCandidateCount": 3913,
     "unresolvedRelativeImportCandidateCount": 28
@@ -5922,6 +5922,16 @@
       "bytes": 1300,
       "lines": 7,
       "sha256": "78c8ef732b37cb4f5bc4e77aa44a6b0706ac8ef8590d59fbf46b50f1013e494a",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/verify_system_logger_diagnostic_template_p336.mjs",
+      "bytes": 1290,
+      "lines": 25,
+      "sha256": "c2f472b32706aa95a4e1ca8935a74e2c8d5cc21eae9d00cf9377be1f85aa2d53",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -38012,7 +38022,7 @@
       "path": "src/services/systemLogger.ts",
       "bytes": 41090,
       "lines": 1020,
-      "sha256": "5042f48119cd8f282f18bd82ccc2a69ae00c4c73a74c00365062220d671ce4b3",
+      "sha256": "c2d8d9c0e650852aa1ca78f512a8bc7019f637b5554b226a2f276731f6ca5aa3",
       "relativeImportCandidates": [
         {
           "line": 1,

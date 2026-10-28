@@ -9,9 +9,9 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1854 |
-| ソースファイル | 1399 |
-| 相対import候補を字句走査したECMAScriptファイル | 1312 |
+| 対象追跡パス（監査制御ファイルを除く） | 1855 |
+| ソースファイル | 1400 |
+| 相対import候補を字句走査したECMAScriptファイル | 1313 |
 | 相対import候補 | 3941 |
 | 追跡パスへ解決できた候補 | 3913 |
 | 未解決候補（即不具合判定ではない） | 28 |
@@ -435,6 +435,7 @@
 | `scripts/verify_stages_35_40.mjs` | 1421 | 1 | `6ef1539610c0814c70a22bc8e9e6be504c146f5b3e549f4f59fbea2e5e48cbed` | 0 | 0 | 0 |
 | `scripts/verify_stages_41_50.mjs` | 1669 | 1 | `af2bfde4ddd6db6bc9fb43d65b8793455df94041e69f9997380f386d9e8e1bd2` | 0 | 0 | 0 |
 | `scripts/verify_stages_41_50_connections.mjs` | 1300 | 7 | `78c8ef732b37cb4f5bc4e77aa44a6b0706ac8ef8590d59fbf46b50f1013e494a` | 0 | 0 | 0 |
+| `scripts/verify_system_logger_diagnostic_template_p336.mjs` | 1290 | 25 | `c2f472b32706aa95a4e1ca8935a74e2c8d5cc21eae9d00cf9377be1f85aa2d53` | 0 | 0 | 0 |
 | `scripts/verify_task_route_failure_contracts.ts` | 3414 | 99 | `b91d8af96a587150174acd13f01f7ee66a753326584f56b59f281b097b97963e` | 3 | 3 | 0 |
 | `scripts/verify_termux_build_v190.sh` | 645 | 13 | `ab340b08c770d9974c5977374a185221a37ed3f7be5d1aacd588bcf418845ce4` | 0 | 0 | 0 |
 | `scripts/verify_unified_autonomous_completion_stage17.mjs` | 1307 | 6 | `504600b36b1aedb99f02a6df1a0dd8fb93673a3381c60eb02dc770181bc60e79` | 0 | 0 | 0 |
@@ -1392,7 +1393,7 @@
 | `src/services/storagePlanningService.ts` | 7407 | 205 | `d820936349bfadf9a848abf6545eeca296bffdd3310d053933aa1d1652efa0a8` | 4 | 4 | 0 |
 | `src/services/storageService.ts` | 32768 | 847 | `8097163d1d85262136a8ef05fcbcb746d619cdfc52161a3b987a9b674b52f8f9` | 1 | 1 | 0 |
 | `src/services/syntheticDataService.ts` | 33805 | 779 | `705b9f03f65b1dd591b1f6b644605ce82009d0e66f198247e459e76902878315` | 9 | 9 | 0 |
-| `src/services/systemLogger.ts` | 41090 | 1020 | `5042f48119cd8f282f18bd82ccc2a69ae00c4c73a74c00365062220d671ce4b3` | 1 | 1 | 0 |
+| `src/services/systemLogger.ts` | 41090 | 1020 | `c2d8d9c0e650852aa1ca78f512a8bc7019f637b5554b226a2f276731f6ca5aa3` | 1 | 1 | 0 |
 | `src/services/taskCaseMemoryService.ts` | 5511 | 45 | `747a02e6ce048f574c2a8270494a585716750e87d61245f7d6f3f4bce30e8c36` | 5 | 5 | 0 |
 | `src/services/taskExecutionOrchestratorService.ts` | 286 | 6 | `0498b47ec7ec4be5b23621672922c3b175246b63b33499c1be6cb39642cf5f44` | 1 | 1 | 0 |
 | `src/services/taskLineageService.ts` | 258 | 6 | `ce6b9933d590eb8ae34f19a39f6d01bcb8c15f730fff0f1dbb4e81877b0bf6ea` | 1 | 1 | 0 |

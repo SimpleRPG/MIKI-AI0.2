@@ -50,6 +50,9 @@ jobs:
       - name: Verify shared research provenance and Evidence status P334
         run: node scripts/verify_research_learning_integrity_p334.mjs
 
+      - name: Verify system diagnostic report template syntax P336
+        run: node scripts/verify_system_logger_diagnostic_template_p336.mjs
+
       - name: Verify web content understanding
         run: npx tsx scripts/verify_web_content_understanding.ts
 
