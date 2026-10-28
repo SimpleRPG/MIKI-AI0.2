@@ -36,9 +36,9 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1852,
-    "sourceFileCount": 1397,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1310,
+    "trackedPathCountExcludingControlPaths": 1854,
+    "sourceFileCount": 1399,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1312,
     "relativeImportCandidateCount": 3941,
     "resolvedRelativeImportCandidateCount": 3913,
     "unresolvedRelativeImportCandidateCount": 28
@@ -5173,6 +5173,26 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/verify_research_learning_integrity_p331.mjs",
+      "bytes": 5247,
+      "lines": 63,
+      "sha256": "d9767b7636f67250565b0987630392e85e7e82d3ce4a2f85d42da9a747ee9147",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/verify_research_learning_integrity_p334.mjs",
+      "bytes": 6961,
+      "lines": 78,
+      "sha256": "53d96dd1b1a631a15a0439665e1c905b0ea6564aece2d637bcded95d4f403267",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -23081,9 +23101,9 @@
     },
     {
       "path": "src/miki/memory/services/evidenceService.ts",
-      "bytes": 15759,
-      "lines": 456,
-      "sha256": "4a3d51059a0bd0010dc844dcb3d2a0ad7683834484d6c22e9214fd3d21c19c73",
+      "bytes": 16188,
+      "lines": 470,
+      "sha256": "c493cdaa272146045d5a62f902c36218ee0e2cb9d79412f14aa5b09195c0c238",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24291,9 +24311,9 @@
     },
     {
       "path": "src/miki/research/services/autonomousSearchService.ts",
-      "bytes": 50662,
-      "lines": 1292,
-      "sha256": "9e80eac8faeb4e2a7fa07f0ed6a9e5ca144d9cc0dc51742b47aa866e6ebec112",
+      "bytes": 51560,
+      "lines": 1309,
+      "sha256": "c694020e39f787af9e4ab10cc17158684a7b7d5daeb003a0af2a7b177e3eeb9a",
       "relativeImportCandidates": [
         {
           "line": 6,

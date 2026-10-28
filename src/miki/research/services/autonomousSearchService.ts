@@ -19,7 +19,7 @@ import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { surfaceVariationGrowthService } from '../../conversation/services/surfaceVariationGrowthService';
 import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
-import { evidenceService } from '../../memory/services/evidenceService';
+import { evidenceService, isSyntheticWebMaterial } from '../../memory/services/evidenceService';
 
 export interface AutonomousSearchConfig {
   enabled:boolean;
@@ -194,29 +194,12 @@ function createProviderStatuses(): Record<SearchProviderName, SearchProviderStat
 }
 
 function isSyntheticSearchResult(result: WebSearchResultItem): boolean {
-  const sourceAndUrl = `${result.source || ''} ${result.url || ''}`
-    .normalize('NFKC')
-    .toLowerCase();
-  const titleAndSnippet = `${result.title || ''} ${result.snippet || ''}`
-    .normalize('NFKC')
-    .toLowerCase();
-
-  const mockProvenanceMarkers = [
-    'mock (non-real)',
-    'mock_fallback',
-    'knowledge.local',
-  ];
-  if (mockProvenanceMarkers.some(marker => sourceAndUrl.includes(marker))) {
-    return true;
-  }
-
-  const mockContentMarkers = [
-    '【テスト用モック】',
-    '【テスト用モックデータ】',
-    '実データではありません',
-  ].map(marker => marker.normalize('NFKC').toLowerCase());
-
-  return mockContentMarkers.some(marker => titleAndSnippet.includes(marker));
+  return isSyntheticWebMaterial({
+    title: String(result.title || ''),
+    snippet: String(result.snippet || ''),
+    source: String(result.source || ''),
+    url: String(result.url || ''),
+  });
 }
 
 function isSourceBackedSearchResult(result: WebSearchResultItem): boolean {
@@ -859,18 +842,23 @@ export class AutonomousSearchService {
     }
   ): AutonomousSearchLearningRecord {
     const triggerType = options?.triggerType || 'in_conversation';
-    const sourceBackedResults = results.filter(isSourceBackedSearchResult);
+    let sourceBackedResults = results.filter(isSourceBackedSearchResult);
     const syntheticResult = results.find(isSyntheticSearchResult);
+    const syntheticSummary = isSyntheticWebMaterial({
+      title: '',
+      snippet: String(summary || ''),
+      source: '',
+    });
 
     // モック、出典URLのない結果、失敗要約だけでは学習を実行しない。
-    if (syntheticResult || sourceBackedResults.length === 0) {
+    if (syntheticResult || syntheticSummary || sourceBackedResults.length === 0) {
       const rejectedRecord: AutonomousSearchLearningRecord = {
         id: 'sr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
         query,
         triggerType,
         timestamp: Date.now(),
         results: [],
-        summary: syntheticResult
+        summary: syntheticResult || syntheticSummary
           ? 'テスト用モックを検出したため、学習・記憶・回答パターンへの反映を拒否しました。'
           : '実URL付きの検索結果がないため、学習・記憶・回答パターンへの反映を拒否しました。',
         extractedKnowledge: [],
@@ -881,7 +869,7 @@ export class AutonomousSearchService {
       this.addRecord(rejectedRecord);
       systemLogger.warn(
         'SELF_IMPROVEMENT',
-        syntheticResult
+        syntheticResult || syntheticSummary
           ? '[Research Learning] mock result rejected; no learning side effects'
           : '[Research Learning] source-less result rejected; no learning side effects',
       );
@@ -891,24 +879,25 @@ export class AutonomousSearchService {
     const verifiedResearchOutcome = this.hasVerifiedResearchOutcome(options);
     const effectiveVerificationStatus = verifiedResearchOutcome ? 'VERIFIED' : 'UNVERIFIED';
 
-    // 取得元URLごとに、実在するEvidence記録を再利用するか新規作成する。
+    // URL一致の実在Evidenceを再利用し、REJECTEDのIDは学習処理へ渡さない。
     const suppliedEvidenceIds = [...new Set((options?.evidenceIds || []).map(String).filter(Boolean))]
       .filter(id => {
         const item = evidenceService.getEvidence(id);
         return Boolean(item && item.kind === 'WEB' && item.status !== 'REJECTED');
       });
-    const sourceEvidenceIds = sourceBackedResults.slice(0, 3).map(result => {
+    const sourceEvidenceIds: string[] = [];
+    const acceptedSourceBackedResults: WebSearchResultItem[] = [];
+    for (const result of sourceBackedResults.slice(0, 3)) {
       const canonicalUrl = canonicalizeSearchUrl(String(result.url || ''));
-      const existingId = suppliedEvidenceIds.find(id => {
-        const item = evidenceService.getEvidence(id);
-        return Boolean(
+      const existingEvidence = suppliedEvidenceIds
+        .map(id => evidenceService.getEvidence(id))
+        .find(item => Boolean(
           item &&
+          item.kind === 'WEB' &&
+          item.status !== 'REJECTED' &&
           canonicalizeSearchUrl(String(item.url || '')) === canonicalUrl
-        );
-      });
-      if (existingId) return existingId;
-
-      return evidenceService.recordWebEvidence({
+        ));
+      const evidence = existingEvidence || evidenceService.recordWebEvidence({
         title: String(result.title || query),
         snippet: String(result.snippet || ''),
         source: String(result.source || 'web_search'),
@@ -923,8 +912,36 @@ export class AutonomousSearchService {
           observed_at: Date.now(),
           result_summary: '検索素材を未検証Evidenceとして記録。Claimの独立検証が必要。',
         },
-      }).evidence_id;
-    });
+      });
+
+      if (!evidence || evidence.kind !== 'WEB' || evidence.status === 'REJECTED') {
+        continue;
+      }
+      acceptedSourceBackedResults.push(result);
+      sourceEvidenceIds.push(evidence.evidence_id);
+    }
+    sourceBackedResults = acceptedSourceBackedResults;
+
+    if (sourceBackedResults.length === 0 || sourceEvidenceIds.length === 0) {
+      const rejectedRecord: AutonomousSearchLearningRecord = {
+        id: 'sr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        query,
+        triggerType,
+        timestamp: Date.now(),
+        results: [],
+        summary: '非拒否のWeb Evidenceがないため、学習・記憶・回答パターンへの反映を拒否しました。',
+        extractedKnowledge: [],
+        integratedToMemory: false,
+        integratedToSyntheticData: false,
+        verificationStatus: 'UNVERIFIED',
+      };
+      this.addRecord(rejectedRecord);
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        '[Research Learning] no non-rejected Web Evidence; no learning side effects',
+      );
+      return rejectedRecord;
+    }
 
     const extractedKnowledge: string[] = [];
 
@@ -967,7 +984,7 @@ export class AutonomousSearchService {
           destination: 'long_term_memory',
           lifecycleStatus: 'CANDIDATE',
           approved: false, // 未検証: 自動昇格防止
-          verificationStatus: options?.verificationStatus || 'UNVERIFIED',
+          verificationStatus: effectiveVerificationStatus,
           researchGapId: options?.researchGapId,
           evidenceIds: sourceEvidenceIds,
           claimIds: [...new Set((options?.claimIds || []).map(String).filter(Boolean))],

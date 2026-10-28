@@ -68,6 +68,36 @@ research_source_role_target?: "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"
 }
 
 /**
+ * Search admission and Evidence rejection must use exactly the same synthetic-material rule.
+ * The caller still has to validate source URL and Evidence status separately.
+ */
+export function isSyntheticWebMaterial(input: {
+  title: string;
+  snippet: string;
+  source: string;
+  url?: string;
+}): boolean {
+  const text = `${input.title} ${input.snippet} ${input.source} ${input.url || ''}`
+    .normalize('NFKC')
+    .toLowerCase();
+
+  return [
+    'local synthetic fallback',
+    'synthetic fallback',
+    'offline fallback',
+    'fallback result',
+    'synthetic result',
+    'mock (non-real)',
+    'mock_fallback',
+    'knowledge.local',
+    'テスト用モック',
+    '【テスト用モック】',
+    '【テスト用モックデータ】',
+    '実データではありません',
+  ].some((marker) => text.includes(marker.normalize('NFKC').toLowerCase()));
+}
+
+/**
  * Evidence is deliberately separated from Claim.
  * A discovered source is not a fact, and evidence never promotes a Claim by itself.
  */
@@ -391,23 +421,7 @@ export class EvidenceService {
     source: string;
     url?: string;
   }): boolean {
-    const text =
-      `${input.title} ${input.snippet} ${input.source} ${input.url || ''}`
-        .normalize('NFKC')
-        .toLowerCase();
-
-    return [
-      'local synthetic fallback',
-      'synthetic fallback',
-      'offline fallback',
-      'fallback result',
-      'synthetic result',
-      'mock (non-real)',
-      'mock_fallback',
-      'knowledge.local',
-      'テスト用モック',
-      '実データではありません',
-    ].some((marker) => text.includes(marker));
+    return isSyntheticWebMaterial(input);
   }
 
   private defaultCluster(input: { source: string; url?: string }): string {

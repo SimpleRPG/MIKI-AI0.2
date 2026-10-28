@@ -9,9 +9,9 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1852 |
-| ソースファイル | 1397 |
-| 相対import候補を字句走査したECMAScriptファイル | 1310 |
+| 対象追跡パス（監査制御ファイルを除く） | 1854 |
+| ソースファイル | 1399 |
+| 相対import候補を字句走査したECMAScriptファイル | 1312 |
 | 相対import候補 | 3941 |
 | 追跡パスへ解決できた候補 | 3913 |
 | 未解決候補（即不具合判定ではない） | 28 |
@@ -372,6 +372,8 @@
 | `scripts/verify_realistic_surface_p142.mjs` | 1822 | 1 | `bf5ecd29bb6c230006d70c475ea8089fecd94db1bd54979e6aa59c5daf79e3de` | 3 | 3 | 0 |
 | `scripts/verify_remaining_development_capabilities_stage8.mjs` | 959 | 7 | `4116f013d9352137e8fbea23eb810c69985bdd70b2d77488889df985e3ff4f6f` | 0 | 0 | 0 |
 | `scripts/verify_repository_visual_learning_p116.mjs` | 1314 | 1 | `ee1185b999a42b50a591eaa421b542256292256c94235c55f86d8b7145f2f20b` | 1 | 1 | 0 |
+| `scripts/verify_research_learning_integrity_p331.mjs` | 5247 | 63 | `d9767b7636f67250565b0987630392e85e7e82d3ce4a2f85d42da9a747ee9147` | 0 | 0 | 0 |
+| `scripts/verify_research_learning_integrity_p334.mjs` | 6961 | 78 | `53d96dd1b1a631a15a0439665e1c905b0ea6564aece2d637bcded95d4f403267` | 0 | 0 | 0 |
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
@@ -898,7 +900,7 @@
 | `src/miki/memory/services/causalMemoryLedgerService.ts` | 2868 | 21 | `0d2bab6e1497ff54a7517e28a7680a38fc952d43a94078f933cbba70a96a1264` | 2 | 2 | 0 |
 | `src/miki/memory/services/claimDatabaseService.ts` | 35155 | 853 | `b1dbaf78f1a0fe0b0861cac880d6db5ab1f7ff034e8a88605debf419f9fc3b61` | 4 | 4 | 0 |
 | `src/miki/memory/services/evidenceLineageGraphService.ts` | 94 | 1 | `a77a4a7a0966685ccae7c5661654837f10f4b780463193ea02d92f0420d7a728` | 1 | 1 | 0 |
-| `src/miki/memory/services/evidenceService.ts` | 15759 | 456 | `4a3d51059a0bd0010dc844dcb3d2a0ad7683834484d6c22e9214fd3d21c19c73` | 4 | 4 | 0 |
+| `src/miki/memory/services/evidenceService.ts` | 16188 | 470 | `c493cdaa272146045d5a62f902c36218ee0e2cb9d79412f14aa5b09195c0c238` | 4 | 4 | 0 |
 | `src/miki/memory/services/failureCatalogService.ts` | 22002 | 482 | `c702502837d7b8ef85e3fa69afd22c08981a415d573ef66a70303534774cb8b4` | 3 | 3 | 0 |
 | `src/miki/memory/services/failureMemoryService.ts` | 5930 | 122 | `82b4cbbdbe0cbee370ddfa53267d6ce2c25a447eeca2f748a3219d7d183d4132` | 3 | 3 | 0 |
 | `src/miki/memory/services/failureUnderstandingService.ts` | 10254 | 140 | `5ee8e11cbabe5a9c1b184ff9e5a14277883d05a25bdf6184537c4416ff35ec2b` | 5 | 5 | 0 |
@@ -934,7 +936,7 @@
 | `src/miki/promotion/services/verifiedKnowledgePromotionService.ts` | 6281 | 143 | `4d0f5265bc2aeaaceaeaf8a0eb8f28c8a81715a1efe6e9f0b77fca0266711896` | 4 | 4 | 0 |
 | `src/miki/research.ts` | 2410 | 45 | `186dc0343b6d0ef103f27ec701da93cb8d9ee7940441bd122aaa8b1083bf0224` | 26 | 26 | 0 |
 | `src/miki/research/index.ts` | 125 | 5 | `295995f684b2416b49e33fb614d608bfec23c7a77e40716b8d17e3524718369b` | 2 | 2 | 0 |
-| `src/miki/research/services/autonomousSearchService.ts` | 50662 | 1292 | `9e80eac8faeb4e2a7fa07f0ed6a9e5ca144d9cc0dc51742b47aa866e6ebec112` | 17 | 17 | 0 |
+| `src/miki/research/services/autonomousSearchService.ts` | 51560 | 1309 | `c694020e39f787af9e4ab10cc17158684a7b7d5daeb003a0af2a7b177e3eeb9a` | 17 | 17 | 0 |
 | `src/miki/research/services/causalInvestigationService.ts` | 2635 | 22 | `0fa29b8c9bbe0242d348223a94af774349769b0cdbe5fdf8821594c117669210` | 1 | 1 | 0 |
 | `src/miki/research/services/claimEvidenceService.ts` | 2724 | 60 | `39a3107ae523bfa4bb0dd38e85e393615edcf7b7909d0e4750f8fe3ed2b6b98c` | 3 | 3 | 0 |
 | `src/miki/research/services/dataFactoryService.ts` | 85 | 1 | `ed3a21f79042b75fb5cdcc44dcb9827898f88a3d1d37426a89f414c3f0ce9194` | 1 | 1 | 0 |

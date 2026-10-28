@@ -24,7 +24,7 @@ const idle = research.slice(idleStart, renderedPageStart);
 
 assert.ok(research.includes('function isSyntheticSearchResult('), 'Synthetic search guard must exist');
 assert.ok(research.includes('function isSourceBackedSearchResult('), 'URL-backed source guard must exist');
-assert.ok(research.includes("const sourceEvidenceIds = sourceBackedResults.slice(0, 3).map"), 'Learning must assign source-backed Evidence IDs');
+assert.ok(research.includes("const sourceEvidenceIds: string[] = [];"), 'Learning must collect source-backed Evidence IDs');
 assert.ok(learning.includes('evidenceService.recordWebEvidence('), 'Search materials must be recorded by EvidenceService');
 assert.ok(!learning.includes("evidenceIdentityService.create('search'"), 'Synthetic evidence identity must not replace Evidence records');
 assert.ok(learning.includes('this.hasVerifiedResearchOutcome(options)'), 'Verification flags must be checked against persisted evidence and claims');
@@ -33,11 +33,11 @@ assert.ok(research.includes("claim.status !== 'SUPPORTED' && claim.status !== 'D
 assert.ok(learning.includes('if (options?.resolvedAgendaId && verifiedResearchOutcome)'), 'Agenda resolution must be gated by verified research');
 assert.ok(learning.includes("verificationStatus: effectiveVerificationStatus"), 'Stored learning status must reflect validated verification');
 
-for (const marker of ['mock (non-real)', 'mock_fallback', 'knowledge.local', '【テスト用モック】', '実データではありません']) {
-  assert.ok(research.includes(marker), `Search learning mock marker missing: ${marker}`);
-}
-for (const marker of ['mock (non-real)', 'mock_fallback', 'knowledge.local', 'テスト用モック', '実データではありません']) {
-  assert.ok(evidence.includes(marker), `Evidence rejection marker missing: ${marker}`);
+assert.ok(evidence.includes('export function isSyntheticWebMaterial('), 'A shared synthetic-material classifier must exist');
+assert.ok(research.includes('return isSyntheticWebMaterial({'), 'Search learning must use the shared classifier');
+assert.ok(evidence.includes('return isSyntheticWebMaterial(input);'), 'Evidence rejection must use the shared classifier');
+for (const marker of ['local synthetic fallback', 'synthetic fallback', 'offline fallback', 'fallback result', 'synthetic result', 'mock (non-real)', 'mock_fallback', 'knowledge.local', 'テスト用モック', '【テスト用モック】', '【テスト用モックデータ】', '実データではありません']) {
+  assert.ok(evidence.includes(marker), `Shared synthetic-material marker missing: ${marker}`);
 }
 
 assert.ok(research.includes('const UNVERIFIED_RESEARCH_COOLDOWN_MS = 24 * 60 * 60 * 1000;'), '24-hour unverified research cooldown must be configured');

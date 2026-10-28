@@ -47,6 +47,9 @@ jobs:
       - name: Verify research provenance and learning gates P331
         run: node scripts/verify_research_learning_integrity_p331.mjs
 
+      - name: Verify shared research provenance and Evidence status P334
+        run: node scripts/verify_research_learning_integrity_p334.mjs
+
       - name: Verify web content understanding
         run: npx tsx scripts/verify_web_content_understanding.ts
 
