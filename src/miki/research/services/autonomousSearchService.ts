@@ -148,6 +148,7 @@ export function mergeSearchResults(
         item: {
           ...item,
           url: canonicalUrl || item.url,
+          provider: output.provider,
           sourceId: identity.sourceId,
           independenceClusterId: identity.independenceClusterId,
         },
@@ -202,12 +203,22 @@ function isSyntheticSearchResult(result: WebSearchResultItem): boolean {
   });
 }
 
-function isSourceBackedSearchResult(result: WebSearchResultItem): boolean {
-  return Boolean(
-    String(result.source || '').trim() &&
-    /^https?:\/\/\S+$/i.test(String(result.url || '').trim()) &&
-    !isSyntheticSearchResult(result)
-  );
+export function isSourceBackedSearchResult(result: WebSearchResultItem): boolean {
+  const source = String(result.source || '').trim();
+  const rawUrl = String(result.url || '').trim();
+  if (!source || !rawUrl || isSyntheticSearchResult(result)) return false;
+
+  try {
+    const parsedUrl = new URL(rawUrl);
+    return (
+      (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') &&
+      Boolean(parsedUrl.hostname) &&
+      !parsedUrl.username &&
+      !parsedUrl.password
+    );
+  } catch {
+    return false;
+  }
 }
 
 const SEARCH_CONFIG_KEY='miki_autonomous_search_config_v1';

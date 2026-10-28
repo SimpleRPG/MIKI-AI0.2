@@ -53,6 +53,9 @@ jobs:
       - name: Verify system diagnostic report template syntax P336
         run: node scripts/verify_system_logger_diagnostic_template_p336.mjs
 
+      - name: Verify background web research provenance P337
+        run: npx tsx scripts/verify_background_web_research_provenance_p337.ts
+
       - name: Verify web content understanding
         run: npx tsx scripts/verify_web_content_understanding.ts
 

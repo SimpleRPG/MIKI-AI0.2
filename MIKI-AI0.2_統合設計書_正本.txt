@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-28
-正本Revision：2026-10-28-P336
+基準日：2026-10-29
+正本Revision：2026-10-29-P337
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -548,7 +548,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] OTHER | src/miki/execution.ts | lines=40 | symbols=execution | callers=1 | deps=22 | Tests=49 / Markers=2
 - [USED] execution | src/miki/execution/services/androidNativeRunnerAdapterService.ts | lines=275 | symbols=AndroidNativeRunnerAdapterService, androidNativeRunnerAdapterService | callers=5 | deps=4 | Plugin=MIKINativeRunner / Tests=16
 - [USED] execution | src/miki/execution/services/automationStudioService.ts | lines=16 | symbols=WorkflowDefinition, WorkflowStage, WorkflowStep, automationStudioService | callers=3 | deps=1 | Storage=miki_automation_workflows_v1
-- [USED] execution | src/miki/execution/services/backgroundWorkerService.ts | lines=1580 | symbols=BackgroundWorkerService, backgroundWorkerService, canRunDeepSleep, canRunShallowSleep, getDeepSleepUnmetReasons | callers=3 | deps=42 | Storage=miki_ai_workmanager_config,miki_ai_workmanager_constraints,miki_ai_workmanager_logs / Tests=5
+- [USED] execution | src/miki/execution/services/backgroundWorkerService.ts | lines=1587 | symbols=BackgroundWorkerService, backgroundWorkerService, canRunDeepSleep, canRunShallowSleep, getDeepSleepUnmetReasons | callers=3 | deps=42 | Storage=miki_ai_workmanager_config,miki_ai_workmanager_constraints,miki_ai_workmanager_logs / Tests=5
 - [USED] execution | src/miki/execution/services/executableExplanationService.ts | lines=12 | symbols=ExplanationEvidence, executableExplanationService | callers=1 | deps=1
 - [USED] execution | src/miki/execution/services/executionEventBusService.ts | lines=90 | symbols=ExecutionEvent, ExecutionEventBusService, ExecutionEventHandler, ExecutionEventType, executionEventBusService | callers=33 | deps=0
 - [USED] execution | src/miki/execution/services/executionPlanningService.ts | lines=1 | symbols=executionPlanningService | callers=1 | deps=0 | Tests=1
@@ -660,7 +660,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] promotion | src/miki/promotion/services/verifiedKnowledgePromotionService.ts | lines=143 | symbols=VerifiedKnowledgePromotion, VerifiedKnowledgePromotionService, verifiedKnowledgePromotionService | callers=9 | deps=4 | Storage=miki_verified_knowledge_promotions_v1
 - [USED] OTHER | src/miki/research.ts | lines=43 | symbols= internalWebQueryLearningCycleService , research | callers=1 | deps=23 | Tests=16 / Markers=1
 - [ORPHAN] research | src/miki/research/index.ts | lines=5 | symbols=- | callers=0 | deps=2 | Tests=20
-- [USED] research | src/miki/research/services/autonomousSearchService.ts | lines=1109 | symbols=AutonomousSearchConfig, AutonomousSearchExecutionResult, AutonomousSearchService, AutonomousSearchStats, SearchProviderExecutionStatus | callers=3 | deps=15 | Storage=miki_autonomous_search_config_v1,miki_autonomous_search_records_v1,miki_autonomous_search_stats_v1 / Tests=6
+- [USED] research | src/miki/research/services/autonomousSearchService.ts | lines=1320 | symbols=AutonomousSearchConfig, AutonomousSearchExecutionResult, AutonomousSearchService, AutonomousSearchStats, SearchProviderExecutionStatus | callers=3 | deps=15 | Storage=miki_autonomous_search_config_v1,miki_autonomous_search_records_v1,miki_autonomous_search_stats_v1 / Tests=6
 - [USED] research | src/miki/research/services/causalInvestigationService.ts | lines=22 | symbols=CausalHypothesis, CausalInvestigation, causalInvestigationService | callers=3 | deps=1 | Storage=miki_causal_investigations_v1
 - [USED] research | src/miki/research/services/claimEvidenceService.ts | lines=60 | symbols=ClaimEvidenceAssessment, ClaimEvidenceService, claimEvidenceService | callers=1 | deps=3 | Tests=1
 - [USED] research | src/miki/research/services/dataFactoryService.ts | lines=1 | symbols= dataFactoryService  | callers=1 | deps=1
@@ -1106,7 +1106,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [ORPHAN] LEGACY_OR_SHARED | src/services/storagePlanningService.ts | lines=220 | symbols=StoragePlanningService, storagePlanningService | callers=0 | deps=4 | Storage=miki_storage_audit_log_v32
 - [USED] LEGACY_OR_SHARED | src/services/storageService.ts | lines=847 | symbols=storageService | callers=277 | deps=1 | Tests=7 | Role=CANONICAL_DOMAIN_IMPLEMENTATION
 - [AVAILABLE_EXPORT_ONLY] LEGACY_OR_SHARED | src/services/syntheticDataService.ts | lines=779 | symbols=SyntheticDataService, syntheticDataService, toolsService | callers=1 | deps=9 | Storage=miki_ai_synthetic_batches
-- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=1033 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
+- [USED] LEGACY_OR_SHARED | src/services/systemLogger.ts | lines=1020 | symbols=RuntimeMemorySample, StepExecutionSnapshot, SystemLogEntry, systemLogger | callers=261 | deps=1 | Tests=2
 - [USED] LEGACY_OR_SHARED | src/services/taskCaseMemoryService.ts | lines=45 | symbols=TaskCaseMaturity, TaskCaseMemoryService, TaskCaseOutcome, TaskCaseRecord, taskCaseMemoryService | callers=4 | deps=5
 - [USED] LEGACY_OR_SHARED | src/services/taskExecutionOrchestratorService.ts | lines=6 | symbols=TaskExecutionHandle, TaskExecutionOrchestratorService, TaskExecutionStatus, taskExecutionOrchestratorService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/execution/services/taskExecutionOrchestratorService.ts
 - [USED] LEGACY_OR_SHARED | src/services/taskLineageService.ts | lines=6 | symbols=TaskLineageRecord, TaskLineageService, taskLineageService | callers=0 | deps=1 | Role=COMPATIBILITY_RE_EXPORT_FACADE; canonical=src/miki/execution/services/taskLineageService.ts
@@ -1818,18 +1818,18 @@ B-012
 完了条件：共有合成素材判定、summary拒否、URLに一致しないEvidence拒否、REJECTED Evidence拒否、拒否時に学習副作用を起こさないことをGitHub Actionsで確認する。
 
 B-013
-状態：実装予定
+状態：検証待ち
 優先度：P1
 件名：バックグラウンドWeb自律成長経路にも検索結果単位の来歴・URL検査を適用する。
-根拠（P333）：`backgroundWorkerService.ts`は検索結果を取得後、`learnFromSearch()`の`isSourceBackedSearchResult()`を通さず、個々の結果を骨格抽出へ渡し、複合スニペットを表現パターン抽出へ直接渡している。現状は後段のProvider名検査が中心で、結果ごとのHTTP(S) URLと合成素材判定を同じ入口で強制していない。
-完了条件：すべてのバックグラウンド検索結果に共通の合成素材・URL検査を適用する。検査拒否時は骨格・表現候補の登録が0件であることをVerifier/CIで確認する。
+根拠（P333、P337実装）：`backgroundWorkerService.ts`の検索結果処理へ、共有`isSourceBackedSearchResult()`、合成summary拒否、実Provider判定を追加した。検査前の結果は骨格・表現抽出へ渡さず、表現抽出でも異なる結果のsnippetを1つのURLへ誤って帰属させない。
+完了条件：個別URL・出典欠落・モック・不正スキーム・資格情報付きURL・不正Provider・合成summaryの拒否、および拒否結果から候補登録が発生しないことを専用VerifierとGitHub Actionsで確認する。
 
 B-014
-状態：実装予定
+状態：検証待ち
 優先度：P1
 件名：並列検索の集約Providerを実ソースProviderと混同せず、有効な検索結果を学習へ接続する。
-根拠（P333）：`autonomousSearchService.ts`は複数Provider成功時に`provider: 'parallel'`を返すが、`webMaterialPatternExtractor.ts`の`VALID_WEB_REAL_DATA_PROVIDERS`に`parallel`はない。`backgroundWorkerService.ts`は個別結果のProviderではなく`searchRes.provider`を抽出器へ渡すため、実データ由来結果であっても骨格・表現学習がProvider判定で拒否され得る。集約Providerを許可するだけではなく、各結果の来歴とURLを検証してからProviderの由来を保持する必要がある。
-完了条件：複数Provider検索でも、各結果に帰属できる実ProviderとURL検査結果を維持する。`parallel`という集約値だけを根拠に許可・拒否せず、実ソースを伴う有効結果のみ学習されることをCIで確認する。
+根拠（P333、P337実装）：`mergeSearchResults()`の各結果へ実Providerを保持し、バックグラウンド経路は各結果のProviderとURLを検査してから骨格・表現抽出へ渡す。`parallel`を個別結果のProviderとして使わない。
+完了条件：複数Provider検索の結果ごとにProvider帰属が維持され、`parallel`だけの結果・許可一覧外Provider・合成結果・ソースURL不正が学習されないことを専用VerifierとGitHub Actionsで確認する。
 
 B-015
 状態：調査中
@@ -1844,6 +1844,20 @@ B-016
 件名：systemLoggerの診断レポートにある未エスケープのバッククォートでTypeScript構文が壊れる問題を修正する。
 根拠（P335、P336実装）：P330で追加された`reportHeader`のTermux起動案内に未エスケープのバッククォートがあり、Actions #924/#925で`systemLogger.ts:974:75`のTypeScriptパースが失敗した。P336では診断TXT内のコマンド・URLを通常表記に変更し、テンプレート本文にネストしたバッククォートが再発しない専用VerifierをWorkflowへ追加する。
 完了条件：テンプレート本文の余分なバッククォートがなく、Termux起動案内とサーバー停止時の注意を保持する。専用Verifier、既存関連検証、lint、Web build、post-push回帰検査が成功し、APK buildとArtifactを実際に確認するまで検証待ちを解除しない。
+
+B-017
+状態：調査中
+優先度：P1
+件名：候補ブラウザE2Eのloopback URL検証を文字列prefixではなくURL構造で行う。
+根拠（P337監査）：`android/app/src/main/java/com/miki/ai/MikiWorkManagerPlugin.kt`の`runCandidateBrowserE2E()`は`startsWith("http://127.0.0.1:")`または`startsWith("http://localhost:")`を検査した後、`WebView.loadUrl(url)`を呼ぶ。`http://127.0.0.1:1234@evil.example/`のようにprefixは一致しても解析後のhostが外部になる形を文字列検査だけでは防げない。通常のpreview生成経路からこの形へ到達できるかは未確認で、悪用成立を断定しない。
+完了条件：scheme・解析後host・port・userinfoをURIとして検証し、loopback以外を拒否する。main-frame navigationとredirectも検査し、正規preview E2Eを維持することを専用テストとCIで確認する。
+
+B-018
+状態：調査中
+優先度：P2
+件名：SearXNGメディア取得時にredirect後のURLとIPv6／特殊プライベート宛先を再検査する。
+根拠（P337監査）：`src/miki/research/services/searxngMediaFetchService.ts`の`SearxngMediaFetchRuntime`は初期URLを`assertAllowedUrl()`で検査してから`fetch()`するが、`request()`はredirect後の宛先を確認せず、現行プライベートhost判定はIPv6 loopback・link-local等を網羅していない。該当Runtimeの実装とVerifier以外に通常Research経路からの参照は見つかっておらず、実際の到達可能性や悪用成立は未確認。
+完了条件：呼出経路とredirect挙動を確認し、redirectごとのscheme／host検証およびloopback・private・link-local・metadata宛先の拒否を追加する。公開URLの正常取得を維持する境界テストとCIで確認する。
 
 B-002
 状態：実装予定
@@ -12650,3 +12664,13 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - Actions #924（run ID `40681721390`）および#925（run ID `40682539060`）のログで、`verify_research_learning_integrity_p331.mjs`と`verify_research_learning_integrity_p334.mjs`の成功後、`verify_web_content_understanding.ts`が`src/services/systemLogger.ts:974:75`の未エスケープバッククォートで失敗し、post-push回帰も同じ構文エラーで失敗したことを確認した。
 - `reportHeader`内のTermux案内から内側のバッククォートを除き、表示内容を保つ。`verify_system_logger_diagnostic_template_p336.mjs`でテンプレート境界と案内文を確認するWorkflow stepを追加した。
 - P336はソース修正・専用Verifier追加・P299追跡ソースインベントリの再生成を含む。GitHub Actionsの結果、APK build／Artifact、実機動作はpush後に実際の結果を確認するまで未確定とする。P222基準の古い完全再帰分類値は再集計していない。
+
+
+【2026-10-29-P337 バックグラウンドWeb研究来歴修正・CI索引整合】
+
+- `mergeSearchResults()`が検索Providerを集約wrapperにだけ保持していたため、結果アイテムへ実Providerを持たせ、`isSourceBackedSearchResult()`を構造的なURL検査へ拡張してexportする。
+- バックグラウンドWeb自律成長では合成summary・各結果のsource/HTTP(S) URL・Providerを確認し、通過した結果だけを骨格／表現抽出へ渡す。表現snippetは結果単位で抽出し、複数URLの内容を先頭URLへ帰属させない。
+- `verify_background_web_research_provenance_p337.ts`を追加し、ソース判定、credentials／scheme／mock拒否、各Providerの保持、バックグラウンドの入口接続を検査するWorkflow stepを登録した。
+- Actions #926で失敗した正本索引の`src/services/systemLogger.ts`の行数を、同ファイルの実際の改行数1020へ修正し、今回変更した主要ソースの索引行数も再集計した。
+- 候補ブラウザE2Eのprefix URL検査（B-017）とメディア取得のredirect／private-host境界（B-018）を追加調査として記録した。到達可能性や悪用成立は確認済みと扱わない。
+- このP337コマンドは提示時点では未実行である。Termuxで新しいmain cloneへの反映とPUSHが完了した後、GitHub Actionsの専用Verifier・既存検証・APK build・Artifactを実結果で確認する。P299追跡ソースインベントリは変更ファイルをstageした後に再生成する。P222基準の完全再帰インベントリは再集計しておらず、リポジトリ全体の再監査完了を主張しない。

@@ -29,6 +29,8 @@ import { featureFlagsService } from '../../safety/services/featureFlagsService';
 import { teacherRequestService } from '../../learning/services/teacherRequestService';
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
 import { unifiedWebResearchService } from '../../research/services/unifiedWebResearchService';
+import { isSourceBackedSearchResult } from '../../research/services/autonomousSearchService';
+import { isSyntheticWebMaterial } from '../../memory/services/evidenceService';
 import { autonomousEvolutionService } from '../../autonomy/services/autonomousEvolutionService';
 import { memoryAuditService } from '../../memory/services/memoryAuditService';
 import { embeddingService } from '../../research/services/embeddingService';
@@ -48,7 +50,7 @@ import { autonomousHardeningService } from '../../autonomy/services/autonomousHa
 import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { surfaceVariationGrowthService } from '../../conversation/services/surfaceVariationGrowthService';
 import { bannedTopicsConfigService } from '../../safety/services/bannedTopicsConfigService';
-import { WebMaterialPatternExtractor } from '../../research/services/webMaterialPatternExtractor';
+import { isRealDataProvider, WebMaterialPatternExtractor } from '../../research/services/webMaterialPatternExtractor';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
 import { selfImprovementRequestEventService } from '../../improvement/services/selfImprovementRequestEventService';
 import { executionEventBusService } from './executionEventBusService';
@@ -1218,11 +1220,22 @@ export class BackgroundWorkerService {
 
             // 2. Web検索実行 (最大8件取得)
             const searchRes = await unifiedWebResearchService.executeSearch(webTopic, { maxResults: 8 });
-            const searchResults = searchRes.results || [];
+            const rawSearchResults = searchRes.results || [];
+            const syntheticSummary = isSyntheticWebMaterial({
+              title: '',
+              snippet: String(searchRes.summary || ''),
+              source: String(searchRes.provider || ''),
+            });
+            const searchResults = syntheticSummary
+              ? []
+              : rawSearchResults.filter((result) => {
+                  const provider = String(result.provider || '').trim();
+                  return isSourceBackedSearchResult(result) && isRealDataProvider(provider);
+                });
 
             systemLogger.info(
               'SELF_IMPROVEMENT',
-              `🌐 [Web素材取得件数] クエリ:「${webTopic}」, 取得件数: ${searchResults.length}件`
+              `🌐 [Web素材取得件数] クエリ:「${webTopic}」, 取得件数: ${rawSearchResults.length}件, 来歴検査通過: ${searchResults.length}件`
             );
 
             if (searchResults.length > 0) {
@@ -1233,10 +1246,9 @@ export class BackgroundWorkerService {
                 const skeletonCand = WebMaterialPatternExtractor.extractSkeletonStructuresFromWebText({
                   title: r.title,
                   snippet: r.snippet,
-                  summary: searchRes.summary,
                   sourceQuery: webTopic,
                   sourceUrl: r.url,
-                  provider: searchRes.provider,
+                  provider: String(r.provider || ''),
                 });
 
                 if (skeletonCand) {
@@ -1249,22 +1261,17 @@ export class BackgroundWorkerService {
               }
 
               // 4. 横(言い回し)への還元: 普遍的言い回し抽出 -> processWebMaterialForVariationGrowth (WEB_DERIVED, 意味保持検査合格のみ)
-              const combinedSnippets = searchResults
-                .map((r) => r.snippet)
-                .filter(Boolean)
-                .join('\n');
-              let webVarResult = { processedCount: 0, passedCount: 0, rejectedCount: 0, promotedCount: 0 };
-              if (combinedSnippets) {
-                const surfacePatterns = WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({
-                  text: combinedSnippets,
+              const surfacePatterns = searchResults.flatMap((result) =>
+                WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({
+                  text: String(result.snippet || ''),
                   sourceQuery: webTopic,
-                  sourceUrl: searchResults[0]?.url || '',
-                  provider: searchRes.provider,
-                });
-
-                if (surfacePatterns.length > 0) {
-                  webVarResult = surfaceVariationGrowthService.processWebMaterialForVariationGrowth(surfacePatterns, 3);
-                }
+                  sourceUrl: String(result.url || ''),
+                  provider: String(result.provider || ''),
+                })
+              );
+              let webVarResult = { processedCount: 0, passedCount: 0, rejectedCount: 0, promotedCount: 0 };
+              if (surfacePatterns.length > 0) {
+                webVarResult = surfaceVariationGrowthService.processWebMaterialForVariationGrowth(surfacePatterns, 3);
               }
 
               systemLogger.info(
