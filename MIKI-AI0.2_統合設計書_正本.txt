@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
-基準日：2026-10-29
-正本Revision：2026-10-29-P339
+基準日：2026-10-30
+正本Revision：2026-10-30-P340
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,8 +119,8 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-10-29-P339
-- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324/P325/P326/P327/P328/P329/P330/P331/P332/P333/P334/P335/P336/P337/P338/P339の対象ファイル変更後に全ファイル件数を再集計したものではない。P332・P333・P335は候補登録のみでソースファイル変更なし。P334/P336ではP299定義の追跡ソースインベントリを再生成するが、P222基準の完全再帰件数は再集計しない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
+- 現行Revision: 2026-10-30-P340
+- 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324/P325/P326/P327/P328/P329/P330/P331/P332/P333/P334/P335/P336/P337/P338/P339/P340の対象ファイル変更後に全ファイル件数を再集計したものではない。P332・P333・P335は候補登録のみでソースファイル変更なし。P334/P336ではP299定義の追跡ソースインベントリを再生成するが、P222基準の完全再帰件数は再集計しない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
 - 現行追跡ソース一覧（P299）: `CURRENT_SOURCE_INVENTORY_P299.json`、閲覧版 `CURRENT_SOURCE_INVENTORY_P299.md`。対象拡張子と集計基準を明示し、Git追跡パスから再生成・検証する。P97/P222の分類・到達性集計やP287～P293のAuthority監査を置き換えない。
@@ -251,7 +251,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 記載形式: [状態] Domain | ファイル | 行数 | Export/Class/Function | 呼出元数 | 依存数 | Storage/Plugin/Test/Marker。詳細な全配列、SHA-256、全呼出元・依存先はJSON正本索引を参照する。
 
-- [USED] UI | src/App.tsx | lines=2041 | symbols=App | callers=1 | deps=113 | Tests=18
+- [USED] UI | src/App.tsx | lines=2111 | symbols=App | callers=1 | deps=113 | Tests=18
 - [USED] OTHER | src/app/appRuntimeLifecycleService.ts | lines=178 | symbols=appRuntimeLifecycleService | callers=1 | deps=31 | Tests=1
 - [ORPHAN] OTHER | src/app/startupPhaseSchedulerService.ts | lines=3 | symbols=startupPhaseSchedulerService | callers=0 | deps=0 | Tests=2
 - [USED] OTHER | src/autonomous_modules/anaphora_history_stack.ts | lines=89 | symbols=AnaphoraHistoryStack, AnaphoraStackItem, anaphoraHistoryStack | callers=2 | deps=0
@@ -455,10 +455,10 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - [USED] CORE | src/miki/core/services/coreExecutionTraceService.ts | lines=85 | symbols=CoreTraceStage, coreExecutionTraceService | callers=1 | deps=1
 - [USED] CORE | src/miki/core/services/coreLineageReadModelService.ts | lines=94 | symbols=VerifiedCoreLineage, coreLineageReadModelService | callers=2 | deps=4 | Tests=1
 - [ORPHAN] CORE | src/miki/core/services/coreOperationRegistryService.ts | lines=37 | symbols=CoreOperationContract, coreOperationRegistryService | callers=0 | deps=0
-- [USED] CORE | src/miki/core/services/coreOrchestratorService.ts | lines=1956 | symbols=CoreImprovementDecision, CoreImprovementDecisionInput, CoreImprovementGateEvidence, CoreOrchestrationResult, UnifiedCognitiveStateSnapshot | callers=4 | deps=41 | Tests=17
+- [USED] CORE | src/miki/core/services/coreOrchestratorService.ts | lines=1980 | symbols=CoreImprovementDecision, CoreImprovementDecisionInput, CoreImprovementGateEvidence, CoreOrchestrationResult, UnifiedCognitiveStateSnapshot | callers=4 | deps=41 | Tests=17
 - [USED] CORE | src/miki/core/services/corePlanRevisionService.ts | lines=134 | symbols=CorePlanRevision, OperationInstanceStatus, RequiredBusinessOperation, corePlanRevisionService | callers=5 | deps=3
 - [USED] CORE | src/miki/core/services/coreResultService.ts | lines=383 | symbols=CoreRequest, CoreResult, CoreResultListener, CoreResultStatus, coreResultService | callers=10 | deps=6 | Storage=miki_core_results_v2
-- [USED] CORE | src/miki/core/services/coreTaskIngressService.ts | lines=144 | symbols=CoreTaskIngressRequest, CoreTaskKind, coreTaskIngressService | callers=12 | deps=15 | Tests=2
+- [USED] CORE | src/miki/core/services/coreTaskIngressService.ts | lines=145 | symbols=CoreTaskIngressRequest, CoreTaskKind, coreTaskIngressService | callers=12 | deps=15 | Tests=2
 - [USED] CORE | src/miki/core/services/cognitiveQualityService.ts | lines=115 | symbols=CognitiveQualityService, cognitiveQualityService, ClarificationPlan, ExplanationPlan | callers=1 | deps=4 | Tests=0
 - [USED] CORE | src/miki/core/services/coreWorldModelGatewayService.ts | lines=8 | symbols=coreWorldModelGatewayService | callers=1 | deps=2 | Tests=1
 - [USED] CORE | src/miki/core/services/crossDomainCirculationService.ts | lines=104 | symbols=DomainCoverage, DomainTransition, MikiDomain, crossDomainCirculationService | callers=23 | deps=2 | Storage=miki_cross_domain_circulation_v1
@@ -1777,7 +1777,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 - 新規実装、Owner変更、呼出経路変更、Storage変更、Native移行、テスト追加時は、設計書とJSON索引を同じ納品で更新する。
 - 後続履歴本文は設計思想と変更系譜の保存領域であり、現在状態の検索には本節を使用する。
 
-■ 調査・実装予定一覧（P339 / 2026-10-29）
+■ 調査・実装予定一覧（P340 / 2026-10-30）
 
 - 本一覧は最新mainの実コードとCI結果を根拠にした現行課題である。P324でコード修正と関連CIの成功を確認したB-001は一覧から除外し、完了根拠をP325履歴へ保存する。
 - 状態は「調査中」「実装予定」「検証待ち」で管理する。完了条件をコード差分と関連CIで確認するまで項目を削除しない。独立実装は1バッチ最大2件とする。
@@ -1863,7 +1863,7 @@ B-019
 状態：検証待ち
 優先度：P1
 件名：通常会話の進捗表示・中断制御をCORE受付タスクの完了待ちから分離する。
-根拠（P337入口監査）：`src/App.tsx`の`handleSendMessage()`は`typedCoreUiGatewayService.submitConversation()`を呼んだ直後に`await`し、COREタスク完了後に`setIsGenerating`／`setIsLoading`と会話メッセージを設定する。AbortControllerもその後に生成される。`handleStopGeneration()`はAbortControllerと`deterministicRuntimeService`を中断するが、先行したCOREタスクIDを受け取って`coreTaskIngressService.cancel()`へ渡していない。`coreTaskIngressService.cancel(taskId)`自体は存在する一方、`submit()`は`coreOrchestratorService.run()`の完了後にタスクIDを返すため、長い処理中の進捗・中断・重複送信境界が最上流で未接続。実コードで確認済みだが、実端末での再現・影響時間は未測定。
+根拠（P339実装・入口監査・GitHub Actions #929）：`src/main.tsx`はStorage準備後に`App`を読み込み、`src/components/ChatPanel.tsx`の`handleSend()`から`src/App.tsx`の`handleSendMessage()`へ送信する。P339ではCORE受付await前にAbortController・ユーザー／アシスタント待機表示・loading状態を設定し、`typedCoreUiGatewayService.submitConversation()` → `coreTaskIngressService.submit()` → `coreOrchestratorService.run()`へAbortSignalを伝搬させる。COREの実Task取消、取消後の遅延応答抑止、P216回答最終化経路を実コードで確認した。GitHub Actions #929ではP339専用Verifier、Webビルド、後続回帰検査が成功した一方、`verify_runtime_failure_fixes.mjs`の4検査が実装索引の旧行数で失敗し、APK工程はスキップされた。実UIの自動操作と実機動作は未確認。
 完了条件：入力時点でユーザー／アシスタントの表示と待機状態を確立し、COREタスクIDを実行中に取得できる仕組みまたは同等の取消トークンを用意して、停止操作が実際のCOREタスクへ到達し、取消後の遅延完了が画面状態を上書きしないこと。連打／複数要求、遅延CORE、取消／完了競合、通常回答のP216 finalizationを専用テストとGitHub Actionsで検証し、UI feedback／CORE Request／Result lifecycleの重複がないことを確認する。
 
 B-002
@@ -12695,3 +12695,10 @@ P279 2026-10-18: 正常な保守サイクルから誤ってEXECUTION_FAILUREを�
 - `typedCoreUiGatewayService.submitConversation()` → `coreTaskIngressService.submit()` → `coreOrchestratorService.run()`にAbortSignalを伝搬させ、CORE Blackboardの実タスクを取消す。取消済み要求はIngressの後続学習・補助イベントを行わずに返す。Orchestratorは記憶評価・Domain参加計画・Synthesis準備・Domain dispatchのawait復帰点で取消状態を再確認し、取消後の遅延応答を通常のTask結果として処理しない。完了済みタスクへの遅延StopがCoreResultをrejectedへ巻き戻さないようにする。
 - `scripts/verify_conversation_cancellation_p339.mjs`を追加し、実CORE ingressを通じた取消伝搬、取消後の遅延戻り、完了／取消競合、およびUIからCORE・P216最終化までの接続をGitHub Actionsで確認する。既存のP216最終化経路は維持する。
 - `CURRENT_SOURCE_INVENTORY_P299.json`および`.md`は、P299の既存生成器でGit追跡パスから再生成する。P339のGitHub Actions、Web build、APK、Artifact、実機挙動は本記録作成時点では未確認。PUSH後に結果を取得し、失敗があれば最新mainの実ログ・差分に基づいて修正する。全tree再帰件数を本バッチで再集計したとは扱わない。
+
+【2026-10-30-P340 P339実装索引同期・入口監査】
+
+- GitHub mainのP339 commit `0508e773efaa2fe4b0f1f0c27df76dbaad549020`を確認した。再帰Git treeは非truncatedの2,007 entries。通常入力経路は`main.tsx` → Storage準備後の`App`読み込み → `ChatPanel.handleSend()` → `App.handleSendMessage()` → Typed CORE Gateway → CORE TaskIngress → CORE Orchestrator → `conversationCoreService.execute()` → CORE/P216 finalization → UI。送信時の待機表示、実Taskへの取消信号、取消後のUI更新防止をソースで確認した。物理端末のUI操作・実機稼働確認とは区別する。
+- GitHub Actions #929（run ID `40973083586`）は失敗。P339専用キャンセルVerifier、Webビルド、後続回帰検査は成功したが、`verify_runtime_failure_fixes.mjs`が現行実装索引の行数不一致で4検査失敗し、APK生成工程がスキップされた。失敗対象は`src/App.tsx`（正本2,041行／実ソース2,111行）、`coreOrchestratorService.ts`（1,956行／1,980行）、`coreTaskIngressService.ts`（144行／145行）であり、正本索引を実ソース行数へ同期する。
+- 正本先頭Revision・現行Revision・P225〜P340連続列を同期する。これはP222基準の完全再帰インベントリ件数を再集計したという意味ではない。P299追跡インベントリはP339で生成・CI確認済みであり、本バッチでソースファイルは変更していない。
+- B-019は「検証待ち」を維持する。P339専用Verifier PASSだけで完了扱いにせず、修正後Actionsのruntime契約検証、Web／APK／Artifactを再確認し、実UI自動操作・実機確認は未実施として区別する。
