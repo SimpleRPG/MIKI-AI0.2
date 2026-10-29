@@ -9,11 +9,11 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1856 |
-| ソースファイル | 1401 |
-| 相対import候補を字句走査したECMAScriptファイル | 1314 |
-| 相対import候補 | 3945 |
-| 追跡パスへ解決できた候補 | 3917 |
+| 対象追跡パス（監査制御ファイルを除く） | 1857 |
+| ソースファイル | 1402 |
+| 相対import候補を字句走査したECMAScriptファイル | 1315 |
+| 相対import候補 | 3950 |
+| 追跡パスへ解決できた候補 | 3922 |
 | 未解決候補（即不具合判定ではない） | 28 |
 
 ## ファイル一覧
@@ -251,6 +251,7 @@
 | `scripts/verify_context_closure_phase1.mjs` | 1118 | 11 | `67262973f1608351e215ab4ee4696360b1e7791c8d67d630a5d021c376c03a83` | 0 | 0 | 0 |
 | `scripts/verify_continuous_surface_p199.mjs` | 2685 | 1 | `720738c200a5c70ebe01ec1958c066b73d4609c4a89a201c4f46b64a00f36f0f` | 1 | 1 | 0 |
 | `scripts/verify_contract_propagation_stage5.mjs` | 4022 | 35 | `29f7dfb977fe19f283a8f467e02c4b8c837844f33bd7684e5bfab10050db123c` | 0 | 0 | 0 |
+| `scripts/verify_conversation_cancellation_p339.mjs` | 8740 | 202 | `47c8aba07ea892e6911165664196d61f8d71ef37bbef9110fdb7b9622b6527aa` | 5 | 5 | 0 |
 | `scripts/verify_conversation_components_p213.mjs` | 1229 | 5 | `361cd85b213acd314a3df5e08aa0822f0dfe306a3b0f4e03e8d7552bd9dc25ef` | 0 | 0 | 0 |
 | `scripts/verify_conversation_geometry_p206.mjs` | 2114 | 1 | `467048975114606ec9ae1e354b88a3d25626a5dd066876b110e02bedbf5271f1` | 2 | 2 | 0 |
 | `scripts/verify_conversation_graph_completion_p214.mjs` | 1427 | 6 | `3ac7b3b19a0d35fe770db1048772e6b4c94515c5dcfe2126eb50fa1c5dc6576a` | 0 | 0 | 0 |
@@ -468,7 +469,7 @@
 | `scripts/verify_workspace_repository_stage33.mjs` | 915 | 1 | `2ff81e47175b1fdb73d88f7c63b14208e6f9907c7a5f6d5acff42011938f9494` | 0 | 0 | 0 |
 | `scripts/verify_world_patterns_p111.mjs` | 1554 | 1 | `7bbe0c27d4733c537e6a79b8ff81ec1d364e6936a6bcbe34714b679461e18f77` | 2 | 2 | 0 |
 | `server.ts` | 259250 | 5846 | `db2a5302f6d0108a7a2b476cc246808f77b3a8d4365acc5c682d404e85cda0f4` | 44 | 42 | 2 |
-| `src/App.tsx` | 88486 | 2041 | `1b780617985e3659f160ae8accb63b5117e4d7a7eca92c42bf834addb175bd76` | 117 | 117 | 0 |
+| `src/App.tsx` | 90916 | 2111 | `d1b66d3fb1e4368b4cbb3a6b3b46e931fb1e5cf90d1e04430bb64abf0351cbad` | 117 | 117 | 0 |
 | `src/app/appRuntimeLifecycleService.ts` | 9930 | 178 | `c0b20a9b7cfd4fd3a9848bf775c25aaa4011b296dcb1c6cfb533e02d03626907` | 31 | 31 | 0 |
 | `src/app/startupPhaseSchedulerService.ts` | 706 | 3 | `bb8ce0bc1ef0201da3c50eb1f06ec8ad60edab97bfb54ad47b481004981b975c` | 0 | 0 | 0 |
 | `src/autonomous_modules/anaphora_history_stack.ts` | 2590 | 89 | `40d02342541b6b4562a2c2754dd9079b8a1cb8eaa3b3307b195b2af9e407c46c` | 0 | 0 | 0 |
@@ -670,10 +671,10 @@
 | `src/miki/core/services/coreExecutionTraceService.ts` | 2036 | 85 | `91b2919ccae41f2d87bf1e85a2dc16195f7a3d08379af3856f659544dc2f0d65` | 1 | 1 | 0 |
 | `src/miki/core/services/coreLineageReadModelService.ts` | 4853 | 94 | `fb90f68b2a0e54f85964b19510cc0ee9b25fdef6bc202af6b4a85ea7e3669ee4` | 4 | 4 | 0 |
 | `src/miki/core/services/coreOperationRegistryService.ts` | 1265 | 37 | `83610a85d64030e05711dbd01a2a4d826779bd4caef0f4b630d40847d88c756d` | 0 | 0 | 0 |
-| `src/miki/core/services/coreOrchestratorService.ts` | 110213 | 1956 | `5e4b1a3f20281115f9f2ca78360eacc25cd74debd9dc2fb54db8e87d09373852` | 43 | 43 | 0 |
+| `src/miki/core/services/coreOrchestratorService.ts` | 111563 | 1980 | `33595c870193963cade3b096a2a6054f2f7506d58294512584ae1107639f7b81` | 43 | 43 | 0 |
 | `src/miki/core/services/corePlanRevisionService.ts` | 6587 | 144 | `f2da95bc0472cc4ab5ee552fdac87336d75cc0c2f439f8a44aaa77b5b08437b0` | 4 | 4 | 0 |
 | `src/miki/core/services/coreResultService.ts` | 11709 | 383 | `a1c2b2b489efdbb7f7f7e9e6e70c18958c89d20096f9ecb06921b7251e54bd52` | 6 | 6 | 0 |
-| `src/miki/core/services/coreTaskIngressService.ts` | 18701 | 144 | `660020219bc84d2ab2b41e8ff84f9c159a641d2fae75347b869993c8d18700de` | 15 | 15 | 0 |
+| `src/miki/core/services/coreTaskIngressService.ts` | 18781 | 145 | `3d0b6f439b508635d39922e08a3b44012194a8eafc6de370abe85f8f8be04c63` | 15 | 15 | 0 |
 | `src/miki/core/services/coreUnifiedGraphManagerP153Service.ts` | 4439 | 15 | `aa4ed655468d23bfae5a74e304b9e8d7f170ea2d69d43b073bb6a49b6a1caad4` | 4 | 4 | 0 |
 | `src/miki/core/services/coreWorldModelGatewayService.ts` | 763 | 8 | `9ea94084f8ccee631b2c34d394065efe6cbfd632cc7635f418e0048309b5e65d` | 2 | 2 | 0 |
 | `src/miki/core/services/crossDomainCirculationService.ts` | 3430 | 104 | `e24b026d10f19698a795f6213108b847575e42217389f4c4ce0b4e73c2c6666a` | 2 | 2 | 0 |
@@ -804,7 +805,7 @@
 | `src/miki/core/services/visualStyleLearningService.ts` | 5908 | 104 | `18f51d183a029ed1fd8863c77d68d3c3f38548fd1b412b3323e40c0894ce3e4e` | 1 | 1 | 0 |
 | `src/miki/core/services/workspaceRepositoryRegistryService.ts` | 5643 | 23 | `d9a78a77c2d4ccaec6f4314b13a6b04afecd7621912aa94f756b27ef967dec0e` | 3 | 3 | 0 |
 | `src/miki/core/ui/typedChatUiGatewayService.ts` | 2228 | 28 | `0bac3fa31ea7d7bf7709fbbf413def366ec246515e0beab338a5102311b5570b` | 20 | 20 | 0 |
-| `src/miki/core/ui/typedCoreUiGatewayService.ts` | 13202 | 75 | `c0d5cc2eb417a4da71f65ad5b1d90f13a4c09519cb9998ac2739647f01457aa2` | 9 | 9 | 0 |
+| `src/miki/core/ui/typedCoreUiGatewayService.ts` | 13229 | 75 | `ec46ce0ad7d96b6d409d2e21444541b0b29795403c5466be7c29086c837dba2c` | 9 | 9 | 0 |
 | `src/miki/core/ui/typedGitHubUiGatewayService.ts` | 2274 | 30 | `a974881144232f08f7166be8fb030a7e436c51b6f111b8c2d137fe4322171283` | 11 | 11 | 0 |
 | `src/miki/core/ui/typedImprovementUiGatewayService.ts` | 26448 | 441 | `682bc953231acee9f99800829c347ee656ff4fcd3178655b450c446f54b273f9` | 29 | 29 | 0 |
 | `src/miki/core/ui/typedMemoryUiGatewayService.ts` | 4954 | 69 | `13ea669fef67d44444285e1da28b60ff12cf75cd17a6b862ee425b772762eb5f` | 8 | 8 | 0 |

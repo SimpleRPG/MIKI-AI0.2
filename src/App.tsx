@@ -298,6 +298,7 @@ export default function App() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const currentAssistantIdRef = useRef<string | null>(null);
+  const conversationRequestSequenceRef = useRef(0);
   const lastTurnUsedMemoryIdsRef = useRef<string[]>([]);
   const lastTurnStrategyRef = useRef<{
     strategy: ConversationStrategy;
@@ -783,7 +784,7 @@ export default function App() {
         prev.map((msg) => {
           if (msg.id === targetId) {
             let content = msg.content;
-            if (content.includes('初期化中') || content.includes('ロード中') || content.includes('推論中') || content.includes('準備中') || content.includes('生成中')) {
+            if (content.includes('初期化中') || content.includes('ロード中') || content.includes('推論中') || content.includes('準備中') || content.includes('生成中') || content.includes('受付中') || content.includes('処理中')) {
               content = '⏹ 生成を中断しました。';
             } else if (!content.includes('中断')) {
               content = content + '\n\n*(⏹ 生成を中断しました)*';
@@ -1103,12 +1104,64 @@ export default function App() {
   ) => {
     if (!text.trim() && (!attached || attached.length === 0)) return;
 
-    // ユーザーチャット操作を記録し、バックグラウンド重処理の割り込みを防止
     backgroundWorkerService.recordUserActivity();
-    const coreTaskPromise = typedCoreUiGatewayService.submitConversation(text, Boolean(attached?.length));
-    const coreTask = await coreTaskPromise;
-    const coreRequestId = coreTask.coreResult?.requestId || coreTask.task.taskId;
-    
+
+    // 新しい送信が始まったら、実行中の要求を取り消す。
+    // 完了済みメッセージはisStreaming=falseのため変更しない。
+    if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+      const previousAssistantId = currentAssistantIdRef.current;
+      systemLogger.warn('CHAT', '前回の未完了リクエストを中断して新規リクエストを開始します');
+      abortControllerRef.current.abort();
+      if (previousAssistantId) {
+        setMessages((prev) => prev.map((msg) =>
+          msg.id === previousAssistantId && msg.isStreaming
+            ? {
+                ...msg,
+                content: `${msg.content}\n\n*(⏹ 新しい要求により中断しました)*`,
+                isStreaming: false,
+              }
+            : msg
+        ));
+      }
+    }
+
+    // CORE受付の完了前に、UI状態と取消トークンを確立する。
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    conversationRequestSequenceRef.current += 1;
+    const requestSuffix = `${Date.now()}_${conversationRequestSequenceRef.current}`;
+    const fastUserId = `msg_user_${requestSuffix}`;
+    const fastAssistantId = `msg_asst_${requestSuffix}`;
+    currentAssistantIdRef.current = fastAssistantId;
+    const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
+
+    setIsGenerating(true);
+    setIsLoading(true);
+    systemLogger.startSession();
+
+    const userMsg: ChatMessage = {
+      id: fastUserId,
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+      attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
+    };
+
+    setMessages((prev) => [
+      ...prev,
+      userMsg,
+      {
+        id: fastAssistantId,
+        role: 'assistant',
+        content: '⚡ CORE受付中…',
+        timestamp: Date.now(),
+        speaker: activeSpeaker,
+        engineMode: 'autonomous_rule',
+        isStreaming: true,
+      },
+    ]);
+
+    let coreRequestId = '';
     const getCoreTracking = (rId: string): CoreTrackingInfo | undefined => {
       const cr = coreResultService.get(rId);
       if (!cr) return undefined;
@@ -1126,66 +1179,68 @@ export default function App() {
       };
     };
 
-    if (abortControllerRef.current) {
-      systemLogger.warn('CHAT', '前回の未完了リクエストが存在したため中断して新規リクエストを開始します');
-      abortControllerRef.current.abort();
-    }
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-    setIsGenerating(true);
-    setIsLoading(true);
-
-    systemLogger.startSession();
-
-    // Step 1: Request received and user input analyzed
-    systemLogger.step(1, 10, 'チャット送信リクエスト受付 & 入力解析', {
-      inputLength: text.length,
-      snippet: text.slice(0, 100),
-      tokenEstimate: Math.ceil(text.length / 2.5),
-      attachedCount: attached?.length || 0,
-      attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
-      selectedEngineMode: engineMode,
-      speakerMode,
-      coreRequestId,
-    });
-
-    const activeMemories = memories.filter((m) => m.active);
-
-    // COREモードでは、旧来のシャドー解析群を実行しない。
-    // それらはLLM経路の比較・観測用であり、通常のCORE応答には不要なため、
-    // 1メッセージあたりのCPU処理・DB照会・ログ量を大幅に削減する。
-    
-    const fastUserId = 'msg_user_' + Date.now();
-    const fastAssistantId = 'msg_asst_' + Date.now();
-    currentAssistantIdRef.current = fastAssistantId;
-    const activeSpeaker = SPEAKER_PROFILES[speakerMode] || SPEAKER_PROFILES.miki;
-
-    coreResultService.updateStatus(coreRequestId, 'processing', {
-      route: ['conversation', 'execution'],
-      processedCategories: ['conversation'],
-    });
-
-    const userMsg: ChatMessage = {
-      id: fastUserId,
-      role: 'user',
-      content: text,
-      timestamp: Date.now(),
-      attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
-      coreTracking: getCoreTracking(coreRequestId),
-    };
-    setMessages((prev) => [...prev, userMsg, {
-      id: fastAssistantId,
-      role: 'assistant',
-      content: '⚡ COREコアで処理中…',
-      timestamp: Date.now(),
-      speaker: activeSpeaker,
-      engineMode: 'autonomous_rule',
-      isStreaming: true,
-      coreTracking: getCoreTracking(coreRequestId),
-    }]);
-
     try {
+      // AbortSignalはCORE ingressからOrchestratorの実タスクまで伝搬する。
+      const coreTask = await typedCoreUiGatewayService.submitConversation(
+        text,
+        Boolean(attached?.length),
+        abortController.signal
+      );
+
+      // Stopまたは新規送信後の遅延完了は、回答確定・画面更新へ進めない。
+      if (abortController.signal.aborted) return;
+
+      coreRequestId = coreTask.coreResult?.requestId || coreTask.task.taskId;
+      if (coreTask.task.status === 'CANCELLED') {
+        setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId
+          ? {
+              ...msg,
+              content: '⏹ CORE受付タスクは中断されました。',
+              isStreaming: false,
+              coreTracking: getCoreTracking(coreRequestId),
+            }
+          : msg
+        ));
+        return;
+      }
+
+      systemLogger.step(1, 10, 'チャット送信リクエスト受付 & 入力解析', {
+        inputLength: text.length,
+        snippet: text.slice(0, 100),
+        tokenEstimate: Math.ceil(text.length / 2.5),
+        attachedCount: attached?.length || 0,
+        attachedFiles: attached?.map((a) => ({ name: a.name, size: a.content.length, type: a.type })),
+        selectedEngineMode: engineMode,
+        speakerMode,
+        coreRequestId,
+      });
+
+      coreResultService.updateStatus(coreRequestId, 'processing', {
+        route: ['conversation', 'execution'],
+        processedCategories: ['conversation'],
+      });
+
+      setMessages((prev) => prev.map((msg) => {
+        if (msg.id === fastUserId) {
+          return { ...msg, coreTracking: getCoreTracking(coreRequestId) };
+        }
+        if (msg.id === fastAssistantId) {
+          return {
+            ...msg,
+            content: '⚡ COREコアで処理中…',
+            coreTracking: getCoreTracking(coreRequestId),
+          };
+        }
+        return msg;
+      }));
+
+      const activeMemories = memories.filter((m) => m.active);
+
+      // COREモードでは、旧来のシャドー解析群を実行しない。
+      // それらはLLM経路の比較・観測用であり、通常のCORE応答には不要なため、
+      // 1メッセージあたりのCPU処理・DB照会・ログ量を大幅に削減する。
       systemLogger.step(2, 10, '⚡ CORE高速経路: シャドー解析をスキップ');
+
       const pipelineRes = await conversationCoreService.execute({
         prompt: text,
         persona: persona?.name,
@@ -1195,6 +1250,9 @@ export default function App() {
         recentMessages: messages,
         messageId: userMsg.id,
       });
+
+      if (abortController.signal.aborted) return;
+
       setConversationState(pipelineRes.nextConversationState);
       if (pipelineRes.taskExecution?.task_id) {
         taskConversationFeedbackService.publishStarted(pipelineRes.taskExecution.task_id);
@@ -1254,6 +1312,8 @@ export default function App() {
           })
         : { status: 'COMPLETED' as const };
 
+      if (abortController.signal.aborted) return;
+
       setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId ? {
         ...msg,
         content: visibleFinalContent,
@@ -1269,21 +1329,31 @@ export default function App() {
         responseLength: visibleFinalContent.length,
       });
     } catch (error) {
+      if (abortController.signal.aborted) return;
       const message = error instanceof Error ? error.message : String(error);
       systemLogger.error('CHAT', `CORE高速経路エラー: ${message}`);
-      coreResultService.fail(coreRequestId, message, {
-        route: ['conversation'],
-        processedCategories: ['conversation'],
-      });
+      if (coreRequestId) {
+        coreResultService.fail(coreRequestId, message, {
+          route: ['conversation'],
+          processedCategories: ['conversation'],
+        });
+      }
       setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId ? {
         ...msg,
         content: `CORE処理でエラーが発生しました。\n\n${message}`,
         isStreaming: false,
-        coreTracking: getCoreTracking(coreRequestId),
+        coreTracking: coreRequestId ? getCoreTracking(coreRequestId) : undefined,
       } : msg));
     } finally {
-      setIsGenerating(false);
-      setIsLoading(false);
+      // 先行リクエストのfinallyが、後続リクエストの状態を解除しないようにする。
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+        if (currentAssistantIdRef.current === fastAssistantId) {
+          currentAssistantIdRef.current = null;
+        }
+        setIsGenerating(false);
+        setIsLoading(false);
+      }
     }
     return;
   };

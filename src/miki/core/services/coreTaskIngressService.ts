@@ -17,7 +17,7 @@ export type CoreTaskKind='USER_REQUEST'|'SELF_IMPROVEMENT'|'EXECUTION_EVENT'|'VE
 export interface CoreTaskIngressRequest {kind:CoreTaskKind;goal:string;source:MikiDomain|'core';payload?:Record<string,unknown>;initialPayload?:Record<string,unknown>;maxCycles?:number;}
 export type CoreConversationFinalizationResult = CoreOrchestrationResult & { finalAnswer: string; finalization?: P216FinalAnswer };
 class CoreTaskIngressService {
- async submit(request:CoreTaskIngressRequest):Promise<CoreOrchestrationResult>{
+ async submit(request:CoreTaskIngressRequest,signal?:AbortSignal):Promise<CoreOrchestrationResult>{
   if(!request.goal.trim())throw new Error('CORE_TASK_GOAL_REQUIRED');
   const maxCycles=request.maxCycles??coreCycleSettingsService.maxCyclesFor(request.kind);
   const payload:Record<string,unknown>={...(request.payload||{}),...(request.initialPayload||{}),kind:request.kind};
@@ -36,7 +36,8 @@ class CoreTaskIngressService {
   payload.crossDomainTransferCandidates=preliminaryTransferCandidates;
   payload.cognitiveContinuity={schemaVersion:1,planKey:intentPlan.deterministicKey,intentCount:intentPlan.units.length,hypothesisCount:intentPlan.hypotheses.length,preparedAt:Date.now()};
   if(request.kind==='SELF_IMPROVEMENT')payload.capabilityLedgerContext=capabilityLedgerService.buildCoreContext(request.goal);
-  const result=await coreOrchestratorService.run(request.goal,request.source as MikiDomain,payload,maxCycles);
+  const result=await coreOrchestratorService.run(request.goal,request.source as MikiDomain,payload,maxCycles,signal);
+  if(result.task.status==='CANCELLED')return result;
   const task=result.task;
   taskBlackboardService.post(task.taskId,'OBSERVATION','core','cognitiveContinuity:requestPlan',{planKey:intentPlan.deterministicKey,isMultiIntent:intentPlan.isMultiIntent,intents:intentPlan.units.map(unit=>({id:unit.id,text:unit.text,goal:unit.goal,action:unit.action,target:unit.target,dependencies:unit.dependencies})),hypotheses:intentPlan.hypotheses,unresolved:intentPlan.unresolved},[]);
   taskBlackboardService.post(task.taskId,'OBSERVATION','core','decision:explanationPlan',explanationPlan,[]);

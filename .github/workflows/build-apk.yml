@@ -56,6 +56,9 @@ jobs:
       - name: Verify background web research provenance P337
         run: npx tsx scripts/verify_background_web_research_provenance_p337.ts
 
+      - name: Verify conversation CORE cancellation lifecycle P339
+        run: npx tsx scripts/verify_conversation_cancellation_p339.mjs
+
       - name: Verify web content understanding
         run: npx tsx scripts/verify_web_content_understanding.ts
 

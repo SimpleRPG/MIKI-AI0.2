@@ -80,7 +80,7 @@ class CoreOrchestratorService {
   else{nextAction='PREPARE_ADOPTION';reasons.push('ALL_GATES_PASSED');}
   return{nextAction,reasons,canMutateCanonical:false,requiresExternalEvaluation:true};
  }
- async run(goal:string,source:MikiDomain='core',payload:Record<string,unknown>={},maxCycles=18):Promise<CoreOrchestrationResult>{
+ async run(goal:string,source:MikiDomain='core',payload:Record<string,unknown>={},maxCycles=18,signal?:AbortSignal):Promise<CoreOrchestrationResult>{
   const created=taskBlackboardService.create(goal,source,payload);
   systemLogger.info(
     'SYSTEM',
@@ -272,7 +272,20 @@ class CoreOrchestratorService {
   taskBlackboardService.append(created.taskId,'DECISION','core','coreAccepted',{goal,source,mode:'CORE_18_DOMAIN_ORCHESTRATION',requestId});
   taskBlackboardService.setStatus(created.taskId,'ROUTING');
   coreResultService.updateStatus(requestId,'processing',{route:['core']});
-  return this.continueTask(created.taskId,maxCycles,requestId);
+
+  const cancelFromSignal=()=>{this.cancel(created.taskId);};
+  if(signal){
+   signal.addEventListener('abort',cancelFromSignal,{once:true});
+   if(signal.aborted)cancelFromSignal();
+  }
+  const afterSignal=taskBlackboardService.get(created.taskId);
+  if(afterSignal?.status==='CANCELLED'){
+   if(signal)signal.removeEventListener('abort',cancelFromSignal);
+   return {task:afterSignal,cycles:0,dispatched:0,coreResult:coreResultService.get(requestId)};
+  }
+  return this.continueTask(created.taskId,maxCycles,requestId).finally(()=>{
+   if(signal)signal.removeEventListener('abort',cancelFromSignal);
+  });
  }
  async resumeFromExecutionEvent(taskId:string,maxCycles=18):Promise<CoreOrchestrationResult|undefined>{
   const currentTask=taskBlackboardService.get(taskId);
@@ -402,9 +415,13 @@ class CoreOrchestratorService {
  }
  cancel(taskId:string){
   const currentTask=taskBlackboardService.get(taskId);
+  if(!currentTask||currentTask.status==='COMPLETED')return undefined;
+  if(currentTask.status==='CANCELLED')return currentTask;
   const reqId=this.resolveRequestId(currentTask,taskId);
+  const cancelled=taskBlackboardService.cancel(taskId);
+  if(!cancelled)return undefined;
   coreResultService.rejected(reqId,'Task cancelled');
-  return taskBlackboardService.cancel(taskId);
+  return cancelled;
  }
  finalizeConversationResponse(taskId:string,response:unknown,validation:{passed:boolean;failedReasons:string[]}):CoreOrchestrationResult|undefined{
   const currentTask=taskBlackboardService.get(taskId);
@@ -1094,6 +1111,7 @@ class CoreOrchestratorService {
     taskBlackboardService.append(taskId,'ERROR','core',`cognitiveStateCheckpointPersistFailed:${cycles}`,{error:error instanceof Error?error.message:String(error),stateId:cognitiveState.stateId,stateHash:cognitiveState.stateHash,action:'PERSISTENCE_RETRY_REQUIRED'},cognitiveState.evidenceIds);
    }
    await this.assessCoreMemoryContext(stateBase,currentPayload,cycles);
+   if(taskBlackboardService.get(taskId)?.status==='CANCELLED')break coreCycle;
    const current=taskBlackboardService.get(taskId)!;
    const plateau=plateauDetectorService.evaluate(current);
    if(plateau.plateau){
@@ -1197,6 +1215,7 @@ class CoreOrchestratorService {
      );
    });
    const domainParticipation=await rustDomainParticipationKernelService.rank(routes);
+   if(taskBlackboardService.get(taskId)?.status==='CANCELLED')break coreCycle;
    routes=domainParticipation.routes;
    taskBlackboardService.append(taskId,'DECISION','core',`rustDomainParticipation:${cycles}`,{
      participatingDomains:domainParticipation.participatingDomains,
@@ -1340,6 +1359,7 @@ class CoreOrchestratorService {
         maxComponents:Number(route.payload.maxComponents||4),
         synthesisContext:await this.buildSynthesisContext(current, route.payload)
       });
+      if(taskBlackboardService.get(taskId)?.status==='CANCELLED')break coreCycle;
 
       dispatched+=1;
 
@@ -1498,6 +1518,7 @@ class CoreOrchestratorService {
       }
     }
 
+    if(taskBlackboardService.get(taskId)?.status==='CANCELLED')break coreCycle;
     const envelope=domainRouterService.create('core',route.target,route.command,{...route.payload,taskId,requestId:reqId},{correlationId:taskId,causationId:taskId,depth:cycles});
     coreExecutionTraceService.record(taskId,cycles,'DISPATCH_START',{
       target:route.target,
@@ -1515,6 +1536,7 @@ class CoreOrchestratorService {
     let reply: Awaited<ReturnType<typeof domainRouterService.dispatch>>;
     try{
       reply=await domainRouterService.dispatch(envelope);
+      if(taskBlackboardService.get(taskId)?.status==='CANCELLED')break coreCycle;
     }catch(error){
       const task=taskBlackboardService.get(taskId);
       systemLogger.error(
@@ -1719,6 +1741,8 @@ class CoreOrchestratorService {
      reasons:completion.reasons
    });
    taskBlackboardService.append(taskId,'DECISION','core',`coreCompletionAssessment:${cycles}`,completion);
+   // 進行中のawaitから戻った後に取消済みなら、遅延した完了判定で上書きしない。
+   if(taskBlackboardService.get(taskId)?.status==='CANCELLED')break coreCycle;
    if(completion.businessCompletion){
     taskBlackboardService.append(taskId,'RESULT','core','coreCompletion',{completedBy:'core',cycle:cycles,failClosed:true,requiredDomains:completion.requiredDomains});
     taskBlackboardService.setStatus(taskId,'COMPLETED');

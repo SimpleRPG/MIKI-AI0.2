@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1856,
-    "sourceFileCount": 1401,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1314,
-    "relativeImportCandidateCount": 3945,
-    "resolvedRelativeImportCandidateCount": 3917,
+    "trackedPathCountExcludingControlPaths": 1857,
+    "sourceFileCount": 1402,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1315,
+    "relativeImportCandidateCount": 3950,
+    "resolvedRelativeImportCandidateCount": 3922,
     "unresolvedRelativeImportCandidateCount": 28
   },
   "records": [
@@ -3002,6 +3002,47 @@
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/verify_conversation_cancellation_p339.mjs",
+      "bytes": 8740,
+      "lines": 202,
+      "sha256": "47c8aba07ea892e6911165664196d61f8d71ef37bbef9110fdb7b9622b6527aa",
+      "relativeImportCandidates": [
+        {
+          "line": 15,
+          "specifier": "../src/services/storageService.ts",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 17,
+          "specifier": "../src/miki/core/services/taskBlackboardService.ts",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/taskBlackboardService.ts"
+        },
+        {
+          "line": 18,
+          "specifier": "../src/miki/core/services/coreResultService.ts",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/coreResultService.ts"
+        },
+        {
+          "line": 19,
+          "specifier": "../src/miki/core/services/coreOrchestratorService.ts",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/coreOrchestratorService.ts"
+        },
+        {
+          "line": 20,
+          "specifier": "../src/miki/core/services/coreTaskIngressService.ts",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/coreTaskIngressService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 5,
+      "resolvedRelativeImportCount": 5,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -6818,9 +6859,9 @@
     },
     {
       "path": "src/App.tsx",
-      "bytes": 88486,
-      "lines": 2041,
-      "sha256": "1b780617985e3659f160ae8accb63b5117e4d7a7eca92c42bf834addb175bd76",
+      "bytes": 90916,
+      "lines": 2111,
+      "sha256": "d1b66d3fb1e4368b4cbb3a6b3b46e931fb1e5cf90d1e04430bb64abf0351cbad",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -14268,9 +14309,9 @@
     },
     {
       "path": "src/miki/core/services/coreOrchestratorService.ts",
-      "bytes": 110213,
-      "lines": 1956,
-      "sha256": "5e4b1a3f20281115f9f2ca78360eacc25cd74debd9dc2fb54db8e87d09373852",
+      "bytes": 111563,
+      "lines": 1980,
+      "sha256": "33595c870193963cade3b096a2a6054f2f7506d58294512584ae1107639f7b81",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14619,9 +14660,9 @@
     },
     {
       "path": "src/miki/core/services/coreTaskIngressService.ts",
-      "bytes": 18701,
-      "lines": 144,
-      "sha256": "660020219bc84d2ab2b41e8ff84f9c159a641d2fae75347b869993c8d18700de",
+      "bytes": 18781,
+      "lines": 145,
+      "sha256": "3d0b6f439b508635d39922e08a3b44012194a8eafc6de370abe85f8f8be04c63",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -18974,9 +19015,9 @@
     },
     {
       "path": "src/miki/core/ui/typedCoreUiGatewayService.ts",
-      "bytes": 13202,
+      "bytes": 13229,
       "lines": 75,
-      "sha256": "c0d5cc2eb417a4da71f65ad5b1d90f13a4c09519cb9998ac2739647f01457aa2",
+      "sha256": "ec46ce0ad7d96b6d409d2e21444541b0b29795403c5466be7c29086c837dba2c",
       "relativeImportCandidates": [
         {
           "line": 1,
