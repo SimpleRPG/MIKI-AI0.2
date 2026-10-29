@@ -388,6 +388,7 @@ export default function App() {
           void observeNativeMorphology();
         }
       } catch (error) {
+        if (!disposed) appRuntimeLifecycleService.failCoreRoutingReady(error);
         const rootElement = document.getElementById('root');
         if (rootElement) {
           startupRecoveryService.renderFatal(rootElement, error);
@@ -1153,7 +1154,7 @@ export default function App() {
       {
         id: fastAssistantId,
         role: 'assistant',
-        content: '⚡ CORE受付中…',
+        content: '⏳ MIKI起動準備を確認中…',
         timestamp: Date.now(),
         speaker: activeSpeaker,
         engineMode: 'autonomous_rule',
@@ -1180,6 +1181,15 @@ export default function App() {
     };
 
     try {
+      // Domain登録と接続監査が終わるまでCOREへdispatchしない。
+      // 待機中のStopはAbortSignalで即時解除できる。
+      await appRuntimeLifecycleService.waitForCoreRoutingReady(abortController.signal);
+      if (abortController.signal.aborted) return;
+      setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId
+        ? { ...msg, content: '⚡ CORE受付中…' }
+        : msg
+      ));
+
       // AbortSignalはCORE ingressからOrchestratorの実タスクまで伝搬する。
       const coreTask = await typedCoreUiGatewayService.submitConversation(
         text,

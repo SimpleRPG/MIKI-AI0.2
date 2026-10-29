@@ -1,4 +1,5 @@
 import { systemLogger } from '../services/systemLogger';
+import { CoreRoutingReadinessGate } from './coreRoutingReadinessGate';
 import { crossDomainCirculationService } from '../miki/core/services/crossDomainCirculationService';
 import { domainIntegrationBootstrapService } from '../miki/core/services/domainIntegrationBootstrapService';
 import { capabilityLearningService } from '../miki/capability/services/capabilityLearningService';
@@ -33,6 +34,15 @@ import { selfImprovementMetricsService } from '../miki/improvement/services/self
 class AppRuntimeLifecycleService {
   private initialized = false;
   private generation = 0;
+  private readonly coreRoutingReadinessGate = new CoreRoutingReadinessGate();
+
+  waitForCoreRoutingReady(signal?: AbortSignal): Promise<void> {
+    return this.coreRoutingReadinessGate.wait(signal);
+  }
+
+  failCoreRoutingReady(reason: unknown): void {
+    this.coreRoutingReadinessGate.markFailed(reason);
+  }
 
   private yieldToBrowser(): Promise<void> {
     return new Promise<void>((resolve) => window.setTimeout(resolve, 0));
@@ -40,6 +50,7 @@ class AppRuntimeLifecycleService {
 
   async initialize(): Promise<void> {
     if (this.initialized) return;
+    this.coreRoutingReadinessGate.reset();
     this.initialized = true;
     const generation = ++this.generation;
 
@@ -54,6 +65,7 @@ class AppRuntimeLifecycleService {
             try {
               await domainIntegrationBootstrapService.initialize();
               if (generation !== this.generation) return;
+              this.coreRoutingReadinessGate.markReady();
               return;
             } catch (error) {
               if (generation !== this.generation) return;
@@ -124,6 +136,7 @@ class AppRuntimeLifecycleService {
           if (generation !== this.generation) return;
         } catch (error) {
           if (generation !== this.generation) return;
+          this.coreRoutingReadinessGate.markFailed(error);
           const elapsedMs = Math.round(performance.now() - startedAt);
           systemLogger.recordRuntimeBreadcrumb('RUNTIME_STAGE_FAILED', {
             stage: stage.name, status: 'FAILED', lastCompleted: lastCompletedStage, elapsedMs,
@@ -160,6 +173,10 @@ class AppRuntimeLifecycleService {
     this.generation += 1;
     if (!this.initialized) return;
     this.initialized = false;
+    this.coreRoutingReadinessGate.markFailed(
+      new Error('APP_RUNTIME_DISPOSED_BEFORE_CORE_READY')
+    );
+    this.coreRoutingReadinessGate.reset();
 
     taskConversationFeedbackService.dispose();
     domainIntegrationBootstrapService.dispose();

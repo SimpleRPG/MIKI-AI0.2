@@ -9,12 +9,12 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1857 |
-| ソースファイル | 1402 |
-| 相対import候補を字句走査したECMAScriptファイル | 1315 |
-| 相対import候補 | 3950 |
-| 追跡パスへ解決できた候補 | 3922 |
-| 未解決候補（即不具合判定ではない） | 28 |
+| 対象追跡パス（監査制御ファイルを除く） | 1859 |
+| ソースファイル | 1404 |
+| 相対import候補を字句走査したECMAScriptファイル | 1317 |
+| 相対import候補 | 3953 |
+| 追跡パスへ解決できた候補 | 3924 |
+| 未解決候補（即不具合判定ではない） | 29 |
 
 ## ファイル一覧
 
@@ -437,6 +437,7 @@
 | `scripts/verify_stages_35_40.mjs` | 1421 | 1 | `6ef1539610c0814c70a22bc8e9e6be504c146f5b3e549f4f59fbea2e5e48cbed` | 0 | 0 | 0 |
 | `scripts/verify_stages_41_50.mjs` | 1669 | 1 | `af2bfde4ddd6db6bc9fb43d65b8793455df94041e69f9997380f386d9e8e1bd2` | 0 | 0 | 0 |
 | `scripts/verify_stages_41_50_connections.mjs` | 1300 | 7 | `78c8ef732b37cb4f5bc4e77aa44a6b0706ac8ef8590d59fbf46b50f1013e494a` | 0 | 0 | 0 |
+| `scripts/verify_startup_core_readiness_p341.mjs` | 5899 | 128 | `fbdb284b272d970f1638e53f2ce16fc15f8d6b4881dc16f6ee53d79fa3f70ac2` | 2 | 1 | 1 |
 | `scripts/verify_system_logger_diagnostic_template_p336.mjs` | 1290 | 25 | `c2f472b32706aa95a4e1ca8935a74e2c8d5cc21eae9d00cf9377be1f85aa2d53` | 0 | 0 | 0 |
 | `scripts/verify_task_route_failure_contracts.ts` | 3414 | 99 | `b91d8af96a587150174acd13f01f7ee66a753326584f56b59f281b097b97963e` | 3 | 3 | 0 |
 | `scripts/verify_termux_build_v190.sh` | 645 | 13 | `ab340b08c770d9974c5977374a185221a37ed3f7be5d1aacd588bcf418845ce4` | 0 | 0 | 0 |
@@ -469,8 +470,9 @@
 | `scripts/verify_workspace_repository_stage33.mjs` | 915 | 1 | `2ff81e47175b1fdb73d88f7c63b14208e6f9907c7a5f6d5acff42011938f9494` | 0 | 0 | 0 |
 | `scripts/verify_world_patterns_p111.mjs` | 1554 | 1 | `7bbe0c27d4733c537e6a79b8ff81ec1d364e6936a6bcbe34714b679461e18f77` | 2 | 2 | 0 |
 | `server.ts` | 259250 | 5846 | `db2a5302f6d0108a7a2b476cc246808f77b3a8d4365acc5c682d404e85cda0f4` | 44 | 42 | 2 |
-| `src/App.tsx` | 90916 | 2111 | `d1b66d3fb1e4368b4cbb3a6b3b46e931fb1e5cf90d1e04430bb64abf0351cbad` | 117 | 117 | 0 |
-| `src/app/appRuntimeLifecycleService.ts` | 9930 | 178 | `c0b20a9b7cfd4fd3a9848bf775c25aaa4011b296dcb1c6cfb533e02d03626907` | 31 | 31 | 0 |
+| `src/App.tsx` | 91449 | 2121 | `ce26f170f61cd96eb92973906710733b854ffd57a1917366bfe467fa3b0373ce` | 117 | 117 | 0 |
+| `src/app/appRuntimeLifecycleService.ts` | 10624 | 195 | `17f560901bb72ae9fc91c6cba541aa0623b01f02790913477f817ee4c8a38f05` | 32 | 32 | 0 |
+| `src/app/coreRoutingReadinessGate.ts` | 2321 | 90 | `b09ec24e88c788732b5639e754de51e367627cf5781856b8c6a2e02bd9a60e2d` | 0 | 0 | 0 |
 | `src/app/startupPhaseSchedulerService.ts` | 706 | 3 | `bb8ce0bc1ef0201da3c50eb1f06ec8ad60edab97bfb54ad47b481004981b975c` | 0 | 0 | 0 |
 | `src/autonomous_modules/anaphora_history_stack.ts` | 2590 | 89 | `40d02342541b6b4562a2c2754dd9079b8a1cb8eaa3b3307b195b2af9e407c46c` | 0 | 0 | 0 |
 | `src/autonomous_modules/anaphora_resolver_sample.ts` | 5763 | 162 | `35d90ceee6a6a7543824c14e75fe74fe2b2bbcb786698feda72a55b6fbbe2569` | 0 | 0 | 0 |
