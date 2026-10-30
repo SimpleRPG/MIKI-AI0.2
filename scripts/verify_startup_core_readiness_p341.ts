@@ -54,10 +54,18 @@ const domainBootstrap = read('src/miki/core/services/domainIntegrationBootstrapS
 const domainRouter = read('src/miki/core/services/domainRouterService.ts');
 const workflow = read('.github/workflows/build-apk.yml');
 
+const renderAppStart = main.indexOf('const renderApp = async () => {');
+const appImportIndex = main.indexOf("import('./App')", renderAppStart);
+const storageReadyIndex = main.indexOf('void storageService.ready');
+const storageReadyThenIndex = main.indexOf('  .then(() => {', storageReadyIndex);
+const renderAfterStorageIndex = main.indexOf('return renderApp();', storageReadyThenIndex);
 check(
-  main.indexOf('void storageService.ready') >= 0 &&
-    main.indexOf('import("./App")') > main.indexOf('void storageService.ready'),
-  'application import follows storage hydration'
+  renderAppStart >= 0 &&
+    appImportIndex > renderAppStart &&
+    appImportIndex < storageReadyIndex &&
+    storageReadyThenIndex > storageReadyIndex &&
+    renderAfterStorageIndex > storageReadyThenIndex,
+  'App import is invoked through renderApp only after storage hydration'
 );
 
 const seedIndex = app.indexOf('await selfCodeSpaceService.initializeBundledSeed();');
@@ -85,6 +93,35 @@ check(
 check(
   handler.includes('finalizeConversationResponse(coreTask.task.taskId'),
   'ready conversation keeps the existing CORE/P216 finalization path'
+);
+
+const failureGuardStart = handler.indexOf(
+  'const coreResultStatus = coreTask.coreResult?.status;'
+);
+const failureGuardEnd = handler.indexOf(
+  "systemLogger.step(1, 10, 'チャット送信リクエスト受付 & 入力解析'",
+  failureGuardStart
+);
+const failureGuardBody = failureGuardStart >= 0 && failureGuardEnd > failureGuardStart
+  ? handler.slice(failureGuardStart, failureGuardEnd)
+  : '';
+const processingUpdateIndex = handler.indexOf(
+  "coreResultService.updateStatus(coreRequestId, 'processing'"
+);
+const conversationExecuteIndex = handler.indexOf(
+  'await conversationCoreService.execute({'
+);
+check(
+  failureGuardStart >= 0 &&
+    failureGuardEnd > failureGuardStart &&
+    processingUpdateIndex > failureGuardEnd &&
+    conversationExecuteIndex > failureGuardEnd &&
+    failureGuardBody.includes("coreTask.task.status === 'FAILED'") &&
+    failureGuardBody.includes("coreResultStatus === 'failed'") &&
+    failureGuardBody.includes("coreResultStatus === 'blocked'") &&
+    failureGuardBody.includes("coreResultStatus === 'rejected'") &&
+    failureGuardBody.includes('return;'),
+  'explicit CORE failures stop before processing downgrade and ConversationCore execution'
 );
 check(
   app.includes('appRuntimeLifecycleService.failCoreRoutingReady(error)'),
@@ -116,12 +153,12 @@ check(
 );
 check(
   workflow.includes('Verify startup chat routing readiness P341') &&
-    workflow.includes('run: npx tsx scripts/verify_startup_core_readiness_p341.mjs'),
+    workflow.includes('run: npx tsx scripts/verify_startup_core_readiness_p341.ts'),
   'GitHub Actions executes the P341 startup readiness verifier'
 );
 
 console.log(JSON.stringify({
-  phase: 'P341',
+  phase: 'P342',
   status: 'PASS',
   checks: checks.length,
   verified: checks,

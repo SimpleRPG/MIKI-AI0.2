@@ -5992,10 +5992,10 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "scripts/verify_startup_core_readiness_p341.mjs",
-      "bytes": 5899,
-      "lines": 128,
-      "sha256": "fbdb284b272d970f1638e53f2ce16fc15f8d6b4881dc16f6ee53d79fa3f70ac2",
+      "path": "scripts/verify_startup_core_readiness_p341.ts",
+      "bytes": 7581,
+      "lines": 165,
+      "sha256": "1f6f1e3813e62072e8f3035f7c22341dfe3dc456127b14f3a683e25e053b2606",
       "relativeImportCandidates": [
         {
           "line": 3,
@@ -6004,7 +6004,7 @@
           "resolvedPath": "src/app/coreRoutingReadinessGate.ts"
         },
         {
-          "line": 59,
+          "line": 58,
           "specifier": "./App",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -6881,9 +6881,9 @@
     },
     {
       "path": "src/App.tsx",
-      "bytes": 91449,
-      "lines": 2121,
-      "sha256": "ce26f170f61cd96eb92973906710733b854ffd57a1917366bfe467fa3b0373ce",
+      "bytes": 92865,
+      "lines": 2159,
+      "sha256": "405aaaf688c802104f0ccb472f5f0b19108df7642d149ff4fab5cebd4e2a16ed",
       "relativeImportCandidates": [
         {
           "line": 2,

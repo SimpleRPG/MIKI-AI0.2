@@ -1214,6 +1214,44 @@ export default function App() {
         return;
       }
 
+      // COREの明示的な失敗・拒否を通常回答へ読み替えない。
+      // WAITING / PAUSED はP216最終化前の継続状態なので、ここでは遮断しない。
+      const coreResultStatus = coreTask.coreResult?.status;
+      const coreTaskFailed = coreTask.task.status === 'FAILED';
+      const coreResultFailed =
+        coreResultStatus === 'failed' ||
+        coreResultStatus === 'blocked' ||
+        coreResultStatus === 'rejected';
+
+      if (coreTaskFailed || coreResultFailed) {
+        const failureStatus = String(
+          coreTaskFailed ? 'FAILED' : coreResultStatus
+        );
+        const failureMessage =
+          `COREが${failureStatus}で終了したため、通常回答の生成を停止しました。COREの診断状態を確認してから再試行してください。`;
+
+        systemLogger.error(
+          'CHAT',
+          '[CORE_TASK_FAILURE] normal conversation answer generation stopped',
+          {
+            taskId: coreTask.task.taskId,
+            taskStatus: coreTask.task.status,
+            coreResultStatus,
+          }
+        );
+
+        setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId
+          ? {
+              ...msg,
+              content: failureMessage,
+              isStreaming: false,
+              coreTracking: getCoreTracking(coreRequestId),
+            }
+          : msg
+        ));
+        return;
+      }
+
       systemLogger.step(1, 10, 'チャット送信リクエスト受付 & 入力解析', {
         inputLength: text.length,
         snippet: text.slice(0, 100),

@@ -60,7 +60,7 @@ jobs:
         run: npx tsx scripts/verify_conversation_cancellation_p339.mjs
 
       - name: Verify startup chat routing readiness P341
-        run: npx tsx scripts/verify_startup_core_readiness_p341.mjs
+        run: npx tsx scripts/verify_startup_core_readiness_p341.ts
 
       - name: Verify web content understanding
         run: npx tsx scripts/verify_web_content_understanding.ts
