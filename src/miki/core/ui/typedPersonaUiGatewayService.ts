@@ -1,3 +1,4 @@
+import { appRuntimeLifecycleService } from '../../../app/appRuntimeLifecycleService';
 import { coreTaskIngressService } from '../services/coreTaskIngressService';
 import { personaProfileService, type PersonaProfile, type PersonaProfileReceipt } from '../../conversation/services/personaProfileService';
 
@@ -15,6 +16,7 @@ class TypedPersonaUiGatewayService {
   preview(profile: PersonaProfile) { return personaProfileService.preview(profile); }
 
   async saveProfile(input: Pick<PersonaProfile, 'name' | 'personalityText' | 'avatarId'>): Promise<PersonaUiSaveResult> {
+    await appRuntimeLifecycleService.waitForCoreRoutingReady();
     const core = await coreTaskIngressService.submit({
       kind: 'USER_REQUEST',
       goal: '会話・人格設定を保存する',

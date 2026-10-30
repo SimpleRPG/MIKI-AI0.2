@@ -977,6 +977,7 @@
         "scripts/verify_predictive_preload_phase25.mjs",
         "scripts/verify_safe_performance_phase24.mjs",
         "scripts/verify_stages_41_50.mjs",
+        "scripts/verify_startup_core_readiness_p341.ts",
         "scripts/verify_unified_autonomous_completion_stage17.mjs"
       ],
       "markers": []
@@ -12240,8 +12241,8 @@
       "path": "src/miki/core/ui/typedCoreUiGatewayService.ts",
       "domain": "CORE",
       "status": "USED",
-      "lines": 75,
-      "sha256": "c0d5cc2eb417a4da71f65ad5b1d90f13a4c09519cb9998ac2739647f01457aa2",
+      "lines": 76,
+      "sha256": "191bc0aba3fedae09b7f5339c6ffbfeb8b02a56443704233febefe1569809b5e",
       "exports": [
         "UiCommand",
         "UiCommandResult",
@@ -12305,6 +12306,7 @@
         "src/components/common/CoreActionStatus.tsx"
       ],
       "dependencies": [
+        "src/app/appRuntimeLifecycleService.ts",
         "src/miki/core/services/coreCycleSettingsService.ts",
         "src/miki/core/services/coreTaskIngressService.ts",
         "src/miki/core/services/externalConnectionUiService.ts",
@@ -12319,7 +12321,8 @@
       "plugins": [],
       "events": [],
       "tests": [
-        "scripts/verify_bundled_self_code_seed.mjs"
+        "scripts/verify_bundled_self_code_seed.mjs",
+        "scripts/verify_startup_core_readiness_p341.ts"
       ],
       "markers": []
     },
@@ -12365,8 +12368,8 @@
       "path": "src/miki/core/ui/typedImprovementUiGatewayService.ts",
       "domain": "CORE",
       "status": "USED",
-      "lines": 414,
-      "sha256": "930fe0c7469dfdc745f49cfde3f6973d7cf29e7ce75a3cc8d11cf13aff3b7058",
+      "lines": 446,
+      "sha256": "51bbd6449bb21af91f4e85b66cb8f3e844ed48dd846849673301117764e454e1",
       "exports": [
         "ImprovementUiCommand",
         "ImprovementUiCommandResult",
@@ -12409,6 +12412,7 @@
         "src/components/AutonomousImprovementHome.tsx"
       ],
       "dependencies": [
+        "src/app/appRuntimeLifecycleService.ts",
         "src/miki/autonomy/services/autonomousContinuousEvolutionService.ts",
         "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
         "src/miki/core/services/candidateValidationEvidenceService.ts",
@@ -12432,6 +12436,7 @@
       "plugins": [],
       "events": [],
       "tests": [
+        "scripts/verify_startup_core_readiness_p341.ts",
         "scripts/verify_workspace_completion_stage29.mjs"
       ],
       "markers": []
@@ -12501,8 +12506,8 @@
       "path": "src/miki/core/ui/typedPersonaUiGatewayService.ts",
       "domain": "CORE",
       "status": "USED",
-      "lines": 35,
-      "sha256": "7a6bc1c07e6eeafb04bf775d0be418311758e868d3d26b2e28a0d33781a50f98",
+      "lines": 37,
+      "sha256": "c83f3c68b369960cdb0c62a5f4ebad276fa8eeeadb7836153feb85142bc2b73c",
       "exports": [
         "PersonaUiSaveResult",
         "typedPersonaUiGatewayService"
@@ -12521,13 +12526,16 @@
         "src/components/PersonaSettingsPanel.tsx"
       ],
       "dependencies": [
+        "src/app/appRuntimeLifecycleService.ts",
         "src/miki/conversation/services/personaProfileService.ts",
         "src/miki/core/services/coreTaskIngressService.ts"
       ],
       "storageKeys": [],
       "plugins": [],
       "events": [],
-      "tests": [],
+      "tests": [
+        "scripts/verify_startup_core_readiness_p341.ts"
+      ],
       "markers": []
     },
     {

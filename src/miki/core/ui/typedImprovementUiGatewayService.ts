@@ -1,3 +1,4 @@
+import { appRuntimeLifecycleService } from '../../../app/appRuntimeLifecycleService';
 import { externalDirectiveIntakeService } from '../services/externalDirectiveIntakeService';
 import { improvementIntakeRouterService } from '../services/improvementIntakeRouterService';
 import { isolatedCandidateWorkspaceService } from '../services/isolatedCandidateWorkspaceService';
@@ -99,11 +100,13 @@ class TypedImprovementUiGatewayService {
   getDevelopmentReviewRequests() { return developmentReviewLifecycleService.list(); }
   getDevelopmentReviewPackages() { return developmentReviewLifecycleService.packages(); }
   async startDevelopmentReview(text:string, targetPaths:string[] = []) {
+    await appRuntimeLifecycleService.waitForCoreRoutingReady();
     const normalized=text.trim();
     if(!normalized)throw new Error('DEVELOPMENT_INSTRUCTION_REQUIRED');
     return developmentReviewLifecycleService.start(developmentReviewLifecycleService.create(normalized,targetPaths));
   }
   async decideDevelopmentReview(instructionId:string, decision:'ACCEPT'|'REJECT'|'REQUEST_CHANGES', reason:string) {
+    await appRuntimeLifecycleService.waitForCoreRoutingReady();
     return developmentReviewLifecycleService.decide({ instructionId, decision, reason });
   }
   downloadDevelopmentEvaluationPackage(packageId:string, revision:number) {
@@ -213,6 +216,7 @@ class TypedImprovementUiGatewayService {
 
   requestWithResult(command:ImprovementUiCommand){ return this.sendImprovementCommand(command); }
   async sendImprovementCommand(command:ImprovementUiCommand):Promise<ImprovementUiCommandResult>{
+    await appRuntimeLifecycleService.waitForCoreRoutingReady();
     if(command.commandType==='START_SPECIFIED_IMPROVEMENT'||command.commandType==='DISCOVER_IMPROVEMENT_TARGET'){
       const diagnostic=selfCodeSpaceService.getWorkspaceDiagnostic();
       const sourceFiles=selfCodeSpaceService.listSourceFiles();
@@ -300,6 +304,7 @@ class TypedImprovementUiGatewayService {
   }
 
   async executeDirective(directiveId:string){
+    await appRuntimeLifecycleService.waitForCoreRoutingReady();
     const externalDirective=externalDirectiveIntakeService.list().find(
       (item)=>item.directiveId===directiveId
     );

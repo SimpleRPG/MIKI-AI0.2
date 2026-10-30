@@ -12,9 +12,9 @@
 | 対象追跡パス（監査制御ファイルを除く） | 1859 |
 | ソースファイル | 1404 |
 | 相対import候補を字句走査したECMAScriptファイル | 1317 |
-| 相対import候補 | 3953 |
-| 追跡パスへ解決できた候補 | 3924 |
-| 未解決候補（即不具合判定ではない） | 29 |
+| 相対import候補 | 3958 |
+| 追跡パスへ解決できた候補 | 3927 |
+| 未解決候補（即不具合判定ではない） | 31 |
 
 ## ファイル一覧
 
@@ -437,7 +437,7 @@
 | `scripts/verify_stages_35_40.mjs` | 1421 | 1 | `6ef1539610c0814c70a22bc8e9e6be504c146f5b3e549f4f59fbea2e5e48cbed` | 0 | 0 | 0 |
 | `scripts/verify_stages_41_50.mjs` | 1669 | 1 | `af2bfde4ddd6db6bc9fb43d65b8793455df94041e69f9997380f386d9e8e1bd2` | 0 | 0 | 0 |
 | `scripts/verify_stages_41_50_connections.mjs` | 1300 | 7 | `78c8ef732b37cb4f5bc4e77aa44a6b0706ac8ef8590d59fbf46b50f1013e494a` | 0 | 0 | 0 |
-| `scripts/verify_startup_core_readiness_p341.ts` | 7581 | 165 | `1f6f1e3813e62072e8f3035f7c22341dfe3dc456127b14f3a683e25e053b2606` | 2 | 1 | 1 |
+| `scripts/verify_startup_core_readiness_p341.ts` | 8888 | 187 | `8a81be6d6fe4ea653f51e871a8402ce226796d3433998f7572e5914575370328` | 4 | 1 | 3 |
 | `scripts/verify_system_logger_diagnostic_template_p336.mjs` | 1290 | 25 | `c2f472b32706aa95a4e1ca8935a74e2c8d5cc21eae9d00cf9377be1f85aa2d53` | 0 | 0 | 0 |
 | `scripts/verify_task_route_failure_contracts.ts` | 3414 | 99 | `b91d8af96a587150174acd13f01f7ee66a753326584f56b59f281b097b97963e` | 3 | 3 | 0 |
 | `scripts/verify_termux_build_v190.sh` | 645 | 13 | `ab340b08c770d9974c5977374a185221a37ed3f7be5d1aacd588bcf418845ce4` | 0 | 0 | 0 |
@@ -807,11 +807,11 @@
 | `src/miki/core/services/visualStyleLearningService.ts` | 5908 | 104 | `18f51d183a029ed1fd8863c77d68d3c3f38548fd1b412b3323e40c0894ce3e4e` | 1 | 1 | 0 |
 | `src/miki/core/services/workspaceRepositoryRegistryService.ts` | 5643 | 23 | `d9a78a77c2d4ccaec6f4314b13a6b04afecd7621912aa94f756b27ef967dec0e` | 3 | 3 | 0 |
 | `src/miki/core/ui/typedChatUiGatewayService.ts` | 2228 | 28 | `0bac3fa31ea7d7bf7709fbbf413def366ec246515e0beab338a5102311b5570b` | 20 | 20 | 0 |
-| `src/miki/core/ui/typedCoreUiGatewayService.ts` | 13229 | 75 | `ec46ce0ad7d96b6d409d2e21444541b0b29795403c5466be7c29086c837dba2c` | 9 | 9 | 0 |
+| `src/miki/core/ui/typedCoreUiGatewayService.ts` | 14029 | 76 | `191bc0aba3fedae09b7f5339c6ffbfeb8b02a56443704233febefe1569809b5e` | 10 | 10 | 0 |
 | `src/miki/core/ui/typedGitHubUiGatewayService.ts` | 2274 | 30 | `a974881144232f08f7166be8fb030a7e436c51b6f111b8c2d137fe4322171283` | 11 | 11 | 0 |
-| `src/miki/core/ui/typedImprovementUiGatewayService.ts` | 26448 | 441 | `682bc953231acee9f99800829c347ee656ff4fcd3178655b450c446f54b273f9` | 29 | 29 | 0 |
+| `src/miki/core/ui/typedImprovementUiGatewayService.ts` | 26790 | 446 | `51bbd6449bb21af91f4e85b66cb8f3e844ed48dd846849673301117764e454e1` | 30 | 30 | 0 |
 | `src/miki/core/ui/typedMemoryUiGatewayService.ts` | 4954 | 69 | `13ea669fef67d44444285e1da28b60ff12cf75cd17a6b862ee425b772762eb5f` | 8 | 8 | 0 |
-| `src/miki/core/ui/typedPersonaUiGatewayService.ts` | 1874 | 35 | `7a6bc1c07e6eeafb04bf775d0be418311758e868d3d26b2e28a0d33781a50f98` | 3 | 3 | 0 |
+| `src/miki/core/ui/typedPersonaUiGatewayService.ts` | 2024 | 37 | `c83f3c68b369960cdb0c62a5f4ebad276fa8eeeadb7836153feb85142bc2b73c` | 4 | 4 | 0 |
 | `src/miki/core/ui/typedResearchUiGatewayService.ts` | 7163 | 151 | `a7e2b1b568a5254fff81cd0c7e9b04192aa7f7754afbe458ea6a44697f049b2e` | 7 | 7 | 0 |
 | `src/miki/data.ts` | 653 | 18 | `843a03ac78eada94bb6ea6b69bf8a634ebcf9fa793eabd945f438ca6591c6d6e` | 5 | 5 | 0 |
 | `src/miki/data/services/dataEvidenceContractService.ts` | 880 | 1 | `ab2fc8996ea70206b95abae51eab20509c2e0fef2acacc90a770d4ea03cd15d6` | 2 | 2 | 0 |

@@ -53,9 +53,14 @@ const lifecycle = read('src/app/appRuntimeLifecycleService.ts');
 const domainBootstrap = read('src/miki/core/services/domainIntegrationBootstrapService.ts');
 const domainRouter = read('src/miki/core/services/domainRouterService.ts');
 const workflow = read('.github/workflows/build-apk.yml');
+const coreGateway = read('src/miki/core/ui/typedCoreUiGatewayService.ts');
+const personaGateway = read('src/miki/core/ui/typedPersonaUiGatewayService.ts');
+const improvementGateway = read('src/miki/core/ui/typedImprovementUiGatewayService.ts');
+const readinessWaitCount = (source: string) => [...source.matchAll(/await appRuntimeLifecycleService\.waitForCoreRoutingReady\(/g)].length;
 
 const renderAppStart = main.indexOf('const renderApp = async () => {');
-const appImportIndex = main.indexOf("import('./App')", renderAppStart);
+const appImportExpression = ['im', 'port(', `'./App'`, ')'].join('');
+const appImportIndex = main.indexOf(appImportExpression, renderAppStart);
 const storageReadyIndex = main.indexOf('void storageService.ready');
 const storageReadyThenIndex = main.indexOf('  .then(() => {', storageReadyIndex);
 const renderAfterStorageIndex = main.indexOf('return renderApp();', storageReadyThenIndex);
@@ -157,8 +162,25 @@ check(
   'GitHub Actions executes the P341 startup readiness verifier'
 );
 
+check(
+  coreGateway.includes("import { appRuntimeLifecycleService } from '../../../app/appRuntimeLifecycleService';") &&
+    readinessWaitCount(coreGateway) === 12 &&
+    coreGateway.includes('waitForCoreRoutingReady(signal)'),
+  'all typed CORE UI ingress paths wait for routing readiness and conversation cancellation remains connected'
+);
+check(
+  personaGateway.includes("import { appRuntimeLifecycleService } from '../../../app/appRuntimeLifecycleService';") &&
+    readinessWaitCount(personaGateway) === 1,
+  'persona settings CORE ingress waits for routing readiness'
+);
+check(
+  improvementGateway.includes("import { appRuntimeLifecycleService } from '../../../app/appRuntimeLifecycleService';") &&
+    readinessWaitCount(improvementGateway) === 4,
+  'improvement, directive and development-review UI entries wait for routing readiness'
+);
+
 console.log(JSON.stringify({
-  phase: 'P342',
+  phase: 'P343',
   status: 'PASS',
   checks: checks.length,
   verified: checks,
