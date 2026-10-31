@@ -8,7 +8,6 @@ import {
   Copy,
   Smartphone,
   Share2,
-  QrCode,
   Sparkles,
   ExternalLink,
 } from 'lucide-react';
@@ -40,8 +39,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [urlCopied, setUrlCopied] = useState(false);
   const [zipUrlCopied, setZipUrlCopied] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
-  const [showQr, setShowQr] = useState(false);
-  const [qrType, setQrType] = useState<'app' | 'zip'>('zip');
   const [shareStatus, setShareStatus] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -198,7 +195,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </div>
             )}
 
-            {/* Quick Actions: Direct Links & QR */}
+            {/* Quick Actions: Direct Links */}
             <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <button
@@ -210,17 +207,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   <span>{zipUrlCopied ? 'ZIPのURLをコピー済!' : 'ZIPの直接URLをコピー'}</span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setQrType('zip');
-                    setShowQr(!showQr);
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-purple-300 border border-slate-700 text-[11px] font-bold flex items-center gap-1 transition-colors"
-                  title="PC画面からスマホカメラで読み取れるQRコードを表示"
-                >
-                  <QrCode className="w-3.5 h-3.5" />
-                  <span>{showQr ? 'QRを閉じる' : 'QRコードでスマホ読込'}</span>
-                </button>
               </div>
 
               <a
@@ -234,49 +220,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </a>
             </div>
 
-            {/* QR Code Popup Display */}
-            {showQr && (
-              <div className="p-4 rounded-xl bg-slate-950 border border-purple-500/40 text-center space-y-3 animate-in fade-in">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-purple-300">
-                    📷 スマホのカメラでかざすとそのままDLできます
-                  </span>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setQrType('zip')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        qrType === 'zip' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      ZIPダウンロード
-                    </button>
-                    <button
-                      onClick={() => setQrType('app')}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        qrType === 'app' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400'
-                      }`}
-                    >
-                      Webアプリ開く
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex justify-center p-3 bg-white rounded-xl mx-auto w-fit shadow-lg">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                      qrType === 'zip' ? directZipUrl : publicBaseUrl
-                    )}`}
-                    alt="Smartphone Download QR Code"
-                    className="w-36 h-36 sm:w-44 sm:h-44"
-                    loading="lazy"
-                  />
-                </div>
-
-                <p className="text-slate-400 text-[10.5px] font-mono break-all px-2">
-                  {qrType === 'zip' ? directZipUrl : publicBaseUrl}
-                </p>
-              </div>
-            )}
           </div>
 
           {/* SECTION 2: Public App URL Banner */}
