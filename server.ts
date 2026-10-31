@@ -1103,361 +1103,6 @@ app.post('/api/self-code/canary-run', async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────
-// AIDER 統合エンジン: Repo Map / Search-Replace / 自己修復ループ / Gitコミット
-// ─────────────────────────────────────────────────────────────
-
-// 1. Aider Repo Map 生成エンドポイント (プロジェクト構造のAST圧縮マップ)
-app.get('/api/aider/repo-map', (req, res) => {
-  try {
-    const srcDir = path.join(process.cwd(), 'src');
-    const targetDirs = [
-      path.join(srcDir, 'types.ts'),
-      path.join(srcDir, 'services'),
-      path.join(srcDir, 'autonomous_modules'),
-    ];
-
-    const fileList: string[] = [];
-    for (const p of targetDirs) {
-      if (!fs.existsSync(p)) continue;
-      const stat = fs.statSync(p);
-      if (stat.isFile()) {
-        fileList.push(p);
-      } else if (stat.isDirectory()) {
-        const entries = fs.readdirSync(p);
-        for (const e of entries) {
-          if (e.endsWith('.ts') && !e.endsWith('.d.ts')) {
-            fileList.push(path.join(p, e));
-          }
-        }
-      }
-    }
-
-    const repoMapEntries: Array<{
-      file: string;
-      symbols: Array<{ kind: string; name: string; signature?: string }>;
-    }> = [];
-
-    let totalSymbols = 0;
-
-    for (const filePath of fileList.slice(0, 40)) {
-      const relPath = path.relative(process.cwd(), filePath);
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const sourceFile = ts.createSourceFile(relPath, content, ts.ScriptTarget.ES2022, true);
-
-      const symbols: Array<{ kind: string; name: string; signature?: string }> = [];
-
-      ts.forEachChild(sourceFile, (node) => {
-        if (ts.isClassDeclaration(node) && node.name) {
-          const methods: string[] = [];
-          node.members.forEach((m) => {
-            if (ts.isMethodDeclaration(m) && m.name && ts.isIdentifier(m.name)) {
-              methods.push(m.name.text);
-            }
-          });
-          symbols.push({
-            kind: 'class',
-            name: node.name.text,
-            signature: methods.length > 0 ? `methods: [${methods.slice(0, 4).join(', ')}]` : undefined,
-          });
-          totalSymbols++;
-        } else if (ts.isInterfaceDeclaration(node) && node.name) {
-          symbols.push({ kind: 'interface', name: node.name.text });
-          totalSymbols++;
-        } else if (ts.isFunctionDeclaration(node) && node.name) {
-          symbols.push({ kind: 'function', name: node.name.text });
-          totalSymbols++;
-        } else if (ts.isTypeAliasDeclaration(node) && node.name) {
-          symbols.push({ kind: 'type', name: node.name.text });
-          totalSymbols++;
-        }
-      });
-
-      if (symbols.length > 0) {
-        repoMapEntries.push({ file: relPath, symbols });
-      }
-    }
-
-    // Aiderスタイルのフォーマットされたテキストマップ
-    let formattedText = '=== AIDER REPOSITORY MAP (AST SYNTAX MAP) ===\n\n';
-    for (const entry of repoMapEntries) {
-      formattedText += `${entry.file}:\n`;
-      for (const sym of entry.symbols) {
-        formattedText += `  │ [${sym.kind}] ${sym.name}${sym.signature ? ` (${sym.signature})` : ''}\n`;
-      }
-      formattedText += '\n';
-    }
-
-    return res.json({
-      success: true,
-      scannedFilesCount: repoMapEntries.length,
-      totalSymbolsCount: totalSymbols,
-      entries: repoMapEntries,
-      formattedRepoMap: formattedText,
-      generatedAt: Date.now(),
-    });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error?.message || 'Repo Map生成失敗' });
-  }
-});
-
-// 2. Aider Search/Replace ブロック差分置換エンドポイント
-app.post('/api/aider/search-replace', (req, res) => {
-  try {
-    const { filePath, searchBlock, replaceBlock } = req.body;
-    if (!filePath || typeof searchBlock !== 'string' || typeof replaceBlock !== 'string') {
-      return res.status(400).json({ success: false, error: '引数が不足しています' });
-    }
-
-    const fullPath = path.resolve(process.cwd(), filePath);
-    if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({ success: false, error: `対象ファイルが存在しません: ${filePath}` });
-    }
-
-    const originalContent = fs.readFileSync(fullPath, 'utf-8');
-    const occurrences = originalContent.split(searchBlock).length - 1;
-
-    if (occurrences === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Searchブロックの内容がファイル内で見つかりませんでした。正確なコード行を指定してください。',
-      });
-    }
-
-    if (occurrences > 1) {
-      return res.status(400).json({
-        success: false,
-        error: `Searchブロックが複数箇所（${occurrences}箇所）にマッチしました。一意に特定できる十分なコンテキスト行を含めてください。`,
-      });
-    }
-
-    const newContent = originalContent.replace(searchBlock, replaceBlock);
-
-    // TypeScript事前検証
-    const sourceFile = ts.createSourceFile(path.basename(fullPath), newContent, ts.ScriptTarget.ES2022, true);
-    const parseDiagnostics = (sourceFile as any).parseDiagnostics || [];
-    if (parseDiagnostics.length > 0) {
-      const firstDiag = parseDiagnostics[0];
-      const message = ts.flattenDiagnosticMessageText(firstDiag.messageText, '\n');
-      return res.status(400).json({
-        success: false,
-        error: `置換後のコードに構文エラーが検知されました: ${message}`,
-      });
-    }
-
-    fs.writeFileSync(fullPath, newContent, 'utf-8');
-
-    return res.json({
-      success: true,
-      filePath,
-      diffSummary: `Search/Replace 適用成功: ${searchBlock.split('\n').length}行 ➔ ${replaceBlock.split('\n').length}行`,
-      timestamp: Date.now(),
-    });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error?.message || 'Search/Replace 適用失敗' });
-  }
-});
-
-// 3. Aider 自動エラー自己修正ループ (Auto-Healing Loop)
-app.post('/api/aider/auto-heal', (req, res) => {
-  try {
-    const { code, filename = 'candidate.ts' } = req.body;
-    if (!code) {
-      return res.status(400).json({ success: false, error: 'コードが提供されていません' });
-    }
-
-    let currentCode = code;
-    let attempts = 0;
-    const history: Array<{ attempt: number; error: string; fixApplied: string }> = [];
-
-    while (attempts < 3) {
-      attempts++;
-      const sourceFile = ts.createSourceFile(filename, currentCode, ts.ScriptTarget.ES2022, true);
-      const parseDiagnostics = (sourceFile as any).parseDiagnostics || [];
-
-      if (parseDiagnostics.length === 0) {
-        break; // 合格
-      }
-
-      const diag = parseDiagnostics[0];
-      const message = ts.flattenDiagnosticMessageText(diag.messageText, '\n');
-
-      let fixApplied = '補正なし';
-      // 一般的な構文修復ルール
-      if (message.includes("'}' expected") || message.includes("expected '}'") || message.includes("';' expected")) {
-        currentCode += '\n}\n';
-        fixApplied = '不足していた閉じ波括弧/セミコロンを自動補完';
-      } else if (message.includes('Cannot find name')) {
-        // 未定義型の自動プレースホルダー型宣言
-        currentCode = `type AnySafe = any;\n` + currentCode;
-        fixApplied = '未定義型のフォールバック型エイリアスを注入';
-      } else {
-        // 末尾クリーンアップ
-        currentCode = currentCode.trim() + '\n';
-        fixApplied = '空白とトークン境界のクリーンアップ';
-      }
-
-      history.push({ attempt: attempts, error: message, fixApplied });
-    }
-
-    // 最終検証
-    const finalFile = ts.createSourceFile(filename, currentCode, ts.ScriptTarget.ES2022, true);
-    const finalDiags = (finalFile as any).parseDiagnostics || [];
-    const healed = finalDiags.length === 0;
-
-    return res.json({
-      success: true,
-      healed,
-      attempts,
-      cleanCode: currentCode,
-      repairHistory: history,
-      finalErrorCount: finalDiags.length,
-    });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error?.message || '自動修復ループ失敗' });
-  }
-});
-
-// ── ファイルスナップショット安全管理機構 (物理復元用) ──
-const SNAPSHOTS_FILE = path.join(process.cwd(), '.miki_snapshots.json');
-
-function saveSnapshotRecord(record: { id: string; filePath: string; originalContent: string; timestamp: number; message: string }) {
-  try {
-    let list: any[] = [];
-    if (fs.existsSync(SNAPSHOTS_FILE)) {
-      list = JSON.parse(fs.readFileSync(SNAPSHOTS_FILE, 'utf-8'));
-    }
-    list.unshift(record);
-    fs.writeFileSync(SNAPSHOTS_FILE, JSON.stringify(list.slice(0, 50), null, 2), 'utf-8');
-  } catch (e) {
-    console.warn('Snapshot save error:', e);
-  }
-}
-
-// 4. Aider アトミックコミット & 物理ロールバック管理
-// ※ Webコンテナ環境においてgitコマンドが未構成の場合でも、実ファイルスナップショット機構により
-//   完全なファイルバックアップと1秒物理ロールバックを決定論的に保証する。
-const COMMITS_FILE = path.join(process.cwd(), 'src', 'autonomous_modules', '.aider_commits.json');
-
-app.get('/api/aider/commits', (req, res) => {
-  try {
-    if (!fs.existsSync(COMMITS_FILE)) {
-      return res.json({ success: true, commits: [] });
-    }
-    const data = JSON.parse(fs.readFileSync(COMMITS_FILE, 'utf-8'));
-    return res.json({ success: true, commits: data });
-  } catch (e: any) {
-    return res.json({ success: true, commits: [] });
-  }
-});
-
-app.post('/api/aider/commit', (req, res) => {
-  try {
-    const { message, files, author } = req.body;
-    const fileList: string[] = Array.isArray(files) ? files : (typeof files === 'string' ? [files] : ['src/autonomous_modules/']);
-
-    // 各対象ファイルの実態を事前スナップショット保存
-    const commitSnapshots: Array<{ filePath: string; snapshotId: string; hadExistingContent: boolean }> = [];
-    for (const f of fileList) {
-      const fullPath = path.resolve(process.cwd(), f);
-      let originalContent = '';
-      let exists = false;
-      if (fs.existsSync(fullPath)) {
-        try {
-          originalContent = fs.readFileSync(fullPath, 'utf-8');
-          exists = true;
-        } catch {}
-      }
-      const sId = `snap_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`;
-      saveSnapshotRecord({
-        id: sId,
-        filePath: f,
-        originalContent,
-        timestamp: Date.now(),
-        message: `Snapshot before commit: ${message || 'auto commit'}`,
-      });
-      commitSnapshots.push({ filePath: f, snapshotId: sId, hadExistingContent: exists });
-    }
-
-    const commitHash = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    const commits = fs.existsSync(COMMITS_FILE)
-      ? JSON.parse(fs.readFileSync(COMMITS_FILE, 'utf-8'))
-      : [];
-
-    const newCommit = {
-      hash: commitHash,
-      message: message || `feat(self-code): autonomous improvement commit [${commitHash}]`,
-      timestamp: Date.now(),
-      files: fileList,
-      snapshots: commitSnapshots,
-      status: 'COMMITTED',
-      engine: 'file_snapshot_change_tracker',
-      author: author || 'Miki Autonomous Engine',
-    };
-
-    commits.unshift(newCommit);
-    const dir = path.dirname(COMMITS_FILE);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(COMMITS_FILE, JSON.stringify(commits.slice(0, 50), null, 2), 'utf-8');
-
-    return res.json({ success: true, commit: newCommit });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error?.message || 'コミット記録失敗' });
-  }
-});
-
-app.post('/api/aider/rollback', (req, res) => {
-  try {
-    const { hash } = req.body;
-    if (!fs.existsSync(COMMITS_FILE)) {
-      return res.status(404).json({ success: false, error: 'コミット履歴がありません' });
-    }
-    const commits = JSON.parse(fs.readFileSync(COMMITS_FILE, 'utf-8'));
-    const targetIdx = commits.findIndex((c: any) => c.hash === hash);
-    if (targetIdx < 0) {
-      return res.status(404).json({ success: false, error: '指定のコミットが見つかりません' });
-    }
-
-    const targetCommit = commits[targetIdx];
-    const restoredFiles: string[] = [];
-
-    // 実ファイルスナップショットをディスクに物理復元
-    if (Array.isArray(targetCommit.snapshots) && targetCommit.snapshots.length > 0) {
-      let snapshotsList: any[] = [];
-      if (fs.existsSync(SNAPSHOTS_FILE)) {
-        snapshotsList = JSON.parse(fs.readFileSync(SNAPSHOTS_FILE, 'utf-8'));
-      }
-      for (const snapInfo of targetCommit.snapshots) {
-        const snap = snapshotsList.find((s: any) => s.id === snapInfo.snapshotId);
-        if (snap) {
-          const fullPath = path.resolve(process.cwd(), snap.filePath);
-          if (snap.originalContent) {
-            fs.writeFileSync(fullPath, snap.originalContent, 'utf-8');
-            restoredFiles.push(snap.filePath);
-          } else if (fs.existsSync(fullPath) && !snapInfo.hadExistingContent) {
-            // 新規作成されたファイルでコミット直前に存在しなかった場合は削除復元
-            fs.unlinkSync(fullPath);
-            restoredFiles.push(`${snap.filePath} (新規作成前へ復元削除)`);
-          }
-        }
-      }
-    }
-
-    commits[targetIdx].status = 'ROLLED_BACK';
-    fs.writeFileSync(COMMITS_FILE, JSON.stringify(commits, null, 2), 'utf-8');
-
-    return res.json({
-      success: true,
-      message: `コミット [${hash}] を安全に物理ロールバックしました。${restoredFiles.length > 0 ? `復元ファイル: [${restoredFiles.join(', ')}]` : '直前の安定スナップショットに復旧完了。'}`,
-      rolledBackHash: hash,
-      restoredFiles,
-    });
-  } catch (error: any) {
-    return res.status(500).json({ success: false, error: error?.message || 'ロールバック失敗' });
-  }
-});
-
-// 設計思想 Master v5.0 第13章: 自律型Web検索＆能動学習エンドポイント
 app.post('/api/search', async (req, res) => {
   const { query, maxResults = 5 } = req.body;
   if (!query || typeof query !== 'string' || !query.trim()) {
@@ -3138,7 +2783,7 @@ app.all('/api/self-code/export-proposal-zip', async (req, res) => {
     const addFolderToZip = (dirPath: string, zipFolder: JSZip, relDir: string = '') => {
       const files = fs.readdirSync(dirPath);
       for (const file of files) {
-        if (file === 'node_modules' || file === 'dist' || file === '.git' || file === '.cache' || file === 'logs' || file === '.miki_pending_proposals' || file === '.aider_snapshots') continue;
+        if (file === 'node_modules' || file === 'dist' || file === '.git' || file === '.cache' || file === 'logs' || file === '.miki_pending_proposals') continue;
         if (file.endsWith('.zip') || file.endsWith('.tar.gz')) continue;
 
         const fullPath = path.join(dirPath, file);
@@ -3397,7 +3042,7 @@ app.post('/api/git/commit', (req, res) => {
       shortHash,
       message: message.trim(),
       engine: 'real_git_cli',
-      note: '本物のGitコミットです（.aider_commits.jsonのスナップショットとは完全に別物です）',
+      note: '本物のGitコミットです',
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'Gitコミット処理例外' });
@@ -3518,7 +3163,7 @@ const INITIAL_LESSONS = [
   {
     id: 'lesson-4',
     chapterNumber: 12,
-    topic: 'Aider差分置換',
+    topic: '差分置換',
     lessonType: 'SUCCESS_PATTERN',
     title: 'Search/Replace ブロックの一意性(Uniqueness)厳格保証',
     rule: '置換対象ブロックは前後3行のコンテキストを含め、対象ファイル内で必ず「出現回数が1回」であることを確認してから適用する。',
@@ -4052,8 +3697,8 @@ app.post('/api/self-code/prompt-to-patch', async (req, res) => {
       .join('\n\n');
 
     const llmPrompt = `あなたはMIKI-AIの自己コード改善エンジンです。以下のユーザー指示と実ファイル抜粋から、
-最も適切な修正対象ファイルを実ファイル一覧の中から1つ選び、実際のコード内容に基づいたAider形式の
-SEARCH/REPLACEパッチを生成してください。存在しないファイルやコードを創作してはいけません。
+最も適切な修正対象ファイルを実ファイル一覧の中から1つ選び、実際のコード内容に基づいた
+SEARCH/REPLACE形式のパッチを生成してください。存在しないファイルやコードを創作してはいけません。
 SEARCH側は対象ファイル内に一字一句そのまま存在する連続した行にしてください。
 
 【ユーザー指示】
@@ -5166,7 +4811,6 @@ app.get('/api/self-code/complexity-heatmap', async (req, res) => {
     const filesToScan = [
       { path: 'miki/selfDevelopment/services/selfCodeArchitectService.ts', category: 'ARCHITECT' },
       { path: 'miki/improvement/miki/improvement/miki/improvement/services/selfImprovementSuiteService.ts', category: 'SELF_IMPROVE' },
-      { path: 'miki/selfDevelopment/miki/selfDevelopment/miki/selfDevelopment/services/aiderEngineService.ts', category: 'AIDER' },
       { path: 'miki/selfDevelopment/miki/selfDevelopment/miki/selfDevelopment/services/mikiSelfCodingSuperchargerService.ts', category: 'SUPERCHARGER' },
       { path: 'miki/selfAwareness/miki/selfAwareness/miki/selfAwareness/services/mikiCognitiveVitalsService.ts', category: 'VITALS' },
       { path: 'miki/autonomy/miki/autonomy/services/mikiUltraEvolverService.ts', category: 'EVOLVER' },

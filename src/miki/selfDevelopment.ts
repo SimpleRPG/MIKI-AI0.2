@@ -14,7 +14,6 @@ export function selfDevelopment() {
 
 // === MIKI CATEGORY SERVICE EXPORTS ===
 // selfDevelopment 配下のサービスを、この17分類の管理入口から公開する。
-export * from './selfDevelopment/services/aiderEngineService';
 export * from './selfDevelopment/services/autonomousSoftwareFactoryService';
 export * from './selfDevelopment/services/codeMapService';
 export * from './selfDevelopment/services/codeSearchService';

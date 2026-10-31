@@ -1,7 +1,6 @@
 export type ServiceConnectivityClass='CONNECTED_RUNTIME'|'DYNAMIC_ENTRY'|'UI_OR_MANUAL'|'DIAGNOSTIC_ONLY'|'DUPLICATE_CONSOLIDATED'|'OBSOLETE_APP_ONLY'|'MISSING_CONNECTION';
 export interface ServiceConnectivityRecord{service:string;path:string;classification:ServiceConnectivityClass;canonical?:string;action:string;}
 const records:ServiceConnectivityRecord[]=[
-{service:'aiderEngineService',path:'src/miki/selfDevelopment/services/aiderEngineService.ts',classification:'DUPLICATE_CONSOLIDATED',canonical:'repositoryRepairOrchestratorService',action:'Do not activate parallel repair/Git authority; route repository repair through canonical orchestrator.'},
 {service:'architectureEvolutionPlannerService',path:'src/miki/selfDevelopment/services/architectureEvolutionPlannerService.ts',classification:'MISSING_CONNECTION',action:'Connect only from explicit architecture-evolution planning request.'},
 {service:'atomicAstTemplateExecutionService',path:'src/miki/selfDevelopment/services/atomicAstTemplateExecutionService.ts',classification:'DUPLICATE_CONSOLIDATED',canonical:'atomicAstTransformationComponentService',action:'Use canonical AST transformation component; legacy template executor is not a runtime authority.'},
 {service:'browserE2EPreflightService',path:'src/miki/selfDevelopment/services/browserE2EPreflightService.ts',classification:'OBSOLETE_APP_ONLY',action:'Keep disconnected because MIKI-AI is app-only and browser preview is out of scope.'},

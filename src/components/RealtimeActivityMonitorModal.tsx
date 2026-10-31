@@ -12,11 +12,8 @@ import {
   Terminal,
   Brain,
   ShieldCheck,
-  RefreshCw,
   Clock,
   GitBranch,
-  RotateCcw,
-  FileCode,
   Check,
   ArrowRight,
   ExternalLink,
@@ -28,7 +25,6 @@ import {
 } from '../services/systemLogger';
 import { proactiveContextOsService, ContextAwarenessSnapshot } from '../miki/strategy/services/proactiveContextOsService';
 import type { AutonomousEvolutionRecord } from '../miki/autonomy/services/autonomousContinuousEvolutionService';
-import type { AiderCommitRecord } from '../miki/selfDevelopment/services/aiderEngineService';
 
 interface RealtimeActivityMonitorModalProps {
   isOpen: boolean;
@@ -53,22 +49,10 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
   const [autoScroll, setAutoScroll] = useState(true);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // 自律改善・Aiderトラッカー
-  const [commits, setCommits] = useState<AiderCommitRecord[]>([]);
+  // 自律改善トラッカー
   const [isEvolutionBusy, setIsEvolutionBusy] = useState(false);
   const [latestEvolutionRecord, setLatestEvolutionRecord] = useState<AutonomousEvolutionRecord | null>(null);
-  const [isRollingBack, setIsRollingBack] = useState<string | null>(null);
-  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
-  const loadCommits = async () => {
-    try {
-      const { aiderEngineService } = await import('../miki/selfDevelopment/services/aiderEngineService');
-      const list = await aiderEngineService.fetchCommits();
-      setCommits(list);
-    } catch {
-      // ignore
-    }
-  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,7 +61,6 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
     setLogs(systemLogger.getLogs().slice(-80));
     setSteps(systemLogger.getCurrentSessionSteps());
     setContextSnapshot(proactiveContextOsService.getSnapshot());
-    loadCommits();
 
     // 1. SystemLogger サブスクライブ
     const unsubLog = systemLogger.subscribeLog((newEntry) => {
@@ -116,24 +99,6 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
 
   if (!isOpen) return null;
 
-  const handleRollback = async (hash: string) => {
-    setIsRollingBack(hash);
-    try {
-      const { aiderEngineService } = await import('../miki/selfDevelopment/services/aiderEngineService');
-      const res = await aiderEngineService.rollbackCommit(hash);
-      if (res.success) {
-        setActionNotice(`✅ コミット [${hash}] を復元しました: ${res.restoredFiles?.join(', ') || res.message}`);
-        await loadCommits();
-      } else {
-        setActionNotice(`⚠️ ロールバック失敗: ${res.message}`);
-      }
-    } catch (e: any) {
-      setActionNotice(`❌ エラー: ${e?.message || e}`);
-    } finally {
-      setIsRollingBack(null);
-      setTimeout(() => setActionNotice(null), 5000);
-    }
-  };
 
   const filteredLogs = logs.filter((l) => {
     if (selectedLogFilter === 'ALL') return true;
@@ -173,7 +138,7 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
-                みきが今何をしているか（推論・思考・自律改善・コード生成・Aiderコミット・スナップショット）を秒単位で可視化します
+                みきが今何をしているか（推論・思考・自律改善・コード生成）を秒単位で可視化します
               </p>
             </div>
           </div>
@@ -199,13 +164,6 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
           </div>
         </div>
 
-        {/* Action Notice */}
-        {actionNotice && (
-          <div className="px-4 py-2 bg-indigo-950 border-b border-indigo-500/50 text-indigo-200 text-xs font-medium flex items-center gap-2 animate-fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{actionNotice}</span>
-          </div>
-        )}
 
         {/* Main Sub-Tab Switcher */}
         <div className="px-3 sm:px-4 py-2 bg-slate-950 border-b border-slate-800 flex items-center gap-2 shrink-0">
@@ -235,12 +193,7 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
             }`}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            <span>自律改善・コミット＆復元</span>
-            {commits.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/30 font-mono">
-                {commits.length}
-              </span>
-            )}
+            <span>自律改善</span>
           </button>
 
           <button
@@ -416,98 +369,6 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
               )}
             </div>
 
-            {/* Aider アトミックコミット & 物理スナップショット復元履歴 */}
-            <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <GitBranch className="w-4 h-4 text-emerald-400" />
-                  <span className="text-xs font-bold text-slate-200">
-                    Aider アトミックコミット & 物理スナップショット復元履歴
-                  </span>
-                </div>
-                <button
-                  onClick={loadCommits}
-                  className="flex items-center gap-1 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10.5px] text-slate-300 rounded-lg border border-slate-700"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>再読み込み</span>
-                </button>
-              </div>
-
-              {commits.length === 0 ? (
-                <div className="py-8 text-center text-slate-500 text-xs">
-                  まだコミット履歴がありません。自律実装サイクルが実行されると、ファイル変更前のスナップショットとコミットがここに記録されます。
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {commits.map((c) => (
-                    <div
-                      key={c.hash}
-                      className={`p-2.5 rounded-xl border text-xs transition-all ${
-                        c.status === 'ROLLED_BACK'
-                          ? 'bg-slate-950/60 border-slate-800/60 opacity-60 text-slate-500'
-                          : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-mono text-[10.5px] font-bold text-indigo-400 bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-800/50">
-                            {c.hash}
-                          </span>
-                          <span className="font-semibold text-slate-100 truncate">
-                            {c.message}
-                          </span>
-                          {c.isStub && (
-                            <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-800">
-                              雛形スタブ
-                            </span>
-                          )}
-                          {c.engine && (
-                            <span className="text-[9.5px] font-mono px-1 py-0.2 rounded bg-slate-800 text-slate-400">
-                              {c.engine}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            {new Date(c.timestamp).toLocaleTimeString()}
-                          </span>
-
-                          {c.status === 'ROLLED_BACK' ? (
-                            <span className="text-[10px] font-bold text-rose-400 bg-rose-950/50 px-2 py-0.5 rounded border border-rose-900/50">
-                              復元済 (ROLLBACK)
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => handleRollback(c.hash)}
-                              disabled={isRollingBack === c.hash}
-                              className="flex items-center gap-1 px-2.5 py-1 bg-rose-950/70 hover:bg-rose-900 text-rose-300 hover:text-rose-100 text-[10.5px] font-bold rounded-lg border border-rose-700/60 transition-all shadow-xs active:scale-95 disabled:opacity-50"
-                              title="この変更前の物理ファイルスナップショットへ巻き戻します"
-                            >
-                              <RotateCcw className={`w-3 h-3 ${isRollingBack === c.hash ? 'animate-spin' : ''}`} />
-                              <span>{isRollingBack === c.hash ? '復元中...' : 'スナップショット復元'}</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {c.files && c.files.length > 0 && (
-                        <div className="mt-1.5 text-[10.5px] text-slate-400 flex items-center gap-2">
-                          <FileCode className="w-3 h-3 text-slate-500" />
-                          <span className="font-mono text-slate-300 truncate">{c.files.join(', ')}</span>
-                          {c.snapshots && (
-                            <span className="text-[9.5px] text-emerald-400">
-                              (スナップショット {c.snapshots.length}件保管済)
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -625,7 +486,7 @@ export const RealtimeActivityMonitorModal: React.FC<RealtimeActivityMonitorModal
         <div className="p-2.5 sm:p-3 bg-slate-950 border-t border-slate-800 shrink-0 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px]">SystemLogger & Aider Engine リアルタイム同期中</span>
+            <span className="text-[11px]">SystemLogger リアルタイム同期中</span>
           </div>
 
           <button
