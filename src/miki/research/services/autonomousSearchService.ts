@@ -39,7 +39,7 @@ export interface AutonomousSearchStats {
   lastSearchAt?:number;
 }
 
-export type SearchProviderName = 'searxng' | 'wikipedia' | 'duckduckgo';
+export type SearchProviderName = 'searxng';
 
 export type SearchProviderExecutionStatus =
   | 'SUCCEEDED'
@@ -118,23 +118,15 @@ function deriveSourceIdentity(provider: SearchProviderName, item: WebSearchResul
 }
 
 /**
- * 複数Providerの結果を、到着順ではなく固定ルールで統合する。
- * maxResultsはProviderごとの取得上限として扱い、探索経路の多様性を保持する。
+ * SearXNG単一Providerの結果を、固定ルールで整列・重複排除する。
+ * maxResultsは取得上限として扱う。
  */
 export function mergeSearchResults(
   outputs: ProviderSearchOutput[],
   preferredProvider: 'auto' | SearchProviderName = 'auto',
   maxResults = 4,
 ): WebSearchResultItem[] {
-  const preferredOrder: SearchProviderName[] =
-    preferredProvider === 'auto'
-      ? ['searxng', 'wikipedia', 'duckduckgo']
-      : [
-          preferredProvider,
-          ...(['searxng', 'wikipedia', 'duckduckgo'] as SearchProviderName[]).filter(
-            (name) => name !== preferredProvider,
-          ),
-        ];
+  const preferredOrder: SearchProviderName[] = ['searxng'];
 
   const rank = new Map(preferredOrder.map((provider, index) => [provider, index]));
   const successfulProviderCount = outputs.filter((output) => output.results.length > 0).length;
@@ -189,8 +181,6 @@ export function mergeSearchResults(
 function createProviderStatuses(): Record<SearchProviderName, SearchProviderStatusRecord> {
   return {
     searxng: { provider: 'searxng', status: 'FAILED', error: 'NOT_RUN' },
-    wikipedia: { provider: 'wikipedia', status: 'FAILED', error: 'NOT_RUN' },
-    duckduckgo: { provider: 'duckduckgo', status: 'FAILED', error: 'NOT_RUN' },
   };
 }
 
@@ -416,7 +406,7 @@ export class AutonomousSearchService {
     options?: {
       maxResults?: number;
       bypassCache?: boolean;
-      preferredProvider?: 'auto' | 'searxng' | 'wikipedia' | 'duckduckgo';
+      preferredProvider?: 'auto' | 'searxng';
     }
   ): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string }> {
     const cleanQuery = query.trim();
@@ -467,8 +457,6 @@ export class AutonomousSearchService {
         providers: [],
         providerStatuses: {
           searxng: { provider: 'searxng', status: 'SKIPPED' },
-          wikipedia: { provider: 'wikipedia', status: 'SKIPPED' },
-          duckduckgo: { provider: 'duckduckgo', status: 'SKIPPED' },
         },
       };
       this.cache.set(cacheKey, { data: mockOutput, timestamp: Date.now() });
@@ -537,7 +525,7 @@ export class AutonomousSearchService {
         });
 
         markProvider('searxng', 'SUCCEEDED');
-        systemLogger.info('SELF_IMPROVEMENT', `🔍 [SearXNG] 並行検索成功: ${results.length}件`);
+        systemLogger.info('SELF_IMPROVEMENT', `🔍 [SearXNG] 検索成功: ${results.length}件`);
         return { provider: 'searxng', results };
       } catch (error: any) {
         const reason = error?.name === 'TimeoutError'
@@ -549,160 +537,17 @@ export class AutonomousSearchService {
       }
     };
 
-    const runWikipedia = async (): Promise<ProviderSearchOutput | null> => {
-      try {
-        const wikiUrl = `https://ja.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(safeQuery)}&utf8=&format=json&origin=*&srlimit=${maxResults}`;
-        const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(5000) });
-
-        if (!wikiRes.ok) {
-          const reason = `HTTP ${wikiRes.status}`;
-          markProvider('wikipedia', 'FAILED', reason);
-          return null;
-        }
-
-        const wikiData = await wikiRes.json();
-        const hits = Array.isArray(wikiData?.query?.search) ? wikiData.query.search : [];
-
-        if (hits.length === 0) {
-          markProvider('wikipedia', 'EMPTY');
-          return null;
-        }
-
-        const results: WebSearchResultItem[] = hits.slice(0, maxResults).map((hit: any) => {
-          const url = `https://ja.wikipedia.org/wiki/${encodeURIComponent(hit.title)}`;
-          const canonicalUrl = canonicalizeSearchUrl(url);
-          const item = {
-            title: hit.title,
-            snippet: (hit.snippet || '').replace(/<[^>]+>/g, '').trim(),
-            url,
-            source: 'Wikipedia (Direct)',
-            publishedDate: hit.timestamp,
-          };
-          const identity = deriveSourceIdentity('wikipedia', item, canonicalUrl);
-          return {
-            ...item,
-            sourceId: identity.sourceId,
-            independenceClusterId: identity.independenceClusterId,
-          };
-        });
-
-        markProvider('wikipedia', 'SUCCEEDED');
-        systemLogger.info('SELF_IMPROVEMENT', `📖 [Wikipedia] 並行検索成功: ${results.length}件`);
-        return { provider: 'wikipedia', results };
-      } catch (error: any) {
-        const reason = error?.message || String(error);
-        markProvider('wikipedia', 'FAILED', reason);
-        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [Wikipedia] 探索経路失敗: ${reason}`);
-        return null;
-      }
-    };
-
-    const runDuckDuckGo = async (): Promise<ProviderSearchOutput | null> => {
-      try {
-        const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(safeQuery)}&format=json&no_html=1&skip_disambig=1`;
-        const ddgRes = await fetch(ddgUrl, { signal: AbortSignal.timeout(5000) });
-
-        if (!ddgRes.ok) {
-          const reason = `HTTP ${ddgRes.status}`;
-          markProvider('duckduckgo', 'FAILED', reason);
-          return null;
-        }
-
-        const ddgData = await ddgRes.json();
-        const results: WebSearchResultItem[] = [];
-
-        const abstractText = (ddgData.AbstractText || ddgData.Abstract || '').trim();
-        if (abstractText) {
-          const url = ddgData.AbstractURL || `https://duckduckgo.com/?q=${encodeURIComponent(safeQuery)}`;
-          const canonicalUrl = canonicalizeSearchUrl(url);
-          const item = {
-            title: ddgData.Heading || safeQuery,
-            snippet: abstractText,
-            url,
-            source: `DuckDuckGo (${ddgData.AbstractSource || 'Instant Answer'})`,
-          };
-          const identity = deriveSourceIdentity('duckduckgo', item, canonicalUrl);
-          results.push({
-            ...item,
-            sourceId: identity.sourceId,
-            independenceClusterId: identity.independenceClusterId,
-          });
-        }
-
-        if (Array.isArray(ddgData.RelatedTopics)) {
-          for (const itemData of ddgData.RelatedTopics) {
-            if (results.length >= maxResults) break;
-            if (itemData?.Text && itemData?.FirstURL) {
-              const topicText = String(itemData.Text).trim();
-              const url = String(itemData.FirstURL);
-              const canonicalUrl = canonicalizeSearchUrl(url);
-              const item = {
-                title: topicText.split(' - ')[0] || topicText.slice(0, 30),
-                snippet: topicText,
-                url,
-                source: 'DuckDuckGo Instant Answer',
-              };
-              const identity = deriveSourceIdentity('duckduckgo', item, canonicalUrl);
-              results.push({
-                ...item,
-                sourceId: identity.sourceId,
-                independenceClusterId: identity.independenceClusterId,
-              });
-            }
-          }
-        }
-
-        if (results.length === 0) {
-          markProvider('duckduckgo', 'EMPTY');
-          return null;
-        }
-
-        markProvider('duckduckgo', 'SUCCEEDED');
-        systemLogger.info('SELF_IMPROVEMENT', `🦆 [DuckDuckGo] 並行検索成功: ${results.length}件`);
-        return { provider: 'duckduckgo', results };
-      } catch (error: any) {
-        const reason = error?.message || String(error);
-        markProvider('duckduckgo', 'FAILED', reason);
-        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [DuckDuckGo] 探索経路失敗: ${reason}`);
-        return null;
-      }
-    };
-
     /*
-     * P0: Providerを直列フォールバックしない。
-     * 3経路を同時に開始し、到着順には依存せずmergeSearchResults()で統合する。
-     *
-     * preferredProviderは「最初に試すProvider」ではなく、
-     * 同率候補の決定論的タイブレーク優先度としてだけ利用する。
+     * P348: 探索経路はSearXNG単一に統一した。Wikipedia／DuckDuckGoへの直接取得は廃止し、
+     * 固定情報（単語・事実）の取得はSearXNG側のエンジンと検索指定（バング記法等）で担う。
+     * SearXNGが結果を返せない場合は、外部へ直接聞きに行かず、その旨を結果として返す。
      */
-    const providerRuns: Array<{
-      name: SearchProviderName;
-      run: () => Promise<ProviderSearchOutput | null>;
-    }> = [
-      { name: 'searxng', run: runSearxng },
-      { name: 'wikipedia', run: runWikipedia },
-      { name: 'duckduckgo', run: runDuckDuckGo },
-    ];
-
-    const settled = await Promise.allSettled(
-      providerRuns.map(async ({ name, run }) => {
-        try {
-          return await run();
-        } catch (error: any) {
-          const reason = error?.message || String(error);
-          markProvider(name, 'FAILED', reason);
-          return null;
-        }
-      }),
-    );
-
-    const outputs = settled
-      .filter((item): item is PromiseFulfilledResult<ProviderSearchOutput | null> => item.status === 'fulfilled')
-      .map((item) => item.value)
-      .filter((value): value is ProviderSearchOutput => Boolean(value && value.results.length > 0));
+    const searxngOutput = await runSearxng();
+    const outputs: ProviderSearchOutput[] =
+      searxngOutput && searxngOutput.results.length > 0 ? [searxngOutput] : [];
 
     const mergedResults = mergeSearchResults(outputs, preferred, maxResults);
-    const successfulProviders = (['searxng', 'wikipedia', 'duckduckgo'] as SearchProviderName[]).filter(
+    const successfulProviders = (['searxng'] as SearchProviderName[]).filter(
       (provider) => providerStatuses[provider].status === 'SUCCEEDED',
     );
 
@@ -711,12 +556,9 @@ export class AutonomousSearchService {
       summary:
         mergedResults[0]?.snippet ||
         (successfulProviders.length
-          ? `「${safeQuery}」について複数の探索経路から候補を取得しました。`
-          : `「${safeQuery}」について利用可能な探索経路から結果を取得できませんでした。`),
-      provider:
-        successfulProviders.length > 1
-          ? 'parallel'
-          : successfulProviders[0] || 'parallel',
+          ? `「${safeQuery}」についてSearXNGから候補を取得しました。`
+          : `「${safeQuery}」についてSearXNGから結果を取得できませんでした。`),
+      provider: successfulProviders[0] || 'searxng',
       providers: successfulProviders,
       providerStatuses,
     };
@@ -1058,9 +900,7 @@ export class AutonomousSearchService {
     try {
       for (const r of sourceBackedResults.slice(0, 2)) {
         const itemProvider = options?.provider ||
-          (r.source?.includes('SearXNG') ? 'searxng' :
-           r.source?.includes('Wikipedia') ? 'wikipedia_direct' :
-           r.source?.includes('DuckDuckGo') ? 'duckduckgo_direct' : undefined);
+          (r.source?.includes('SearXNG') ? 'searxng' : undefined);
 
         const skeletonCand = WebMaterialPatternExtractor.extractSkeletonStructuresFromWebText({
           title: r.title,
@@ -1089,9 +929,7 @@ export class AutonomousSearchService {
         .join('\n');
       if (combinedSnippets) {
         const topProvider = options?.provider ||
-          (sourceBackedResults[0]?.source?.includes('SearXNG') ? 'searxng' :
-           sourceBackedResults[0]?.source?.includes('Wikipedia') ? 'wikipedia_direct' :
-           sourceBackedResults[0]?.source?.includes('DuckDuckGo') ? 'duckduckgo_direct' : undefined);
+          (sourceBackedResults[0]?.source?.includes('SearXNG') ? 'searxng' : undefined);
 
         const surfacePatterns = WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({
           text: combinedSnippets,
