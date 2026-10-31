@@ -77,22 +77,10 @@ class ExternalAiResearchBundleService {
     if (!bundle) return undefined;
     bundle.promptSha256 = canonicalSha256Object({ provider: bundle.provider, gapIds: [...bundle.gapIds].sort(), promptText: bundle.promptText });
     bundle.replayKey = bundle.replayKey || `ER-REPLAY-${canonicalSha256Object({ provider: bundle.provider, gapIds: [...bundle.gapIds].sort() }).slice(0,20)}`;
-    bundle.mode = 'AUTO'; bundle.status = 'SENT'; bundle.updatedAt = Date.now(); this.save();
-    try {
-      const response = await fetch(apiUrl('/api/chat'), {
-        method: 'POST',
-        headers: getCustomApiHeaders(),
-        body: JSON.stringify({ message: bundle.promptText, history: [], persona: { name: 'ExternalResearch', role: 'research assistant' }, settings: { engineMode: 'gemini_cloud' }, files: [], attachedFiles: [], memories: [], activeGameCode: '' }),
-      });
-      if (!response.ok) throw new Error(`HTTP_${response.status}`);
-      const body = await response.json();
-      const text = typeof body.text === 'string' ? body.text : typeof body.reply === 'string' ? body.reply : '';
-      if (!text.trim()) throw new Error('EMPTY_RESPONSE');
-      return this.importResponse(bundleId, text, 'AUTO');
-    } catch (error) {
-      bundle.status = 'FAILED'; bundle.error = error instanceof Error ? error.message : String(error); bundle.updatedAt = Date.now(); this.save();
-      return this.clone(bundle);
-    }
+    // P349: 外部AIへの自動送信経路（/api/chat）は廃止した。外部AIの応答は素材として
+    // 手動取込（importResponse）でのみ受け付ける。
+    bundle.mode = 'AUTO'; bundle.status = 'FAILED'; bundle.error = 'AUTO_SEND_REMOVED: 自動送信経路は廃止されました。応答は手動で取り込んでください。'; bundle.updatedAt = Date.now(); this.save();
+    return this.clone(bundle);
   }
 
   public importResponse(bundleId: string, responseText: string, mode: 'AUTO' | 'MANUAL' = 'MANUAL'): ExternalAiResearchBundle | undefined {

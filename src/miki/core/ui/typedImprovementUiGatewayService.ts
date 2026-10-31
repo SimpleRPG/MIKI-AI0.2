@@ -118,7 +118,6 @@ class TypedImprovementUiGatewayService {
   fetchImprovementLessons(filter?:string){return mikiSelfCodingSuperchargerService.fetchLessons(filter);}
   recordImprovementLesson(input:Parameters<typeof mikiSelfCodingSuperchargerService.recordLesson>[0]){return mikiSelfCodingSuperchargerService.recordLesson(input);}
   scanImprovementDeadCode(){return mikiSelfCodingSuperchargerService.scanDeadCode();}
-  generateImprovementPromptToPatch(prompt:string){return mikiSelfCodingSuperchargerService.generatePromptToPatch(prompt);}
   fetchImprovementSnapshots(){return mikiSelfCodingSuperchargerService.fetchSnapshots();}
   fetchImprovementGapRecommendations(){return mikiSelfCodingSuperchargerService.fetchGapRecommendations();}
   rollbackImprovementSnapshot(snapshotId:string){return mikiSelfCodingSuperchargerService.rollbackSnapshot(snapshotId);}

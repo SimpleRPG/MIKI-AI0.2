@@ -500,10 +500,10 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   }
 
   // 2. Strict External Transmission Boundary Guard (設計思想 1. 外部送信境界の修正)
-  // ローカル推論 (webgpu, native_gpu, external_gpu 等) 指定時、勝手に外部クラウド (/api/chat / Gemini) に流れることを厳格に遮断。
-  // クラウド送信はユーザーが明示的に engineMode === 'gemini_cloud' を選択した場合のみ許可される。
-  if (params.engineMode && params.engineMode !== 'gemini_cloud') {
-    systemLogger.warn('CHAT', `[外部送信境界ガード] engineMode=${params.engineMode} のため、外部クラウド(/api/chat)への送信を完全遮断しました。Miki COREの端末内基本処理で応答します。`);
+  // ローカル推論 (webgpu, native_gpu, external_gpu 等) 指定時、勝手に外部クラウド (Gemini) に流れることを厳格に遮断。
+  // クラウド会話モードはP349で廃止済み。いかなるモード指定でも会話を外部クラウドへ送信しない。
+  if (params.engineMode) {
+    systemLogger.warn('CHAT', `[外部送信境界ガード] engineMode=${params.engineMode} のため、外部クラウドへの送信を完全遮断しました。Miki COREの端末内基本処理で応答します。`);
     const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
       prompt: params.prompt,
       persona: params.persona?.name,
@@ -517,72 +517,8 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
     };
   }
 
-  // 3. Explicit Gemini Cloud Request (/api/chat) with Outbound Privacy Guardrail (Master v5.0 第11章)
-  systemLogger.info('CHAT', `Sending chat request (prompt length: ${params.prompt.length})`, {
-    engineMode: params.engineMode,
-    speakerMode: params.speakerMode,
-    attachedFilesCount: params.attachedFiles?.length || 0,
-    workspaceFilesCount: params.workspaceFiles?.length || 0,
-  });
-
-  // Audit the complete JSON payload, including chat history, attachments, workspace files, and memory fields.
-  // Keep AbortSignal out of JSON so the sanitized object preserves the fetch cancellation contract.
-  const { signal: requestSignal, ...paramsForAudit } = params;
-  const payloadAudit = sanitizeOutboundPayload(paramsForAudit, (serialized) =>
-    privacyGuardrailService.auditOutboundContent(serialized, 'gemini_cloud', { autoSanitize: true })
-  );
-  if (!payloadAudit.allowed) {
-    const reason = payloadAudit.blockedReason || payloadAudit.audit?.blockedReason || '機密情報検知';
-    systemLogger.warn('PRIVACY', `[外部送信ガードレール] 送信を遮断しました: ${reason}`);
-    return {
-      text: `⚠️ 【プライバシー保護ガードレールによる外部送信遮断】\n\n送信対象のJSON payload全体を安全に検査・サニタイズできなかったため、クラウドAPIへの送信を遮断しました。\n・遮断理由: ${reason}`,
-      engineMode: 'gemini_cloud',
-      model: 'Privacy Guardrail Interceptor',
-      privacyAudit: payloadAudit.audit,
-    };
-  }
-  const outboundParams: SendChatMessageParams = {
-    ...payloadAudit.payload,
-    ...(requestSignal ? { signal: requestSignal } : {}),
-  };
-  try {
-    // 10 second timeout protection so UI never hangs
-    const timeoutController = new AbortController();
-    const timeoutId = setTimeout(() => timeoutController.abort(), 10000);
-
-    const onUserAbort = () => {
-      clearTimeout(timeoutId);
-      timeoutController.abort();
-    };
-    params.signal?.addEventListener('abort', onUserAbort);
-
-    const res = await fetch(apiUrl('/api/chat'), {
-      method: 'POST',
-      headers: getCustomApiHeaders(),
-      body: JSON.stringify(outboundParams),
-      signal: timeoutController.signal,
-    });
-
-    clearTimeout(timeoutId);
-    params.signal?.removeEventListener('abort', onUserAbort);
-
-    if (res.ok) {
-      const data: ChatResponse = await res.json();
-      data.privacyAudit = payloadAudit.audit!;
-      systemLogger.info('CHAT', 'Chat response received from server API', { model: data.model });
-      return data;
-    } else {
-      systemLogger.warn('CHAT', `Server chat API returned status ${res.status}`);
-    }
-  } catch (err: any) {
-    if (params.signal?.aborted) {
-      systemLogger.info('CHAT', 'Chat request aborted by user');
-      throw err;
-    }
-    systemLogger.warn('CHAT', `Network chat fetch error, invoking autonomous fallback: ${err?.message || err}`);
-  }
-
-  // Standalone / On-device Heuristic Companion Fallback
+  // 3. P349: Geminiクラウド会話モード（/api/chat）は廃止した。
+  // Geminiは素材供給（教師・蒸留・審査）専用とし、会話の応答生成は端末内の基本処理で行う。
   const pipelineRes = await nonLlmHardwarePipelineService.executePipeline({
     prompt: params.prompt,
     persona: params.persona?.name,
@@ -590,9 +526,8 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   });
   return {
     text: pipelineRes.replyText,
-    engineMode: params.engineMode || "autonomous_rule",
-    model: "Miki CORE基本処理（フォールバック）",
-    privacyAudit: payloadAudit.audit,
+    engineMode: params.engineMode || 'autonomous_rule',
+    model: 'Miki CORE基本処理',
     hardwareTelemetry: pipelineRes.telemetry,
   };
 }

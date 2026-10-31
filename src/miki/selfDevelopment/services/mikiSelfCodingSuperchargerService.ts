@@ -84,16 +84,6 @@ export interface DeadCodeScanResult {
   findings: DeadCodeFinding[];
 }
 
-export interface PromptToPatchResult {
-  success: boolean;
-  prompt: string;
-  targetFile: string;
-  targetFeature: string;
-  reasoning: string;
-  searchReplaceDiff: string;
-  dryRunValid: boolean;
-}
-
 export interface SnapshotRecord {
   id: string;
   filePath: string;
@@ -341,27 +331,6 @@ class MikiSelfCodingSuperchargerService {
     return res;
   }
 
-  /**
-   * 5. 自然言語 Prompt-to-Patch パッチ生成機
-   */
-  public async generatePromptToPatch(prompt: string): Promise<PromptToPatchResult> {
-    const res = await callSelfCodeApi<PromptToPatchResult>('/api/self-code/prompt-to-patch', {
-      method: 'POST',
-      body: { prompt },
-    });
-    if (isApiFailure(res)) {
-      return {
-        success: false,
-        prompt,
-        targetFile: '',
-        targetFeature: '',
-        reasoning: `パッチ生成失敗: ${res.reason}`,
-        searchReplaceDiff: '',
-        dryRunValid: false,
-      };
-    }
-    return res;
-  }
 
   /**
    * 6. みき自律自己実装パイプライン (Prompt -> AST Plan -> Snapshot -> Verify -> Apply -> Commit)
