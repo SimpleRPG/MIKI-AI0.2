@@ -4204,7 +4204,7 @@ async function searchHumanWisdomCode(rawPrompt: string, language = 'typescript')
     // 外部検索エラーは静かにフォールバック
   }
 
-  // 3. NPM Registry 検索
+  // 3. NPM Registry 部品調査（実物の登録情報とREADMEを調査する。雛形コードは生成しない）
   try {
     const npmQuery = cleanQuery.split(/\s+/).slice(0, 2).join(' ');
     const npmUrl = `https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(npmQuery)}&size=2`;
@@ -4216,13 +4216,43 @@ async function searchHumanWisdomCode(rawPrompt: string, language = 'typescript')
     if (npmRes.ok) {
       const npmData: any = await npmRes.json();
       const objects = npmData.objects || [];
+      // NPM部品調査: 名前と説明文から雛形コードを捏造せず、レジストリの登録情報と
+      // READMEの実物を調査し、根拠付きの「部品候補」として返す。
       for (const obj of objects.slice(0, 2)) {
         const pkg = obj.package;
+        let dossier = `// [NPM部品調査] ${pkg.name} v${pkg.version}\n// 説明: ${pkg.description || ''}\n`;
+        try {
+          const metaRes = await fetch(`https://registry.npmjs.org/${encodeURIComponent(pkg.name)}`, {
+            headers: { 'User-Agent': 'MikiAI-HumanWisdom-Excavator/1.0' },
+            signal: AbortSignal.timeout(2500),
+          });
+          if (metaRes.ok) {
+            const meta: any = await metaRes.json();
+            const latestTag = meta['dist-tags']?.latest || pkg.version;
+            const latest = meta.versions?.[latestTag] || {};
+            const license = typeof latest.license === 'string' ? latest.license : (latest.license?.type || meta.license || '不明');
+            const repoUrl = (typeof latest.repository === 'string' ? latest.repository : (latest.repository?.url || '')).replace(/^git\+/, '');
+            const typesInfo = (latest.types || latest.typings) ? `型定義あり (${latest.types || latest.typings})` : (latest.typesVersions ? '型定義あり (typesVersions)' : '型定義の宣言なし');
+            dossier += `// License: ${license}\n// Repository: ${repoUrl || '不明'}\n// Types: ${typesInfo}\n`;
+            const readme: string = typeof meta.readme === 'string' ? meta.readme : '';
+            if (readme && !readme.startsWith('ERROR')) {
+              const codeBlock = readme.match(/```(?:typescript|ts|javascript|js)\n([\s\S]*?)```/);
+              const prose = readme.replace(/```[\s\S]*?```/g, ' ').replace(/[#>*`\[\]()]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400);
+              dossier += `// README要旨: ${prose}\n`;
+              if (codeBlock && codeBlock[1].trim().length > 20) {
+                dossier += `\n// README記載の使用例（実物抜粋）:\n${codeBlock[1].trim().slice(0, 1200)}\n`;
+              }
+            }
+          }
+        } catch {
+          // 登録情報の取得に失敗した場合は、検索結果の基本情報のみで部品候補とする
+        }
+        dossier += '// 注意: これは実在パッケージの調査記録であり、生成コードではない。採用する場合は通常の候補検証・承認経路を通すこと。';
         snippets.push({
           id: `npm_${pkg.name}`,
-          title: `NPM: ${pkg.name} (v${pkg.version})`,
+          title: `NPM部品: ${pkg.name} (v${pkg.version})`,
           language,
-          code: `// NPM Package: ${pkg.name}\n// Description: ${pkg.description || ''}\nexport interface ${pkg.name.replace(/[^a-zA-Z0-9]/g, '_')}Config {\n  enabled?: boolean;\n}\n\nexport class ${pkg.name.replace(/[^a-zA-Z0-9]/g, '_')}Service {\n  constructor(private config: ${pkg.name.replace(/[^a-zA-Z0-9]/g, '_')}Config = {}) {}\n  public async execute(payload: unknown): Promise<{ success: boolean; data: any }> {\n    return { success: true, data: payload };\n  }\n}`,
+          code: dossier,
           sourceUrl: pkg.links?.npm || `https://www.npmjs.com/package/${pkg.name}`,
           sourceType: 'npm',
           description: pkg.description,
@@ -5063,7 +5093,7 @@ app.post('/api/self-code/search-web-code', async (req, res) => {
     }
 
     const cleanQuery = query.trim();
-    // 人類の知恵自律発掘エンジンを実行（GitHub, NPM, OSSパターン, 知識・スキル自動保存）
+    // 人類の知恵自律発掘エンジンを実行（GitHub, NPM部品調査, OSSパターン, 知識・スキル自動保存）
     const wisdomResult = await searchHumanWisdomCode(cleanQuery, language);
     const snippets = wisdomResult.allSnippets;
 
@@ -5081,7 +5111,7 @@ app.post('/api/self-code/search-web-code', async (req, res) => {
       },
     ];
 
-    const summary = `ネット大海（GitHub / NPM / OSS知恵バンク）から「${cleanQuery}」に関する先行コード・知恵 ${snippets.length} 件を発掘し、知識・スキル（${wisdomResult.learnedSkill?.id || 'Skill IR'}）として自己蓄積しました。`;
+    const summary = `ネット大海（GitHub / NPM部品調査 / OSS知恵バンク）から「${cleanQuery}」に関する先行コード・部品情報 ${snippets.length} 件を調査し、知識・スキル（${wisdomResult.learnedSkill?.id || 'Skill IR'}）として自己蓄積しました。`;
 
     return res.json({
       query: cleanQuery,
