@@ -9,12 +9,12 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1858 |
-| ソースファイル | 1403 |
-| 相対import候補を字句走査したECMAScriptファイル | 1316 |
-| 相対import候補 | 3955 |
-| 追跡パスへ解決できた候補 | 3924 |
-| 未解決候補（即不具合判定ではない） | 31 |
+| 対象追跡パス（監査制御ファイルを除く） | 1821 |
+| ソースファイル | 1374 |
+| 相対import候補を字句走査したECMAScriptファイル | 1287 |
+| 相対import候補 | 3875 |
+| 追跡パスへ解決できた候補 | 3861 |
+| 未解決候補（即不具合判定ではない） | 14 |
 
 ## ファイル一覧
 
@@ -212,24 +212,18 @@
 | `scripts/verify_alternative_bundles_e2e_phase81.mjs` | 5977 | 10 | `29936c29ec73b599ea78e1e31dc102ba5057c77f0169fa4fbb39e0eb1c8e7c9c` | 5 | 5 | 0 |
 | `scripts/verify_analyzed_super_resolution_p127.mjs` | 1986 | 1 | `367d400e1749d760d87bb710a8299e69890ecdced848de1e3ff700132fbd989b` | 2 | 2 | 0 |
 | `scripts/verify_anatomical_person_p198.mjs` | 2695 | 3 | `004d5bab1bf3d3af48f631b81704b99b9ff08e5db29735af2297492b3cc2d80a` | 1 | 1 | 0 |
-| `scripts/verify_android_japanese_morphology_contract.ts` | 5463 | 51 | `861d171c496fd2ee258e67ef3cdd3ae3d78cc837af512de3fbf7016d26aef5c7` | 0 | 0 | 0 |
-| `scripts/verify_android_native_contract.ts` | 3990 | 48 | `02ef5f086fcb955031187b436ca60df520494823c89f1fa2858465fd57c816a9` | 0 | 0 | 0 |
 | `scripts/verify_android_startup_blackout_fix.mjs` | 3546 | 32 | `e4eeeb3fc4f504c6d5cfabfa08045cfc49e35823741ed4b6a35b756f1da02e54` | 0 | 0 | 0 |
 | `scripts/verify_android_voice_contract.ts` | 1171 | 20 | `f87a5d2799af2d96c9253b0eba92fb7658d17274c19358f458cec131a4929aa0` | 0 | 0 | 0 |
 | `scripts/verify_android_workmanager_contract.ts` | 7894 | 81 | `e4400aee0640f08a736aa24714536dffddecfea2395c14a9f682686559df9dc2` | 0 | 0 | 0 |
 | `scripts/verify_architecture_integration_stage25.mjs` | 1554 | 2 | `391aa7575a87b2fa8581ffc2ce06561d71b576256298dcfda06c9da62d02b218` | 0 | 0 | 0 |
 | `scripts/verify_ast_candidate_transformation_stage3.mjs` | 3018 | 31 | `8b462ef84eca2f598441f4196645a37393bf06acd52fd496532b2fe63bb3bc03` | 0 | 0 | 0 |
-| `scripts/verify_autonomous_cancel_recovery_p297.mjs` | 4382 | 68 | `964c9af93dd559ba37c7966b96935a40b7f2c056f5975a6dde2629dfccb3e00b` | 4 | 4 | 0 |
 | `scripts/verify_autonomous_capability_innovation_stage52.mjs` | 1202 | 1 | `ba0fef556543b39e3a272a2869bde157c67ecf8d1f82ecd02ced6a05ad48f498` | 0 | 0 | 0 |
 | `scripts/verify_autonomous_completion_stage15.mjs` | 1182 | 5 | `112207a1bbffdbb2e6341398b4595ac4f8d8bcd5487c3a1265169e5132c445a1` | 0 | 0 | 0 |
 | `scripts/verify_autonomous_e2e_stage28.mjs` | 674 | 1 | `ff0b4a8de5540b72b1e27e2b6662fd6a9477eaccaa2cdb29e84c7ad22622d147` | 0 | 0 | 0 |
 | `scripts/verify_autonomous_feature_construction_execution_stage13.mjs` | 1241 | 11 | `f9193a07dffd344d0f2b5c3ad532517d63013bbdc7a61f34385d0380afb61637` | 0 | 0 | 0 |
 | `scripts/verify_autonomous_feature_development_stage12.mjs` | 1757 | 9 | `2b7d37a4da531cddfcff31755af0cafb16a53debf44de9302049fba9e52b3a24` | 0 | 0 | 0 |
 | `scripts/verify_autonomous_hardening_wiring.ts` | 8405 | 132 | `ecc75430c859f0bea699d85fbf91d483e942dff7076c20bea9bd6f9c20b984ca` | 3 | 3 | 0 |
-| `scripts/verify_autonomous_infrastructure_integration.ts` | 9155 | 179 | `151e5e0571cc72b65c525264e637fc56a4a6a55ca8f4ed5108fc0765b30d6fb9` | 6 | 6 | 0 |
-| `scripts/verify_autonomous_state_integrity_p296.mjs` | 8726 | 127 | `4d1c14433dcaa2c048061d91baaee735823ed944ae53052e1bad3c24a166bade` | 8 | 8 | 0 |
 | `scripts/verify_autonomous_worker_safety_p293.mjs` | 5036 | 84 | `8a13d519d17a024119ea5cd8e3c9ae92fef805ab1d75c686efb61a9360ffc7d4` | 6 | 6 | 0 |
-| `scripts/verify_background_web_research_provenance_p337.ts` | 3729 | 45 | `a736210f72e7a77fd1bcd52a272959a21213a439d6a55cc80515164184f753ba` | 2 | 2 | 0 |
 | `scripts/verify_blackboard_corrupt_snapshot_p291.mjs` | 1248 | 17 | `089dbff1ebb9f154a4cfc4e75d6f14f9717bee988f78f369f907e906cd01634a` | 2 | 2 | 0 |
 | `scripts/verify_body_type_trends_p115.mjs` | 1392 | 1 | `7c71d5c6adc150cff210a8353fd37502188ae4910965b1072e06528fd8c577f6` | 1 | 1 | 0 |
 | `scripts/verify_browser_boundary.mjs` | 662 | 6 | `8af736b25feedffb550d7c38f7a352d1765b20c90761a9069936c648bad60d3c` | 0 | 0 | 0 |
@@ -241,22 +235,15 @@
 | `scripts/verify_candidate_development_completion_stage11.mjs` | 1180 | 12 | `3eda299cb73acdffd43361db8ee890064155e89c2a59478ba719398009e72536` | 0 | 0 | 0 |
 | `scripts/verify_candidate_repair_retry_loop_stage10.mjs` | 1171 | 12 | `7472c80cb78ec76be00d677ded9d24b1f18dd2f94a6047e466db027b5221c2a0` | 0 | 0 | 0 |
 | `scripts/verify_canvas_scene_generation_p110.mjs` | 1396 | 1 | `f92f98442bae3a086750be562ca388fd97558d5a2bfd39548e29202e822e5443` | 1 | 1 | 0 |
-| `scripts/verify_capability_ledger_graph_storage_p295.mjs` | 5711 | 105 | `a6d9c5ea95ef3dd3654e02c1078c58833589684cb71c5c6c9d7c69d6e6871ea1` | 7 | 7 | 0 |
 | `scripts/verify_claim_safety_current.mjs` | 940 | 2 | `507e575db4b5c85246ccf28c28af5bde0a42d7cefcd3738a64ef172db315e7c4` | 1 | 1 | 0 |
 | `scripts/verify_closed_surface_p143.mjs` | 1966 | 1 | `14900087574646bc2a6b3bc64736136dfb4a424472ee0d021b6b3594ecc3c9fd` | 3 | 3 | 0 |
 | `scripts/verify_code_only_quality_v272.mjs` | 1455 | 5 | `abecb25fead46be927c66cea3e24373f9986cab0287878da9148ad9e658d20d0` | 0 | 0 | 0 |
 | `scripts/verify_completion_resilience_connection.mjs` | 1460 | 1 | `8ce997c86e1ca7b626bffd6aa9328078cb7370393b0d6545e6e168c66b60d767` | 0 | 0 | 0 |
-| `scripts/verify_complexity_cost_gate_behavior.ts` | 6870 | 154 | `0067605bb6776174c8a20bb8ec7197be17cb7ec4713ef9fe76a91a00b68f9486` | 10 | 2 | 8 |
 | `scripts/verify_comprehensive_visual_profile_p132.mjs` | 3590 | 1 | `fd52db57ff839f43b0c17284a644db8761ea1074f260f07ed71d6950ead1581c` | 2 | 2 | 0 |
 | `scripts/verify_context_closure_phase1.mjs` | 1118 | 11 | `67262973f1608351e215ab4ee4696360b1e7791c8d67d630a5d021c376c03a83` | 0 | 0 | 0 |
 | `scripts/verify_continuous_surface_p199.mjs` | 2685 | 1 | `720738c200a5c70ebe01ec1958c066b73d4609c4a89a201c4f46b64a00f36f0f` | 1 | 1 | 0 |
 | `scripts/verify_contract_propagation_stage5.mjs` | 4022 | 35 | `29f7dfb977fe19f283a8f467e02c4b8c837844f33bd7684e5bfab10050db123c` | 0 | 0 | 0 |
-| `scripts/verify_conversation_cancellation_p339.mjs` | 8740 | 202 | `47c8aba07ea892e6911165664196d61f8d71ef37bbef9110fdb7b9622b6527aa` | 5 | 5 | 0 |
-| `scripts/verify_conversation_components_p213.mjs` | 1229 | 5 | `361cd85b213acd314a3df5e08aa0822f0dfe306a3b0f4e03e8d7552bd9dc25ef` | 0 | 0 | 0 |
 | `scripts/verify_conversation_geometry_p206.mjs` | 2114 | 1 | `467048975114606ec9ae1e354b88a3d25626a5dd066876b110e02bedbf5271f1` | 2 | 2 | 0 |
-| `scripts/verify_conversation_graph_completion_p214.mjs` | 1427 | 6 | `3ac7b3b19a0d35fe770db1048772e6b4c94515c5dcfe2126eb50fa1c5dc6576a` | 0 | 0 | 0 |
-| `scripts/verify_conversation_graph_runtime_p212.mjs` | 1434 | 5 | `9681f9d573af01c2f04a318d388fd1ea8ecdd102aed3d74f0cc8ff338b0f87e3` | 0 | 0 | 0 |
-| `scripts/verify_conversation_learning_and_reasoning.ts` | 7700 | 154 | `af7b3fa772718de1860c7537a1db9fe016380510ded94e1c648fa7d987ecd38c` | 6 | 6 | 0 |
 | `scripts/verify_conversation_meaning_phase85.mjs` | 1309 | 2 | `cefbbce7994d8b5419ea3468491ae117cd79c3de85628fd96f8c6b7c82c92e32` | 2 | 2 | 0 |
 | `scripts/verify_conversation_phase87.mjs` | 4073 | 12 | `50859a0000466e3144b7adf9cde39297e070419cb9b0d821f6dc8d47ac97c7b5` | 4 | 4 | 0 |
 | `scripts/verify_conversation_phase89.mjs` | 1907 | 2 | `9860a042fbe2e7fb9c4977c9674f33b52ebbe650fd924f3a968585603fed1a27` | 2 | 2 | 0 |
@@ -265,11 +252,8 @@
 | `scripts/verify_conversation_phase94.mjs` | 666 | 2 | `9686a3e1c8c1c21a4ed93ebc240166a58fd60f28aba5214bac6a295b8cda61bb` | 1 | 1 | 0 |
 | `scripts/verify_conversation_recursive_phase86.mjs` | 1692 | 7 | `0fa5809e4ace11e5d13d3130d4b7e72a6cb8636878eb5ecee34ec8867082627c` | 5 | 4 | 1 |
 | `scripts/verify_conversation_research_component_graph_p207.mjs` | 2688 | 1 | `c15cfe26244949cf926a9b1d3e6743ab72928a2f019d8d033cee9571e9e164f5` | 1 | 1 | 0 |
-| `scripts/verify_conversation_ui_graph_e2e_p215.mjs` | 11525 | 133 | `6d92713bb5ed4d236e949f0507cc85623940945717b81d76cd14b68a6eca2049` | 6 | 6 | 0 |
 | `scripts/verify_core_autonomy_regressions_p291.mjs` | 4042 | 69 | `7777b61f99fdab1120cf2a691a1aec62a19322f0c2be39962364711cd5b1ae60` | 1 | 1 | 0 |
-| `scripts/verify_core_cognitive_graph_p155.mjs` | 3243 | 1 | `1a11d364b8b07753bd6f6f1fac57cef32a3b99724a73a4c5b4993b3a3dd163d4` | 1 | 1 | 0 |
 | `scripts/verify_core_graph_shards_p153.mjs` | 1928 | 1 | `5c9039713fc6df9309158c41ae57d3498d77c14263e9d3d103930eca63b3f296` | 2 | 2 | 0 |
-| `scripts/verify_cross_domain_graph_p211.mjs` | 7329 | 36 | `9cc88b8dcdfdebd0b5c45568a22344e5076a1468c4f7354665d1bbd9f2411a10` | 1 | 1 | 0 |
 | `scripts/verify_deep_alternative_gaps_phase82.mjs` | 5203 | 9 | `a2dc9a0389ab8ccf478284a18ffdce207d196a548e868665a35c1ac33f32f6c8` | 0 | 0 | 0 |
 | `scripts/verify_detailed_human_rules_p194.mjs` | 2724 | 1 | `1f0f34d6ddc92f41e9ac5e3a2d07e23e71375746c8b41c2e3118fb27bb35c35f` | 3 | 3 | 0 |
 | `scripts/verify_deterministic_semantics_components_stage24.mjs` | 1564 | 2 | `6d31c9c4ae13150c9c04779cc27ce2876deacf85748c44821828bf236b02d878` | 0 | 0 | 0 |
@@ -293,7 +277,6 @@
 | `scripts/verify_garment_evidence_p134.mjs` | 2174 | 1 | `b1df0fb076cf62daf03986853ef6df181bb57150179214cd5a326f3f1b8b1125` | 1 | 1 | 0 |
 | `scripts/verify_garment_seamless_boundary_p137.mjs` | 2332 | 1 | `6b86150784e8e284e993d0ab8332cda83210ebd5fefcbc8997bae682055e04b0` | 2 | 2 | 0 |
 | `scripts/verify_garment_zero_gap_p135.mjs` | 1899 | 1 | `8e51c04bfc39f7536cca8ca992ee0c702ed7cd07309092cba80755362dfcb860` | 1 | 1 | 0 |
-| `scripts/verify_graph_answer_pipeline_p216.mjs` | 6457 | 14 | `9615311976f2b937ff0cd531e3bd5a1a7c8448b034bea0e110b2b967e3ee7bac` | 1 | 1 | 0 |
 | `scripts/verify_graph_person_generation_p160.mjs` | 3231 | 1 | `8dcec9240f85588acea4ef570d207b4af12a2b6770f8d8ac133c97ba863e421f` | 4 | 4 | 0 |
 | `scripts/verify_graph_reasoning_p154.mjs` | 2461 | 1 | `1eb88e1cc0b3646987a2bce3a827b661d0d40c490de40139c3832efdd2a592a6` | 1 | 1 | 0 |
 | `scripts/verify_headless_webview_pipeline.ts` | 7381 | 155 | `06ea805952ae53d416df04c150a0a2089e626da32b424c16f12b033b8cbf8eb2` | 4 | 4 | 0 |
@@ -374,19 +357,14 @@
 | `scripts/verify_realistic_surface_p142.mjs` | 1822 | 1 | `bf5ecd29bb6c230006d70c475ea8089fecd94db1bd54979e6aa59c5daf79e3de` | 3 | 3 | 0 |
 | `scripts/verify_remaining_development_capabilities_stage8.mjs` | 959 | 7 | `4116f013d9352137e8fbea23eb810c69985bdd70b2d77488889df985e3ff4f6f` | 0 | 0 | 0 |
 | `scripts/verify_repository_visual_learning_p116.mjs` | 1314 | 1 | `ee1185b999a42b50a591eaa421b542256292256c94235c55f86d8b7145f2f20b` | 1 | 1 | 0 |
-| `scripts/verify_research_learning_integrity_p331.mjs` | 5247 | 63 | `d9767b7636f67250565b0987630392e85e7e82d3ce4a2f85d42da9a747ee9147` | 0 | 0 | 0 |
-| `scripts/verify_research_learning_integrity_p334.mjs` | 6961 | 78 | `53d96dd1b1a631a15a0439665e1c905b0ea6564aece2d637bcded95d4f403267` | 0 | 0 | 0 |
 | `scripts/verify_review_safety_and_planning_stage20.mjs` | 1187 | 2 | `4e59e7d35e26829401aeba260d5bb8fd5ec4aa47aec7605134817fdef1ff24de` | 0 | 0 | 0 |
 | `scripts/verify_rich_visual_e2e_p125.mjs` | 2317 | 1 | `de1123dadca876d1c64977670de74421679bae789b7585d6e821121ddde2ecb8` | 2 | 2 | 0 |
 | `scripts/verify_runtime_depth_stage51.mjs` | 1165 | 1 | `3a11348b1202932efc1fb89b218c818cbbbc9448afb3c0a479a62af214b113df` | 0 | 0 | 0 |
-| `scripts/verify_runtime_failure_fixes.mjs` | 98266 | 1398 | `8a4d57d4ed613423ad253ed145a10b07292dd2ab98990e7b6cef80d91535bb63` | 6 | 0 | 6 |
 | `scripts/verify_runtime_logging_phase1.mjs` | 2083 | 67 | `543d7d439ba2d5e633e84e8f95b88b9636756f840cd98472840129456335de74` | 0 | 0 | 0 |
-| `scripts/verify_runtime_proof_workspace_policy_p328.ts` | 2260 | 61 | `79c4e9dd80ffe53984bccbe34fa0c9bfbf90d3cb507497ca45a1de0ec9b7393c` | 1 | 1 | 0 |
 | `scripts/verify_rust_17_domains_phase38.mjs` | 1677 | 1 | `9a34a6e4801caf14b9742698ea255a9c9b67b047d1b5ffa36ced98e00a41dc1a` | 0 | 0 | 0 |
 | `scripts/verify_rust_android_compatibility.mjs` | 1224 | 12 | `683e8a0cc507b4e065be1ff853de06ccf4add294904cb32bc672df8599d488db` | 0 | 0 | 0 |
 | `scripts/verify_rust_compare_shadow_phase9.mjs` | 1420 | 2 | `39ba4c1570bfe9676ad22297e7a724a924c72cdda6205d940fda9d4c8da19094` | 0 | 0 | 0 |
 | `scripts/verify_rust_copy_dedup_phase7.mjs` | 1676 | 9 | `ab2ddb4a92bf3962d3ae1758b648211da4a6f884fcfb7d026e8216875fb1bd6f` | 0 | 0 | 0 |
-| `scripts/verify_rust_core_kernel_phase37.mjs` | 3109 | 41 | `2366669a216338bc18fa6b3eebcfb24d4fd411f5445c7141281aac17216f0320` | 0 | 0 | 0 |
 | `scripts/verify_rust_data_phase43.mjs` | 2148 | 1 | `18e0ba9c295ef66381fb52611b704a6bbc679aa700462450eb424f85186c4621` | 0 | 0 | 0 |
 | `scripts/verify_rust_data_phase44.mjs` | 1768 | 1 | `c9cbb2029a1a3c92edb71e324835e87df994273e192f1c4f28b021d6bf5fd83d` | 0 | 0 | 0 |
 | `scripts/verify_rust_domain_contract_fixtures_phase49.mjs` | 1582 | 1 | `58eed4de04ebce87c3bd04107c89aef2e56f8002189739bcd635c8e9df3533bb` | 0 | 0 | 0 |
@@ -437,15 +415,10 @@
 | `scripts/verify_stages_35_40.mjs` | 1421 | 1 | `6ef1539610c0814c70a22bc8e9e6be504c146f5b3e549f4f59fbea2e5e48cbed` | 0 | 0 | 0 |
 | `scripts/verify_stages_41_50.mjs` | 1669 | 1 | `af2bfde4ddd6db6bc9fb43d65b8793455df94041e69f9997380f386d9e8e1bd2` | 0 | 0 | 0 |
 | `scripts/verify_stages_41_50_connections.mjs` | 1300 | 7 | `78c8ef732b37cb4f5bc4e77aa44a6b0706ac8ef8590d59fbf46b50f1013e494a` | 0 | 0 | 0 |
-| `scripts/verify_startup_core_readiness_p341.ts` | 8888 | 187 | `8a81be6d6fe4ea653f51e871a8402ce226796d3433998f7572e5914575370328` | 4 | 1 | 3 |
-| `scripts/verify_system_logger_diagnostic_template_p336.mjs` | 1290 | 25 | `c2f472b32706aa95a4e1ca8935a74e2c8d5cc21eae9d00cf9377be1f85aa2d53` | 0 | 0 | 0 |
-| `scripts/verify_task_route_failure_contracts.ts` | 3414 | 99 | `b91d8af96a587150174acd13f01f7ee66a753326584f56b59f281b097b97963e` | 3 | 3 | 0 |
 | `scripts/verify_termux_build_v190.sh` | 645 | 13 | `ab340b08c770d9974c5977374a185221a37ed3f7be5d1aacd588bcf418845ce4` | 0 | 0 | 0 |
 | `scripts/verify_unified_autonomous_completion_stage17.mjs` | 1307 | 6 | `504600b36b1aedb99f02a6df1a0dd8fb93673a3381c60eb02dc770181bc60e79` | 0 | 0 | 0 |
-| `scripts/verify_unified_candidate_pipeline_p321.mjs` | 8057 | 135 | `1b50c3de92fb740e3136264ea36e280b80ace67b298ddd2df52ff17949133ed8` | 1 | 1 | 0 |
 | `scripts/verify_unified_graph_p151.mjs` | 2555 | 1 | `8ec223e3552a1f22ef247f8ead99d6dc9b7e1183b80e42312b93f74e9a16f903` | 1 | 1 | 0 |
 | `scripts/verify_unified_instruction_development_stage16.mjs` | 1090 | 6 | `89468fdb4f950bd5bf22652350b466f07b948515843007d0301f4ccc0d72e3e4` | 0 | 0 | 0 |
-| `scripts/verify_user_facing_runtime_language_p330.mjs` | 4988 | 63 | `798cacd8d9f71afbce0f124eff527e436b666200876da3965f5276a9dbdfad4e` | 0 | 0 | 0 |
 | `scripts/verify_v13_surface_and_persona.ts` | 9502 | 192 | `1c0ef4f5898612e8eee35add5773527fae3fe253eb3d794092355e933a26f850` | 4 | 4 | 0 |
 | `scripts/verify_v14_surface_variation.ts` | 12965 | 245 | `923b27f29448eb7fd85886d9247388dd3817bfb5e8e58f8a00b2c672d1ad3fc0` | 5 | 5 | 0 |
 | `scripts/verify_v15_falsification_learning.ts` | 4169 | 92 | `7b525b47600a169fe00d79aff03c470bff9bce8e612302265cedf13817445404` | 2 | 2 | 0 |
@@ -462,8 +435,6 @@
 | `scripts/verify_visual_project_learning_p122.mjs` | 2683 | 1 | `a66838e7ae783f9b27731913b51efca90398648eb3013c44ba6fe1ee8101a7ff` | 3 | 3 | 0 |
 | `scripts/verify_visual_reference_research_p117.mjs` | 1709 | 1 | `7d37035744d7d91749c79999604679125dc191371365bbb9c8bfb81a75f341c1` | 1 | 1 | 0 |
 | `scripts/verify_visual_truth_size_p124.mjs` | 2477 | 2 | `3ffcc553bc957ec60a5d9049815fcfe725d754412128a7c1c15b7b5b84da06d0` | 1 | 1 | 0 |
-| `scripts/verify_web_content_understanding.ts` | 2432 | 46 | `bd3561c89ff208978701d54338cc442ea6703b6f98c36d06c9d9c76b6407f02d` | 1 | 1 | 0 |
-| `scripts/verify_web_semantic_rule_learning.ts` | 9492 | 167 | `266a75df31c3f84035af3e8a30946f882ad74dc7dbe2fdf3e55e9316abeee273` | 7 | 7 | 0 |
 | `scripts/verify_worker_runtime_stage61.mjs` | 1547 | 1 | `338946fc800a923593751a883117336b239b44c7ed7f21eb1c3ed82a6e73e824` | 0 | 0 | 0 |
 | `scripts/verify_worker_transaction_executors_stage27.mjs` | 1531 | 2 | `a46fe0db24dfffa9abeba218a243a9df4460590d99578a9f3fd455218acc8771` | 0 | 0 | 0 |
 | `scripts/verify_workspace_completion_stage29.mjs` | 1402 | 2 | `b4176f66fa9ca552e14ea5c6d082f71b9672fd7ac37b5b61f92c33aca1c60334` | 0 | 0 | 0 |
