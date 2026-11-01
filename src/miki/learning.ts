@@ -18,7 +18,6 @@ export * from './learning/services/autonomousCurriculumService';
 export * from './learning/services/codeComprehensionQuizService';
 export * from './learning/services/decisionLearningService';
 export * from './learning/services/executionLearningCoordinatorService';
-export * from './learning/services/goalBacksolvingLearningService';
 export * from './learning/services/mikiConversationLearningService';
 export * from './learning/services/mikiUnifiedLearningContinuumService';
 export * from './learning/services/taskConversationFeedbackService';

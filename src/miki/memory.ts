@@ -28,7 +28,6 @@ export * from './memory/services/researchMemoryVerificationSubscriberService';
 export * from './memory/services/metaMemoryService';
 export * from './memory/services/mikiBrainCapsuleService';
 export * from './memory/services/mikiIntrospectionJournalService';
-export * from './memory/services/semanticCacheService';
 export * from './memory/services/structuralMemoryService';
 export * from './memory/services/taskCaseMemoryService';
 export * from './memory/services/wordAssociationGraphService';

@@ -18,7 +18,6 @@ export * from './selfDevelopment/services/autonomousSoftwareFactoryService';
 export * from './selfDevelopment/services/codeMapService';
 export * from './selfDevelopment/services/codeSearchService';
 export * from './selfDevelopment/services/codeSkeletonService';
-export * from './selfDevelopment/services/codeUnderstandingService';
 export * from './selfDevelopment/services/codebaseReflectionService';
 export * from './selfDevelopment/services/mikiAutonomousDevStudioService';
 export * from './selfDevelopment/services/mikiSelfCodingSuperchargerService';

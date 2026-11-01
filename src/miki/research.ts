@@ -17,7 +17,6 @@ export function research() {
 export * from './research/services/autonomousSearchService';
 export * from './research/services/causalInvestigationService';
 export * from './research/services/dataFactoryService';
-export * from './research/services/dataUnderstandingService';
 export * from './research/services/digitalResearchNoteService';
 export * from './research/services/embeddingService';
 export * from './research/services/japaneseAnalysisService';
@@ -37,9 +36,6 @@ export * from './research/services/researchQueryOutcomeLearningService';
 
 export * from './research/services/queryPatternRepositoryService';
 
-export { internalWebQueryLearningCycleService } from './research/services/internalWebQueryLearningCycleService';
-export type { ResearchEnvironmentKind, WebContentKind, RenderedPageInput, RenderedPageSections, InternalResearchEvidence, InternalResearchClaim, LearnedTerm, InternalKnowledgeComponent, InternalWebQueryCycleResult } from './research/services/internalWebQueryLearningCycleService';
 
 export * from "./research/services/webTermLearningService";
 export * from './research/services/visualReferenceResearchService';
-export * from './research/services/searxngMediaFetchService';

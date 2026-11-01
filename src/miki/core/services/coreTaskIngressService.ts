@@ -69,9 +69,25 @@ class CoreTaskIngressService {
   const attribution={taskId:task.taskId,goalHash:canonicalSha256Object(request.goal),outcome,contributingDomains:route,capabilityRefs:[...new Set(task.entries.filter(entry=>/capability/i.test(entry.key)).map(entry=>entry.key))].slice(-20),evidenceIds,failures:failureRefs,causalStatus:'CANDIDATE_ONLY',verificationRequired:true,recordedAt:Date.now()};
   taskBlackboardService.post(task.taskId,'OBSERVATION','learning','learning:causalAttributionCandidate',attribution,evidenceIds);
   causalMemoryLedgerService.linkDecisionResult(String(payload.requestId||task.taskId),route.join('→')||String(request.source),outcome==='SUCCESS'?'SUCCESS':outcome==='FAILURE'?'FAILURE':'INCONCLUSIVE',verified,task.taskId);
+  let createdInvestigationId:string|undefined;
   if(failureRefs.length){
    const investigation=causalInvestigationService.create(request.goal,failureRefs.slice(0,8));
+   createdInvestigationId=investigation.id;
    taskBlackboardService.post(task.taskId,'OBSERVATION','research','causal:investigationCandidate',{investigationId:investigation.id,hypothesisIds:investigation.hypotheses.map(item=>item.id),status:'OPEN',verificationRequired:true},evidenceIds);
+  }
+  // P362: close the causal loop. Hypotheses used to be created and
+  // never updated again. Feed this task's outcome back as an
+  // observation to hypotheses from EARLIER investigations of the same
+  // goal: recurrence of the same failure supports a cause; a later
+  // success without recurrence weakens it. (The investigation created
+  // by this very task is excluded — its own failure is the origin of
+  // its hypotheses, not an independent observation.)
+  for(const prior of causalInvestigationService.list().filter(x=>x.problem===request.goal&&x.id!==createdInvestigationId)){
+   for(const h of prior.hypotheses){
+    if(h.status==='REJECTED')continue;
+    if(outcome==='SUCCESS')causalInvestigationService.updateHypothesis(h.id,`後続タスク ${task.taskId} は成功し、当該原因は再発しなかった`,false);
+    else if(failureRefs.includes(h.cause))causalInvestigationService.updateHypothesis(h.id,`後続タスク ${task.taskId} でも同じ失敗が再発した`,true);
+   }
   }
   mikiUnifiedLearningContinuumService.observe({domain:request.source==='conversation'?'conversation':request.source==='research'?'research':request.kind==='SELF_IMPROVEMENT'?'code':'system',key:`task:${request.kind}:${intentPlan.deterministicKey}`,action:'core_task_outcome',input:request.goal,outcome:outcome==='SUCCESS'?'SUCCESS':outcome==='FAILURE'?'FAILURE':'UNKNOWN',verified,capabilityIds:attribution.capabilityRefs,concepts:route.map(domain=>`domain:${domain}`),lesson:`task=${task.taskId}; status=${task.status}; causal attribution remains candidate-only`});
   if(request.source==='conversation')conversationGraphRuntimeP212Service.ingestInput(result.task.taskId,request.goal);

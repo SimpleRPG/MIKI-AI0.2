@@ -1,6 +1,16 @@
 import { canonicalSha256Object } from './canonicalSha256Service';
 import type { VisualProject, VisualKnowledgeMemory } from './visualProjectLearningCompositionService';
-import type { MediaReference, MediaReferencePacket } from '../../research/services/searxngMediaFetchService';
+// P362: media reference shapes kept locally; the SearXNG media fetch
+// service that used to define them was unconnected and was removed.
+export type MediaKind = 'IMAGE' | 'VIDEO';
+export interface MediaSearchIntent { query:string; kind:MediaKind; maxResults:number; }
+export interface MediaReference {
+  mediaKind:MediaKind; title:string; sourcePageUrl:string; mediaUrl?:string; thumbnailUrl?:string;
+  mimeType?:string; width?:number; height?:number; durationSeconds?:number; creator?:string;
+  license?:string; licenseUrl?:string; attribution?:string; searchProvider:'searxng'; sourceEngine?:string;
+  sourceVerified:boolean; extractionEvidence:string[];
+}
+export interface MediaReferencePacket { intent:MediaSearchIntent; references:MediaReference[]; rejected:string[]; packetSha256:string; }
 
 export type VisualConversationAction='CREATE_NEW_PROJECT'|'EDIT_EXISTING_PROJECT'|'CREATE_VARIANT'|'RESEARCH_REFERENCES'|'LEARN_REFERENCES';
 export type VisualOutputKind='PIXEL_ART'|'CANVAS'|'AVATAR'|'SPRITE_SHEET'|'TILE_MAP';

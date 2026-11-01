@@ -12,7 +12,6 @@ import { situationalAwarenessService } from '../miki/selfAwareness/services/situ
 import { automationStudioService } from '../miki/execution/services/automationStudioService';
 import { causalInvestigationService } from '../miki/research/services/causalInvestigationService';
 import { benchmarkFactoryService } from '../miki/verification/services/benchmarkFactoryService';
-import { dataUnderstandingService } from '../miki/research/services/dataUnderstandingService';
 import { unknownResolutionService } from '../miki/unknown/services/unknownResolutionService';
 import { reversibilityService } from '../miki/safety/services/reversibilityService';
 import { knowledgeOperatingSystemService } from '../miki/selfAwareness/services/knowledgeOperatingSystemService';
@@ -97,7 +96,6 @@ class AppRuntimeLifecycleService {
           void automationStudioService;
           void causalInvestigationService;
           void benchmarkFactoryService;
-          void dataUnderstandingService;
           void unknownResolutionService;
           void reversibilityService;
           void knowledgeOperatingSystemService;

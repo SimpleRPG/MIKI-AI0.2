@@ -97,7 +97,6 @@ import { situationalAwarenessService } from './miki/selfAwareness/services/situa
 import { automationStudioService } from './miki/execution/services/automationStudioService';
 import { causalInvestigationService } from './miki/research/services/causalInvestigationService';
 import { benchmarkFactoryService } from './miki/verification/services/benchmarkFactoryService';
-import { dataUnderstandingService } from './miki/research/services/dataUnderstandingService';
 import { unknownResolutionService } from './miki/unknown/services/unknownResolutionService';
 import { reversibilityService } from './miki/safety/services/reversibilityService';
 import { knowledgeOperatingSystemService } from './miki/selfAwareness/services/knowledgeOperatingSystemService';
@@ -117,7 +116,6 @@ import { capabilityGapService } from './miki/capability/services/capabilityGapSe
 import { skillIrCompilerService } from './miki/selfDevelopment/services/skillIrCompilerService';
 import { formalConstraintSolverService } from './miki/verification/services/formalConstraintSolverService';
 import { capabilityPluginService } from './miki/capability/services/capabilityPluginService';
-import { codeUnderstandingService } from './miki/selfDevelopment/services/codeUnderstandingService';
 import { vbaDesignAssistantService } from './miki/selfDevelopment/services/vbaDesignAssistantService';
 import { featureFlagsService } from './miki/safety/services/featureFlagsService';
 import { dialogueEvaluationService } from './miki/conversation/services/dialogueEvaluationService';
