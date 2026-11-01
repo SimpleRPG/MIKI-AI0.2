@@ -6,8 +6,15 @@ class CandidateAdoptionReadinessService {
  assessWithApprovalReceipt(input:CandidateAdoptionReadinessInput & { baseRevision:string; approvalReceipt?:HumanAdoptionApprovalReceipt }):CandidateAdoptionReadinessResult {
   const initial=this.assess({...input,humanApproved:false});
   const approvalReasons=humanAdoptionApprovalReceiptService.validate(input.approvalReceipt,{candidateId:input.candidateId,candidateHash:input.candidateHash,reviewPackageHash:input.reviewPackageHash,baseRevision:input.baseRevision});
-  const reasons=initial.reasons.filter(reason=>reason!=='HUMAN_APPROVAL_REQUIRED').concat(approvalReasons);
-  const readyForHumanDecision=initial.readyForHumanDecision;
+  // P367: reviewer risk notes (EXTERNAL_REVIEW_WARNINGS) are advisory
+  // information for the human, not a veto. Once a valid approval
+  // receipt exists, the human has decided with those warnings in
+  // view; keeping the warning as a blocker made every honest review
+  // (which always lists some risk) permanently unadoptable.
+  const cleared=new Set<string>(['HUMAN_APPROVAL_REQUIRED']);
+  if(approvalReasons.length===0)cleared.add('EXTERNAL_REVIEW_WARNINGS');
+  const reasons=initial.reasons.filter(reason=>!cleared.has(reason)).concat(approvalReasons);
+  const readyForHumanDecision=initial.reasons.every(reason=>cleared.has(reason));
   return {readinessId:`ADOPTREADY-${canonicalSha256Object({input:{...input,approvalReceiptSha256:input.approvalReceipt?.receiptSha256},reasons}).slice(0,24)}`,readyForHumanDecision,readyForFormalAdoption:readyForHumanDecision&&approvalReasons.length===0,reasons,hashBindings:initial.hashBindings};
  }
  assess(input:CandidateAdoptionReadinessInput):CandidateAdoptionReadinessResult { const reasons:string[]=[]; const review=input.externalReview; const identity=Boolean(review&&review.candidateId===input.candidateId); const candidate=Boolean(review&&review.candidateHash===input.candidateHash); const reviewPackage=Boolean(review&&review.reviewPackageHash===input.reviewPackageHash); if(!input.candidateId||!input.candidateHash||!input.reviewPackageHash)reasons.push('IDENTITY_OR_HASH_MISSING'); if(!input.validationPassed)reasons.push('VALIDATION_NOT_PASSED'); if((input.unexecutedChecks||[]).length)reasons.push('UNEXECUTED_CHECKS_REMAIN'); if(!review)reasons.push('EXTERNAL_REVIEW_MISSING'); else {if(!identity)reasons.push('REVIEW_CANDIDATE_ID_MISMATCH');if(!candidate)reasons.push('REVIEW_CANDIDATE_HASH_MISMATCH');if(!reviewPackage)reasons.push('REVIEW_PACKAGE_HASH_MISMATCH');if((review.warnings||[]).length)reasons.push('EXTERNAL_REVIEW_WARNINGS');if(!['ACCEPT','APPROVE','PASS'].includes(String(review.verdict||'').toUpperCase()))reasons.push('EXTERNAL_REVIEW_NOT_ACCEPTED');} const readyForHumanDecision=reasons.length===0; if(!input.humanApproved)reasons.push('HUMAN_APPROVAL_REQUIRED'); return {readinessId:`ADOPTREADY-${canonicalSha256Object({input,reasons}).slice(0,24)}`,readyForHumanDecision,readyForFormalAdoption:readyForHumanDecision&&input.humanApproved,reasons,hashBindings:{candidate,reviewPackage,identity}}; } }

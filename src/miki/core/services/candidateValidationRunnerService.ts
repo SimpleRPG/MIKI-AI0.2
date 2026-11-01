@@ -48,8 +48,15 @@ class CandidateValidationRunnerService {
   let body:any=candidateValidationResultCacheService.get(validationCacheKey);
   if(!body){
     let response:Response;
-    try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles:isLightMode?[]:sourceFiles,validationRequirements,contractTestIntents:testIntents,testCommands,acceptanceCriterionIds,sourceCommitSha:isLightMode?lightManifest!.commitSha:undefined,repoUrl:isLightMode?`https://github.com/${lightManifest!.repository}`:undefined,githubToken:isLightMode?(selfCodeSpaceService.getGitHubPat()||undefined):undefined,candidateFiles:workspace.files.map(file=>({path:file.path,isNewFile:file.isNewFile,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
-    catch(error){return this.rollbackFailure(workspaceId,workspace.writeGuardId,[error instanceof Error?`VALIDATION_REQUEST_FAILED:${error.message}`:'VALIDATION_REQUEST_FAILED']);}
+    // P367: this fetch had no timeout; a server that accepts the
+    // connection but never answers froze candidate validation (and
+    // the dispatching task) forever. Bound the wait well above the
+    // server's own stage budgets so only a genuine hang trips it.
+    const validationAbort=new AbortController();
+    const validationTimer=setTimeout(()=>validationAbort.abort(),15*60_000);
+    try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),signal:validationAbort.signal,body:JSON.stringify({workspaceId,candidateSha256,sourceFiles:isLightMode?[]:sourceFiles,validationRequirements,contractTestIntents:testIntents,testCommands,acceptanceCriterionIds,sourceCommitSha:isLightMode?lightManifest!.commitSha:undefined,repoUrl:isLightMode?`https://github.com/${lightManifest!.repository}`:undefined,githubToken:isLightMode?(selfCodeSpaceService.getGitHubPat()||undefined):undefined,candidateFiles:workspace.files.map(file=>({path:file.path,isNewFile:file.isNewFile,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
+    catch(error){clearTimeout(validationTimer);return this.rollbackFailure(workspaceId,workspace.writeGuardId,[error instanceof Error?`VALIDATION_REQUEST_FAILED:${error.message}`:'VALIDATION_REQUEST_FAILED']);}
+    clearTimeout(validationTimer);
     if(!response.ok)return this.rollbackFailure(workspaceId,workspace.writeGuardId,[`VALIDATION_HTTP_${response.status}`]);
     body=await response.json() as Record<string,any>;
     candidateValidationResultCacheService.put(validationCacheKey,body);

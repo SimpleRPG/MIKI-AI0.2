@@ -45,6 +45,8 @@ const HISTORY_INDEX_KEY='miki_domain_router_history_v2_index';
 const HISTORY_SEGMENT_MAX_ENTRIES=50;
 const HISTORY_SEGMENT_MAX_CHARS=512*1024;
 const MAX_DEPTH=18;
+// P367: upper bound for one domain handler dispatch (see dispatch()).
+const HANDLER_TIMEOUT_MS=10*60_000;
 const MAX_HISTORY=2000;
 
 type DomainHistoryEntry={envelope:DomainEnvelope;reply:DomainReply};
@@ -99,7 +101,13 @@ class DomainRouterService {
     if(!registration.commands.includes(envelope.command))return this.finish(envelope,{accepted:false,domain:envelope.target,command:envelope.command,error:'DOMAIN_COMMAND_NOT_SUPPORTED',completedAt:Date.now()});
     governanceKernelService.begin(envelope);
     crossDomainCirculationService.record(envelope.source,envelope.target,`ROUTE_${envelope.command}`,envelope.evidenceIds[0]);
-    try{return this.finish(envelope,await handler(envelope));}
+    // P367: handlers were awaited with no timeout, so one hung
+    // handler stalled its task at DISPATCH_START forever. Bound the
+    // wait; a timeout completes as a retryable rejection and the
+    // late handler result is discarded.
+    const handlerPromise=handler(envelope);
+    const timeoutPromise=new Promise<DomainReply>(resolve=>setTimeout(()=>resolve({accepted:false,domain:envelope.target,command:envelope.command,error:'DOMAIN_HANDLER_TIMEOUT',completedAt:Date.now()}),HANDLER_TIMEOUT_MS));
+    try{return this.finish(envelope,await Promise.race([handlerPromise,timeoutPromise]));}
     catch(error){return this.finish(envelope,{accepted:false,domain:envelope.target,command:envelope.command,error:String(error),completedAt:Date.now()});}
     finally{governanceKernelService.end(envelope);}
   }

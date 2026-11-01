@@ -74,6 +74,9 @@ export interface AutonomousLoopPersistenceState { status:AutonomousLoopPersisten
 const KEY = 'miki_autonomous_self_improvement_loop_v2';
 const LEGACY_KEY = 'miki_autonomous_self_improvement_loop_v1';
 const MAX_ATTEMPTS = 3;
+// P367: consecutive resource waits before a request is dropped
+// visibly instead of stalling the queue forever (see waitForResource).
+const MAX_RESOURCE_WAITS = 30;
 const RECOVERY_POLL_MS = 60_000;
 const RESOURCE_WAIT_MS = [2 * 60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000];
 const EVIDENCE_WAIT_MS = [2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60_000];
@@ -447,6 +450,7 @@ class AutonomousSelfImprovementLoopService {
 
         this.replaceLegacyMisclassifiedTask(request);
         request.attempts += 1;
+        request.resourceWaitCount = 0;
         const workflow = request.taskId
           ? await this.resumeOwnedTask(request.taskId)
           : await coreTaskIngressService.submit({
@@ -540,7 +544,13 @@ class AutonomousSelfImprovementLoopService {
           if (!this.isGenerationCurrent(generation)) return;
           continue;
         }
-        const cycleBudgetPaused = workflow.task.status === 'PAUSED' && workflow.task.entries.some(entry => entry.kind === 'CHECKPOINT' && entry.key === 'coreCycleBudgetExhausted');
+        // P367: a PAUSED task is a resumable pause, not a failure. The
+        // orchestrator records several pause checkpoints (cycle limit,
+        // background budget window, foreground user activity); only the
+        // cycle-limit key used to be recognized here, so healthy tasks
+        // advancing one budget window at a time burned attempts and
+        // were dropped after three windows.
+        const cycleBudgetPaused = workflow.task.status === 'PAUSED' && workflow.task.entries.some(entry => entry.kind === 'CHECKPOINT' && (entry.key === 'coreCycleBudgetExhausted' || entry.key.startsWith('backgroundBudgetPause:') || entry.key.startsWith('backgroundBudgetCycle:')));
         if (cycleBudgetPaused) {
           request.attempts -= 1;
           this.state.status = 'RUNNING';
@@ -646,6 +656,15 @@ class AutonomousSelfImprovementLoopService {
 
   private waitForResource(request: AutonomousImprovementRequest, reason: string): void {
     request.resourceWaitCount = (request.resourceWaitCount || 0) + 1;
+    // P367: nothing works behind a resource wait (only a periodic
+    // sensor re-read), so it must not be unbounded. After
+    // MAX_RESOURCE_WAITS consecutive waits the request is dropped
+    // visibly instead of stalling the whole queue forever behind a
+    // condition nobody is working to resolve.
+    if (request.resourceWaitCount > MAX_RESOURCE_WAITS) {
+      this.dropCurrent(`RESOURCE_WAIT_EXHAUSTED:${reason}`);
+      return;
+    }
     const index = Math.min(request.resourceWaitCount - 1, RESOURCE_WAIT_MS.length - 1);
     this.state.status = 'WAITING_RESOURCE';
     this.state.lastReason = reason;

@@ -12375,9 +12375,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 46645,
-      "lines": 1008,
-      "sha256": "eee9671c2a4404e93341c8bd0963ae564c7576b702fad35cc86d26f28ab7b6c3",
+      "bytes": 47803,
+      "lines": 1027,
+      "sha256": "24036a0495a03ad71b90a10b9c911a9d9c9f94aff30cd9caa99bf5b22bf564bc",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12901,9 +12901,9 @@
     },
     {
       "path": "src/miki/core/services/candidateValidationRunnerService.ts",
-      "bytes": 9600,
-      "lines": 83,
-      "sha256": "9cf8068d29167d57ccc12bb6d9f9870b90f4169e67661aeec823703baa943e12",
+      "bytes": 10090,
+      "lines": 90,
+      "sha256": "03d168269bd9908e7897852fbe743e30b15a376f76429ac6cbc6a68f168af2b8",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14411,9 +14411,9 @@
     },
     {
       "path": "src/miki/core/services/domainIntegrationBootstrapService.ts",
-      "bytes": 58840,
-      "lines": 879,
-      "sha256": "6775efd4f7cb43f43da87a886debb21f183dcad067df5d5bc0b71c58f594d3b0",
+      "bytes": 59295,
+      "lines": 887,
+      "sha256": "fd27f112ebc49dda1d618f2c65ef3851a596d485121b4836607c92e204fb7281",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14836,73 +14836,73 @@
           "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
         },
         {
-          "line": 719,
+          "line": 727,
           "specifier": "../../selfDevelopment/services/formalAdoptionAuthorizationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/formalAdoptionAuthorizationService.ts"
         },
         {
-          "line": 720,
+          "line": 728,
           "specifier": "../../selfDevelopment/services/formalAdoptionAuthorizationLedgerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/formalAdoptionAuthorizationLedgerService.ts"
         },
         {
-          "line": 727,
+          "line": 735,
           "specifier": "./reviewZipExportService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/reviewZipExportService.ts"
         },
         {
-          "line": 728,
+          "line": 736,
           "specifier": "./isolatedCandidateWorkspaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
         },
         {
-          "line": 729,
+          "line": 737,
           "specifier": "./persistenceReceiptLedgerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/persistenceReceiptLedgerService.ts"
         },
         {
-          "line": 730,
+          "line": 738,
           "specifier": "./selfCodeSpaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
         },
         {
-          "line": 756,
+          "line": 764,
           "specifier": "./externalReviewIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/externalReviewIntakeService.ts"
         },
         {
-          "line": 781,
+          "line": 789,
           "specifier": "./improvementIntakeRouterService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/improvementIntakeRouterService.ts"
         },
         {
-          "line": 782,
+          "line": 790,
           "specifier": "./externalDirectiveIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/externalDirectiveIntakeService.ts"
         },
         {
-          "line": 813,
+          "line": 821,
           "specifier": "./reviewZipExportService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/reviewZipExportService.ts"
         },
         {
-          "line": 843,
+          "line": 851,
           "specifier": "./candidateValidationRunnerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/candidateValidationRunnerService.ts"
         },
         {
-          "line": 844,
+          "line": 852,
           "specifier": "./isolatedCandidateWorkspaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
@@ -15156,9 +15156,9 @@
     },
     {
       "path": "src/miki/core/services/domainRouterService.ts",
-      "bytes": 16722,
-      "lines": 236,
-      "sha256": "8f2c70b7c99e3344fff038326e782d4c26a2ec01e030a393d472dc5e3b55b041",
+      "bytes": 17365,
+      "lines": 244,
+      "sha256": "eafd72cdab0e1d749cb324285443d2a7a49777809e9b1bffb2a7a30c5998de35",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -15389,9 +15389,9 @@
     },
     {
       "path": "src/miki/core/services/externalReviewIntakeService.ts",
-      "bytes": 26517,
-      "lines": 487,
-      "sha256": "69aebdfddebf590e5e6a9dbe7b732e5ccca1aab8474bd3e803485810381c135f",
+      "bytes": 30052,
+      "lines": 546,
+      "sha256": "4c07a50d7573429bcdbb177192b72ce33b22dabc3267dbbcb5a5263c2e3ca006",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -25594,9 +25594,9 @@
     },
     {
       "path": "src/miki/safety/services/resourceGovernanceService.ts",
-      "bytes": 7014,
-      "lines": 177,
-      "sha256": "eb3767a32ad8dab6a6f4fedb09bfc9fdcf3d09be9b6a5fd1df2a08b71b7a6c25",
+      "bytes": 7757,
+      "lines": 186,
+      "sha256": "d44ec765cbf66ae05c9c1388a3647eb78ce532e839b8aa7e4014ddaa5bf508f5",
       "relativeImportCandidates": [
         {
           "line": 7,
@@ -26989,9 +26989,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/candidateAdoptionReadinessService.ts",
-      "bytes": 3262,
-      "lines": 14,
-      "sha256": "1dfa954d31812b6e8c6237970afc81cd189a4406e993d9a62fb85d34dc740535",
+      "bytes": 3737,
+      "lines": 21,
+      "sha256": "8000a7b5a9550e276ae1ce2925bbc2cb3cae72d6ca50baa33dc03958fb475317",
       "relativeImportCandidates": [
         {
           "line": 1,

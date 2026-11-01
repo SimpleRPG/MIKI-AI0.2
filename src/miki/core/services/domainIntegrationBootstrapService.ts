@@ -709,11 +709,19 @@ class DomainIntegrationBootstrapService{
      taskId,corePlanRevision,operationInstanceId,targetSha256:candidateManifestSha256
    },'miki_candidate_persistence_receipts_v1');
    const changedFilePaths=workspace.files.filter(file=>file.baselineSha256!==file.candidateSha256).map(file=>file.path);
+   // P367: a successful generation must carry at least one verifiable
+   // evidence reference, or the reply contract rejects it as
+   // BUSINESS_SUCCESS_EVIDENCE_REQUIRED, no success is recorded, and
+   // the same GENERATE_CANDIDATE is planned again forever. The
+   // persistence receipt is that reference: this candidate workspace
+   // was persisted and reloaded, which is checkable evidence that
+   // the generation result exists.
+   const generationEvidenceIds=[...new Set([...workspace.files.flatMap(file=>file.evidenceIds),receipt.receiptId])];
    return done({operation:'GENERATE_CANDIDATE',operationClass:'BUSINESS',...result,runId:run.runId,
      candidateId,workspaceId:workspace.workspaceId,candidateRevision,candidateManifestSha256,
      baselineSnapshotSha256:workspace.baseSnapshotSha256,changedFilePaths,
-     unresolvedItems:result.reasons,generationEvidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))],
-     persistenceReceiptIds:[receipt.receiptId],evidenceIds:[...new Set(workspace.files.flatMap(file=>file.evidenceIds))]});
+     unresolvedItems:result.reasons,generationEvidenceIds,
+     persistenceReceiptIds:[receipt.receiptId],evidenceIds:generationEvidenceIds});
   }
   if(domain==='promotion'&&envelope.command==='APPROVE_REVIEWED_CANDIDATE'){
    const {formalAdoptionAuthorizationService}=await import('../../selfDevelopment/services/formalAdoptionAuthorizationService');

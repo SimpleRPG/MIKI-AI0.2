@@ -20,7 +20,7 @@ import { isolatedCandidateWorkspaceService } from './isolatedCandidateWorkspaceS
 export type ExternalAiRole = 'REVIEWER' | 'UNKNOWN_COMPONENT_AUTHOR' | 'TEACHER';
 export type ExternalReviewSourceType = 'PASTED_TEXT' | 'IMPORTED_TXT' | 'IMPORTED_JSON';
 export type ExternalReviewVerdict = 'ACCEPT' | 'REJECT' | 'CHANGES_REQUESTED' | 'UNCLEAR';
-export type ExternalReviewStatus = 'DRAFT' | 'IMPORTED' | 'PARSED' | 'MISMATCH' | 'USER_DECIDED' | 'ARCHIVED';
+export type ExternalReviewStatus = 'DRAFT' | 'IMPORTED' | 'PARSED' | 'MISMATCH' | 'UNVERIFIED' | 'USER_DECIDED' | 'ARCHIVED';
 export type ExternalReviewDecisionValue = 'ACCEPT' | 'REJECT' | 'REQUEST_CHANGES' | 'HOLD' | 'PARTIAL_ACCEPT' | 'PARTIAL_REJECT';
 
 export interface ExternalReviewRecord {
@@ -159,12 +159,62 @@ class ExternalReviewIntakeService {
       corePlanRevision: packageReferences.corePlanRevision,
       operationInstanceId: packageReferences.operationInstanceId,
       claims: parsed.claims, suggestions: parsed.requestedChanges, unknownComponents: parsed.unknownComponents, questions: parsed.questions, mismatchReasons,
-      status: mismatch || coreResult.task.status !== 'COMPLETED' ? 'MISMATCH' : 'PARSED',
+      // P367: a hash/reference mismatch is a genuine MISMATCH, but a
+      // correspondence task that merely did not complete (budget
+      // pause, WAITING) says nothing about the review itself. Burning
+      // the record as MISMATCH made valid reviews permanently
+      // unusable; keep them UNVERIFIED and re-checkable instead.
+      status: mismatch ? 'MISMATCH' : coreResult.task.status === 'COMPLETED' ? 'PARSED' : 'UNVERIFIED',
       coreTaskId: coreResult.task.taskId,
     };
     this.records.set(externalReviewId, record);
     this.persistRecords();
     this.saveDraft(reviewPackage.packageId, '');
+    return this.cloneRecord(record);
+  }
+
+  // P367: re-run the correspondence check for a review whose import
+  // task did not complete. References are re-extracted from the
+  // stored raw response and compared against the current package,
+  // so a package that changed in the meantime still lands in
+  // MISMATCH; a task that completes promotes the record to PARSED.
+  async reverify(externalReviewId: string): Promise<ExternalReviewRecord> {
+    const record = this.records.get(externalReviewId);
+    if (!record) throw new Error('EXTERNAL_REVIEW_NOT_FOUND');
+    if (record.status !== 'UNVERIFIED') return this.cloneRecord(record);
+    const reviewPackage = reviewZipExportService.list().find(item => item.packageId === record.packageId);
+    if (!reviewPackage) throw new Error('REVIEW_PACKAGE_NOT_FOUND');
+    const packageReferences = this.extractPackageReferences(record.rawResponse);
+    const mismatchReasons: string[] = [];
+    if (packageReferences.packageId && packageReferences.packageId !== reviewPackage.packageId) mismatchReasons.push('PACKAGE_ID_MISMATCH');
+    if (packageReferences.packageRevision !== undefined && packageReferences.packageRevision !== reviewPackage.packageRevision) mismatchReasons.push('PACKAGE_REVISION_MISMATCH');
+    if (packageReferences.candidateManifestSha256 && packageReferences.candidateManifestSha256 !== reviewPackage.candidateManifestSha256) mismatchReasons.push('CANDIDATE_MANIFEST_SHA256_MISMATCH');
+    if (packageReferences.zipSha256 && packageReferences.zipSha256 !== reviewPackage.zipSha256) mismatchReasons.push('ZIP_SHA256_MISMATCH');
+    if (mismatchReasons.length > 0) {
+      record.mismatchReasons = mismatchReasons;
+      record.status = 'MISMATCH';
+      this.persistRecords();
+      return this.cloneRecord(record);
+    }
+    const coreResult = await coreTaskIngressService.submit({
+      kind: 'USER_REQUEST',
+      goal: '外部AI評価返信を対象Packageへ対応付け、正規化して保存可否を判断する',
+      source: 'conversation',
+      payload: {
+        operation: 'IMPORT_EXTERNAL_AI_REVIEW',
+        packageId: reviewPackage.packageId,
+        packageRevision: reviewPackage.packageRevision,
+        candidateManifestSha256: reviewPackage.candidateManifestSha256,
+        zipSha256: reviewPackage.zipSha256,
+        rawResponseSha256: record.rawResponseSha256,
+        sourceType: record.sourceType,
+        mismatch: false,
+      },
+      maxCycles: 18,
+    });
+    record.coreTaskId = coreResult.task.taskId;
+    if (coreResult.task.status === 'COMPLETED') record.status = 'PARSED';
+    this.persistRecords();
     return this.cloneRecord(record);
   }
 
@@ -176,6 +226,15 @@ class ExternalReviewIntakeService {
     const record = this.records.get(input.externalReviewId);
     if (!record) throw new Error('EXTERNAL_REVIEW_NOT_FOUND');
     if (record.status === 'MISMATCH') throw new Error('PACKAGE_REVIEW_MISMATCH');
+    if (record.status === 'UNVERIFIED') {
+      // P367: give the correspondence check another chance instead
+      // of dead-ending a review whose only fault was an interrupted
+      // import task.
+      await this.reverify(input.externalReviewId);
+      const refreshedStatus = this.records.get(input.externalReviewId)?.status;
+      if (refreshedStatus === 'MISMATCH') throw new Error('PACKAGE_REVIEW_MISMATCH');
+      if (refreshedStatus !== 'PARSED' && refreshedStatus !== 'USER_DECIDED') throw new Error('EXTERNAL_REVIEW_VERIFICATION_INCOMPLETE');
+    }
     const normalizedReason=input.reason.trim();
     const existingDecisions=this.listDecisions(record.externalReviewId).filter(item=>item.packageId===record.packageId&&item.packageRevision===record.packageRevision&&item.status!=='BLOCKED');
     const identicalDecision=existingDecisions.find(item=>item.decision===input.decision&&item.reason===normalizedReason);

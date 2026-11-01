@@ -67,10 +67,19 @@ class ResourceGovernanceService {
     const free = quota !== null && usage !== null ? Math.max(0, quota - usage) : null;
     const freeGb = free === null ? null : free / GB;
     const effectiveFreeGb = freeGb ?? DEFAULT_FREE_GB;
+    // P367: navigator.storage.estimate() reports the WebView origin
+    // quota (10GiB on the target device), not device free space, so
+    // the old absolute thresholds (5/10/15GB) pinned the device at
+    // CONSERVE or worse forever and guaranteed an eventual permanent
+    // STOP_COLLECTION as MIKI's own data grew. Judge by the tighter
+    // of an absolute floor and the remaining quota ratio: protection
+    // still engages before the quota is actually exhausted, but a
+    // mostly-empty quota is NORMAL.
+    const freeRatio = quota !== null && quota > 0 && free !== null ? free / quota : null;
     const mode: ResourceMode =
-      effectiveFreeGb < 5 ? 'STOP_COLLECTION' :
-      effectiveFreeGb < 10 ? 'CLEANUP' :
-      effectiveFreeGb < 15 ? 'CONSERVE' : 'NORMAL';
+      effectiveFreeGb < 0.25 || (freeRatio !== null && freeRatio < 0.02) ? 'STOP_COLLECTION' :
+      effectiveFreeGb < 1 || (freeRatio !== null && freeRatio < 0.08) ? 'CLEANUP' :
+      effectiveFreeGb < 2.5 || (freeRatio !== null && freeRatio < 0.2) ? 'CONSERVE' : 'NORMAL';
 
     this.snapshot = { quotaBytes: quota, usageBytes: usage, freeBytes: free, freeGb, mode, measuredAt: Date.now() };
     try { storageService.setItem(SNAPSHOT_KEY, JSON.stringify(this.snapshot)); } catch { /* quota may be full */ }
