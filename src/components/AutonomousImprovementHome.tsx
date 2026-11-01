@@ -52,6 +52,7 @@ import {
 import { ReviewPackageLibrary } from './ReviewPackageLibrary';
 import { SelfCodeSpaceScreen } from './SelfCodeSpaceScreen';
 import { LearningArchivePanel } from './LearningArchivePanel';
+import { LearningInspectorPanel } from './LearningInspectorPanel';
 import DevelopmentReviewLifecyclePanel from './self_improvement/DevelopmentReviewLifecyclePanel';
 import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
@@ -993,7 +994,10 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
         )}
 
         {activeSection === 'learning_archive' && (
-          <LearningArchivePanel />
+          <div>
+            <LearningArchivePanel />
+            <LearningInspectorPanel />
+          </div>
         )}
 
         {activeSection === 'review_packages' && (

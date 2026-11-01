@@ -89,6 +89,19 @@ export class MikiUnifiedLearningContinuumService {
 
   constructor() { this.load(); }
 
+  /**
+   * P380: forget one learned profile. This is the correction window
+   * for learned state: if MIKI learned something wrong, the user can
+   * remove exactly that profile instead of wiping all learning.
+   */
+  public forgetProfile(key: string): boolean {
+    const normalized = normalizeKey(key);
+    if (!this.profiles.has(normalized)) return false;
+    this.profiles.delete(normalized);
+    this.save();
+    return true;
+  }
+
   public getProfile(key: string): LearningProfile | undefined {
     return this.profiles.get(normalizeKey(key));
   }

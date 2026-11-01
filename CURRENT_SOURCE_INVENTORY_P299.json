@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1745,
-    "sourceFileCount": 1298,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1211,
-    "relativeImportCandidateCount": 3598,
-    "resolvedRelativeImportCandidateCount": 3582,
+    "trackedPathCountExcludingControlPaths": 1746,
+    "sourceFileCount": 1299,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1212,
+    "relativeImportCandidateCount": 3601,
+    "resolvedRelativeImportCandidateCount": 3585,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -7129,9 +7129,9 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 88674,
-      "lines": 1762,
-      "sha256": "79eb85137e76e991c8f3aaabb4d5a4c8e509deef291fae7e457fca596fbed824",
+      "bytes": 88815,
+      "lines": 1766,
+      "sha256": "8c373b6afdb0658d818f24818be5d3f69d9e104f44ff8eaa00de589815672e06",
       "relativeImportCandidates": [
         {
           "line": 47,
@@ -7165,25 +7165,31 @@
         },
         {
           "line": 55,
+          "specifier": "./LearningInspectorPanel",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/components/LearningInspectorPanel.tsx"
+        },
+        {
+          "line": 56,
           "specifier": "./self_improvement/DevelopmentReviewLifecyclePanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/self_improvement/DevelopmentReviewLifecyclePanel.tsx"
         },
         {
-          "line": 56,
+          "line": 57,
           "specifier": "../miki/core/ui/typedCoreUiGatewayService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/ui/typedCoreUiGatewayService.ts"
         },
         {
-          "line": 57,
+          "line": 58,
           "specifier": "../utils/isEditableInputActive",
           "resolution": "RESOLVED",
           "resolvedPath": "src/utils/isEditableInputActive.ts"
         }
       ],
-      "relativeImportCandidateCount": 8,
-      "resolvedRelativeImportCount": 8,
+      "relativeImportCandidateCount": 9,
+      "resolvedRelativeImportCount": 9,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -7606,6 +7612,29 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/components/LearningInspectorPanel.tsx",
+      "bytes": 5845,
+      "lines": 125,
+      "sha256": "f17a7700f3162eecab3bd7eb1557f661a7b20aa73131ef08773a94cb39775c6d",
+      "relativeImportCandidates": [
+        {
+          "line": 3,
+          "specifier": "../miki/learning/services/mikiUnifiedLearningContinuumService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "../miki/core/services/outcomePredictionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/outcomePredictionService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -21960,9 +21989,9 @@
     },
     {
       "path": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts",
-      "bytes": 19298,
-      "lines": 377,
-      "sha256": "4fb8a0971335284ce9c9c52aa692646454091dde5de2ca9091dc0c7da367501b",
+      "bytes": 19734,
+      "lines": 390,
+      "sha256": "137faec75724b5d7d9fae03a6fdaf927a41325d0ddab2b298cf878fa126aecf4",
       "relativeImportCandidates": [
         {
           "line": 1,
