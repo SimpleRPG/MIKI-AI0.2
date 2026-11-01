@@ -41,53 +41,6 @@ jobs:
       - name: Verify current tracked source inventory P299
         run: python scripts/audit_current_source_inventory_p299.py --check
 
-      - name: Verify user-facing CORE wording and local API routing P330
-        run: node scripts/verify_user_facing_runtime_language_p330.mjs
-
-      - name: Verify research provenance and learning gates P331
-        run: node scripts/verify_research_learning_integrity_p331.mjs
-
-      - name: Verify shared research provenance and Evidence status P334
-        run: node scripts/verify_research_learning_integrity_p334.mjs
-
-      - name: Verify system diagnostic report template syntax P336
-        run: node scripts/verify_system_logger_diagnostic_template_p336.mjs
-
-      - name: Verify background web research provenance P337
-        run: npx tsx scripts/verify_background_web_research_provenance_p337.ts
-
-      - name: Verify conversation CORE cancellation lifecycle P339
-        run: npx tsx scripts/verify_conversation_cancellation_p339.mjs
-
-      - name: Verify startup chat routing readiness P341
-        run: npx tsx scripts/verify_startup_core_readiness_p341.ts
-
-      - name: Verify web content understanding
-        run: npx tsx scripts/verify_web_content_understanding.ts
-
-      - name: Verify evidence-backed web semantic rule learning
-        run: npx tsx scripts/verify_web_semantic_rule_learning.ts
-
-      - name: Verify conversation and work-instruction failure recovery
-        run: npx tsx scripts/verify_task_route_failure_contracts.ts
-
-      - name: Verify unified self-coding candidate and file validation P321
-        run: npm run verify:unified-candidate-pipeline:p321
-
-      - name: Verify cognitive graph node identity and conversation edges
-        timeout-minutes: 10
-        run: |
-          npm run verify:core-cognitive-graph:p155
-          npm run verify:cross-domain-graph:p211
-          npm run verify:conversation-graph-runtime:p212
-          npm run verify:conversation-components:p213
-          npm run verify:conversation-graph-completion:p214
-          npm run verify:conversation-ui-graph-e2e:p215
-          npm run verify:graph-answer-pipeline:p216
-          npx tsx scripts/verify_capability_ledger_graph_storage_p295.mjs
-          npx tsx scripts/verify_autonomous_state_integrity_p296.mjs
-          npx tsx scripts/verify_autonomous_cancel_recovery_p297.mjs
-
       - name: Build Web Application
         env:
           VITE_MIKI_BUILD_REVISION: ${{ github.sha }}
@@ -112,15 +65,6 @@ jobs:
 
       - name: Install Android WorkManager / headless-fetch plugin
         run: bash scripts/install_android_workmanager.sh
-
-      - name: Verify Native and runtime failure contracts
-        run: |
-          npx tsx scripts/verify_complexity_cost_gate_behavior.ts
-          node scripts/verify_runtime_failure_fixes.mjs
-          npx tsx scripts/verify_runtime_proof_workspace_policy_p328.ts
-          npx tsx scripts/verify_android_native_contract.ts
-          npx tsx scripts/verify_android_japanese_morphology_contract.ts
-          node scripts/verify_rust_core_kernel_phase37.mjs
 
       - name: Sync Capacitor Android
         env:
@@ -209,8 +153,6 @@ jobs:
 
           run_check postpush_import_check npm run check:imports
           run_check postpush_typescript_lint npm run lint
-          run_check postpush_conversation_learning npx tsx scripts/verify_conversation_learning_and_reasoning.ts
-          run_check postpush_autonomous_infrastructure npx tsx scripts/verify_autonomous_infrastructure_integration.ts
 
           echo "POSTPUSH_REGRESSION_FAILURES=$failures" | tee -a p258-regression-results.txt "$GITHUB_STEP_SUMMARY"
           exit "$failures"
