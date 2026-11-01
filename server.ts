@@ -4008,53 +4008,8 @@ app.post('/api/self-code/reflexion', async (req, res) => {
       }
     }
 
-    // 1. 外部教師API (Gemini) が利用可能な場合は、反省パッチの生成を試行
-    const apiKeys = extractAllApiKeys(req);
-    if (apiKeys.length > 0) {
-      try {
-        const prompt = `あなたはMIKI-AIの自己反省（Reflexion）認知エンジンです。以下の自己改善試行における失敗情報を分析し、厳密な根本原因特定と修正パッチをJSONのみで生成してください。
-【対象ファイル】: ${targetFile}
-【章番号】: 第${chapterNumber}章
-【試行回数】: ${attemptCount}回目
-【失敗理由/エラー】: ${failureReason}
-【対象コード】:
-${targetCode || '（コード未指定）'}
-
-必ず以下のJSON形式のみを出力してください（Markdownバッククォート不要）:
-{
-  "rootCause": "エラーの真の根本原因（日本語）",
-  "selfCritique": "何を見落としていたかの自己批判（日本語）",
-  "resolutionStrategy": "安全な解決戦略（日本語）",
-  "generatedPatch": "修正コード（TypeScript）",
-  "confidenceScore": 88
-}`;
-        const { response } = await generateContentWithFallback(req, {
-          contents: prompt,
-          config: { temperature: 0.2, maxOutputTokens: 1000 },
-        });
-        const text = response?.text?.trim() || '';
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          return res.json({
-            success: true,
-            chapterNumber,
-            targetFile,
-            reflectionCycle: attemptCount,
-            rootCause: parsed.rootCause || `${failureReason} の直接解析結果`,
-            selfCritique: parsed.selfCritique || `${targetFile} の事前バリデーション不備`,
-            resolutionStrategy: parsed.resolutionStrategy || '不変条件の厳密遵守',
-            generatedPatch: parsed.generatedPatch || '',
-            confidenceScore: typeof parsed.confidenceScore === 'number' ? parsed.confidenceScore : 90,
-            readyToRetry: true,
-          });
-        }
-      } catch (geminiErr) {
-        console.warn('[Reflexion API] External Gemini execution notice:', geminiErr);
-      }
-    }
-
-    // 2. 決定論的分析（実引数 failureReason と targetFile に基づく厳格解析）
+    // P364: Gemini分岐は廃止した（P349方針：外部は素材供給まで）。本ルートは決定論的分析のみを行う。
+    // 決定論的分析（実引数 failureReason と targetFile に基づく厳格解析）
     const isBoundary = /boundary|null|undefined|range|negative|out of/i.test(failureReason);
     const isTypeOrSyntax = /syntax|type|cannot read|is not a function/i.test(failureReason);
     const isInvariant = /invariant|rule|contract|forbidden|security|key/i.test(failureReason);
@@ -4202,51 +4157,8 @@ app.post('/api/self-code/big-o-optimize', async (req, res) => {
       return res.status(400).json({ error: 'Code is required' });
     }
 
-    // 1. 外部教師API (Gemini) が利用可能な場合は、高度なアルゴリズム最適化パッチ生成を試行
-    const apiKeys = extractAllApiKeys(req);
-    if (apiKeys.length > 0) {
-      try {
-        const prompt = `あなたはMIKI-AIの計算量・アルゴリズム最適化エンジンです。
-以下のTypeScriptコードの時間計算量・空間計算量を解析し、計算量を改善したコードと差分をJSON形式のみで出力してください。
-【対象関数/モジュール】: ${targetName}
-【コード】:
-${code.slice(0, 3000)}
-
-必ず以下のJSON形式のみを出力してください（Markdownバッククォート不要）:
-{
-  "detectedIssue": "検出された計算量ボトルネック（日本語）",
-  "originalComplexity": "改善前の時間計算量（例: O(N^2)）",
-  "optimizedComplexity": "改善後の時間計算量（例: O(N)）",
-  "memoryImpact": "メモリ使用量への影響（日本語）",
-  "optimizedCode": "入力コードを実際に書き直した完全な最適化コード",
-  "patchDiff": "SEARCH/REPLACE形式の差分"
-}`;
-        const { response } = await generateContentWithFallback(req, {
-          contents: prompt,
-          config: { temperature: 0.1, maxOutputTokens: 1500 },
-        });
-        const text = response?.text?.trim() || '';
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          return res.json({
-            success: true,
-            targetName,
-            detectedIssue: parsed.detectedIssue || '二重走査または非効率な反復計算',
-            originalComplexity: parsed.originalComplexity || 'O(N²)',
-            optimizedComplexity: parsed.optimizedComplexity || 'O(N)',
-            estimatedSpeedupFactor: '実測ベンチマーク推奨',
-            memoryImpact: parsed.memoryImpact || 'インデックス用Mapメモリ追加',
-            optimizedCode: parsed.optimizedCode || code,
-            patchDiff: parsed.patchDiff || '',
-          });
-        }
-      } catch (geminiErr) {
-        console.warn('[Big-O Optimizer API] External Gemini execution notice:', geminiErr);
-      }
-    }
-
-    // 2. 構造的・決定論的解析（入力コードの構造を実際に解析）
+    // P364: Gemini分岐は廃止した（P349方針：外部は素材供給まで）。本ルートは決定論的分析のみを行う。
+    // 構造的・決定論的解析（入力コードの構造を実際に解析）
     const normalized = code.replace(/\s+/g, ' ');
     const hasNestedLoop = /for\s*\(.*for\s*\(/.test(normalized) || /for\s*\(.*\.forEach\(/.test(normalized);
     const hasFilterFind = /\.filter\(.*\.find\(/.test(normalized) || /\.filter\(.*\.filter\(/.test(normalized);
