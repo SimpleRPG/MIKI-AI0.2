@@ -36,10 +36,24 @@ class ConversationGraphRuntimeP212Service {
   // Hits are learned locally, so later turns resolve them without
   // the server. This never waits and never blocks the response.
   for (const term of contentTerms.slice(0,4)) { if (!japaneseDictionaryService.lookup(term).length) dictionaryBootstrapService.lookupDeep(term); }
-  const languageComponents=conversationLanguageComponentGraphP213Service.analyze(text,crossDomainGraphConnectionP211Service.snapshot(),resolvedContext,contentTerms);
+  // P391: discourse resolution. A referential input ("それを…",
+  // "その…", "他は…") names no object of its own; the newest topic
+  // on the conversation's stack supplies it. The referent's terms
+  // join this turn's effective content terms, so component
+  // analysis, learned-example matching and answer requirements all
+  // see what the turn is actually about. A referential input with
+  // nothing to point at becomes an explicit REFERENCE_GAP instead
+  // of a silent guess.
+  const reference=conversationGraphCompletionP214Service.resolveReference(text);
+  const resolvedExtra=reference?reference.terms.filter(term=>!contentTerms.includes(term)):[];
+  const effectiveTerms=reference?[...contentTerms,...resolvedExtra].slice(0,16):contentTerms;
+  const unresolvedReference=!reference&&conversationGraphCompletionP214Service.isReferential(text);
+  conversationGraphCompletionP214Service.observeTopic(text,contentTerms,contentTerms.flatMap(term=>japaneseDictionaryService.conceptIdsFor(term)));
+  const languageComponents=conversationLanguageComponentGraphP213Service.analyze(text,crossDomainGraphConnectionP211Service.snapshot(),resolvedContext,effectiveTerms);
+  if(unresolvedReference)languageComponents.gaps.push({gapId:`gap:ref:${turnId}`,kind:'REFERENCE_GAP',surface:text.slice(0,64),reason:'Referential expression has no antecedent in the conversation topic stack',confidence:.9});
   const semantic=semanticGraphCoreP208Service.understand(text,this.semanticState,resolvedContext);
   const lexemes=[...new Set(text.normalize('NFKC').split(/[\s、。！？,.!?]+/u).filter(Boolean))].map(token=>({token,found:semanticDictionaryGraphP209Service.has(token)}));
-  const inputReceipt=conversationGraphConnectorP211Service.connect({eventKind:'INPUT',subjectId:turnId,payload:{taskId,text,lexemes,languageComponents,usedComponentIds:analysis.usedComponentIds,semanticCandidates:semantic.candidates},confidence:.95,uncertainty:semantic.selected?0.05:.45,sourceRefs:[`conversation:${taskId}`,semantic.receiptSha256],participantDomains:['memory','capability','research','unknown','verification'],requiresVerification:!semantic.selected});
+  const inputReceipt=conversationGraphConnectorP211Service.connect({eventKind:'INPUT',subjectId:turnId,payload:{taskId,text,lexemes,languageComponents,usedComponentIds:analysis.usedComponentIds,semanticCandidates:semantic.candidates,discourse:{referential:reference!==undefined||unresolvedReference,resolvedSurface:reference?.surface,resolvedTerms:resolvedExtra,unresolvedReference}},confidence:.95,uncertainty:semantic.selected?0.05:.45,sourceRefs:[`conversation:${taskId}`,semantic.receiptSha256],participantDomains:['memory','capability','research','unknown','verification'],requiresVerification:!semantic.selected});
   for (const mutation of semantic.mutationCandidates) {
    const candidate = mutation.payload.candidate as SemanticCandidate;
    conversationGraphConnectorP211Service.connect({
@@ -75,7 +89,7 @@ class ConversationGraphRuntimeP212Service {
    researchGraphConnectorP211Service.connect({eventKind:'ACTION',subjectId:`research:${turnId}`,payload:{taskId,question:text,reason:semantic.requiresResearch?'SEMANTIC_CANDIDATE_NOT_ACCEPTED':'LANGUAGE_COMPONENT_GAP',gaps:languageComponents.gaps},confidence:.82,uncertainty:.35,sourceRefs:[inputReceipt.eventSha256],participantDomains:['conversation','unknown','verification'],relatedNodeIds:[...inputReceipt.createdNodeIds,...gapUnknownNodeIds,...unknownReceipt.createdNodeIds]});
   }
   const base={turnId,inputReceiptSha256:inputReceipt.receiptSha256,semanticReceiptSha256:semantic.receiptSha256,usedComponentIds:analysis.usedComponentIds,selectedConceptId:semantic.selected?.conceptId,requiresResearch:semantic.requiresResearch,graphSha256:crossDomainGraphConnectionP211Service.snapshot().graphSha256};
-  const receipt={...base,receiptSha256:canonicalSha256Object(base)};this.inputByTask.set(taskId,{...receipt,inputNodeIds:inputReceipt.createdNodeIds,inputSurface:text.slice(0,512),constraintIds:languageComponents.constraintIds,intentIds:languageComponents.intentIds,grammarIds:languageComponents.grammarIds,meaningComponentIds:languageComponents.components.map(component=>component.componentId),contentTerms});conversationGraphCompletionP214Service.save(crossDomainGraphConnectionP211Service.snapshot());return receipt;
+  const receipt={...base,receiptSha256:canonicalSha256Object(base)};this.inputByTask.set(taskId,{...receipt,inputNodeIds:inputReceipt.createdNodeIds,inputSurface:text.slice(0,512),constraintIds:languageComponents.constraintIds,intentIds:languageComponents.intentIds,grammarIds:languageComponents.grammarIds,meaningComponentIds:languageComponents.components.map(component=>component.componentId),contentTerms:effectiveTerms});conversationGraphCompletionP214Service.save(crossDomainGraphConnectionP211Service.snapshot());return receipt;
  }
  ingestOutput(taskId:string,response:unknown,validation:{passed?:boolean;counterexample?:string;repair?:string}={}):ConversationRuntimeReceipt|undefined {
   const input=this.inputByTask.get(taskId);if(!input)return undefined;

@@ -10264,9 +10264,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphCompletionP214Service.ts",
-      "bytes": 3859,
-      "lines": 16,
-      "sha256": "9e120276aba24db023672e1f24ef2059436ea438c916783f7a88e1f2062b5f72",
+      "bytes": 5406,
+      "lines": 30,
+      "sha256": "f50313166cb183e68a900748fa5a8daaa17091c7e0cd7085387ddc6ff289d475",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10310,9 +10310,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 11715,
-      "lines": 96,
-      "sha256": "f9e54180c8298058395d2bf3a1f4be4b69654b5056dcf12661dc32da401220f6",
+      "bytes": 13125,
+      "lines": 110,
+      "sha256": "44f9097d2fa0798d7ed6994d56a8ede934076855cbf63d2d6323da173c8f1c81",
       "relativeImportCandidates": [
         {
           "line": 1,
