@@ -92,13 +92,16 @@ class CognitiveQualityService {
     const query = normalize(goal);
     const targetDomains = new Set(activeDomains.map(domain => this.learningDomain(domain)).filter((x): x is 'conversation' | 'rpg' | 'execution' | 'research' | 'code' | 'system' => Boolean(x)));
     const profiles = mikiUnifiedLearningContinuumService.getSnapshot().profiles;
+    // P374: surface the most available experience first, so the
+    // 20-candidate window holds the relations currently in active,
+    // proven use rather than whichever was stored first.
     const candidates = profiles.filter(profile => {
       if (profile.verified < 1 || profile.uses < 2 || !profile.key || profile.key.startsWith('capability:')) return false;
       const key = normalize(profile.key);
       const intersectsGoal = key.length >= 3 && (query.includes(key) || key.split(/[\s:_-]+/).some(part => part.length >= 3 && query.includes(part)));
       const sourceDomains = Object.entries(profile.domains).filter(([, count]) => count > 0).map(([domain]) => domain);
       return intersectsGoal && sourceDomains.some(domain => !targetDomains.has(domain as never)) && [...targetDomains].some(domain => profile.domains[domain] === 0);
-    }).slice(0, 20).map(profile => ({ key: profile.key, sourceDomains: Object.entries(profile.domains).filter(([, count]) => count > 0).map(([domain]) => domain), targetDomains: [...targetDomains], confidence: profile.confidence, status: verifiedOutcome ? 'TRANSFER_OUTCOME_REQUIRES_CAUSAL_CONFIRMATION' : 'TRANSFER_CANDIDATE', causalPromotionAllowed: false }));
+    }).sort((a, b) => mikiUnifiedLearningContinuumService.activationOf(b) - mikiUnifiedLearningContinuumService.activationOf(a)).slice(0, 20).map(profile => ({ key: profile.key, sourceDomains: Object.entries(profile.domains).filter(([, count]) => count > 0).map(([domain]) => domain), targetDomains: [...targetDomains], confidence: profile.confidence, activation: mikiUnifiedLearningContinuumService.activationOf(profile), status: verifiedOutcome ? 'TRANSFER_OUTCOME_REQUIRES_CAUSAL_CONFIRMATION' : 'TRANSFER_CANDIDATE', causalPromotionAllowed: false }));
     return candidates;
   }
 

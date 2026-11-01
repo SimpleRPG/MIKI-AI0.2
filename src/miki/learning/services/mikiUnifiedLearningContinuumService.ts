@@ -28,7 +28,7 @@ export interface MikiLearningSnapshot {
   version: 1;
   updatedAt: number;
   profiles: LearningProfile[];
-  crossDomainLinks: Array<{ concept: string; domains: UnifiedExperienceDomain[]; strength: number }>;
+  crossDomainLinks: Array<{ concept: string; domains: UnifiedExperienceDomain[]; strength: number; kind: 'CAPABILITY' | 'CAUSAL' | 'CONCEPT'; basis: { uses: number; successes: number; verified: number; lastObservedAt: number } }>;
   recommendedCapabilities: Array<{ capabilityId: string; score: number; reason: string }>;
   // 成長速度の可視化 (掛け算式合成メトリクス)
   conversationComponentsCount: number;
@@ -124,12 +124,27 @@ export class MikiUnifiedLearningContinuumService {
     this.save();
   }
 
+  /**
+   * P374: ACT-R式の活性化。confidence が「その経験がどれだけ確かか」を
+   * 表すのに対し、activation は「今どれだけ取り出しやすくあるべきか」を
+   * 表す。長く触れていない経験と、1回だけの経験は、確かでも前面には
+   * 出さない。鮮度の半減期は30日（P363の事例鮮度と同じ規約）。
+   * 下限を残すのは、実証済みの知識は古くても無価値にはならないため。
+   */
+  public activationOf(profile: LearningProfile, now = Date.now()): number {
+    const ageDays = Math.max(0, (now - profile.lastObservedAt) / 86400000);
+    const recency = Math.pow(0.5, ageDays / 30);
+    const frequency = Math.min(1, Math.log1p(Math.max(0, profile.uses)) / Math.log1p(20));
+    const availability = 0.3 + 0.7 * recency * frequency;
+    return Math.round(profile.confidence * availability * 100) / 100;
+  }
+
   /** 過去経験を能力選択に反映する。ただしVERIFIED能力のみ返す。 */
   public rankCapabilities(capabilityIds: string[], query: string): Array<{ capabilityId: string; score: number; reason: string }> {
     const q = normalizeKey(query);
     return capabilityIds.map(id => {
       const p = this.profiles.get(`capability:${normalizeKey(id)}`);
-      const direct = p ? p.confidence : 0;
+      const direct = p ? this.activationOf(p) : 0;
       const related = [...this.profiles.values()]
         .filter(x => x.key !== `capability:${normalizeKey(id)}` && q && q.includes(x.key))
         .reduce((s, x) => s + x.confidence * 0.15, 0);
@@ -140,7 +155,7 @@ export class MikiUnifiedLearningContinuumService {
         : p?.lastLesson
           ? ` / 教訓: ${p.lastLesson.slice(0, 120)}`
           : '';
-      return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}${lessonNote}` : '共通経験なし。新規候補として扱う' };
+      return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}, activation=${this.activationOf(p)}${lessonNote}` : '共通経験なし。新規候補として扱う' };
     }).sort((a, b) => b.score - a.score);
   }
 
@@ -209,7 +224,7 @@ export class MikiUnifiedLearningContinuumService {
 
   public getSnapshot(): MikiLearningSnapshot {
     const all = [...this.profiles.values()];
-    const links = all.map(p => ({ concept: p.key, domains: (Object.keys(p.domains) as UnifiedExperienceDomain[]).filter(d => p.domains[d] > 0), strength: Math.min(100, p.uses * 10 + p.verified * 10) }))
+    const links = all.map(p => ({ concept: p.key, domains: (Object.keys(p.domains) as UnifiedExperienceDomain[]).filter(d => p.domains[d] > 0), strength: this.activationOf(p), kind: (p.key.startsWith('capability:') ? 'CAPABILITY' : p.key.startsWith('causal:') ? 'CAUSAL' : 'CONCEPT') as 'CAPABILITY' | 'CAUSAL' | 'CONCEPT', basis: { uses: p.uses, successes: p.successes, verified: p.verified, lastObservedAt: p.lastObservedAt } }))
       .filter(x => x.domains.length >= 2).sort((a, b) => b.strength - a.strength).slice(0, 100);
     const caps = all.filter(p => p.key.startsWith('capability:')).sort((a, b) => b.confidence - a.confidence).slice(0, 50)
       .map(p => ({ capabilityId: p.key.slice('capability:'.length), score: p.confidence, reason: `uses=${p.uses}; success=${p.successes}; verified=${p.verified}` }));

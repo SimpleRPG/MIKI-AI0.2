@@ -13174,9 +13174,9 @@
     },
     {
       "path": "src/miki/core/services/cognitiveQualityService.ts",
-      "bytes": 8425,
-      "lines": 115,
-      "sha256": "0e7033e79b65b67c31add7fb6f96091defd214dc75a9fe595ca71ff16403fe8a",
+      "bytes": 8809,
+      "lines": 118,
+      "sha256": "5be18f1e9c621d9cfc55f92a046dc3b5e7b71b5a384ac7f926989933ca82ddaf",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -21855,9 +21855,9 @@
     },
     {
       "path": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts",
-      "bytes": 11635,
-      "lines": 238,
-      "sha256": "94b3d959295f26872895a9211ebc352b99af3faaafa63c1fe462dbaa95e86e39",
+      "bytes": 12961,
+      "lines": 253,
+      "sha256": "f27c9118a51b1b3897b49083795efdd831c58b1eb0b9ae50d8ea3c6c6bc009b5",
       "relativeImportCandidates": [
         {
           "line": 1,
