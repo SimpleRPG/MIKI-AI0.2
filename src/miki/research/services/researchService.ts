@@ -65,12 +65,32 @@ export interface ResearchResult {
  * - Search alone never resolves a Knowledge Gap.
  * - Only a later explicit verifier may promote Claims or resolve the Gap.
  */
-function assessResearchSourceRole(query: { intentType?: string; sourceTierTarget?: string; siteOrDomainConstraints?: string[] }, page: { url: string }): "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED" {
+export function assessResearchSourceRole(query: { intentType?: string; sourceTierTarget?: string; siteOrDomainConstraints?: string[] }, page: { url: string }): "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED" {
   if (query.intentType === "COUNTEREVIDENCE") return "COUNTEREVIDENCE";
   const host = (() => { try { return new URL(page.url).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; } })();
   const constraints = (query.siteOrDomainConstraints || []).map(v => v.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0]).filter(Boolean);
   if (host && constraints.some(domain => host === domain || host.endsWith("." + domain))) return "OFFICIAL";
+  // P387: public-sector and academic issuers are authoritative for
+  // their own publications even when the query named no explicit
+  // site. Until now such pages stayed UNCLASSIFIED, so the primary /
+  // official source requirements of the research policy could
+  // almost never be satisfied by what was actually gathered.
+  if (host && (host.endsWith(".go.jp") || host.endsWith(".lg.jp") || host.endsWith(".ac.jp") || host.endsWith(".gov") || host.endsWith(".edu"))) return "OFFICIAL";
   return "UNCLASSIFIED";
+}
+
+/**
+ * P387: page reading is the expensive, deep step and only a few
+ * pages are read per pass. Read authoritative (official / primary)
+ * pages first instead of whatever the search order happened to
+ * return; the remaining results still contribute snippet evidence.
+ */
+export function orderResultsForReading<T extends { url?: string }>(results: T[], query: { intentType?: string; sourceTierTarget?: string; siteOrDomainConstraints?: string[] }): T[] {
+  const rank = (item: T): number => {
+    const role = assessResearchSourceRole(query, { url: item.url || "" });
+    return role === "OFFICIAL" || role === "PRIMARY" ? 0 : 1;
+  };
+  return [...results].sort((a, b) => rank(a) - rank(b));
 }
 
 export class ResearchService {
@@ -370,7 +390,7 @@ export class ResearchService {
         // Search is only the discovery step. Read the selected result pages before
         // building the final evidence/claim set, so SearXNG -> page content -> Evidence
         // is one Research pipeline rather than two disconnected services.
-        const readResults = await unifiedWebResearchService.readSearchResultPages(passQuery, results, {
+        const readResults = await unifiedWebResearchService.readSearchResultPages(passQuery, orderResultsForReading(results, queryPlan.status === "READY" ? queryPlan.queries[pass] : {}), {
           maxPages: maxPagesPerPass,
         });
         const isCounterEvidencePass =

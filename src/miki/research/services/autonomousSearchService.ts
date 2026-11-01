@@ -7,6 +7,7 @@ import {
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { getSearxngSearchSettings, buildSearxngSearchUrl } from './searxngSettingsService';
+import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
 import { selfImprovementService } from '../../improvement/services/selfImprovementService';
 import { experienceLinkService } from '../../experience/services/experienceLinkService';
@@ -117,6 +118,40 @@ function deriveSourceIdentity(provider: SearchProviderName, item: WebSearchResul
   return { sourceId, independenceClusterId };
 }
 
+function contentFingerprint(title: string, snippet: string): string | null {
+  const normalizedTitle = String(title || '').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '');
+  if (normalizedTitle.length < 8) return null;
+  const normalizedLead = String(snippet || '').normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '').slice(0, 40);
+  return `${normalizedTitle}|${normalizedLead}`;
+}
+
+/**
+ * P387: independence was judged by hostname alone, so the same wire
+ * story reprinted by several portals counted as several independent
+ * sources, and the research policy could be "satisfied" by copies of
+ * a single report. Items from different hosts whose title and lead
+ * agree (a reprint fingerprint) now share one content cluster; only
+ * genuinely distinct reporting keeps separate clusters.
+ */
+export function applyContentIndependenceClusters<T extends { title: string; snippet: string; url?: string; independenceClusterId?: string }>(items: T[]): T[] {
+  const groups = new Map<string, T[]>();
+  for (const item of items) {
+    const fingerprint = contentFingerprint(item.title, item.snippet);
+    if (!fingerprint) continue;
+    const group = groups.get(fingerprint);
+    if (group) group.push(item); else groups.set(fingerprint, [item]);
+  }
+  for (const [fingerprint, group] of groups) {
+    if (group.length < 2) continue;
+    const hosts = new Set(group.map((item) => { try { return new URL(String(item.url || '')).hostname.toLowerCase().replace(/^www\./, ''); } catch { return ''; } }));
+    hosts.delete('');
+    if (hosts.size < 2) continue;
+    const clusterId = `cluster_content_${canonicalSha256Object({ fingerprint }).slice(0, 12)}`;
+    for (const item of group) item.independenceClusterId = clusterId;
+  }
+  return items;
+}
+
 /**
  * SearXNG単一Providerの結果を、固定ルールで整列・重複排除する。
  * maxResultsは取得上限として扱う。
@@ -175,7 +210,7 @@ export function mergeSearchResults(
     }
   }
 
-  return Array.from(deduped.values()).slice(0, maxCombinedResults);
+  return applyContentIndependenceClusters(Array.from(deduped.values()).slice(0, maxCombinedResults));
 }
 
 function createProviderStatuses(): Record<SearchProviderName, SearchProviderStatusRecord> {
@@ -524,6 +559,7 @@ export class AutonomousSearchService {
           };
         });
 
+        applyContentIndependenceClusters(results);
         markProvider('searxng', 'SUCCEEDED');
         systemLogger.info('SELF_IMPROVEMENT', `🔍 [SearXNG] 検索成功: ${results.length}件`);
         return { output: { provider: 'searxng', results }, retryable: false };
