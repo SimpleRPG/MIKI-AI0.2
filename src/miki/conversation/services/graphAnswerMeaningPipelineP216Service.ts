@@ -1,8 +1,8 @@
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 
-export interface P216AnswerRequirements { inputSurface:string; intentIds:string[]; constraintIds:string[]; grammarIds:string[]; meaningComponentIds:string[]; executionResult?:unknown }
-export interface P216MeaningPart { partId:string; kind:'CONCLUSION'|'ACTION'|'CONSTRAINT'|'EVIDENCE'|'LIMITATION'|'NEXT_STEP'; meaningId:string; required:boolean; text:string }
+export interface P216AnswerRequirements { inputSurface:string; intentIds:string[]; constraintIds:string[]; grammarIds:string[]; meaningComponentIds:string[]; contentTerms?:string[]; executionResult?:unknown }
+export interface P216MeaningPart { partId:string; kind:'CONCLUSION'|'ACTION'|'CONSTRAINT'|'CONTENT'|'EVIDENCE'|'LIMITATION'|'NEXT_STEP'; meaningId:string; required:boolean; text:string }
 export interface P216AnswerPlan { planId:string; skeleton:'DIRECT_RESULT'|'IMPLEMENTATION_REPORT'|'RESEARCH_REPORT'|'CLARIFICATION'; parts:P216MeaningPart[]; intentIds:string[]; constraintIds:string[]; graphComponentIds:string[]; planSha256:string }
 export interface P216FinalAnswer { text:string; plan:P216AnswerPlan; semanticPreservation:{passed:boolean;missingMeaningIds:string[];contradictions:string[]};executionConsistency:{passed:boolean;unsupportedClaims:string[]};grammar:{passed:boolean;issues:string[]};repaired:boolean;receiptSha256:string }
 
@@ -24,6 +24,12 @@ function hasExecutionEvidence(value: unknown): boolean {
   return ['PASS', 'SUCCESS', 'COMPLETED'].includes(status) && (hasEvidenceIds || hasExecutionId);
 }
 
+const REQUIRED_TOKENS:Record<string,RegExp>={
+ 'intent.implement':/実装|反映|更新/u,'intent.research':/調査|確認|根拠/u,
+ 'constraint.preserve':/維持|保持|失わ|削除しない/u,'constraint.no-omission':/全部|全て|すべて|省略しない/u,'constraint.capacity':/容量|サイズ|常駐|分割/u
+};
+const contentTermsOf=(requirements:P216AnswerRequirements):string[]=>[...new Set((requirements.contentTerms??[]).map(term=>term.trim()).filter(term=>term.length>=2))].slice(0,12);
+
 class GraphAnswerMeaningPipelineP216Service {
  plan(requirements:P216AnswerRequirements):P216AnswerPlan {
   const parts:P216MeaningPart[]=[];
@@ -39,6 +45,14 @@ class GraphAnswerMeaningPipelineP216Service {
    else if(id==='constraint.capacity')add('CONSTRAINT',id,'容量・常駐量・分割保存への配慮を明示する。');
    else add('CONSTRAINT',id,`${id}を満たしたことを明示する。`);
   }
+  // P383: a plan whose intent/constraint ids have no checkable token
+  // used to certify any grammatical text. When the input itself carries
+  // content terms, require the answer to engage with at least one of
+  // them. This part is never repaired by assertion in finalize: either
+  // the answer addresses the input's content or preservation fails.
+  const checkable=[...requirements.intentIds,...requirements.constraintIds].some(id=>REQUIRED_TOKENS[id]);
+  const contentTerms=contentTermsOf(requirements);
+  if(!checkable&&contentTerms.length>=2)add('CONTENT','input.content',`入力の内容（${contentTerms.slice(0,6).join('、')}）に応答する。`);
   add('EVIDENCE','answer.evidence','実行結果または検証結果を根拠として示す。',false);
   add('LIMITATION','answer.limitation','未実行・未確認事項を事実どおり区別する。',false);
   const core={planId:`answer-plan:${canonicalSha256Object({requirements,parts}).slice(0,32)}`,skeleton:implementation?'IMPLEMENTATION_REPORT' as const:research?'RESEARCH_REPORT' as const:'DIRECT_RESULT' as const,parts,intentIds:[...new Set(requirements.intentIds)],constraintIds:[...new Set(requirements.constraintIds)],graphComponentIds:[...new Set(requirements.meaningComponentIds)]};
@@ -49,10 +63,7 @@ class GraphAnswerMeaningPipelineP216Service {
   const before=normalizeAnswerSurface(candidate);
   const surfaceMissing=!before.trim();
   let text=surfaceMissing?'回答本文が空のため、内容を確定できませんでした。':before;
-  const requiredTokens:Record<string,RegExp>={
-   'intent.implement':/実装|反映|更新/u,'intent.research':/調査|確認|根拠/u,
-   'constraint.preserve':/維持|保持|失わ|削除しない/u,'constraint.no-omission':/全部|全て|すべて|省略しない/u,'constraint.capacity':/容量|サイズ|常駐|分割/u
-  };
+  const requiredTokens=REQUIRED_TOKENS;
   const requiredIds=[...plan.intentIds,...plan.constraintIds];
   let missing=requiredIds.filter(id=>requiredTokens[id]&&!requiredTokens[id].test(text));
   const prefix:string[]=[];
@@ -78,6 +89,10 @@ class GraphAnswerMeaningPipelineP216Service {
   const grammarRecheck=surfaceGrammarAndStyleService.validateGrammarAndParticles(text);
   const remainingGrammarIssues=[...grammarRecheck.conjugationIssues,...grammarRecheck.particleIssues];
   missing=requiredIds.filter(id=>requiredTokens[id]&&!requiredTokens[id].test(text));
+  if(plan.parts.some(part=>part.meaningId==='input.content')){
+   const normalizedText=text.normalize('NFKC').toLowerCase();
+   if(!contentTermsOf(requirements).some(term=>normalizedText.includes(term.normalize('NFKC').toLowerCase())))missing.push('input.content');
+  }
   if(surfaceMissing)missing.push('ANSWER_SURFACE_EMPTY');
   const semantic={passed:missing.length===0&&contradictions.length===0,missingMeaningIds:missing,contradictions};
   const execution={passed:unsupportedClaims.length===0,unsupportedClaims};
