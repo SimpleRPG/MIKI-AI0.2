@@ -627,7 +627,36 @@ export interface GitHubPullProgressUpdate {
   }>;
 }
 
-export async function importGitHubRepo(
+const githubImportFlights = new Map<string, Promise<GitHubRepoData>>();
+
+export function importGitHubRepo(
+  repoUrl: string,
+  branch?: string,
+  githubToken?: string,
+  knownFiles: Array<{ path: string; blobSha?: string; sha256?: string }> = [],
+  onProgress?: (
+    progress: GitHubPullProgressUpdate
+  ) => void | Promise<void>
+): Promise<GitHubRepoData> {
+  // P351: concurrent callers share one in-flight import instead of
+  // each starting a duplicate download of the same repository.
+  const key = `${repoUrl}#${branch || 'main'}`;
+  const existing = githubImportFlights.get(key);
+  if (existing) return existing;
+  const flight = importGitHubRepoOnce(
+    repoUrl,
+    branch,
+    githubToken,
+    knownFiles,
+    onProgress
+  ).finally(() => {
+    githubImportFlights.delete(key);
+  });
+  githubImportFlights.set(key, flight);
+  return flight;
+}
+
+async function importGitHubRepoOnce(
   repoUrl: string,
   branch?: string,
   githubToken?: string,

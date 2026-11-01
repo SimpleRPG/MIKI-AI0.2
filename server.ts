@@ -1734,6 +1734,7 @@ type GitHubPullProgressState = {
 };
 
 const githubPullProgress = new Map<string, GitHubPullProgressState>();
+const githubPullInFlight = new Map<string, Promise<any>>();
 const GITHUB_PULL_PROGRESS_TTL_MS = 5 * 60 * 1000;
 
 function expireGitHubPullProgress(progressId: string) {
@@ -1782,6 +1783,17 @@ app.post('/api/github/import', async (req, res) => {
   };
 
   githubPullProgress.set(progressId, progressState);
+
+  // P351: shared-promise handles for the in-flight import dedup.
+  // Declared outside the try so the catch block can settle them.
+  let pullKey = '';
+  let resolvePull: (payload: any) => void = () => {};
+  let rejectPull: (error: any) => void = () => {};
+  const pullPromise = new Promise<any>((resolve, reject) => {
+    resolvePull = resolve;
+    rejectPull = reject;
+  });
+  pullPromise.catch(() => {});
 
   try {
     const pullStartedAt = Date.now();
@@ -1844,6 +1856,22 @@ app.post('/api/github/import', async (req, res) => {
       `repository=${owner}/${repo} branch=${branch} PAT=${authToken ? 'PRESENT' : 'ABSENT'} knownFiles=${Array.isArray(knownFiles) ? knownFiles.length : 0}`
     );
 
+    // P351: share one in-flight import per repository and branch so
+    // concurrent callers do not download the same files in parallel.
+    pullKey = `${owner}/${repo}#${branch}`;
+    const inFlightPull = githubPullInFlight.get(pullKey);
+    if (inFlightPull) {
+      const sharedPayload = await inFlightPull;
+      progressState.status = 'COMPLETED';
+      progressState.phase = 'completed';
+      progressState.detail = 'deduped: shared in-flight import';
+      progressState.updatedAt = Date.now();
+      expireGitHubPullProgress(progressId);
+      return res.json({ ...sharedPayload, deduped: true });
+    }
+
+    githubPullInFlight.set(pullKey, pullPromise);
+
     const headers: Record<string,string> = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'MIKI-AI0.2'
@@ -1854,21 +1882,58 @@ app.post('/api/github/import', async (req, res) => {
     }
 
     const api = async (url: string, options: RequestInit = {}) => {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...headers,
-          ...(options.headers || {})
+      // P351: every request gets a timeout and bounded retries so one
+      // stalled response cannot hang the whole import forever.
+      const maxAttempts = 3;
+      let lastError: any;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 30000);
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+              ...headers,
+              ...(options.headers || {})
+            }
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            const retryable =
+              response.status === 429 || response.status >= 500;
+            if (retryable && attempt < maxAttempts) {
+              const retryAfterSec = Number(
+                response.headers.get('retry-after') || 0
+              );
+              const waitMs = Math.min(
+                Math.max(retryAfterSec * 1000, 1000 * 2 ** (attempt - 1)),
+                30000
+              );
+              await new Promise((resolve) => setTimeout(resolve, waitMs));
+              continue;
+            }
+            throw new Error(
+              `GitHub API ${response.status}: ${errorText}`
+            );
+          }
+
+          return response.json();
+        } catch (err: any) {
+          lastError = err;
+          const isHttpError = /^GitHub API \d+:/.test(
+            String(err?.message || '')
+          );
+          if (isHttpError || attempt >= maxAttempts) throw err;
+          await new Promise((resolve) =>
+            setTimeout(resolve, 1000 * 2 ** (attempt - 1))
+          );
+        } finally {
+          clearTimeout(timer);
         }
-      });
-
-      if (!response.ok) {
-        throw new Error(
-          `GitHub API ${response.status}: ${await response.text()}`
-        );
       }
-
-      return response.json();
+      throw lastError || new Error('GitHub API request failed');
     };
 
     recordPullPhase('repo_info_start', 'GitHub repository metadata');
@@ -2026,12 +2091,85 @@ app.post('/api/github/import', async (req, res) => {
       };
     };
 
+    // P351: fetch the whole repository archive in one request instead
+    // of one API call per file. Files missing from the archive fall
+    // back to the per-file fetch above.
+    let archiveEntries: Map<string, any> | null = null;
+    if (changedItems.length > 0) {
+      try {
+        recordPullPhase(
+          'archive_fetch_start',
+          `commitSha=${commitSha.slice(0, 12)}`
+        );
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 180000);
+        try {
+          const archiveResponse = await fetch(
+            `https://api.github.com/repos/${owner}/${repo}/zipball/${commitSha}`,
+            { headers, signal: controller.signal }
+          );
+          if (!archiveResponse.ok) {
+            throw new Error(
+              `GitHub API ${archiveResponse.status}: ${await archiveResponse.text()}`
+            );
+          }
+          const archiveBuffer = Buffer.from(
+            await archiveResponse.arrayBuffer()
+          );
+          const zip = await JSZip.loadAsync(archiveBuffer);
+          archiveEntries = new Map<string, any>();
+          for (const name of Object.keys(zip.files)) {
+            const entry = zip.files[name];
+            if (entry.dir) continue;
+            const relativePath = name.split('/').slice(1).join('/');
+            if (relativePath) archiveEntries.set(relativePath, entry);
+          }
+          recordPullPhase(
+            'archive_fetch_done',
+            `bytes=${archiveBuffer.length} entries=${archiveEntries.size}`
+          );
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch (archiveError: any) {
+        recordPullPhase(
+          'archive_fetch_failed',
+          String(archiveError?.message || archiveError).slice(0, 160)
+        );
+        archiveEntries = null;
+      }
+    }
+
+    const missingItems: any[] = [];
+    if (archiveEntries) {
+      for (const item of changedItems) {
+        const entry = archiveEntries.get(item.path);
+        if (!entry) {
+          missingItems.push(item);
+          continue;
+        }
+        const content = await entry.async('string');
+        completedFetches += 1;
+        recordPullPhase(
+          'blob_progress',
+          `downloaded=${completedFetches}/${changedItems.length} unchanged=${unchangedFiles} path=${item.path}`
+        );
+        changedFiles.push({
+          path: item.path,
+          content,
+          blobSha: item.blobSha,
+        });
+      }
+    } else {
+      missingItems.push(...changedItems);
+    }
+
     for (
       let index = 0;
-      index < changedItems.length;
+      index < missingItems.length;
       index += CONCURRENCY
     ) {
-      const batch = changedItems.slice(
+      const batch = missingItems.slice(
         index,
         index + CONCURRENCY
       );
@@ -2063,7 +2201,7 @@ app.post('/api/github/import', async (req, res) => {
     progressState.updatedAt = Date.now();
     expireGitHubPullProgress(progressId);
 
-    return res.json({
+    const pullPayload = {
       success: true,
       repoName: repoInfo.name,
       owner,
@@ -2082,7 +2220,10 @@ app.post('/api/github/import', async (req, res) => {
       changedFiles,
       deletedPaths,
       truncated: false
-    });
+    };
+    resolvePull(pullPayload);
+    githubPullInFlight.delete(pullKey);
+    return res.json(pullPayload);
   } catch (error: any) {
     progressState.status = 'FAILED';
     progressState.phase = 'failed';
@@ -2092,6 +2233,8 @@ app.post('/api/github/import', async (req, res) => {
       Number(progressState.updatedAt || Date.now());
     progressState.updatedAt = Date.now();
     expireGitHubPullProgress(progressId);
+    rejectPull(error);
+    githubPullInFlight.delete(pullKey);
 
     return res.status(500).json({
       error: error?.message || 'GitHub import error',
