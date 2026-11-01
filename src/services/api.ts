@@ -532,48 +532,6 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   };
 }
 
-export async function distillKnowledgeForLocalLLM(params: {
-  topic: string;
-  skillType: string;
-  currentMemories?: MemoryItem[];
-  persona?: PersonaConfig;
-}): Promise<{
-  success: boolean;
-  knowledge?: {
-    title: string;
-    category: string;
-    content: string;
-    qaPairs: Array<{ q: string; a: string }>;
-    summary: string;
-  };
-  error?: string;
-}> {
-  const outbound = sanitizeOutboundPayload(params, (serialized) =>
-    privacyGuardrailService.auditOutboundContent(serialized, 'teacher_distill', { autoSanitize: true })
-  );
-  if (!outbound.allowed) {
-    return {
-      success: false,
-      error: `プライバシー保護ガードレールにより遮断されました: ${outbound.blockedReason || outbound.audit?.blockedReason || '機密情報検知'}`,
-    };
-  }
-
-  try {
-    const res = await fetch(apiUrl('/api/train-distill'), {
-      method: 'POST',
-      headers: getCustomApiHeaders(),
-      body: JSON.stringify(outbound.payload),
-    });
-    if (!res.ok) throw new Error(`Distillation failed with status ${res.status}`);
-    return await res.json();
-  } catch (err: any) {
-    return {
-      success: false,
-      error: err.message || 'Distillation failed'
-    };
-  }
-}
-
 export async function sendDebugRequest(
   errorLogs: string[],
   activeGameCode: string,

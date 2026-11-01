@@ -3654,6 +3654,7 @@ app.post('/api/self-code/dead-code-scan', (req, res) => {
 });
 
 // ── 5.5. みき自律自己実装パイプライン & スナップショット安全機構 ──
+const SNAPSHOTS_FILE = path.join(process.cwd(), '.miki_self_code_snapshots.json');
 app.get('/api/self-code/snapshots', (req, res) => {
   try {
     if (!fs.existsSync(SNAPSHOTS_FILE)) return res.json({ success: true, snapshots: [] });

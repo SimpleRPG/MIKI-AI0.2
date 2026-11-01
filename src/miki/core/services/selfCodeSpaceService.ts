@@ -81,6 +81,7 @@ export interface SelfCodeWorkspaceDiagnostic {
 
 class SelfCodeSpaceService {
   private lightContentCache = new Map<string, string>();
+  private lightIndexRefreshInFlight = false;
 
   getGitHubSettings(): SelfCodeGitHubSettings {
     try {
@@ -503,6 +504,7 @@ class SelfCodeSpaceService {
           seedRevision: String(manifest.seedRevision),
         }
       );
+      this.recordLightManifest(files);
       checkpoint('APPLY_COMPLETE', { fileCount: total, totalContentChars, maxFileChars });
 
       storageService.setItem(
@@ -670,6 +672,7 @@ class SelfCodeSpaceService {
     // 正常PULL時の正本は githubSyncService に一本化する。
     // clean snapshot を別KEYへJSON.stringifyして二重保存しない。
     storageService.removeItem(KEY);
+    this.recordLightManifest(files);
 
     return snapshot;
   }
@@ -766,6 +769,75 @@ class SelfCodeSpaceService {
     const updated:SelfCodeSnapshot={...snapshot,files:next,repoSha256:canonicalSha256(next.map(file=>({path:file.path,sha256:file.sha256}))),syncedAt:Date.now(),dirty:true,baseRepoSha256:snapshot.baseRepoSha256||snapshot.repoSha256};
     storageService.setItem(KEY,JSON.stringify(updated));
     return this.clone(updated);
+  }
+
+  // P354: whenever the classic sync state is (re)built, also record
+  // the light manifest so index-first consumers can work without a
+  // separate light sync. The understanding index is refreshed in
+  // the background and never blocks the sync itself.
+  private recordLightManifest(files: SelfCodeFile[]): void {
+    try {
+      const settings = this.getGitHubSettings();
+      const sync = githubSyncService.get(
+        settings.repository,
+        settings.branch
+      );
+      const commitSha = sync?.commitSha || '';
+      if (!commitSha) return;
+      const manifestFiles = files
+        .filter(
+          file =>
+            typeof file.blobSha === 'string' && Boolean(file.blobSha)
+        )
+        .map(file => ({ path: file.path, blobSha: String(file.blobSha) }));
+      if (manifestFiles.length === 0) return;
+      const lightManifest: SelfCodeLightManifest = {
+        repository: settings.repository,
+        branch: settings.branch,
+        commitSha,
+        files: manifestFiles,
+        syncedAt: Date.now(),
+      };
+      storageService.setItem(LIGHT_KEY, JSON.stringify(lightManifest));
+      this.refreshLightIndexInBackground();
+    } catch {
+      // Index-first state is an accelerator; never fail the sync.
+    }
+  }
+
+  private refreshLightIndexInBackground(): void {
+    if (this.lightIndexRefreshInFlight) return;
+    this.lightIndexRefreshInFlight = true;
+    void (async () => {
+      try {
+        const { selfCodeUnderstandingService } = await import(
+          './selfCodeUnderstandingService'
+        );
+        selfCodeUnderstandingService.ensure([], this.listSourceFiles());
+      } catch {
+        // Background indexing is best-effort.
+      } finally {
+        this.lightIndexRefreshInFlight = false;
+      }
+    })();
+  }
+
+  // P354: the light manifest may stand in for the classic source
+  // tree when both describe the same commit and no local edits are
+  // pending. Server validation uses this to avoid posting every
+  // file (the classic body exceeds the server request size limit).
+  isLightSourceCurrent(): boolean {
+    const manifest = this.getLightManifest();
+    if (!manifest) return false;
+    const snapshot = this.get();
+    if (snapshot?.dirty) return false;
+    if (!snapshot) return true;
+    const settings = this.getGitHubSettings();
+    const sync = githubSyncService.get(
+      settings.repository,
+      settings.branch
+    );
+    return Boolean(sync?.commitSha) && sync!.commitSha === manifest.commitSha;
   }
 
   getLightManifest(): SelfCodeLightManifest | undefined {

@@ -32,7 +32,7 @@ class CandidateValidationRunnerService {
   const executionRoutes=['STATIC','TYPECHECK','REGRESSION','COUNTEREXAMPLE','GENERALIZATION','PERSISTENCE','DEVICE'].map(stage=>executionEnvironmentRouterService.route(stage));
   if(executionRoutes.some(route=>route.environment==='MANUAL_REVIEW'))return this.rollbackFailure(workspaceId,workspace.writeGuardId,['VALIDATION_EXECUTION_ENVIRONMENT_MISSING']);
   const lightManifest=selfCodeSpaceService.getLightManifest();
-  const isLightMode=sourceFiles.length===0&&Boolean(lightManifest);
+  const isLightMode=Boolean(lightManifest)&&selfCodeSpaceService.isLightSourceCurrent();
   // P353: STATIC is a deterministic local check (P350 hierarchy).
   // Run it on the client first; a failure rejects the candidate
   // without a server round trip, and the evidence is recorded here.
@@ -48,7 +48,7 @@ class CandidateValidationRunnerService {
   let body:any=candidateValidationResultCacheService.get(validationCacheKey);
   if(!body){
     let response:Response;
-    try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles,validationRequirements,contractTestIntents:testIntents,testCommands,acceptanceCriterionIds,sourceCommitSha:isLightMode?lightManifest!.commitSha:undefined,repoUrl:isLightMode?`https://github.com/${lightManifest!.repository}`:undefined,githubToken:isLightMode?(selfCodeSpaceService.getGitHubPat()||undefined):undefined,candidateFiles:workspace.files.map(file=>({path:file.path,isNewFile:file.isNewFile,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
+    try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles:isLightMode?[]:sourceFiles,validationRequirements,contractTestIntents:testIntents,testCommands,acceptanceCriterionIds,sourceCommitSha:isLightMode?lightManifest!.commitSha:undefined,repoUrl:isLightMode?`https://github.com/${lightManifest!.repository}`:undefined,githubToken:isLightMode?(selfCodeSpaceService.getGitHubPat()||undefined):undefined,candidateFiles:workspace.files.map(file=>({path:file.path,isNewFile:file.isNewFile,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
     catch(error){return this.rollbackFailure(workspaceId,workspace.writeGuardId,[error instanceof Error?`VALIDATION_REQUEST_FAILED:${error.message}`:'VALIDATION_REQUEST_FAILED']);}
     if(!response.ok)return this.rollbackFailure(workspaceId,workspace.writeGuardId,[`VALIDATION_HTTP_${response.status}`]);
     body=await response.json() as Record<string,any>;
