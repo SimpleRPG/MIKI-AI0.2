@@ -121,7 +121,12 @@ class ReviewZipExportService {
    const changedFiles=snapshotFiles.filter(file=>file.baselineSha256!==file.candidateSha256).map(file=>file.path);
    const changeHistory={packageId,packageSeriesId,packageRevision,candidateRevision,previousPackageId:source?.packageId??null,createdAt:Date.now(),changedFiles};
    const issue={issueId:workspace.issueId,runId,objective:run.objective,sourceId:run.sourceId,runType:run.runType};
-   const reviewRequest={packageId,candidateId,validationBundleId,packageSeriesId,packageRevision,candidateRevision,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,packageManifestSha256,candidateManifestSha256,objective:'Evaluate this isolated MIKI-AI self-improvement candidate. Do not assume it is adopted or applied.',changedFiles,evaluationPoints:['correctness','regression risk','security and safety','maintainability','baseline-to-candidate consistency'],unresolvedChecks,requestedResponse:{packageId:'repeat exactly',packageManifestSha256:'repeat exactly',decision:'ACCEPT|REJECT|NEEDS_CHANGES',findings:'ordered list',requiredChanges:'ordered list'},externalReviewQuestions:options.externalReviewQuestions||[]};
+   // P377: assemble the context of the attempt itself — what was
+   // already tried in this series, the current hypotheses, the
+   // known failure patterns, and where MIKI is stuck — so the
+   // external reviewer receives a good question, not just files.
+   const reviewerContext=await this.buildReviewerContext({run,workspaceId,packageSeriesId,packageRevision,unresolvedChecks,candidateUnknownContext,externalReviewQuestions:options.externalReviewQuestions||[]});
+   const reviewRequest={packageId,candidateId,validationBundleId,packageSeriesId,packageRevision,candidateRevision,transactionId,corePlanRevision,operationInstanceId,persistenceReceiptId,packageManifestSha256,candidateManifestSha256,objective:'Evaluate this isolated MIKI-AI self-improvement candidate. Do not assume it is adopted or applied.',changedFiles,evaluationPoints:['correctness','regression risk','security and safety','maintainability','baseline-to-candidate consistency'],unresolvedChecks,requestedResponse:{packageId:'repeat exactly',packageManifestSha256:'repeat exactly',decision:'ACCEPT|REJECT|NEEDS_CHANGES',findings:'ordered list',requiredChanges:'ordered list'},externalReviewQuestions:options.externalReviewQuestions||[],reviewerContextFile:'reviewer_context.json'};
    const zip=new JSZip();
    for(const file of snapshotFiles){zip.file(`baseline/${file.path}`,file.baselineContent);zip.file(`candidate/${file.path}`,file.candidateContent);}
    zip.file('baseline_manifest.json',JSON.stringify({...baselineManifest,baselineManifestSha256},null,2));
@@ -132,6 +137,7 @@ class ReviewZipExportService {
    zip.file('validation.json',JSON.stringify({schemaVersion:2,workspaceId,validationManifest,validationSummary:validationManifest,requirements:{validationRequirements:externalDirective.validationRequirements,deliveryRequirements:externalDirective.deliveryRequirements},performed:validation.filter(item=>item.candidateSha256===workspace.candidateRevisionSha256&&item.passed).map(item=>({...item,status:'PASSED'})),unperformed:validationManifest.missing.map(stage=>({stage,status:'NOT_RUN'})),shadowEvaluation:shadow??null,disclosure:'NOT_RUN and ENVIRONMENT_UNAVAILABLE are never treated as PASS'},null,2));
    zip.file('unresolved_checks.json',JSON.stringify({packageId,items:unresolvedChecks,candidateUnknownContext:candidateUnknownContext??null,externalQuestions:candidateUnknownContext?.externalQuestions??[]},null,2));
    zip.file('review_request.json',JSON.stringify(reviewRequest,null,2));
+   zip.file('reviewer_context.json',JSON.stringify(reviewerContext,null,2));
    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
    if(!await this.verify(blob,{packageManifestSha256,baselineManifestSha256,candidateManifestSha256,files:snapshotFiles}))return {ok:false,code:'ZIP_VERIFY_FAILED',message:'Generated ZIP failed entry or SHA verification'};
    const zipSha256=await this.sha(blob); const createdAt=Date.now();
@@ -150,6 +156,58 @@ class ReviewZipExportService {
    isolatedCandidateWorkspaceService.setStatus(workspaceId,'EXPORTED');
    return {ok:true,code:'SUCCESS',message:'Evaluation ZIP created, reloaded, and SHA verified',artifact:{...this.clone(record),blob,size:blob.size}};
   }catch(error){return {ok:false,code:'ZIP_BUILD_FAILED',message:error instanceof Error?error.message:String(error)};}
+ }
+ // P377: the attempt's own context for the external reviewer.
+ // Every source is best-effort: a source that fails yields an empty
+ // section, never a failed package.
+ private async buildReviewerContext(input:{
+   run:{objective?:string};
+   workspaceId:string;
+   packageSeriesId:string;
+   packageRevision:number;
+   unresolvedChecks:string[];
+   candidateUnknownContext?:{candidateNotes?:string[];externalQuestions?:string[]}|null;
+   externalReviewQuestions:string[];
+ }):Promise<Record<string,unknown>>{
+   const previousReviews:Array<{packageRevision:number;verdict:string;risks:string[];requestedChanges:string[]}>=[];
+   try{
+     const {externalReviewIntakeService}=await import('./externalReviewIntakeService');
+     const priors=[...this.ledger.values()].filter(record=>record.packageSeriesId===input.packageSeriesId&&record.packageRevision<input.packageRevision).sort((a,b)=>a.packageRevision-b.packageRevision);
+     for(const prior of priors){
+       for(const review of externalReviewIntakeService.list(prior.packageId)){
+         if(review.status==='MISMATCH')continue;
+         previousReviews.push({packageRevision:prior.packageRevision,verdict:review.externalVerdict,risks:(review.risks||[]).slice(0,10),requestedChanges:(review.requestedChanges||[]).slice(0,10)});
+       }
+     }
+   }catch{/* best-effort */}
+   let currentHypotheses:Array<{cause:string;status:string;weight:number;observations:number}>=[];
+   try{
+     const {causalInvestigationService}=await import('../../research/services/causalInvestigationService');
+     const objective=String(input.run.objective||'');
+     if(objective){
+       currentHypotheses=causalInvestigationService.list().filter(investigation=>investigation.problem===objective).slice(0,3)
+         .flatMap(investigation=>investigation.hypotheses.filter(hypothesis=>hypothesis.status!=='REJECTED')
+           .map(hypothesis=>({cause:hypothesis.cause,status:hypothesis.status,weight:hypothesis.weight,observations:hypothesis.observations.length})))
+         .slice(0,8);
+     }
+   }catch{/* best-effort */}
+   let knownFailurePatterns:Array<{signatureId:string;title:string;avoidanceInstruction:string}>=[];
+   try{
+     const {failureCatalogService}=await import('../../memory/services/failureCatalogService');
+     knownFailurePatterns=failureCatalogService.findRelevantSignatures(String(input.run.objective||''),{}).map(signature=>({signatureId:signature.signatureId,title:signature.title,avoidanceInstruction:signature.avoidanceInstruction}));
+   }catch{/* best-effort */}
+   return {
+     schemaVersion:1,
+     attempted:{
+       previousReviews,
+       validationRecords:candidateValidationEvidenceService.list(input.workspaceId).length,
+     },
+     currentHypotheses,
+     knownFailurePatterns,
+     stuckPoints:[...input.unresolvedChecks,...(input.candidateUnknownContext?.candidateNotes??[])],
+     questionsForReviewer:[...new Set([...input.externalReviewQuestions,...(input.candidateUnknownContext?.externalQuestions??[])])],
+     note:'Context MIKI assembled about its own attempt. Treat as claims to verify, not as established facts.',
+   };
  }
  async regenerate(packageId:string):Promise<ReviewZipCreateResult>{
   const record=this.ledger.get(packageId); if(!record)return {ok:false,code:'PACKAGE_NOT_FOUND',message:`Package not found: ${packageId}`};

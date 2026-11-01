@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1743,
     "sourceFileCount": 1296,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1209,
-    "relativeImportCandidateCount": 3590,
-    "resolvedRelativeImportCandidateCount": 3574,
+    "relativeImportCandidateCount": 3593,
+    "resolvedRelativeImportCandidateCount": 3577,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -17260,9 +17260,9 @@
     },
     {
       "path": "src/miki/core/services/reviewZipExportService.ts",
-      "bytes": 24233,
-      "lines": 216,
-      "sha256": "267cd4c15720aac0a7ee6ee714861c1645e6df4f543495c0f33755f8f50c5f02",
+      "bytes": 27945,
+      "lines": 274,
+      "sha256": "877549cd6d747027facd43d8dd7aab5e999ffbf7a60e30633079b56e31f53dc7",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -17317,10 +17317,28 @@
           "specifier": "./lifecycleTransitionPolicyService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/lifecycleTransitionPolicyService.ts"
+        },
+        {
+          "line": 174,
+          "specifier": "./externalReviewIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/externalReviewIntakeService.ts"
+        },
+        {
+          "line": 185,
+          "specifier": "../../research/services/causalInvestigationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/causalInvestigationService.ts"
+        },
+        {
+          "line": 196,
+          "specifier": "../../memory/services/failureCatalogService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/failureCatalogService.ts"
         }
       ],
-      "relativeImportCandidateCount": 9,
-      "resolvedRelativeImportCount": 9,
+      "relativeImportCandidateCount": 12,
+      "resolvedRelativeImportCount": 12,
       "unresolvedRelativeImportCount": 0
     },
     {
