@@ -10,6 +10,19 @@ import { conversationComponentCompositionService } from '../../conversation/serv
  * 共通概念・手続き・成功率・鮮度を集約する決定論的なメタ学習層。
  * 生成モデルは使用せず、観測された経験だけから優先度を更新する。
  */
+// P376: a lesson together with the conditions under which it was
+// observed. APPLIES records where an approach worked; BOUNDARY
+// records where it failed — the counterexample that marks the edge
+// of the lesson's validity. A lesson without its conditions gets
+// over-generalized; a lesson with them can be reused precisely.
+export interface ScopedLesson {
+  text: string;
+  kind: 'APPLIES' | 'BOUNDARY';
+  domain: UnifiedExperienceDomain;
+  concepts: string[];
+  observedAt: number;
+}
+
 export interface LearningProfile {
   key: string;
   uses: number;
@@ -22,6 +35,8 @@ export interface LearningProfile {
   // P360: 教訓の文章を捨てず、直近分と直近の失敗分を保持する（予測側が読める形にする）
   lastLesson?: string;
   lastFailureLesson?: string;
+  // P376: 条件つき教訓（適用できた条件と、失敗した境界）
+  scopedLessons?: ScopedLesson[];
 }
 
 export interface MikiLearningSnapshot {
@@ -110,6 +125,18 @@ export class MikiUnifiedLearningContinuumService {
         const lessonText = input.lesson.trim().slice(0, 300);
         current.lastLesson = lessonText;
         if (input.outcome === 'FAILURE') current.lastFailureLesson = lessonText;
+        // P376: keep the conditions with the lesson. UNKNOWN outcomes
+        // carry no applicability information and are not recorded.
+        if (input.outcome === 'SUCCESS' || input.outcome === 'FAILURE') {
+          const scoped: ScopedLesson = {
+            text: lessonText,
+            kind: input.outcome === 'SUCCESS' ? 'APPLIES' : 'BOUNDARY',
+            domain: input.domain,
+            concepts: (input.concepts || []).map(normalizeKey).filter(Boolean).slice(0, 8),
+            observedAt: now,
+          };
+          current.scopedLessons = [...(current.scopedLessons || []), scoped].slice(-6);
+        }
       }
       current.domains[input.domain] += 1;
       const successRate = current.successes / Math.max(1, current.successes + current.failures);
@@ -139,6 +166,16 @@ export class MikiUnifiedLearningContinuumService {
     return Math.round(profile.confidence * availability * 100) / 100;
   }
 
+  /** P376: the scoped lessons for one key, split by kind, newest first. */
+  public lessonContextFor(key: string): { applies: ScopedLesson[]; boundaries: ScopedLesson[] } {
+    const profile = this.profiles.get(normalizeKey(key));
+    const lessons = [...(profile?.scopedLessons || [])].reverse();
+    return {
+      applies: lessons.filter(lesson => lesson.kind === 'APPLIES'),
+      boundaries: lessons.filter(lesson => lesson.kind === 'BOUNDARY'),
+    };
+  }
+
   /** 過去経験を能力選択に反映する。ただしVERIFIED能力のみ返す。 */
   public rankCapabilities(capabilityIds: string[], query: string): Array<{ capabilityId: string; score: number; reason: string }> {
     const q = normalizeKey(query);
@@ -150,12 +187,14 @@ export class MikiUnifiedLearningContinuumService {
         .reduce((s, x) => s + x.confidence * 0.15, 0);
       const usage = p ? Math.min(20, p.uses) : 0;
       const score = Math.round((direct + related + usage) * 100) / 100;
+      const boundary = (p?.scopedLessons || []).filter(lesson => lesson.kind === 'BOUNDARY').slice(-1)[0];
       const lessonNote = p?.lastFailureLesson
         ? ` / 失敗教訓: ${p.lastFailureLesson.slice(0, 120)}`
         : p?.lastLesson
           ? ` / 教訓: ${p.lastLesson.slice(0, 120)}`
           : '';
-      return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}, activation=${this.activationOf(p)}${lessonNote}` : '共通経験なし。新規候補として扱う' };
+      const boundaryNote = boundary ? ` / 境界: ${boundary.text.slice(0, 120)} (${boundary.domain})` : '';
+      return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}, activation=${this.activationOf(p)}${lessonNote}${boundaryNote}` : '共通経験なし。新規候補として扱う' };
     }).sort((a, b) => b.score - a.score);
   }
 

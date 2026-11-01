@@ -21896,9 +21896,9 @@
     },
     {
       "path": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts",
-      "bytes": 12961,
-      "lines": 253,
-      "sha256": "f27c9118a51b1b3897b49083795efdd831c58b1eb0b9ae50d8ea3c6c6bc009b5",
+      "bytes": 14886,
+      "lines": 292,
+      "sha256": "754f5986aafccdb203bcba47bcc42038f4ea583adbf383171568c471ffb27127",
       "relativeImportCandidates": [
         {
           "line": 1,
