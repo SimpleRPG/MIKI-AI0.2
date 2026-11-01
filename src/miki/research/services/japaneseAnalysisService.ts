@@ -57,6 +57,23 @@ const PUNCT = new Set(Array.from('、。！？!?「」『』（）()［］[]【�
 const QUESTION = /[？\?]|ですか|でしょうか|どうして|なぜ|何|どれ|どこ|いつ|誰|教えて/;
 const CORRECTION = /違う|そうじゃない|ではなく|じゃなく|間違|訂正|修正|前提が変|勘違い/;
 
+const CONTENT_TERM_STOPWORDS = new Set(['その', 'この', 'あの', 'どの', 'これ', 'それ', 'あれ', 'どれ', 'こと', 'もの']);
+
+/**
+ * The content terms of an analyzed text: the words that carry what the
+ * text is about. FUNCTION tokens (greetings, thanks, formulaic words)
+ * and their fragments are not content, and neither are demonstratives
+ * or formal nouns. Shared by answer validation (P383) and learned
+ * example reuse (P384) so both judge "content" the same way.
+ */
+export function contentTermsFromTokens(tokens: JapaneseToken[]): string[] {
+  const functionSurfaces = tokens.filter(token => token.pos === 'FUNCTION').map(token => token.surface);
+  return [...new Set(tokens
+    .filter(token => token.kind === 'WORD' && token.pos !== 'FUNCTION')
+    .map(token => token.lemma && token.lemma.length >= 2 ? token.lemma : token.surface)
+    .filter(term => term.length >= 2 && !CONTENT_TERM_STOPWORDS.has(term) && !functionSurfaces.some(surface => surface !== term && surface.includes(term))))].slice(0, 12);
+}
+
 function enrichToken(token: JapaneseToken): JapaneseToken {
   const hit: JapaneseDictionaryEntry | undefined = japaneseDictionaryService.lookup(token.surface)[0];
   if (!hit) return token;

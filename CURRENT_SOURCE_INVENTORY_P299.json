@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1746,
     "sourceFileCount": 1299,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1212,
-    "relativeImportCandidateCount": 3602,
-    "resolvedRelativeImportCandidateCount": 3586,
+    "relativeImportCandidateCount": 3605,
+    "resolvedRelativeImportCandidateCount": 3589,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -10304,9 +10304,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 11510,
-      "lines": 91,
-      "sha256": "670016d8ba1f742a39878dc74ad26501be5cd5ec2552fe5b19df8fd26581ed84",
+      "bytes": 11111,
+      "lines": 89,
+      "sha256": "069cc132f5df1557e50358387dcf4a1bd82c67267d447128261d9cfc14f44f64",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10334,55 +10334,61 @@
         },
         {
           "line": 5,
+          "specifier": "../../research/services/japaneseAnalysisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
+        },
+        {
+          "line": 6,
           "specifier": "./conversationLanguageComponentGraphP213Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationLanguageComponentGraphP213Service.ts"
         },
         {
-          "line": 6,
+          "line": 7,
           "specifier": "./conversationGraphCompletionP214Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationGraphCompletionP214Service.ts"
         },
         {
-          "line": 7,
+          "line": 8,
           "specifier": "./conversationGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationGraphConnectorP211Service.ts"
         },
         {
-          "line": 8,
+          "line": 9,
           "specifier": "../../research/services/researchGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchGraphConnectorP211Service.ts"
         },
         {
-          "line": 9,
+          "line": 10,
           "specifier": "../../unknown/services/unknownGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/unknown/services/unknownGraphConnectorP211Service.ts"
         },
         {
-          "line": 10,
+          "line": 11,
           "specifier": "../../experience/services/experienceGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/experience/services/experienceGraphConnectorP211Service.ts"
         },
         {
-          "line": 11,
+          "line": 12,
           "specifier": "../../verification/services/verificationGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verificationGraphConnectorP211Service.ts"
         },
         {
-          "line": 12,
+          "line": 13,
           "specifier": "../../core/services/crossDomainGraphConnectionP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/crossDomainGraphConnectionP211Service.ts"
         }
       ],
-      "relativeImportCandidateCount": 12,
-      "resolvedRelativeImportCount": 12,
+      "relativeImportCandidateCount": 13,
+      "resolvedRelativeImportCount": 13,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -10397,9 +10403,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationLanguageComponentGraphP213Service.ts",
-      "bytes": 6550,
-      "lines": 37,
-      "sha256": "e29609ee39f8216f94b494a7df7b20bf2c97c489bf5f2422f5e1d52a5456b647",
+      "bytes": 8231,
+      "lines": 49,
+      "sha256": "ac4bc281a3454cd6e44b596d71ae36ea3054a0063003f52ea5a7729bb891795a",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10412,10 +10418,22 @@
           "specifier": "../../core/services/unifiedKnowledgeGraphP151Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/unifiedKnowledgeGraphP151Service.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "./japaneseAnalysisCompositionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/japaneseAnalysisCompositionService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "../../research/services/japaneseAnalysisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
         }
       ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -24034,9 +24052,9 @@
     },
     {
       "path": "src/miki/research/services/japaneseAnalysisService.ts",
-      "bytes": 12426,
-      "lines": 248,
-      "sha256": "74ff084c34538226dd3343d31975fcbd7cc9ab741f867d524b906ffc2a03d938",
+      "bytes": 13464,
+      "lines": 265,
+      "sha256": "4a99dc3a6371732dc1d87ba32a364a906d66fe4cdf11462d986a3b97226c8eb8",
       "relativeImportCandidates": [
         {
           "line": 1,

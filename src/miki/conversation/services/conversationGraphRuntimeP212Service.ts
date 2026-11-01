@@ -2,6 +2,7 @@ import { canonicalSha256Object } from '../../core/services/canonicalSha256Servic
 import { semanticGraphCoreP208Service, type SemanticCandidate, type SemanticGraphState } from '../../core/services/semanticGraphCoreP208Service';
 import { semanticDictionaryGraphP209Service } from '../../core/services/semanticDictionaryGraphP209Service';
 import { conversationComponentPipelineService } from './conversationComponentPipelineService';
+import { contentTermsFromTokens } from '../../research/services/japaneseAnalysisService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -22,16 +23,13 @@ class ConversationGraphRuntimeP212Service {
   if(!taskId.trim()||!text.trim())throw new Error('P212_EMPTY_CONVERSATION_INPUT');
   const turnId=`turn:${canonicalSha256Object({taskId,text}).slice(0,32)}`;
   const analysis=conversationComponentPipelineService.analyzeSync(text);
-  const languageComponents=conversationLanguageComponentGraphP213Service.analyze(text,crossDomainGraphConnectionP211Service.snapshot(),resolvedContext);
   // P383: keep the input's own content terms so the answer plan can
   // require engagement with what was actually said when the intent /
-  // constraint layer yields no checkable requirement. FUNCTION tokens
-  // (greetings, thanks, formulaic words) and their fragments are not
-  // content; demonstratives and formal nouns carry no topic either.
-  const rawTokens=analysis.analysis?.tokens??[];
-  const functionSurfaces=rawTokens.filter(token=>token.pos==='FUNCTION').map(token=>token.surface);
-  const contentTermStopwords=new Set(['その','この','あの','どの','これ','それ','あれ','どれ','こと','もの']);
-  const contentTerms=[...new Set(rawTokens.filter(token=>token.kind==='WORD'&&token.pos!=='FUNCTION').map(token=>token.lemma&&token.lemma.length>=2?token.lemma:token.surface).filter(term=>term.length>=2&&!contentTermStopwords.has(term)&&!functionSurfaces.some(surface=>surface!==term&&surface.includes(term))))].slice(0,12);
+  // constraint layer yields no checkable requirement. P384: the same
+  // terms go to the component analysis so learned examples can be
+  // matched by content overlap instead of whole-surface inclusion.
+  const contentTerms=contentTermsFromTokens(analysis.analysis?.tokens??[]);
+  const languageComponents=conversationLanguageComponentGraphP213Service.analyze(text,crossDomainGraphConnectionP211Service.snapshot(),resolvedContext,contentTerms);
   const semantic=semanticGraphCoreP208Service.understand(text,this.semanticState,resolvedContext);
   const lexemes=[...new Set(text.normalize('NFKC').split(/[\s、。！？,.!?]+/u).filter(Boolean))].map(token=>({token,found:semanticDictionaryGraphP209Service.has(token)}));
   const inputReceipt=conversationGraphConnectorP211Service.connect({eventKind:'INPUT',subjectId:turnId,payload:{taskId,text,lexemes,languageComponents,usedComponentIds:analysis.usedComponentIds,semanticCandidates:semantic.candidates},confidence:.95,uncertainty:semantic.selected?0.05:.45,sourceRefs:[`conversation:${taskId}`,semantic.receiptSha256],participantDomains:['memory','capability','research','unknown','verification'],requiresVerification:!semantic.selected});
@@ -80,7 +78,7 @@ class ConversationGraphRuntimeP212Service {
   const passed=validation.passed!==false&&semanticValidation.passed;
   const validationReceipt=verificationGraphConnectorP211Service.connect({eventKind:'VALIDATION',subjectId:`validation:${taskId}`,payload:{taskId,passed,semanticValidation,counterexample:validation.counterexample,repair:validation.repair??semanticValidation.repair},confidence:passed?.95:.85,uncertainty:passed?.05:.25,sourceRefs:[output.eventSha256],participantDomains:['conversation','experience','learning','improvement'],relatedNodeIds:output.createdNodeIds});
   const experienceReceipt=experienceGraphConnectorP211Service.connect({eventKind:passed?'RESULT':'ERROR',subjectId:`experience:${taskId}`,payload:{taskId,passed,usedComponentIds:input.usedComponentIds,selectedConceptId:input.selectedConceptId,counterexample:validation.counterexample,repair:validation.repair},confidence:.9,uncertainty:.1,sourceRefs:[output.eventSha256],participantDomains:['conversation','learning','verification'],relatedNodeIds:[...input.inputNodeIds,...output.createdNodeIds,...validationReceipt.createdNodeIds]});
-  crossDomainGraphConnectionP211Service.connect({domain:'learning',eventKind:passed?'RESULT':'CORRECTION',subjectId:`learning:${taskId}`,payload:{taskId,outcome:passed?'POSITIVE_EXAMPLE':'COUNTEREXAMPLE',surface:input.inputSurface,meaningIds:input.selectedConceptId?[input.selectedConceptId]:[],counterexample:validation.counterexample,repair:validation.repair,reuseCondition:input.selectedConceptId},confidence:passed?.9:.8,uncertainty:passed?.1:.25,sourceRefs:[output.eventSha256],participantDomains:['conversation','experience','verification'],relatedNodeIds:[...input.inputNodeIds,...output.createdNodeIds,...validationReceipt.createdNodeIds,...experienceReceipt.createdNodeIds]});
+  crossDomainGraphConnectionP211Service.connect({domain:'learning',eventKind:passed?'RESULT':'CORRECTION',subjectId:`learning:${taskId}`,payload:{taskId,outcome:passed?'POSITIVE_EXAMPLE':'COUNTEREXAMPLE',surface:input.inputSurface,contentTerms:input.contentTerms,meaningIds:input.selectedConceptId?[input.selectedConceptId]:[],counterexample:validation.counterexample,repair:validation.repair,reuseCondition:input.selectedConceptId},confidence:passed?.9:.8,uncertainty:passed?.1:.25,sourceRefs:[output.eventSha256],participantDomains:['conversation','experience','verification'],relatedNodeIds:[...input.inputNodeIds,...output.createdNodeIds,...validationReceipt.createdNodeIds,...experienceReceipt.createdNodeIds]});
   const current={...input,graphSha256:crossDomainGraphConnectionP211Service.snapshot().graphSha256};this.inputByTask.delete(taskId);conversationGraphCompletionP214Service.save(crossDomainGraphConnectionP211Service.snapshot());return{...current,receiptSha256:canonicalSha256Object(current)};
  }
  getAnswerRequirements(taskId:string,executionResult?:unknown){const input=this.inputByTask.get(taskId);if(!input)return undefined;return{inputSurface:input.inputSurface,intentIds:input.intentIds,constraintIds:input.constraintIds,grammarIds:input.grammarIds,meaningComponentIds:input.meaningComponentIds,contentTerms:input.contentTerms,executionResult}}

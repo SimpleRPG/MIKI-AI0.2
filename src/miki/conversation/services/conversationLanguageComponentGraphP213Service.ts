@@ -1,5 +1,7 @@
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import type { P151Graph } from '../../core/services/unifiedKnowledgeGraphP151Service';
+import { japaneseAnalysisCompositionService } from './japaneseAnalysisCompositionService';
+import { contentTermsFromTokens } from '../../research/services/japaneseAnalysisService';
 
 export type ConversationComponentKind='CHARACTER_COMPONENT'|'LEXEME_COMPONENT'|'PHRASE_COMPONENT'|'GRAMMAR_COMPONENT'|'MEANING_COMPONENT'|'INTENT_COMPONENT'|'CONSTRAINT_COMPONENT'|'CONTEXT_COMPONENT'|'KNOWLEDGE_COMPONENT'|'RESPONSE_COMPONENT'|'POSITIVE_EXAMPLE_COMPONENT'|'COUNTEREXAMPLE_COMPONENT'|'REPAIR_COMPONENT'|'EXECUTABLE_COMPONENT';
 export type ConversationGapKind='LEXEME_GAP'|'PHRASE_GAP'|'GRAMMAR_GAP'|'MEANING_GAP'|'INTENT_GAP'|'CONSTRAINT_GAP'|'CONTEXT_GAP'|'REFERENCE_GAP'|'EVIDENCE_GAP'|'CAPABILITY_GAP'|'INTEGRATION_GAP'|'VALIDATION_GAP'|'AMBIGUITY';
@@ -18,8 +20,9 @@ const BUILTIN:LanguageComponent[]=[
  definition('RESPONSE_COMPONENT','つまり',['response.summary']),definition('RESPONSE_COMPONENT','違う？',['response.contrast-confirmation'])
 ];
 class ConversationLanguageComponentGraphP213Service{
- analyze(text:string,graph:P151Graph,context:{activeGoalIds:string[];openGoalIds:string[]}):ComponentAnalysis{
-  const normalized=normalize(text);const found=BUILTIN.filter(c=>normalized.includes(c.normalized));const learned=this.learned(graph,normalized);const components=[...new Map([...found,...learned].map(c=>[c.componentId,c])).values()];
+ private learnedTermCache=new Map<string,string[]>();
+ analyze(text:string,graph:P151Graph,context:{activeGoalIds:string[];openGoalIds:string[]},inputContentTerms?:string[]):ComponentAnalysis{
+  const normalized=normalize(text);const found=BUILTIN.filter(c=>normalized.includes(c.normalized));const inputTerms=inputContentTerms??contentTermsFromTokens(japaneseAnalysisCompositionService.analyzeSync(text).analysis.tokens);const learned=this.learned(graph,normalized,inputTerms);const components=[...new Map([...found,...learned].map(c=>[c.componentId,c])).values()];
   const gaps:Array<{gapId:string;kind:ConversationGapKind;surface:string;reason:string;confidence:number}>=[];
   const add=(kind:ConversationGapKind,surface:string,reason:string,confidence=.85)=>gaps.push({gapId:`gap:${canonicalSha256Object({kind,surface,reason}).slice(0,24)}`,kind,surface,reason,confidence});
   if(!components.length)add('PHRASE_GAP',text,'No known language component matched the utterance');
@@ -32,6 +35,15 @@ class ConversationLanguageComponentGraphP213Service{
   const core={components,gaps,intentIds,constraintIds,grammarIds,reusedLearnedComponentIds:learned.map(c=>c.componentId)};return{...core,analysisSha256:canonicalSha256Object(core)};
  }
  promote(surface:string,meaningIds:string[],kind:ConversationComponentKind='PHRASE_COMPONENT'):LanguageComponent{return definition(kind,surface,meaningIds,[],.8)}
- private learned(graph:P151Graph,normalized:string):LanguageComponent[]{const out:LanguageComponent[]=[];for(const node of graph.nodes){const payload=node.payload as Record<string,unknown>;if(payload.outcome!=='POSITIVE_EXAMPLE'&&payload.outcome!=='COUNTEREXAMPLE')continue;const learnedSurface=typeof payload.surface==='string'?normalize(payload.surface):'';if(!learnedSurface||!normalized.includes(learnedSurface))continue;const kind=payload.outcome==='COUNTEREXAMPLE'?'COUNTEREXAMPLE_COMPONENT':'POSITIVE_EXAMPLE_COMPONENT';const base={componentId:`learned:${node.nodeId}`,kind:kind as ConversationComponentKind,surface:learnedSurface,normalized:learnedSurface,meaningIds:Array.isArray(payload.meaningIds)?payload.meaningIds.filter((x):x is string=>typeof x==='string'):[],conditions:typeof payload.repair==='string'?[payload.repair]:[],confidence:node.confidence,source:'LEARNED_GRAPH' as const};out.push({...base,sha256:canonicalSha256Object(base)})}return out}
+ // P384: learned examples used to be reused only when a later input
+ // contained the example's whole surface verbatim, which almost never
+ // happens for real sentences. Reuse is now judged by content overlap:
+ // the example's content terms (stored on the node since P384, derived
+ // from its surface for older nodes) against the input's content terms.
+ // A match needs at least two shared terms, or full coverage of an
+ // example that has only one or two terms. Whole-surface inclusion
+ // still matches, as before.
+ private learned(graph:P151Graph,normalized:string,inputTerms:string[]):LanguageComponent[]{const out:LanguageComponent[]=[];for(const node of graph.nodes){const payload=node.payload as Record<string,unknown>;if(payload.outcome!=='POSITIVE_EXAMPLE'&&payload.outcome!=='COUNTEREXAMPLE')continue;const rawSurface=typeof payload.surface==='string'?payload.surface:'';const learnedSurface=normalize(rawSurface);if(!learnedSurface)continue;let matched=normalized.includes(learnedSurface);if(!matched){const nodeTerms=Array.isArray(payload.contentTerms)?payload.contentTerms.filter((x):x is string=>typeof x==='string'):this.derivedTerms(node.nodeId,rawSurface);const shared=nodeTerms.filter(term=>inputTerms.includes(term));matched=shared.length>=2||(nodeTerms.length>0&&shared.length===nodeTerms.length)}if(!matched)continue;const kind=payload.outcome==='COUNTEREXAMPLE'?'COUNTEREXAMPLE_COMPONENT':'POSITIVE_EXAMPLE_COMPONENT';const base={componentId:`learned:${node.nodeId}`,kind:kind as ConversationComponentKind,surface:learnedSurface,normalized:learnedSurface,meaningIds:Array.isArray(payload.meaningIds)?payload.meaningIds.filter((x):x is string=>typeof x==='string'):[],conditions:typeof payload.repair==='string'?[payload.repair]:[],confidence:node.confidence,source:'LEARNED_GRAPH' as const};out.push({...base,sha256:canonicalSha256Object(base)})}return out}
+ private derivedTerms(nodeId:string,surface:string):string[]{const cached=this.learnedTermCache.get(nodeId);if(cached)return cached;const terms=contentTermsFromTokens(japaneseAnalysisCompositionService.analyzeSync(surface).analysis.tokens);if(this.learnedTermCache.size>1000)this.learnedTermCache.clear();this.learnedTermCache.set(nodeId,terms);return terms}
 }
 export const conversationLanguageComponentGraphP213Service=new ConversationLanguageComponentGraphP213Service();
