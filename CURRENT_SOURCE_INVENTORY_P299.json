@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1747,
     "sourceFileCount": 1300,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1213,
-    "relativeImportCandidateCount": 3609,
-    "resolvedRelativeImportCandidateCount": 3593,
+    "relativeImportCandidateCount": 3611,
+    "resolvedRelativeImportCandidateCount": 3595,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -5844,9 +5844,9 @@
     },
     {
       "path": "server.ts",
-      "bytes": 208544,
-      "lines": 4750,
-      "sha256": "e9f64026194b9a448a2026687190a287b7b9ffbadecc7e3f2ef5d5129415784f",
+      "bytes": 210641,
+      "lines": 4788,
+      "sha256": "002ebbde423ee9cdc96fd5134a50d0cb40f0b02d4ea9c0bdeaa984fde09e0a30",
       "relativeImportCandidates": [
         {
           "line": 15,
@@ -6101,12 +6101,12 @@
           "resolvedPath": "src/miki/improvement/services/selfImprovementMetricsService.ts"
         },
         {
-          "line": 3553,
+          "line": 3591,
           "specifier": "./chapter_${chapterNumber}",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 3886,
+          "line": 3924,
           "specifier": "./component.cjs",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -10310,9 +10310,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 11111,
-      "lines": 89,
-      "sha256": "069cc132f5df1557e50358387dcf4a1bd82c67267d447128261d9cfc14f44f64",
+      "bytes": 11715,
+      "lines": 96,
+      "sha256": "f9e54180c8298058395d2bf3a1f4be4b69654b5056dcf12661dc32da401220f6",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10346,55 +10346,67 @@
         },
         {
           "line": 6,
+          "specifier": "../../research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "../../research/services/dictionaryBootstrapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/dictionaryBootstrapService.ts"
+        },
+        {
+          "line": 8,
           "specifier": "./conversationLanguageComponentGraphP213Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationLanguageComponentGraphP213Service.ts"
         },
         {
-          "line": 7,
+          "line": 9,
           "specifier": "./conversationGraphCompletionP214Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationGraphCompletionP214Service.ts"
         },
         {
-          "line": 8,
+          "line": 10,
           "specifier": "./conversationGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationGraphConnectorP211Service.ts"
         },
         {
-          "line": 9,
+          "line": 11,
           "specifier": "../../research/services/researchGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchGraphConnectorP211Service.ts"
         },
         {
-          "line": 10,
+          "line": 12,
           "specifier": "../../unknown/services/unknownGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/unknown/services/unknownGraphConnectorP211Service.ts"
         },
         {
-          "line": 11,
+          "line": 13,
           "specifier": "../../experience/services/experienceGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/experience/services/experienceGraphConnectorP211Service.ts"
         },
         {
-          "line": 12,
+          "line": 14,
           "specifier": "../../verification/services/verificationGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verificationGraphConnectorP211Service.ts"
         },
         {
-          "line": 13,
+          "line": 15,
           "specifier": "../../core/services/crossDomainGraphConnectionP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/crossDomainGraphConnectionP211Service.ts"
         }
       ],
-      "relativeImportCandidateCount": 13,
-      "resolvedRelativeImportCount": 13,
+      "relativeImportCandidateCount": 15,
+      "resolvedRelativeImportCount": 15,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -23953,9 +23965,9 @@
     },
     {
       "path": "src/miki/research/services/dictionaryBootstrapService.ts",
-      "bytes": 2936,
-      "lines": 60,
-      "sha256": "55bd10d9dab63e79b6451e27a8347e2b2571f08415f35184d378cca72b57ab25",
+      "bytes": 4557,
+      "lines": 91,
+      "sha256": "76cf51eb975355485c2607906dbab593bd27a77b39d2cc883181f4a4124cd1c8",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24116,9 +24128,9 @@
     },
     {
       "path": "src/miki/research/services/japaneseDictionaryService.ts",
-      "bytes": 14514,
-      "lines": 181,
-      "sha256": "f4b3f9402da4d8feef782bd4003a30f05efb1889fb121495713f42b0b8b47d4f",
+      "bytes": 15616,
+      "lines": 209,
+      "sha256": "a8999dbd649ebd3e8dc777f94ccf67a1d97552d4501a200d8d4b162ffdbd46e6",
       "relativeImportCandidates": [
         {
           "line": 1,

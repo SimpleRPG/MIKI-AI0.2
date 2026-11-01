@@ -17,11 +17,42 @@ interface DictionaryBootstrapState { version: string; importedAt: number; entrie
  */
 class DictionaryBootstrapService {
   private attempted = false;
+  private deepAttempted = new Set<string>();
 
   public initialize(): void {
     if (this.attempted) return;
     this.attempted = true;
     void this.attempt();
+  }
+
+  /**
+   * P386: ask the server's full dictionary about one word the local
+   * dictionary does not know. Fire-and-forget: on a hit the entries
+   * are learned into the local JMdict collection, so later turns
+   * resolve the word locally. Each surface is attempted at most
+   * once per launch, and every failure is silent.
+   */
+  public lookupDeep(surface: string): void {
+    const clean = (surface || '').trim();
+    if (!clean || this.deepAttempted.has(clean)) return;
+    this.deepAttempted.add(clean);
+    void (async () => {
+      try {
+        const base = String(storageService.getItem('miki_api_base_url') || '').replace(/\/$/, '');
+        if (!base) return;
+        let signal: AbortSignal | undefined;
+        try { signal = (AbortSignal as unknown as { timeout?: (value: number) => AbortSignal }).timeout?.(15000); } catch { signal = undefined; }
+        const response = await fetch(`${base}/api/dictionary/lookup?surface=${encodeURIComponent(clean)}`, { signal });
+        if (!response.ok) return;
+        const data = (await response.json()) as { entries?: Parameters<typeof japaneseDictionaryService.addImportedEntries>[0] };
+        if (Array.isArray(data?.entries) && data.entries.length) {
+          const added = japaneseDictionaryService.addImportedEntries(data.entries, 'JMdict');
+          if (added > 0) systemLogger.info('CHAT', `[JapaneseDictionary] deep lookup learned "${clean}" from the server dictionary (${added} entries)`);
+        }
+      } catch {
+        // Deep lookup is best-effort by design; see class docs.
+      }
+    })();
   }
 
   private async attempt(): Promise<void> {

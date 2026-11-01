@@ -214,6 +214,44 @@ app.get('/api/dictionary/package', (req, res) => {
   if (!fs.existsSync(file)) { res.status(404).json({ success: false, reason: 'DICTIONARY_NOT_READY' }); return; }
   res.type('application/json').sendFile(file);
 });
+// Deep lookup over the full tier. The index is built lazily on first
+// use (one parse of the full package) and then served from memory,
+// so the app can ask about a word its common tier does not know
+// without ever holding the full dictionary itself.
+let dictionaryDeepIndex: Map<string, Array<Record<string, unknown>>> | null = null;
+let dictionaryDeepIndexPromise: Promise<Map<string, Array<Record<string, unknown>>>> | null = null;
+function ensureDictionaryDeepIndex(): Promise<Map<string, Array<Record<string, unknown>>>> {
+  if (dictionaryDeepIndex) return Promise.resolve(dictionaryDeepIndex);
+  if (!dictionaryDeepIndexPromise) {
+    dictionaryDeepIndexPromise = (async () => {
+      const raw = await fs.promises.readFile(path.join(DICTIONARY_DIR, 'jmdict-full.json'), 'utf8');
+      const pkg = JSON.parse(raw) as { entries?: Array<Record<string, unknown>> };
+      const index = new Map<string, Array<Record<string, unknown>>>();
+      for (const entry of pkg.entries || []) {
+        const surface = String(entry?.surface || '');
+        if (!surface) continue;
+        const key = surface.normalize('NFKC').trim().toLowerCase();
+        const list = index.get(key);
+        if (list) list.push(entry); else index.set(key, [entry]);
+      }
+      dictionaryDeepIndex = index;
+      return index;
+    })().catch((error) => { dictionaryDeepIndexPromise = null; throw error; });
+  }
+  return dictionaryDeepIndexPromise;
+}
+app.get('/api/dictionary/lookup', async (req, res) => {
+  const surface = String(req.query.surface || '').trim();
+  if (!surface) { res.status(400).json({ success: false, reason: 'SURFACE_REQUIRED' }); return; }
+  if (!readDictionaryManifest()) { res.status(404).json({ success: false, reason: 'DICTIONARY_NOT_READY' }); return; }
+  try {
+    const index = await ensureDictionaryDeepIndex();
+    const hits = index.get(surface.normalize('NFKC').trim().toLowerCase()) || [];
+    res.json({ success: true, surface, entries: hits.slice(0, 8) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, reason: String(error?.message || error) });
+  }
+});
 
 
 // Multi-Key Pool & Rotation Manager with Quota Fallback (設計思想: 複数プロジェクト対応)

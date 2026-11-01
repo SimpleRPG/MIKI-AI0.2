@@ -131,6 +131,34 @@ class JapaneseDictionaryService {
     return this.importPackage({ schemaVersion: 1, source, entries });
   }
 
+  /**
+   * P386: append individually fetched entries (e.g. deep lookups
+   * against the server's full dictionary) to an imported source,
+   * deduplicated by normalized surface, and persist them together
+   * with that source's package.
+   */
+  public addImportedEntries(entries: JapaneseDictionaryEntry[], source: Exclude<JapaneseDictionarySource,'BUILTIN'|'PERSONAL'>): number {
+    const existing = this.imported.get(source) || [];
+    const seen = new Set(existing.map(e => `${e.normalized}::${e.surface}`));
+    let added = 0;
+    for (const entry of entries || []) {
+      if (!entry?.surface) continue;
+      const normalized = normalize(entry.surface);
+      const key = `${normalized}::${entry.surface}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      existing.push({ ...entry, normalized, source, priority: entry.priority ?? 60 });
+      added += 1;
+    }
+    if (added > 0) {
+      this.imported.set(source, existing);
+      const info = this.packageInfo.get(source);
+      if (info) info.entryCount = existing.length;
+      this.savePackages();
+    }
+    return added;
+  }
+
   public getStats() {
     return { builtin: this.builtinEntries.length, personal: this.personal.size, imported: [...this.imported.entries()].reduce((n,[,v]) => n + v.length, 0), sources: [...this.imported.keys()], packages: [...this.packageInfo.values()] };
   }

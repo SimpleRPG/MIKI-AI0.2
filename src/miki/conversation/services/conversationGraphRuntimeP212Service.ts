@@ -3,6 +3,8 @@ import { semanticGraphCoreP208Service, type SemanticCandidate, type SemanticGrap
 import { semanticDictionaryGraphP209Service } from '../../core/services/semanticDictionaryGraphP209Service';
 import { conversationComponentPipelineService } from './conversationComponentPipelineService';
 import { contentTermsFromTokens } from '../../research/services/japaneseAnalysisService';
+import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
+import { dictionaryBootstrapService } from '../../research/services/dictionaryBootstrapService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -29,6 +31,11 @@ class ConversationGraphRuntimeP212Service {
   // terms go to the component analysis so learned examples can be
   // matched by content overlap instead of whole-surface inclusion.
   const contentTerms=contentTermsFromTokens(analysis.analysis?.tokens??[]);
+  // P386: content terms the local dictionary cannot resolve are
+  // asked once to the server's full dictionary, in the background.
+  // Hits are learned locally, so later turns resolve them without
+  // the server. This never waits and never blocks the response.
+  for (const term of contentTerms.slice(0,4)) { if (!japaneseDictionaryService.lookup(term).length) dictionaryBootstrapService.lookupDeep(term); }
   const languageComponents=conversationLanguageComponentGraphP213Service.analyze(text,crossDomainGraphConnectionP211Service.snapshot(),resolvedContext,contentTerms);
   const semantic=semanticGraphCoreP208Service.understand(text,this.semanticState,resolvedContext);
   const lexemes=[...new Set(text.normalize('NFKC').split(/[\s、。！？,.!?]+/u).filter(Boolean))].map(token=>({token,found:semanticDictionaryGraphP209Service.has(token)}));
