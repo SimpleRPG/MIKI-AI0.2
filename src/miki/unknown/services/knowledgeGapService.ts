@@ -261,10 +261,23 @@ export class KnowledgeGapService {
       ...(gap.identity?.environment ? [`environment=${gap.identity.environment}`] : []),
       ...(options?.environment && options.environment !== gap.identity?.environment ? [`currentEnvironment=${options.environment}`] : []),
     ].filter(Boolean);
-    const researchRoute = options?.preferredRoute || (/実装|再現|性能|互換|環境/.test(`${gap.query} ${gap.reason}`) ? 'EXECUTION_TEST' : 'WEB_SEARCH');
+    // P382: route by the gap's TYPE. The type used to be recorded
+    // but ignored — every gap was re-guessed from its text and most
+    // were sent to web search. What is unknown decides how it can
+    // be resolved: intent, references and user constraints only the
+    // user can settle; relations, causes, dependencies and
+    // contradictions are settled inside (index, graph, causal
+    // records); effects, conditions, exceptions and implementations
+    // are settled by running; terms, versions, sources and
+    // staleness by gathering material.
+    const researchRoute = options?.preferredRoute || this.routeForType(gap.type);
     const verificationMethods = researchRoute === 'EXECUTION_TEST'
       ? ['再現可能な実行テスト', '成果物・実装・テストケース・環境の照合', 'Verifierによる明示検証']
-      : ['独立Evidenceの収集', 'Claim/Evidence照合', 'Verifierによる明示検証'];
+      : researchRoute === 'USER_CLARIFICATION'
+        ? ['ユーザーへの確認質問', '回答をClaimとして登録', 'Verifierによる明示検証']
+        : researchRoute === 'CORE_REVIEW'
+          ? ['理解索引・グラフの走査', '因果記録・証拠との照合', 'Verifierによる明示検証']
+          : ['独立Evidenceの収集', 'Claim/Evidence照合', 'Verifierによる明示検証'];
     const plan: KnowledgeGapResolutionPlan = {
       planId: `GAPPLAN-${canonicalSha256Object({ gapId: gap.id, missingConditions, requiredEvidence: gap.requiredEvidence, researchRoute }).slice(0, 20)}`,
       gapId: gap.id,
@@ -273,7 +286,7 @@ export class KnowledgeGapService {
       requiredEvidence: [...new Set(gap.requiredEvidence)].slice(0, 12),
       verificationMethods,
       researchRoute,
-      blackboardAction: researchRoute === 'EXECUTION_TEST' ? 'EXECUTION_TEST' : 'RESEARCH',
+      blackboardAction: researchRoute === 'EXECUTION_TEST' ? 'EXECUTION_TEST' : researchRoute === 'USER_CLARIFICATION' ? 'CLARIFY' : researchRoute === 'CORE_REVIEW' ? 'BLOCK' : 'RESEARCH',
       createdAt: Date.now(),
     };
     const updated = this.update(gap.id, { resolutionPlan: plan, status: gap.status === 'RESOLVED' ? 'RESOLVED' : gap.status });
@@ -331,6 +344,34 @@ export class KnowledgeGapService {
       hash = Math.imul(hash, 16777619);
     }
     return `PUNK-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+  }
+
+  /** P382: the resolution route a gap type calls for. */
+  public routeForType(type: KnowledgeGapType): KnowledgeGapResolutionPlan['researchRoute'] {
+    const routes: Record<KnowledgeGapType, KnowledgeGapResolutionPlan['researchRoute']> = {
+      UNKNOWN_INTENT: 'USER_CLARIFICATION',
+      UNKNOWN_REFERENCE: 'USER_CLARIFICATION',
+      UNKNOWN_USER_CONSTRAINT: 'USER_CLARIFICATION',
+      UNKNOWN_RELATION: 'CORE_REVIEW',
+      UNKNOWN_CAUSE: 'CORE_REVIEW',
+      CONTRADICTION: 'CORE_REVIEW',
+      UNKNOWN_DEPENDENCY: 'CORE_REVIEW',
+      UNKNOWN_EFFECT: 'EXECUTION_TEST',
+      UNKNOWN_CONDITION: 'EXECUTION_TEST',
+      UNKNOWN_EXCEPTION: 'EXECUTION_TEST',
+      UNKNOWN_COUNTEREXAMPLE: 'EXECUTION_TEST',
+      UNKNOWN_IMPLEMENTATION: 'EXECUTION_TEST',
+      UNKNOWN_COMPATIBILITY: 'EXECUTION_TEST',
+      UNKNOWN_CAPABILITY: 'EXECUTION_TEST',
+      WEAK_COMPONENT: 'EXECUTION_TEST',
+      UNKNOWN_TERM: 'WEB_SEARCH',
+      UNKNOWN_VERSION: 'WEB_SEARCH',
+      UNKNOWN_SOURCE: 'WEB_SEARCH',
+      UNKNOWN_CONFIDENCE: 'WEB_SEARCH',
+      STALE_INFORMATION: 'WEB_SEARCH',
+      INSUFFICIENT_EVIDENCE: 'WEB_SEARCH',
+    };
+    return routes[type] || 'WEB_SEARCH';
   }
 
   private inferType(query:string,reason:string):KnowledgeGapType{

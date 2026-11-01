@@ -32723,9 +32723,9 @@
     },
     {
       "path": "src/miki/unknown/services/knowledgeGapService.ts",
-      "bytes": 22682,
-      "lines": 351,
-      "sha256": "826bd7628ea8fa80cd78b6f890c2c36d6e1fcb47d1d3a80c55e2ce05c4d1847b",
+      "bytes": 24763,
+      "lines": 392,
+      "sha256": "915af59e7470b1860fdc233bb0ac94bfe5199f7449462a6c43558fcbbfed402a",
       "relativeImportCandidates": [
         {
           "line": 1,
