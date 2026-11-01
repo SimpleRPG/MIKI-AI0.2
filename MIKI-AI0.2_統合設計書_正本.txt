@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-31
-正本Revision：2026-11-01-P365
+正本Revision：2026-11-01-P366
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,7 +119,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-11-01-P365
+- 現行Revision: 2026-11-01-P366
 - 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324/P325/P326/P327/P328/P329/P330/P331/P332/P333/P334/P335/P336/P337/P338/P339/P340/P341/P342の対象ファイル変更後に全ファイル件数を再集計したものではない。P332・P333・P335は候補登録のみでソースファイル変更なし。P334/P336ではP299定義の追跡ソースインベントリを再生成するが、P222基準の完全再帰件数は再集計しない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
@@ -13007,5 +13007,19 @@ P364の記録を受けて残存する生成系経路を洗い直したところ�
 削除範囲は、サーバールート /api/debug 本体、クライアントの sendDebugRequest（apiService の公開分を含む）と、App の handleAutoDebug におけるクラウド呼出である。handleAutoDebug 自体は残し、従来フォールバックとして存在したローカル自己修復ヒューリスティック（Canvas初期化ガードとオプショナルチェーン化の決定論的書き換え）だけが動く形にした。なお /api/debug のキー無し応答は「自動修正しました」と称して未修正コードをそのまま返すものでもあった。
 
 これにより、サーバー側のGemini利用は教師系2ルート（素材供給）と鍵の管理・検証のみとなった。確認として、サーバー再起動後に POST /api/debug が404を返し、POST /api/teacher-request が正常に応答すること、型検査とimport解決が0件であること、在庫の再生成と --check の通過を確認した。
+
+【2026-11-01-P366 実機テストで判明した自律改善ループの詰まりの解消】
+
+P365までの状態で実機テストを行い、COREオーケストレーション自体（Rustカーネル参加、環境計画取得、分類への派遣・観測・再評価）は動作することを確認した。一方で、改善タスクが先へ進まない事象が複合的に発生した。端末から持ち帰った実行記録（RUN DETAIL・キュー詳細）とコードを照合し、原因を4点に特定して解消した。
+
+第1に、テストタスクが ROUTING のまま凍結した。ブラックボードの resume は ROUTING 状態のタスクを「経路回復を明示的に許可した場合」しか再開しないが、自律改善ループからの呼出はそのフラグ（coreTaskIngress→coreOrchestrator→blackboard まで通っていた）を渡していなかった。ループ専用の resumeOwnedTask を設けてフラグを渡すよう接続した。あわせて、参照先タスクが不存在・終了済みのリクエストは試行回数を消費するリトライではなく即時破棄（dropCurrent）とした。タスク不存在の例外で drain 全体が FAILED に倒れる経路も、同じ箇所で吸収した。
+
+第2に、回復タスクが「必要Evidence: PERSISTENT_BACKEND_REQUIRED」を巡って循環した。この理由は永続バックエンドという環境状態であり、調査すべき知識でも不足能力でもないが、requiredAssetAcquisitionService の分類では EVIDENCE（証拠調査）へ落ち、回復計画では知識合成の対象になっていた。分類に BACKEND を新設し、取得は storageService の実バックエンド確認（memory でなければ充足）とした。知識合成の計画対象からも除外した。
+
+第3に、起動のたびに優先度70〜75の回復・負債リクエストが再生成され、利用者の指示が後回しにされた。preflight の理由（バックエンド、スナップショット有無、Run登録）は全て環境・登録の前提条件でありコードの負債ではないが、従来は UNEXECUTED_CHECK 負債として記録され、discovery が優先度75で再キューしていた。preflight 失敗は負債化せずリソース待ち（Run不存在は破棄）に変更し、preflight 通過時に当該Runの旧負債を resolve するよう接続した（resolve の呼出元はこれまで存在しなかった）。discovery 側でも、PREFLIGHT由来の旧負債と、取得基盤自身が作る required_asset.* のギャップ記録（知識・能力とも）をキュー化対象から外した。
+
+第4に、preflight の SOURCE_SNAPSHOT_EMPTY が、索引先行（軽量マニフェストのみ保持）という正規の同期状態を「空」と誤判定していた。軽量マニフェストにファイルがあればスナップショット有りとみなすよう改めた。
+
+検証は、型検査とimport解決が0件であること、簡易実行環境で preflight（軽量マニフェスト有無で判定が変わること）とバックエンド取得（sqliteで充足・memoryで不充足・合成ギャップを作らないこと）を実走で確認した。ループ全体の挙動（再開・破棄・負債解消の実効）は実機での再テストで確認する。
 
 確認として、全ツリーの型検査（tsc --noEmit）はエラー0件、import解決は未解決0件。サーバーを再起動して、削除した POST /api/train-distill が404になること、教師スキルAPIが API としては応答しないこと（SPAフォールバックのHTMLのみ）、存置した GET /api/self-code/package-scripts が200で応答することを確認した。原因調査の観測還元は CORE の実走を要するため簡易実行環境では未実走であり、効果は実機側で観測される。在庫は再生成し、追跡対象は1748件から1741件になった。

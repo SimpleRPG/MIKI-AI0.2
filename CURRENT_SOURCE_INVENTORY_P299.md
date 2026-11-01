@@ -603,8 +603,8 @@
 | `src/miki/core/services/anatomicalProceduralPersonP198Service.ts` | 12529 | 85 | `cf4af2d33dc6d668d40a25fedfc9f1a3e1bde70171b7137a3be4a1dd96a4f35b` | 1 | 1 | 0 |
 | `src/miki/core/services/autonomousCandidatePreparationService.ts` | 14467 | 215 | `e5d0bde13dae5ad1594e632d0d8deeda553603d7bb4f57bb758331fbf637656f` | 6 | 6 | 0 |
 | `src/miki/core/services/autonomousImprovementTrajectoryService.ts` | 2861 | 15 | `c8e544ff51b2090c9aba19bc92f10fbba9382945835e28a5f8845ed657e4178c` | 1 | 1 | 0 |
-| `src/miki/core/services/autonomousIssueDiscoveryService.ts` | 34041 | 571 | `f66bce890221b7fc1fbc6eb1171c1c4ca5a70488897edc2c5459c4942cfedf4b` | 13 | 13 | 0 |
-| `src/miki/core/services/autonomousSelfImprovementLoopService.ts` | 44431 | 962 | `bdfc7f985b12e47026399a1793176e68e8c1922f7edd90842a8aac0a381abeb3` | 11 | 11 | 0 |
+| `src/miki/core/services/autonomousIssueDiscoveryService.ts` | 34555 | 576 | `28f523d4a06353532c75f5dac70cff7c547119b2db9679ecfc019e50c88debea` | 13 | 13 | 0 |
+| `src/miki/core/services/autonomousSelfImprovementLoopService.ts` | 46645 | 1008 | `eee9671c2a4404e93341c8bd0963ae564c7576b702fad35cc86d26f28ab7b6c3` | 11 | 11 | 0 |
 | `src/miki/core/services/blackboardRecoveryService.ts` | 809 | 6 | `997dc830c65b6d4eb613e4f5e896b6e5a73280825799f542408f1e78297ada8f` | 1 | 1 | 0 |
 | `src/miki/core/services/bodyTypeTrendService.ts` | 3381 | 14 | `ec7b217df647446c94fc89e3359eda56588cd56bb5962921558a5073a2506914` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateAutoRebaseService.ts` | 2849 | 14 | `b5affca11da61a5b228a5cdef665265b6542eedc66f5204bbdbdf220d851447d` | 1 | 1 | 0 |
@@ -647,7 +647,7 @@
 | `src/miki/core/services/coreOrchestratorService.ts` | 111563 | 1980 | `33595c870193963cade3b096a2a6054f2f7506d58294512584ae1107639f7b81` | 43 | 43 | 0 |
 | `src/miki/core/services/corePlanRevisionService.ts` | 6587 | 144 | `f2da95bc0472cc4ab5ee552fdac87336d75cc0c2f439f8a44aaa77b5b08437b0` | 4 | 4 | 0 |
 | `src/miki/core/services/coreResultService.ts` | 11709 | 383 | `a1c2b2b489efdbb7f7f7e9e6e70c18958c89d20096f9ecb06921b7251e54bd52` | 6 | 6 | 0 |
-| `src/miki/core/services/coreTaskIngressService.ts` | 19881 | 161 | `88c08073be963553cef12afb062e3b302312c50c9670449d1ab75dbfb279edd3` | 15 | 15 | 0 |
+| `src/miki/core/services/coreTaskIngressService.ts` | 19929 | 161 | `16be69f1dacf8869ef66b419f69db3277f5b6b6671c6420137ef8f6132797cd1` | 15 | 15 | 0 |
 | `src/miki/core/services/coreUnifiedGraphManagerP153Service.ts` | 4439 | 15 | `aa4ed655468d23bfae5a74e304b9e8d7f170ea2d69d43b073bb6a49b6a1caad4` | 4 | 4 | 0 |
 | `src/miki/core/services/coreWorldModelGatewayService.ts` | 763 | 8 | `9ea94084f8ccee631b2c34d394065efe6cbfd632cc7635f418e0048309b5e65d` | 2 | 2 | 0 |
 | `src/miki/core/services/crossDomainCirculationService.ts` | 3430 | 104 | `e24b026d10f19698a795f6213108b847575e42217389f4c4ce0b4e73c2c6666a` | 2 | 2 | 0 |
@@ -729,7 +729,7 @@
 | `src/miki/core/services/realPhotoFaceFeatureP146Service.ts` | 3130 | 7 | `784dccb039bd95998f3d150d51d350721a1a49199eda67397cfb7d8e843feee9` | 1 | 1 | 0 |
 | `src/miki/core/services/realisticPersonSurfaceRendererP142Service.ts` | 7190 | 25 | `6b52e8ae79a1a1c40e38ce14b24009b7c4c1e229058ac598886bce4a1b6ea8c7` | 2 | 2 | 0 |
 | `src/miki/core/services/repositoryBackedVisualLearningService.ts` | 5230 | 14 | `aef6636f40238441e2bf340081feda838daae7bf177c8128a7cf8f6aade8bd1f` | 2 | 2 | 0 |
-| `src/miki/core/services/requiredAssetAcquisitionService.ts` | 26871 | 725 | `91ef12b66215b1e48855d6b0df7cf6c47984c7cd071567b95afe312cf660655d` | 10 | 10 | 0 |
+| `src/miki/core/services/requiredAssetAcquisitionService.ts` | 28252 | 751 | `a2ab6ec6c825524b242366ce7db68b6796f8c001c474edbe5a6b89af0bcbcb46` | 10 | 10 | 0 |
 | `src/miki/core/services/requirementConsistencyGraphService.ts` | 1551 | 12 | `62d1a1d47df12725da4126d669c572a201d62cab3716fd6b3c3e56b83163599b` | 1 | 1 | 0 |
 | `src/miki/core/services/requirementPriorityResolverService.ts` | 1456 | 11 | `bcad666662d92118cfbd7f472934b98ed5a02671452e8176c390d68521c7153c` | 1 | 1 | 0 |
 | `src/miki/core/services/requirementTraceabilityMatrixService.ts` | 1042 | 5 | `a19b2ed8e0a14f18f6d6108ce50064d7347ddf7e73ce055728987bc781bfa36c` | 2 | 2 | 0 |
@@ -750,7 +750,7 @@
 | `src/miki/core/services/selfCodeUnderstandingService.ts` | 24380 | 506 | `52df1a52e24f5723ee37096455a80932bc2816adfeb4238987530f958466e065` | 3 | 3 | 0 |
 | `src/miki/core/services/selfImprovementDirectionService.ts` | 3075 | 21 | `11768ec41737474a4aff4ad53d43eeb43c96a63abf3de5e1f55a4ec673f5a24d` | 1 | 1 | 0 |
 | `src/miki/core/services/selfImprovementIngressService.ts` | 1741 | 16 | `63954c313d0a86ea55dac6aaddd55680b5eebf56274a508d7890f6f241ce81f1` | 3 | 3 | 0 |
-| `src/miki/core/services/selfImprovementPreflightService.ts` | 1081 | 18 | `956e9a7cdef432b1ae791fbdd693ec53f8e03cebee1291bedc38e5a3ecaea49c` | 3 | 3 | 0 |
+| `src/miki/core/services/selfImprovementPreflightService.ts` | 1335 | 21 | `b7effe9c8d366bf35fe6a8cf2399eb1fded4bbc1e835e117c2d06b9a2821752a` | 3 | 3 | 0 |
 | `src/miki/core/services/semanticContextBudgetService.ts` | 637 | 3 | `6a4c33035ec8238ff66b2c22e088fb8b2de67faab0057d5ae0ed0b2eebcf5b2a` | 0 | 0 | 0 |
 | `src/miki/core/services/semanticDictionaryGraphP209Service.ts` | 2597 | 15 | `37f06d06d6880f8c53adc416b5574c45caa0c0e18f560721165fac898422b836` | 2 | 2 | 0 |
 | `src/miki/core/services/semanticGraphCoreP208Service.ts` | 6542 | 25 | `d2e5d5152af85744b904788ec08ca33bd2de16a965bcf597d778debcdf4b53d6` | 1 | 1 | 0 |

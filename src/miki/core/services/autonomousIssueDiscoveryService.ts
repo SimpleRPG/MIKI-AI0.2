@@ -68,14 +68,19 @@ class AutonomousIssueDiscoveryService{
    if(!this.isCurrentGeneration(generation))return this.emptyScanResult(mode);
    const before=this.issues.size;
    for(const event of executionEventBusService.list('execution.failed').slice(0,50))this.upsert('EXECUTION_FAILURE',event.event_id,`実行失敗: ${event.component_id}`,`${event.test_case_id} / ${event.error_message||event.output_summary||event.type}`,90);
-   for(const gap of knowledgeGapService.listOpen(50))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${gap.query}`,gap.reason||gap.query,70);
-   for(const gap of capabilityGapService.getAllGaps().filter(item=>item.status==='OPEN').slice(0,50))this.upsert('CAPABILITY_GAP',gap.gap_id,`能力不足: ${gap.capabilityId}`,gap.description||gap.current_workaround||gap.capabilityId,80);
+   // P366: gaps named required_asset.* are bookkeeping records created by
+   // required-asset acquisition itself, not capabilities or knowledge to
+   // pursue. Queueing them spawned self-referencing recovery tasks.
+   for(const gap of knowledgeGapService.listOpen(50).filter(gap=>!/required_asset\./i.test(gap.query)))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${gap.query}`,gap.reason||gap.query,70);
+   for(const gap of capabilityGapService.getAllGaps().filter(item=>item.status==='OPEN'&&!/^required_asset\./i.test(item.capabilityId)).slice(0,50))this.upsert('CAPABILITY_GAP',gap.gap_id,`能力不足: ${gap.capabilityId}`,gap.description||gap.current_workaround||gap.capabilityId,80);
    for(const task of taskBlackboardService.list(100).filter(item=>this.isStallCandidate(item.status,item.pausedReason))){
     const goal=this.normalizeDiagnosticPrefixes(task.goal);
     this.upsert('STALLED_TASK',task.taskId,`停滞タスク: ${goal}`,task.pausedReason||task.status,65);
    }
    for(const domain of crossDomainCirculationService.getDisconnectedDomains())this.upsert('DOMAIN_DISCONNECTED',domain,`18分類未循環: ${domain}`,`${domain}分類のIN/OUT実績が不足`,45);
-   for(const debt of improvementDebtService.listOpen().slice(0,50))this.upsert('IMPROVEMENT_DEBT',debt.debtId,`改善負債: ${debt.kind}`,debt.detail,75);
+   // P366: PREFLIGHT debts record environment preconditions from older
+   // builds; they are not actionable code debt and must not be re-queued.
+   for(const debt of improvementDebtService.listOpen().filter(debt=>!debt.detail.startsWith('PREFLIGHT:')).slice(0,50))this.upsert('IMPROVEMENT_DEBT',debt.debtId,`改善負債: ${debt.kind}`,debt.detail,75);
 
    let queued=0;
    if(mode==='AUTONOMOUS'){

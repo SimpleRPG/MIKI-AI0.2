@@ -417,14 +417,24 @@ class AutonomousSelfImprovementLoopService {
           const preflight = await selfImprovementPreflightService.evaluate(request.runId);
           if (!this.isGenerationCurrent(generation)) return;
           if (!preflight.passed) {
-            if (preflight.reasons.includes('PERSISTENT_BACKEND_REQUIRED')) {
-              this.waitForResource(request, 'PERSISTENT_BACKEND_REQUIRED');
+            // P366: preflight reasons are environment/registry preconditions
+            // (persistent backend, snapshot presence, run registration),
+            // never code debt. The previous route recorded UNEXECUTED_CHECK
+            // debt for them; discovery re-queued that debt at priority 75
+            // and starved user-requested work in a self-feeding loop.
+            if (preflight.reasons.includes('RUN_NOT_FOUND')) {
+              this.dropCurrent(`PREFLIGHT_RUN_NOT_FOUND:${request.runId || ''}`);
               continue;
             }
-            improvementDebtService.record('UNEXECUTED_CHECK', `PREFLIGHT:${preflight.reasons.join(',')}`, request.runId);
-            await this.acquireThenWaitForEvidence(request, preflight.reasons.join(','), generation);
-            if (!this.isGenerationCurrent(generation)) return;
+            this.waitForResource(request, preflight.reasons.join(','));
             continue;
+          }
+          // P366: a passing preflight settles PREFLIGHT debt that older
+          // builds recorded for this run, so it stops being re-queued.
+          for (const debt of improvementDebtService.listOpen()) {
+            if (debt.runId === request.runId && debt.kind === 'UNEXECUTED_CHECK' && debt.detail.startsWith('PREFLIGHT:')) {
+              improvementDebtService.resolve(debt.debtId);
+            }
           }
         }
 
@@ -438,7 +448,7 @@ class AutonomousSelfImprovementLoopService {
         this.replaceLegacyMisclassifiedTask(request);
         request.attempts += 1;
         const workflow = request.taskId
-          ? await coreTaskIngressService.resume(request.taskId, coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'))
+          ? await this.resumeOwnedTask(request.taskId)
           : await coreTaskIngressService.submit({
               kind: 'SELF_IMPROVEMENT',
               goal: request.trigger,
@@ -458,6 +468,13 @@ class AutonomousSelfImprovementLoopService {
             });
         if (!this.isGenerationCurrent(generation)) return;
         if (!workflow) {
+          // P366: a task that is gone or already terminal can never be
+          // resumed; drop the request instead of burning attempts on it.
+          const orphanTask = request.taskId ? taskBlackboardService.get(request.taskId) : undefined;
+          if (!orphanTask || orphanTask.status === 'COMPLETED' || orphanTask.status === 'FAILED' || orphanTask.status === 'CANCELLED') {
+            this.dropCurrent(`BLACKBOARD_TASK_NOT_RESUMABLE:${request.taskId || ''}`);
+            continue;
+          }
           this.failOrRetry(request, 'BLACKBOARD_TASK_RESUME_FAILED');
           continue;
         }
@@ -921,6 +938,35 @@ class AutonomousSelfImprovementLoopService {
     request.nextAttemptAt=this.state.retryAt;
     request.waitKind='RETRY';
     request.waitReason=reason;
+    this.save();
+  }
+
+  private async resumeOwnedTask(taskId: string) {
+    // P366: loop-owned tasks can be left in ROUTING by an interrupted
+    // cycle; the blackboard resumes those only when routing recovery is
+    // explicitly allowed (the flag existed end-to-end but was never
+    // passed). A task that no longer exists is reported as undefined so
+    // the caller can drop the request instead of failing the whole drain.
+    try {
+      return await coreTaskIngressService.resume(taskId, coreCycleSettingsService.maxCyclesFor('SELF_IMPROVEMENT'), true);
+    } catch (error) {
+      if (String(error).includes('CORE_TASK_NOT_FOUND')) return undefined;
+      throw error;
+    }
+  }
+
+  private dropCurrent(reason: string): void {
+    // P366: the head request can never proceed (its run or task is gone
+    // or terminal). Remove it instead of retrying until MAX_ATTEMPTS.
+    const request = this.state.queue[0];
+    if (request?.taskId) {
+      this.finishRecoverySubgoals(request.taskId, 'FAILED', reason);
+    }
+    this.state.queue.shift();
+    this.state.status = 'IDLE';
+    this.state.activeRequestId = undefined;
+    this.state.lastReason = reason;
+    this.state.retryAt = undefined;
     this.save();
   }
 

@@ -146,14 +146,14 @@ class CoreTaskIngressService {
   taskBlackboardService.post(taskId,passed?'RESULT':'OBSERVATION','learning','learning:answerOutcome',{passed,verified:passed&&Boolean(finalized),failedReasons:[...new Set(failedReasons)],claimCount:claimTrace.length,unregisteredClaimCount:claimTrace.filter(item=>item.assessment.outcome==='UNREGISTERED').length},[]);
   return result?{...result,finalAnswer:finalResponse,...(finalized?{finalization:finalized}:{})}:undefined;
  }
- async resume(taskId:string,maxCycles=coreCycleSettingsService.maxCyclesFor('USER_REQUEST')):Promise<CoreOrchestrationResult|undefined>{
+ async resume(taskId:string,maxCycles=coreCycleSettingsService.maxCyclesFor('USER_REQUEST'),allowRoutingRecovery=false):Promise<CoreOrchestrationResult|undefined>{
   if(!taskId.trim())throw new Error('CORE_TASK_ID_REQUIRED');
   const task=taskBlackboardService.get(taskId);
   if(!task)throw new Error('CORE_TASK_NOT_FOUND');
   // CORE is the single authority for snapshot hashing, checkpoint-chain validation and
   // recovery. A duplicate wrapper-level check used to reject a recoverable valid snapshot
   // before CORE could re-root its missing/corrupt receipt.
-  return coreOrchestratorService.resume(taskId,maxCycles);
+  return coreOrchestratorService.resume(taskId,maxCycles,allowRoutingRecovery);
  }
  pause(taskId:string,reason?:string){return coreOrchestratorService.pause(taskId,reason);}
  cancel(taskId:string){return coreOrchestratorService.cancel(taskId);}

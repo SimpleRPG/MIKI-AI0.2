@@ -8,7 +8,10 @@ class SelfImprovementPreflightService {
     const reasons: string[] = [];
     const run = improvementIntakeRouterService.get(runId);
     if (!run) reasons.push('RUN_NOT_FOUND');
-    if (selfCodeSpaceService.listSourceFiles().length === 0) reasons.push('SOURCE_SNAPSHOT_EMPTY');
+    // P366: index-first retention (P352) holds only the light manifest;
+    // that is a valid synced state, not an empty snapshot.
+    const lightManifest = selfCodeSpaceService.getLightManifest();
+    if (selfCodeSpaceService.listSourceFiles().length === 0 && !(lightManifest && lightManifest.files.length > 0)) reasons.push('SOURCE_SNAPSHOT_EMPTY');
     if (storageService.getBackendName() === 'memory') reasons.push('PERSISTENT_BACKEND_REQUIRED');
     const result: PreflightResult = { passed: reasons.length === 0, runId, reasons, checkedAt: Date.now() };
     storageService.setItem(`miki_preflight_${runId}`, JSON.stringify(result));

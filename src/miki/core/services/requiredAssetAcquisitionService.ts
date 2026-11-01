@@ -9,7 +9,7 @@ import { missingAssetSynthesisService, type MissingAssetDraftKind } from './miss
 import { missingAssetValidationService } from './missingAssetValidationService';
 import { missingCapabilityRecoveryService } from './missingCapabilityRecoveryService';
 
-export type RequiredAssetKind = 'EVIDENCE' | 'CAPABILITY' | 'VALIDATION_SCRIPT' | 'RESOURCE_CAPACITY';
+export type RequiredAssetKind = 'EVIDENCE' | 'CAPABILITY' | 'VALIDATION_SCRIPT' | 'RESOURCE_CAPACITY' | 'BACKEND';
 export type RequiredAssetStatus = 'OPEN' | 'ACQUIRING' | 'ACQUIRED' | 'BLOCKED';
 
 export interface RequiredAssetRequest {
@@ -70,7 +70,9 @@ class RequiredAssetAcquisitionService {
     reasons: string[];
     objective: string;
   }): Promise<RequiredAssetAcquisitionResult> {
-    const recoveryPlans=missingCapabilityRecoveryService.planAll(input.reasons);
+    // P366: the persistent-backend requirement is an environment state,
+    // not missing knowledge; never plan knowledge synthesis for it.
+    const recoveryPlans=missingCapabilityRecoveryService.planAll(input.reasons.filter(reason=>!/PERSISTENT_BACKEND/i.test(reason)));
     if(input.taskId&&recoveryPlans.length>0){taskBlackboardService.append(input.taskId,'DECISION','core','missing-capability-recovery-plans',{plans:recoveryPlans},[]);}
     const expandedReasons = [...input.reasons, ...recoveryPlans.flatMap(plan => plan.actions.map(action => `RECOVERY_ACTION_REQUIRED:${action}:${plan.reason}`))];
     const requestedDrafts: Array<{ kind: MissingAssetDraftKind; requirement: string }> = [];
@@ -113,7 +115,12 @@ class RequiredAssetAcquisitionService {
       request.updatedAt = Date.now();
       this.save();
 
-      if (requirement.kind === 'EVIDENCE') {
+      if (requirement.kind === 'BACKEND') {
+        const outcome = this.acquireBackendCheck(request);
+        progressed = progressed || outcome.progressed;
+        acquired = acquired && outcome.acquired;
+        reasons.push(...outcome.reasons);
+      } else if (requirement.kind === 'EVIDENCE') {
         const outcome = await this.acquireEvidence(request, input.objective);
         progressed = progressed || outcome.progressed;
         acquired = acquired && outcome.acquired;
@@ -512,6 +519,23 @@ class RequiredAssetAcquisitionService {
     return { progressed: true, acquired: false, reasons: [`CAPABILITY_GAP_CREATED:${entry.gap_id}`] };
   }
 
+  private acquireBackendCheck(request: RequiredAssetRequest): { progressed: boolean; acquired: boolean; reasons: string[] } {
+    // P366: check the live storage backend instead of researching the
+    // requirement as if it were knowledge. Previously this reason fell
+    // through to evidence research / capability-gap recording, which
+    // could never satisfy it and spawned self-referencing recovery tasks.
+    const backend = storageService.getBackendName();
+    const satisfied = backend !== 'memory';
+    request.status = satisfied ? 'ACQUIRED' : 'BLOCKED';
+    request.updatedAt = Date.now();
+    this.save();
+    return {
+      progressed: true,
+      acquired: satisfied,
+      reasons: [satisfied ? `PERSISTENT_BACKEND_AVAILABLE:${backend}` : 'PERSISTENT_BACKEND_REQUIRED'],
+    };
+  }
+
   private classify(reasons: string[]): Array<{ kind: RequiredAssetKind; requirement: string }> {
     const output: Array<{ kind: RequiredAssetKind; requirement: string }> = [];
     for (const raw of reasons) {
@@ -519,7 +543,9 @@ class RequiredAssetAcquisitionService {
       if (!reason) {
         continue;
       }
-      if (/required_asset\.capability/i.test(reason)) {
+      if (/PERSISTENT_BACKEND/i.test(reason)) {
+        output.push({ kind: 'BACKEND', requirement: reason });
+      } else if (/required_asset\.capability/i.test(reason)) {
         output.push({ kind: 'CAPABILITY', requirement: reason });
       } else if (/RESOURCE|MEMORY_ONLY|BATTERY|THERMAL|CAPACITY/i.test(reason)) {
         output.push({ kind: 'RESOURCE_CAPACITY', requirement: reason });

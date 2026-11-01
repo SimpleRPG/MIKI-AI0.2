@@ -12286,9 +12286,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousIssueDiscoveryService.ts",
-      "bytes": 34041,
-      "lines": 571,
-      "sha256": "f66bce890221b7fc1fbc6eb1171c1c4ca5a70488897edc2c5459c4942cfedf4b",
+      "bytes": 34555,
+      "lines": 576,
+      "sha256": "28f523d4a06353532c75f5dac70cff7c547119b2db9679ecfc019e50c88debea",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12375,9 +12375,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 44431,
-      "lines": 962,
-      "sha256": "bdfc7f985b12e47026399a1793176e68e8c1922f7edd90842a8aac0a381abeb3",
+      "bytes": 46645,
+      "lines": 1008,
+      "sha256": "eee9671c2a4404e93341c8bd0963ae564c7576b702fad35cc86d26f28ab7b6c3",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -13916,9 +13916,9 @@
     },
     {
       "path": "src/miki/core/services/coreTaskIngressService.ts",
-      "bytes": 19881,
+      "bytes": 19929,
       "lines": 161,
-      "sha256": "88c08073be963553cef12afb062e3b302312c50c9670449d1ab75dbfb279edd3",
+      "sha256": "16be69f1dacf8869ef66b419f69db3277f5b6b6671c6420137ef8f6132797cd1",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -16784,9 +16784,9 @@
     },
     {
       "path": "src/miki/core/services/requiredAssetAcquisitionService.ts",
-      "bytes": 26871,
-      "lines": 725,
-      "sha256": "91ef12b66215b1e48855d6b0df7cf6c47984c7cd071567b95afe312cf660655d",
+      "bytes": 28252,
+      "lines": 751,
+      "sha256": "a2ab6ec6c825524b242366ce7db68b6796f8c001c474edbe5a6b89af0bcbcb46",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17572,9 +17572,9 @@
     },
     {
       "path": "src/miki/core/services/selfImprovementPreflightService.ts",
-      "bytes": 1081,
-      "lines": 18,
-      "sha256": "956e9a7cdef432b1ae791fbdd693ec53f8e03cebee1291bedc38e5a3ecaea49c",
+      "bytes": 1335,
+      "lines": 21,
+      "sha256": "b7effe9c8d366bf35fe6a8cf2399eb1fded4bbc1e835e117c2d06b9a2821752a",
       "relativeImportCandidates": [
         {
           "line": 1,
