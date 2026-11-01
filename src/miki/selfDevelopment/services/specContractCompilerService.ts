@@ -125,7 +125,12 @@ export class SpecContractCompilerService {
     const understanding=selfCodeUnderstandingService.ensure(targetPaths); const contextReceipt=contextClosureReceiptService.create(understanding); const unresolved:string[]=[]; const blockers:string[]=[];
     if(!objective){unresolved.push('OBJECTIVE_REQUIRED');blockers.push('OBJECTIVE_REQUIRED');} if(targetPaths.length===0){unresolved.push('TARGET_PATHS_REQUIRED');blockers.push('TARGET_PATHS_REQUIRED');}
     if(!understanding.ready){unresolved.push(...understanding.reasons);blockers.push(...understanding.reasons);}
-    if(understanding.unresolvedEdges.length>0){const edgeReasons=understanding.unresolvedEdges.map(value=>`UNRESOLVED_EDGE:${value}`);unresolved.push(...edgeReasons);blockers.push(...edgeReasons);}
+    // P361: unresolved edges are recorded for the whole scope, but only
+    // edges originating in the target files themselves block the
+    // contract. Scope-wide edges are understanding noise (bare CALLS
+    // the index could not resolve); making them all blockers left
+    // improvement contracts structurally BLOCKED almost always.
+    if(understanding.unresolvedEdges.length>0){const edgeReasons=understanding.unresolvedEdges.map(value=>`UNRESOLVED_EDGE:${value}`);unresolved.push(...edgeReasons);blockers.push(...understanding.unresolvedEdges.filter(value=>targetPaths.some(target=>value.startsWith(`${target}:`))).map(value=>`UNRESOLVED_EDGE:${value}`));}
     if(contextReceipt.status!=='CLOSED'){unresolved.push(...contextReceipt.unresolved);blockers.push('CONTEXT_CLOSURE_INCOMPLETE');}
     if(requirements.length===0){unresolved.push('REQUIREMENTS_REQUIRED');blockers.push('REQUIREMENTS_REQUIRED');}
     if(validationRequirements.length===0){unresolved.push('VALIDATION_REQUIREMENTS_REQUIRED');blockers.push('VALIDATION_REQUIREMENTS_REQUIRED');}

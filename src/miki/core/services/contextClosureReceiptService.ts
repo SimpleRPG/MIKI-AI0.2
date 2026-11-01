@@ -26,6 +26,20 @@ class ContextClosureReceiptService {
       ...(!understanding.snapshotSha256?['UNDERSTANDING_SNAPSHOT_REQUIRED']:[]),
       ...(understanding.targetPaths.length===0?['TARGET_PATHS_REQUIRED']:[]),
     ].filter(Boolean);
+    // P361: all unresolved edges stay on the receipt as a record, but
+    // closure is blocked only by edges originating in the target files
+    // themselves. Scope-wide unresolved edges are index noise (bare
+    // CALLS that could not be resolved); treating them as incomplete
+    // closure left the receipt — and every contract built on it —
+    // permanently INCOMPLETE/BLOCKED.
+    const blockingUnresolved=[
+      ...understanding.reasons,
+      ...understanding.unresolvedEdges
+        .filter(value=>understanding.targetPaths.some(target=>value.startsWith(`${target}:`)))
+        .map(value=>`UNRESOLVED_EDGE:${value}`),
+      ...(!understanding.snapshotSha256?['UNDERSTANDING_SNAPSHOT_REQUIRED']:[]),
+      ...(understanding.targetPaths.length===0?['TARGET_PATHS_REQUIRED']:[]),
+    ].filter(Boolean);
     const seed={
       repositorySnapshotSha256:understanding.snapshotSha256||understanding.repoSha256,
       targetPaths:[...understanding.targetPaths].sort(),
@@ -43,7 +57,7 @@ class ContextClosureReceiptService {
       executionPathCount:understanding.executionPaths.length,
       contractValues:seed.contractValues,
       unresolved:seed.unresolved,
-      status:understanding.ready&&seed.unresolved.length===0?'CLOSED':'INCOMPLETE',
+      status:understanding.ready&&blockingUnresolved.length===0?'CLOSED':'INCOMPLETE',
       createdAt:Date.now(),
     };
     this.save(receipt);

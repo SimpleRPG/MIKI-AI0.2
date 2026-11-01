@@ -40,7 +40,7 @@ function normalizePath(value: string): string {
 export function getSearxngSearchSettings(): SearxngSearchSettings {
   const baseUrl = normalizeBaseUrl(readString(BASE_URL_KEYS) || 'http://127.0.0.1:8888');
   const path = normalizePath(readString(PATH_KEYS) || '/search');
-  const timeoutMs = Math.min(30000, Math.max(500, readNumber(TIMEOUT_KEYS) ?? 2500));
+  const timeoutMs = Math.min(30000, Math.max(500, readNumber(TIMEOUT_KEYS) ?? 8000));
   return { baseUrl, path, timeoutMs };
 }
 

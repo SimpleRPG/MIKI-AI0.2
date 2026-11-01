@@ -349,27 +349,49 @@ class SelfCodeUnderstandingService {
     if(missing.length)return {...empty,repoSha256,targetPaths:targets,reasons:[`TARGET_NOT_UNDERSTOOD:${missing.join('|')}`]};
 
     const related=new Set<string>();
-    const queue=[...targets];
     const contractIndex=new Map<string,Set<string>>();
     for(const entry of entries.values())for(const literal of entry.literalContracts){
       const paths=contractIndex.get(`${literal.role}|${literal.value}`)||new Set<string>();
       paths.add(entry.path);contractIndex.set(`${literal.role}|${literal.value}`,paths);
     }
 
-    while(queue.length){
-      const path=queue.shift()!;
-      const entry=entries.get(path);if(!entry)continue;
-      const neighbors=new Set<string>();
-      for(const raw of entry.imports){const resolved=this.resolve(entries,path,raw);if(resolved)neighbors.add(resolved);}
-      for(const importedBy of entry.importedBy)neighbors.add(importedBy);
-      for(const literal of entry.literalContracts){
-        const peers=contractIndex.get(`${literal.role}|${literal.value}`);
-        for(const peer of peers||[])if(peer!==path)neighbors.add(peer);
+    // P361: budgeted, direction-aware expansion (design doc:
+    // Budgeted Evidence Packet). Impact flows mainly along dependents
+    // (importedBy): a target's dependents, and their dependents, can
+    // be affected by a change. Dependencies (imports) and rare-contract
+    // peers matter at depth 1 only; expanding them further made every
+    // target "related" to almost the whole repository (measured 986
+    // of 1050 files), which destroyed the value of the scope.
+    // Contract edges are followed only for rare contracts: a literal
+    // shared by many files (common storage keys, generic status
+    // values) is a weak edge and must not glue files together.
+    const COMMON_CONTRACT_THRESHOLD=25;
+    const DEPTH2_BUDGET=200;
+    const MAX_RELATED=400;
+    const seenAt=new Map<string,number>(targets.map(path=>[path,0]));
+    const queueWithDepth: Array<{path:string;depth:number;viaDependent:boolean}>=targets.map(path=>({path,depth:0,viaDependent:true}));
+    const admit=(neighbor:string,nd:number,viaDependent:boolean)=>{
+      if(seenAt.has(neighbor))return;
+      if(nd===2&&related.size>=DEPTH2_BUDGET)return;
+      if(related.size>=MAX_RELATED)return;
+      seenAt.set(neighbor,nd);
+      if(!targets.includes(neighbor)){
+        related.add(neighbor);queueWithDepth.push({path:neighbor,depth:nd,viaDependent});
       }
-      for(const neighbor of neighbors){
-        if(!targets.includes(neighbor)&&!related.has(neighbor)){
-          related.add(neighbor);queue.push(neighbor);
+    };
+    while(queueWithDepth.length){
+      const {path,depth,viaDependent}=queueWithDepth.shift()!;
+      const entry=entries.get(path);if(!entry)continue;
+      if(depth===0){
+        for(const importedBy of entry.importedBy)admit(importedBy,1,true);
+        for(const raw of entry.imports){const resolved=this.resolve(entries,path,raw);if(resolved)admit(resolved,1,false);}
+        for(const literal of entry.literalContracts){
+          const peers=contractIndex.get(`${literal.role}|${literal.value}`);
+          if(!peers||peers.size>COMMON_CONTRACT_THRESHOLD)continue;
+          for(const peer of peers)if(peer!==path)admit(peer,1,false);
         }
+      } else if(depth===1&&viaDependent){
+        for(const importedBy of entry.importedBy)admit(importedBy,2,false);
       }
     }
 
@@ -424,7 +446,7 @@ class SelfCodeUnderstandingService {
       const contracts=entry.literalContracts.filter(item=>item.role!=='OTHER').map(item=>`${item.role}:${item.value}`);
       const direct=targetSet.has(entry.path);
       const sharedWithTarget=contracts.some(value=>targets.some(target=>entries.get(target)?.literalContracts.some(item=>`${item.role}:${item.value}`===value)));
-      const scope:ImpactScope=direct?'MUST_CHANGE':TEST_PATH.test(entry.path)?'TEST_ONLY':sharedWithTarget?'CONTRACT_DEPENDENCY':entry.imports.some(path=>targetSet.has(path))||entry.importedBy.some(path=>targetSet.has(path))?'MUST_INSPECT':'POSSIBLY_RELATED';
+      const scope:ImpactScope=direct?'MUST_CHANGE':TEST_PATH.test(entry.path)?'TEST_ONLY':sharedWithTarget?'CONTRACT_DEPENDENCY':entry.imports.some(raw=>{const resolved=this.resolve(entries,entry.path,raw);return resolved?targetSet.has(resolved):false;})||entry.importedBy.some(path=>targetSet.has(path))?'MUST_INSPECT':'POSSIBLY_RELATED';
       const reasons=[direct?'EXPLICIT_TARGET':TEST_PATH.test(entry.path)?'TEST_PATH':sharedWithTarget?'SHARED_COMMAND_EVENT_OR_STORAGE_CONTRACT':'DEPENDENCY_EXPANSION'];
       return {path:entry.path,scope,reasons,symbolIds:entry.symbols.map(symbol=>symbol.id),contractValues:contracts};
     }).sort((a,b)=>a.path.localeCompare(b.path));

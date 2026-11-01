@@ -575,13 +575,18 @@ export class ResearchService {
           acceptedIndependentSourceCount: new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)).size,
           candidateUrlsChecked: results.filter(result => !!result.url).length,
           renderedPages: readResults.filter(page => page.success && !!page.text.trim()).length,
-          supportingSourceCount: verification.filter(result => result.outcome === "SUPPORTED" || result.outcome === "DEVICE_VERIFIED").length,
+          // P361: verification is CORE's job and is always empty at this
+          // point, so deriving progress from it made both indicators
+          // permanently fake (0 / no-conflict). Use real collected data
+          // instead: supporting material actually gathered in this run,
+          // and contradictions already present in local knowledge.
+          supportingSourceCount: evidence.filter(item => item.status !== "REJECTED" && item.metadata?.research_source_role !== "COUNTEREVIDENCE").length,
           counterEvidenceSourceCount: evidence.filter(item => item.status !== "REJECTED" && item.metadata?.research_source_role === "COUNTEREVIDENCE").length,
           primarySourceSatisfied: evidence.some(item => item.status !== "REJECTED" && (item.metadata?.research_source_role === "PRIMARY" || (item.metadata?.research_source_role === "OFFICIAL" && item.metadata?.research_source_tier_target === "PRIMARY_OR_OFFICIAL"))),
           counterEvidenceSearchCompleted: queryPlan.status === "READY" && queryPlan.queries.slice(0, pass + 1).some(query => query.intentType === "COUNTEREVIDENCE" && evidence.some(item => item.status !== "REJECTED" && !!item.url)),
           excludedDuplicateCount: 0,
           rejectedQualityCount: evidence.filter(item => item.status === "REJECTED").length,
-          conflictingEvidence: verification.some(result => result.outcome === "CONTRADICTED"),
+          conflictingEvidence: (localMatch.contradictingClaims || []).length > 0,
           requiredIntentTypes: [...new Set(requiredIntentTypes)],
           completedIntentTypes: [...new Set(completedIntentTypes)],
           environmentApplicabilitySatisfied: queryPlan.status !== "READY" || !requiredIntentTypes.includes("CURRENT_ENVIRONMENT") || completedIntentTypes.includes("CURRENT_ENVIRONMENT"),

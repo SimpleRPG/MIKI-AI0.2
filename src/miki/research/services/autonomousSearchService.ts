@@ -479,7 +479,7 @@ export class AutonomousSearchService {
       };
     };
 
-    const runSearxng = async (): Promise<ProviderSearchOutput | null> => {
+    const attemptSearxng = async (): Promise<{ output: ProviderSearchOutput | null; retryable: boolean }> => {
       try {
         const searxSettings = getSearxngSearchSettings();
         const searxUrl = buildSearxngSearchUrl(searxSettings, safeQuery);
@@ -489,7 +489,7 @@ export class AutonomousSearchService {
           const reason = `HTTP ${searxRes.status}`;
           markProvider('searxng', 'FAILED', reason);
           systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 応答失敗: ${reason}`);
-          return null;
+          return { output: null, retryable: searxRes.status >= 500 };
         }
 
         const searxData = await searxRes.json();
@@ -498,7 +498,7 @@ export class AutonomousSearchService {
         if (hits.length === 0) {
           markProvider('searxng', 'EMPTY');
           systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 検索結果0件');
-          return null;
+          return { output: null, retryable: false };
         }
 
         const results: WebSearchResultItem[] = hits.slice(0, maxResults).map((hit: any) => {
@@ -526,15 +526,26 @@ export class AutonomousSearchService {
 
         markProvider('searxng', 'SUCCEEDED');
         systemLogger.info('SELF_IMPROVEMENT', `🔍 [SearXNG] 検索成功: ${results.length}件`);
-        return { provider: 'searxng', results };
+        return { output: { provider: 'searxng', results }, retryable: false };
       } catch (error: any) {
         const reason = error?.name === 'TimeoutError'
           ? 'タイムアウト'
           : error?.message || String(error);
         markProvider('searxng', 'FAILED', reason);
         systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 探索経路失敗: ${reason}`);
-        return null;
+        return { output: null, retryable: true };
       }
+    };
+
+    // P361: SearXNG is the single research route (P348), so a transient
+    // failure must not zero out the whole pass. Retry exactly once, and
+    // only for transient causes (network error, timeout, HTTP 5xx).
+    const runSearxng = async (): Promise<ProviderSearchOutput | null> => {
+      const first = await attemptSearxng();
+      if (first.output || !first.retryable) return first.output;
+      systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 一時的な失敗のため1回だけ再試行します');
+      const second = await attemptSearxng();
+      return second.output;
     };
 
     /*

@@ -13314,9 +13314,9 @@
     },
     {
       "path": "src/miki/core/services/contextClosureReceiptService.ts",
-      "bytes": 2696,
-      "lines": 63,
-      "sha256": "887c0bb228a23c0381c35c3e145223986f3d38dcb0d7a868a682c8018b1e8e48",
+      "bytes": 3519,
+      "lines": 77,
+      "sha256": "024aa3fb1badbfdc002cade2dfc6b8010f471b0d6915063fcbf7b79610d5c1e0",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17517,9 +17517,9 @@
     },
     {
       "path": "src/miki/core/services/selfCodeUnderstandingService.ts",
-      "bytes": 21348,
-      "lines": 444,
-      "sha256": "2f6df0773a2c0c4939276494110fc99f442b0c520adefc518334731ecf01416b",
+      "bytes": 22798,
+      "lines": 466,
+      "sha256": "57bd41e5f1657e45d6a1aa0ad7350ace92ef19f219f561334da54dac62a16441",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -23697,9 +23697,9 @@
     },
     {
       "path": "src/miki/research/services/autonomousSearchService.ts",
-      "bytes": 45211,
-      "lines": 1158,
-      "sha256": "05550ea4eb039878078e046cf13acfc22dd38925132c25d0c54a9c4d40757e11",
+      "bytes": 45984,
+      "lines": 1169,
+      "sha256": "dbacb2cf953a879f1d4e2633b03b9fde3d1ad6ae87b60bd6c87f779b8d0599b5",
       "relativeImportCandidates": [
         {
           "line": 6,
@@ -24257,9 +24257,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 39413,
-      "lines": 825,
-      "sha256": "d38c19116f22db6532fa60da68b28f0d654885a5fe4fd162ef04e365060124e0",
+      "bytes": 39769,
+      "lines": 830,
+      "sha256": "3c558a4c9f5178850c0b655fa176961813eaa6f13bb53de237131da03752cfc6",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24494,7 +24494,7 @@
       "path": "src/miki/research/services/searxngSettingsService.ts",
       "bytes": 1877,
       "lines": 54,
-      "sha256": "9690f05260bf27e6a27a147428f62705e5620326e21342921dafdffdf0738a39",
+      "sha256": "562d632d8b40d8da315e905ab8d94f2c413095e7e6873e77cf94a1162279b099",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31144,9 +31144,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/specContractCompilerService.ts",
-      "bytes": 13558,
-      "lines": 178,
-      "sha256": "40f5786869f59c5947bf044249e3a0d195d201fbfe1f510f924bf56edc374bb2",
+      "bytes": 14028,
+      "lines": 183,
+      "sha256": "bbbb1ec7f5214ad07c1e430f8a1553f2e601033b1db049ee5e150065fee87356",
       "relativeImportCandidates": [
         {
           "line": 6,
