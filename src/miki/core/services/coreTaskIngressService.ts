@@ -14,6 +14,7 @@ import { cognitiveQualityService } from './cognitiveQualityService';
 import { causalMemoryLedgerService } from '../../memory/services/causalMemoryLedgerService';
 import { causalInvestigationService } from '../../research/services/causalInvestigationService';
 import { outcomePredictionService } from './outcomePredictionService';
+import { conversationPragmaticsService } from '../../conversation/services/conversationPragmaticsService';
 export type CoreTaskKind='USER_REQUEST'|'SELF_IMPROVEMENT'|'EXECUTION_EVENT'|'VERIFICATION_EVENT'|'SYSTEM_TASK';
 export interface CoreTaskIngressRequest {kind:CoreTaskKind;goal:string;source:MikiDomain|'core';payload?:Record<string,unknown>;initialPayload?:Record<string,unknown>;maxCycles?:number;}
 export type CoreConversationFinalizationResult = CoreOrchestrationResult & { finalAnswer: string; finalization?: P216FinalAnswer };
@@ -25,6 +26,24 @@ class CoreTaskIngressService {
   const intentPlan=decomposeMultiIntent(request.goal);
   payload.intentPlan=intentPlan;
   payload.input=typeof payload.input==='string'?payload.input:request.goal;
+  // P381: nobody used to feed the clarification selector, so the
+  // "ask when unsure" path never engaged for conversation. Build
+  // candidates from the pragmatic reading (figurative or ironic
+  // intent needs confirming before it is acted on) and from
+  // high-confidence potential unknowns (a term whose local claim
+  // needs revalidation).
+  if((!Array.isArray(payload.clarificationCandidates)||payload.clarificationCandidates.length===0)&&(request.source==='conversation'||request.kind==='USER_REQUEST')){
+   const builtCandidates:Array<Record<string,unknown>>=[];
+   const pragmaticReading=conversationPragmaticsService.interpret(request.goal);
+   if(pragmaticReading.requiresClarification){
+    builtCandidates.push({id:'clarify-pragmatics',question:'その言い方は比喩やたとえのようです。どういう意味で言っていますか？',informationGain:0.7,decisionImpact:0.8,answerCost:0.3,resolves:pragmaticReading.signals});
+   }
+   const topUnknown=cognitiveQualityService.predictPotentialUnknowns(request.goal).find(candidate=>candidate.confidence>=0.65);
+   if(topUnknown){
+    builtCandidates.push({id:`clarify-unknown-${topUnknown.term}`,question:`「${topUnknown.term}」について、前に学んだ内容と合っているか確認が必要です。どの対象・意味のことですか？`,informationGain:0.6,decisionImpact:0.6,answerCost:0.4,resolves:[topUnknown.term]});
+   }
+   if(builtCandidates.length)payload.clarificationCandidates=builtCandidates;
+  }
   const clarificationPlan=cognitiveQualityService.selectClarification(Array.isArray(payload.clarificationCandidates)?payload.clarificationCandidates as never:[]);
   const explanationPlan=cognitiveQualityService.planExplanation({goal:request.goal,requestedLevel:payload.explanationLevel,userLevel:payload.userUnderstandingLevel});
   const potentialUnknownCandidates=cognitiveQualityService.predictPotentialUnknowns(request.goal);
@@ -112,7 +131,7 @@ class CoreTaskIngressService {
   const candidate=typeof response==='string'?response:typeof envelope?.reply==='string'?envelope.reply:'';
   const requirements=conversationGraphRuntimeP212Service.getAnswerRequirements(taskId,envelope?.executionResult);
   const finalized=requirements?graphAnswerMeaningPipelineP216Service.finalize(candidate,requirements):undefined;
-  const finalResponse=finalized?.text??'回答を確定できませんでした。会話入力または意味要件の記録を確認してください。';
+  let finalResponse=finalized?.text??'回答を確定できませんでした。会話入力または意味要件の記録を確認してください。';
   const taskBefore=taskBlackboardService.get(taskId);
   const answerHash=canonicalSha256Object(finalResponse);
   const claimTrace=claimEvidenceService.extractClaimSentences(finalResponse).filter(sentence=>!/[?？]$/.test(sentence)).slice(0,20).map((sentence,index)=>{
@@ -152,6 +171,15 @@ class CoreTaskIngressService {
    if(!finalized.grammar.passed)failedReasons.push(...finalized.grammar.issues);
   }
   const answerValidationPassed=finalized!==undefined&&finalized.semanticPreservation.passed&&finalized.executionConsistency.passed&&finalized.grammar.passed;
+  // P381: when the composed answer could not be validated and a
+  // clarifying question was selected during intake, ask that
+  // question instead of returning an unsupported answer or a bare
+  // failure notice. A validated answer is never replaced.
+  if(!answerValidationPassed){
+   const clarificationEntry=[...(taskBefore?.entries||[])].reverse().find(entry=>entry.key==='decision:informationGainClarification');
+   const selectedQuestion=(clarificationEntry?.value as {selected?:{question?:string}}|undefined)?.selected?.question;
+   if(typeof selectedQuestion==='string'&&selectedQuestion.trim())finalResponse=`確認させてください。${selectedQuestion}`;
+  }
   const result=coreOrchestratorService.finalizeConversationResponse(taskId,finalResponse,{passed:answerValidationPassed,failedReasons:[...new Set(failedReasons)]});
   if(!result)failedReasons.push('CORE_FINALIZATION_RESULT_MISSING');
   const passed=Boolean(result)&&answerValidationPassed;
