@@ -14411,9 +14411,9 @@
     },
     {
       "path": "src/miki/core/services/domainIntegrationBootstrapService.ts",
-      "bytes": 60828,
-      "lines": 903,
-      "sha256": "0d05e736256e982437f8f2f5a170ba8917826e853215bcb053fce2608d7b5fb4",
+      "bytes": 61376,
+      "lines": 908,
+      "sha256": "241e413d9d62a46bd80441a84b6154f29d6765c5aa85c4ca5dd86c267aab98ee",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14890,19 +14890,19 @@
           "resolvedPath": "src/miki/core/services/externalDirectiveIntakeService.ts"
         },
         {
-          "line": 821,
+          "line": 826,
           "specifier": "./reviewZipExportService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/reviewZipExportService.ts"
         },
         {
-          "line": 851,
+          "line": 856,
           "specifier": "./candidateValidationRunnerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/candidateValidationRunnerService.ts"
         },
         {
-          "line": 852,
+          "line": 857,
           "specifier": "./isolatedCandidateWorkspaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
@@ -17438,9 +17438,9 @@
     },
     {
       "path": "src/miki/core/services/selfCodeSpaceService.ts",
-      "bytes": 37113,
-      "lines": 1117,
-      "sha256": "e3abc099f0499112f30196754b161dc88d840a75252600a92638dc762b2156dc",
+      "bytes": 45391,
+      "lines": 1320,
+      "sha256": "babc0ec66c7635f52ecf27f2ae1b316c7a7978336dae169a82b8f5ae15dfe38a",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17479,13 +17479,13 @@
           "resolvedPath": "src/services/githubSyncService.ts"
         },
         {
-          "line": 813,
+          "line": 825,
           "specifier": "./selfCodeUnderstandingService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeUnderstandingService.ts"
         },
         {
-          "line": 905,
+          "line": 1103,
           "specifier": "./selfCodeUnderstandingService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeUnderstandingService.ts"

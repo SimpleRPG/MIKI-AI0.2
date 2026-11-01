@@ -794,8 +794,13 @@ class DomainIntegrationBootstrapService{
    if(originatingDirective?.activePackageRevision!==undefined&&originatingDirective.activePackageRevision!==pkg.packageRevision)return {accepted:false,domain,command:envelope.command,error:'DIRECTIVE_ACTIVE_REVISION_MISMATCH',completedAt:Date.now()};
    if(originatingDirective&&originatingDirective.status!=='ADOPTION_PENDING')return {accepted:false,domain,command:envelope.command,error:'DIRECTIVE_NOT_ADOPTION_PENDING',completedAt:Date.now()};
    const beforeApply=selfCodeSpaceService.get();
-   if(!beforeApply)return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_NOT_SYNCED",completedAt:Date.now()};
-   const applied=selfCodeSpaceService.applyCandidate(workspace.files.map(file=>({path:file.path,baselineSha256:file.baselineSha256,candidateContent:file.candidateContent})));
+   // P372: in index-first mode there is no full snapshot; the
+   // candidate is applied to the light changeset instead. A light
+   // manifest must exist, otherwise nothing is synced at all.
+   const lightChangesetBefore=beforeApply?undefined:selfCodeSpaceService.getLightChangeset();
+   if(!beforeApply&&!selfCodeSpaceService.getLightManifest())return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_NOT_SYNCED",completedAt:Date.now()};
+   const candidateFiles=workspace.files.map(file=>({path:file.path,baselineSha256:file.baselineSha256,candidateContent:file.candidateContent}));
+   const applied=beforeApply?selfCodeSpaceService.applyCandidate(candidateFiles):await selfCodeSpaceService.applyCandidateLight(candidateFiles);
    let result;
    try{
     result=await isolatedCandidateWorkspaceService.commitWithReceipt(workspace.workspaceId,receipt,operationInstanceId,taskId);
@@ -810,7 +815,7 @@ class DomainIntegrationBootstrapService{
     try{reviewZipExportService.updateStatus(packageId,'EXTERNAL_REVIEW_PENDING','PROMOTION_COMPENSATION');}catch{}
     if(originatingDirective){try{externalDirectiveIntakeService.updateStatus(originatingDirective.directiveId,'ADOPTION_PENDING',originatingRun?.runId,'PROMOTION_COMPENSATION');}catch{}}
     if(result?.transaction?.transactionId)candidateCommitTransactionService.rollback(result.transaction.transactionId,'PROMOTION_COMPENSATION');
-    try{selfCodeSpaceService.restoreSnapshot(beforeApply,applied.repoSha256);}
+    try{if(beforeApply)selfCodeSpaceService.restoreSnapshot(beforeApply,applied.repoSha256);else selfCodeSpaceService.restoreLightChangeset(lightChangesetBefore,applied.repoSha256);}
     catch(recoveryError){return {accepted:false,domain,command:envelope.command,error:"SELF_CODE_SPACE_RECOVERY_REQUIRED",completedAt:Date.now()};}
     throw error;
    }

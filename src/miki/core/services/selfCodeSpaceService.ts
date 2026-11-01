@@ -41,8 +41,20 @@ export interface SelfCodeLightManifest {
   syncedAt: number;
 }
 
+// P372: local edits accumulated against the light manifest, before
+// they are pushed. Only the changed files' contents are held; the
+// rest of the tree stays as manifest entries.
+export interface SelfCodeLightChangeset {
+  repository: string;
+  branch: string;
+  baseCommitSha: string;
+  files: Array<{ path: string; content: string; sha256: string }>;
+  updatedAt: number;
+}
+
 const KEY = 'miki_self_code_space_v1';
 const LIGHT_KEY = 'miki_self_code_light_manifest_v1';
+const LIGHT_CHANGESET_KEY = 'miki_self_code_light_changeset_v1';
 const SETTINGS_KEY = 'miki_self_code_github_settings_v1';
 const SEED_APPLIED_KEY = 'miki_self_code_seed_revision_v1';
 const DEFAULT_REPOSITORY = 'SimpleRPG/MIKI-AI0.2';
@@ -859,6 +871,192 @@ class SelfCodeSpaceService {
     }
   }
 
+  getLightChangeset(): SelfCodeLightChangeset | undefined {
+    try {
+      const raw = storageService.getItem(LIGHT_CHANGESET_KEY);
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw) as SelfCodeLightChangeset;
+      if (
+        !parsed ||
+        typeof parsed.repository !== 'string' ||
+        typeof parsed.branch !== 'string' ||
+        typeof parsed.baseCommitSha !== 'string' ||
+        !Array.isArray(parsed.files) ||
+        !parsed.files.every(
+          file =>
+            file &&
+            typeof file.path === 'string' &&
+            typeof file.content === 'string' &&
+            typeof file.sha256 === 'string'
+        )
+      )
+        return undefined;
+      return parsed;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // Identity of the effective light tree: manifest entries, with
+  // pending changeset contents standing in for their paths. With no
+  // changeset this equals the classic manifest hash.
+  private lightRevisionSha256(
+    manifest: SelfCodeLightManifest,
+    changeset: SelfCodeLightChangeset | undefined
+  ): string {
+    const changed = new Map(
+      (changeset?.files || []).map(file => [file.path, file.sha256])
+    );
+    return canonicalSha256(
+      manifest.files.map(file => ({
+        path: file.path,
+        sha256: changed.get(file.path) ?? file.blobSha,
+      }))
+    );
+  }
+
+  // P372: light-mode counterpart of applyCandidate. Changed files
+  // are verified against their baselines (pending changeset content
+  // for stacked edits, the manifest-commit content otherwise) and
+  // accumulated as a changeset; the full tree is never materialized.
+  async applyCandidateLight(
+    files: Array<{ path: string; baselineSha256: string; candidateContent: string }>
+  ): Promise<{ repoSha256: string }> {
+    const manifest = this.getLightManifest();
+    if (!manifest) throw new Error('SELF_CODE_SPACE_NOT_SYNCED');
+    const settings = this.getGitHubSettings();
+    if (manifest.repository !== settings.repository || manifest.branch !== settings.branch)
+      throw new Error('SELF_CODE_GITHUB_CONFIG_CHANGED_SYNC_REQUIRED');
+    const existing = this.getLightChangeset();
+    if (
+      existing &&
+      (existing.repository !== manifest.repository ||
+        existing.branch !== manifest.branch ||
+        existing.baseCommitSha !== manifest.commitSha)
+    )
+      throw new Error('SELF_CODE_BASELINE_CONFLICT:CHANGESET_BASE_MOVED');
+    const existingByPath = new Map(
+      (existing?.files || []).map(file => [file.path, file])
+    );
+    const manifestPaths = new Set(manifest.files.map(file => file.path));
+    const freshPaths: string[] = [];
+    for (const file of files) {
+      const pending = existingByPath.get(file.path);
+      if (pending) {
+        if (pending.sha256 !== file.baselineSha256)
+          throw new Error(`SELF_CODE_BASELINE_CONFLICT:${file.path}`);
+      } else {
+        if (!manifestPaths.has(file.path))
+          throw new Error(`SELF_CODE_FILE_NOT_FOUND:${file.path}`);
+        freshPaths.push(file.path);
+      }
+    }
+    if (freshPaths.length > 0) {
+      const baselines = await this.ensureFileContents(freshPaths);
+      for (const file of files) {
+        if (existingByPath.has(file.path)) continue;
+        const baseline = baselines.get(file.path);
+        if (baseline === undefined || canonicalSha256(baseline) !== file.baselineSha256)
+          throw new Error(`SELF_CODE_BASELINE_CONFLICT:${file.path}`);
+      }
+    }
+    const merged = new Map(existingByPath);
+    for (const file of files)
+      merged.set(file.path, {
+        path: file.path,
+        content: file.candidateContent,
+        sha256: canonicalSha256(file.candidateContent),
+      });
+    const changeset: SelfCodeLightChangeset = {
+      repository: manifest.repository,
+      branch: manifest.branch,
+      baseCommitSha: manifest.commitSha,
+      files: [...merged.values()].sort((a, b) => a.path.localeCompare(b.path)),
+      updatedAt: Date.now(),
+    };
+    storageService.setItem(LIGHT_CHANGESET_KEY, JSON.stringify(changeset));
+    for (const file of changeset.files)
+      this.lightContentCache.set(file.path, file.content);
+    return { repoSha256: this.lightRevisionSha256(manifest, changeset) };
+  }
+
+  // P372: compensation counterpart for applyCandidateLight, mirroring
+  // restoreSnapshot's expected-revision guard.
+  restoreLightChangeset(
+    previous: SelfCodeLightChangeset | undefined,
+    expectedCurrentRepoSha256: string
+  ): void {
+    const manifest = this.getLightManifest();
+    if (!manifest) throw new Error('SELF_CODE_SPACE_NOT_SYNCED');
+    const current = this.lightRevisionSha256(manifest, this.getLightChangeset());
+    if (current !== expectedCurrentRepoSha256)
+      throw new Error('SELF_CODE_SPACE_RESTORE_CONFLICT');
+    if (previous) storageService.setItem(LIGHT_CHANGESET_KEY, JSON.stringify(previous));
+    else storageService.removeItem(LIGHT_CHANGESET_KEY);
+    this.lightContentCache.clear();
+  }
+
+  // P372: push only the pending changeset. The server endpoint
+  // builds the new tree on top of the remote head (base_tree), so
+  // the full file set is never needed; expectedBaseCommitSha makes
+  // the server refuse with a conflict when the remote moved on.
+  private async pushLight(
+    token: string,
+    commitMessage?: string
+  ): Promise<SelfCodeSnapshot> {
+    const manifest = this.getLightManifest();
+    const changeset = this.getLightChangeset();
+    if (!manifest || !changeset) throw new Error('SELF_CODE_SPACE_NOT_SYNCED');
+    if (changeset.files.length === 0) throw new Error('SELF_CODE_SPACE_NOT_DIRTY');
+    if (!token.trim()) throw new Error('GITHUB_TOKEN_REQUIRED');
+    const settings = this.getGitHubSettings();
+    if (
+      changeset.repository !== settings.repository ||
+      changeset.branch !== settings.branch ||
+      manifest.repository !== settings.repository ||
+      manifest.branch !== settings.branch
+    )
+      throw new Error('SELF_CODE_GITHUB_CONFIG_CHANGED_SYNC_REQUIRED');
+    if (manifest.commitSha !== changeset.baseCommitSha)
+      throw new Error('SELF_CODE_BASELINE_CONFLICT:CHANGESET_BASE_MOVED');
+    const result = await apiService.pushToGitHubRepo({
+      repoUrl: settings.repository,
+      branch: settings.branch,
+      commitMessage: commitMessage?.trim() || settings.commitMessage,
+      files: changeset.files.map(file => ({ path: file.path, content: file.content })),
+      deletedPaths: [],
+      expectedBaseCommitSha: changeset.baseCommitSha,
+      githubToken: token.trim(),
+    });
+    if (!result.success) throw new Error('SELF_CODE_SPACE_PUSH_FAILED');
+    const blobByPath = new Map(
+      (result.changedFilesMeta || [])
+        .filter(meta => typeof meta.blobSha === 'string')
+        .map(meta => [meta.path, String(meta.blobSha)])
+    );
+    const nextManifest: SelfCodeLightManifest = {
+      ...manifest,
+      commitSha: result.commitSha,
+      files: manifest.files.map(file =>
+        blobByPath.has(file.path)
+          ? { path: file.path, blobSha: blobByPath.get(file.path)! }
+          : file
+      ),
+      syncedAt: Date.now(),
+    };
+    storageService.setItem(LIGHT_KEY, JSON.stringify(nextManifest));
+    storageService.removeItem(LIGHT_CHANGESET_KEY);
+    for (const file of changeset.files) this.lightContentCache.delete(file.path);
+    return {
+      repository: settings.repository,
+      branch: settings.branch,
+      repoSha256: this.lightRevisionSha256(nextManifest, undefined),
+      files: [],
+      syncedAt: Date.now(),
+      source: 'GITHUB',
+    };
+  }
+
   // P352: index-first sync. Fetch only the manifest, refresh the
   // understanding index from the contents of new/changed source
   // files, and do not retain file contents afterwards.
@@ -999,11 +1197,21 @@ class SelfCodeSpaceService {
   ): Promise<Map<string, string>> {
     const result = new Map<string, string>();
     const manifest = this.getLightManifest();
+    // P372: pending light edits are the current local state of those
+    // paths; serve them ahead of the manifest-commit contents.
+    const pendingByPath = new Map(
+      (this.getLightChangeset()?.files || []).map(file => [file.path, file.content])
+    );
     const missing: Array<{ path: string; blobSha: string }> = [];
     for (const path of paths) {
       const held = this.readFile(path);
       if (held) {
         result.set(path, held.content);
+        continue;
+      }
+      const pending = pendingByPath.get(path);
+      if (pending !== undefined) {
+        result.set(path, pending);
         continue;
       }
       const cached = this.lightContentCache.get(path);
@@ -1047,12 +1255,7 @@ class SelfCodeSpaceService {
     }
     const manifest = this.getLightManifest();
     if (manifest && manifest.files.length > 0) {
-      return canonicalSha256(
-        manifest.files.map(file => ({
-          path: file.path,
-          sha256: file.blobSha,
-        }))
-      );
+      return this.lightRevisionSha256(manifest, this.getLightChangeset());
     }
     return '';
   }
@@ -1070,7 +1273,7 @@ class SelfCodeSpaceService {
 
   async push(token:string,commitMessage?:string): Promise<SelfCodeSnapshot> {
     const snapshot=this.get();
-    if(!snapshot) throw new Error('SELF_CODE_SPACE_NOT_SYNCED');
+    if(!snapshot) return this.pushLight(token,commitMessage);
     if(!snapshot.dirty) throw new Error('SELF_CODE_SPACE_NOT_DIRTY');
     if(!token.trim()) throw new Error('GITHUB_TOKEN_REQUIRED');
     const settings=this.getGitHubSettings();
