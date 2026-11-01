@@ -2999,7 +2999,7 @@ export const additionalTypescriptCodeKnowledge: CodeKnowledgeDefinition[] = [
       constraints: ['type parameter must satisfy constraint'],
       adaptationRules: ['add constraint only when implementation requires it'],
     },
-  },,
+  },
   {
     "id": "code.typescript.indexed-access-type",
     "componentType": "CODE_CONSTRUCTION",

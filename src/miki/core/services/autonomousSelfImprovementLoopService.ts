@@ -472,9 +472,31 @@ class AutonomousSelfImprovementLoopService {
             });
         if (!this.isGenerationCurrent(generation)) return;
         if (!workflow) {
+          const orphanTask = request.taskId ? taskBlackboardService.get(request.taskId) : undefined;
+          if (orphanTask?.status === 'COMPLETED') {
+            // P369: a task that completed while this loop was waiting
+            // (evidence wait, restart) is finished work, not an
+            // orphan. Re-evaluate the evidence gate once; if it
+            // passes, record completion instead of dropping the
+            // request as not resumable.
+            const orphanQuality = evidenceQualityGateService.evaluate(orphanTask);
+            const orphanHasBusinessResult = orphanTask.entries.some(entry => {
+              if (entry.kind !== 'RESULT' || !entry.value || typeof entry.value !== 'object') return false;
+              return (entry.value as Record<string, unknown>).operationClass === 'BUSINESS';
+            });
+            if (!orphanHasBusinessResult || orphanQuality.passed) {
+              this.finishRecoverySubgoals(
+                orphanTask.taskId,
+                'RESOLVED',
+                orphanHasBusinessResult ? 'EVIDENCE_QUALITY_GATE_PASSED' : 'PARENT_TASK_COMPLETED_GATE_NOT_REQUIRED',
+                orphanQuality.evidenceIds,
+              );
+              this.completeCurrent('IMPROVEMENT_CYCLE_COMPLETED');
+              continue;
+            }
+          }
           // P366: a task that is gone or already terminal can never be
           // resumed; drop the request instead of burning attempts on it.
-          const orphanTask = request.taskId ? taskBlackboardService.get(request.taskId) : undefined;
           if (!orphanTask || orphanTask.status === 'COMPLETED' || orphanTask.status === 'FAILED' || orphanTask.status === 'CANCELLED') {
             this.dropCurrent(`BLACKBOARD_TASK_NOT_RESUMABLE:${request.taskId || ''}`);
             continue;

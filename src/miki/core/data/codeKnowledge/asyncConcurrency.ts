@@ -327,7 +327,7 @@ export const asyncConcurrencyCodeKnowledge: CodeKnowledgeDefinition[] = [
         constraints: ['Use the canonical API or architecture represented by this knowledge item.'],
         adaptationRules: ['Adapt arguments and surrounding syntax to the target project contract.'],
       },
-    },,
+    },
   {
     "id": "code.async-concurrency.debounce",
     "componentType": "CODE_CONSTRUCTION",
@@ -695,7 +695,7 @@ export const asyncConcurrencyCodeComponents: CodeComponentDefinition[] = [
     publicInterfaces: [],
     tests: "CONTRACT_TEST_SPEC:\\nknowledge=code.async-concurrency.stream-pipeline\\ninputs=['input']\\noutputs=['promise']\\nprerequisites=constructionProfile.constraints\\nimplementation_template=await pipeline({source}, {destination});",
     validation: "VALIDATION_SPEC:\\nknowledge=code.async-concurrency.stream-pipeline\\nrequiredValidation=['Use the canonical API or architecture represented by this knowledge item.']\\ndependencies=[]\\nsupportedEnvironments=['MIKI_RUNTIME','ANDROID']\\ninitialStatus=CANDIDATE\\nverificationRequired=ANALYZED,CLOUD_TESTED,DEVICE_TESTED,VERIFIED",
-  },,
+  },
   {
     "knowledgeId": "code.async-concurrency.debounce",
     "componentType": "CODE_CONSTRUCTION",

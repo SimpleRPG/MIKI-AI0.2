@@ -11614,9 +11614,9 @@
     },
     {
       "path": "src/miki/core/data/codeKnowledge/asyncConcurrency.ts",
-      "bytes": 35847,
+      "bytes": 35845,
       "lines": 753,
-      "sha256": "63bb62e0f1f6c3f53e1ef11cc7a970484f33adacecbbe2d45cf5662522860222",
+      "sha256": "651bc77795c5a0efeeb07c05cc7cf97c679baeeff49beeeded0786838d723a9f",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -11872,9 +11872,9 @@
     },
     {
       "path": "src/miki/core/data/codeKnowledge/testing.ts",
-      "bytes": 43234,
+      "bytes": 43233,
       "lines": 1676,
-      "sha256": "ef1c9639074d84b75d7728760d6097bbb79fb9072217c1709686d33021f2950d",
+      "sha256": "df9a7f30079c89df463e134dbb80ce8a90ab83e38e1d5e7a3499faa9c3cb6db7",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -11889,9 +11889,9 @@
     },
     {
       "path": "src/miki/core/data/codeKnowledge/typescript.ts",
-      "bytes": 164450,
+      "bytes": 164449,
       "lines": 4985,
-      "sha256": "7091df4b9713bf06a4059b4cbc04c4ac9a7225353641e0d6cb921eeadef1976e",
+      "sha256": "f609907509c498459d1d230c8ebfce8695e00fa8a9b41f6c47173e452dda1bbe",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12375,9 +12375,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 47803,
-      "lines": 1027,
-      "sha256": "24036a0495a03ad71b90a10b9c911a9d9c9f94aff30cd9caa99bf5b22bf564bc",
+      "bytes": 49010,
+      "lines": 1049,
+      "sha256": "73036b93ca659a643c42d18e8e2747283d6f484ebe5fd4976ed13a4a2f0a0d68",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14411,9 +14411,9 @@
     },
     {
       "path": "src/miki/core/services/domainIntegrationBootstrapService.ts",
-      "bytes": 59295,
-      "lines": 887,
-      "sha256": "fd27f112ebc49dda1d618f2c65ef3851a596d485121b4836607c92e204fb7281",
+      "bytes": 60828,
+      "lines": 903,
+      "sha256": "0d05e736256e982437f8f2f5a170ba8917826e853215bcb053fce2608d7b5fb4",
       "relativeImportCandidates": [
         {
           "line": 1,

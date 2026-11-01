@@ -859,9 +859,25 @@ if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
    const expectedHash=String(envelope.payload.candidateManifestSha256||workspace.candidateRevisionSha256);
    if(expectedHash!==workspace.candidateRevisionSha256)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
    const result=await candidateValidationRunnerService.run(workspaceId);
+   // P369: register the validation run itself as EXECUTION evidence
+   // and carry its id in the reply. Validation results used to live
+   // only in the validation runner's own store, which the evidence
+   // quality gate cannot read, so a locally completed improvement
+   // could never satisfy the gate's verified-execution path. The
+   // reply ledger binds this id to the task/plan/reply lineage; it
+   // counts as verified only when this reply succeeds.
+   const validationEvidence=EvidenceService.getInstance().recordExecutionEvidence({
+     title:`Candidate validation ${result.passed?'PASSED':'FAILED'}: ${candidateId}`,
+     snippet:JSON.stringify({workspaceId,candidateId,candidateSha256:workspace.candidateRevisionSha256,passed:result.passed,passedChecks:result.passedChecks||[],failedChecks:result.failedChecks||[],unexecutedChecks:result.unexecutedChecks||[],reasons:result.reasons}).slice(0,4000),
+     source:'candidateValidationRunnerService',
+     sourceId:String(envelope.payload.taskId||''),
+     independenceClusterId:`candidate_validation_${workspaceId}`,
+     metadata:{component_id:'candidateValidationRunnerService',passed:result.passed,environment:'application-runtime',runner:'core-domain-handler',observed_at:Date.now(),result_summary:result.passed?'Candidate validation passed':'Candidate validation failed',assertion_status:result.passed?'PASS':'FAIL'}
+   });
+   const validationEvidenceIds=[...new Set([...(result.evidenceIds||[]),validationEvidence.evidence_id])];
    if(!result.passed)return {
      accepted:false,domain,command:envelope.command,error:result.reasons.join('|')||'VALIDATION_FAILED',
-     result:{operation:'VALIDATE_CANDIDATE',operationClass:'BUSINESS',...result,candidateId,candidateHash:workspace.candidateRevisionSha256},completedAt:Date.now()
+     result:{operation:'VALIDATE_CANDIDATE',operationClass:'BUSINESS',...result,evidenceIds:validationEvidenceIds,candidateId,candidateHash:workspace.candidateRevisionSha256},completedAt:Date.now()
    };
    const validationBundleId=`VAL-${candidateId}`;
    const validationReceiptId=`PR-VAL-${candidateId}-${canonicalSha256(String(envelope.payload.operationInstanceId||'' )).slice(0,12)}`;
@@ -877,9 +893,9 @@ if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
      validationBundleId,candidateId,candidateHash:workspace.candidateRevisionSha256,
      validationStatus:result.passed?'PASSED':'FAILED',
      passedChecks:result.passedChecks||[],failedChecks:result.failedChecks||[],
-     unexecutedChecks:result.unexecutedChecks||[],evidenceIds:result.evidenceIds||[],
+     unexecutedChecks:result.unexecutedChecks||[],
      persistenceReceiptIds:[validationReceipt.receiptId],reviewEligibility:result.passed,
-     ...result});
+     ...result,evidenceIds:validationEvidenceIds});
   }
   return {accepted:false,domain,command:envelope.command,error:'DOMAIN_COMMAND_HANDLER_MISSING',completedAt:Date.now()};
  }

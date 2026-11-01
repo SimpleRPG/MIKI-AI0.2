@@ -133,7 +133,7 @@ export const additionalTestingCodeKnowledge: CodeKnowledgeDefinition[] = [
     doesNotApplyWhen: [],
     sourceUrls: ['https://vitest.dev/guide/learn/testing-in-practice'],
     sourceArtifactIds: ['vitest-failure-feedback'],
-  },,
+  },
 {
   "id": "code.testing.describe",
   "componentType": "CODE_CONSTRUCTION",
