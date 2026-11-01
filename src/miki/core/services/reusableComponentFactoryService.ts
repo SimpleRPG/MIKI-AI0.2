@@ -287,6 +287,19 @@ class ReusableComponentFactoryService{
     return this.builtInCatalogCache;
   }
 
+  // P375: health probe for the self-knowledge checks. A catalog that
+  // cannot build (for example a malformed seed entry) must be
+  // discoverable by MIKI itself instead of surfacing as an unrelated
+  // crash during generation.
+  public probeBuiltInCatalog(): { ok: boolean; count: number; error?: string } {
+    try {
+      const catalog = this.builtInCatalog();
+      return { ok: catalog.length > 0, count: catalog.length };
+    } catch (error) {
+      return { ok: false, count: 0, error: String(error instanceof Error ? error.message : error) };
+    }
+  }
+
 
   private isBuiltInShadowed(
     persisted:AnyReusableComponent,
