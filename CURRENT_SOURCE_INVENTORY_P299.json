@@ -39,9 +39,9 @@
     "trackedPathCountExcludingControlPaths": 1741,
     "sourceFileCount": 1294,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1207,
-    "relativeImportCandidateCount": 3582,
+    "relativeImportCandidateCount": 3583,
     "resolvedRelativeImportCandidateCount": 3566,
-    "unresolvedRelativeImportCandidateCount": 16
+    "unresolvedRelativeImportCandidateCount": 17
   },
   "records": [
     {
@@ -13916,9 +13916,9 @@
     },
     {
       "path": "src/miki/core/services/coreTaskIngressService.ts",
-      "bytes": 19929,
-      "lines": 161,
-      "sha256": "16be69f1dacf8869ef66b419f69db3277f5b6b6671c6420137ef8f6132797cd1",
+      "bytes": 21931,
+      "lines": 175,
+      "sha256": "8c84d096effa5f03a3cd5ba14041499c3828a949fea6a67cd079193f902f9292",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14009,11 +14009,16 @@
           "specifier": "../../research/services/causalInvestigationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/causalInvestigationService.ts"
+        },
+        {
+          "line": 16,
+          "specifier": "./outcomePredictionService",
+          "resolution": "UNRESOLVED_CANDIDATE"
         }
       ],
-      "relativeImportCandidateCount": 15,
+      "relativeImportCandidateCount": 16,
       "resolvedRelativeImportCount": 15,
-      "unresolvedRelativeImportCount": 0
+      "unresolvedRelativeImportCount": 1
     },
     {
       "path": "src/miki/core/services/coreUnifiedGraphManagerP153Service.ts",

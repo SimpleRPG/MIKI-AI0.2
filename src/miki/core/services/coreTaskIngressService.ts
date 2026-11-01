@@ -13,6 +13,7 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { cognitiveQualityService } from './cognitiveQualityService';
 import { causalMemoryLedgerService } from '../../memory/services/causalMemoryLedgerService';
 import { causalInvestigationService } from '../../research/services/causalInvestigationService';
+import { outcomePredictionService } from './outcomePredictionService';
 export type CoreTaskKind='USER_REQUEST'|'SELF_IMPROVEMENT'|'EXECUTION_EVENT'|'VERIFICATION_EVENT'|'SYSTEM_TASK';
 export interface CoreTaskIngressRequest {kind:CoreTaskKind;goal:string;source:MikiDomain|'core';payload?:Record<string,unknown>;initialPayload?:Record<string,unknown>;maxCycles?:number;}
 export type CoreConversationFinalizationResult = CoreOrchestrationResult & { finalAnswer: string; finalization?: P216FinalAnswer };
@@ -35,6 +36,10 @@ class CoreTaskIngressService {
   payload.learningOpportunities=preliminaryLearningOpportunities;
   payload.crossDomainTransferCandidates=preliminaryTransferCandidates;
   payload.cognitiveContinuity={schemaVersion:1,planKey:intentPlan.deterministicKey,intentCount:intentPlan.units.length,hypothesisCount:intentPlan.hypotheses.length,preparedAt:Date.now()};
+  // P373: record an outcome prediction BEFORE the task runs, based
+  // on observed history for the same plan. No history, no prediction.
+  const prediction=outcomePredictionService.predict({planKey:intentPlan.deterministicKey,goal:request.goal});
+  if(prediction)payload.predictionId=prediction.predictionId;
   if(request.kind==='SELF_IMPROVEMENT')payload.capabilityLedgerContext=capabilityLedgerService.buildCoreContext(request.goal);
   const result=await coreOrchestratorService.run(request.goal,request.source as MikiDomain,payload,maxCycles,signal);
   if(result.task.status==='CANCELLED')return result;
@@ -90,6 +95,15 @@ class CoreTaskIngressService {
    }
   }
   mikiUnifiedLearningContinuumService.observe({domain:request.source==='conversation'?'conversation':request.source==='research'?'research':request.kind==='SELF_IMPROVEMENT'?'code':'system',key:`task:${request.kind}:${intentPlan.deterministicKey}`,action:'core_task_outcome',input:request.goal,outcome:outcome==='SUCCESS'?'SUCCESS':outcome==='FAILURE'?'FAILURE':'UNKNOWN',verified,capabilityIds:attribution.capabilityRefs,concepts:route.map(domain=>`domain:${domain}`),lesson:`task=${task.taskId}; status=${task.status}; causal attribution remains candidate-only`});
+  // P373: resolve the pre-run prediction. A clear mismatch is the
+  // learning signal: the recorded basis for expecting this outcome
+  // was wrong, so surface it on the blackboard and in the continuum
+  // instead of letting the outcome pass as an unexamined fact.
+  const predictionResolution=outcomePredictionService.resolve(typeof payload.predictionId==='string'?payload.predictionId:undefined,outcome,task.taskId);
+  if(predictionResolution&&!predictionResolution.matched&&(outcome==='SUCCESS'||outcome==='FAILURE')){
+   taskBlackboardService.post(task.taskId,'OBSERVATION','learning','learning:predictionMismatch',{predictionId:predictionResolution.record.predictionId,planKey:intentPlan.deterministicKey,predicted:predictionResolution.record.predicted,observed:outcome,basisSamples:predictionResolution.record.basisSamples,basisSuccessRate:predictionResolution.record.basisSuccessRate,policy:'MISMATCH_MARKS_WHERE_THE_OUTCOME_MODEL_WAS_WRONG; RE-EXAMINE THE BASIS BEFORE TRUSTING THE SAME PREDICTION AGAIN'},evidenceIds);
+   mikiUnifiedLearningContinuumService.observe({domain:request.source==='conversation'?'conversation':request.source==='research'?'research':request.kind==='SELF_IMPROVEMENT'?'code':'system',key:`task:${request.kind}:${intentPlan.deterministicKey}`,action:'prediction_mismatch',input:request.goal,outcome,verified,capabilityIds:[],concepts:['learning:prediction-calibration'],lesson:`predicted ${predictionResolution.record.predicted} (basis ${predictionResolution.record.basisSamples} samples, success rate ${predictionResolution.record.basisSuccessRate}) but observed ${outcome}`});
+  }
   if(request.source==='conversation')conversationGraphRuntimeP212Service.ingestInput(result.task.taskId,request.goal);
   return result;
  }
