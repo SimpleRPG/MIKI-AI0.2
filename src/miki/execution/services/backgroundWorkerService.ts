@@ -1109,6 +1109,8 @@ export class BackgroundWorkerService {
         }
         const indexedClaimFreshness=claimDatabaseService.indexMissingFreshness(deepSleepExecuted?24:8);
         if(indexedClaimFreshness)weaknessFound.push(`[知識半減期] 旧Claim ${indexedClaimFreshness}件へ鮮度索引を段階適用`);
+        const freshnessBacklog=claimDatabaseService.freshnessBacklog();
+        if(freshnessBacklog.missing>0)weaknessFound.push(`[知識半減期] 鮮度索引の未適用が ${freshnessBacklog.missing}/${freshnessBacklog.candidates} 件滞留`);
         const due = knowledgeHalfLifeService.due(deepSleepExecuted ? 20 : 8);
         let staleClaimGapCount=0;
         for(const record of due.filter(item=>item.key.startsWith('claim:')).slice(0,deepSleepExecuted?12:4)){

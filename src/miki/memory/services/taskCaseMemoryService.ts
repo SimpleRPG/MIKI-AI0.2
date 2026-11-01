@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { failureMemoryService } from './failureMemoryService';
 import { componentVersionHistoryService } from '../../capability/services/componentVersionHistoryService';
+import { experienceFreshnessService } from '../../experience/services/experienceFreshnessService';
 import { systemLogger } from '../../../services/systemLogger';
 
 export type TaskCaseOutcome = 'SUCCESS'|'FAILURE';
@@ -116,7 +117,10 @@ export class TaskCaseMemoryService {
   }
   public list(){return [...this.records];}
   private match(goal:string,n:string){const g=goal.toLowerCase();return g===n||g.includes(n)||n.includes(g);}
-  private score(r:TaskCaseRecord){return (r.maturity==='STABLE'?300:200)+Math.min(50,r.evidence_event_ids.length*5);}
+  // P363: apply the existing freshness coefficient (30-day half-life)
+  // so an old success case no longer ranks equal to a current one.
+  // Fresh cases keep the full base score; fully stale ones keep half.
+  private score(r:TaskCaseRecord){const base=(r.maturity==='STABLE'?300:200)+Math.min(50,r.evidence_event_ids.length*5);const freshness=experienceFreshnessService.evaluate(r.updated_at).freshness_score/100;return base*(0.5+0.5*freshness);}
   private same(a:string[],b:string[]){return a.length===b.length&&a.every((x,i)=>x===b[i]);}
   private upsert(input:Omit<TaskCaseRecord,'case_id'|'created_at'|'updated_at'>){const now=Date.now();const existing=this.records.find(r=>r.task_id===input.task_id&&r.outcome===input.outcome&&this.same(r.component_ids,input.component_ids));if(existing){existing.evidence_event_ids=Array.from(new Set([...existing.evidence_event_ids,...input.evidence_event_ids]));existing.maturity=input.maturity==='STABLE'||existing.maturity==='STABLE'?'STABLE':input.maturity;existing.output_summary=input.output_summary||existing.output_summary;existing.error_message=input.error_message||existing.error_message;existing.updated_at=now;this.save();return existing;}const r={...input,case_id:`CASE-${this.hash(`${input.task_id}|${input.outcome}|${input.evidence_event_ids.join(',')}`)}`,created_at:now,updated_at:now};this.records.unshift(r);this.records=this.records.slice(0,2000);this.save();return r;}
   private load(){try{const raw=storageService.getItem(this.storageKey);if(raw)this.records=JSON.parse(raw);}catch{this.records=[];}}

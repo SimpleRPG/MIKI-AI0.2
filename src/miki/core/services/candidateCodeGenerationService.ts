@@ -6,6 +6,7 @@ import { storageService } from '../../../services/storageService';
 import { canonicalSha256 } from './canonicalSha256Service';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
 import { failureCatalogService } from '../../memory/services/failureCatalogService';
+import { systemLogger } from '../../../services/systemLogger';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { candidateUnknownResolutionService } from './candidateUnknownResolutionService';
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
@@ -1288,7 +1289,12 @@ class CandidateCodeGenerationService {
 
  }
  private findDuplicateExports(files:CandidateGenerationFile[]):string[]{
-  const snapshot=selfCodeUnderstandingService.getSnapshot();if(!snapshot)return [];
+  const snapshot=selfCodeUnderstandingService.getSnapshot();
+  if(!snapshot){systemLogger.warn('SELF_IMPROVEMENT','[重複検知] 理解索引が無いため重複チェックをスキップしました（無効化を無言にしない）');return [];}
+  const manifestCommit=selfCodeSpaceService.getLightManifest()?.commitSha;
+  if(snapshot.sourceCommitSha&&manifestCommit&&snapshot.sourceCommitSha!==manifestCommit){
+    systemLogger.warn('SELF_IMPROVEMENT',`[重複検知] 索引の生成元コミット (${snapshot.sourceCommitSha.slice(0,8)}) が現在のマニフェスト (${manifestCommit.slice(0,8)}) と異なります。古い索引で重複チェックを行います`);
+  }
   const owners=new Map<string,string>();
   for(const entry of snapshot.entries)for(const name of entry.exports){if(!owners.has(name))owners.set(name,entry.path);}
   const duplicates:string[]=[];

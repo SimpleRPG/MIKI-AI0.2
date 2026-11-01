@@ -629,6 +629,16 @@ export class ClaimDatabaseService {
    * 旧バージョンから永続化されているClaimへも鮮度ポリシーを段階適用する。
    * 一回の監査で全件を走査せず、未分類のREAL Claimだけを上限付きで索引化する。
    */
+  /** P363: 鮮度索引の滞留量（可視化専用。処理は indexMissingFreshness の上限付き方式のまま）。 */
+  public freshnessBacklog(): { candidates: number; indexed: number; missing: number } {
+    const candidates = Array.from(this.claims.values()).filter(claim => claim.world === 'REAL' && !['FALSE', 'SUPERSEDED', 'CONTEXT_ONLY'].includes(claim.status));
+    let missing = 0;
+    for (const claim of candidates) {
+      if (!knowledgeHalfLifeService.get(`claim:${claim.claim_id}`)) missing++;
+    }
+    return { candidates: candidates.length, indexed: candidates.length - missing, missing };
+  }
+
   public indexMissingFreshness(limit=24):number {
     // Reclassify a bounded, round-robin slice. This migrates prior FIXED/10-year records
     // created by older policy revisions as well as records with no freshness entry, without

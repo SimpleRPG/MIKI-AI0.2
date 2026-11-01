@@ -50,6 +50,10 @@ export interface CodeUnderstandingEntry {
   relations:CodeRelationRecord[];
   literalContracts:CodeLiteralContract[];
   parseDiagnostics:string[];
+  // P363: one-line role extracted deterministically from the file's
+  // leading comment (never generated). Lets consumers reason about
+  // what a file is for, not only what it exports.
+  role?:string;
 }
 
 export interface CodeUnderstandingSnapshot {
@@ -60,6 +64,9 @@ export interface CodeUnderstandingSnapshot {
   createdAt:number;
   updatedAt:number;
   targetFingerprints:Record<string,string>;
+  // P363: which commit this index was built from, so consumers can
+  // tell a current index from a silently stale one.
+  sourceCommitSha?:string;
 }
 
 export type ImpactScope='MUST_CHANGE'|'MUST_INSPECT'|'CONTRACT_DEPENDENCY'|'TEST_ONLY'|'POSSIBLY_RELATED';
@@ -272,8 +279,33 @@ class SelfCodeUnderstandingService {
       path:f.path,contentHash:f.contentHash,
       imports:[...new Set(imports)],importedBy:[],exports:[...new Set(exports)],
       symbols,relations:this.uniqueRelations(relations),
-      literalContracts:this.uniqueLiterals(literalContracts),parseDiagnostics
+      literalContracts:this.uniqueLiterals(literalContracts),parseDiagnostics,
+      role:this.extractRole(f.content)
     };
+  }
+
+  /** P363: extract a one-line role from the file's leading comment. */
+  private extractRole(content:string):string|undefined{
+    const head=content.slice(0,4000);
+    const block=head.match(/\/\*\*?([\s\S]*?)\*\//);
+    if(block){
+      for(const rawLine of block[1].split('\n')){
+        const line=rawLine.replace(/^\s*\*\s?/,'').trim();
+        if(line&&!line.startsWith('@'))return line.slice(0,120);
+      }
+    }
+    const lines=head.split('\n');
+    for(const rawLine of lines){
+      const line=rawLine.trim();
+      if(!line)continue;
+      if(line.startsWith('//')){
+        const text=line.replace(/^\/\/\s?/,'').trim();
+        if(text&&!text.startsWith('@'))return text.slice(0,120);
+        continue;
+      }
+      break;
+    }
+    return undefined;
   }
 
   private uniqueRelations(relations:CodeRelationRecord[]):CodeRelationRecord[]{
@@ -301,6 +333,13 @@ class SelfCodeUnderstandingService {
   }
 
   public getSnapshot():CodeUnderstandingSnapshot|undefined{try{const raw=storageService.getItem(KEY);if(!raw)return undefined;const parsed=JSON.parse(raw) as CodeUnderstandingSnapshot;return parsed?.schemaVersion===2?parsed:undefined;}catch{return undefined;}}
+
+  /** P363: record which commit the stored index was built from. */
+  public stampSourceCommit(commitSha:string):void{
+    if(!commitSha)return;
+    const snapshot=this.getSnapshot();if(!snapshot||snapshot.sourceCommitSha===commitSha)return;
+    try{storageService.setItem(KEY,JSON.stringify({...snapshot,sourceCommitSha:commitSha,updatedAt:Date.now()}));}catch{}
+  }
 
   public exportsOf(path:string,content:string):string[]{return this.parse({path,content,contentHash:''}).exports;}
 
@@ -412,7 +451,8 @@ class SelfCodeUnderstandingService {
       }))),
       entries:[...entries.values()].sort((a,b)=>a.path.localeCompare(b.path)),
       createdAt:previous?.createdAt||now,updatedAt:now,
-      targetFingerprints:{...(previous?.targetFingerprints||{}),[key]:fingerprint}
+      targetFingerprints:{...(previous?.targetFingerprints||{}),[key]:fingerprint},
+      sourceCommitSha:previous?.sourceCommitSha
     };
     const targetFingerprintChanged=previous?.targetFingerprints?.[key]!==fingerprint;
     const snapshotChanged=previous?.snapshotSha256!==snapshot.snapshotSha256;

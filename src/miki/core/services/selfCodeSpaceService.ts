@@ -814,6 +814,8 @@ class SelfCodeSpaceService {
           './selfCodeUnderstandingService'
         );
         selfCodeUnderstandingService.ensure([], this.listSourceFiles());
+        const manifestCommit = this.getLightManifest()?.commitSha;
+        if (manifestCommit) selfCodeUnderstandingService.stampSourceCommit(manifestCommit);
       } catch {
         // Background indexing is best-effort.
       } finally {
@@ -955,6 +957,7 @@ class SelfCodeSpaceService {
     }
 
     selfCodeUnderstandingService.ensure([], sourceFiles);
+    selfCodeUnderstandingService.stampSourceCommit(String(data.commitSha));
 
     const lightManifest: SelfCodeLightManifest = {
       repository: settings.repository,
