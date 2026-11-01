@@ -10,6 +10,7 @@ import { mikiUnifiedLearningContinuumService } from '../../learning/services/mik
 import { canonicalSha256Object } from './canonicalSha256Service';
 import { claimEvidenceService } from '../../research/services/claimEvidenceService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { evidenceService } from '../../memory/services/evidenceService';
 import { cognitiveQualityService } from './cognitiveQualityService';
 import { causalMemoryLedgerService } from '../../memory/services/causalMemoryLedgerService';
 import { causalInvestigationService } from '../../research/services/causalInvestigationService';
@@ -179,6 +180,24 @@ class CoreTaskIngressService {
    const clarificationEntry=[...(taskBefore?.entries||[])].reverse().find(entry=>entry.key==='decision:informationGainClarification');
    const selectedQuestion=(clarificationEntry?.value as {selected?:{question?:string}}|undefined)?.selected?.question;
    if(typeof selectedQuestion==='string'&&selectedQuestion.trim())finalResponse=`確認させてください。${selectedQuestion}`;
+  }
+  // P392: disclose the answer's footing in the answer itself. When
+  // the answer's sentences trace back to web evidence, the reader
+  // should be able to see how much that footing is worth: evidence
+  // from a single independence cluster means the content rests on
+  // one source and is unconfirmed anywhere else; two or more
+  // clusters earn a compact source line. Answers with no web
+  // evidence behind them (internal knowledge, plain conversation)
+  // are left untouched, and only validated answers are annotated.
+  if(answerValidationPassed){
+   const webById=new Map(evidenceService.list().filter(record=>record.kind==='WEB'&&record.status!=='REJECTED').map(record=>[record.evidence_id,record]));
+   const used=[...new Set(claimTrace.flatMap(item=>item.candidateEvidenceIds))].flatMap(id=>{const record=webById.get(id);return record?[record]:[]});
+   if(used.length){
+    const clusters=new Set(used.map(record=>record.independence_cluster_id));
+    const hosts=[...new Set(used.map(record=>{try{return record.url?new URL(record.url).host:''}catch{return ''}}).filter(Boolean))];
+    if(clusters.size===1)finalResponse+=`\n\n※この回答の情報は、1つの情報源${hosts.length===1?`（${hosts[0]}）`:''}だけに基づいています。他の情報源では確認できていません。`;
+    else finalResponse+=`\n\n出典：${(hosts.length?hosts:used.map(record=>record.source)).slice(0,3).join('、')}`;
+   }
   }
   const result=coreOrchestratorService.finalizeConversationResponse(taskId,finalResponse,{passed:answerValidationPassed,failedReasons:[...new Set(failedReasons)]});
   if(!result)failedReasons.push('CORE_FINALIZATION_RESULT_MISSING');

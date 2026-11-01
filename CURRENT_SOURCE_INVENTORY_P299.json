@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1748,
     "sourceFileCount": 1301,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1214,
-    "relativeImportCandidateCount": 3623,
-    "resolvedRelativeImportCandidateCount": 3607,
+    "relativeImportCandidateCount": 3624,
+    "resolvedRelativeImportCandidateCount": 3608,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -14016,9 +14016,9 @@
     },
     {
       "path": "src/miki/core/services/coreTaskIngressService.ts",
-      "bytes": 24215,
-      "lines": 203,
-      "sha256": "856a176a9ecf76ee2c67deb097512379cbb96980a15a47364635275478cbbd56",
+      "bytes": 25732,
+      "lines": 222,
+      "sha256": "f4086144c28f492fa8dd625d51576c081da0f8a6dbb558d039015cc02efb6e95",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14094,37 +14094,43 @@
         },
         {
           "line": 13,
+          "specifier": "../../memory/services/evidenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/evidenceService.ts"
+        },
+        {
+          "line": 14,
           "specifier": "./cognitiveQualityService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/cognitiveQualityService.ts"
         },
         {
-          "line": 14,
+          "line": 15,
           "specifier": "../../memory/services/causalMemoryLedgerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/causalMemoryLedgerService.ts"
         },
         {
-          "line": 15,
+          "line": 16,
           "specifier": "../../research/services/causalInvestigationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/causalInvestigationService.ts"
         },
         {
-          "line": 16,
+          "line": 17,
           "specifier": "./outcomePredictionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/outcomePredictionService.ts"
         },
         {
-          "line": 17,
+          "line": 18,
           "specifier": "../../conversation/services/conversationPragmaticsService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationPragmaticsService.ts"
         }
       ],
-      "relativeImportCandidateCount": 17,
-      "resolvedRelativeImportCount": 17,
+      "relativeImportCandidateCount": 18,
+      "resolvedRelativeImportCount": 18,
       "unresolvedRelativeImportCount": 0
     },
     {
