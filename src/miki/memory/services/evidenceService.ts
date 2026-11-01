@@ -65,6 +65,7 @@ research_source_role_target?: "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"
     research_source_author?: string;
     research_source_category?: string;
     research_source_metadata?: string;
+    source_page_graph_id?: string;
   };
 }
 

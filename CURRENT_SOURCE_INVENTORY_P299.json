@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1747,
-    "sourceFileCount": 1300,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1213,
-    "relativeImportCandidateCount": 3612,
-    "resolvedRelativeImportCandidateCount": 3596,
+    "trackedPathCountExcludingControlPaths": 1748,
+    "sourceFileCount": 1301,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1214,
+    "relativeImportCandidateCount": 3620,
+    "resolvedRelativeImportCandidateCount": 3604,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -22620,9 +22620,9 @@
     },
     {
       "path": "src/miki/memory/services/evidenceService.ts",
-      "bytes": 16224,
-      "lines": 471,
-      "sha256": "824d7478661569457a1947298bcdff0aaa47859614d002fe2a00f5d9baa9eebe",
+      "bytes": 16259,
+      "lines": 472,
+      "sha256": "91f598cd1a79cd46a0941617fd72ee75cf3b8086e7bad9ff332a8501da0a96ab",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24357,9 +24357,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 41050,
-      "lines": 850,
-      "sha256": "f558e1fc79a55aab2fcf72ac4a441e00382bfd9d2ff00f0bb7bb05e684fb6532",
+      "bytes": 44009,
+      "lines": 898,
+      "sha256": "c2b4c9f2ffc79ce50dd9cf568119274fd6c9c1916cfe3160519519b375b98a42",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24411,49 +24411,67 @@
         },
         {
           "line": 9,
+          "specifier": "./sourcePageGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/sourcePageGraphService.ts"
+        },
+        {
+          "line": 10,
+          "specifier": "./japaneseAnalysisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
+        },
+        {
+          "line": 11,
+          "specifier": "../../conversation/services/japaneseAnalysisCompositionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/japaneseAnalysisCompositionService.ts"
+        },
+        {
+          "line": 12,
           "specifier": "./researchQueryPlanningService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchQueryPlanningService.ts"
         },
         {
-          "line": 10,
+          "line": 13,
           "specifier": "../../core/services/collectionSourceRegistryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/collectionSourceRegistryService.ts"
         },
         {
-          "line": 11,
+          "line": 14,
           "specifier": "../../verification/services/verifierService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verifierService.ts"
         },
         {
-          "line": 12,
+          "line": 15,
           "specifier": "./researchQueryOutcomeLearningService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchQueryOutcomeLearningService.ts"
         },
         {
-          "line": 13,
+          "line": 16,
           "specifier": "./webResearchPolicyService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webResearchPolicyService.ts"
         },
         {
-          "line": 14,
+          "line": 17,
           "specifier": "../../memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         },
         {
-          "line": 18,
+          "line": 21,
           "specifier": "./webMaterialPatternExtractor",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webMaterialPatternExtractor.ts"
         }
       ],
-      "relativeImportCandidateCount": 15,
-      "resolvedRelativeImportCount": 15,
+      "relativeImportCandidateCount": 18,
+      "resolvedRelativeImportCount": 18,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -24588,6 +24606,47 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/research/services/sourcePageGraphService.ts",
+      "bytes": 10302,
+      "lines": 277,
+      "sha256": "1448a84e24499e5edeb7bf8804dbee30312e82353ec012e1ddd15e230c91ddde",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "./japaneseAnalysisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
+        },
+        {
+          "line": 5,
+          "specifier": "../../conversation/services/japaneseAnalysisCompositionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/japaneseAnalysisCompositionService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 5,
+      "resolvedRelativeImportCount": 5,
       "unresolvedRelativeImportCount": 0
     },
     {

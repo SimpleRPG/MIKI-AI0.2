@@ -6,6 +6,9 @@ import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/service
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { webTermLearningService } from './webTermLearningService';
 import { webContentUnderstandingService } from './webContentUnderstandingService';
+import { sourcePageGraphService } from './sourcePageGraphService';
+import { contentTermsFromTokens } from './japaneseAnalysisService';
+import { japaneseAnalysisCompositionService } from '../../conversation/services/japaneseAnalysisCompositionService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
 import { collectionSourceRegistryService } from '../../core/services/collectionSourceRegistryService';
 import type { VerificationResult } from '../../verification/services/verifierService';
@@ -319,6 +322,20 @@ export class ResearchService {
         );
       }
 
+      // P388: statements already modeled in source page graphs are
+      // recalled before any new search, so a known source is
+      // traversed instead of re-searched from zero. Recalled
+      // statements become claims on their original page evidence.
+      try {
+        const recallTerms = contentTermsFromTokens(japaneseAnalysisCompositionService.analyzeSync(baseQuery).analysis?.tokens ?? []);
+        for (const hit of sourcePageGraphService.searchStatements(recallTerms, 4)) {
+          if (!hit.graph.evidenceId) continue;
+          const recalledClaimId = this.linkResearchEvidenceToClaim(hit.graph.evidenceId, hit.statement.text, claimIdByNormalizedStatement, true);
+          if (recalledClaimId && !claimIds.includes(recalledClaimId)) claimIds.push(recalledClaimId);
+          if (recalledClaimId && !localClaimIds.includes(recalledClaimId)) localClaimIds.push(recalledClaimId);
+        }
+      } catch { /* graph recall is an addition, never a blocker */ }
+
       // LOCALだけで終了しない。
       // LOCAL knowledgeを現在のWeb evidenceで補強・更新・反証する。
       // 自動検索判定がfalseでもKnowledge Gapとして明示的に登録された調査は、
@@ -408,6 +425,16 @@ export class ResearchService {
                 ? 'duckduckgo'
                 : 'headless_webview';
           const content = page.text.trim().slice(0, 12000);
+          // P388: model the whole page (not only its head) as a
+          // per-source graph before recording evidence, so claims
+          // can come from anywhere in the page and the page stays
+          // traversable for later research on the same source.
+          const pageGraphBuild = sourcePageGraphService.buildFromPage({
+            url: page.url,
+            title: page.result.title,
+            text: page.text,
+            questionTerms: queryPlan.status === "READY" ? (queryPlan.queries[pass]?.termsIncluded || []) : [],
+          });
           const pageEvidence = evidenceService.recordWebEvidence({
             title: `${page.result.title} [本文読取]`,
             snippet: content,
@@ -433,11 +460,32 @@ export class ResearchService {
               research_source_author: String((page.result as any).author || ""),
               research_source_category: String((page.result as any).category || ""),
               research_source_metadata: String((page.result as any).metadata || ""),
+              source_page_graph_id: pageGraphBuild.graph.pageId,
             },
           });
           evidence.push(pageEvidence);
 
           if (pageEvidence.status === 'REJECTED') continue;
+
+          sourcePageGraphService.attachEvidenceId(pageGraphBuild.graph.pageId, pageEvidence.evidence_id);
+
+          // P388: statements the page makes anywhere in its text
+          // (not only inside the head slice) become claims on this
+          // page's evidence when they speak to the research question.
+          {
+            const normalizedFullText = this.normalizeClaimStatement(page.text);
+            let graphClaims = 0;
+            for (const relevant of pageGraphBuild.relevantStatements) {
+              if (graphClaims >= 4) break;
+              const normalizedStatement = this.normalizeClaimStatement(relevant.text);
+              if (normalizedStatement.length < 15 || !normalizedFullText.includes(normalizedStatement)) continue;
+              const graphClaimId = this.linkResearchEvidenceToClaim(pageEvidence.evidence_id, relevant.text, claimIdByNormalizedStatement, !isCounterEvidencePass);
+              if (graphClaimId) {
+                if (!claimIds.includes(graphClaimId)) claimIds.push(graphClaimId);
+                graphClaims += 1;
+              }
+            }
+          }
 
           // Understand page content independently from the search-result snippet.
           // Every accepted sentence is checked against the fetched page before its
