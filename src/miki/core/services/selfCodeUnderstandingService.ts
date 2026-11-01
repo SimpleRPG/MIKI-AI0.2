@@ -304,6 +304,16 @@ class SelfCodeUnderstandingService {
 
   public exportsOf(path:string,content:string):string[]{return this.parse({path,content,contentHash:''}).exports;}
 
+  // P353: the STATIC validation stage, identical to the server-side
+  // check (typescript.transpileModule error diagnostics).
+  public staticDiagnostics(path:string,content:string):Array<{code:number;path:string;message:string}>{
+    if(!/\.(ts|tsx)$/.test(path))return [];
+    const result=ts.transpileModule(content,{compilerOptions:{target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX},reportDiagnostics:true,fileName:path});
+    return (result.diagnostics||[])
+      .filter(d=>d.category===ts.DiagnosticCategory.Error)
+      .map(d=>({code:d.code,path,message:ts.flattenDiagnosticMessageText(d.messageText,'\n')}));
+  }
+
   ensure(targetPaths:string[],sourceFiles?:Array<{path:string;content:string;contentHash:string}>):CodeUnderstandingResult {
     const files=(sourceFiles||selfCodeSpaceService.listSourceFiles()).filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
     const empty:CodeUnderstandingResult={ready:false,reused:false,repoSha256:'',targetPaths,relatedPaths:[],reasons:[],symbolIds:[],executionRelations:[],contractValues:[],executionPaths:[],impactScopes:[],unresolvedEdges:[]};

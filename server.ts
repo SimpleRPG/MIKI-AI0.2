@@ -1241,11 +1241,49 @@ app.post('/api/candidate-validation/run', async (req, res) => {
       ? req.body.acceptanceCriterionIds.filter((value:any)=>typeof value === 'string' && value.trim())
       : [];
 
-    if (!req.body?.workspaceId || !req.body?.candidateSha256 || sourceFiles.length === 0 || candidateFiles.length === 0) {
+    // P353: in index-first mode the client holds no file contents.
+    // Materialize the source tree from the commit archive instead of
+    // receiving every file from the client.
+    let effectiveSourceFiles = sourceFiles;
+    if (effectiveSourceFiles.length === 0 && req.body?.sourceCommitSha && req.body?.repoUrl) {
+      try {
+        const repoMatch = String(req.body.repoUrl)
+          .replace(/^https?:\/\/github\.com\//i, '')
+          .replace(/\.git$/i, '')
+          .replace(/\/+$/g, '')
+          .split('/');
+        const archiveHeaders: Record<string, string> = {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'MIKI-AI0.2',
+        };
+        const archiveToken = req.body?.githubToken || req.body?.token;
+        if (archiveToken) archiveHeaders.Authorization = `Bearer ${archiveToken}`;
+        const archiveEntries = await getRepoArchiveEntries(
+          repoMatch[0],
+          repoMatch[1],
+          String(req.body.sourceCommitSha),
+          archiveHeaders
+        );
+        const binaryPattern = /\.(png|jpe?g|gif|ico|webp|bmp|woff2?|ttf|eot|zip|gz|pdf|mp4|mp3|wav|ogg|webm|wasm|node|dll|exe|bin)$/i;
+        const materialized: any[] = [];
+        for (const [entryPath, entry] of archiveEntries) {
+          if (binaryPattern.test(entryPath)) continue;
+          materialized.push({
+            path: entryPath,
+            content: await entry.async('string'),
+          });
+        }
+        effectiveSourceFiles = materialized;
+      } catch {
+        effectiveSourceFiles = [];
+      }
+    }
+
+    if (!req.body?.workspaceId || !req.body?.candidateSha256 || effectiveSourceFiles.length === 0 || candidateFiles.length === 0) {
       return res.status(400).json({error:'VALIDATION_INPUT_INCOMPLETE'});
     }
 
-    for (const file of sourceFiles) {
+    for (const file of effectiveSourceFiles) {
       const relative = safePath(file.path);
       if (sourceContentByPath.has(relative)) throw new Error(`DUPLICATE_SOURCE_PATH:${relative}`);
       const content = String(file.content || '');

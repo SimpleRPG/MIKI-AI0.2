@@ -4,6 +4,7 @@ import { isolatedCandidateWorkspaceService } from './isolatedCandidateWorkspaceS
 import { candidateValidationEvidenceService, type ValidationStage } from './candidateValidationEvidenceService';
 import { shadowEvaluationService } from './shadowEvaluationService';
 import { executionEnvironmentRouterService } from './executionEnvironmentRouterService';
+import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { candidateWriteGuardService } from './candidateWriteGuardService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import { deterministicDiagnosticRepairService, type DiagnosticRepairPlan, type TypeScriptDiagnosticInput } from '../../selfDevelopment/services/deterministicDiagnosticRepairService';
@@ -30,11 +31,24 @@ class CandidateValidationRunnerService {
   const testIntents=contractField?contractTestIntentService.create(contractField,contractCondition):[];
   const executionRoutes=['STATIC','TYPECHECK','REGRESSION','COUNTEREXAMPLE','GENERALIZATION','PERSISTENCE','DEVICE'].map(stage=>executionEnvironmentRouterService.route(stage));
   if(executionRoutes.some(route=>route.environment==='MANUAL_REVIEW'))return this.rollbackFailure(workspaceId,workspace.writeGuardId,['VALIDATION_EXECUTION_ENVIRONMENT_MISSING']);
-  const validationCacheKey=canonicalSha256({candidateSha256,sourceSnapshot:sourceFiles.map(file=>({path:file.path,contentHash:file.contentHash})),validationPlan:validationPlan||null,validationRequirements,testCommands,acceptanceCriterionIds,testIntents});
+  const lightManifest=selfCodeSpaceService.getLightManifest();
+  const isLightMode=sourceFiles.length===0&&Boolean(lightManifest);
+  // P353: STATIC is a deterministic local check (P350 hierarchy).
+  // Run it on the client first; a failure rejects the candidate
+  // without a server round trip, and the evidence is recorded here.
+  const staticStartedAt=Date.now();
+  const localDiagnostics=workspace.files.flatMap(file=>selfCodeUnderstandingService.staticDiagnostics(file.path,file.candidateContent));
+  candidateValidationEvidenceService.record({workspaceId,candidateSha256,stage:'STATIC',passed:localDiagnostics.length===0,command:'typescript.transpileModule (local)',exitCode:localDiagnostics.length===0?0:1,startedAt:staticStartedAt,completedAt:Date.now(),logRef:localDiagnostics.map(d=>`${d.path}:${d.code}:${d.message}`).join('\n').slice(-12000)||'PASS'});
+  if(localDiagnostics.length>0){
+   const repairPlans=localDiagnostics.map(item=>deterministicDiagnosticRepairService.plan(item));
+   const failed=this.rollbackFailure(workspaceId,workspace.writeGuardId,['FAILED_STATIC',...localDiagnostics.map(d=>`${d.path}:${d.code}:${d.message}`)]);
+   return {...failed,repairPlans,testIntents,retryRecommended:repairPlans.some(plan=>plan.accepted)};
+  }
+  const validationCacheKey=canonicalSha256({candidateSha256,sourceSnapshot:isLightMode?selfCodeSpaceService.getSourceSnapshotSha256():sourceFiles.map(file=>({path:file.path,contentHash:file.contentHash})),validationPlan:validationPlan||null,validationRequirements,testCommands,acceptanceCriterionIds,testIntents});
   let body:any=candidateValidationResultCacheService.get(validationCacheKey);
   if(!body){
     let response:Response;
-    try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles,validationRequirements,contractTestIntents:testIntents,testCommands,acceptanceCriterionIds,candidateFiles:workspace.files.map(file=>({path:file.path,isNewFile:file.isNewFile,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
+    try{response=await fetch(apiUrl('/api/candidate-validation/run'),{method:'POST',headers:getCustomApiHeaders(),body:JSON.stringify({workspaceId,candidateSha256,sourceFiles,validationRequirements,contractTestIntents:testIntents,testCommands,acceptanceCriterionIds,sourceCommitSha:isLightMode?lightManifest!.commitSha:undefined,repoUrl:isLightMode?`https://github.com/${lightManifest!.repository}`:undefined,githubToken:isLightMode?(selfCodeSpaceService.getGitHubPat()||undefined):undefined,candidateFiles:workspace.files.map(file=>({path:file.path,isNewFile:file.isNewFile,baselineContent:file.baselineContent,candidateContent:file.candidateContent,baselineSha256:file.baselineSha256,candidateSha256:file.candidateSha256}))})});}
     catch(error){return this.rollbackFailure(workspaceId,workspace.writeGuardId,[error instanceof Error?`VALIDATION_REQUEST_FAILED:${error.message}`:'VALIDATION_REQUEST_FAILED']);}
     if(!response.ok)return this.rollbackFailure(workspaceId,workspace.writeGuardId,[`VALIDATION_HTTP_${response.status}`]);
     body=await response.json() as Record<string,any>;

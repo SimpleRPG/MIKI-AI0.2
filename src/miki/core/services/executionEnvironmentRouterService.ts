@@ -1,7 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { canonicalSha256Object } from './canonicalSha256Service';
 
-export type CiExecutionEnvironment='DEVICE'|'SERVER'|'GITHUB_ACTIONS'|'MANUAL_REVIEW';
+export type CiExecutionEnvironment='LOCAL'|'DEVICE'|'SERVER'|'GITHUB_ACTIONS'|'MANUAL_REVIEW';
 export interface EnvironmentRoute { stage:string; environment:CiExecutionEnvironment; reason:string; }
 
 export interface EnvironmentFingerprint {
@@ -27,8 +27,9 @@ const text=(value:unknown):string => typeof value==='string' ? value.trim() : va
 class ExecutionEnvironmentRouterService {
   route(stage:string):EnvironmentRoute {
     const normalized=stage.toUpperCase();
+    if(normalized==='STATIC')return {stage,environment:'LOCAL',reason:'DETERMINISTIC_LOCAL_CHECK'};
     if(normalized==='DEVICE')return {stage,environment:'GITHUB_ACTIONS',reason:'APK_AND_ANDROID_CONTRACT'};
-    if(['STATIC','TYPECHECK','REGRESSION','COUNTEREXAMPLE','GENERALIZATION','PERSISTENCE'].includes(normalized))return {stage,environment:'SERVER',reason:'ISOLATED_NODE_RUNNER'};
+    if(['TYPECHECK','REGRESSION','COUNTEREXAMPLE','GENERALIZATION','PERSISTENCE'].includes(normalized))return {stage,environment:'SERVER',reason:'ISOLATED_NODE_RUNNER'};
     return {stage,environment:'MANUAL_REVIEW',reason:'NO_VERIFIED_RUNNER'};
   }
 
