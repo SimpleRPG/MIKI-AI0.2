@@ -36,12 +36,12 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1741,
-    "sourceFileCount": 1294,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1207,
-    "relativeImportCandidateCount": 3583,
-    "resolvedRelativeImportCandidateCount": 3566,
-    "unresolvedRelativeImportCandidateCount": 17
+    "trackedPathCountExcludingControlPaths": 1742,
+    "sourceFileCount": 1295,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1208,
+    "relativeImportCandidateCount": 3585,
+    "resolvedRelativeImportCandidateCount": 3569,
+    "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
     {
@@ -14013,12 +14013,13 @@
         {
           "line": 16,
           "specifier": "./outcomePredictionService",
-          "resolution": "UNRESOLVED_CANDIDATE"
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/outcomePredictionService.ts"
         }
       ],
       "relativeImportCandidateCount": 16,
-      "resolvedRelativeImportCount": 15,
-      "unresolvedRelativeImportCount": 1
+      "resolvedRelativeImportCount": 16,
+      "unresolvedRelativeImportCount": 0
     },
     {
       "path": "src/miki/core/services/coreUnifiedGraphManagerP153Service.ts",
@@ -16313,6 +16314,29 @@
       ],
       "relativeImportCandidateCount": 3,
       "resolvedRelativeImportCount": 3,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/services/outcomePredictionService.ts",
+      "bytes": 4270,
+      "lines": 127,
+      "sha256": "418fad2e5220b4c94e31f0dbb083a64bfd182e59476fb52242ddffd6e8d70af2",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "./canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
