@@ -14,6 +14,17 @@ import {
 import { SKELETON_VARIATIONS_DATA } from '../../data/skeletonVariationData';
 import { AnswerSkeletonType, MultiAxisPersonaConfig } from '../../../types';
 import { responseSurfacePolicyService } from '../../strategy/services/responseSurfacePolicyService';
+import { storageService } from '../../../services/storageService';
+
+// P393: grown variations are the product of the variation growth
+// cycles (mutations, web material, teacher material — all verified
+// before promotion). They used to live only in memory, so every
+// restart returned the surface pools to their initial size and the
+// growth never accumulated. They are now persisted like other
+// learned state, with caps so the store stays bounded.
+const DYNAMIC_VARIATIONS_KEY = 'miki_dynamic_surface_variations_v1';
+const MAX_DYNAMIC_PER_CATEGORY = 60;
+const MAX_DYNAMIC_TOTAL = 600;
 
 export class RecentUsageCache {
   private static instance: RecentUsageCache;
@@ -127,6 +138,28 @@ export class SurfaceVariationService {
 
   constructor() {
     this.cache = RecentUsageCache.getInstance();
+    this.loadDynamicVariations();
+  }
+
+  private loadDynamicVariations(): void {
+    try {
+      const raw = storageService.getItem(DYNAMIC_VARIATIONS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, VariationItem[]>;
+      for (const [categoryKey, items] of Object.entries(parsed || {})) {
+        if (!Array.isArray(items)) continue;
+        const clean = items.filter((item) => item && typeof item.id === 'string' && typeof item.text === 'string').slice(-MAX_DYNAMIC_PER_CATEGORY);
+        if (clean.length) this.dynamicVariations.set(categoryKey, clean);
+      }
+    } catch { /* a broken store must never break surface selection */ }
+  }
+
+  private persistDynamicVariations(): void {
+    try {
+      const out: Record<string, VariationItem[]> = {};
+      for (const [categoryKey, items] of this.dynamicVariations) if (items.length) out[categoryKey] = items;
+      storageService.setItem(DYNAMIC_VARIATIONS_KEY, JSON.stringify(out));
+    } catch { /* persistence is best-effort; selection keeps working */ }
   }
 
   public static getInstance(): SurfaceVariationService {
@@ -176,7 +209,20 @@ export class SurfaceVariationService {
     const list = this.dynamicVariations.get(categoryKey) || [];
     if (!list.some((x) => x.id === item.id || x.text === item.text)) {
       list.push(item);
+      // P393: bounded accumulation — oldest grown variants in a
+      // category retire first, and a global cap trims across
+      // categories, so the persisted store cannot grow without limit.
+      while (list.length > MAX_DYNAMIC_PER_CATEGORY) list.shift();
       this.dynamicVariations.set(categoryKey, list);
+      let total = 0;
+      for (const items of this.dynamicVariations.values()) total += items.length;
+      while (total > MAX_DYNAMIC_TOTAL) {
+        const firstKey = [...this.dynamicVariations.keys()].find((key) => (this.dynamicVariations.get(key) || []).length > 0);
+        if (!firstKey) break;
+        this.dynamicVariations.get(firstKey)!.shift();
+        total -= 1;
+      }
+      this.persistDynamicVariations();
     }
   }
 
