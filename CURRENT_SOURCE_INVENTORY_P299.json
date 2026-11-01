@@ -5844,9 +5844,9 @@
     },
     {
       "path": "server.ts",
-      "bytes": 201990,
-      "lines": 4653,
-      "sha256": "c795f76f508dd8cff798dbc704826441b65dbf6a36d7a8c33ed8f8a41d0dfe2d",
+      "bytes": 200735,
+      "lines": 4620,
+      "sha256": "736af496c9325429a7bd565eed200c5e51d49a71d02199c66fc4c6a0f3facf14",
       "relativeImportCandidates": [
         {
           "line": 12,
@@ -6101,12 +6101,12 @@
           "resolvedPath": "src/miki/improvement/services/selfImprovementMetricsService.ts"
         },
         {
-          "line": 3456,
+          "line": 3423,
           "specifier": "./chapter_${chapterNumber}",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 3789,
+          "line": 3756,
           "specifier": "./component.cjs",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -6117,9 +6117,9 @@
     },
     {
       "path": "src/App.tsx",
-      "bytes": 92670,
-      "lines": 2157,
-      "sha256": "4730e2cb573ff4d184825eb56f772fbe9fd723500f91b57049d9f19438f341db",
+      "bytes": 92114,
+      "lines": 2142,
+      "sha256": "e3e0d4592a1ef9776c69ca6767190212d4a9880e6f6af112f30af2dbd1f2d700",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -33764,9 +33764,9 @@
     },
     {
       "path": "src/services/api.ts",
-      "bytes": 30175,
-      "lines": 960,
-      "sha256": "d8363ef351ef82c7e5b72e6d65559df869d48a29986b664f5acea564357e108d",
+      "bytes": 28978,
+      "lines": 919,
+      "sha256": "a9067b783e1111c636b9e488fab9b2229c24fbf6d6181f2717247c7db6028612",
       "relativeImportCandidates": [
         {
           "line": 11,

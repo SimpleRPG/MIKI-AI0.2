@@ -440,8 +440,8 @@
 | `scripts/verify_workspace_completion_stage29.mjs` | 1402 | 2 | `b4176f66fa9ca552e14ea5c6d082f71b9672fd7ac37b5b61f92c33aca1c60334` | 0 | 0 | 0 |
 | `scripts/verify_workspace_repository_stage33.mjs` | 915 | 1 | `2ff81e47175b1fdb73d88f7c63b14208e6f9907c7a5f6d5acff42011938f9494` | 0 | 0 | 0 |
 | `scripts/verify_world_patterns_p111.mjs` | 1554 | 1 | `7bbe0c27d4733c537e6a79b8ff81ec1d364e6936a6bcbe34714b679461e18f77` | 2 | 2 | 0 |
-| `server.ts` | 201990 | 4653 | `c795f76f508dd8cff798dbc704826441b65dbf6a36d7a8c33ed8f8a41d0dfe2d` | 44 | 42 | 2 |
-| `src/App.tsx` | 92670 | 2157 | `4730e2cb573ff4d184825eb56f772fbe9fd723500f91b57049d9f19438f341db` | 115 | 115 | 0 |
+| `server.ts` | 200735 | 4620 | `736af496c9325429a7bd565eed200c5e51d49a71d02199c66fc4c6a0f3facf14` | 44 | 42 | 2 |
+| `src/App.tsx` | 92114 | 2142 | `e3e0d4592a1ef9776c69ca6767190212d4a9880e6f6af112f30af2dbd1f2d700` | 115 | 115 | 0 |
 | `src/app/appRuntimeLifecycleService.ts` | 10488 | 193 | `a2251485a9a0f74847a8840426e1b9efbe0d79a9cda21e2abeca1de730a020f2` | 31 | 31 | 0 |
 | `src/app/coreRoutingReadinessGate.ts` | 2321 | 90 | `b09ec24e88c788732b5639e754de51e367627cf5781856b8c6a2e02bd9a60e2d` | 0 | 0 | 0 |
 | `src/app/startupPhaseSchedulerService.ts` | 706 | 3 | `bb8ce0bc1ef0201da3c50eb1f06ec8ad60edab97bfb54ad47b481004981b975c` | 0 | 0 | 0 |
@@ -1232,7 +1232,7 @@
 | `src/miki/verification/services/verifierService.ts` | 6647 | 174 | `0a14920b0d65d1c497119c6d016c3e26d714f341a15fe7256598902d3e0b0c42` | 5 | 5 | 0 |
 | `src/services/abstractSanitizerService.ts` | 264 | 6 | `235bcac1db7b4a79176502d385c5a92b81c8108e9fd6fede556cd9207891f101` | 1 | 1 | 0 |
 | `src/services/affectionDynamicsService.ts` | 278 | 6 | `a673276fab51b45c20c8159165a3739b89bc465fcc753eea7098f80edd4ec1a1` | 1 | 1 | 0 |
-| `src/services/api.ts` | 30175 | 960 | `d8363ef351ef82c7e5b72e6d65559df869d48a29986b664f5acea564357e108d` | 7 | 7 | 0 |
+| `src/services/api.ts` | 28978 | 919 | `a9067b783e1111c636b9e488fab9b2229c24fbf6d6181f2717247c7db6028612` | 7 | 7 | 0 |
 | `src/services/autonomousRevalidationLoopService.ts` | 77 | 1 | `b7475b11c25882db7aadd48bfcf6452de0c0b6ffe43e73990f8a301ca722d97f` | 1 | 1 | 0 |
 | `src/services/autonomousSearchService.ts` | 67 | 1 | `74c1496e8f38105ba9a104cbddb06c550f2c7dabb4fc03f14ff3e3b8c71e5193` | 1 | 1 | 0 |
 | `src/services/capabilityConfidenceService.ts` | 278 | 6 | `63a8ddef7d1299df4df9d4aaa246ac314e897b099cf9d130505b45c0f86236da` | 1 | 1 | 0 |

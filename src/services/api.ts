@@ -532,46 +532,6 @@ export async function sendChatMessage(params: SendChatMessageParams): Promise<Ch
   };
 }
 
-export async function sendDebugRequest(
-  errorLogs: string[],
-  activeGameCode: string,
-  workspaceFiles: WorkspaceFile[]
-): Promise<{ text: string }> {
-  // 外部デバッグ送信前プライバシー監査
-  const audit = privacyGuardrailService.auditOutboundContent(
-    [...errorLogs, activeGameCode].join('\n'),
-    'external_debug',
-    { autoSanitize: true }
-  );
-  if (!audit.allowed) {
-    return {
-      text: `⚠️ 【プライバシー保護ガードレール】デバッグ対象コード/ログ内に機密情報が検出されたため、外部送信を遮断しました: ${audit.blockedReason}`,
-    };
-  }
-
-  try {
-    const res = await fetch(apiUrl('/api/debug'), {
-      method: 'POST',
-      headers: getCustomApiHeaders(),
-      body: JSON.stringify({
-        errorLogs,
-        activeGameCode: audit.sanitizedText,
-        workspaceFiles,
-      })
-    });
-
-    if (!res.ok) {
-      throw new Error(`Debug error ${res.status}`);
-    }
-
-    return await res.json();
-  } catch (err: any) {
-    return {
-      text: `エラーを修正しました！以下のコードを適用してください。\n\`\`\`html\n${activeGameCode}\n\`\`\``
-    };
-  }
-}
-
 export interface GitHubPullProgressUpdate {
   status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'NOT_FOUND';
   progressId: string;
@@ -781,7 +741,6 @@ export async function fetchGitHubFileContents(
 export const apiService = {
   checkServerHealth,
   sendChatMessage,
-  sendDebugRequest,
   importGitHubRepo,
   fetchGitHubFileContents,
   pushToGitHubRepo,

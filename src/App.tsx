@@ -57,7 +57,7 @@ import {
 } from './types';
 import { toolsService } from './miki/capability/services/toolsService';
 import { taskPlanService } from './miki/strategy/services/taskPlanService';
-import { sendChatMessage, sendDebugRequest, autoSyncServerEnvKeysIfEmpty } from './services/api';
+import { sendChatMessage, autoSyncServerEnvKeysIfEmpty } from './services/api';
 import { deterministicRuntimeService } from './miki/safety/services/deterministicRuntimeService';
 import { systemLogger } from './services/systemLogger';
 import { worldModelService } from './miki/selfAwareness/services/worldModelService';
@@ -1426,29 +1426,14 @@ export default function App() {
     try {
       systemLogger.info('STEP', `⚡ サンドボックス自動自己修復ループ開始: ${errorLogs.length}件のエラーログ`);
 
-      let responseText = '';
-      try {
-        const response = await sendDebugRequest(
-          errorLogs,
-          activeGameCode,
-          workspaceFiles
-        );
-        responseText = response.text;
-      } catch (cloudErr) {
-        // クラウドAPIオフライン時のローカル自己修復ヒューリスティック
-        systemLogger.warn('CHAT', 'クラウドデバッガーオフラインのためローカル自律デバッガーを実行');
-        let patchedCode = activeGameCode;
-        
-        // よくあるCanvas/JSエラーの自動修復パターン
-        if (errorSummary.includes('getContext') || errorSummary.includes('canvas')) {
-          patchedCode = patchedCode.replace(/const canvas = document\.getElementById\([^)]+\);/, 'const canvas = document.getElementById("gameCanvas") || document.querySelector("canvas") || document.createElement("canvas");');
-        }
-        if (errorSummary.includes('undefined') || errorSummary.includes('null')) {
-          patchedCode = patchedCode.replace(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/, '$1?.$2');
-        }
+      // P365: 外部デバッガー (/api/debug) は廃止した。ローカル自己修復ヒューリスティックのみで修復する。
+      let patchedCode = activeGameCode;
 
-        responseText = `エラーを解析して修正したよ！\n- **原因**: 実行時参照エラーまたはCanvas要素のバインド不備\n- **対策**: 安全なオプショナルチェーンとCanvas初期化ガードを追加したよ！\n\n\`\`\`html\n${patchedCode}\n\`\`\`\n\nこれで動くはず！確認してみてね！`;
-      }
+      // よくあるCanvas/JSエラーの自動修復パターン
+      patchedCode = patchedCode.replace(/const canvas = document\.getElementById\([^)]+\);/, 'const canvas = document.getElementById("gameCanvas") || document.querySelector("canvas") || document.createElement("canvas");');
+      patchedCode = patchedCode.replace(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)/, '$1?.$2');
+
+      const responseText = `エラーを解析して修正したよ！\n- **原因**: 実行時参照エラーまたはCanvas要素のバインド不備\n- **対策**: 安全なオプショナルチェーンとCanvas初期化ガードを追加したよ！\n\n\`\`\`html\n${patchedCode}\n\`\`\`\n\nこれで動くはず！確認してみてね！`;
 
       const debugEvaluation = completionJudgeService.evaluateCompletion({
         userGoal: 'サンドボックス実行エラーの自動修復',

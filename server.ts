@@ -1649,39 +1649,6 @@ app.post('/api/teacher-variation', async (req, res) => {
 });
 
 // Auto-Debugger Endpoint
-app.post('/api/debug', async (req, res) => {
-  try {
-    const { errorLogs, activeGameCode, workspaceFiles } = req.body;
-    const ai = getAIClient(req);
-
-    if (!ai) {
-      return res.json({
-        text: `エラーを検出しました:\n\`${(errorLogs || []).join('\n')}\`\n\n構文や変数のスコープを自動修正しました！以下のコードを適用してください。\n\`\`\`html\n${activeGameCode}\n\`\`\``
-      });
-    }
-
-    const prompt = `あなたはAI自動デバッガーです。
-以下のWeb/ゲーム実行中にコンソールエラーが発生しました:
-【エラーログ】:
-${(errorLogs || []).join('\n')}
-
-【現在のソースコード】:
-${activeGameCode}
-
-エラーの原因を特定し、親切に1〜2文で解説した上で、完全にバグを修正した動くHTMLコードを \`\`\`html で囲んで出力してください。`;
-
-    const { response } = await generateContentWithFallback(req, {
-      contents: prompt,
-      config: { temperature: 0.2 }
-    });
-
-    res.json({ text: response.text || '修正コードを生成しました。' });
-  } catch (error: any) {
-    console.error('Error in /api/debug:', error);
-    res.status(500).json({ error: error.message || 'Debug error' });
-  }
-});
-
 // GitHub Import Endpoint
 type GitHubPullProgressState = {
   status: 'RUNNING' | 'COMPLETED' | 'FAILED';
