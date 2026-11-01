@@ -120,8 +120,13 @@ class CoreTaskIngressService {
   // was wrong, so surface it on the blackboard and in the continuum
   // instead of letting the outcome pass as an unexamined fact.
   const predictionResolution=outcomePredictionService.resolve(typeof payload.predictionId==='string'?payload.predictionId:undefined,outcome,task.taskId);
+  // P397: an outcome with no prediction is still history. Recording
+  // it is what lets prediction bases form at all on a fresh install
+  // (previously history could only grow by resolving predictions,
+  // which already require history).
+  if(!predictionResolution&&(outcome==='SUCCESS'||outcome==='FAILURE'))outcomePredictionService.observeOutcome({planKey:intentPlan.deterministicKey,goal:request.goal,observed:outcome,taskId:task.taskId});
   if(predictionResolution&&!predictionResolution.matched&&(outcome==='SUCCESS'||outcome==='FAILURE')){
-   taskBlackboardService.post(task.taskId,'OBSERVATION','learning','learning:predictionMismatch',{predictionId:predictionResolution.record.predictionId,planKey:intentPlan.deterministicKey,predicted:predictionResolution.record.predicted,observed:outcome,basisSamples:predictionResolution.record.basisSamples,basisSuccessRate:predictionResolution.record.basisSuccessRate,policy:'MISMATCH_MARKS_WHERE_THE_OUTCOME_MODEL_WAS_WRONG; RE-EXAMINE THE BASIS BEFORE TRUSTING THE SAME PREDICTION AGAIN'},evidenceIds);
+   taskBlackboardService.post(task.taskId,'OBSERVATION','learning','learning:predictionMismatch',{predictionId:predictionResolution.record.predictionId,planKey:intentPlan.deterministicKey,predicted:predictionResolution.record.predicted,observed:outcome,basisSamples:predictionResolution.record.basisSamples,basisSuccessRate:predictionResolution.record.basisSuccessRate,basisRevised:predictionResolution.record.basisRevised===true,policy:'MISMATCH_MARKS_WHERE_THE_OUTCOME_MODEL_WAS_WRONG; RE-EXAMINE THE BASIS BEFORE TRUSTING THE SAME PREDICTION AGAIN'},evidenceIds);
    mikiUnifiedLearningContinuumService.observe({domain:request.source==='conversation'?'conversation':request.source==='research'?'research':request.kind==='SELF_IMPROVEMENT'?'code':'system',key:`task:${request.kind}:${intentPlan.deterministicKey}`,action:'prediction_mismatch',input:request.goal,outcome,verified,capabilityIds:[],concepts:['learning:prediction-calibration'],lesson:`predicted ${predictionResolution.record.predicted} (basis ${predictionResolution.record.basisSamples} samples, success rate ${predictionResolution.record.basisSuccessRate}) but observed ${outcome}`});
   }
   if(request.source==='conversation')conversationGraphRuntimeP212Service.ingestInput(result.task.taskId,request.goal);
