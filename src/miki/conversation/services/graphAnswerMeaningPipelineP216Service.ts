@@ -1,5 +1,6 @@
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
+import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 
 export interface P216AnswerRequirements { inputSurface:string; intentIds:string[]; constraintIds:string[]; grammarIds:string[]; meaningComponentIds:string[]; contentTerms?:string[]; executionResult?:unknown }
 export interface P216MeaningPart { partId:string; kind:'CONCLUSION'|'ACTION'|'CONSTRAINT'|'CONTENT'|'EVIDENCE'|'LIMITATION'|'NEXT_STEP'; meaningId:string; required:boolean; text:string }
@@ -91,7 +92,13 @@ class GraphAnswerMeaningPipelineP216Service {
   missing=requiredIds.filter(id=>requiredTokens[id]&&!requiredTokens[id].test(text));
   if(plan.parts.some(part=>part.meaningId==='input.content')){
    const normalizedText=text.normalize('NFKC').toLowerCase();
-   if(!contentTermsOf(requirements).some(term=>normalizedText.includes(term.normalize('NFKC').toLowerCase())))missing.push('input.content');
+   // P389: engagement may be phrased as a paraphrase. A concept
+   // sibling of a content term (same WordNet synset in the
+   // dictionary) counts as touching the input's content; an answer
+   // that touches neither a term nor any sibling still fails.
+   const contentTerms=contentTermsOf(requirements);
+   const acceptedTerms=[...contentTerms,...japaneseDictionaryService.expandConceptSiblings(contentTerms)];
+   if(!acceptedTerms.some(term=>normalizedText.includes(term.normalize('NFKC').toLowerCase())))missing.push('input.content');
   }
   if(surfaceMissing)missing.push('ANSWER_SURFACE_EMPTY');
   const semantic={passed:missing.length===0&&contradictions.length===0,missingMeaningIds:missing,contradictions};

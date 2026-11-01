@@ -96,7 +96,8 @@ app.get('/api/health', (_req, res) => {
 // previous package stays in place until the new one is complete.
 const DICTIONARY_DIR = path.join(process.cwd(), 'dictionary-data');
 const DICTIONARY_SOURCE_URL = 'http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz';
-interface DictionaryManifest { version: string; entries: number; commonEntries: number; fullBytes: number; commonBytes: number; convertedAt: string; sourceLastModified?: string }
+const WORDNET_ZIP_URL = 'https://raw.githubusercontent.com/nltk/nltk_data/gh-pages/packages/corpora/omw-1.4.zip';
+interface DictionaryManifest { version: string; entries: number; commonEntries: number; fullBytes: number; commonBytes: number; convertedAt: string; sourceLastModified?: string; wordnet?: { lemmas: number; entriesWithConcepts: number } | null }
 const dictionaryJob: { state: 'IDLE' | 'RUNNING' | 'READY' | 'ERROR'; startedAt?: string; finishedAt?: string; error?: string } = { state: 'IDLE' };
 function readDictionaryManifest(): DictionaryManifest | null {
   try { return JSON.parse(fs.readFileSync(path.join(DICTIONARY_DIR, 'manifest.json'), 'utf8')) as DictionaryManifest; } catch { return null; }
@@ -128,22 +129,64 @@ function dictionaryPos(raw: string): string {
   if (raw === 'int') return 'FUNCTION';
   return 'UNKNOWN';
 }
+// P389: Japanese WordNet (via the Open Multilingual Wordnet data)
+// supplies synsets: groups of words that share one concept. Returns
+// a lemma -> synset ids map, or null when unavailable; conversion
+// then simply proceeds without concept ids.
+async function loadWordnetSynsets(): Promise<Map<string, string[]> | null> {
+  try {
+    const zipTmp = path.join(DICTIONARY_DIR, 'omw-1.4.zip.tmp');
+    await downloadToFile(WORDNET_ZIP_URL, zipTmp);
+    const zip = await JSZip.loadAsync(await fs.promises.readFile(zipTmp));
+    const file = zip.file('omw-1.4/jpn/wn-data-jpn.tab');
+    if (!file) { fs.rmSync(zipTmp, { force: true }); return null; }
+    const text = await file.async('string');
+    fs.renameSync(zipTmp, path.join(DICTIONARY_DIR, 'omw-1.4.zip'));
+    const lemmaToSynsets = new Map<string, string[]>();
+    for (const line of text.split('\n')) {
+      const parts = line.split('\t');
+      if (parts.length < 3 || parts[1] !== 'jpn:lemma') continue;
+      const lemma = parts[2].trim();
+      if (!lemma) continue;
+      const synsetId = `wn:${parts[0]}`;
+      const list = lemmaToSynsets.get(lemma);
+      if (list) { if (!list.includes(synsetId)) list.push(synsetId); } else lemmaToSynsets.set(lemma, [synsetId]);
+    }
+    return lemmaToSynsets.size ? lemmaToSynsets : null;
+  } catch { return null; }
+}
 async function convertJmdict(): Promise<DictionaryManifest> {
   fs.mkdirSync(DICTIONARY_DIR, { recursive: true });
   const gzTmp = path.join(DICTIONARY_DIR, 'JMdict_e.gz.tmp');
   const sourceLastModified = await downloadToFile(DICTIONARY_SOURCE_URL, gzTmp);
+  const wordnet = await loadWordnetSynsets();
+  const semanticIdsFor = (lemma: string, pos: string): string[] | undefined => {
+    if (!wordnet) return undefined;
+    const want = pos === 'NOUN' ? 'n' : pos === 'VERB' ? 'v' : pos === 'ADJECTIVE' ? 'a' : pos === 'ADVERB' ? 'r' : '';
+    const candidates = [lemma];
+    if (lemma.endsWith('する') && lemma.length > 2) candidates.push(lemma.slice(0, -2));
+    const ids: string[] = [];
+    for (const candidate of candidates) {
+      for (const id of wordnet.get(candidate) || []) {
+        if (!want || id.endsWith(`-${want}`)) ids.push(id);
+      }
+    }
+    const unique = [...new Set(ids)].slice(0, 6);
+    return unique.length ? unique : undefined;
+  };
   const fullTmp = path.join(DICTIONARY_DIR, 'jmdict-full.json.tmp');
   const commonTmp = path.join(DICTIONARY_DIR, 'jmdict-common.json.tmp');
   const full = fs.createWriteStream(fullTmp);
   const common = fs.createWriteStream(commonTmp);
   const header = (version: string, name: string) => `{"schemaVersion":1,"source":"JMdict","version":${JSON.stringify(version)},"dictionaryName":${JSON.stringify(name)},"entries":[`;
-  const version = sourceLastModified || new Date().toISOString();
+  const version = (sourceLastModified || new Date().toISOString()) + (wordnet ? '+wn1' : '');
   full.write(header(version, 'JMdict (full)'));
   common.write(header(version, 'JMdict (common)'));
-  let firstFull = true, firstCommon = true, entries = 0, commonEntries = 0;
+  let firstFull = true, firstCommon = true, entries = 0, commonEntries = 0, entriesWithConcepts = 0;
   const emit = (entry: Record<string, unknown>, isCommon: boolean) => {
     const json = JSON.stringify(entry);
     full.write((firstFull ? '' : ',') + json); firstFull = false; entries += 1;
+    if (Array.isArray(entry.semanticIds) && entry.semanticIds.length) entriesWithConcepts += 1;
     if (isCommon) { common.write((firstCommon ? '' : ',') + json); firstCommon = false; commonEntries += 1; }
   };
   const processEntry = (block: string) => {
@@ -159,12 +202,14 @@ async function convertJmdict(): Promise<DictionaryManifest> {
     const isCommon = markerCommon || markerCommon2 || nfCommon;
     const priority = markerCommon ? 70 : isCommon ? 66 : 55;
     const reading = rebs[0];
+    const semanticIds = semanticIdsFor(kebs.length ? kebs[0] : reading, pos);
+    const conceptField = semanticIds ? { semanticIds } : {};
     if (kebs.length) {
-      for (const keb of kebs) emit({ surface: keb, lemma: kebs[0], reading, pos, priority }, isCommon);
+      for (const keb of kebs) emit({ surface: keb, lemma: kebs[0], reading, pos, priority, ...conceptField }, isCommon);
       // Kana-only lookups (e.g. あさごはん) need the reading as a surface too.
-      if (!kebs.includes(reading)) emit({ surface: reading, lemma: kebs[0], reading, pos, priority }, isCommon);
+      if (!kebs.includes(reading)) emit({ surface: reading, lemma: kebs[0], reading, pos, priority, ...conceptField }, isCommon);
     } else {
-      emit({ surface: reading, lemma: reading, reading, pos, priority }, isCommon);
+      emit({ surface: reading, lemma: reading, reading, pos, priority, ...conceptField }, isCommon);
     }
   };
   let buffer = '';
@@ -189,7 +234,7 @@ async function convertJmdict(): Promise<DictionaryManifest> {
   fs.renameSync(fullTmp, fullPath);
   fs.renameSync(commonTmp, commonPath);
   fs.renameSync(gzTmp, path.join(DICTIONARY_DIR, 'JMdict_e.gz'));
-  const manifest: DictionaryManifest = { version, entries, commonEntries, fullBytes: fs.statSync(fullPath).size, commonBytes: fs.statSync(commonPath).size, convertedAt: new Date().toISOString(), sourceLastModified };
+  const manifest: DictionaryManifest = { version, entries, commonEntries, fullBytes: fs.statSync(fullPath).size, commonBytes: fs.statSync(commonPath).size, convertedAt: new Date().toISOString(), sourceLastModified, wordnet: wordnet ? { lemmas: wordnet.size, entriesWithConcepts } : null };
   const manifestTmp = path.join(DICTIONARY_DIR, 'manifest.json.tmp');
   fs.writeFileSync(manifestTmp, JSON.stringify(manifest, null, 2));
   fs.renameSync(manifestTmp, path.join(DICTIONARY_DIR, 'manifest.json'));

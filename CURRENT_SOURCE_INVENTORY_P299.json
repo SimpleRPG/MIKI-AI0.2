@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1748,
     "sourceFileCount": 1301,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1214,
-    "relativeImportCandidateCount": 3620,
-    "resolvedRelativeImportCandidateCount": 3604,
+    "relativeImportCandidateCount": 3621,
+    "resolvedRelativeImportCandidateCount": 3605,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -5844,9 +5844,9 @@
     },
     {
       "path": "server.ts",
-      "bytes": 210641,
-      "lines": 4788,
-      "sha256": "002ebbde423ee9cdc96fd5134a50d0cb40f0b02d4ea9c0bdeaa984fde09e0a30",
+      "bytes": 213267,
+      "lines": 4833,
+      "sha256": "f0c49e91146096ce5e85e99ca06a56876c921f65fbd985c088be969cbc25678e",
       "relativeImportCandidates": [
         {
           "line": 15,
@@ -6101,12 +6101,12 @@
           "resolvedPath": "src/miki/improvement/services/selfImprovementMetricsService.ts"
         },
         {
-          "line": 3591,
+          "line": 3636,
           "specifier": "./chapter_${chapterNumber}",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 3924,
+          "line": 3969,
           "specifier": "./component.cjs",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -10769,9 +10769,9 @@
     },
     {
       "path": "src/miki/conversation/services/graphAnswerMeaningPipelineP216Service.ts",
-      "bytes": 9057,
-      "lines": 104,
-      "sha256": "5fd1818c1f023b08ea7aaa8daaaf5b54eb7c229d2a36c7d222efc9211a05a79f",
+      "bytes": 9552,
+      "lines": 111,
+      "sha256": "fdacd5a2e831ba332f413369cb7370b31cd8ed8f4aa48f3ce8ff8c3b73b49cfc",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10784,10 +10784,16 @@
           "specifier": "./surfaceGrammarAndStyleService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/surfaceGrammarAndStyleService.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -24134,9 +24140,9 @@
     },
     {
       "path": "src/miki/research/services/japaneseDictionaryService.ts",
-      "bytes": 15616,
-      "lines": 209,
-      "sha256": "a8999dbd649ebd3e8dc777f94ccf67a1d97552d4501a200d8d4b162ffdbd46e6",
+      "bytes": 17444,
+      "lines": 253,
+      "sha256": "af93938972293419f9f9bc29e9fa3b8b0498bce78ac8c828e9229d3f5bdfca79",
       "relativeImportCandidates": [
         {
           "line": 1,

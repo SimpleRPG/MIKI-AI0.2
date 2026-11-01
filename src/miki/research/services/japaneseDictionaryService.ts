@@ -70,6 +70,7 @@ class JapaneseDictionaryService {
   private imported = new Map<JapaneseDictionarySource, JapaneseDictionaryEntry[]>();
   private packageInfo = new Map<JapaneseDictionarySource, JapaneseDictionaryPackageInfo>();
   private builtinEntries: JapaneseDictionaryEntry[] = BUILTIN.map(makeEntry);
+  private semanticIndex: Map<string, Set<string>> | null = null;
   private constructor() { this.loadPersonal(); this.loadPackages(); }
   public static getInstance(): JapaneseDictionaryService { return this.instance ||= new JapaneseDictionaryService(); }
 
@@ -120,6 +121,7 @@ class JapaneseDictionaryService {
     if (!pkg || pkg.schemaVersion !== 1 || !Array.isArray(pkg.entries)) return 0;
     const normalized = pkg.entries.filter(e => e?.surface).map(e => ({ ...e, normalized: normalize(e.surface), source: pkg.source, priority: e.priority ?? 60 }));
     if (!normalized.length) return 0;
+    this.semanticIndex = null;
     this.imported.set(pkg.source, normalized);
     this.packageInfo.set(pkg.source, { source: pkg.source, version: pkg.version, dictionaryName: pkg.dictionaryName, entryCount: normalized.length, importedAt: Date.now() });
     this.savePackages();
@@ -151,12 +153,54 @@ class JapaneseDictionaryService {
       added += 1;
     }
     if (added > 0) {
+      this.semanticIndex = null;
       this.imported.set(source, existing);
       const info = this.packageInfo.get(source);
       if (info) info.entryCount = existing.length;
       this.savePackages();
     }
     return added;
+  }
+
+  /**
+   * P389: concept siblings. Words that share a semantic id (a
+   * WordNet synset attached during dictionary conversion) are the
+   * same concept in different words — paraphrases of each other.
+   * Given content terms, return the lemmas of their concept
+   * siblings so callers can recognize a paraphrase as engagement
+   * with the same content. The index is built lazily over the
+   * entries this service holds and rebuilt when they change.
+   */
+  public expandConceptSiblings(terms: string[], maxTotal = 24): string[] {
+    if (!this.semanticIndex) {
+      const index = new Map<string, Set<string>>();
+      const addEntry = (entry: JapaneseDictionaryEntry) => {
+        for (const id of entry.semanticIds || []) {
+          if (!id.startsWith('wn:')) continue;
+          const lemmas = index.get(id) || new Set<string>();
+          lemmas.add(entry.lemma || entry.surface);
+          index.set(id, lemmas);
+        }
+      };
+      for (const entry of this.builtinEntries) addEntry(entry);
+      for (const entry of this.personal.values()) addEntry(entry);
+      for (const entries of this.imported.values()) for (const entry of entries) addEntry(entry);
+      this.semanticIndex = index;
+    }
+    const termSet = new Set(terms);
+    const out = new Set<string>();
+    for (const term of terms) {
+      for (const entry of this.lookup(term)) {
+        for (const id of entry.semanticIds || []) {
+          if (!id.startsWith('wn:')) continue;
+          for (const lemma of this.semanticIndex.get(id) || []) {
+            if (!termSet.has(lemma)) out.add(lemma);
+            if (out.size >= maxTotal) return [...out];
+          }
+        }
+      }
+    }
+    return [...out];
   }
 
   public getStats() {
