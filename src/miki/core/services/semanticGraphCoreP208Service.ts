@@ -1,4 +1,5 @@
 import { canonicalSha256Object } from './canonicalSha256Service';
+import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 
 export type SemanticAssetKind='LEXEME'|'CONCEPT'|'INTENT_PATTERN'|'CONSTRAINT_PATTERN'|'DISCOURSE_PATTERN'|'COMPONENT_CONDITION'|'RESEARCH_TRIGGER'|'POSITIVE_EXAMPLE'|'COUNTEREXAMPLE'|'FAILURE_PATTERN'|'REPAIR_RULE';
 export interface SemanticAsset{assetId:string;kind:SemanticAssetKind;surface:string;normalized:string;conceptId:string;domain:string;confidence:number;version:number;enabled:boolean;conditions:string[];evidenceIds:string[];counterexampleIds:string[];sha256:string}
@@ -19,7 +20,43 @@ class SemanticGraphCoreP208Service{
  {assetId:'component.semantic.graph',kind:'COMPONENT_CONDITION',surface:'意味候補はGraph根拠と反例を共同評価',normalized:'意味候補はgraph根拠と反例を共同評価',conceptId:'capability.semantic-understanding',domain:'capability',confidence:1,version:1,enabled:true,conditions:['GRAPH_COMMIT_REQUIRED'],evidenceIds:['ev.p208.e2e'],counterexampleIds:[]}
  ];return this.state(0,definitions.map(asset=>({...asset,sha256:canonicalSha256Object(asset)})))}
  commit(state:SemanticGraphState,input:SemanticCommit):SemanticGraphState{if(input.expectedGeneration!==state.generation)throw new Error('SEMANTIC_GRAPH_GENERATION_CONFLICT');const byId=new Map(state.assets.map(asset=>[asset.assetId,asset]));for(const raw of input.assets){if(!raw.assetId||!raw.conceptId||raw.confidence<0||raw.confidence>1)throw new Error('SEMANTIC_GRAPH_INVALID_ASSET');byId.set(raw.assetId,{...raw,normalized:normalize(raw.normalized||raw.surface),sha256:canonicalSha256Object(raw)})}return this.state(state.generation+1,[...byId.values()])}
- understand(text:string,state:SemanticGraphState,context:{activeGoalIds:string[];openGoalIds:string[]}):SemanticUnderstandingResult{const value=normalize(text),groups=new Map<string,SemanticAsset[]>();for(const asset of state.assets){if(!asset.enabled||asset.kind==='COUNTEREXAMPLE'||asset.kind==='REPAIR_RULE')continue;if(value.includes(asset.normalized)){const list=groups.get(asset.conceptId)||[];list.push(asset);groups.set(asset.conceptId,list)}}const candidates=[...groups].map(([conceptId,assets])=>{let score=assets.reduce((sum,a)=>sum+a.confidence,0)/assets.length;const counter=state.assets.filter(a=>a.kind==='COUNTEREXAMPLE'&&a.conceptId===conceptId&&a.conditions.includes('MULTIPLE_OPEN_GOALS')&&context.openGoalIds.length>1);score-=counter.length*.45;const missingActive=assets.some(a=>a.conditions.includes('ACTIVE_GOAL_REQUIRED'))&&context.activeGoalIds.length===0;score-=missingActive?.5:0;const decision=score>=.75&&!counter.length?'ACCEPT':score>=.35?'CONDITIONAL':'REJECT';return{conceptId,score:Math.max(0,Math.min(1,score)),matchedAssetIds:assets.map(a=>a.assetId),evidenceIds:assets.flatMap(a=>a.evidenceIds),counterexampleIds:counter.map(a=>a.assetId),requiredComponentIds:decision==='ACCEPT'?['conversation.analysis.composed','semantic.graph.reasoner']:['semantic.graph.reasoner','conversation.reference.guard'],decision} as SemanticCandidate}).sort((a,b)=>b.score-a.score);const selected=candidates.find(c=>c.decision==='ACCEPT');const mutationCandidates=candidates.map(c=>({semanticKind:'KNOWLEDGE',ownerDomain:'conversation',participantDomains:['conversation','memory','research','capability','verification'],subjectId:`semantic:${canonicalSha256Object({text,c})}`,payload:{text,candidate:c,graphGeneration:state.generation}}));return{input:text,candidates,selected,requiresResearch:!selected,mutationCandidates,receiptSha256:canonicalSha256Object({text,candidates,generation:state.generation})}}
+ understand(text:string,state:SemanticGraphState,context:{activeGoalIds:string[];openGoalIds:string[]}):SemanticUnderstandingResult{
+  const value=normalize(text),groups=new Map<string,Array<{asset:SemanticAsset,viaConcept:boolean}>>();
+  const add=(asset:SemanticAsset,viaConcept:boolean)=>{const list=groups.get(asset.conceptId)||[];list.push({asset,viaConcept});groups.set(asset.conceptId,list)};
+  for(const asset of state.assets){
+   if(!asset.enabled||asset.kind==='COUNTEREXAMPLE'||asset.kind==='REPAIR_RULE')continue;
+   if(value.includes(asset.normalized)){add(asset,false);continue}
+   // P390: a paraphrase of the asset's wording — one content word
+   // replaced by a concept sibling (same WordNet synset) — still
+   // reaches the asset's concept, at discounted confidence.
+   if(this.conceptMatched(value,asset))add(asset,true);
+  }
+  const candidates=[...groups].map(([conceptId,entries])=>{
+   const assets=entries.map(e=>e.asset);
+   let score=entries.reduce((sum,e)=>sum+e.asset.confidence*(e.viaConcept?.8:1),0)/entries.length;
+   const counter=state.assets.filter(a=>a.kind==='COUNTEREXAMPLE'&&a.conceptId===conceptId&&a.conditions.includes('MULTIPLE_OPEN_GOALS')&&context.openGoalIds.length>1);
+   score-=counter.length*.45;
+   const missingActive=assets.some(a=>a.conditions.includes('ACTIVE_GOAL_REQUIRED'))&&context.activeGoalIds.length===0;
+   score-=missingActive?.5:0;
+   const decision=score>=.75&&!counter.length?'ACCEPT':score>=.35?'CONDITIONAL':'REJECT';
+   return{conceptId,score:Math.max(0,Math.min(1,score)),matchedAssetIds:assets.map(a=>a.assetId),evidenceIds:assets.flatMap(a=>a.evidenceIds),counterexampleIds:counter.map(a=>a.assetId),requiredComponentIds:decision==='ACCEPT'?['conversation.analysis.composed','semantic.graph.reasoner']:['semantic.graph.reasoner','conversation.reference.guard'],decision} as SemanticCandidate;
+  }).sort((a,b)=>b.score-a.score);
+  const selected=candidates.find(c=>c.decision==='ACCEPT');
+  const mutationCandidates=candidates.map(c=>({semanticKind:'KNOWLEDGE',ownerDomain:'conversation',participantDomains:['conversation','memory','research','capability','verification'],subjectId:`semantic:${canonicalSha256Object({text,c})}`,payload:{text,candidate:c,graphGeneration:state.generation}}));
+  return{input:text,candidates,selected,requiresResearch:!selected,mutationCandidates,receiptSha256:canonicalSha256Object({text,candidates,generation:state.generation})};
+ }
+ private conceptMatched(value:string,asset:SemanticAsset):boolean{
+  const words=new Set<string>();
+  if(asset.normalized.length<=6)words.add(asset.normalized);
+  for(let i=0;i<asset.normalized.length;i++){const hit=japaneseDictionaryService.findLongest(asset.normalized,i);if(hit?.lemma&&hit.lemma.length>=2)words.add(hit.lemma)}
+  for(const word of words){
+   if(!word||!asset.normalized.includes(word))continue;
+   for(const sibling of japaneseDictionaryService.expandConceptSiblings([word],12)){
+    if(value.includes(asset.normalized.replace(word,sibling)))return true;
+   }
+  }
+  return false;
+ }
  private state(generation:number,assets:SemanticAsset[]):SemanticGraphState{const ordered=[...assets].sort((a,b)=>a.assetId.localeCompare(b.assetId));return{generation,assets:ordered,sha256:canonicalSha256Object({generation,assets:ordered})}}
 }
 export const semanticGraphCoreP208Service=new SemanticGraphCoreP208Service();

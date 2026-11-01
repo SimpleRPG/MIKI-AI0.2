@@ -162,6 +162,15 @@ class JapaneseDictionaryService {
     return added;
   }
 
+  /** P389/P390: the WordNet synset ids a term belongs to, if any. */
+  public conceptIdsFor(term: string): string[] {
+    const ids = new Set<string>();
+    for (const entry of this.lookup(term || '')) {
+      for (const id of entry.semanticIds || []) if (id.startsWith('wn:')) ids.add(id);
+    }
+    return [...ids];
+  }
+
   /**
    * P389: concept siblings. Words that share a semantic id (a
    * WordNet synset attached during dictionary conversion) are the
