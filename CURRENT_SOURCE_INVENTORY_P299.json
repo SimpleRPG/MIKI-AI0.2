@@ -5846,9 +5846,9 @@
     },
     {
       "path": "server.ts",
-      "bytes": 231182,
-      "lines": 5354,
-      "sha256": "baad92ab4dd0e8e9f4b850b741dbddf017305bbce009e28991e17dd046ae5c19",
+      "bytes": 211874,
+      "lines": 4887,
+      "sha256": "5d69b00a2e73b466c1270f38a5a2d5a9cfba63ed5ab0c0b9a1861223cbd3dc48",
       "relativeImportCandidates": [
         {
           "line": 12,
@@ -6108,7 +6108,7 @@
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 4359,
+          "line": 3935,
           "specifier": "./component.cjs",
           "resolution": "UNRESOLVED_CANDIDATE"
         }

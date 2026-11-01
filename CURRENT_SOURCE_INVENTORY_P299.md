@@ -440,7 +440,7 @@
 | `scripts/verify_workspace_completion_stage29.mjs` | 1402 | 2 | `b4176f66fa9ca552e14ea5c6d082f71b9672fd7ac37b5b61f92c33aca1c60334` | 0 | 0 | 0 |
 | `scripts/verify_workspace_repository_stage33.mjs` | 915 | 1 | `2ff81e47175b1fdb73d88f7c63b14208e6f9907c7a5f6d5acff42011938f9494` | 0 | 0 | 0 |
 | `scripts/verify_world_patterns_p111.mjs` | 1554 | 1 | `7bbe0c27d4733c537e6a79b8ff81ec1d364e6936a6bcbe34714b679461e18f77` | 2 | 2 | 0 |
-| `server.ts` | 231182 | 5354 | `baad92ab4dd0e8e9f4b850b741dbddf017305bbce009e28991e17dd046ae5c19` | 44 | 42 | 2 |
+| `server.ts` | 211874 | 4887 | `5d69b00a2e73b466c1270f38a5a2d5a9cfba63ed5ab0c0b9a1861223cbd3dc48` | 44 | 42 | 2 |
 | `src/App.tsx` | 92865 | 2159 | `405aaaf688c802104f0ccb472f5f0b19108df7642d149ff4fab5cebd4e2a16ed` | 117 | 117 | 0 |
 | `src/app/appRuntimeLifecycleService.ts` | 10624 | 195 | `17f560901bb72ae9fc91c6cba541aa0623b01f02790913477f817ee4c8a38f05` | 32 | 32 | 0 |
 | `src/app/coreRoutingReadinessGate.ts` | 2321 | 90 | `b09ec24e88c788732b5639e754de51e367627cf5781856b8c6a2e02bd9a60e2d` | 0 | 0 | 0 |
