@@ -1,6 +1,7 @@
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
+import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { storageService } from '../../../services/storageService';
 import { canonicalSha256 } from './canonicalSha256Service';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
@@ -33,15 +34,11 @@ export interface CandidateGenerationOutcome { accepted:boolean; runId:string; wo
 class CandidateCodeGenerationService {
  async generate(runId:string):Promise<CandidateGenerationOutcome>{
   const run=improvementIntakeRouterService.get(runId);if(!run)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};
-  const currentSourceFiles=selfCodeSpaceService.listSourceFiles();
-  if(currentSourceFiles.length===0)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_EMPTY']};
+  let currentSourceFiles=selfCodeSpaceService.listSourceFiles();
+  const lightMode=currentSourceFiles.length===0&&Boolean(selfCodeSpaceService.getLightManifest());
+  if(currentSourceFiles.length===0&&!lightMode)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_EMPTY']};
 
-  const currentSourceSnapshotSha256=canonicalSha256(
-    currentSourceFiles.map(file=>({
-      path:file.path,
-      sha256:file.contentHash
-    }))
-  );
+  const currentSourceSnapshotSha256=selfCodeSpaceService.getSourceSnapshotSha256();
 
   const runSourceSnapshotSha256=
     typeof run.payload.sourceSnapshotSha256==='string'
@@ -66,7 +63,30 @@ class CandidateCodeGenerationService {
     };
   }
 
-  const probe=await autonomousCandidatePreparationService.prepareForRun(runId,[]);const targetPaths=probe.targetPaths;
+  // P352: in index-first mode there is no classic snapshot. Hydrate
+  // the target files and their index neighborhood on demand and let
+  // generation work on that context closure instead.
+  let sourceOverride:typeof currentSourceFiles|undefined;
+  if(lightMode){
+   const payloadTargets=Array.isArray(run.payload.targetFiles)
+    ? run.payload.targetFiles.filter((value):value is string=>typeof value==='string'&&Boolean(value.trim())).map(value=>value.trim())
+    : [];
+   if(payloadTargets.length>0){
+    const entryByPath=new Map((selfCodeUnderstandingService.getSnapshot()?.entries||[]).map(entry=>[entry.path,entry]));
+    const manifest=selfCodeSpaceService.getLightManifest();
+    const synthetic=(manifest?.files||[])
+     .filter(item=>entryByPath.has(item.path))
+     .map(item=>({path:item.path,content:'',contentHash:entryByPath.get(item.path)!.contentHash}));
+    const rel=selfCodeUnderstandingService.ensure(payloadTargets,synthetic);
+    const wanted=[...new Set([...payloadTargets,...rel.relatedPaths])];
+    const contents=await selfCodeSpaceService.ensureFileContents(wanted);
+    currentSourceFiles=wanted
+     .filter(path=>contents.has(path))
+     .map(path=>selfCodeSpaceService.toSourceFile(path,contents.get(path)!));
+    sourceOverride=currentSourceFiles;
+   }
+  }
+  const probe=await autonomousCandidatePreparationService.prepareForRun(runId,[],sourceOverride);const targetPaths=probe.targetPaths;
   if(targetPaths.length===0)return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
   const sources=new Map(currentSourceFiles.map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
   if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
@@ -156,8 +176,10 @@ class CandidateCodeGenerationService {
       generated.push({path:target.path,candidateContent:outcome.candidateContent,evidenceIds:[...target.evidenceIds]});
     }
     if(astFallbackReasons.length===0&&generated.length>0&&!failureFeedback){
-      const prepared=await autonomousCandidatePreparationService.prepareForRun(runId,generated);
+      const prepared=await autonomousCandidatePreparationService.prepareForRun(runId,generated,sourceOverride);
       if(prepared.workspaceId){
+        const duplicates=this.findDuplicateExports(generated);
+        if(duplicates.length>0)return {accepted:false,runId,files:[],reasons:duplicates,attemptCount:1};
         return {
           accepted:true,runId,workspaceId:prepared.workspaceId,files:generated,reasons:[],attemptCount:1,
           responseHash:canonicalSha256({
@@ -1215,7 +1237,8 @@ class CandidateCodeGenerationService {
 
     const prepared=await autonomousCandidatePreparationService.prepareForRun(
       runId,
-      materialized.files
+      materialized.files,
+      sourceOverride
     );
 
     if(!prepared.workspaceId){
@@ -1231,6 +1254,20 @@ class CandidateCodeGenerationService {
       return {accepted:false,runId,files:[],reasons:[reason],attemptCount:1};
     }
 
+    const duplicates=this.findDuplicateExports(materialized.files);
+    if(duplicates.length>0){
+      const reason=duplicates[0];
+      this.record(runId,{
+        attemptCount:1,
+        status:'BLOCKED',
+        reason,
+        responseHash:canonicalSha256(JSON.stringify({
+          runId,duplicates
+        }))
+      });
+      return {accepted:false,runId,files:[],reasons:duplicates,attemptCount:1};
+    }
+
     return {
       accepted:true,
       runId,
@@ -1241,6 +1278,21 @@ class CandidateCodeGenerationService {
       learningLineage
     };
 
+ }
+ private findDuplicateExports(files:CandidateGenerationFile[]):string[]{
+  const snapshot=selfCodeUnderstandingService.getSnapshot();if(!snapshot)return [];
+  const owners=new Map<string,string>();
+  for(const entry of snapshot.entries)for(const name of entry.exports){if(!owners.has(name))owners.set(name,entry.path);}
+  const duplicates:string[]=[];
+  for(const file of files){
+   const baseline=new Set(snapshot.entries.find(entry=>entry.path===file.path)?.exports||[]);
+   for(const name of selfCodeUnderstandingService.exportsOf(file.path,file.candidateContent)){
+    if(baseline.has(name))continue;
+    const owner=owners.get(name);
+    if(owner&&owner!==file.path)duplicates.push(`DUPLICATE_EXPORT:${name}:${owner}`);
+   }
+  }
+  return [...new Set(duplicates)];
  }
  private materializeComposition(
   runId:string,

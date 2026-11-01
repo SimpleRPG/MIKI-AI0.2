@@ -72,8 +72,8 @@ class AutonomousCandidatePreparationService {
   if(drafts.length===0)return undefined;return isolatedCandidateWorkspaceService.create(issueId,drafts.map(x=>({path:x.targetPath,baselineContent:x.baselineContent,candidateContent:x.candidateContent,evidenceIds:x.evidenceIds})));
  }
 
- async prepareForRun(runId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>):Promise<{workspaceId?:string;targetPaths:string[];missingPaths:string[];reason?:string}>{
-  const { improvementIntakeRouterService }=await import('./improvementIntakeRouterService');const run=improvementIntakeRouterService.get(runId);const sourceMap=new Map(selfCodeSpaceService.listSourceFiles().map(file=>[file.path,file]));if(!run)return {targetPaths:[],missingPaths:[],reason:'IMPROVEMENT_RUN_NOT_FOUND'};
+ async prepareForRun(runId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>,sourceFilesOverride?:Array<{path:string;content:string;contentHash:string}>):Promise<{workspaceId?:string;targetPaths:string[];missingPaths:string[];reason?:string}>{
+  const { improvementIntakeRouterService }=await import('./improvementIntakeRouterService');const run=improvementIntakeRouterService.get(runId);const sourceMap=new Map((sourceFilesOverride||selfCodeSpaceService.listSourceFiles()).map(file=>[file.path,file]));if(!run)return {targetPaths:[],missingPaths:[],reason:'IMPROVEMENT_RUN_NOT_FOUND'};
   if(run.runType==='EXTERNAL_DIRECTIVE'){
    const targetPaths=Array.isArray(run.payload.targetFiles)?run.payload.targetFiles.filter((value):value is string=>typeof value==='string'):[];const missingPaths=targetPaths.filter(path=>!sourceMap.has(path));if(targetPaths.length===0)return {targetPaths:[],missingPaths:[],reason:'EXTERNAL_DIRECTIVE_TARGETS_MISSING'};if(missingPaths.length>0)return {targetPaths,missingPaths,reason:'EXTERNAL_DIRECTIVE_TARGET_NOT_FOUND'};
    const supplied=new Map((aiCandidates||[]).map(candidate=>[candidate.path,candidate]));const drafts=[] as Array<{path:string;baselineContent:string;candidateContent:string;evidenceIds:string[]}>;

@@ -1761,6 +1761,222 @@ app.get('/api/github/import/progress/:progressId', (req, res) => {
   return res.json(state);
 });
 
+
+// P352: on-demand GitHub file contents, served from a per-commit
+// archive cache so individual files do not cost one API call each.
+const repoArchiveCache = new Map<
+  string,
+  { expiresAt: number; entries: Map<string, any> }
+>();
+
+async function fetchGitHubJsonWithRetry(
+  url: string,
+  headers: Record<string, string>,
+  timeoutMs = 30000
+): Promise<any> {
+  const maxAttempts = 3;
+  let lastError: any;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        headers,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        const retryable =
+          response.status === 429 || response.status >= 500;
+        if (retryable && attempt < maxAttempts) {
+          const retryAfterSec = Number(
+            response.headers.get('retry-after') || 0
+          );
+          const waitMs = Math.min(
+            Math.max(retryAfterSec * 1000, 1000 * 2 ** (attempt - 1)),
+            30000
+          );
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+          continue;
+        }
+        throw new Error(`GitHub API ${response.status}: ${errorText}`);
+      }
+      return response.json();
+    } catch (err: any) {
+      lastError = err;
+      const isHttpError = /^GitHub API \d+:/.test(
+        String(err?.message || '')
+      );
+      if (isHttpError || attempt >= maxAttempts) throw err;
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 * 2 ** (attempt - 1))
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw lastError || new Error('GitHub API request failed');
+}
+
+async function getRepoArchiveEntries(
+  owner: string,
+  repo: string,
+  ref: string,
+  headers: Record<string, string>
+): Promise<Map<string, any>> {
+  const key = `${owner}/${repo}@${ref}`;
+  const cached = repoArchiveCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.entries;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 180000);
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/zipball/${ref}`,
+      { headers, signal: controller.signal }
+    );
+    if (!response.ok) {
+      throw new Error(
+        `GitHub API ${response.status}: ${await response.text()}`
+      );
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const zip = await JSZip.loadAsync(buffer);
+    const entries = new Map<string, any>();
+    for (const name of Object.keys(zip.files)) {
+      const entry = zip.files[name];
+      if (entry.dir) continue;
+      const relativePath = name.split('/').slice(1).join('/');
+      if (relativePath) entries.set(relativePath, entry);
+    }
+    repoArchiveCache.set(key, {
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      entries,
+    });
+    while (repoArchiveCache.size > 3) {
+      const oldest = repoArchiveCache.keys().next().value;
+      if (!oldest) break;
+      repoArchiveCache.delete(oldest);
+    }
+    return entries;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+app.post('/api/github/file-contents', async (req, res) => {
+  try {
+    const {
+      repoUrl,
+      branch = 'main',
+      commitSha: givenCommitSha,
+      items = [],
+      token,
+      githubToken,
+    } = req.body || {};
+
+    if (!repoUrl) {
+      return res.status(400).json({ error: 'repoUrl is required' });
+    }
+
+    const match = String(repoUrl)
+      .replace(/^https?:\/\/github\.com\//i, '')
+      .replace(/\.git$/i, '')
+      .replace(/\/+$/g, '')
+      .split('/');
+
+    if (match.length < 2) {
+      return res.status(400).json({ error: 'Invalid GitHub repository' });
+    }
+
+    const [owner, repo] = match;
+    const requested: Array<{ path: string; blobSha?: string }> = (
+      Array.isArray(items) ? items : []
+    )
+      .filter((item: any) => item && typeof item.path === 'string')
+      .slice(0, 200);
+
+    if (requested.length === 0) {
+      return res.status(400).json({ error: 'items are required' });
+    }
+
+    const authToken = token || githubToken;
+    const headers: Record<string, string> = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'MIKI-AI0.2',
+    };
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
+    let commitSha =
+      typeof givenCommitSha === 'string' ? givenCommitSha : '';
+    if (!commitSha) {
+      const branchInfo = await fetchGitHubJsonWithRetry(
+        `https://api.github.com/repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}`,
+        headers
+      );
+      commitSha = branchInfo.commit.sha;
+    }
+
+    const entries = await getRepoArchiveEntries(
+      owner,
+      repo,
+      commitSha,
+      headers
+    );
+
+    const files: Array<{
+      path: string;
+      content: string;
+      blobSha?: string;
+    }> = [];
+    const missing: string[] = [];
+    const blobFallback: Array<{ path: string; blobSha?: string }> = [];
+
+    for (const item of requested) {
+      const entry = entries.get(item.path);
+      if (entry) {
+        files.push({
+          path: item.path,
+          content: await entry.async('string'),
+          blobSha: item.blobSha,
+        });
+      } else if (item.blobSha) {
+        blobFallback.push(item);
+      } else {
+        missing.push(item.path);
+      }
+    }
+
+    for (const item of blobFallback) {
+      try {
+        const blob = await fetchGitHubJsonWithRetry(
+          `https://api.github.com/repos/${owner}/${repo}/git/blobs/${item.blobSha}`,
+          headers
+        );
+        const content =
+          blob.encoding === 'base64'
+            ? Buffer.from(
+                String(blob.content || '').replace(/\n/g, ''),
+                'base64'
+              ).toString('utf8')
+            : String(blob.content || '');
+        files.push({ path: item.path, content, blobSha: item.blobSha });
+      } catch {
+        missing.push(item.path);
+      }
+    }
+
+    return res.json({ success: true, commitSha, files, missing });
+  } catch (err: any) {
+    return res.status(500).json({
+      success: false,
+      error: err?.message || 'GitHub file contents failed',
+    });
+  }
+});
+
 app.post('/api/github/import', async (req, res) => {
   const requestedProgressId =
     typeof req.body?.progressId === 'string' &&
@@ -1827,7 +2043,8 @@ app.post('/api/github/import', async (req, res) => {
       branch = 'main',
       token,
       githubToken,
-      knownFiles = []
+      knownFiles = [],
+      includeContents
     } = req.body || {};
 
     if (!repoUrl) {
@@ -2217,7 +2434,8 @@ app.post('/api/github/import', async (req, res) => {
         events: pullDiagnostics,
       },
       manifest,
-      changedFiles,
+      changedFiles: includeContents === false ? [] : changedFiles,
+      changedPaths: changedFiles.map((file: any) => file.path),
       deletedPaths,
       truncated: false
     };

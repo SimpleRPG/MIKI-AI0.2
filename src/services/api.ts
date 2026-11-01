@@ -636,11 +636,14 @@ export function importGitHubRepo(
   knownFiles: Array<{ path: string; blobSha?: string; sha256?: string }> = [],
   onProgress?: (
     progress: GitHubPullProgressUpdate
-  ) => void | Promise<void>
+  ) => void | Promise<void>,
+  options?: { includeContents?: boolean }
 ): Promise<GitHubRepoData> {
   // P351: concurrent callers share one in-flight import instead of
   // each starting a duplicate download of the same repository.
-  const key = `${repoUrl}#${branch || 'main'}`;
+  const key = `${repoUrl}#${branch || 'main'}#${
+    options?.includeContents === false ? 'light' : 'full'
+  }`;
   const existing = githubImportFlights.get(key);
   if (existing) return existing;
   const flight = importGitHubRepoOnce(
@@ -648,7 +651,8 @@ export function importGitHubRepo(
     branch,
     githubToken,
     knownFiles,
-    onProgress
+    onProgress,
+    options
   ).finally(() => {
     githubImportFlights.delete(key);
   });
@@ -663,7 +667,8 @@ async function importGitHubRepoOnce(
   knownFiles: Array<{ path: string; blobSha?: string; sha256?: string }> = [],
   onProgress?: (
     progress: GitHubPullProgressUpdate
-  ) => void | Promise<void>
+  ) => void | Promise<void>,
+  options?: { includeContents?: boolean }
 ): Promise<GitHubRepoData> {
   const progressId =
     globalThis.crypto?.randomUUID?.() ||
@@ -716,6 +721,7 @@ async function importGitHubRepoOnce(
         githubToken,
         knownFiles,
         progressId,
+        includeContents: options?.includeContents,
       })
     });
 
@@ -763,11 +769,63 @@ export async function pushToGitHubRepo(params: GitHubPushParams): Promise<GitHub
   return await res.json();
 }
 
+export interface GitHubFileContentsResult {
+  success: boolean;
+  commitSha: string;
+  files: Array<{ path: string; content: string; blobSha?: string }>;
+  missing: string[];
+}
+
+export async function fetchGitHubFileContents(
+  repoUrl: string,
+  input: {
+    branch?: string;
+    commitSha?: string;
+    githubToken?: string;
+    items: Array<{ path: string; blobSha?: string }>;
+  }
+): Promise<GitHubFileContentsResult> {
+  // This read-only endpoint can be called after long local
+  // processing (indexing), when a pooled connection may have gone
+  // stale, so one retry is allowed on network errors.
+  let res: Response | undefined;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      res = await fetch(apiUrl('/api/github/file-contents'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoUrl,
+          branch: input.branch,
+          commitSha: input.commitSha,
+          githubToken: input.githubToken,
+          items: input.items,
+        }),
+      });
+      break;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  if (!res) throw lastError;
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(
+      errData.error || `GitHub file contents failed (${res.status})`
+    );
+  }
+
+  return (await res.json()) as GitHubFileContentsResult;
+}
+
 export const apiService = {
   checkServerHealth,
   sendChatMessage,
   sendDebugRequest,
   importGitHubRepo,
+  fetchGitHubFileContents,
   pushToGitHubRepo,
   importFromGitHub: async (
     params: { token?: string; repoUrl: string; branch?: string },

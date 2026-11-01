@@ -1,7 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { selfImprovementIngressService } from './selfImprovementIngressService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
-import { canonicalSha256 } from './canonicalSha256Service';
 import { taskBlackboardService } from './taskBlackboardService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 import type { AutonomousImplementationPlan } from './autonomousCandidatePreparationService';
@@ -18,14 +17,9 @@ class ImprovementIntakeRouterService{
  }
 
  private currentSourceSnapshotSha256():string{
-  const files=selfCodeSpaceService.listSourceFiles();
-  if(!files.length)return '';
-  return canonicalSha256(
-   files.map(file=>({
-    path:file.path,
-    sha256:file.contentHash
-   }))
-  );
+  // P352: shared with candidate generation via the space service so
+  // classic and index-first modes identify the same snapshot.
+  return selfCodeSpaceService.getSourceSnapshotSha256();
  }
  async receive(input:{runType:ImprovementRunType;sourceId:string;objective:string;payload?:Record<string,unknown>;priority?:number;relatedRunIds?:string[];changeSetId?:ChangeSetID}):Promise<ImprovementIntakeRun>{const now=Date.now();this.sequence+=1;const prefix=input.runType==='AUTONOMOUS_DISCOVERY'?'AUTO':input.runType==='EXTERNAL_DIRECTIVE'?'EXT':input.runType==='EXECUTION_FAILURE'?'EXEC':input.runType==='REVALIDATION'?'REVAL':'USER';const sourceSnapshotSha256=this.currentSourceSnapshotSha256();
     if(!sourceSnapshotSha256)throw new Error('SOURCE_SNAPSHOT_REQUIRED');

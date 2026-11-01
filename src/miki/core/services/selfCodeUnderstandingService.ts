@@ -302,8 +302,10 @@ class SelfCodeUnderstandingService {
 
   public getSnapshot():CodeUnderstandingSnapshot|undefined{try{const raw=storageService.getItem(KEY);if(!raw)return undefined;const parsed=JSON.parse(raw) as CodeUnderstandingSnapshot;return parsed?.schemaVersion===2?parsed:undefined;}catch{return undefined;}}
 
-  ensure(targetPaths:string[]):CodeUnderstandingResult {
-    const files=selfCodeSpaceService.listSourceFiles().filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
+  public exportsOf(path:string,content:string):string[]{return this.parse({path,content,contentHash:''}).exports;}
+
+  ensure(targetPaths:string[],sourceFiles?:Array<{path:string;content:string;contentHash:string}>):CodeUnderstandingResult {
+    const files=(sourceFiles||selfCodeSpaceService.listSourceFiles()).filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
     const empty:CodeUnderstandingResult={ready:false,reused:false,repoSha256:'',targetPaths,relatedPaths:[],reasons:[],symbolIds:[],executionRelations:[],contractValues:[],executionPaths:[],impactScopes:[],unresolvedEdges:[]};
     if(!files.length)return {...empty,reasons:['SOURCE_SNAPSHOT_EMPTY']};
 

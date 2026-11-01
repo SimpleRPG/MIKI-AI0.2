@@ -33,7 +33,16 @@ export interface SelfCodeSnapshot {
   source?: 'BUNDLED_SEED' | 'GITHUB';
 }
 
+export interface SelfCodeLightManifest {
+  repository: string;
+  branch: string;
+  commitSha: string;
+  files: Array<{ path: string; blobSha: string }>;
+  syncedAt: number;
+}
+
 const KEY = 'miki_self_code_space_v1';
+const LIGHT_KEY = 'miki_self_code_light_manifest_v1';
 const SETTINGS_KEY = 'miki_self_code_github_settings_v1';
 const SEED_APPLIED_KEY = 'miki_self_code_seed_revision_v1';
 const DEFAULT_REPOSITORY = 'SimpleRPG/MIKI-AI0.2';
@@ -71,6 +80,8 @@ export interface SelfCodeWorkspaceDiagnostic {
 
 
 class SelfCodeSpaceService {
+  private lightContentCache = new Map<string, string>();
+
   getGitHubSettings(): SelfCodeGitHubSettings {
     try {
       const raw=storageService.getItem(SETTINGS_KEY);
@@ -755,6 +766,231 @@ class SelfCodeSpaceService {
     const updated:SelfCodeSnapshot={...snapshot,files:next,repoSha256:canonicalSha256(next.map(file=>({path:file.path,sha256:file.sha256}))),syncedAt:Date.now(),dirty:true,baseRepoSha256:snapshot.baseRepoSha256||snapshot.repoSha256};
     storageService.setItem(KEY,JSON.stringify(updated));
     return this.clone(updated);
+  }
+
+  getLightManifest(): SelfCodeLightManifest | undefined {
+    try {
+      const raw = storageService.getItem(LIGHT_KEY);
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw);
+      if (
+        !parsed ||
+        typeof parsed.commitSha !== 'string' ||
+        !Array.isArray(parsed.files)
+      )
+        return undefined;
+      return parsed as SelfCodeLightManifest;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // P352: index-first sync. Fetch only the manifest, refresh the
+  // understanding index from the contents of new/changed source
+  // files, and do not retain file contents afterwards.
+  async syncIndexFirst(): Promise<{
+    repository: string;
+    branch: string;
+    commitSha: string;
+    fileCount: number;
+    indexedFiles: number;
+    fetchedFiles: number;
+    syncedAt: number;
+  }> {
+    const settings = this.getGitHubSettings();
+    const token = this.getGitHubPat();
+    const repoUrl = `https://github.com/${settings.repository}`;
+    const previous = this.getLightManifest();
+    const knownFiles = (previous?.files || []).map(file => ({
+      path: file.path,
+      blobSha: file.blobSha,
+    }));
+
+    const data: any = await apiService.importGitHubRepo(
+      repoUrl,
+      settings.branch,
+      token || undefined,
+      knownFiles,
+      undefined,
+      { includeContents: false }
+    );
+
+    const manifest: Array<{ path: string; blobSha: string }> = (
+      Array.isArray(data?.manifest) ? data.manifest : []
+    ).map((item: any) => ({
+      path: String(item.path),
+      blobSha: String(item.blobSha || ''),
+    }));
+    if (!data?.commitSha || manifest.length === 0) {
+      throw new Error('SELF_CODE_LIGHT_SYNC_INVALID_RESPONSE');
+    }
+    const changedPaths = new Set<string>(
+      Array.isArray(data.changedPaths) ? data.changedPaths : []
+    );
+
+    const { selfCodeUnderstandingService } = await import(
+      './selfCodeUnderstandingService'
+    );
+    const previousIndex = selfCodeUnderstandingService.getSnapshot();
+    const entryByPath = new Map(
+      (previousIndex?.entries || []).map(entry => [entry.path, entry])
+    );
+
+    const isSource = (path: string) => /\.(?:ts|tsx|js|jsx)$/.test(path);
+    const fetchTargets = manifest.filter(
+      item =>
+        isSource(item.path) &&
+        (changedPaths.has(item.path) || !entryByPath.has(item.path))
+    );
+
+    const fetchedContents = new Map<string, string>();
+    for (let i = 0; i < fetchTargets.length; i += 25) {
+      const batch = fetchTargets.slice(i, i + 25);
+      const result = await apiService.fetchGitHubFileContents(repoUrl, {
+        commitSha: String(data.commitSha),
+        githubToken: token || undefined,
+        items: batch,
+      });
+      for (const file of result.files) {
+        fetchedContents.set(file.path, file.content);
+      }
+    }
+
+    const sourceFiles: Array<{
+      path: string;
+      content: string;
+      contentHash: string;
+    }> = [];
+    for (const item of manifest) {
+      if (!isSource(item.path)) continue;
+      const content = fetchedContents.get(item.path);
+      if (content !== undefined) {
+        sourceFiles.push({
+          path: item.path,
+          content,
+          contentHash: sha256HexFromText(content),
+        });
+        continue;
+      }
+      const entry = entryByPath.get(item.path);
+      if (entry) {
+        sourceFiles.push({
+          path: item.path,
+          content: '',
+          contentHash: entry.contentHash,
+        });
+      }
+    }
+
+    selfCodeUnderstandingService.ensure([], sourceFiles);
+
+    const lightManifest: SelfCodeLightManifest = {
+      repository: settings.repository,
+      branch: settings.branch,
+      commitSha: String(data.commitSha),
+      files: manifest,
+      syncedAt: Date.now(),
+    };
+    storageService.setItem(LIGHT_KEY, JSON.stringify(lightManifest));
+
+    return {
+      repository: lightManifest.repository,
+      branch: lightManifest.branch,
+      commitSha: lightManifest.commitSha,
+      fileCount: manifest.length,
+      indexedFiles: sourceFiles.length,
+      fetchedFiles: fetchedContents.size,
+      syncedAt: lightManifest.syncedAt,
+    };
+  }
+
+  // P352: read one file's content, fetching it on demand when the
+  // classic full snapshot does not hold it.
+  async ensureFileContent(path: string): Promise<string> {
+    const contents = await this.ensureFileContents([path]);
+    const content = contents.get(path);
+    if (content !== undefined) return content;
+    const manifest = this.getLightManifest();
+    if (!manifest) throw new Error('SELF_CODE_NOT_SYNCED');
+    if (!manifest.files.some(file => file.path === path))
+      throw new Error(`SELF_CODE_FILE_NOT_FOUND:${path}`);
+    throw new Error(`SELF_CODE_FILE_CONTENT_MISSING:${path}`);
+  }
+
+  // P352: batch variant of ensureFileContent. Held or cached files
+  // are served locally; the rest are fetched in one request.
+  async ensureFileContents(
+    paths: string[]
+  ): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    const manifest = this.getLightManifest();
+    const missing: Array<{ path: string; blobSha: string }> = [];
+    for (const path of paths) {
+      const held = this.readFile(path);
+      if (held) {
+        result.set(path, held.content);
+        continue;
+      }
+      const cached = this.lightContentCache.get(path);
+      if (cached !== undefined) {
+        result.set(path, cached);
+        continue;
+      }
+      const entry = manifest?.files.find(file => file.path === path);
+      if (entry) missing.push(entry);
+    }
+    if (missing.length > 0 && manifest) {
+      const settings = this.getGitHubSettings();
+      const fetched = await apiService.fetchGitHubFileContents(
+        `https://github.com/${settings.repository}`,
+        {
+          commitSha: manifest.commitSha,
+          githubToken: this.getGitHubPat() || undefined,
+          items: missing,
+        }
+      );
+      for (const file of fetched.files) {
+        if (this.lightContentCache.size > 50)
+          this.lightContentCache.clear();
+        this.lightContentCache.set(file.path, file.content);
+        result.set(file.path, file.content);
+      }
+    }
+    return result;
+  }
+
+  // P352: the source snapshot identity shared by intake and
+  // candidate generation. Classic mode hashes file contents;
+  // index-first mode hashes the manifest (path + blobSha), which is
+  // stable no matter which files are currently hydrated.
+  getSourceSnapshotSha256(): string {
+    const files = this.listSourceFiles();
+    if (files.length > 0) {
+      return canonicalSha256(
+        files.map(file => ({ path: file.path, sha256: file.contentHash }))
+      );
+    }
+    const manifest = this.getLightManifest();
+    if (manifest && manifest.files.length > 0) {
+      return canonicalSha256(
+        manifest.files.map(file => ({
+          path: file.path,
+          sha256: file.blobSha,
+        }))
+      );
+    }
+    return '';
+  }
+
+  toSourceFile(path: string, content: string) {
+    return {
+      path,
+      content,
+      language: this.language(path),
+      evidenceIds: [] as string[],
+      updatedAt: Date.now(),
+      contentHash: sha256HexFromText(content),
+    };
   }
 
   async push(token:string,commitMessage?:string): Promise<SelfCodeSnapshot> {
