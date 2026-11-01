@@ -13,6 +13,7 @@ import { unknownGraphConnectorP211Service } from '../../unknown/services/unknown
 import { experienceGraphConnectorP211Service } from '../../experience/services/experienceGraphConnectorP211Service';
 import { verificationGraphConnectorP211Service } from '../../verification/services/verificationGraphConnectorP211Service';
 import { crossDomainGraphConnectionP211Service } from '../../core/services/crossDomainGraphConnectionP211Service';
+import { userCommunicationPreferenceService } from './userCommunicationPreferenceService';
 
 export interface ConversationGraphContext { activeGoalIds:string[]; openGoalIds:string[] }
 export interface ConversationRuntimeReceipt { turnId:string; inputReceiptSha256:string; semanticReceiptSha256:string; usedComponentIds:string[]; selectedConceptId?:string; requiresResearch:boolean; graphSha256:string; receiptSha256:string }
@@ -24,6 +25,10 @@ class ConversationGraphRuntimeP212Service {
   const resolvedContext=context??conversationGraphCompletionP214Service.context(text);conversationGraphCompletionP214Service.observeInput(taskId,text);
   if(!taskId.trim()||!text.trim())throw new Error('P212_EMPTY_CONVERSATION_INPUT');
   const turnId=`turn:${canonicalSha256Object({taskId,text}).slice(0,32)}`;
+  // P394: a short instruction about the answering style itself
+  // ("短くして", "詳しく説明して") is the user's standing delivery
+  // preference, remembered for later answers — not just this one.
+  userCommunicationPreferenceService.observeUserInput(text);
   const analysis=conversationComponentPipelineService.analyzeSync(text);
   // P383: keep the input's own content terms so the answer plan can
   // require engagement with what was actually said when the intent /

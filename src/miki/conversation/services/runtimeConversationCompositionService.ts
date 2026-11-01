@@ -9,6 +9,7 @@ import { conversationLearningEpisodeService } from './conversationLearningEpisod
 import type { ConversationFeedbackScope } from './conversationFeedbackEvidenceService';
 import { systemLogger } from '../../../services/systemLogger';
 import { compositionalRealizationService } from './compositionalRealizationService';
+import { userCommunicationPreferenceService } from './userCommunicationPreferenceService';
 
 export interface RuntimeConversationCompositionOptions { maxCandidates?: number; timeBudgetMs?: number; assembledCode?: string; }
 export interface RuntimeConversationConcurrencyState { inFlight: boolean; startedAt?: number; }
@@ -166,6 +167,13 @@ export class RuntimeConversationCompositionService {
   private readonly inFlight = new Map<string, RuntimeConversationConcurrencyState>();
   public compose(ir: AnswerContentIR, primarySkeleton: AnswerSkeletonType, options: RuntimeConversationCompositionOptions = {}): RuntimeConversationCompositionResult {
     const startedAt = performance.now();
+    // P394: the user's standing delivery preference fills in the
+    // detail level when this request carries none of its own
+    // (STANDARD). An explicit per-request level always wins, and
+    // generation and selection both see the effective level, so
+    // the choice stays consistent — and keys the cache correctly.
+    const standingDetail = userCommunicationPreferenceService.currentDetailLevel();
+    if (standingDetail && ir.detail_level === 'STANDARD') ir = { ...ir, detail_level: standingDetail };
     const personaProfile = personaProfileService.get();
     const compositionPlan = autonomousAnswerCompositionPlanService.create(ir);
     const sceneScopes: ConversationFeedbackScope[] = ['WORDING', 'TONE', 'ANSWER_STRUCTURE', ...(ir.detail_level === 'BRIEF' || ir.detail_level === 'DETAILED' ? ['DETAIL_LEVEL' as const] : [])];
