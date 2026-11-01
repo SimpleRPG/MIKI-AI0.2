@@ -28,6 +28,7 @@ import {
   Award,
   AlertCircle,
   FileCode,
+  Archive,
   Shield,
   Send,
   Boxes,
@@ -50,6 +51,7 @@ import {
 } from '../miki/core/mikiInteractionBus';
 import { ReviewPackageLibrary } from './ReviewPackageLibrary';
 import { SelfCodeSpaceScreen } from './SelfCodeSpaceScreen';
+import { LearningArchivePanel } from './LearningArchivePanel';
 import DevelopmentReviewLifecyclePanel from './self_improvement/DevelopmentReviewLifecyclePanel';
 import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
@@ -68,6 +70,7 @@ type MainSection =
   | 'core_18'
   | 'review_packages'
   | 'self_code'
+  | 'learning_archive'
 ;
 
 const formatRuntimeStatus = (value: string) => {
@@ -714,6 +717,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
           { id: 'core_18', label: '18構成 & CORE Result', icon: Boxes, count: coreResults.length },
           { id: 'review_packages', label: '評価用ZIP', icon: UploadCloud },
           { id: 'self_code', label: '自己コードスペース', icon: FileCode },
+          { id: 'learning_archive', label: '学習の保全', icon: Archive },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSection === tab.id;
@@ -986,6 +990,10 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
         {activeSection === 'self_code' && (
           <SelfCodeSpaceScreen />
+        )}
+
+        {activeSection === 'learning_archive' && (
+          <LearningArchivePanel />
         )}
 
         {activeSection === 'review_packages' && (
