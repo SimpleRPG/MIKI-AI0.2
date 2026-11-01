@@ -8005,9 +8005,9 @@
     },
     {
       "path": "src/components/self_improvement/DevelopmentReviewLifecyclePanel.tsx",
-      "bytes": 2564,
+      "bytes": 2634,
       "lines": 3,
-      "sha256": "304095f2c193f0114c091b62bcf8a405b69957366941056752385dec0c9b5e2a",
+      "sha256": "9bdf2dcdaf1c4430e47d2c50ba6fe70982d23045f8abf05d71096a3a9fe30ea6",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -27928,9 +27928,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/developmentLifecycleStateMachineService.ts",
-      "bytes": 1719,
-      "lines": 36,
-      "sha256": "dc677cb6cf9e6a3e85d419a6efffba03a45ad78f02281a6cfa38bb488aeacb45",
+      "bytes": 2323,
+      "lines": 46,
+      "sha256": "2047ec3b732e0be69fbb712ca8bda77f0a4d9b69bdafe4df3917907349942e43",
       "relativeImportCandidates": [
         {
           "line": 1,

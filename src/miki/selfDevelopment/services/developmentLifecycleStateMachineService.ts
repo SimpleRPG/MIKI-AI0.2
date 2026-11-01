@@ -11,7 +11,7 @@ const transitions: Record<DevelopmentLifecycleState, DevelopmentLifecycleState[]
   REJECTED: ['COMPLETED'],
   REVISION_REQUESTED: ['REVISION_RUNNING'],
   REVISION_RUNNING: ['REVIEW_READY', 'PROMOTION_FAILED'],
-  PROMOTION_FAILED: ['REVISION_REQUESTED'],
+  PROMOTION_FAILED: ['REVISION_REQUESTED', 'ACCEPTED'],
   COMPLETED: [],
 };
 
@@ -27,7 +27,17 @@ class DevelopmentLifecycleStateMachineService {
     if (request.state === 'PROMOTION_FAILED' && decision === 'REQUEST_CHANGES') {
       return Boolean(request.instructionText.trim());
     }
-    return request.state === 'REVIEW_READY' &&
+    // P370: a promotion failure is often transient (the external
+    // review had not been imported yet, its correspondence check had
+    // not finished, CORE was briefly unavailable). As long as the
+    // candidate itself is complete, ACCEPT may be retried from
+    // PROMOTION_FAILED; the adoption path re-validates the candidate
+    // and the review on every attempt, so a retry cannot adopt
+    // anything that does not currently pass. REJECT stays
+    // REVIEW_READY-only.
+    const decidable = request.state === 'REVIEW_READY' ||
+      (request.state === 'PROMOTION_FAILED' && decision === 'ACCEPT');
+    return decidable &&
       Boolean(request.workspaceId && request.candidateId && request.candidateSha256 && request.reviewPackageId) &&
       (decision !== 'ACCEPT' || Boolean(request.candidateSha256));
   }
