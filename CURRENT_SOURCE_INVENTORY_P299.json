@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1749,
     "sourceFileCount": 1302,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1215,
-    "relativeImportCandidateCount": 3628,
-    "resolvedRelativeImportCandidateCount": 3612,
+    "relativeImportCandidateCount": 3630,
+    "resolvedRelativeImportCandidateCount": 3614,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -10310,9 +10310,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 13489,
-      "lines": 115,
-      "sha256": "2670d70639c9f9d7ad386a3d269ff2b75bc3b9191bdad16d026423632f998541",
+      "bytes": 15658,
+      "lines": 147,
+      "sha256": "72dfce9cbfdb38edceea597365c2d42bce1403608b1bab9d73fc6cf8704bffef",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10409,10 +10409,22 @@
           "specifier": "./userCommunicationPreferenceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/userCommunicationPreferenceService.ts"
+        },
+        {
+          "line": 17,
+          "specifier": "./surfaceVariationGrowthService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/surfaceVariationGrowthService.ts"
+        },
+        {
+          "line": 18,
+          "specifier": "../../research/services/webMaterialPatternExtractor",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/webMaterialPatternExtractor.ts"
         }
       ],
-      "relativeImportCandidateCount": 16,
-      "resolvedRelativeImportCount": 16,
+      "relativeImportCandidateCount": 18,
+      "resolvedRelativeImportCount": 18,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -11167,9 +11179,9 @@
     },
     {
       "path": "src/miki/conversation/services/surfaceVariationService.ts",
-      "bytes": 20398,
-      "lines": 551,
-      "sha256": "695e2a5be0e9b69728ecd885a52366b2a50cc4f10bff2b6397a34527b1d86c8a",
+      "bytes": 21943,
+      "lines": 573,
+      "sha256": "e3ce25d7c3260cbd9401ac6e1b14580735e19743d5f312ed1e783fcde8500f95",
       "relativeImportCandidates": [
         {
           "line": 13,
@@ -19180,9 +19192,9 @@
     },
     {
       "path": "src/miki/data/surfaceVariationData.ts",
-      "bytes": 57004,
-      "lines": 709,
-      "sha256": "bacc6f052f86733027156ecdc4c997d6115e9fb68a57e1dd04cccbb5b8f84e11",
+      "bytes": 57160,
+      "lines": 712,
+      "sha256": "1b0bda92d670e49da889164c719c41774ba70c49a241486444664adf7f51cb67",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -24895,9 +24907,9 @@
     },
     {
       "path": "src/miki/research/services/webMaterialPatternExtractor.ts",
-      "bytes": 15594,
-      "lines": 412,
-      "sha256": "caff894195342520c351b6c14ee0f66846bbc99d43906922792ea93a00ffd0bc",
+      "bytes": 15870,
+      "lines": 417,
+      "sha256": "44af30311b33c9bdb591ebafebc5292697918a223c015f99efdbd940feb356cf",
       "relativeImportCandidates": [
         {
           "line": 13,

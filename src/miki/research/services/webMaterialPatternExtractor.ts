@@ -26,6 +26,11 @@ export const VALID_WEB_REAL_DATA_PROVIDERS = [
   'gemini_grounding',
   'headless_webview',
   'rss_feed',
+  // P395: a real conversation with the user is real data too —
+  // surface patterns extracted from delivered, validated answers
+  // carry this provider. Fabricated/mock/synthetic sources stay
+  // excluded by the substring filter in isRealDataProvider.
+  'conversation',
 ] as const;
 
 export function isRealDataProvider(provider?: string): boolean {

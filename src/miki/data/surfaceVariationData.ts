@@ -6,6 +6,9 @@
 export interface VariationItem {
   id: string;
   text: string;
+  /** P395: monotonic registration order for grown variants, used
+   *  to evict the globally oldest when the total cap is reached. */
+  grownSeq?: number;
   sourceType?: 'PRESET' | 'MUTATION' | 'WEB_OBSERVED' | 'GEMINI_GENERATED';
   sourceProvenance?: {
     query?: string;

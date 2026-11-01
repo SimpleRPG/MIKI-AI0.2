@@ -22,9 +22,15 @@ import { storageService } from '../../../services/storageService';
 // restart returned the surface pools to their initial size and the
 // growth never accumulated. They are now persisted like other
 // learned state, with caps so the store stays bounded.
+// P395: the caps are a safety valve, not a ration — one item is a
+// few dozen bytes, so the limits sit far above any realistic
+// accumulation (300 per category, 10,000 in total). When the total
+// cap is ever reached, the globally oldest grown variants retire
+// first (tracked by a monotonic grownSeq), never an arbitrary
+// category.
 const DYNAMIC_VARIATIONS_KEY = 'miki_dynamic_surface_variations_v1';
-const MAX_DYNAMIC_PER_CATEGORY = 60;
-const MAX_DYNAMIC_TOTAL = 600;
+const MAX_DYNAMIC_PER_CATEGORY = 300;
+const MAX_DYNAMIC_TOTAL = 10000;
 
 export class RecentUsageCache {
   private static instance: RecentUsageCache;
@@ -134,6 +140,7 @@ export class SurfaceVariationService {
   private static instance: SurfaceVariationService;
   private cache: RecentUsageCache;
   private dynamicVariations: Map<string, VariationItem[]> = new Map();
+  private dynamicSeq = 0;
   private currentTurnUsedIds: Set<string> = new Set();
 
   constructor() {
@@ -145,20 +152,26 @@ export class SurfaceVariationService {
     try {
       const raw = storageService.getItem(DYNAMIC_VARIATIONS_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as Record<string, VariationItem[]>;
-      for (const [categoryKey, items] of Object.entries(parsed || {})) {
+      const parsed = JSON.parse(raw) as { version?: number; seq?: number; categories?: Record<string, VariationItem[]> } | Record<string, VariationItem[]>;
+      // v2 envelope (P395) carries the sequence counter; the P393
+      // bare-record format is still readable (its items simply have
+      // no grownSeq and therefore count as the oldest).
+      const categories = (parsed as { categories?: Record<string, VariationItem[]> }).categories || (parsed as Record<string, VariationItem[]>);
+      if (typeof (parsed as { seq?: number }).seq === 'number') this.dynamicSeq = (parsed as { seq?: number }).seq || 0;
+      for (const [categoryKey, items] of Object.entries(categories || {})) {
         if (!Array.isArray(items)) continue;
         const clean = items.filter((item) => item && typeof item.id === 'string' && typeof item.text === 'string').slice(-MAX_DYNAMIC_PER_CATEGORY);
         if (clean.length) this.dynamicVariations.set(categoryKey, clean);
+        for (const item of clean) if (typeof item.grownSeq === 'number' && item.grownSeq > this.dynamicSeq) this.dynamicSeq = item.grownSeq;
       }
     } catch { /* a broken store must never break surface selection */ }
   }
 
   private persistDynamicVariations(): void {
     try {
-      const out: Record<string, VariationItem[]> = {};
-      for (const [categoryKey, items] of this.dynamicVariations) if (items.length) out[categoryKey] = items;
-      storageService.setItem(DYNAMIC_VARIATIONS_KEY, JSON.stringify(out));
+      const categories: Record<string, VariationItem[]> = {};
+      for (const [categoryKey, items] of this.dynamicVariations) if (items.length) categories[categoryKey] = items;
+      storageService.setItem(DYNAMIC_VARIATIONS_KEY, JSON.stringify({ version: 2, seq: this.dynamicSeq, categories }));
     } catch { /* persistence is best-effort; selection keeps working */ }
   }
 
@@ -208,18 +221,27 @@ export class SurfaceVariationService {
   public registerDynamicVariant(categoryKey: string, item: VariationItem): void {
     const list = this.dynamicVariations.get(categoryKey) || [];
     if (!list.some((x) => x.id === item.id || x.text === item.text)) {
-      list.push(item);
-      // P393: bounded accumulation — oldest grown variants in a
-      // category retire first, and a global cap trims across
-      // categories, so the persisted store cannot grow without limit.
+      list.push({ ...item, grownSeq: ++this.dynamicSeq });
+      // Bounded accumulation: within a category the oldest retire
+      // first (array order is registration order); across the whole
+      // store the globally oldest grown variant (smallest grownSeq,
+      // sequence-less legacy items first) retires first.
       while (list.length > MAX_DYNAMIC_PER_CATEGORY) list.shift();
       this.dynamicVariations.set(categoryKey, list);
       let total = 0;
       for (const items of this.dynamicVariations.values()) total += items.length;
       while (total > MAX_DYNAMIC_TOTAL) {
-        const firstKey = [...this.dynamicVariations.keys()].find((key) => (this.dynamicVariations.get(key) || []).length > 0);
-        if (!firstKey) break;
-        this.dynamicVariations.get(firstKey)!.shift();
+        let oldestKey: string | undefined;
+        let oldestIndex = -1;
+        let oldestSeq = Infinity;
+        for (const [key, items] of this.dynamicVariations) {
+          items.forEach((candidate, index) => {
+            const seq = typeof candidate.grownSeq === 'number' ? candidate.grownSeq : 0;
+            if (seq < oldestSeq) { oldestSeq = seq; oldestKey = key; oldestIndex = index; }
+          });
+        }
+        if (!oldestKey || oldestIndex < 0) break;
+        this.dynamicVariations.get(oldestKey)!.splice(oldestIndex, 1);
         total -= 1;
       }
       this.persistDynamicVariations();

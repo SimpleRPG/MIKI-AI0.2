@@ -14,16 +14,31 @@ import { experienceGraphConnectorP211Service } from '../../experience/services/e
 import { verificationGraphConnectorP211Service } from '../../verification/services/verificationGraphConnectorP211Service';
 import { crossDomainGraphConnectionP211Service } from '../../core/services/crossDomainGraphConnectionP211Service';
 import { userCommunicationPreferenceService } from './userCommunicationPreferenceService';
+import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
+import { WebMaterialPatternExtractor } from '../../research/services/webMaterialPatternExtractor';
 
 export interface ConversationGraphContext { activeGoalIds:string[]; openGoalIds:string[] }
 export interface ConversationRuntimeReceipt { turnId:string; inputReceiptSha256:string; semanticReceiptSha256:string; usedComponentIds:string[]; selectedConceptId?:string; requiresResearch:boolean; graphSha256:string; receiptSha256:string }
 class ConversationGraphRuntimeP212Service {
  private semanticState:SemanticGraphState=semanticGraphCoreP208Service.bootstrap();
  private readonly inputByTask=new Map<string,ConversationRuntimeReceipt & {inputNodeIds:string[];inputSurface:string;constraintIds:string[];intentIds:string[];grammarIds:string[];meaningComponentIds:string[];contentTerms:string[]}>();
+ // P395: the last delivered answer that passed validation, waiting
+ // to be judged by the user's next turn. If that turn corrects it,
+ // nothing is harvested; if the conversation simply moves on, its
+ // phrasing becomes growth material through the same gate web
+ // material passes.
+ private pendingAnswerHarvest:{text:string;question:string}|undefined;
  constructor(){const saved=conversationGraphCompletionP214Service.load();if(saved)crossDomainGraphConnectionP211Service.restore(saved.graph)}
  ingestInput(taskId:string,text:string,context?:ConversationGraphContext):ConversationRuntimeReceipt {
   const resolvedContext=context??conversationGraphCompletionP214Service.context(text);conversationGraphCompletionP214Service.observeInput(taskId,text);
   if(!taskId.trim()||!text.trim())throw new Error('P212_EMPTY_CONVERSATION_INPUT');
+  // P395: judge the previous delivered answer by this turn. A
+  // correction discards it as growth material; anything else lets
+  // its phrasing be harvested through the variation growth gate.
+  if(this.pendingAnswerHarvest){
+   const pending=this.pendingAnswerHarvest;this.pendingAnswerHarvest=undefined;
+   if(!/違う|訂正|ではなく|そうじゃなく|そうではない/u.test(text))this.harvestAnswerPatterns(pending);
+  }
   const turnId=`turn:${canonicalSha256Object({taskId,text}).slice(0,32)}`;
   // P394: a short instruction about the answering style itself
   // ("短くして", "詳しく説明して") is the user's standing delivery
@@ -105,7 +120,24 @@ class ConversationGraphRuntimeP212Service {
   const validationReceipt=verificationGraphConnectorP211Service.connect({eventKind:'VALIDATION',subjectId:`validation:${taskId}`,payload:{taskId,passed,semanticValidation,counterexample:validation.counterexample,repair:validation.repair??semanticValidation.repair},confidence:passed?.95:.85,uncertainty:passed?.05:.25,sourceRefs:[output.eventSha256],participantDomains:['conversation','experience','learning','improvement'],relatedNodeIds:output.createdNodeIds});
   const experienceReceipt=experienceGraphConnectorP211Service.connect({eventKind:passed?'RESULT':'ERROR',subjectId:`experience:${taskId}`,payload:{taskId,passed,usedComponentIds:input.usedComponentIds,selectedConceptId:input.selectedConceptId,counterexample:validation.counterexample,repair:validation.repair},confidence:.9,uncertainty:.1,sourceRefs:[output.eventSha256],participantDomains:['conversation','learning','verification'],relatedNodeIds:[...input.inputNodeIds,...output.createdNodeIds,...validationReceipt.createdNodeIds]});
   crossDomainGraphConnectionP211Service.connect({domain:'learning',eventKind:passed?'RESULT':'CORRECTION',subjectId:`learning:${taskId}`,payload:{taskId,outcome:passed?'POSITIVE_EXAMPLE':'COUNTEREXAMPLE',surface:input.inputSurface,contentTerms:input.contentTerms,meaningIds:input.selectedConceptId?[input.selectedConceptId]:[],counterexample:validation.counterexample,repair:validation.repair,reuseCondition:input.selectedConceptId},confidence:passed?.9:.8,uncertainty:passed?.1:.25,sourceRefs:[output.eventSha256],participantDomains:['conversation','experience','verification'],relatedNodeIds:[...input.inputNodeIds,...output.createdNodeIds,...validationReceipt.createdNodeIds,...experienceReceipt.createdNodeIds]});
-  const current={...input,graphSha256:crossDomainGraphConnectionP211Service.snapshot().graphSha256};this.inputByTask.delete(taskId);conversationGraphCompletionP214Service.save(crossDomainGraphConnectionP211Service.snapshot());return{...current,receiptSha256:canonicalSha256Object(current)};
+  const current={...input,graphSha256:crossDomainGraphConnectionP211Service.snapshot().graphSha256};this.inputByTask.delete(taskId);conversationGraphCompletionP214Service.save(crossDomainGraphConnectionP211Service.snapshot());
+  // P395: only a validated answer becomes harvest material, and
+  // only once the next turn leaves it uncorrected (see ingestInput).
+  if(passed&&typeof response==='string'&&response.trim().length>=8)this.pendingAnswerHarvest={text:response,question:input.inputSurface};
+  return{...current,receiptSha256:canonicalSha256Object(current)};
+ }
+ // P395: mine a delivered, validated, uncorrected answer for
+ // surface patterns, through the same extractor and the same
+ // verification/promotion gate as web material. The generated
+ // footing notes (P392) are fixed annotations, not phrasing the
+ // conversation produced, so they are excluded. Harvesting must
+ // never break intake, hence the contained failure.
+ private harvestAnswerPatterns(pending:{text:string;question:string}):void {
+  try{
+   const patterns=WebMaterialPatternExtractor.extractSurfacePatternsFromWebText({text:pending.text,sourceQuery:pending.question,sourceUrl:'conversation://self',provider:'conversation'});
+   const own=patterns.filter(pattern=>!pattern.originalFragment.startsWith('※')&&!pattern.originalFragment.startsWith('出典'));
+   if(own.length)surfaceVariationGrowthService.processWebMaterialForVariationGrowth(own,2);
+  }catch{ /* best-effort growth material only */ }
  }
  getAnswerRequirements(taskId:string,executionResult?:unknown){const input=this.inputByTask.get(taskId);if(!input)return undefined;return{inputSurface:input.inputSurface,intentIds:input.intentIds,constraintIds:input.constraintIds,grammarIds:input.grammarIds,meaningComponentIds:input.meaningComponentIds,contentTerms:input.contentTerms,executionResult}}
  snapshot(){return crossDomainGraphConnectionP211Service.snapshot()}
