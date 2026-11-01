@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1745,
     "sourceFileCount": 1298,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1211,
-    "relativeImportCandidateCount": 3597,
-    "resolvedRelativeImportCandidateCount": 3581,
+    "relativeImportCandidateCount": 3598,
+    "resolvedRelativeImportCandidateCount": 3582,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -21960,9 +21960,9 @@
     },
     {
       "path": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts",
-      "bytes": 14886,
-      "lines": 292,
-      "sha256": "754f5986aafccdb203bcba47bcc42038f4ea583adbf383171568c471ffb27127",
+      "bytes": 19298,
+      "lines": 377,
+      "sha256": "4fb8a0971335284ce9c9c52aa692646454091dde5de2ca9091dc0c7da367501b",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -21987,10 +21987,16 @@
           "specifier": "../../conversation/services/conversationComponentCompositionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationComponentCompositionService.ts"
+        },
+        {
+          "line": 5,
+          "specifier": "../../core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         }
       ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
+      "relativeImportCandidateCount": 5,
+      "resolvedRelativeImportCount": 5,
       "unresolvedRelativeImportCount": 0
     },
     {

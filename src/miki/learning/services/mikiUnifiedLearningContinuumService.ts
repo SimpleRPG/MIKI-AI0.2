@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { unifiedMikiExperienceService, UnifiedExperienceDomain, UnifiedOutcome } from '../../experience/services/unifiedMikiExperienceService';
 import { conversationComponentCompositionService } from '../../conversation/services/conversationComponentCompositionService';
+import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 
 /**
  * Miki Unified Learning Continuum
@@ -21,6 +22,24 @@ export interface ScopedLesson {
   domain: UnifiedExperienceDomain;
   concepts: string[];
   observedAt: number;
+}
+
+// P379: a generalized rule distilled from repeated scoped lessons
+// of one profile. Individual lessons say what happened once; a rule
+// states the shared conditions and the measured tendency, and only
+// forms once there is enough measured evidence (>= 5 outcomes and
+// >= 2 same-kind lessons) so a single episode never hardens into a
+// rule.
+export interface GeneralizedRule {
+  ruleId: string;
+  key: string;
+  kind: 'APPLIES_WHEN' | 'FAILS_WHEN';
+  domain?: UnifiedExperienceDomain;
+  concepts: string[];
+  samples: number;
+  successRate: number;
+  supportingLessons: number;
+  statement: string;
 }
 
 export interface LearningProfile {
@@ -44,6 +63,7 @@ export interface MikiLearningSnapshot {
   updatedAt: number;
   profiles: LearningProfile[];
   crossDomainLinks: Array<{ concept: string; domains: UnifiedExperienceDomain[]; strength: number; kind: 'CAPABILITY' | 'CAUSAL' | 'CONCEPT'; basis: { uses: number; successes: number; verified: number; lastObservedAt: number } }>;
+  generalizedRules: GeneralizedRule[];
   recommendedCapabilities: Array<{ capabilityId: string; score: number; reason: string }>;
   // 成長速度の可視化 (掛け算式合成メトリクス)
   conversationComponentsCount: number;
@@ -178,6 +198,7 @@ export class MikiUnifiedLearningContinuumService {
 
   /** 過去経験を能力選択に反映する。ただしVERIFIED能力のみ返す。 */
   public rankCapabilities(capabilityIds: string[], query: string): Array<{ capabilityId: string; score: number; reason: string }> {
+    const generalized = this.buildGeneralizedRules();
     const q = normalizeKey(query);
     return capabilityIds.map(id => {
       const p = this.profiles.get(`capability:${normalizeKey(id)}`);
@@ -194,7 +215,11 @@ export class MikiUnifiedLearningContinuumService {
           ? ` / 教訓: ${p.lastLesson.slice(0, 120)}`
           : '';
       const boundaryNote = boundary ? ` / 境界: ${boundary.text.slice(0, 120)} (${boundary.domain})` : '';
-      return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}, activation=${this.activationOf(p)}${lessonNote}${boundaryNote}` : '共通経験なし。新規候補として扱う' };
+      // P379: a distilled rule outranks individual episodes in the explanation.
+      const distilled = generalized.find(rule => rule.key === `capability:${normalizeKey(id)}` && rule.kind === 'FAILS_WHEN')
+        || generalized.find(rule => rule.key === `capability:${normalizeKey(id)}` && rule.kind === 'APPLIES_WHEN');
+      const distilledNote = distilled ? ` / 一般化: ${distilled.statement}` : '';
+      return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}, activation=${this.activationOf(p)}${lessonNote}${boundaryNote}${distilledNote}` : '共通経験なし。新規候補として扱う' };
     }).sort((a, b) => b.score - a.score);
   }
 
@@ -245,6 +270,64 @@ export class MikiUnifiedLearningContinuumService {
     return { promoted: true, reason: 'VERIFIED_CAUSAL_PROMOTED', key: promotionKey };
   }
 
+  /**
+   * P379: distill generalized rules from the profiles. Common
+   * conditions are the concepts shared by at least half of the
+   * same-kind scoped lessons; the domain is their most frequent one.
+   */
+  public buildGeneralizedRules(): GeneralizedRule[] {
+    const rules: GeneralizedRule[] = [];
+    const commonConditions = (lessons: ScopedLesson[]): { concepts: string[]; domain?: UnifiedExperienceDomain } => {
+      const conceptCounts = new Map<string, number>();
+      const domainCounts = new Map<UnifiedExperienceDomain, number>();
+      for (const lesson of lessons) {
+        for (const concept of lesson.concepts) conceptCounts.set(concept, (conceptCounts.get(concept) || 0) + 1);
+        domainCounts.set(lesson.domain, (domainCounts.get(lesson.domain) || 0) + 1);
+      }
+      const threshold = Math.ceil(lessons.length / 2);
+      const concepts = [...conceptCounts.entries()].filter(([, count]) => count >= threshold).map(([concept]) => concept).slice(0, 6);
+      const domain = [...domainCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+      return { concepts, domain };
+    };
+    for (const profile of this.profiles.values()) {
+      const measured = profile.successes + profile.failures;
+      if (measured < 5) continue;
+      const successRate = profile.successes / measured;
+      const lessons = profile.scopedLessons || [];
+      const applies = lessons.filter(lesson => lesson.kind === 'APPLIES');
+      const boundaries = lessons.filter(lesson => lesson.kind === 'BOUNDARY');
+      if (applies.length >= 2 && successRate >= 0.6) {
+        const { concepts, domain } = commonConditions(applies);
+        rules.push({
+          ruleId: `GRULE-${canonicalSha256Object(`${profile.key}:APPLIES:${domain || ''}:${concepts.join('|')}`)}`,
+          key: profile.key,
+          kind: 'APPLIES_WHEN',
+          domain,
+          concepts,
+          samples: measured,
+          successRate: Math.round(successRate * 1000) / 1000,
+          supportingLessons: applies.length,
+          statement: `「${profile.key}」は${domain ? `${domain}の文脈で` : ''}${concepts.length ? `${concepts.join('・')}の条件が揃うと` : ''}成功しやすい（実測${measured}件、成功率${Math.round(successRate * 100)}%）`,
+        });
+      }
+      if (boundaries.length >= 2 && 1 - successRate >= 0.6) {
+        const { concepts, domain } = commonConditions(boundaries);
+        rules.push({
+          ruleId: `GRULE-${canonicalSha256Object(`${profile.key}:FAILS:${domain || ''}:${concepts.join('|')}`)}`,
+          key: profile.key,
+          kind: 'FAILS_WHEN',
+          domain,
+          concepts,
+          samples: measured,
+          successRate: Math.round(successRate * 1000) / 1000,
+          supportingLessons: boundaries.length,
+          statement: `「${profile.key}」は${domain ? `${domain}の文脈で` : ''}${concepts.length ? `${concepts.join('・')}の条件では` : ''}失敗しやすい（実測${measured}件、成功率${Math.round(successRate * 100)}%）`,
+        });
+      }
+    }
+    return rules.sort((a, b) => b.samples - a.samples).slice(0, 50);
+  }
+
   /** 8層記憶へ渡せる「学習要約」。事実DBを汚さず、経験/手続き/メタ学習として扱う。 */
   public buildMemoryLayerSummary() {
     const all = [...this.profiles.values()];
@@ -265,6 +348,7 @@ export class MikiUnifiedLearningContinuumService {
     const all = [...this.profiles.values()];
     const links = all.map(p => ({ concept: p.key, domains: (Object.keys(p.domains) as UnifiedExperienceDomain[]).filter(d => p.domains[d] > 0), strength: this.activationOf(p), kind: (p.key.startsWith('capability:') ? 'CAPABILITY' : p.key.startsWith('causal:') ? 'CAUSAL' : 'CONCEPT') as 'CAPABILITY' | 'CAUSAL' | 'CONCEPT', basis: { uses: p.uses, successes: p.successes, verified: p.verified, lastObservedAt: p.lastObservedAt } }))
       .filter(x => x.domains.length >= 2).sort((a, b) => b.strength - a.strength).slice(0, 100);
+    const generalizedRules = this.buildGeneralizedRules();
     const caps = all.filter(p => p.key.startsWith('capability:')).sort((a, b) => b.confidence - a.confidence).slice(0, 50)
       .map(p => ({ capabilityId: p.key.slice('capability:'.length), score: p.confidence, reason: `uses=${p.uses}; success=${p.successes}; verified=${p.verified}` }));
     
@@ -275,6 +359,7 @@ export class MikiUnifiedLearningContinuumService {
       updatedAt: Date.now(),
       profiles: all.slice(0, MAX_PROFILES),
       crossDomainLinks: links,
+      generalizedRules,
       recommendedCapabilities: caps,
       conversationComponentsCount: convStats.conversationComponentsCount,
       theoreticalCompositionsCount: convStats.theoreticalCompositionsCount,
