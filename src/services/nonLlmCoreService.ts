@@ -4,15 +4,15 @@ import {
   defaultConversationState,
   inferConversationStage,
   resolveAnaphora,
-} from './conversationStateService';
+} from '../miki/conversation/services/conversationStateService';
 import { requestTypeCompilerService } from './requestTypeCompilerService';
 import { claimDatabaseService } from './claimDatabaseService';
 import { longTermMemoryService } from './longTermMemoryService';
 import { latentIntentMiningService } from './latentIntentMiningService';
-import { answerContentIrService } from './answerContentIrService';
+import { answerContentIrService } from '../miki/conversation/services/answerContentIrService';
 import { componentRegistryService } from './componentRegistryService';
 import { capabilityGraphService } from './capabilityGraphService';
-import { componentCompositionService } from './componentCompositionService';
+import { componentCompositionService } from '../miki/capability/services/componentCompositionService';
 import { unifiedDecisionEngineService } from './unifiedDecisionEngineService';
 import { affectionDynamicsService } from './affectionDynamicsService';
 import { systemLogger } from './systemLogger';
@@ -24,14 +24,14 @@ import { reusableComponentFactoryService } from '../miki/core/services/reusableC
 import { capabilityReuseService } from './capabilityReuseService';
 import { failureMemoryService } from './failureMemoryService';
 import { japaneseAnalysisService } from './japaneseAnalysisService';
-import { hybridConversationEngineService } from './hybridConversationEngineService';
+import { hybridConversationEngineService } from '../miki/conversation/services/hybridConversationEngineService';
 import { implementationSelectionService } from './implementationSelectionService';
-import { nonLlmCodeSynthesisService } from './nonLlmCodeSynthesisService';
-import { answerPlanService } from './answerPlanService';
+import { nonLlmCodeSynthesisService } from '../miki/selfDevelopment/services/nonLlmCodeSynthesisService';
+import { answerPlanService } from '../miki/strategy/services/answerPlanService';
 import { formalConstraintSolverService } from './formalConstraintSolverService';
 import { deterministicCapabilityExecutionService } from './deterministicCapabilityExecutionService';
-import { unifiedMikiExperienceService } from './unifiedMikiExperienceService';
-import { mikiUnifiedLearningContinuumService } from './mikiUnifiedLearningContinuumService';
+import { unifiedMikiExperienceService } from '../miki/experience/services/unifiedMikiExperienceService';
+import { mikiUnifiedLearningContinuumService } from '../miki/learning/services/mikiUnifiedLearningContinuumService';
 import { verifiedKnowledgePromotionService } from './verifiedKnowledgePromotionService';
 import { verifiedCapabilityPromotionService } from './verifiedCapabilityPromotionService';
 

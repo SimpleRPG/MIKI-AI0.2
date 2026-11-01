@@ -9,11 +9,11 @@
 
 | 指標 | 件数 |
 |---|---:|
-| 対象追跡パス（監査制御ファイルを除く） | 1786 |
-| ソースファイル | 1339 |
-| 相対import候補を字句走査したECMAScriptファイル | 1252 |
-| 相対import候補 | 3747 |
-| 追跡パスへ解決できた候補 | 3733 |
+| 対象追跡パス（監査制御ファイルを除く） | 1748 |
+| ソースファイル | 1301 |
+| 相対import候補を字句走査したECMAScriptファイル | 1214 |
+| 相対import候補 | 3602 |
+| 追跡パスへ解決できた候補 | 3588 |
 | 未解決候補（即不具合判定ではない） | 14 |
 
 ## ファイル一覧
@@ -1220,10 +1220,10 @@
 | `src/miki/verification/services/draftVerificationService.ts` | 5311 | 146 | `d5e0fc123e5eb87d9dab2698b9c85e55935cbf35e46f56561aab9412362a4bca` | 2 | 2 | 0 |
 | `src/miki/verification/services/externalReviewNormalizerService.ts` | 5112 | 153 | `0c9bb74a42d480a14a47ca55bb0a17eee8ec7bae460bbaa901a09b7761bd28fc` | 0 | 0 | 0 |
 | `src/miki/verification/services/falsificationService.ts` | 23389 | 577 | `0ffc572c94612ffb281425eafca71c36de33bb8b59c1e33880aa7173a68195a2` | 1 | 1 | 0 |
-| `src/miki/verification/services/faultInjectionLabService.ts` | 1912 | 19 | `78c504116ed443126056758236ed0de54eed784f41edd5f392dd9e42ece9ed60` | 1 | 1 | 0 |
+| `src/miki/verification/services/faultInjectionLabService.ts` | 1918 | 19 | `4a9cc5b7912e553900549448dde981fb91e2654ac906ecf779a1498261ea51dd` | 1 | 1 | 0 |
 | `src/miki/verification/services/formalConstraintSolverService.ts` | 5075 | 161 | `41266fbed46d4b01b43665bf9adfa727feeb8f5da23db9977250386238c61a06` | 2 | 2 | 0 |
 | `src/miki/verification/services/formalProofService.ts` | 2980 | 89 | `fbeb67316d2cb36f6445feff4816464ef94e909117a5bb070ef9be484610fd15` | 1 | 1 | 0 |
-| `src/miki/verification/services/formalSemanticsKernelService.ts` | 2109 | 26 | `f6803be5c59726ea601dc180c7671d29364566f2dec81c6af9398ac812ac6082` | 1 | 1 | 0 |
+| `src/miki/verification/services/formalSemanticsKernelService.ts` | 2115 | 26 | `9171a5ef928d9cbf80a7d7d9d1f3dcf0ee7c1b95b93180804b3266a606f44836` | 1 | 1 | 0 |
 | `src/miki/verification/services/operationalConformanceService.ts` | 14263 | 89 | `00ac819d2dee9aa64f5d417c50bfd85f581797d494501ef37caba5414b0abfa5` | 0 | 0 | 0 |
 | `src/miki/verification/services/projectTestRegistryService.ts` | 1720 | 70 | `0d9ab8ecedca7aae9a1dbed7a20f1dda7904e8d63799d6a3633ba5c353c2502f` | 1 | 1 | 0 |
 | `src/miki/verification/services/regressionBenchmarkService.ts` | 29221 | 725 | `10e40c0d51c95a7a20474f5df8c47db1f8461f39f7407b40cb94181d0a508ff2` | 6 | 6 | 0 |
@@ -1239,54 +1239,37 @@
 | `src/miki/verification/services/verifierService.ts` | 6647 | 174 | `0a14920b0d65d1c497119c6d016c3e26d714f341a15fe7256598902d3e0b0c42` | 5 | 5 | 0 |
 | `src/services/abstractSanitizerService.ts` | 264 | 6 | `235bcac1db7b4a79176502d385c5a92b81c8108e9fd6fede556cd9207891f101` | 1 | 1 | 0 |
 | `src/services/affectionDynamicsService.ts` | 278 | 6 | `a673276fab51b45c20c8159165a3739b89bc465fcc753eea7098f80edd4ec1a1` | 1 | 1 | 0 |
-| `src/services/answerContentIrService.ts` | 11214 | 261 | `86a4b2b5687d2bdb285ef4bf79b508c1f468138f1f44030ee109e750511220df` | 3 | 3 | 0 |
-| `src/services/answerPlanService.ts` | 22177 | 543 | `abc67e53593b63b0ea1878e8d03a8768ae77bf3540de6683a0dd9e6469b6fa31` | 4 | 4 | 0 |
 | `src/services/api.ts` | 30175 | 960 | `d8363ef351ef82c7e5b72e6d65559df869d48a29986b664f5acea564357e108d` | 7 | 7 | 0 |
 | `src/services/autonomousRevalidationLoopService.ts` | 77 | 1 | `b7475b11c25882db7aadd48bfcf6452de0c0b6ffe43e73990f8a301ca722d97f` | 1 | 1 | 0 |
 | `src/services/autonomousSearchService.ts` | 67 | 1 | `74c1496e8f38105ba9a104cbddb06c550f2c7dabb4fc03f14ff3e3b8c71e5193` | 1 | 1 | 0 |
-| `src/services/canaryDeploymentSafetyService.ts` | 6315 | 169 | `0cb9a21a064085d9934484209bcefbe892f9b44648262a9c550dcf8187392bfa` | 2 | 2 | 0 |
 | `src/services/capabilityConfidenceService.ts` | 278 | 6 | `63a8ddef7d1299df4df9d4aaa246ac314e897b099cf9d130505b45c0f86236da` | 1 | 1 | 0 |
 | `src/services/capabilityGapService.ts` | 264 | 6 | `40f49334fd7ae096bebe0cc61d24feb1d5f4c62c2086b53495e293a2adf50741` | 1 | 1 | 0 |
 | `src/services/capabilityGraphService.ts` | 268 | 6 | `657331f078f4bc06e9e28b7539dfbf8fddd7b5ea8450370b484fc7f9f6aaca0d` | 1 | 1 | 0 |
 | `src/services/capabilityImplementationRegistryService.ts` | 302 | 6 | `4bfd5ae1f6d98238ccd11c51b06b58fe294269fb086bcd52e3d82e6c30f3e427` | 1 | 1 | 0 |
 | `src/services/capabilityLearningService.ts` | 274 | 6 | `3966c5930b3ae275898562181b8692586cfb4dbd2c6037e4d5b2913969105858` | 1 | 1 | 0 |
-| `src/services/capabilityPluginService.ts` | 25285 | 661 | `f3463ac108d6412aca371f6cfc4c2cb8c8d436c61d519da386d7eefdbf8e814e` | 3 | 3 | 0 |
 | `src/services/capabilityReuseService.ts` | 268 | 6 | `8d04dba373cb864ac4b6c460e5ee270b4fe1684dc8629dc026a80bfaaf581b9c` | 1 | 1 | 0 |
-| `src/services/changeImpactSimulatorService.ts` | 3124 | 35 | `e902a3ee4715147ce6b0e3307dec76638d85a3266fc1413685dbbf24bfd4adcb` | 2 | 2 | 0 |
 | `src/services/chapter69_90PlatformServices.ts` | 19250 | 113 | `b4a446dbf970caeb3836e72fe8fc3767eb01b9da4508b408a868737a03cd5cc6` | 2 | 2 | 0 |
 | `src/services/claimDatabaseService.ts` | 308 | 6 | `f770b026dd602277b43ed79ad9877d6eab03f191b436708c31e2914318f5c5c3` | 1 | 1 | 0 |
-| `src/services/cloudAiRestrictedGatewayService.ts` | 9998 | 260 | `1a23a9673a9ce477c1f5c7b45a8b7fc2919039fd8da2a9a7170358b504fcb35d` | 5 | 5 | 0 |
-| `src/services/codeComprehensionQuizService.ts` | 1168 | 15 | `ee235953d890614c702bf24aeb5cba90a7cf46920cc547d5f404b00b1b7e1aac` | 1 | 1 | 0 |
-| `src/services/codeMapService.ts` | 4185 | 70 | `9f96abaf6ef1d4a4b263849f1acb74a73a764b314d358ed3b3fd43d48d0f6116` | 1 | 1 | 0 |
-| `src/services/codeSearchService.ts` | 4593 | 112 | `8f64390b1f34fc90da065dcde458f0ce903304ec1d457e54046fbbea26063434` | 3 | 3 | 0 |
 | `src/services/cognitiveDebuggerService.ts` | 72 | 1 | `f9aa8710abe5d8e0cee8c755fa09674b96d338c0259ed6416ab83b5f844c656e` | 1 | 1 | 0 |
 | `src/services/cognitiveEvidenceIntegrationService.ts` | 84 | 1 | `65de679b3815b2bc05a8c0a17608495fe06ad988176da5465110f0f393975ae1` | 1 | 1 | 0 |
 | `src/services/completionJudgeService.ts` | 70 | 1 | `03f88c8ad345f6f057e8a25575027023be8be44ff4b6c65809d5a8708be4fbaa` | 1 | 1 | 0 |
 | `src/services/componentArtifactStoreService.ts` | 282 | 6 | `0f7e0f799374e76ee9472dcfff2f43c2ffd72137fea230fb44900c4644b53724` | 1 | 1 | 0 |
-| `src/services/componentCompositionService.ts` | 10444 | 234 | `34bad77668e72fb5a9164f78bd10520198236c788dfd0e1240e7a1fd96cec000` | 4 | 4 | 0 |
-| `src/services/componentImprovementCandidateService.ts` | 8718 | 147 | `11cc384cc7f89eb62bdc6e5d610f1c811517d7681dacedcce7a626e7a494c2f7` | 5 | 5 | 0 |
-| `src/services/componentPromotionService.ts` | 8236 | 118 | `561f8b141c75a629939241ea2f7f30ed615f2c003914e7f2bc80b5c9e1cd77f5` | 6 | 6 | 0 |
 | `src/services/componentRegistryService.ts` | 128 | 4 | `417d0f97e998b952d61e653fd749ad427314a42adc5fa5231cd4824ae937624a` | 1 | 1 | 0 |
 | `src/services/componentRegressionService.ts` | 74 | 1 | `b9a8e1554637499532f8e54f7d51ce2acfe544b11c3074ddc21fbb44ea22c3fc` | 1 | 1 | 0 |
 | `src/services/componentTestCaseService.ts` | 72 | 1 | `bc276a0bf29b09eb6bc2e30831d88f4be2a77a5d50b2131ebb7af4cc9971b040` | 1 | 1 | 0 |
 | `src/services/componentVerificationService.ts` | 76 | 1 | `08157258ffb4cea82bedf69d4c6e42d3b408de83045bfe9bb32978f899cb9412` | 1 | 1 | 0 |
 | `src/services/componentVersionHistoryService.ts` | 284 | 6 | `476cb6ead063c55fa7c1f8cd77fba1fe1785cc96a131d0ae1bb0a0cda504d315` | 1 | 1 | 0 |
-| `src/services/conversationStateService.ts` | 26468 | 691 | `25b037f15a05a751d16c1aef6e3ddf65f2a207de70ce303fb59f2f478b86d207` | 4 | 4 | 0 |
-| `src/services/counterexampleContractRefinementService.ts` | 7907 | 144 | `36089be12dfd5354170b423413f1c5bdb2872102f2665056bd8f58f715d1a625` | 3 | 3 | 0 |
 | `src/services/counterfactualReasoningService.ts` | 138 | 1 | `ea1389ec5a3724b115ef8250d68b07ecb19e871ec94154adac7c94ce4fedfa3d` | 1 | 1 | 0 |
 | `src/services/decisionLearningService.ts` | 266 | 6 | `8fc02b35f8d9e24298f73475b2094d88a0b3a956aae2aa6c9a05becb43c49e68` | 1 | 1 | 0 |
 | `src/services/deterministicCapabilityEvolutionService.ts` | 302 | 6 | `399dbc2f96db568f6b9e3e828241e33f976a9b601486a1a83480670c5565087a` | 1 | 1 | 0 |
 | `src/services/deterministicCapabilityExecutionService.ts` | 302 | 6 | `5663c740a8e656d4169380acc29cb7cebbe108f7e125671359a50ef5cb598afb` | 1 | 1 | 0 |
-| `src/services/digitalResearchNoteService.ts` | 6473 | 159 | `8e1c6c8c57d3668358386552a124235144b3fa9869a2d4ca8359acd6c58dd8ed` | 2 | 2 | 0 |
 | `src/services/downstreamImpactService.ts` | 266 | 6 | `5194ea2f6d0f85ca16b4ff3edd178ecaceead1ce3730a6daa08fb992050ed753` | 1 | 1 | 0 |
 | `src/services/dynamicToolFactoryService.ts` | 71 | 1 | `de11ff968eee0ba67e1f464ad27f1105c70b28711efb51cc3aa90398b56a7cce` | 1 | 1 | 0 |
-| `src/services/embeddingService.ts` | 12063 | 346 | `f5ce67e139e8f9531060fe2a44709a05ffba3a3253d9234f3c8514cb5c5618a8` | 5 | 5 | 0 |
 | `src/services/evidenceService.ts` | 57 | 1 | `21e22b5d8cb06370b11bfc20cec004306e0182dd6765a2f31580bc2b4ee4403e` | 1 | 1 | 0 |
 | `src/services/executionRouteRankingService.ts` | 276 | 6 | `5a9dde700e73e0a2e06e1c85e371abd532c06974137c285b3f5d5458e59f270e` | 1 | 1 | 0 |
 | `src/services/executionRunnerService.ts` | 266 | 6 | `8e73578daa9df1d5da68bc91538c6c8bfaca13437de35aa0ff12b6a50008c0db` | 1 | 1 | 0 |
 | `src/services/experienceFreshnessService.ts` | 276 | 6 | `69b5f06db3a701f182e04007bb2669333a2d234a7783bd5a521f40379bc6a24f` | 1 | 1 | 0 |
 | `src/services/experienceRouterService.ts` | 270 | 6 | `5ff57b31ac7fa3e7d3c0e4e7d418531229f7f5731eea8d6199f9f4e175407417` | 1 | 1 | 0 |
-| `src/services/externalRunnerAdapterService.ts` | 4789 | 100 | `d29a8351ec2e4014e9e0fc94b4c6df2b6ae64844d74685b06713fe389f212e32` | 2 | 2 | 0 |
 | `src/services/failureMemoryService.ts` | 256 | 6 | `2f63ff0c5d93d2aa5b03607a1cd87dc87d2ef2976974171a18f243e53f521a49` | 1 | 1 | 0 |
 | `src/services/failureRecoveryService.ts` | 260 | 6 | `1f476cd704f02b0c2e1c4aa3fef4feb536e92a141f7baa12654e781622bed7b2` | 1 | 1 | 0 |
 | `src/services/failureUnderstandingService.ts` | 69 | 1 | `5eadb0c04de4b36150228c8359e9c99ea7db81dc0b3d0f30ba9b441246cc9257` | 1 | 1 | 0 |
@@ -1298,23 +1281,14 @@
 | `src/services/formalSemanticsKernelService.ts` | 76 | 1 | `fb9ad0444f477baf6609f6df10ab6a9497944769fa4c20effdd8f8607ab11fd8` | 1 | 1 | 0 |
 | `src/services/githubSyncService.ts` | 13668 | 553 | `a28c1c5c26fcc387353a4e7fa70f90383cd8fc537728426fe9d34ba9a2cf467a` | 2 | 2 | 0 |
 | `src/services/hardeningRegressionCandidateService.ts` | 296 | 6 | `2b5a7855788b300843b2081ab08841b584ac463ef3e202b97bdea1e0ebd7d0a9` | 1 | 1 | 0 |
-| `src/services/hybridConversationEngineService.ts` | 2308 | 40 | `7495000c6fb9828a777abd60a16264a68327537d130ac389ba9d6394710fa5fd` | 4 | 4 | 0 |
 | `src/services/implementationSelectionService.ts` | 280 | 6 | `6fa73a45e211408c3a5988f5a76ae354de9b152b57c15b8eacacc568e43f17e4` | 1 | 1 | 0 |
-| `src/services/improvementCanaryRollbackService.ts` | 8700 | 191 | `9847d4e7e1b28af64d728fffb89a8c9c60fb4af8f7d1c49ff0e8e620a3c2ae95` | 8 | 8 | 0 |
-| `src/services/improvementRegressionCoordinatorService.ts` | 10854 | 231 | `6a804df04d689284465d8471d7ccdf85b5b447da6fac372eb76791f93d6406f3` | 9 | 9 | 0 |
-| `src/services/improvementStaticGuardService.ts` | 5757 | 98 | `038cc13ca0f673faae8f20b4f39d8af38806ea8d0458848dc7767e5604de6647` | 3 | 3 | 0 |
 | `src/services/japaneseAnalysisService.ts` | 266 | 6 | `3dabe5f59b8f4da58741389d6ca57eb00178ff0cdde07001ac14bf842bcc006f` | 1 | 1 | 0 |
 | `src/services/japaneseDictionaryService.ts` | 270 | 6 | `a9c6b7e585510b7716d3287bbc7b0e2fc0e3907dfc534b5c49b105f328ffcccf` | 1 | 1 | 0 |
 | `src/services/knowledgeGapService.ts` | 62 | 1 | `430e34818ae524ae851f6ff9cf1a69657f1a40f346165bd8141fb972d4e8f634` | 1 | 1 | 0 |
-| `src/services/knowledgeOperatingSystemService.ts` | 4959 | 113 | `4fa55d5eeb99538b3998d966bf01bcde5cd6032e5c3f833d11b16eed9918cef9` | 2 | 2 | 0 |
 | `src/services/latentIntentMiningService.ts` | 268 | 6 | `edf43967a5244771d2f8a6524275bd7ebbcf95c8cc46233a40c7811769c47170` | 1 | 1 | 0 |
 | `src/services/longTermMemoryService.ts` | 258 | 6 | `dcca89c0de2306fbf8fb8acbc554c047c86da89c7a010734910770d3973302f2` | 1 | 1 | 0 |
-| `src/services/mikiUltraEvolverService.ts` | 7484 | 256 | `c88f096c04228a8818e607389f628857b8c36a5532c4dde0f800121834c7c4cc` | 1 | 1 | 0 |
-| `src/services/mikiUnifiedLearningContinuumService.ts` | 7385 | 153 | `2aee2051d8ba944e4681bb5767922187f507e62397fc7dc3d2f9d41ef6948a7f` | 3 | 3 | 0 |
-| `src/services/modelLifecycleService.ts` | 1851 | 48 | `9ea0295fe397d7e8a143cba040de34e0f40c1ed65a5b3a705d12a446fe0993d5` | 1 | 1 | 0 |
 | `src/services/nonBlockingStartupP156Service.ts` | 924 | 3 | `bdc8d46356d3e4326400f133da31f302766522931e84b5c1cbe98095aa820bb2` | 0 | 0 | 0 |
-| `src/services/nonLlmCodeSynthesisService.ts` | 1761 | 27 | `a971e4f3eb5704f8df5cdbcb2ba8eba826127a8e9e5d1d3c9f3e32c8322ea8ac` | 4 | 4 | 0 |
-| `src/services/nonLlmCoreService.ts` | 29126 | 592 | `aed98784b163b4a4bc616e3e0161f47a56dc65514aa4f980715752ed3860d9f9` | 31 | 31 | 0 |
+| `src/services/nonLlmCoreService.ts` | 29341 | 592 | `df99743bee5e9d4f02f2c32bff69b30050da7b0736faaa23a5d775e21a7a3880` | 31 | 31 | 0 |
 | `src/services/nonLlmHardwarePipelineService.ts` | 274 | 6 | `a50a3d2ee3db5528e201170046ad77d9332056c2768acd5b08eb1cbda6be8d8a` | 1 | 1 | 0 |
 | `src/services/nonLlmRuntimeService.ts` | 5897 | 93 | `b7e5726174ad0dae4bcaf1ab133ce49fc576fbff5b1fe11206a8d86ad5e4168e` | 2 | 2 | 0 |
 | `src/services/operationalConformanceService.ts` | 77 | 1 | `11cd98cfdc4bddcb9333c76b167d9aef3fcb5e22042a4ba7dade720dcabd93f5` | 1 | 1 | 0 |
@@ -1325,30 +1299,18 @@
 | `src/services/researchService.ts` | 59 | 1 | `69758afed06d42f57c68d70c69bb6e1e46eb47dd5cfe22bd1f4242f74ef7e587` | 1 | 1 | 0 |
 | `src/services/researchStrategyService.ts` | 67 | 1 | `94b7d70d179171666b741800f3530b6e7dc1174ef125acdfd79b6d6edb9aa90e` | 1 | 1 | 0 |
 | `src/services/researchToRemediationService.ts` | 72 | 1 | `3bb600f94db06c98f4bd8015d7ebb384612fceb9277f70a0da71374a860b9c28` | 1 | 1 | 0 |
-| `src/services/responseSurfacePolicyService.ts` | 5758 | 133 | `c676e53a43eed118c7ad4b1dbb64e097c7dad06746da78beabe63f7784250939` | 2 | 2 | 0 |
-| `src/services/safeImprovementPipelineService.ts` | 11020 | 193 | `34a88d0b82f870850942b7fc4533d77c7c5d0cbada036b1a49fef5930a576341` | 9 | 9 | 0 |
-| `src/services/schemaValidationService.ts` | 7201 | 216 | `46df0d2b7d859cee8f852a8ef633e55c382c418825088ea08944436f97a2e6bd` | 1 | 1 | 0 |
-| `src/services/selfCodeApiClient.ts` | 3837 | 113 | `aa78fe56af79f374d6b3310a044f2eaa25e83ed9698bee4ad7bc465f9b330e49` | 1 | 1 | 0 |
-| `src/services/selfImprovementExperimentService.ts` | 5121 | 122 | `26c22b013709dd9e663cd88716876dfdacb206b18f98d5f112742699a8acc511` | 3 | 3 | 0 |
-| `src/services/selfImprovementMetricsService.ts` | 6257 | 77 | `47cdf9cdf83f18682909a7b869a6186a5822aa7dea6290d8f0457f91bdd84eed` | 7 | 7 | 0 |
 | `src/services/skillsService.ts` | 250 | 6 | `1a1c9655a80cc46873ee5ddc41bc068edd624e4e13d2a5205b32552c5c066f5f` | 1 | 1 | 0 |
 | `src/services/startupRecoveryService.ts` | 7324 | 190 | `99baaac69d63d06c8cd13a3d144f8a40d35b72bdca2157b0f69a0b9058af4e7e` | 1 | 1 | 0 |
 | `src/services/storageService.ts` | 32768 | 847 | `8097163d1d85262136a8ef05fcbcb746d619cdfc52161a3b987a9b674b52f8f9` | 1 | 1 | 0 |
-| `src/services/syntheticDataService.ts` | 33805 | 779 | `705b9f03f65b1dd591b1f6b644605ce82009d0e66f198247e459e76902878315` | 9 | 9 | 0 |
 | `src/services/systemLogger.ts` | 41090 | 1020 | `c2d8d9c0e650852aa1ca78f512a8bc7019f637b5554b226a2f276731f6ca5aa3` | 1 | 1 | 0 |
-| `src/services/taskCaseMemoryService.ts` | 5511 | 45 | `747a02e6ce048f574c2a8270494a585716750e87d61245f7d6f3f4bce30e8c36` | 5 | 5 | 0 |
 | `src/services/taskExecutionOrchestratorService.ts` | 286 | 6 | `0498b47ec7ec4be5b23621672922c3b175246b63b33499c1be6cb39642cf5f44` | 1 | 1 | 0 |
 | `src/services/taskLineageService.ts` | 258 | 6 | `ce6b9933d590eb8ae34f19a39f6d01bcb8c15f730fff0f1dbb4e81877b0bf6ea` | 1 | 1 | 0 |
 | `src/services/testAssertionService.ts` | 268 | 6 | `a75b517b57ccdd71f0c1208842fba340d99ffecd5cb9dfa345beebad6bc872d0` | 1 | 1 | 0 |
-| `src/services/toolsService.ts` | 57893 | 1549 | `c10a925b444eed33706e5b921b2ee0b9087b29b05fd4268942b68494e110d46e` | 10 | 10 | 0 |
 | `src/services/unifiedDecisionEngineService.ts` | 276 | 6 | `c0a73e19602eef2e999bd5ad08ba4fa11b0f7853226d33969e55a6ffa2b0f7a8` | 1 | 1 | 0 |
-| `src/services/unifiedMikiExperienceService.ts` | 8845 | 202 | `1ea40f12e2071e5e99ebc33925562e49f8439e7b6f5bbec2cc72a0205cd13faf` | 2 | 2 | 0 |
 | `src/services/vbaStaticVerifierService.ts` | 276 | 6 | `8199c9b88f318f6f3e1b00982e47f8df13495a8410d4382962177c07b3be5553` | 1 | 1 | 0 |
 | `src/services/verifiedCapabilityPromotionService.ts` | 79 | 1 | `a9bcca11585d450bc0a5863eaf694b7c960116bcd105e2af1a9a4fe126c421c7` | 1 | 1 | 0 |
 | `src/services/verifiedKnowledgePromotionService.ts` | 78 | 1 | `77180f52939692f1c8b16073a6550b316afcea5d16faaa4ad9e612feeb458826` | 1 | 1 | 0 |
 | `src/services/verifierService.ts` | 63 | 1 | `649b962570322d9c1cafa1bba67f699b883a685588b5f660982a61d128856603` | 1 | 1 | 0 |
-| `src/services/workingAgendaService.ts` | 6450 | 195 | `d7127f70926e2426c2c1e68c5170970aaac888f028a152fab8591fe9bb98c28c` | 3 | 3 | 0 |
-| `src/services/worldModelService.ts` | 15337 | 362 | `13933660e664255f344ef1bf82acc3934db8b581285b38a38127501b4ba99540` | 3 | 3 | 0 |
 | `src/types.ts` | 11159 | 302 | `3caca8c14a77f9d9644f918daa2ba3f27edfc462900be569267809cd157f67d6` | 0 | 0 | 0 |
 | `src/types/evidenceSelfImprovementTypes.ts` | 4727 | 183 | `7216dd51f32a3a75c245d14fed436c58e885b9f812d9779baa66fe64f55378d6` | 0 | 0 | 0 |
 | `src/utils/codeMergeService.ts` | 385 | 12 | `233fd3500244d10db061f9c02004d79146462cc5c4373751caac44bc502dfd4d` | 0 | 0 | 0 |

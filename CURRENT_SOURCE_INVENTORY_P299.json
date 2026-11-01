@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1786,
-    "sourceFileCount": 1339,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1252,
-    "relativeImportCandidateCount": 3747,
-    "resolvedRelativeImportCandidateCount": 3733,
+    "trackedPathCountExcludingControlPaths": 1748,
+    "sourceFileCount": 1301,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1214,
+    "relativeImportCandidateCount": 3602,
+    "resolvedRelativeImportCandidateCount": 3588,
     "unresolvedRelativeImportCandidateCount": 14
   },
   "records": [
@@ -33557,15 +33557,15 @@
     },
     {
       "path": "src/miki/verification/services/faultInjectionLabService.ts",
-      "bytes": 1912,
+      "bytes": 1918,
       "lines": 19,
-      "sha256": "78c504116ed443126056758236ed0de54eed784f41edd5f392dd9e42ece9ed60",
+      "sha256": "4a9cc5b7912e553900549448dde981fb91e2654ac906ecf779a1498261ea51dd",
       "relativeImportCandidates": [
         {
           "line": 1,
-          "specifier": "../../../services/mikiUnifiedLearningContinuumService",
+          "specifier": "../../learning/services/mikiUnifiedLearningContinuumService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/mikiUnifiedLearningContinuumService.ts"
+          "resolvedPath": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts"
         }
       ],
       "relativeImportCandidateCount": 1,
@@ -33614,15 +33614,15 @@
     },
     {
       "path": "src/miki/verification/services/formalSemanticsKernelService.ts",
-      "bytes": 2109,
+      "bytes": 2115,
       "lines": 26,
-      "sha256": "f6803be5c59726ea601dc180c7671d29364566f2dec81c6af9398ac812ac6082",
+      "sha256": "9171a5ef928d9cbf80a7d7d9d1f3dcf0ee7c1b95b93180804b3266a606f44836",
       "relativeImportCandidates": [
         {
           "line": 1,
-          "specifier": "../../../services/mikiUnifiedLearningContinuumService",
+          "specifier": "../../learning/services/mikiUnifiedLearningContinuumService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/mikiUnifiedLearningContinuumService.ts"
+          "resolvedPath": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts"
         }
       ],
       "relativeImportCandidateCount": 1,
@@ -33961,70 +33961,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/answerContentIrService.ts",
-      "bytes": 11214,
-      "lines": 261,
-      "sha256": "86a4b2b5687d2bdb285ef4bf79b508c1f468138f1f44030ee109e750511220df",
-      "relativeImportCandidates": [
-        {
-          "line": 7,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 8,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 9,
-          "specifier": "./responseSurfacePolicyService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/responseSurfacePolicyService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/answerPlanService.ts",
-      "bytes": 22177,
-      "lines": 543,
-      "sha256": "abc67e53593b63b0ea1878e8d03a8768ae77bf3540de6683a0dd9e6469b6fa31",
-      "relativeImportCandidates": [
-        {
-          "line": 6,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 7,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 8,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 9,
-          "specifier": "./conversationStateService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/conversationStateService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/api.ts",
       "bytes": 30175,
       "lines": 960,
@@ -34109,29 +34045,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/canaryDeploymentSafetyService.ts",
-      "bytes": 6315,
-      "lines": 169,
-      "sha256": "0cb9a21a064085d9934484209bcefbe892f9b44648262a9c550dcf8187392bfa",
-      "relativeImportCandidates": [
-        {
-          "line": 10,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 11,
-          "specifier": "./api",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/api.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -34220,35 +34133,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/capabilityPluginService.ts",
-      "bytes": 25285,
-      "lines": 661,
-      "sha256": "f3463ac108d6412aca371f6cfc4c2cb8c8d436c61d519da386d7eefdbf8e814e",
-      "relativeImportCandidates": [
-        {
-          "line": 5,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 6,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 7,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/capabilityReuseService.ts",
       "bytes": 268,
       "lines": 6,
@@ -34263,29 +34147,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/changeImpactSimulatorService.ts",
-      "bytes": 3124,
-      "lines": 35,
-      "sha256": "e902a3ee4715147ce6b0e3307dec76638d85a3266fc1413685dbbf24bfd4adcb",
-      "relativeImportCandidates": [
-        {
-          "line": 2,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./codeMapService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/codeMapService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -34326,110 +34187,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/cloudAiRestrictedGatewayService.ts",
-      "bytes": 9998,
-      "lines": 260,
-      "sha256": "1a23a9673a9ce477c1f5c7b45a8b7fc2919039fd8da2a9a7170358b504fcb35d",
-      "relativeImportCandidates": [
-        {
-          "line": 15,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 16,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        },
-        {
-          "line": 17,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 18,
-          "specifier": "./improvementStaticGuardService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/improvementStaticGuardService.ts"
-        },
-        {
-          "line": 19,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/codeComprehensionQuizService.ts",
-      "bytes": 1168,
-      "lines": 15,
-      "sha256": "ee235953d890614c702bf24aeb5cba90a7cf46920cc547d5f404b00b1b7e1aac",
-      "relativeImportCandidates": [
-        {
-          "line": 2,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 1,
-      "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/codeMapService.ts",
-      "bytes": 4185,
-      "lines": 70,
-      "sha256": "9f96abaf6ef1d4a4b263849f1acb74a73a764b314d358ed3b3fd43d48d0f6116",
-      "relativeImportCandidates": [
-        {
-          "line": 7,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 1,
-      "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/codeSearchService.ts",
-      "bytes": 4593,
-      "lines": 112,
-      "sha256": "8f64390b1f34fc90da065dcde458f0ce903304ec1d457e54046fbbea26063434",
-      "relativeImportCandidates": [
-        {
-          "line": 10,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 11,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 12,
-          "specifier": "./api",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/api.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -34498,129 +34255,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/componentCompositionService.ts",
-      "bytes": 10444,
-      "lines": 234,
-      "sha256": "34bad77668e72fb5a9164f78bd10520198236c788dfd0e1240e7a1fd96cec000",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./capabilityGraphService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/capabilityGraphService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/componentImprovementCandidateService.ts",
-      "bytes": 8718,
-      "lines": 147,
-      "sha256": "11cc384cc7f89eb62bdc6e5d610f1c811517d7681dacedcce7a626e7a494c2f7",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 5,
-          "specifier": "./improvementStaticGuardService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/improvementStaticGuardService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/componentPromotionService.ts",
-      "bytes": 8236,
-      "lines": 118,
-      "sha256": "561f8b141c75a629939241ea2f7f30ed615f2c003914e7f2bc80b5c9e1cd77f5",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./componentRegressionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegressionService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./evidenceService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/evidenceService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 5,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 6,
-          "specifier": "./componentArtifactStoreService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentArtifactStoreService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -34709,70 +34343,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/conversationStateService.ts",
-      "bytes": 26468,
-      "lines": 691,
-      "sha256": "25b037f15a05a751d16c1aef6e3ddf65f2a207de70ce303fb59f2f478b86d207",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "../autonomous_modules/anaphora_history_stack",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/autonomous_modules/anaphora_history_stack.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "../autonomous_modules/anaphora_resolver_sample",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/autonomous_modules/anaphora_resolver_sample.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/counterexampleContractRefinementService.ts",
-      "bytes": 7907,
-      "lines": 144,
-      "sha256": "36089be12dfd5354170b423413f1c5bdb2872102f2665056bd8f58f715d1a625",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./mikiUnifiedLearningContinuumService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/mikiUnifiedLearningContinuumService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/counterfactualReasoningService.ts",
       "bytes": 138,
       "lines": 1,
@@ -34841,29 +34411,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/digitalResearchNoteService.ts",
-      "bytes": 6473,
-      "lines": 159,
-      "sha256": "8e1c6c8c57d3668358386552a124235144b3fa9869a2d4ca8359acd6c58dd8ed",
-      "relativeImportCandidates": [
-        {
-          "line": 12,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 13,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/downstreamImpactService.ts",
       "bytes": 266,
       "lines": 6,
@@ -34895,47 +34442,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/embeddingService.ts",
-      "bytes": 12063,
-      "lines": 346,
-      "sha256": "f5ce67e139e8f9531060fe2a44709a05ffba3a3253d9234f3c8514cb5c5618a8",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./nonLlmRuntimeService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/nonLlmRuntimeService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "../miki/execution/services/nativeBackgroundService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/execution/services/nativeBackgroundService.ts"
-        },
-        {
-          "line": 5,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -35021,29 +34527,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/externalRunnerAdapterService.ts",
-      "bytes": 4789,
-      "lines": 100,
-      "sha256": "d29a8351ec2e4014e9e0fc94b4c6df2b6ae64844d74685b06713fe389f212e32",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./executionRunnerService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/executionRunnerService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -35240,41 +34723,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/hybridConversationEngineService.ts",
-      "bytes": 2308,
-      "lines": 40,
-      "sha256": "7495000c6fb9828a777abd60a16264a68327537d130ac389ba9d6394710fa5fd",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./conversationStateService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/conversationStateService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./japaneseAnalysisService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/japaneseAnalysisService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./answerContentIrService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/answerContentIrService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/implementationSelectionService.ts",
       "bytes": 280,
       "lines": 6,
@@ -35289,159 +34737,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/improvementCanaryRollbackService.ts",
-      "bytes": 8700,
-      "lines": 191,
-      "sha256": "9847d4e7e1b28af64d728fffb89a8c9c60fb4af8f7d1c49ff0e8e620a3c2ae95",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./executionRunnerService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/executionRunnerService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "../miki/execution/services/executionEventBusService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/execution/services/executionEventBusService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        },
-        {
-          "line": 5,
-          "specifier": "./downstreamImpactService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/downstreamImpactService.ts"
-        },
-        {
-          "line": 6,
-          "specifier": "./selfImprovementExperimentService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/selfImprovementExperimentService.ts"
-        },
-        {
-          "line": 7,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 8,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 8,
-      "resolvedRelativeImportCount": 8,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/improvementRegressionCoordinatorService.ts",
-      "bytes": 10854,
-      "lines": 231,
-      "sha256": "6a804df04d689284465d8471d7ccdf85b5b447da6fac372eb76791f93d6406f3",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./componentImprovementCandidateService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentImprovementCandidateService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./safeImprovementPipelineService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/safeImprovementPipelineService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./componentRegressionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegressionService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "../miki/execution/services/executionEventBusService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/execution/services/executionEventBusService.ts"
-        },
-        {
-          "line": 5,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 6,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 7,
-          "specifier": "./executionRunnerService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/executionRunnerService.ts"
-        },
-        {
-          "line": 8,
-          "specifier": "./externalRunnerAdapterService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/externalRunnerAdapterService.ts"
-        },
-        {
-          "line": 9,
-          "specifier": "../miki/execution/services/androidNativeRunnerAdapterService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/execution/services/androidNativeRunnerAdapterService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 9,
-      "resolvedRelativeImportCount": 9,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/improvementStaticGuardService.ts",
-      "bytes": 5757,
-      "lines": 98,
-      "sha256": "038cc13ca0f673faae8f20b4f39d8af38806ea8d0458848dc7767e5604de6647",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -35496,29 +34791,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/knowledgeOperatingSystemService.ts",
-      "bytes": 4959,
-      "lines": 113,
-      "sha256": "4fa55d5eeb99538b3998d966bf01bcde5cd6032e5c3f833d11b16eed9918cef9",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/latentIntentMiningService.ts",
       "bytes": 268,
       "lines": 6,
@@ -35553,69 +34825,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/mikiUltraEvolverService.ts",
-      "bytes": 7484,
-      "lines": 256,
-      "sha256": "c88f096c04228a8818e607389f628857b8c36a5532c4dde0f800121834c7c4cc",
-      "relativeImportCandidates": [
-        {
-          "line": 12,
-          "specifier": "./selfCodeApiClient",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/selfCodeApiClient.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 1,
-      "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/mikiUnifiedLearningContinuumService.ts",
-      "bytes": 7385,
-      "lines": 153,
-      "sha256": "2aee2051d8ba944e4681bb5767922187f507e62397fc7dc3d2f9d41ef6948a7f",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./unifiedMikiExperienceService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/unifiedMikiExperienceService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/modelLifecycleService.ts",
-      "bytes": 1851,
-      "lines": 48,
-      "sha256": "9ea0295fe397d7e8a143cba040de34e0f40c1ed65a5b3a705d12a446fe0993d5",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 1,
-      "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/nonBlockingStartupP156Service.ts",
       "bytes": 924,
       "lines": 3,
@@ -35626,45 +34835,10 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/nonLlmCodeSynthesisService.ts",
-      "bytes": 1761,
-      "lines": 27,
-      "sha256": "a971e4f3eb5704f8df5cdbcb2ba8eba826127a8e9e5d1d3c9f3e32c8322ea8ac",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./capabilityGraphService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/capabilityGraphService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./componentCompositionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentCompositionService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/nonLlmCoreService.ts",
-      "bytes": 29126,
+      "bytes": 29341,
       "lines": 592,
-      "sha256": "aed98784b163b4a4bc616e3e0161f47a56dc65514aa4f980715752ed3860d9f9",
+      "sha256": "df99743bee5e9d4f02f2c32bff69b30050da7b0736faaa23a5d775e21a7a3880",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -35674,9 +34848,9 @@
         },
         {
           "line": 7,
-          "specifier": "./conversationStateService",
+          "specifier": "../miki/conversation/services/conversationStateService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/conversationStateService.ts"
+          "resolvedPath": "src/miki/conversation/services/conversationStateService.ts"
         },
         {
           "line": 8,
@@ -35704,9 +34878,9 @@
         },
         {
           "line": 12,
-          "specifier": "./answerContentIrService",
+          "specifier": "../miki/conversation/services/answerContentIrService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/answerContentIrService.ts"
+          "resolvedPath": "src/miki/conversation/services/answerContentIrService.ts"
         },
         {
           "line": 13,
@@ -35722,9 +34896,9 @@
         },
         {
           "line": 15,
-          "specifier": "./componentCompositionService",
+          "specifier": "../miki/capability/services/componentCompositionService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentCompositionService.ts"
+          "resolvedPath": "src/miki/capability/services/componentCompositionService.ts"
         },
         {
           "line": 16,
@@ -35794,9 +34968,9 @@
         },
         {
           "line": 27,
-          "specifier": "./hybridConversationEngineService",
+          "specifier": "../miki/conversation/services/hybridConversationEngineService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/hybridConversationEngineService.ts"
+          "resolvedPath": "src/miki/conversation/services/hybridConversationEngineService.ts"
         },
         {
           "line": 28,
@@ -35806,15 +34980,15 @@
         },
         {
           "line": 29,
-          "specifier": "./nonLlmCodeSynthesisService",
+          "specifier": "../miki/selfDevelopment/services/nonLlmCodeSynthesisService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/nonLlmCodeSynthesisService.ts"
+          "resolvedPath": "src/miki/selfDevelopment/services/nonLlmCodeSynthesisService.ts"
         },
         {
           "line": 30,
-          "specifier": "./answerPlanService",
+          "specifier": "../miki/strategy/services/answerPlanService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/answerPlanService.ts"
+          "resolvedPath": "src/miki/strategy/services/answerPlanService.ts"
         },
         {
           "line": 31,
@@ -35830,15 +35004,15 @@
         },
         {
           "line": 33,
-          "specifier": "./unifiedMikiExperienceService",
+          "specifier": "../miki/experience/services/unifiedMikiExperienceService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/unifiedMikiExperienceService.ts"
+          "resolvedPath": "src/miki/experience/services/unifiedMikiExperienceService.ts"
         },
         {
           "line": 34,
-          "specifier": "./mikiUnifiedLearningContinuumService",
+          "specifier": "../miki/learning/services/mikiUnifiedLearningContinuumService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/mikiUnifiedLearningContinuumService.ts"
+          "resolvedPath": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts"
         },
         {
           "line": 35,
@@ -36034,210 +35208,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/responseSurfacePolicyService.ts",
-      "bytes": 5758,
-      "lines": 133,
-      "sha256": "c676e53a43eed118c7ad4b1dbb64e097c7dad06746da78beabe63f7784250939",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/safeImprovementPipelineService.ts",
-      "bytes": 11020,
-      "lines": 193,
-      "sha256": "34a88d0b82f870850942b7fc4533d77c7c5d0cbada036b1a49fef5930a576341",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./componentRegressionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegressionService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./componentPromotionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentPromotionService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./executionRunnerService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/executionRunnerService.ts"
-        },
-        {
-          "line": 5,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 6,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 7,
-          "specifier": "./componentImprovementCandidateService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentImprovementCandidateService.ts"
-        },
-        {
-          "line": 8,
-          "specifier": "./improvementCanaryRollbackService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/improvementCanaryRollbackService.ts"
-        },
-        {
-          "line": 9,
-          "specifier": "./selfImprovementExperimentService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/selfImprovementExperimentService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 9,
-      "resolvedRelativeImportCount": 9,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/schemaValidationService.ts",
-      "bytes": 7201,
-      "lines": 216,
-      "sha256": "46df0d2b7d859cee8f852a8ef633e55c382c418825088ea08944436f97a2e6bd",
-      "relativeImportCandidates": [
-        {
-          "line": 7,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 1,
-      "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/selfCodeApiClient.ts",
-      "bytes": 3837,
-      "lines": 113,
-      "sha256": "aa78fe56af79f374d6b3310a044f2eaa25e83ed9698bee4ad7bc465f9b330e49",
-      "relativeImportCandidates": [
-        {
-          "line": 9,
-          "specifier": "./api",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/api.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 1,
-      "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/selfImprovementExperimentService.ts",
-      "bytes": 5121,
-      "lines": 122,
-      "sha256": "26c22b013709dd9e663cd88716876dfdacb206b18f98d5f112742699a8acc511",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./selfImprovementMetricsService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/selfImprovementMetricsService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/selfImprovementMetricsService.ts",
-      "bytes": 6257,
-      "lines": 77,
-      "sha256": "47cdf9cdf83f18682909a7b869a6186a5822aa7dea6290d8f0457f91bdd84eed",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../miki/execution/services/executionEventBusService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/execution/services/executionEventBusService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./failureMemoryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/failureMemoryService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./taskCaseMemoryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/taskCaseMemoryService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./knowledgeGapService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/knowledgeGapService.ts"
-        },
-        {
-          "line": 5,
-          "specifier": "./capabilityReuseService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/capabilityReuseService.ts"
-        },
-        {
-          "line": 6,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 7,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 7,
-      "resolvedRelativeImportCount": 7,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/skillsService.ts",
       "bytes": 250,
       "lines": 6,
@@ -36289,71 +35259,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/syntheticDataService.ts",
-      "bytes": 33805,
-      "lines": 779,
-      "sha256": "705b9f03f65b1dd591b1f6b644605ce82009d0e66f198247e459e76902878315",
-      "relativeImportCandidates": [
-        {
-          "line": 7,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 8,
-          "specifier": "./toolsService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/toolsService.ts"
-        },
-        {
-          "line": 9,
-          "specifier": "../miki/improvement/services/selfImprovementService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/improvement/services/selfImprovementService.ts"
-        },
-        {
-          "line": 10,
-          "specifier": "./worldModelService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/worldModelService.ts"
-        },
-        {
-          "line": 11,
-          "specifier": "./regressionBenchmarkService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/regressionBenchmarkService.ts"
-        },
-        {
-          "line": 12,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 13,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 14,
-          "specifier": "../utils/trainingSampleSafetyFilter",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/utils/trainingSampleSafetyFilter.ts"
-        },
-        {
-          "line": 15,
-          "specifier": "./nonLlmRuntimeService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/nonLlmRuntimeService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 9,
-      "resolvedRelativeImportCount": 9,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/systemLogger.ts",
       "bytes": 41090,
       "lines": 1020,
@@ -36368,47 +35273,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/taskCaseMemoryService.ts",
-      "bytes": 5511,
-      "lines": 45,
-      "sha256": "747a02e6ce048f574c2a8270494a585716750e87d61245f7d6f3f4bce30e8c36",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentRegistryService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./failureMemoryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/failureMemoryService.ts"
-        },
-        {
-          "line": 4,
-          "specifier": "./componentVersionHistoryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/componentVersionHistoryService.ts"
-        },
-        {
-          "line": 5,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -36463,77 +35327,6 @@
       "unresolvedRelativeImportCount": 0
     },
     {
-      "path": "src/services/toolsService.ts",
-      "bytes": 57893,
-      "lines": 1549,
-      "sha256": "c10a925b444eed33706e5b921b2ee0b9087b29b05fd4268942b68494e110d46e",
-      "relativeImportCandidates": [
-        {
-          "line": 9,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 10,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        },
-        {
-          "line": 11,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 12,
-          "specifier": "./capabilityPluginService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/capabilityPluginService.ts"
-        },
-        {
-          "line": 13,
-          "specifier": "../miki/research/services/unifiedWebResearchService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/research/services/unifiedWebResearchService.ts"
-        },
-        {
-          "line": 14,
-          "specifier": "../miki/selfDevelopment/services/selfCodeArchitectService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfDevelopment/services/selfCodeArchitectService.ts"
-        },
-        {
-          "line": 15,
-          "specifier": "../miki/verification/services/cognitiveDebuggerService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/verification/services/cognitiveDebuggerService.ts"
-        },
-        {
-          "line": 16,
-          "specifier": "./digitalResearchNoteService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/digitalResearchNoteService.ts"
-        },
-        {
-          "line": 17,
-          "specifier": "../miki/selfDevelopment/services/codebaseReflectionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfDevelopment/services/codebaseReflectionService.ts"
-        },
-        {
-          "line": 18,
-          "specifier": "./api",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/api.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 10,
-      "resolvedRelativeImportCount": 10,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
       "path": "src/services/unifiedDecisionEngineService.ts",
       "bytes": 276,
       "lines": 6,
@@ -36548,29 +35341,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/unifiedMikiExperienceService.ts",
-      "bytes": 8845,
-      "lines": 202,
-      "sha256": "1ea40f12e2071e5e99ebc33925562e49f8439e7b6f5bbec2cc72a0205cd13faf",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -36639,64 +35409,6 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/workingAgendaService.ts",
-      "bytes": 6450,
-      "lines": 195,
-      "sha256": "d7127f70926e2426c2c1e68c5170970aaac888f028a152fab8591fe9bb98c28c",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./systemLogger",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/systemLogger.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
-      "unresolvedRelativeImportCount": 0
-    },
-    {
-      "path": "src/services/worldModelService.ts",
-      "bytes": 15337,
-      "lines": 362,
-      "sha256": "13933660e664255f344ef1bf82acc3934db8b581285b38a38127501b4ba99540",
-      "relativeImportCandidates": [
-        {
-          "line": 1,
-          "specifier": "../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 2,
-          "specifier": "./skillsService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/skillsService.ts"
-        },
-        {
-          "line": 3,
-          "specifier": "./storageService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
-        }
-      ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
