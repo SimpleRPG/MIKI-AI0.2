@@ -97,6 +97,7 @@ class AutonomousSelfImprovementLoopService {
   private state: AutonomousLoopState = { status: 'IDLE', queue: [], updatedAt: 0 };
   private running = false;
   private sequence = 0;
+  private lastLoadDroppedInvalid = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
   private lifecycleGeneration = 0;
@@ -150,6 +151,10 @@ class AutonomousSelfImprovementLoopService {
       void this.drain();
       return { ...duplicate };
     }
+    // P371: never persist a request this service's own loader would
+    // reject. A blank trigger can only produce a meaningless task, so
+    // it is refused here; out-of-range optional fields are sanitized.
+    if (!trigger || !trigger.trim()) throw new Error('AUTONOMOUS_LOOP_TRIGGER_REQUIRED');
     const now = Date.now();
     this.sequence += 1;
     const normalizedPayload=normalizeDiscoveryIssuePayload(meta.payload);
@@ -157,11 +162,11 @@ class AutonomousSelfImprovementLoopService {
       id: `AIR-${now}-${String(this.sequence).padStart(6, '0')}`,
       trigger,
       source,
-      runId: meta.runId,
-      changeSetId: meta.changeSetId,
-      runType: meta.runType,
-      sourceId: meta.sourceId,
-      priority: meta.priority,
+      runId: typeof meta.runId === 'string' ? meta.runId : undefined,
+      changeSetId: typeof meta.changeSetId === 'string' ? meta.changeSetId : undefined,
+      runType: typeof meta.runType === 'string' ? meta.runType : undefined,
+      sourceId: typeof meta.sourceId === 'string' ? meta.sourceId : undefined,
+      priority: typeof meta.priority === 'number' && Number.isFinite(meta.priority) ? Math.max(0, meta.priority) : undefined,
       payload: normalizedPayload ? { ...normalizedPayload } : undefined,
       createdAt: now,
       attempts: 0,
@@ -1026,7 +1031,29 @@ class AutonomousSelfImprovementLoopService {
 
   private quarantine(sourceKey:string,raw:string,reason:string):boolean{const base=`${sourceKey}_quarantine_v1`;const envelope={version:1,sourceKey,quarantinedAt:Date.now(),reason:reason.slice(0,500),raw};try{let destination=base;const existing=storageService.getItem(base);if(existing!==null){try{const parsed=JSON.parse(existing) as Record<string,unknown>;if(parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw)return true;}catch{}let suffix=0;do{destination=`${base}_${Date.now()}_${suffix++}`;if(suffix>1000)return false;}while(storageService.getItem(destination)!==null);}storageService.setItem(destination,JSON.stringify(envelope));const saved=storageService.getItem(destination);if(saved===null)return false;const parsed=JSON.parse(saved) as Record<string,unknown>;return parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw;}catch{return false;}}
 
-  private parseState(raw:string):AutonomousLoopState{const value:unknown=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_ROOT');const parsed=value as Record<string,unknown>;const validStatuses:AutonomousLoopStatus[]=['IDLE','RUNNING','WAITING_RESOURCE','WAITING_EVIDENCE','PAUSED','FAILED'];if(typeof parsed.status!=='string'||!validStatuses.includes(parsed.status as AutonomousLoopStatus)||!Array.isArray(parsed.queue)||parsed.queue.length>10000||typeof parsed.updatedAt!=='number'||!Number.isFinite(parsed.updatedAt)||parsed.updatedAt<0)throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_SHAPE');const ids=new Set<string>();for(const item of parsed.queue){if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID');const request=item as Record<string,unknown>;if(typeof request.id!=='string'||!request.id.trim()||ids.has(request.id)||typeof request.trigger!=='string'||!request.trigger.trim()||!['AUTOPILOT','UI','EXECUTION','SYSTEM'].includes(String(request.source))||typeof request.createdAt!=='number'||!Number.isFinite(request.createdAt)||request.createdAt<0||typeof request.attempts!=='number'||!Number.isInteger(request.attempts)||request.attempts<0)throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_FIELDS');ids.add(request.id);for(const key of ['runId','strategyId','strategyName','runType','sourceId','taskId','workspaceId','waitReason','changeSetId'])if(request[key]!==undefined&&typeof request[key]!=='string')throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_STRING');for(const key of ['priority','resourceWaitCount','evidenceWaitCount','nextAttemptAt'])if(request[key]!==undefined&&(typeof request[key]!=='number'||!Number.isFinite(request[key])||(request[key] as number)<0))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_NUMBER');for(const key of ['resourceWaitCount','evidenceWaitCount'])if(request[key]!==undefined&&!Number.isInteger(request[key]))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_COUNT');if(request.waitKind!==undefined&&!['RESOURCE','EVIDENCE','RETRY'].includes(String(request.waitKind)))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_KIND');if(request.cancelRequested!==undefined&&typeof request.cancelRequested!=='boolean')throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_CANCEL_REQUEST');if(request.payload!==undefined&&(!request.payload||typeof request.payload!=='object'||Array.isArray(request.payload)))throw new Error('AUTONOMOUS_LOOP_REQUEST_INVALID_PAYLOAD');}for(const key of ['activeRequestId','lastTaskId','lastReason'])if(parsed[key]!==undefined&&typeof parsed[key]!=='string')throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_OPTIONAL_STRING');if(parsed.retryAt!==undefined&&(typeof parsed.retryAt!=='number'||!Number.isFinite(parsed.retryAt)||(parsed.retryAt as number)<0))throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_RETRY_AT');return parsed as unknown as AutonomousLoopState;}
+  private requestInvalidReason(item:unknown,ids:Set<string>):string|null{
+    if(!item||typeof item!=='object'||Array.isArray(item))return 'AUTONOMOUS_LOOP_REQUEST_INVALID';
+    const request=item as Record<string,unknown>;
+    if(typeof request.id!=='string'||!request.id.trim()||ids.has(request.id))return 'AUTONOMOUS_LOOP_REQUEST_INVALID_ID';
+    if(typeof request.trigger!=='string'||!request.trigger.trim()||!['AUTOPILOT','UI','EXECUTION','SYSTEM'].includes(String(request.source))||typeof request.createdAt!=='number'||!Number.isFinite(request.createdAt)||request.createdAt<0||typeof request.attempts!=='number'||!Number.isInteger(request.attempts)||request.attempts<0)return 'AUTONOMOUS_LOOP_REQUEST_INVALID_FIELDS';
+    for(const key of ['runId','strategyId','strategyName','runType','sourceId','taskId','workspaceId','waitReason','changeSetId'])if(request[key]!==undefined&&typeof request[key]!=='string')return 'AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_STRING';
+    for(const key of ['priority','resourceWaitCount','evidenceWaitCount','nextAttemptAt'])if(request[key]!==undefined&&(typeof request[key]!=='number'||!Number.isFinite(request[key])||(request[key] as number)<0))return 'AUTONOMOUS_LOOP_REQUEST_INVALID_OPTIONAL_NUMBER';
+    for(const key of ['resourceWaitCount','evidenceWaitCount'])if(request[key]!==undefined&&!Number.isInteger(request[key]))return 'AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_COUNT';
+    if(request.waitKind!==undefined&&!['RESOURCE','EVIDENCE','RETRY'].includes(String(request.waitKind)))return 'AUTONOMOUS_LOOP_REQUEST_INVALID_WAIT_KIND';
+    if(request.cancelRequested!==undefined&&typeof request.cancelRequested!=='boolean')return 'AUTONOMOUS_LOOP_REQUEST_INVALID_CANCEL_REQUEST';
+    if(request.payload!==undefined&&(!request.payload||typeof request.payload!=='object'||Array.isArray(request.payload)))return 'AUTONOMOUS_LOOP_REQUEST_INVALID_PAYLOAD';
+    ids.add(request.id);
+    return null;
+  }
+
+  private parseState(raw:string):AutonomousLoopState{const value:unknown=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_ROOT');const parsed=value as Record<string,unknown>;const validStatuses:AutonomousLoopStatus[]=['IDLE','RUNNING','WAITING_RESOURCE','WAITING_EVIDENCE','PAUSED','FAILED'];if(typeof parsed.status!=='string'||!validStatuses.includes(parsed.status as AutonomousLoopStatus)||!Array.isArray(parsed.queue)||parsed.queue.length>10000||typeof parsed.updatedAt!=='number'||!Number.isFinite(parsed.updatedAt)||parsed.updatedAt<0)throw new Error('AUTONOMOUS_LOOP_SNAPSHOT_INVALID_SHAPE');
+    // P371: tolerate individual invalid queue items (for example a
+    // record written by an older build) by dropping only those items
+    // instead of quarantining the whole queue. Root/shape corruption
+    // still rejects the entire snapshot: when the envelope itself is
+    // untrustworthy there is nothing safe to salvage.
+    const ids=new Set<string>();const validQueue:unknown[]=[];let droppedInvalid=0;for(const item of parsed.queue){if(this.requestInvalidReason(item,ids)!==null){droppedInvalid+=1;continue;}validQueue.push(item);}this.lastLoadDroppedInvalid=droppedInvalid;parsed.queue=validQueue;
+    for(const key of ['activeRequestId','lastTaskId','lastReason'])if(parsed[key]!==undefined&&typeof parsed[key]!=='string')throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_OPTIONAL_STRING');if(parsed.retryAt!==undefined&&(typeof parsed.retryAt!=='number'||!Number.isFinite(parsed.retryAt)||(parsed.retryAt as number)<0))throw new Error('AUTONOMOUS_LOOP_STATE_INVALID_RETRY_AT');return parsed as unknown as AutonomousLoopState;}
 
   private save(): void {
     this.assertWritable();
@@ -1041,8 +1068,8 @@ class AutonomousSelfImprovementLoopService {
     if(raw===null)return;
     let parsed:AutonomousLoopState;
     try{parsed=this.parseState(raw);}catch(error){const reason=String(error instanceof Error?error.message:error).slice(0,500);this.state={status:'IDLE',queue:[],updatedAt:0};if(this.quarantine(sourceKey,raw,reason)){this.persistenceStatus='RECOVERED_QUARANTINED';this.persistenceReason=`${sourceKey}_QUARANTINED:${reason}`;}else this.blockPersistence(`${sourceKey}_QUARANTINE_FAILED:${reason}`);return;}
-    const activeQueue=parsed.queue.filter(item=>item.attempts<MAX_ATTEMPTS);const purgedCount=parsed.queue.length-activeQueue.length;this.state={...parsed,queue:activeQueue};
-    if(purgedCount>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;this.state.lastReason=`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`;try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
+    const activeQueue=parsed.queue.filter(item=>item.attempts<MAX_ATTEMPTS);const purgedCount=parsed.queue.length-activeQueue.length;const droppedInvalid=this.lastLoadDroppedInvalid;this.state={...parsed,queue:activeQueue};
+    if(purgedCount>0||droppedInvalid>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;const parts:string[]=[];if(droppedInvalid>0)parts.push(`INVALID_REQUESTS_DROPPED:${droppedInvalid}`);if(purgedCount>0)parts.push(`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`);this.state.lastReason=parts.join(':');try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
   }
 }
 
