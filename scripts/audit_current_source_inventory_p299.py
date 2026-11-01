@@ -18,7 +18,9 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 JSON_OUT = ROOT / "CURRENT_SOURCE_INVENTORY_P299.json"
-MD_OUT = ROOT / "CURRENT_SOURCE_INVENTORY_P299.md"
+# P368: the human-readable Markdown report was retired; the JSON is
+# the single inventory report. Its path stays in CONTROL_PATHS so
+# the counts are stable whether or not the file still exists.
 CONTROL_PATHS = {
     "scripts/audit_current_source_inventory_p299.py",
     "CURRENT_SOURCE_INVENTORY_P299.json",
@@ -172,64 +174,20 @@ def build_inventory() -> dict:
     }
 
 
-def render_markdown(data: dict) -> str:
-    counts = data["counts"]
-    out = [
-        "# MIKI-AI0.2 現行追跡ソースインベントリ（P299）",
-        "",
-        "- 対象は `git ls-files --cached` に記録されたパスのうち、定義済みソース拡張子に該当するファイルです。",
-        "- この一覧はバイト数・行数・SHA-256と、ECMAScriptの相対import候補を記録します。",
-        "- 相対import解析は字句的な候補検出です。未解決候補は自動的に不具合を意味せず、コメント・動的構築・alias・実行時呼出し・意味上のAuthorityを証明しません。",
-        "- P287～P293の履歴台帳は改変せず、authority/重複監査の歴史的根拠として保持します。",
-        "",
-        "## 集計",
-        "",
-        "| 指標 | 件数 |",
-        "|---|---:|",
-        f"| 対象追跡パス（監査制御ファイルを除く） | {counts['trackedPathCountExcludingControlPaths']} |",
-        f"| ソースファイル | {counts['sourceFileCount']} |",
-        f"| 相対import候補を字句走査したECMAScriptファイル | {counts['ecmascriptSourceFileCountScannedForRelativeImports']} |",
-        f"| 相対import候補 | {counts['relativeImportCandidateCount']} |",
-        f"| 追跡パスへ解決できた候補 | {counts['resolvedRelativeImportCandidateCount']} |",
-        f"| 未解決候補（即不具合判定ではない） | {counts['unresolvedRelativeImportCandidateCount']} |",
-        "",
-        "## ファイル一覧",
-        "",
-        "| パス | bytes | lines | SHA-256 | import候補 | resolved | unresolved |",
-        "|---|---:|---:|---|---:|---:|---:|",
-    ]
-    for record in data["records"]:
-        path = record["path"].replace("|", "\\|")
-        out.append(
-            f"| `{path}` | {record['bytes']} | {record['lines']} | `{record['sha256']}` | "
-            f"{record['relativeImportCandidateCount']} | {record['resolvedRelativeImportCount']} | "
-            f"{record['unresolvedRelativeImportCount']} |"
-        )
-    out.extend([
-        "",
-        "## 解釈上の境界",
-        "",
-        "このインベントリは追跡対象ファイルの現行スナップショットです。P97/P222基準の分類・到達性集計とは対象範囲が異なり、過去台帳の判定や完全なruntime呼出しグラフを置き換えません。",
-        "",
-    ])
-    return "\n".join(out)
-
-
-def expected_outputs() -> tuple[str, str, dict]:
+def expected_outputs() -> tuple[str, dict]:
     data = build_inventory()
     json_text = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
-    markdown_text = render_markdown(data)
-    return json_text, markdown_text, data
+    return json_text, data
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--write", action="store_true", help="regenerate both inventory reports")
-    mode.add_argument("--check", action="store_true", help="verify committed reports match current tracked files")
+    mode.add_argument("--write", action="store_true", help="regenerate the inventory report")
+    mode.add_argument("--check", action="store_true", help="verify the committed report matches current tracked files")
     args = parser.parse_args()
-    json_text, markdown_text, data = expected_outputs()
-    expected = ((JSON_OUT, json_text), (MD_OUT, markdown_text))
+    json_text, data = expected_outputs()
+    expected = ((JSON_OUT, json_text),)
     if args.write:
         for path, content in expected:
             path.write_text(content, encoding="utf-8", newline="\n")
