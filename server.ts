@@ -6,6 +6,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import zlib from 'node:zlib';
+import http from 'node:http';
+import https from 'node:https';
 import os from 'os';
 import { spawnSync, execFileSync } from 'child_process';
 import ts from 'typescript';
@@ -83,6 +86,133 @@ app.use(express.json({ limit: '50mb' }));
 
 app.get('/api/health', (_req, res) => {
   res.json({ status:'ok', service:'miki-ai', phase:'INSTRUCTION_TO_ADOPTION', timestamp:new Date().toISOString() });
+});
+
+// ===== P385: server-side dictionary store (JMdict) =====
+// The large dictionary lives outside the app, on this server. The
+// server fetches and converts it in the background, once per upstream
+// revision; the app only ever receives a finished package, so a slow
+// or failed conversion can never make the app unusable, and the
+// previous package stays in place until the new one is complete.
+const DICTIONARY_DIR = path.join(process.cwd(), 'dictionary-data');
+const DICTIONARY_SOURCE_URL = 'http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz';
+interface DictionaryManifest { version: string; entries: number; commonEntries: number; fullBytes: number; commonBytes: number; convertedAt: string; sourceLastModified?: string }
+const dictionaryJob: { state: 'IDLE' | 'RUNNING' | 'READY' | 'ERROR'; startedAt?: string; finishedAt?: string; error?: string } = { state: 'IDLE' };
+function readDictionaryManifest(): DictionaryManifest | null {
+  try { return JSON.parse(fs.readFileSync(path.join(DICTIONARY_DIR, 'manifest.json'), 'utf8')) as DictionaryManifest; } catch { return null; }
+}
+if (readDictionaryManifest()) dictionaryJob.state = 'READY';
+function downloadToFile(url: string, dest: string, redirects = 0): Promise<string | undefined> {
+  return new Promise((resolve, reject) => {
+    if (redirects > 5) { reject(new Error('DICTIONARY_DOWNLOAD_TOO_MANY_REDIRECTS')); return; }
+    const client = url.startsWith('https:') ? https : http;
+    const request = client.get(url, (response) => {
+      const status = response.statusCode || 0;
+      if (status >= 300 && status < 400 && response.headers.location) { response.resume(); resolve(downloadToFile(response.headers.location, dest, redirects + 1)); return; }
+      if (status !== 200) { response.resume(); reject(new Error(`DICTIONARY_DOWNLOAD_HTTP_${status}`)); return; }
+      const out = fs.createWriteStream(dest);
+      response.pipe(out);
+      out.on('finish', () => { out.close(); resolve(response.headers['last-modified']); });
+      out.on('error', reject);
+    });
+    request.on('error', reject);
+  });
+}
+function dictionaryPos(raw: string): string {
+  if (!raw) return 'UNKNOWN';
+  if (raw.startsWith('n')) return 'NOUN';
+  if (raw.startsWith('v')) return 'VERB';
+  if (raw.startsWith('adj')) return 'ADJECTIVE';
+  if (raw.startsWith('adv')) return 'ADVERB';
+  if (raw === 'pn') return 'PRONOUN';
+  if (raw === 'int') return 'FUNCTION';
+  return 'UNKNOWN';
+}
+async function convertJmdict(): Promise<DictionaryManifest> {
+  fs.mkdirSync(DICTIONARY_DIR, { recursive: true });
+  const gzTmp = path.join(DICTIONARY_DIR, 'JMdict_e.gz.tmp');
+  const sourceLastModified = await downloadToFile(DICTIONARY_SOURCE_URL, gzTmp);
+  const fullTmp = path.join(DICTIONARY_DIR, 'jmdict-full.json.tmp');
+  const commonTmp = path.join(DICTIONARY_DIR, 'jmdict-common.json.tmp');
+  const full = fs.createWriteStream(fullTmp);
+  const common = fs.createWriteStream(commonTmp);
+  const header = (version: string, name: string) => `{"schemaVersion":1,"source":"JMdict","version":${JSON.stringify(version)},"dictionaryName":${JSON.stringify(name)},"entries":[`;
+  const version = sourceLastModified || new Date().toISOString();
+  full.write(header(version, 'JMdict (full)'));
+  common.write(header(version, 'JMdict (common)'));
+  let firstFull = true, firstCommon = true, entries = 0, commonEntries = 0;
+  const emit = (entry: Record<string, unknown>, isCommon: boolean) => {
+    const json = JSON.stringify(entry);
+    full.write((firstFull ? '' : ',') + json); firstFull = false; entries += 1;
+    if (isCommon) { common.write((firstCommon ? '' : ',') + json); firstCommon = false; commonEntries += 1; }
+  };
+  const processEntry = (block: string) => {
+    const kebs = [...block.matchAll(/<keb>([^<]+)<\/keb>/g)].map((m) => m[1]);
+    const rebs = [...block.matchAll(/<reb>([^<]+)<\/reb>/g)].map((m) => m[1]);
+    if (!rebs.length) return;
+    const pos = dictionaryPos((block.match(/<pos>&([^;]+);<\/pos>/) || [])[1] || '');
+    const pris = [...block.matchAll(/<(?:ke_pri|re_pri)>([^<]+)<\/(?:ke_pri|re_pri)>/g)].map((m) => m[1]);
+    const markerCommon = pris.some((p) => p === 'news1' || p === 'ichi1' || p === 'spec1' || p === 'gai1');
+    const markerCommon2 = pris.some((p) => p === 'news2' || p === 'ichi2' || p === 'spec2' || p === 'gai2');
+    const nf = pris.map((p) => /^nf(\d+)$/.exec(p)).find(Boolean);
+    const nfCommon = nf ? Number(nf[1]) <= 32 : false;
+    const isCommon = markerCommon || markerCommon2 || nfCommon;
+    const priority = markerCommon ? 70 : isCommon ? 66 : 55;
+    const reading = rebs[0];
+    if (kebs.length) {
+      for (const keb of kebs) emit({ surface: keb, lemma: kebs[0], reading, pos, priority }, isCommon);
+      // Kana-only lookups (e.g. あさごはん) need the reading as a surface too.
+      if (!kebs.includes(reading)) emit({ surface: reading, lemma: kebs[0], reading, pos, priority }, isCommon);
+    } else {
+      emit({ surface: reading, lemma: reading, reading, pos, priority }, isCommon);
+    }
+  };
+  let buffer = '';
+  const stream = fs.createReadStream(gzTmp).pipe(zlib.createGunzip());
+  stream.setEncoding('utf8');
+  for await (const chunk of stream as AsyncIterable<string>) {
+    buffer += chunk;
+    let start = buffer.indexOf('<entry>');
+    while (start !== -1) {
+      const end = buffer.indexOf('</entry>', start);
+      if (end === -1) break;
+      processEntry(buffer.slice(start, end + 8));
+      buffer = buffer.slice(end + 8);
+      start = buffer.indexOf('<entry>');
+    }
+  }
+  full.write(']}'); common.write(']}');
+  await Promise.all([new Promise<void>((r) => full.end(() => r())), new Promise<void>((r) => common.end(() => r()))]);
+  if (entries < 100000) throw new Error(`DICTIONARY_CONVERSION_TOO_FEW_ENTRIES:${entries}`);
+  const fullPath = path.join(DICTIONARY_DIR, 'jmdict-full.json');
+  const commonPath = path.join(DICTIONARY_DIR, 'jmdict-common.json');
+  fs.renameSync(fullTmp, fullPath);
+  fs.renameSync(commonTmp, commonPath);
+  fs.renameSync(gzTmp, path.join(DICTIONARY_DIR, 'JMdict_e.gz'));
+  const manifest: DictionaryManifest = { version, entries, commonEntries, fullBytes: fs.statSync(fullPath).size, commonBytes: fs.statSync(commonPath).size, convertedAt: new Date().toISOString(), sourceLastModified };
+  const manifestTmp = path.join(DICTIONARY_DIR, 'manifest.json.tmp');
+  fs.writeFileSync(manifestTmp, JSON.stringify(manifest, null, 2));
+  fs.renameSync(manifestTmp, path.join(DICTIONARY_DIR, 'manifest.json'));
+  return manifest;
+}
+app.get('/api/dictionary/status', (_req, res) => {
+  const manifest = readDictionaryManifest();
+  res.json({ success: true, job: dictionaryJob, manifest, ready: Boolean(manifest) });
+});
+app.post('/api/dictionary/prepare', (_req, res) => {
+  if (dictionaryJob.state === 'RUNNING') { res.json({ success: true, started: false, job: dictionaryJob }); return; }
+  dictionaryJob.state = 'RUNNING'; dictionaryJob.startedAt = new Date().toISOString(); delete dictionaryJob.error;
+  void (async () => {
+    try { await convertJmdict(); dictionaryJob.state = 'READY'; dictionaryJob.finishedAt = new Date().toISOString(); }
+    catch (error: any) { dictionaryJob.state = 'ERROR'; dictionaryJob.error = String(error?.message || error); dictionaryJob.finishedAt = new Date().toISOString(); }
+  })();
+  res.json({ success: true, started: true, job: dictionaryJob });
+});
+app.get('/api/dictionary/package', (req, res) => {
+  const tier = req.query.tier === 'full' ? 'full' : 'common';
+  const file = path.join(DICTIONARY_DIR, tier === 'full' ? 'jmdict-full.json' : 'jmdict-common.json');
+  if (!fs.existsSync(file)) { res.status(404).json({ success: false, reason: 'DICTIONARY_NOT_READY' }); return; }
+  res.type('application/json').sendFile(file);
 });
 
 

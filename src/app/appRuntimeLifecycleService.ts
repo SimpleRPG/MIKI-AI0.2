@@ -29,6 +29,7 @@ import { decisionLearningService } from '../miki/learning/services/decisionLearn
 import { taskResultFeedbackService } from '../miki/learning/services/taskResultFeedbackService';
 import { taskConversationFeedbackService } from '../miki/learning/services/taskConversationFeedbackService';
 import { selfImprovementMetricsService } from '../miki/improvement/services/selfImprovementMetricsService';
+import { dictionaryBootstrapService } from '../miki/research/services/dictionaryBootstrapService';
 
 class AppRuntimeLifecycleService {
   private initialized = false;
@@ -82,6 +83,7 @@ class AppRuntimeLifecycleService {
         },
       },
       { name: 'capabilityLearningService.initialize', run: () => capabilityLearningService.initialize() },
+      { name: 'dictionaryBootstrapService.initialize', run: () => dictionaryBootstrapService.initialize() },
       { name: 'initializeChapter69to90', run: () => initializeChapter69to90() },
       {
         name: 'componentArtifactStoreService.reconcile',
