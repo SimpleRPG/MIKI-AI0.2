@@ -131,7 +131,7 @@ class CoreTaskIngressService {
   const envelope=response&&typeof response==='object'&&!Array.isArray(response)?response as Record<string,unknown>:undefined;
   const candidate=typeof response==='string'?response:typeof envelope?.reply==='string'?envelope.reply:'';
   const requirements=conversationGraphRuntimeP212Service.getAnswerRequirements(taskId,envelope?.executionResult);
-  const finalized=requirements?graphAnswerMeaningPipelineP216Service.finalize(candidate,requirements):undefined;
+  let finalized=requirements?graphAnswerMeaningPipelineP216Service.finalize(candidate,requirements):undefined;
   let finalResponse=finalized?.text??'回答を確定できませんでした。会話入力または意味要件の記録を確認してください。';
   const taskBefore=taskBlackboardService.get(taskId);
   const answerHash=canonicalSha256Object(finalResponse);
@@ -171,7 +171,20 @@ class CoreTaskIngressService {
    if(!finalized.executionConsistency.passed)failedReasons.push(...finalized.executionConsistency.unsupportedClaims);
    if(!finalized.grammar.passed)failedReasons.push(...finalized.grammar.issues);
   }
-  const answerValidationPassed=finalized!==undefined&&finalized.semanticPreservation.passed&&finalized.executionConsistency.passed&&finalized.grammar.passed;
+  let answerValidationPassed=finalized!==undefined&&finalized.semanticPreservation.passed&&finalized.executionConsistency.passed&&finalized.grammar.passed;
+  // P396: when the composed candidate could not be validated and
+  // the question was directed at MIKI's own state, the answer
+  // computed from the actual stores at intake takes its place —
+  // but only if that answer itself passes the same validation.
+  if(!answerValidationPassed){
+   const selfInquiryAnswer=conversationGraphRuntimeP212Service.getSelfInquiryAnswer(taskId);
+   if(selfInquiryAnswer&&requirements){
+    const refinalized=graphAnswerMeaningPipelineP216Service.finalize(selfInquiryAnswer,requirements);
+    if(refinalized.semanticPreservation.passed&&refinalized.executionConsistency.passed&&refinalized.grammar.passed){
+     finalResponse=refinalized.text;finalized=refinalized;answerValidationPassed=true;failedReasons.length=0;
+    }
+   }
+  }
   // P381: when the composed answer could not be validated and a
   // clarifying question was selected during intake, ask that
   // question instead of returning an unsupported answer or a bare

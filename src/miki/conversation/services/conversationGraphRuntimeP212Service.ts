@@ -16,12 +16,14 @@ import { crossDomainGraphConnectionP211Service } from '../../core/services/cross
 import { userCommunicationPreferenceService } from './userCommunicationPreferenceService';
 import { surfaceVariationGrowthService } from './surfaceVariationGrowthService';
 import { WebMaterialPatternExtractor } from '../../research/services/webMaterialPatternExtractor';
+import { surfaceVariationService } from './surfaceVariationService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 
 export interface ConversationGraphContext { activeGoalIds:string[]; openGoalIds:string[] }
 export interface ConversationRuntimeReceipt { turnId:string; inputReceiptSha256:string; semanticReceiptSha256:string; usedComponentIds:string[]; selectedConceptId?:string; requiresResearch:boolean; graphSha256:string; receiptSha256:string }
 class ConversationGraphRuntimeP212Service {
  private semanticState:SemanticGraphState=semanticGraphCoreP208Service.bootstrap();
- private readonly inputByTask=new Map<string,ConversationRuntimeReceipt & {inputNodeIds:string[];inputSurface:string;constraintIds:string[];intentIds:string[];grammarIds:string[];meaningComponentIds:string[];contentTerms:string[]}>();
+ private readonly inputByTask=new Map<string,ConversationRuntimeReceipt & {inputNodeIds:string[];inputSurface:string;constraintIds:string[];intentIds:string[];grammarIds:string[];meaningComponentIds:string[];contentTerms:string[];selfInquiryAnswer?:string}>();
  // P395: the last delivered answer that passed validation, waiting
  // to be judged by the user's next turn. If that turn corrects it,
  // nothing is harvested; if the conversation simply moves on, its
@@ -108,8 +110,9 @@ class ConversationGraphRuntimeP212Service {
    const unknownReceipt=unknownGraphConnectorP211Service.connect({eventKind:'UNKNOWN',subjectId:`unknown:${turnId}`,payload:{taskId,text,candidates:semantic.candidates},confidence:.8,uncertainty:.7,sourceRefs:[inputReceipt.eventSha256],participantDomains:['conversation','research'],relatedNodeIds:[...inputReceipt.createdNodeIds,...gapUnknownNodeIds]});
    researchGraphConnectorP211Service.connect({eventKind:'ACTION',subjectId:`research:${turnId}`,payload:{taskId,question:text,reason:semantic.requiresResearch?'SEMANTIC_CANDIDATE_NOT_ACCEPTED':'LANGUAGE_COMPONENT_GAP',gaps:languageComponents.gaps},confidence:.82,uncertainty:.35,sourceRefs:[inputReceipt.eventSha256],participantDomains:['conversation','unknown','verification'],relatedNodeIds:[...inputReceipt.createdNodeIds,...gapUnknownNodeIds,...unknownReceipt.createdNodeIds]});
   }
+  const selfInquiryAnswer=this.computeSelfInquiry(text);
   const base={turnId,inputReceiptSha256:inputReceipt.receiptSha256,semanticReceiptSha256:semantic.receiptSha256,usedComponentIds:analysis.usedComponentIds,selectedConceptId:semantic.selected?.conceptId,requiresResearch:semantic.requiresResearch,graphSha256:crossDomainGraphConnectionP211Service.snapshot().graphSha256};
-  const receipt={...base,receiptSha256:canonicalSha256Object(base)};this.inputByTask.set(taskId,{...receipt,inputNodeIds:inputReceipt.createdNodeIds,inputSurface:text.slice(0,512),constraintIds:languageComponents.constraintIds,intentIds:languageComponents.intentIds,grammarIds:languageComponents.grammarIds,meaningComponentIds:languageComponents.components.map(component=>component.componentId),contentTerms:effectiveTerms});conversationGraphCompletionP214Service.save(crossDomainGraphConnectionP211Service.snapshot());return receipt;
+  const receipt={...base,receiptSha256:canonicalSha256Object(base)};this.inputByTask.set(taskId,{...receipt,inputNodeIds:inputReceipt.createdNodeIds,inputSurface:text.slice(0,512),constraintIds:languageComponents.constraintIds,intentIds:languageComponents.intentIds,grammarIds:languageComponents.grammarIds,meaningComponentIds:languageComponents.components.map(component=>component.componentId),contentTerms:effectiveTerms,selfInquiryAnswer});conversationGraphCompletionP214Service.save(crossDomainGraphConnectionP211Service.snapshot());return receipt;
  }
  ingestOutput(taskId:string,response:unknown,validation:{passed?:boolean;counterexample?:string;repair?:string}={}):ConversationRuntimeReceipt|undefined {
   const input=this.inputByTask.get(taskId);if(!input)return undefined;
@@ -139,6 +142,44 @@ class ConversationGraphRuntimeP212Service {
    if(own.length)surfaceVariationGrowthService.processWebMaterialForVariationGrowth(own,2);
   }catch{ /* best-effort growth material only */ }
  }
+ // P396: questions directed at MIKI's own state are answered from
+ // the stores themselves, not from the web and not from composed
+ // general knowledge: is a word in the dictionary, how many
+ // entries / phrasings / claims are held, and what was just
+ // answered. The computed answer is offered to finalization, which
+ // still puts it through the same meaning validation as any
+ // candidate (see coreTaskIngressService).
+ private computeSelfInquiry(text:string):string|undefined {
+  const value=text.trim();
+  const dictMatch=value.match(/(.{1,24}?)(?:は|って)辞書に(?:ある|載って|入って)/u);
+  if(dictMatch){
+   const term=dictMatch[1].replace(/^(この|その|あの)/u,'').trim();
+   if(term){
+    const hits=japaneseDictionaryService.lookup(term);
+    if(hits.length){const entry=hits[0];const gloss=entry.gloss?entry.gloss.slice(0,80):'';return `『${term}』は辞書に載っています。${entry.reading?`読みは「${entry.reading}」です。`:''}${gloss?`意味は「${gloss}」です。`:''}`.trim()}
+    return `『${term}』は手元の辞書には載っていません。サーバー側の全量辞書に問い合わせておきます。`;
+   }
+  }
+  if(/(言い回し|表現)は(?:何件|いくつ)/u.test(value)){
+   const summary=surfaceVariationService.getAllCategoriesSummary();
+   const total=summary.reduce((n,c)=>n+c.totalCount,0);const dynamic=summary.reduce((n,c)=>n+c.dynamicCount,0);
+   return `言い回しは全部で${total}件あります。そのうち、学習で増えたものが${dynamic}件です。`;
+  }
+  if(/(?:辞書|単語)は(?:何件|何語|いくつ)/u.test(value)){
+   const stats=japaneseDictionaryService.getStats();
+   return `辞書には全部で${stats.builtin+stats.personal+stats.imported}件の語が載っています。`;
+  }
+  if(/(?:主張|知識)は(?:何件|いくつ)/u.test(value)){
+   return `今、知識として登録されている主張は${claimDatabaseService.listClaims().length}件です。`;
+  }
+  if(/さっき(?:何て|なんて|何を)(?:言った|答えた)/u.test(value)||/前の答え/u.test(value)){
+   const nodes=crossDomainGraphConnectionP211Service.snapshot().nodes||[];
+   for(let i=nodes.length-1;i>=0;i--){const payload=nodes[i].payload as {response?:unknown};if(payload&&typeof payload.response==='string'&&payload.response.trim()){const answer=payload.response.trim();return `直前は『${answer.slice(0,120)}${answer.length>120?'…':''}』と答えました。`}}
+   return 'まだ答えた記録がありません。';
+  }
+  return undefined;
+ }
+ getSelfInquiryAnswer(taskId:string):string|undefined { return this.inputByTask.get(taskId)?.selfInquiryAnswer; }
  getAnswerRequirements(taskId:string,executionResult?:unknown){const input=this.inputByTask.get(taskId);if(!input)return undefined;return{inputSurface:input.inputSurface,intentIds:input.intentIds,constraintIds:input.constraintIds,grammarIds:input.grammarIds,meaningComponentIds:input.meaningComponentIds,contentTerms:input.contentTerms,executionResult}}
  snapshot(){return crossDomainGraphConnectionP211Service.snapshot()}
  restore(snapshot:ReturnType<typeof crossDomainGraphConnectionP211Service.snapshot>){crossDomainGraphConnectionP211Service.restore(snapshot)}
