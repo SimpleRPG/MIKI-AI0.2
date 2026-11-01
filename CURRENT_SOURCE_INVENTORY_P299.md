@@ -12,8 +12,8 @@
 | 対象追跡パス（監査制御ファイルを除く） | 1748 |
 | ソースファイル | 1301 |
 | 相対import候補を字句走査したECMAScriptファイル | 1214 |
-| 相対import候補 | 3602 |
-| 追跡パスへ解決できた候補 | 3588 |
+| 相対import候補 | 3604 |
+| 追跡パスへ解決できた候補 | 3590 |
 | 未解決候補（即不具合判定ではない） | 14 |
 
 ## ファイル一覧
@@ -608,7 +608,7 @@
 | `src/miki/core/services/blackboardRecoveryService.ts` | 809 | 6 | `997dc830c65b6d4eb613e4f5e896b6e5a73280825799f542408f1e78297ada8f` | 1 | 1 | 0 |
 | `src/miki/core/services/bodyTypeTrendService.ts` | 3381 | 14 | `ec7b217df647446c94fc89e3359eda56588cd56bb5962921558a5073a2506914` | 1 | 1 | 0 |
 | `src/miki/core/services/candidateAutoRebaseService.ts` | 2849 | 14 | `b5affca11da61a5b228a5cdef665265b6542eedc66f5204bbdbdf220d851447d` | 1 | 1 | 0 |
-| `src/miki/core/services/candidateCodeGenerationService.ts` | 67921 | 1642 | `b474cf3cf9df0a2735241d5af5731de92498eef9c2b20e2a302eca71c0ac2f33` | 28 | 28 | 0 |
+| `src/miki/core/services/candidateCodeGenerationService.ts` | 68383 | 1650 | `b39b7a2afdd35ea3277605e57cca276d878c379d6b1f2d40313973318c0aeb45` | 29 | 29 | 0 |
 | `src/miki/core/services/candidateCommitTransactionService.ts` | 8608 | 45 | `1a98649a03776da438f9736a0040228c95ddbf21c8496ee57e73548527950dd8` | 2 | 2 | 0 |
 | `src/miki/core/services/candidateConstraintValidationService.ts` | 3013 | 9 | `917b44e4bf12c864b2694cd9be514f6e4780ef875462d3ab526a69f84cb36b06` | 3 | 3 | 0 |
 | `src/miki/core/services/candidateEditCollisionService.ts` | 1693 | 10 | `357bc26fc788fe39fd004c26bf410c0e043ef8a30bf32cd6f280fdeac404a12b` | 1 | 1 | 0 |
@@ -832,7 +832,7 @@
 | `src/miki/experience/services/experienceRouterService.ts` | 18862 | 454 | `9c84e0b5eea6cbd49aab7427986b915fefb068f9464a8de0de801fc8135a1062` | 7 | 7 | 0 |
 | `src/miki/experience/services/experienceRustKernelService.ts` | 755 | 1 | `0c51d0a23ecab39e0c998b4d8595f91045d428c42eeaf767e72a81ad7841ca2e` | 0 | 0 | 0 |
 | `src/miki/experience/services/unifiedExperienceImprovementBridgeService.ts` | 975 | 31 | `b6c6a1b07d3c06edd8a5f6e1ba009105a3e737f84aeaeb297d2b97dde8622849` | 2 | 2 | 0 |
-| `src/miki/experience/services/unifiedMikiExperienceService.ts` | 13009 | 315 | `caa5ee1064d2060ab13272d6be108328a56e25e604a7d1fc26b11db2c984d1b7` | 3 | 3 | 0 |
+| `src/miki/experience/services/unifiedMikiExperienceService.ts` | 14484 | 340 | `1f30a0e7cc1216d31330940347262309fb16ec7e65a981df5c89d6d202735eba` | 3 | 3 | 0 |
 | `src/miki/experience/services/virtualExperienceGeneratorService.ts` | 3098 | 45 | `f0cc26a7c853397f749450298ab4fa7ba73efa7393f13966bcfae67eb6996afa` | 4 | 4 | 0 |
 | `src/miki/improvement.ts` | 1589 | 31 | `4c6b19b2627c5c1881d9479f71378ac2f00b8ec877cb1f008cf43b4c3ded3471` | 15 | 15 | 0 |
 | `src/miki/improvement/services/componentImprovementCandidateService.ts` | 8780 | 147 | `616626fb5da460722c617f05d531042ff0cfcc8fb9152f37ba4f54f1a232d183` | 5 | 5 | 0 |
@@ -865,7 +865,7 @@
 | `src/miki/learning/services/learningGraphConnectorP211Service.ts` | 522 | 6 | `15b27daee40ffb31a107db986e14dd5599839f2396b4c9fef57088b42745c7ef` | 2 | 2 | 0 |
 | `src/miki/learning/services/learningRustKernelService.ts` | 743 | 1 | `ca0541521ea85a317f87eab06ef2d6068f7cba15ede0f571fb504e74a5c794b6` | 0 | 0 | 0 |
 | `src/miki/learning/services/mikiConversationLearningService.ts` | 21966 | 429 | `1eebad8ad7d94f97fc6f13e8036881c28089ab59dbbf931f653f5ca6403c205a` | 6 | 6 | 0 |
-| `src/miki/learning/services/mikiUnifiedLearningContinuumService.ts` | 10973 | 225 | `e1a90b44d5bbc341d686fc0391400648d0885479f4c5881a3b8dc85edd7cb622` | 4 | 4 | 0 |
+| `src/miki/learning/services/mikiUnifiedLearningContinuumService.ts` | 11635 | 238 | `94b3d959295f26872895a9211ebc352b99af3faaafa63c1fe462dbaa95e86e39` | 4 | 4 | 0 |
 | `src/miki/learning/services/taskConversationFeedbackService.ts` | 6082 | 150 | `7e52ddc78fe9565c140af1dcc069f8bb0b4e55e2ca1066563674910fbc78976c` | 4 | 4 | 0 |
 | `src/miki/learning/services/taskResultFeedbackService.ts` | 7530 | 150 | `35801b99c406c67330809205f89cdf219f377843f1cfe69fee5f5932bdddfa13` | 11 | 11 | 0 |
 | `src/miki/learning/services/teacherDriftService.ts` | 6098 | 170 | `348bc449d946ff898f1da505a90c0f7d3a8ddd0d30039941b8df36c31adc3c7e` | 3 | 3 | 0 |
@@ -876,7 +876,7 @@
 | `src/miki/memory/services/causalMemoryLedgerService.ts` | 2868 | 21 | `0d2bab6e1497ff54a7517e28a7680a38fc952d43a94078f933cbba70a96a1264` | 2 | 2 | 0 |
 | `src/miki/memory/services/claimDatabaseService.ts` | 35155 | 853 | `b1dbaf78f1a0fe0b0861cac880d6db5ab1f7ff034e8a88605debf419f9fc3b61` | 4 | 4 | 0 |
 | `src/miki/memory/services/evidenceLineageGraphService.ts` | 94 | 1 | `a77a4a7a0966685ccae7c5661654837f10f4b780463193ea02d92f0420d7a728` | 1 | 1 | 0 |
-| `src/miki/memory/services/evidenceService.ts` | 16188 | 470 | `c493cdaa272146045d5a62f902c36218ee0e2cb9d79412f14aa5b09195c0c238` | 4 | 4 | 0 |
+| `src/miki/memory/services/evidenceService.ts` | 16224 | 471 | `824d7478661569457a1947298bcdff0aaa47859614d002fe2a00f5d9baa9eebe` | 4 | 4 | 0 |
 | `src/miki/memory/services/failureCatalogService.ts` | 22002 | 482 | `c702502837d7b8ef85e3fa69afd22c08981a415d573ef66a70303534774cb8b4` | 3 | 3 | 0 |
 | `src/miki/memory/services/failureMemoryService.ts` | 5930 | 122 | `82b4cbbdbe0cbee370ddfa53267d6ce2c25a447eeca2f748a3219d7d183d4132` | 3 | 3 | 0 |
 | `src/miki/memory/services/failureUnderstandingService.ts` | 10254 | 140 | `5ee8e11cbabe5a9c1b184ff9e5a14277883d05a25bdf6184537c4416ff35ec2b` | 5 | 5 | 0 |
@@ -931,7 +931,7 @@
 | `src/miki/research/services/researchQueryOutcomeLearningService.ts` | 7408 | 174 | `543efdc6ea5bb29aa75d25a17ef0852f9071b23c18fb9db340406b4149990345` | 4 | 4 | 0 |
 | `src/miki/research/services/researchQueryPlanningService.ts` | 11855 | 45 | `8c32e10dbc345b638a64b1825a34f78f675b8665eec349b7f331a8a1831e17d6` | 4 | 4 | 0 |
 | `src/miki/research/services/researchRustKernelService.ts` | 743 | 1 | `1c5a5779394b2d6cec5c45272f6b45c5e545839941698f57ef12b1c6b105dd26` | 0 | 0 | 0 |
-| `src/miki/research/services/researchService.ts` | 38556 | 810 | `ac7af0ca7d5f376ff957005b754159f7288012d39f7f5749cd46e28eacdf7880` | 14 | 14 | 0 |
+| `src/miki/research/services/researchService.ts` | 39413 | 825 | `d38c19116f22db6532fa60da68b28f0d654885a5fe4fd162ef04e365060124e0` | 15 | 15 | 0 |
 | `src/miki/research/services/researchStrategyService.ts` | 7383 | 158 | `88dd12e1c20638c1f2226a95baf76ddf73bbfb7d3de5febd18df8faba89cfb40` | 2 | 2 | 0 |
 | `src/miki/research/services/researchToRemediationService.ts` | 9504 | 160 | `ae43b1232c993a77e121d3a9d0acd531464b5abb03c9ff34cde470372815bdf6` | 11 | 11 | 0 |
 | `src/miki/research/services/scienceExperimentService.ts` | 91 | 1 | `fc0d87a8a20d520482fb266f36bb9036f47e052a07084de6bb1fd4c78213c908` | 1 | 1 | 0 |
@@ -1133,7 +1133,7 @@
 | `src/miki/selfDevelopment/services/runtimeWorkspaceHostAdapterService.ts` | 1105 | 3 | `14e1c266e7565b825c70a7f3112354c209327a41029590790d60d9134004c856` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/rustSelfDevelopmentKernelService.ts` | 1674 | 1 | `ce21ce6d8b66fa80f4f317cbaa449a9398661af87e5da59af83e0225c49cfe09` | 0 | 0 | 0 |
 | `src/miki/selfDevelopment/services/selfCodeApiClient.ts` | 3793 | 113 | `5e260e9ccf65ada7ceb5d4d69f18a25d4c594b5d1f12e026a14c6e985bb5b4b9` | 1 | 1 | 0 |
-| `src/miki/selfDevelopment/services/selfCodeArchitectService.ts` | 66655 | 1258 | `0f21871eec593b71c0e41323f41e06c03dd6cfbdb14b5f083f57454534bdaa00` | 26 | 26 | 0 |
+| `src/miki/selfDevelopment/services/selfCodeArchitectService.ts` | 68106 | 1281 | `41a73ddfdc4b93feb3b20bd70d4d05eeee9e99603de1d040db2c43b4142df16e` | 26 | 26 | 0 |
 | `src/miki/selfDevelopment/services/selfDevelopmentArchitectureAuditService.ts` | 2604 | 5 | `29b1147b6fe7cf9dde76f7ef43209807c4bbb9c7a2f5ee1953306f50a65aecfe` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/selfDevelopmentGraphConnectorP211Service.ts` | 550 | 6 | `eb835e76145774a01dff9357e322f8f738fe4bdcfecb46739b9483af471ecbde` | 2 | 2 | 0 |
 | `src/miki/selfDevelopment/services/semanticApplicationEnforcementService.ts` | 6494 | 14 | `313e98f823330dfc0f1ec68035d0b1cfb41907996c08940a6a68211f0cfae42a` | 1 | 1 | 0 |

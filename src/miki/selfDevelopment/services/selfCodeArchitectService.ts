@@ -439,6 +439,29 @@ export class SelfCodeArchitectService {
       },
     };
 
+    // P360: 過去の自己コード改善経験を想起し、同一対象で棄却・ロールバックされた前例を提案へ添付する
+    const priorExperiences = unifiedMikiExperienceService.findSelfCodeExperiences(
+      { chapterNumber: targetChapterNum, targetFile: targetFileHint },
+      5
+    );
+    const priorWarnings = unifiedMikiExperienceService.priorSelfCodeWarnings(
+      { chapterNumber: targetChapterNum, targetFile: targetFileHint }
+    );
+    if (priorExperiences.length > 0) {
+      (proposal as any).priorExperience = {
+        recalledCount: priorExperiences.length,
+        lastVerdict: priorExperiences[0].verdict,
+        lastImprovementMethod: priorExperiences[0].improvementMethod,
+        rejectedOrRolledBackCount: priorWarnings.length,
+        warnings: priorWarnings.slice(0, 3),
+      };
+      if (priorWarnings.length > 0) {
+        const w = priorWarnings[0];
+        proposal.description += ` 【過去経験の警告】同一対象で過去に${w.rolledBack ? 'ロールバック' : '棄却'}された手法があります（${w.improvementMethod}${w.rollbackReason ? `: ${w.rollbackReason}` : ''}）。同手法の再提案は根拠を強化してください。`;
+        systemLogger.warn('SELF_IMPROVEMENT', `[経験想起] 第${targetChapterNum}章には棄却・ロールバック済みの前例が${priorWarnings.length}件あります。提案へ警告を添付しました。`);
+      }
+    }
+
     this.proposals.unshift(proposal);
     this.saveProposals();
 

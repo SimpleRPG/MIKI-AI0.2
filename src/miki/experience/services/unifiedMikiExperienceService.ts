@@ -272,6 +272,31 @@ export class UnifiedMikiExperienceService {
     return this.state.selfCodeExperiences.slice(-Math.max(1, Math.min(60, limit)));
   }
 
+  /** P360: 過去の自己コード改善経験を、対象（章／対象ファイル／対象名）で想起する。新しい順に返す。 */
+  public findSelfCodeExperiences(query: { chapterNumber?: number; targetFile?: string; target?: string }, limit = 5): SelfCodeExperienceDetail[] {
+    const matches = this.state.selfCodeExperiences.filter((e) => {
+      if (query.chapterNumber !== undefined && e.chapterNumber === query.chapterNumber) return true;
+      if (query.targetFile && e.targetFile === query.targetFile) return true;
+      if (query.target && e.target === query.target) return true;
+      return false;
+    });
+    return matches.slice(-Math.max(1, Math.min(60, limit))).reverse();
+  }
+
+  /** P360: 同一対象で過去に棄却・ロールバックされた手法の警告を返す（想起の判断材料）。 */
+  public priorSelfCodeWarnings(query: { chapterNumber?: number; targetFile?: string; target?: string }): Array<{ improvementMethod: string; verdict: SelfCodeExperienceDetail['verdict']; rolledBack: boolean; rollbackReason?: string; problem: string; timestamp?: number }> {
+    return this.findSelfCodeExperiences(query, 60)
+      .filter((e) => e.verdict === 'REJECT' || e.rolledBack)
+      .map((e) => ({
+        improvementMethod: e.improvementMethod,
+        verdict: e.verdict,
+        rolledBack: e.rolledBack,
+        rollbackReason: e.rollbackReason,
+        problem: e.problem,
+        timestamp: e.timestamp,
+      }));
+  }
+
   public getState(): UnifiedMikiState {
     return JSON.parse(JSON.stringify(this.state));
   }

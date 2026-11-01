@@ -5,6 +5,7 @@ import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { storageService } from '../../../services/storageService';
 import { canonicalSha256 } from './canonicalSha256Service';
 import { reviewLearningArtifactService } from './reviewLearningArtifactService';
+import { failureCatalogService } from '../../memory/services/failureCatalogService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { candidateUnknownResolutionService } from './candidateUnknownResolutionService';
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
@@ -921,7 +922,14 @@ class CandidateCodeGenerationService {
    * 既存Compositionの制約・修正知識としてだけ渡す。
    * unresolvedConflictsは命令化せず、未解決状態として明示する。
    */
+  // P360: 失敗カタログの回避指示を生成文脈へ接続する（事後走査だけでなく生成時に回避させる）
+  const failureAvoidanceBlock=failureCatalogService.formatRulesForPrompt({
+    userPrompt:[run.objective,...this.strings(run.payload.requestedChanges)].filter(Boolean).join(' / '),
+    language:'typescript',
+  });
+
   const learningGuidance=[
+    failureAvoidanceBlock,
     learningContext.acceptedPatterns.length>0
       ? `Accepted patterns: ${learningContext.acceptedPatterns.map(item=>item.acceptedApproach).join(' | ')}`
       : '',

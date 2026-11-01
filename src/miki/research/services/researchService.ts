@@ -7,6 +7,7 @@ import { mikiUnifiedLearningContinuumService } from '../../learning/services/mik
 import { webTermLearningService } from './webTermLearningService';
 import { webContentUnderstandingService } from './webContentUnderstandingService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
+import { collectionSourceRegistryService } from '../../core/services/collectionSourceRegistryService';
 import type { VerificationResult } from '../../verification/services/verifierService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
 import { webResearchPolicyService, WebResearchProgress } from './webResearchPolicyService';
@@ -217,6 +218,18 @@ export class ResearchService {
       ? { route: options.forceRoute, reason: '呼び出し元が明示的にこの研究経路を要求しました。', alternatives: [] as ResearchRoute[] }
       : researchStrategyService.chooseRoute(gap.type, gap.query);
 
+    // P360: 収集レシートを発行し、この調査ランで記録するEvidenceへIDを載せる（収集台帳への最小接続）
+    const collectionReceipt = collectionSourceRegistryService.record({
+      taskId: gap.id,
+      sourceType: 'WEB_RESEARCH',
+      sourceRecordIds: queryPlan.status === "READY" ? queryPlan.queries.map((q) => q.queryId) : [],
+      collectedArtifactKind: 'CLAIM',
+      canonicalSha256: queryPlan.status === "READY" ? queryPlan.queryPlanId : gap.id,
+      verificationStatus: 'RETRIEVED',
+      storedByDomain: 'research',
+      coreDecisionId: gap.id,
+    });
+
     try {
       /*
        * LOCAL is a real Research strand.
@@ -390,6 +403,7 @@ export class ResearchService {
               result_summary: `検索結果URLを実際に読み取り、本文${page.text.length}文字を取得`,
               research_query_id: queryPlan.status === "READY" ? queryPlan.queries[pass]?.queryId : undefined,
               research_query_plan_id: queryPlan.status === "READY" ? queryPlan.queryPlanId : undefined,
+              collection_receipt_id: collectionReceipt.collectionReceiptId,
               research_source_tier_target: queryPlan.status === "READY" ? queryPlan.queries[pass]?.sourceTierTarget : undefined,
               research_intent_type: queryPlan.status === "READY" ? queryPlan.queries[pass]?.intentType : undefined,
               research_source_role_target: queryPlan.status === "READY" ? ({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string,'PRIMARY'|'OFFICIAL'|'SECONDARY'|'COUNTEREVIDENCE'|'UNCLASSIFIED'>)[queryPlan.queries[pass]?.intentType || ""] || "UNCLASSIFIED" : "UNCLASSIFIED",
@@ -503,6 +517,7 @@ export class ResearchService {
           metadata: {
             research_query_id: queryPlan.status === "READY" ? queryPlan.queries[pass]?.queryId : undefined,
             research_query_plan_id: queryPlan.status === "READY" ? queryPlan.queryPlanId : undefined,
+            collection_receipt_id: collectionReceipt.collectionReceiptId,
             research_source_tier_target: queryPlan.status === "READY" ? queryPlan.queries[pass]?.sourceTierTarget : undefined,
             research_source_role_target: queryPlan.status === "READY" && queryPlan.queries[pass]
               ? (({ COUNTEREVIDENCE: "COUNTEREVIDENCE", PRIMARY_SOURCE: "PRIMARY", OFFICIAL_SPECIFICATION: "OFFICIAL" } as Record<string, 'PRIMARY'|'OFFICIAL'|'SECONDARY'|'COUNTEREVIDENCE'|'UNCLASSIFIED'>)[queryPlan.queries[pass].intentType || ""] || "UNCLASSIFIED")

@@ -19,6 +19,9 @@ export interface LearningProfile {
   lastObservedAt: number;
   confidence: number;
   domains: Record<UnifiedExperienceDomain, number>;
+  // P360: 教訓の文章を捨てず、直近分と直近の失敗分を保持する（予測側が読める形にする）
+  lastLesson?: string;
+  lastFailureLesson?: string;
 }
 
 export interface MikiLearningSnapshot {
@@ -103,6 +106,11 @@ export class MikiUnifiedLearningContinuumService {
       if (input.outcome === 'FAILURE') current.failures += 1;
       if (input.verified) current.verified += 1;
       current.lastObservedAt = now;
+      if (input.lesson && input.lesson.trim()) {
+        const lessonText = input.lesson.trim().slice(0, 300);
+        current.lastLesson = lessonText;
+        if (input.outcome === 'FAILURE') current.lastFailureLesson = lessonText;
+      }
       current.domains[input.domain] += 1;
       const successRate = current.successes / Math.max(1, current.successes + current.failures);
       const verificationRate = current.verified / Math.max(1, current.uses);
@@ -111,7 +119,7 @@ export class MikiUnifiedLearningContinuumService {
     }
     for (const id of input.capabilityIds || []) {
       const key = `capability:${normalizeKey(id)}`;
-      this.observe({ domain: input.domain, key, outcome: input.outcome, verified: input.verified });
+      this.observe({ domain: input.domain, key, outcome: input.outcome, verified: input.verified, lesson: input.lesson });
     }
     this.save();
   }
@@ -127,7 +135,12 @@ export class MikiUnifiedLearningContinuumService {
         .reduce((s, x) => s + x.confidence * 0.15, 0);
       const usage = p ? Math.min(20, p.uses) : 0;
       const score = Math.round((direct + related + usage) * 100) / 100;
-      return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}` : '共通経験なし。新規候補として扱う' };
+      const lessonNote = p?.lastFailureLesson
+        ? ` / 失敗教訓: ${p.lastFailureLesson.slice(0, 120)}`
+        : p?.lastLesson
+          ? ` / 教訓: ${p.lastLesson.slice(0, 120)}`
+          : '';
+      return { capabilityId: id, score, reason: p ? `共通経験 uses=${p.uses}, success=${p.successes}, verified=${p.verified}, confidence=${p.confidence}${lessonNote}` : '共通経験なし。新規候補として扱う' };
     }).sort((a, b) => b.score - a.score);
   }
 

@@ -54,6 +54,7 @@ export interface EvidenceRecord {
     replay_key?: string;
     research_query_id?: string;
     research_query_plan_id?: string;
+    collection_receipt_id?: string;
     research_source_tier_target?: string;
     research_source_tier?: string;
 research_source_role_target?: "PRIMARY"|"OFFICIAL"|"SECONDARY"|"COUNTEREVIDENCE"|"UNCLASSIFIED";
