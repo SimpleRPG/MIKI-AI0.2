@@ -13,6 +13,7 @@ import {
   Cpu,
   ShieldCheck,
   Database,
+  Download,
   ListTree,
   RefreshCw,
   Eye,
@@ -553,9 +554,9 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     );
   };
 
-  const copyImprovementRunDetail = async (detail: any) => {
+  const buildImprovementRunDetailText = (detail: any): string | null => {
     const task = detail?.task;
-    if (!task) return;
+    if (!task) return null;
 
     const compact = (value: any): string => {
       if (value === undefined || value === null || value === '') return '―';
@@ -604,7 +605,12 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
         : []),
     ];
 
-    const text = lines.join('\\n');
+    return lines.join('\\n');
+  };
+
+  const copyImprovementRunDetail = async (detail: any) => {
+    const text = buildImprovementRunDetailText(detail);
+    if (!text) return;
 
     try {
       await navigator.clipboard.writeText(text);
@@ -626,6 +632,33 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       setActionMessage({
         text: '実行詳細をAI用テキストとしてコピーしました。',
         type: 'success',
+      });
+    }
+  };
+
+  const saveImprovementRunDetail = (detail: any) => {
+    const text = buildImprovementRunDetailText(detail);
+    if (!text) return;
+
+    try {
+      const taskId = String(detail?.task?.taskId || 'unknown').replace(/[^\w-]+/g, '_');
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MIKI_RUN_DETAIL_${taskId}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setActionMessage({
+        text: '実行詳細をテキストファイルとして保存しました。',
+        type: 'success',
+      });
+    } catch {
+      setActionMessage({
+        text: '実行詳細をテキストファイルとして保存できませんでした。',
+        type: 'error',
       });
     }
   };
@@ -1384,6 +1417,14 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                     >
                       <FileText className="w-3.5 h-3.5" />
                       AI用テキストをコピー
+                    </button>
+                    <button
+                      onClick={() => saveImprovementRunDetail(detail)}
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-semibold flex items-center gap-1.5 transition"
+                      title="この実行の詳細をテキストファイルとして保存"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      ファイルに保存
                     </button>
                     <button
                       onClick={() => copyAllCheckpoints(detail)}

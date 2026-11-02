@@ -7135,60 +7135,60 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 88815,
-      "lines": 1766,
-      "sha256": "8c373b6afdb0658d818f24818be5d3f69d9e104f44ff8eaa00de589815672e06",
+      "bytes": 90419,
+      "lines": 1807,
+      "sha256": "f181ace32a5ee9f11b509f4bf9c75266880e95231f57b33562538e92a05fae3d",
       "relativeImportCandidates": [
         {
-          "line": 47,
+          "line": 48,
           "specifier": "../miki/core/ui/typedImprovementUiGatewayService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/ui/typedImprovementUiGatewayService.ts"
         },
         {
-          "line": 51,
+          "line": 52,
           "specifier": "../miki/core/mikiInteractionBus",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/mikiInteractionBus.ts"
         },
         {
-          "line": 52,
+          "line": 53,
           "specifier": "./ReviewPackageLibrary",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/ReviewPackageLibrary.tsx"
         },
         {
-          "line": 53,
+          "line": 54,
           "specifier": "./SelfCodeSpaceScreen",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/SelfCodeSpaceScreen.tsx"
         },
         {
-          "line": 54,
+          "line": 55,
           "specifier": "./LearningArchivePanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/LearningArchivePanel.tsx"
         },
         {
-          "line": 55,
+          "line": 56,
           "specifier": "./LearningInspectorPanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/LearningInspectorPanel.tsx"
         },
         {
-          "line": 56,
+          "line": 57,
           "specifier": "./self_improvement/DevelopmentReviewLifecyclePanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/self_improvement/DevelopmentReviewLifecyclePanel.tsx"
         },
         {
-          "line": 57,
+          "line": 58,
           "specifier": "../miki/core/ui/typedCoreUiGatewayService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/ui/typedCoreUiGatewayService.ts"
         },
         {
-          "line": 58,
+          "line": 59,
           "specifier": "../utils/isEditableInputActive",
           "resolution": "RESOLVED",
           "resolvedPath": "src/utils/isEditableInputActive.ts"
