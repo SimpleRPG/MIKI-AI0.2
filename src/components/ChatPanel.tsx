@@ -152,8 +152,6 @@ interface ChatPanelProps {
   setSpeakerMode: (mode: string) => void;
   onApplyCode: (files: { path: string; name: string; content: string; language: string }[]) => void;
   onClearHistory: () => void;
-  useSearch: boolean;
-  setUseSearch: (val: boolean) => void;
   workspaceFiles: WorkspaceFile[];
   onOpenGamePreview?: () => void;
   onOpenExportModal?: () => void;
@@ -184,8 +182,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   setSpeakerMode,
   onApplyCode,
   onClearHistory,
-  useSearch,
-  setUseSearch,
   workspaceFiles,
   onOpenGamePreview,
   onOpenExportModal,
@@ -3371,12 +3367,6 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
                   </div>
                 )}
 
-                {useSearch && (
-                  <div className="flex items-center gap-1.5 text-emerald-400 animate-pulse">
-                    <Search className="w-3 h-3" />
-                    <span>Google Search で最新情報を検索中...</span>
-                  </div>
-                )}
 
                 <div className="flex items-center justify-between pt-1">
                   <button
@@ -3489,18 +3479,6 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
 
 
 
-          <button
-            type="button"
-            onClick={() => setUseSearch(!useSearch)}
-            className={`p-2 rounded-lg transition-colors shrink-0 ${
-              useSearch
-                ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-500/40'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-            title="Google検索グラウンディング"
-          >
-            <Search className="w-4 h-4" />
-          </button>
 
 
           <button

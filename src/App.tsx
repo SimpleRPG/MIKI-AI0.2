@@ -284,7 +284,6 @@ export default function App() {
   });
   const [activeFilePath, setActiveFilePath] = useState<string>(WORKSPACE_TEMPLATES[0].files[0].path);
 
-  const [useSearch, setUseSearch] = useState<boolean>(true);
   const [fps, setFps] = useState<number>(60);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLogItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -1807,8 +1806,6 @@ export default function App() {
         onOpenMemoryModal={() => { void loadMemoryModal(); setIsMemoryModalOpen(true); }}
         onOpenExportModal={() => setIsExportModalOpen(true)}
         onNewBlankProject={handleNewBlankProject}
-        useSearch={useSearch}
-        setUseSearch={setUseSearch}
         fps={fps}
         onOpenActivityMonitor={() => { void loadActivityMonitor(); setIsGlobalActivityMonitorOpen(true); }}
         onOpenSelfImprovementModal={() => setActiveTab('improvement')}
@@ -1846,8 +1843,6 @@ export default function App() {
                   },
                 ]);
               }}
-              useSearch={useSearch}
-              setUseSearch={setUseSearch}
               workspaceFiles={workspaceFiles}
               onOpenGamePreview={() => setActiveTab('preview')}
               onOpenExportModal={() => setIsExportModalOpen(true)}
@@ -1961,8 +1956,6 @@ export default function App() {
                     },
                   ]);
                 }}
-                useSearch={useSearch}
-                setUseSearch={setUseSearch}
                 workspaceFiles={workspaceFiles}
                 onOpenGamePreview={() => setMobileTab('preview')}
                 onOpenExportModal={() => setIsExportModalOpen(true)}
