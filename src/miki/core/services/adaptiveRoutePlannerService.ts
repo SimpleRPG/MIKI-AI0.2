@@ -169,6 +169,31 @@ function buildCodeComponentGapMeaning(componentIds:string[]):string {
   ].join(' ');
 }
 
+/*
+ * P406: CODE_COMPOSITION_PLAN_UNAVAILABLE には未解決Component IDが
+ * 含まれないため、生成時にブラックボードへ残された不足内訳
+ * （candidateGenerationGap: ConstructionギャップとUnknown質問）から
+ * 同型の意味文を組み立てる。
+ */
+function buildCompositionGapMeaning(input:{
+  goal:string;
+  targetPaths:string[];
+  gapDescriptions:string[];
+  gapReason:string;
+}):string {
+  return [
+    '自律コード改善で必要な実装能力（検証済みCODE Component・実装パターン）が不足している。',
+    '不足文字列そのものを検索意図として扱わず、対象ファイルと不足の内訳から必要能力を意味化する。',
+    '既存CODE Componentで再利用または適応できる場合はそれを優先し、存在しない場合のみ実装パターン・契約・依存・テスト方法をResearchで調査する。',
+    `goal=${input.goal}`,
+    `targetPaths=${input.targetPaths.join(', ') || 'none'}`,
+    ...(input.gapReason ? [`synthesisGapReason=${input.gapReason}`] : []),
+    ...(input.gapDescriptions.length
+      ? [`gapDescriptions=${input.gapDescriptions.join(' || ')}`]
+      : ['gapDescriptions=none recorded (generation did not leave a gap breakdown)']),
+  ].join(' ');
+}
+
 function successfulBusinessEntries(task:BlackboardTask):BlackboardEntry[] {
   return task.entries.filter(entry => {
     if(entry.kind!=='RESULT') return false;
@@ -658,12 +683,23 @@ class AdaptiveRoutePlannerService {
      */
     const latestCandidateGenerationError=this.latestOperationError(task,'GENERATE_CANDIDATE');
 
-    if(latestCandidateGenerationError.startsWith('CODE_COMPOSITION_COMPONENT_UNRESOLVED:')){
-      const unresolved=latestCandidateGenerationError
-        .slice('CODE_COMPOSITION_COMPONENT_UNRESOLVED:'.length)
-        .split(',')
-        .map(value=>value.trim())
-        .filter(Boolean);
+    /*
+     * P406: 実機で発生する CODE_COMPOSITION_PLAN_UNAVAILABLE も、
+     * UNRESOLVED と同じ逃げ道（UNKNOWN/Research→再生成）へ結線する。
+     * UNAVAILABLE には未解決Component IDが無いので unresolved は空とし、
+     * 意味文は candidateGenerationGap の不足内訳から組み立てる。
+     */
+    const compositionUnresolved=latestCandidateGenerationError.startsWith('CODE_COMPOSITION_COMPONENT_UNRESOLVED:');
+    const compositionUnavailable=latestCandidateGenerationError.startsWith('CODE_COMPOSITION_PLAN_UNAVAILABLE');
+
+    if(compositionUnresolved||compositionUnavailable){
+      const unresolved=compositionUnresolved
+        ? latestCandidateGenerationError
+          .slice('CODE_COMPOSITION_COMPONENT_UNRESOLVED:'.length)
+          .split(',')
+          .map(value=>value.trim())
+          .filter(Boolean)
+        : [];
 
       const errorIndex=[...task.entries].map((entry,index)=>({entry,index})).reverse()
         .find(({entry})=>{
@@ -672,6 +708,35 @@ class AdaptiveRoutePlannerService {
           return String(value?.operation||'')==='GENERATE_CANDIDATE'
             && String(value?.error||'')===latestCandidateGenerationError;
         })?.index ?? -1;
+
+      /*
+       * P406: UNAVAILABLE の場合、生成が失敗前に残した不足内訳
+       * （candidateGenerationGap）はエラー記録より前に積まれている。
+       * 対象エラーの直前にある最新のものを採用する。
+       */
+      const gapEntry=compositionUnavailable
+        ? [...task.entries]
+          .map((entry,index)=>({entry,index}))
+          .reverse()
+          .find(({entry,index})=>
+            index<=errorIndex &&
+            entry.kind==='OBSERVATION' &&
+            entry.key==='candidateGenerationGap'
+          )
+        : undefined;
+
+      const gapValue=gapEntry
+        ? objectValue(gapEntry.entry)
+        : undefined;
+
+      const gapDescriptions=[
+        ...(Array.isArray(gapValue?.constructionGaps)
+          ? gapValue.constructionGaps.map(value=>String(value))
+          : []),
+        ...(Array.isArray(gapValue?.unknownQuestions)
+          ? gapValue.unknownQuestions.map(value=>String(value))
+          : []),
+      ].filter(Boolean);
 
       const latestResolution=[...task.entries]
         .map((entry,index)=>({entry,index}))
@@ -688,18 +753,28 @@ class AdaptiveRoutePlannerService {
         : undefined;
 
       if(!latestResolution){
-        const componentGapMeaning=buildCodeComponentGapMeaning(unresolved);
+        const componentGapMeaning=unresolved.length>0
+          ? buildCodeComponentGapMeaning(unresolved)
+          : buildCompositionGapMeaning({
+              goal:task.goal,
+              targetPaths:coreTargetPaths,
+              gapDescriptions,
+              gapReason:String(gapValue?.synthesisGapReason||''),
+            });
 
         routes.push({
           target:'unknown',
           command:'RESOLVE_UNKNOWN',
-          reason:'CORE converts unresolved CODE Component references into a semantic implementation gap before UNKNOWN/Research',
+          reason:compositionUnavailable
+            ? 'CORE converts the composition shortage (CODE_COMPOSITION_PLAN_UNAVAILABLE) into a semantic capability gap before UNKNOWN/Research'
+            : 'CORE converts unresolved CODE Component references into a semantic implementation gap before UNKNOWN/Research',
           payload:{
             taskId:task.taskId,
             question:componentGapMeaning,
             unknownTerms:[componentGapMeaning],
             unresolvedComponents:unresolved,
             componentGap:true,
+            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions} : {}),
             componentGapMeaning,
             useSearch:true,
             adaptive:true,
@@ -720,7 +795,26 @@ class AdaptiveRoutePlannerService {
         ''
       ).trim();
 
-      if(resolutionStatus==='RESEARCH_REQUIRED' && researchQuestion){
+      const latestResearchAfterResolution=[...task.entries]
+        .map((entry,index)=>({entry,index}))
+        .reverse()
+        .find(({entry,index})=>{
+          if(index<=latestResolution.index) return false;
+          if(entry.domain!=='research') return false;
+          if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
+          const operation=String(objectValue(entry)?.operation||'');
+          return operation==='EXECUTE_AUTONOMOUS_SEARCH' || operation==='RUN_RESEARCH';
+        });
+
+      /*
+       * P406: RESEARCH_REQUIRED でも、解決の後にResearchが既に
+       * 実行されている場合は再び RUN_RESEARCH へ戻さない（従来は
+       * 無条件に戻していたため、調査結果が揃っても再生成へ進めず
+       * Researchを繰り返すだけだった）。planMemoryRecovery 側と
+       * 同じ「未実行の場合だけ調査へ」という形にそろえ、実行済みの
+       * 場合は後段のEvidence/Claim検証・再生成の判定へ進める。
+       */
+      if(resolutionStatus==='RESEARCH_REQUIRED' && researchQuestion && !latestResearchAfterResolution){
         routes.push({
           target:'research',
           command:'RUN_RESEARCH',
@@ -737,17 +831,6 @@ class AdaptiveRoutePlannerService {
 
         return this.decorateOperations(task,this.uniqueOperations(routes));
       }
-
-      const latestResearchAfterResolution=[...task.entries]
-        .map((entry,index)=>({entry,index}))
-        .reverse()
-        .find(({entry,index})=>{
-          if(index<=latestResolution.index) return false;
-          if(entry.domain!=='research') return false;
-          if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
-          const operation=String(objectValue(entry)?.operation||'');
-          return operation==='EXECUTE_AUTONOMOUS_SEARCH' || operation==='RUN_RESEARCH';
-        });
 
       const researchEnvelope=latestResearchAfterResolution
         ? objectValue(latestResearchAfterResolution.entry)
@@ -1062,6 +1145,7 @@ class AdaptiveRoutePlannerService {
               componentIds:unresolved,
               reasons:[latestCandidateGenerationError],
               unresolvedComponents:unresolved,
+              ...(compositionUnavailable ? {gapDescriptions} : {}),
               result:{
                 error:latestCandidateGenerationError,
                 unknownResolutionStatus:resolutionStatus,
@@ -2664,8 +2748,10 @@ class AdaptiveRoutePlannerService {
     );
   }
 
-  private extractCandidateIdentity(entry:BlackboardEntry|Record<string,unknown>):Record<string,unknown> {
-    const value=entry instanceof Object && 'value' in entry ? objectValue(entry as BlackboardEntry)||{} : entry as Record<string,unknown>;
+  private extractCandidateIdentity(entry:BlackboardEntry|Record<string,unknown>|undefined):Record<string,unknown> {
+    // P406: 初回生成の失敗（前回候補なし）でも逃げ道の再生成判定が
+    // 例外で死なないよう、未定義は空の同一性として扱う。
+    const value=!entry ? {} : entry instanceof Object && 'value' in entry ? objectValue(entry as BlackboardEntry)||{} : entry as Record<string,unknown>;
     return {
       candidateId:value.candidateId,
       workspaceId:value.workspaceId,

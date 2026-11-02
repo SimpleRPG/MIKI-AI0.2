@@ -583,6 +583,13 @@ class ReusableComponentFactoryService{
 
   const componentPackage={
     ...base,
+    /*
+     * P406: 能力グラフ経路はレジストリ部品を componentKind='CODE'
+     * で絞るが、登録側がその種別を持たせていなかったため、検証を
+     * 通ったコード部品が合成候補へ一切現れなかった。コード部品の
+     * 登録はここが正本なので、種別はここで持たせる。
+     */
+    componentKind:'CODE' as const,
     componentType:input.componentType||'RESEARCHED_CODE_COMPONENT',
     exports:input.exports||[],
     imports:input.imports||[],
@@ -824,7 +831,22 @@ class ReusableComponentFactoryService{
  }
 
  storeCandidates(items:AnyReusableComponent[]):{componentIds:string[];persistenceReceiptId:string;reloaded:boolean}{const existing=this.read<AnyReusableComponent>(COMPONENT_KEY);const merged=[...items,...existing.filter(item=>!items.some(next=>next.canonicalSha256===item.canonicalSha256))].slice(0,1000);storageService.setItem(COMPONENT_KEY,JSON.stringify(merged));const loaded=this.read<AnyReusableComponent>(COMPONENT_KEY);const reloaded=items.every(item=>loaded.some(saved=>saved.componentId===item.componentId&&saved.canonicalSha256===item.canonicalSha256));if(!reloaded)throw new Error('COMPONENT_REPOSITORY_PERSISTENCE_FAILED');return {componentIds:items.map(x=>x.componentId),persistenceReceiptId:`CPR-${canonicalSha256Object({ids:items.map(x=>x.componentId),at:Date.now()}).slice(0,20)}`,reloaded};}
- retrieve(input:{purpose:string;environmentFingerprint:string;kinds?:ReusableComponentKind[]}):{candidates:AnyReusableComponent[];excludedComponentIds:string[];exclusionReasons:Record<string,string>}{const words=this.words(input.purpose);const excludedComponentIds:string[]=[];const exclusionReasons:Record<string,string>={};const candidates=this.list().filter(item=>{if(input.kinds&&!input.kinds.includes(item.componentKind)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='KIND_NOT_SELECTED';return false;}if(!['MIKI_APPROVED','ACTIVE','USER_APPROVED'].includes(item.lifecycleStatus)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='NOT_MIKI_APPROVED';return false;}if(item.environmentFingerprint!=='unknown'&&item.environmentFingerprint!=='universal'&&item.environmentFingerprint!==input.environmentFingerprint){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='ENVIRONMENT_REVALIDATION_REQUIRED';return false;}const hay=this.words([item.purpose,...item.appliesWhen,item.componentType].join(' '));const matched=words.some(word=>hay.includes(word));if(!matched){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='PURPOSE_NOT_MATCHED';}return matched;});return {candidates,excludedComponentIds,exclusionReasons};}
+ /*
+  * P406: 環境指紋はカンマ区切りの集合（例 'MIKI_RUNTIME,ANDROID'）。
+  * 完全一致で判定すると、対象環境を含む部品まで環境不一致で
+  * 外れ、承認済み部品が材料に入らなかった。集合の共通部分で
+  * 判定する。呼び出し側が環境を特定できない（unknown /
+  * universal）場合は従来どおり、特定環境向けの部品を材料に
+  * しない。
+  */
+ private environmentFingerprintMatches(itemFingerprint:string,inputFingerprint:string):boolean{
+   if(itemFingerprint==='unknown'||itemFingerprint==='universal')return true;
+   if(inputFingerprint==='unknown'||inputFingerprint==='universal')return false;
+   const itemSet=new Set(itemFingerprint.split(',').map(value=>value.trim()).filter(Boolean));
+   return inputFingerprint.split(',').map(value=>value.trim()).filter(Boolean).some(value=>itemSet.has(value));
+ }
+
+ retrieve(input:{purpose:string;environmentFingerprint:string;kinds?:ReusableComponentKind[]}):{candidates:AnyReusableComponent[];excludedComponentIds:string[];exclusionReasons:Record<string,string>}{const words=this.words(input.purpose);const excludedComponentIds:string[]=[];const exclusionReasons:Record<string,string>={};const candidates=this.list().filter(item=>{if(input.kinds&&!input.kinds.includes(item.componentKind)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='KIND_NOT_SELECTED';return false;}if(!['MIKI_APPROVED','ACTIVE','USER_APPROVED'].includes(item.lifecycleStatus)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='NOT_MIKI_APPROVED';return false;}if(!this.environmentFingerprintMatches(item.environmentFingerprint,input.environmentFingerprint)){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='ENVIRONMENT_REVALIDATION_REQUIRED';return false;}const hay=this.words([item.purpose,...item.appliesWhen,item.componentType].join(' '));const matched=words.some(word=>hay.includes(word));if(!matched){excludedComponentIds.push(item.componentId);exclusionReasons[item.componentId]='PURPOSE_NOT_MATCHED';}return matched;});return {candidates,excludedComponentIds,exclusionReasons};}
  plan(input:{taskId:string;purpose:string;environmentFingerprint:string;requiredKinds?:ReusableComponentKind[]}):ComponentPack{const found=this.retrieve({purpose:input.purpose,environmentFingerprint:input.environmentFingerprint,kinds:input.requiredKinds});const knowledge=found.candidates.filter(x=>x.componentKind==='KNOWLEDGE').map(x=>x.componentId);const code=found.candidates.filter(x=>x.componentKind==='CODE').map(x=>x.componentId);const conversation=found.candidates.filter(x=>x.componentKind==='CONVERSATION').map(x=>x.componentId);const unresolved=(input.requiredKinds||[]).filter(kind=>!found.candidates.some(x=>x.componentKind===kind)).map(kind=>`${kind}_COMPONENT_REQUIRED`);const context={taskId:input.taskId,knowledge,code,conversation,excluded:found.excludedComponentIds,environmentFingerprint:input.environmentFingerprint,unresolved};const componentContextSha256=canonicalSha256Object(context);return {componentPackId:`CPACK-${componentContextSha256.slice(0,20)}`,knowledgePackId:`KPACK-${canonicalSha256Object(knowledge).slice(0,20)}`,usedKnowledgeComponentIds:knowledge,usedCodeComponentIds:code,usedConversationComponentIds:conversation,adaptedComponentIds:[],createdComponentIds:[],excludedComponentIds:found.excludedComponentIds,exclusionReasons:found.exclusionReasons,environmentFingerprint:input.environmentFingerprint,unresolvedComponentNeeds:unresolved,componentContextSha256,packSha256:canonicalSha256Object({...context,componentContextSha256})};}
 
  buildConstructionGraph(input:{

@@ -1219,6 +1219,29 @@ class CoreOrchestratorService {
        ? failureReply.normalized as Record<string,unknown>
        : undefined;
 
+     // P406: COREが未知解決・調査を経て意図的に再投入する経路は、
+     // 材料が変わっていない盲目的な再試行とは区別する。再投入の
+     // 目印（failureFeedback.retryOfCandidateRevision は計画側が
+     // 解決済み再生成にだけ付ける）があり、かつ失敗の後に解決活動
+     // （RESOLVE_UNKNOWN / Research / Claim・部品検証）の記録が
+     // ある場合、その経路は負の知識の時間窓で落とさない。
+     // 失敗後に何も記録が無い再試行は従来どおり canRetry で止める。
+     const failureFeedback=route.payload?.failureFeedback&&typeof route.payload.failureFeedback==='object'
+       ? route.payload.failureFeedback as Record<string,unknown>
+       : undefined;
+
+     if(failureFeedback&&failureFeedback.retryOfCandidateRevision!==undefined&&latestFailure){
+       const failureIndex=planningTask.entries.indexOf(latestFailure);
+       const resolutionAfterFailure=planningTask.entries.slice(failureIndex+1).some(entry=>{
+         if(entry.kind!=='RESULT'&&entry.kind!=='OBSERVATION')return false;
+         const value=entry.value&&typeof entry.value==='object'
+           ? entry.value as Record<string,unknown>
+           : {};
+         return ['RESOLVE_UNKNOWN','RUN_RESEARCH','EXECUTE_AUTONOMOUS_SEARCH','VERIFY_RESEARCH_CLAIMS','VERIFY_CODE_COMPONENT'].includes(String(value.operation||''));
+       });
+       if(resolutionAfterFailure)return true;
+     }
+
      const retryReason=String(
        failureValue?.error||
        failureValue?.summary||

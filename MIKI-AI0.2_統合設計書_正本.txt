@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-31
-正本Revision：2026-11-02-P405
+正本Revision：2026-11-02-P406
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,7 +119,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-11-02-P405
+- 現行Revision: 2026-11-02-P406
 - 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324/P325/P326/P327/P328/P329/P330/P331/P332/P333/P334/P335/P336/P337/P338/P339/P340/P341/P342の対象ファイル変更後に全ファイル件数を再集計したものではない。P332・P333・P335は候補登録のみでソースファイル変更なし。P334/P336ではP299定義の追跡ソースインベントリを再生成するが、P222基準の完全再帰件数は再集計しない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
@@ -13326,3 +13326,11 @@ P405（2026-11-02）PAUSED空回りの是正：自律改善ループの予算停
 - 修正（autonomousSelfImprovementLoopService.ts のみ）：実行開始前にブラックボードのエントリ数を記録し、予算停止の分類は「今回の実行で追加されたエントリ」だけを見るよう変更。あわせて、今回の実行の dispatched が0の予算停止は「区切り進行」ではなく failOrRetry（従来のRETRYバックオフ＋attempts消費）へ回す（絶対サイクル数による予算トラップやフォアグラウンドブロックによる空回りも同経路で防止）。plateau自体の意味論（P403の因果登録を含む）は変更していない。
 - 検証：harness66（実機形状のフィクスチャ：実経路で plateau PAUSED にしたタスク＋予算チェックポイント履歴）で、修正前は同一要求が2,144回stepされタスクのサイクル数が5→2,167（全再開dispatched=0）になる空回りを再現。修正後は再開1回のみ・RETRYバックオフ（約10分）・attempts返金なし・次要求が飢えず処理される・駐車要求のみになるとループが PAUSED＋retryAt で静止、を確認。harness57／63回帰PASS、tscエラー0、相対import未解決0。
 - 残存観測（本節では未対応）：plateauの吸収性そのものは残るため、plateauしたタスクは再開しても進展せず、要求はバックオフを経て試行上限で落ち、発見側の STALLED_TASK 経路（P403-B3/B4）で扱われる。また autonomousRevalidationLoopService にも履歴全体を見る予算停止判定があるが、そちらは周期実行で即時再stepの構造ではないため対象外とした。
+
+P406（2026-11-02）部品不足の3断線の是正：合成の復活・不足の伝播・再試行の連鎖断ち
+- 背景：実機で GENERATE_CANDIDATE 到達タスクは全て CODE_COMPOSITION_PLAN_UNAVAILABLE で FAILED になっていた。調査で断線3件を特定した。(1)合成の到達不能：能力グラフ経路はレジストリ部品を種別 CODE で絞るが登録側が種別を持たせず常時0件。既存部品経路は Factory の部品ID（RC-CODE-…）でレジストリ（CC-…）を引いて常時未解決。(2)伝播の断線：計画側の逃げ道（不足→RESOLVE_UNKNOWN→RUN_RESEARCH→再生成）は CODE_COMPOSITION_COMPONENT_UNRESOLVED 専用で、実機で出る UNAVAILABLE には分岐が無く、不足の内訳（gapReason／CONSTRUCTION_GAP 一覧）は生成台帳の中だけに留まっていた。(3)再試行の連鎖：生成失敗が負の知識に記録され、同一理由の再試行が最低15分ブロックされ、再生成が計画の濾過で落ちて経路0件→FAILED。
+- 案1（配線）：計画側の逃げ道分岐を UNAVAILABLE にも結線した。生成側は UNAVAILABLE で失敗する際、不足の内訳（合成gap理由・CONSTRUCTION_GAP 一覧・未知の問い）をブラックボードへ観測として残し、計画側はそれを未知解決の問いと gapDescriptions として調査へ渡す。調査を経た再投入（未知解決→調査→再生成の証跡がブラックボードに残っている場合）は負の知識の再試行ブロックを迂回する。材料の変わっていない盲目的な再試行は従来どおりブロックされる。併せて、調査済みでも RUN_RESEARCH へ戻り続ける問題（調査完了の確認が分岐より後ろにあった）と、初回失敗時に計画が例外で落ちる問題（前回成功結果が無い場合の候補同一性の読み取り）を是正した。単一対象 Construction Graph の検証待ち理由文字列（CONSTRUCTION_GRAPH_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION）を境界の判定リストへ追加し、その経路の候補が検証へ進めるようにした。
+- 案3（候補化ゲート）：調査材料→部品候補化の判定を、ランの payload が宣言する検証要求から、生成側が実際に組み立てる実効検証要求（品質計画・受入条件・テスト行列を含む）へ変更した。検証要求を宣言しないラン（自律発見系など）でも、収集した材料が候補化→検証→再利用へ進める。材料が無ければ候補は作られない（対照で確認）。
+- 案2（合成の復活）：コード部品の登録（reusableComponentFactoryService.createCodeComponentCandidate）とレジストリ初期シード4件（VBA設計例）に種別 CODE を持たせた。生成側の受け渡しでは Factory の部品IDを各アーティファクトが保持する registryComponentId へ変換してから合成へ渡す。併せて部品パックの環境指紋の突合せを是正した：ランが環境指紋を持たない場合、合成材料は生成対象の環境（ANDROID）で評価する。Factory の材料選別は指紋の完全一致をやめ、カンマ区切りの集合の共通部分で判定する（呼び出し側が環境を特定できない場合は従来どおり特定環境向け部品を材料にしない）。
+- 検証：harness67（案1：UNAVAILABLE→RESOLVE_UNKNOWN→RUN_RESEARCH→再生成が負の知識ブロックを迂回して実際に走ること、材料の変わらないタスクは逃げ道へ回ること）・harness68（案3：検証要求が空のランで調査材料が候補化され、材料なしでは候補が作られないこと）・harness69（案2：候補→検証済み→承認→部品パック→ID変換→合成の両経路（既存部品・能力グラフ）で実際に使えること）全てPASS。回帰 harness57／63／66 PASS、tscエラー0、相対import未解決0。
+- 提案として分離（本節では未実施）：知識系課題がコード生成の梯子へ乗る問題（課題種別で梯子を選ぶ再設計）と、plateau 判定の吸収性（履歴全体への最大連続一致）の是正は、意味論の変更として別途判断する。

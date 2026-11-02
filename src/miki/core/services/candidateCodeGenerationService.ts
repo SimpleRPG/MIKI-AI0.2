@@ -801,10 +801,17 @@ class CandidateCodeGenerationService {
    * Research本文そのものからコードを推測しない。
    * 明示的なcodeExamplesだけをCandidate化し、Verification待ちにする。
    */
+  /*
+   * P406: 候補化のゲートは payload.validationRequirements で判定して
+   * いたため、自律発見系など検証要求を明示しないランでは、材料が
+   * 収集できていても全件破棄されていた。候補が実際に受ける検証は
+   * 生成側で組み立てる実効検証要求（品質計画・受入条件・テスト
+   * 行列を含む）なので、判定はそちらで行う。
+   */
   const researchedCandidates=this.parseImplementationMaterials(
     unknownContext.implementationMaterials,
     targetPaths,
-    this.strings(run.payload.validationRequirements),
+    effectiveValidationRequirements,
   );
 
   for(const candidate of researchedCandidates){
@@ -911,10 +918,17 @@ class CandidateCodeGenerationService {
     packageId:learningPackageId
   });
 
+  /*
+   * P406: 合成材料の環境は生成対象の環境（ANDROID。
+   * compiledRequest.environment と同じ）で評価する。ランが環境
+   * 指紋を持たない場合に 'unknown' のままだと、ANDROID 向けに
+   * 検証・承認された部品が環境不一致で材料から外れ、再利用の
+   * 輪が閉じなかった。
+   */
   const componentPack=reusableComponentFactoryService.plan({
     taskId:run.taskId||run.runId,
     purpose:[run.objective,knowledgeHints].filter(Boolean).join(' / '),
-    environmentFingerprint,
+    environmentFingerprint:environmentFingerprint==='unknown'?'ANDROID':environmentFingerprint,
     requiredKinds:['KNOWLEDGE','CODE']
   });
 
@@ -1018,9 +1032,19 @@ class CandidateCodeGenerationService {
       deliveryRequirements:this.strings(run.payload.deliveryRequirements)
     };
 
-    const reusableComponentIds = [
-      ...componentPack.usedCodeComponentIds,
-    ];
+    /*
+     * P406: componentPack の ID は Factory 側のアーティファクトID
+     * （RC-CODE-…）であり、合成の正本である Component Registry の
+     * ID（CC-…）ではない。そのまま渡すと合成側で常時未解決になり、
+     * 検証済み部品の再利用が成立しなかった。各アーティファクトが
+     * 保持する registryComponentId へ変換してから渡す。対応付けの
+     * 無い部品は元のIDのまま渡し、合成側で未解決として扱わせる。
+     */
+    const factoryArtifacts = reusableComponentFactoryService.list();
+    const reusableComponentIds = componentPack.usedCodeComponentIds.map(id => {
+      const artifact = factoryArtifacts.find(item => item.componentId === id);
+      return artifact?.registryComponentId || id;
+    });
 
     if(
       constructionRender.accepted &&
@@ -1123,6 +1147,27 @@ class CandidateCodeGenerationService {
       const reason=createdCodeComponentIds.length>0
         ? 'NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION'
         : 'CODE_COMPOSITION_PLAN_UNAVAILABLE';
+
+      /*
+       * P406: 不足の内訳は生成台帳の中だけにあり、計画側は理由文字列
+       * 1本しか読めなかった。計画側の逃げ道（UNKNOWN/Research）が
+       * 「何が不足か」を材料にできるよう、計算済みの内訳をタスクの
+       * ブラックボードへも残す（台帳の記録は従来どおり）。
+       */
+      if(reason==='CODE_COMPOSITION_PLAN_UNAVAILABLE'&&run.taskId){
+        taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGap',{
+          operation:'GENERATE_CANDIDATE',
+          runId,
+          reason,
+          synthesisGapReason:synthesisPlan.source.gapReason||'',
+          blockedReason:synthesisPlan.blockedReason||'',
+          constructionGaps:constructionGapRequirements,
+          unknownQuestions:unknownContext.items
+            .map(item=>item.question)
+            .filter(Boolean),
+          targetPaths,
+        },[]);
+      }
 
       this.record(runId,{
         attemptCount:1,

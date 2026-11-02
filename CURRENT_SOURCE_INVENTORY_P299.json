@@ -9311,9 +9311,9 @@
     },
     {
       "path": "src/miki/capability/services/componentRegistryService.ts",
-      "bytes": 44367,
-      "lines": 989,
-      "sha256": "014054a2c02b079383d949a3baf13e4a5744414449d284d428d75f7546280f22",
+      "bytes": 44491,
+      "lines": 993,
+      "sha256": "328b684b4823859d2e389464e48d076acd533dc74069ee49e4b619425b19b8be",
       "relativeImportCandidates": [
         {
           "line": 7,
@@ -12211,9 +12211,9 @@
     },
     {
       "path": "src/miki/core/services/adaptiveRoutePlannerService.ts",
-      "bytes": 137064,
-      "lines": 3064,
-      "sha256": "6261edba543959c50f253ccff805c3a6cd8e2bd9a86f9d04dd673e716d478c18",
+      "bytes": 141338,
+      "lines": 3150,
+      "sha256": "cdd89f19d616ac97c6dbed2c9e9f4e9a7437de9dde6174ac2434effbbe0eb760",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12668,9 +12668,9 @@
     },
     {
       "path": "src/miki/core/services/candidateCodeGenerationService.ts",
-      "bytes": 69049,
-      "lines": 1656,
-      "sha256": "ce85f7360564a30ed4511cf61326ce9df0fd586cb3e2c3620d60ec31bf6ac06e",
+      "bytes": 71637,
+      "lines": 1701,
+      "sha256": "56237c4ff92e604957607172a988e33b33a57544d4fa304db6a1a8046f9defb8",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12847,7 +12847,7 @@
           "resolvedPath": "src/miki/core/data/codeKnowledge/common.ts"
         },
         {
-          "line": 1369,
+          "line": 1414,
           "specifier": "../../research/services/webMaterialPatternExtractor",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webMaterialPatternExtractor.ts"
@@ -13730,9 +13730,9 @@
     },
     {
       "path": "src/miki/core/services/coreOrchestratorService.ts",
-      "bytes": 115306,
-      "lines": 2034,
-      "sha256": "c66f5ba11ccd2510f6162585f5d3c7c01b81dbda2b52d323be7f7aab27373dff",
+      "bytes": 116806,
+      "lines": 2057,
+      "sha256": "a73b73fcebaba3586f08009076d9ecadeba207f790f64761fff33511e44da47a",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14600,9 +14600,9 @@
     },
     {
       "path": "src/miki/core/services/domainIntegrationBootstrapService.ts",
-      "bytes": 61376,
-      "lines": 908,
-      "sha256": "241e413d9d62a46bd80441a84b6154f29d6765c5aa85c4ca5dd86c267aab98ee",
+      "bytes": 61471,
+      "lines": 909,
+      "sha256": "2d53a04a5e40a07dcc7999cfc877527ecd8eeb6b263420914a616028a0583cc0",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -15019,79 +15019,79 @@
           "resolvedPath": "src/miki/core/services/improvementIntakeRouterService.ts"
         },
         {
-          "line": 697,
+          "line": 698,
           "specifier": "./isolatedCandidateWorkspaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
         },
         {
-          "line": 727,
+          "line": 728,
           "specifier": "../../selfDevelopment/services/formalAdoptionAuthorizationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/formalAdoptionAuthorizationService.ts"
         },
         {
-          "line": 728,
+          "line": 729,
           "specifier": "../../selfDevelopment/services/formalAdoptionAuthorizationLedgerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/formalAdoptionAuthorizationLedgerService.ts"
         },
         {
-          "line": 735,
+          "line": 736,
           "specifier": "./reviewZipExportService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/reviewZipExportService.ts"
         },
         {
-          "line": 736,
+          "line": 737,
           "specifier": "./isolatedCandidateWorkspaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
         },
         {
-          "line": 737,
+          "line": 738,
           "specifier": "./persistenceReceiptLedgerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/persistenceReceiptLedgerService.ts"
         },
         {
-          "line": 738,
+          "line": 739,
           "specifier": "./selfCodeSpaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
         },
         {
-          "line": 764,
+          "line": 765,
           "specifier": "./externalReviewIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/externalReviewIntakeService.ts"
         },
         {
-          "line": 789,
+          "line": 790,
           "specifier": "./improvementIntakeRouterService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/improvementIntakeRouterService.ts"
         },
         {
-          "line": 790,
+          "line": 791,
           "specifier": "./externalDirectiveIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/externalDirectiveIntakeService.ts"
         },
         {
-          "line": 826,
+          "line": 827,
           "specifier": "./reviewZipExportService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/reviewZipExportService.ts"
         },
         {
-          "line": 856,
+          "line": 857,
           "specifier": "./candidateValidationRunnerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/candidateValidationRunnerService.ts"
         },
         {
-          "line": 857,
+          "line": 858,
           "specifier": "./isolatedCandidateWorkspaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/isolatedCandidateWorkspaceService.ts"
@@ -17189,9 +17189,9 @@
     },
     {
       "path": "src/miki/core/services/reusableComponentFactoryService.ts",
-      "bytes": 73317,
-      "lines": 1749,
-      "sha256": "fe9f1dd7649d4a7da42dbab35f87da72bdc4022e58d3256bf3a2f3c4d7a326bc",
+      "bytes": 74586,
+      "lines": 1771,
+      "sha256": "f08d9a78d2d1869203d0926449d9c68abfc60682034126c17ebd0a5c6871691e",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -675,6 +675,7 @@ class DomainIntegrationBootstrapService{
    const awaitingVerification=
      result.reasons.some(reason =>
        reason==='NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION' ||
+       reason==='CONSTRUCTION_GRAPH_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION' ||
        reason==='CONSTRUCTION_GRAPH_MULTI_FILE_CODE_COMPONENT_CANDIDATES_CREATED_AWAITING_VERIFICATION'
      );
 
