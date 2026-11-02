@@ -7223,9 +7223,9 @@
     },
     {
       "path": "src/components/ChatPanel.tsx",
-      "bytes": 224882,
-      "lines": 3906,
-      "sha256": "615961b0f32cf1d1f5a11c9a3ebfd3d466b0b5ec5c09de6c193297af29aa8f65",
+      "bytes": 215631,
+      "lines": 3746,
+      "sha256": "bdab22fd12e3cc0437dc7651f8a7859afa0be437ad1ed0965c4bfe4a168416f2",
       "relativeImportCandidates": [
         {
           "line": 82,
@@ -10310,9 +10310,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 18589,
-      "lines": 188,
-      "sha256": "0068a216930236b5a0cd121dd3d6155ca879752344a56b712bc884a75b63694d",
+      "bytes": 19447,
+      "lines": 194,
+      "sha256": "d6db23f462b71cbacf34b19dd37485f0a9e0443d17976ed46d115cb3a0e8af35",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14075,9 +14075,9 @@
     },
     {
       "path": "src/miki/core/services/coreTaskIngressService.ts",
-      "bytes": 27005,
-      "lines": 240,
-      "sha256": "5012aabf7df2d4912ae316c8a5c6cd0b38b8a640ece0a8f97108a439d615bac6",
+      "bytes": 27269,
+      "lines": 245,
+      "sha256": "c23ed098aaaa30063048e82d5c1eee5b646b11f5de0d54a9a238e95d8a7712d2",
       "relativeImportCandidates": [
         {
           "line": 1,

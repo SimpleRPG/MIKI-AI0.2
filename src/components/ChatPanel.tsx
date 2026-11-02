@@ -265,7 +265,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   } | null>(null);
   const [isDependencyGraphModalOpen, setIsDependencyGraphModalOpen] = useState(false);
   const [isTimeMachineOpen, setIsTimeMachineOpen] = useState(false);
-  const [isSelfImplementLauncherOpen, setIsSelfImplementLauncherOpen] = useState(false);
   const [isAutonomousDevStudioOpen, setIsAutonomousDevStudioOpen] = useState(false);
   const [autonomousVerifications, setAutonomousVerifications] = useState<Record<string, AutonomousVerificationData>>({});
   const [expandedExternalDiagMsgId, setExpandedExternalDiagMsgId] = useState<string | null>(null);
@@ -3421,127 +3420,6 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
       {/* Input Form Footer */}
       <div className="p-2 sm:p-3 bg-slate-900 border-t border-slate-800 shrink-0">
         {/* みき自律改善クイックランチャートレイ */}
-        {isSelfImplementLauncherOpen && (
-          <div className="mb-2 p-2.5 bg-slate-950/95 border border-fuchsia-500/40 rounded-xl space-y-1.5 text-xs shadow-xl animate-in slide-in-from-bottom-2">
-            <div className="flex items-center justify-between pb-1 border-b border-slate-800">
-              <span className="font-bold text-fuchsia-300 flex items-center gap-1.5">
-                <Rocket className="w-3.5 h-3.5 text-fuchsia-400" />
-                <span>みき自律コード改善＆自己実装ランチャー</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsSelfImplementLauncherOpen(false)}
-                className="text-slate-400 hover:text-white p-0.5 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setInputText('【自律バグ修復】現在のコードベース内の構文エラーや実行時例外、不整合を自己診断し、直ちに修正差分を作成して適用してください。');
-                  setIsSelfImplementLauncherOpen(false);
-                  textareaRef.current?.focus();
-                }}
-                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-fuchsia-950/60 border border-slate-800 hover:border-fuchsia-500/40 rounded-lg text-slate-300 hover:text-fuchsia-200 text-left transition-colors cursor-pointer"
-              >
-                <Bug className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                <span className="truncate">🐛 構文＆例外の自己診断・自律修復</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setInputText('【自律リファクタリング】不要なデッドコード、重複処理を排除し、最新のTypeScriptベストプラクティスに従ってコードを最適化してください。');
-                  setIsSelfImplementLauncherOpen(false);
-                  textareaRef.current?.focus();
-                }}
-                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-fuchsia-950/60 border border-slate-800 hover:border-fuchsia-500/40 rounded-lg text-slate-300 hover:text-fuchsia-200 text-left transition-colors cursor-pointer"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="truncate">⚡ デッドコード排除・最適化</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setInputText('【ASTシンボル＆未実装分析】リポジトリ内の関数・クラス・エクスポートをスキャンし、まだ実装されていない機能ギャップを特定して実装計画を立ててください。');
-                  setIsSelfImplementLauncherOpen(false);
-                  textareaRef.current?.focus();
-                }}
-                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-fuchsia-950/60 border border-slate-800 hover:border-fuchsia-500/40 rounded-lg text-slate-300 hover:text-fuchsia-200 text-left transition-colors cursor-pointer"
-              >
-                <ListTree className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span className="truncate">🗺️ ASTシンボル構造＆ギャップ診断</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSelfImplementLauncherOpen(false);
-                  setIsDependencyGraphModalOpen(true);
-                }}
-                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-teal-950/60 border border-slate-800 hover:border-teal-500/40 rounded-lg text-slate-300 hover:text-teal-200 text-left transition-colors cursor-pointer"
-              >
-                <Network className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                <span className="truncate">🕸️ 依存関係＆循環参照インスペクター</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setInputText('【TDD単体テスト生成＆検証】主要モジュールの正常系・境界値・不変条件テストスイートを自動合成し、全テストPassを確認してください。');
-                  setIsSelfImplementLauncherOpen(false);
-                  textareaRef.current?.focus();
-                }}
-                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-indigo-950/60 border border-slate-800 hover:border-indigo-500/40 rounded-lg text-slate-300 hover:text-indigo-200 text-left transition-colors cursor-pointer"
-              >
-                <FlaskConical className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span className="truncate">🧪 TDD単体テスト自動合成＆検証</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSelfImplementLauncherOpen(false);
-                  setIsTimeMachineOpen(true);
-                }}
-                className="flex items-center gap-1.5 p-2 bg-slate-900 hover:bg-fuchsia-950/60 border border-slate-800 hover:border-fuchsia-500/40 rounded-lg text-slate-300 hover:text-fuchsia-200 text-left transition-colors cursor-pointer"
-              >
-                <History className="w-3.5 h-3.5 text-fuchsia-400 shrink-0" />
-                <span className="truncate">⏱️ タイムマシン (自動退避から即時復元)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSelfImplementLauncherOpen(false);
-                  onOpenSelfImprovementModal?.();
-                }}
-                className="flex items-center gap-1.5 p-2 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900/90 hover:to-teal-900/90 border border-emerald-500/50 rounded-lg text-emerald-200 text-left transition-all cursor-pointer"
-              >
-                <Bot className="w-3.5 h-3.5 text-emerald-300 shrink-0 animate-pulse" />
-                <span className="truncate font-semibold">🤖 自律コード巡回・オートパイロット</span>
-              </button>
-
-              {onOpenSelfImprovementModal && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSelfImplementLauncherOpen(false);
-                    onOpenSelfImprovementModal();
-                  }}
-                  className="flex items-center gap-1.5 p-2 bg-gradient-to-r from-fuchsia-950/80 to-indigo-950/80 hover:from-fuchsia-900/90 hover:to-indigo-900/90 border border-fuchsia-500/50 rounded-lg text-fuchsia-200 text-left transition-all cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-yellow-300 shrink-0" />
-                  <span className="truncate">🛠️ 自己改善スタジオを開く</span>
-                </button>
-              )}
-            </div>
-          </div>
-        )}
 
         <input
           type="file"
@@ -3609,27 +3487,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
             <Paperclip className="w-4 h-4" />
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsSelfImplementLauncherOpen(!isSelfImplementLauncherOpen)}
-            className={`p-2 rounded-lg transition-colors shrink-0 ${
-              isSelfImplementLauncherOpen
-                ? 'text-fuchsia-300 bg-fuchsia-950/80 border border-fuchsia-500/50 shadow-xs'
-                : 'text-slate-400 hover:text-fuchsia-300 hover:bg-slate-900'
-            }`}
-            title="みき自己実装・自律コード改善ランチャー"
-          >
-            <Rocket className="w-4 h-4" />
-          </button>
 
-          <button
-            type="button"
-            onClick={() => setIsAutonomousDevStudioOpen(true)}
-            className="p-2 rounded-lg transition-colors shrink-0 text-slate-400 hover:text-emerald-300 hover:bg-slate-900"
-            title="みき自律コード改善・オートパイロット"
-          >
-            <Bot className="w-4 h-4" />
-          </button>
 
           <button
             type="button"
@@ -3644,24 +3502,6 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
             <Search className="w-4 h-4" />
           </button>
 
-          {onToggleMultiStep && (
-            <button
-              type="button"
-              onClick={onToggleMultiStep}
-              className={`p-2 rounded-lg transition-colors shrink-0 ${
-                isMultiStepEnabled
-                  ? 'text-indigo-400 bg-indigo-950/60 border border-indigo-500/40 shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-              title={
-                isMultiStepEnabled
-                  ? '多段推論タスク計画モード: 有効 (要件分析・検証ステップを実行)'
-                  : '多段推論タスク計画モード: 自動判定 (クリックで常時計画モードに固定)'
-              }
-            >
-              <Layers className="w-4 h-4" />
-            </button>
-          )}
 
           <button
             type="button"

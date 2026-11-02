@@ -177,11 +177,16 @@ class CoreTaskIngressService {
    if(!finalized.grammar.passed)failedReasons.push(...finalized.grammar.issues);
   }
   let answerValidationPassed=finalized!==undefined&&finalized.semanticPreservation.passed&&finalized.executionConsistency.passed&&finalized.grammar.passed;
-  // P396: when the composed candidate could not be validated and
-  // the question was directed at MIKI's own state, the answer
-  // computed from the actual stores at intake takes its place —
-  // but only if that answer itself passes the same validation.
-  if(!answerValidationPassed){
+  // P396/P398: when the question was directed at MIKI's own state,
+  // the answer computed from the actual stores at intake is the
+  // authoritative one. P396 only let it replace a candidate that
+  // had FAILED validation; on device a composed brush-off
+  // ("確認できません") could still pass validation by echoing a
+  // question word, and the counted answer lost to it. So the
+  // computed answer now takes precedence whenever it exists and
+  // itself passes the same validation — whether or not the
+  // composed candidate passed.
+  {
    const selfInquiryAnswer=conversationGraphRuntimeP212Service.getSelfInquiryAnswer(taskId);
    if(selfInquiryAnswer&&requirements){
     const refinalized=graphAnswerMeaningPipelineP216Service.finalize(selfInquiryAnswer,requirements);

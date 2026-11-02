@@ -151,7 +151,7 @@ class ConversationGraphRuntimeP212Service {
  // candidate (see coreTaskIngressService).
  private computeSelfInquiry(text:string):string|undefined {
   const value=text.trim();
-  const dictMatch=value.match(/(.{1,24}?)(?:は|って)辞書に(?:ある|載って|入って)/u);
+  const dictMatch=value.match(/(.{1,24}?)(?:は|って)(?:辞書|じしょ)に(?:ある|載って|入って)/u);
   if(dictMatch){
    const term=dictMatch[1].replace(/^(この|その|あの)/u,'').trim();
    if(term){
@@ -165,17 +165,23 @@ class ConversationGraphRuntimeP212Service {
    const total=summary.reduce((n,c)=>n+c.totalCount,0);const dynamic=summary.reduce((n,c)=>n+c.dynamicCount,0);
    return `言い回しは全部で${total}件あります。そのうち、学習で増えたものが${dynamic}件です。`;
   }
-  if(/(?:辞書|単語)は(?:何件|何語|いくつ)/u.test(value)){
+  if(/(?:辞書|単語)に?は(?:何件|何語|いくつ)/u.test(value)){
    const stats=japaneseDictionaryService.getStats();
    return `辞書には全部で${stats.builtin+stats.personal+stats.imported}件の語が載っています。`;
   }
   if(/(?:主張|知識)は(?:何件|いくつ)/u.test(value)){
    return `今、知識として登録されている主張は${claimDatabaseService.listClaims().length}件です。`;
   }
-  if(/さっき(?:何て|なんて|何を)(?:言った|答えた)/u.test(value)||/前の答え/u.test(value)){
+  if(/さっき(?:何て|なんて|何を|何の話|なんの話|どんな話)/u.test(value)||/(?:何の話|なんの話)(?:してた|だった)/u.test(value)||/前の答え|直前の答え|さっきの答え/u.test(value)){
    const nodes=crossDomainGraphConnectionP211Service.snapshot().nodes||[];
-   for(let i=nodes.length-1;i>=0;i--){const payload=nodes[i].payload as {response?:unknown};if(payload&&typeof payload.response==='string'&&payload.response.trim()){const answer=payload.response.trim();return `直前は『${answer.slice(0,120)}${answer.length>120?'…':''}』と答えました。`}}
-   return 'まだ答えた記録がありません。';
+   // The snapshot's node order is not chronological (P398 device
+   // follow-up: result nodes sit scattered in the array), so pick
+   // the response whose task id is newest rather than the last
+   // array element. Task ids are TASK-<ms>-<sequence>.
+   let bestAnswer: string|undefined;let bestMs=-1;let bestSeq=-1;let bestIndex=-1;
+   nodes.forEach((node,index)=>{const payload=node.payload as {response?:unknown;taskId?:unknown};if(!payload||typeof payload.response!=='string'||!payload.response.trim())return;let ms=-1;let seq=-1;if(typeof payload.taskId==='string'){const parts=payload.taskId.split('-');if(parts.length>=3){ms=Number(parts[1])||-1;seq=Number(parts[2])||-1}}if(ms>bestMs||(ms===bestMs&&seq>bestSeq)||(ms===bestMs&&seq===bestSeq&&index>bestIndex)){bestMs=ms;bestSeq=seq;bestIndex=index;bestAnswer=payload.response.trim()}});
+   if(bestAnswer)return `さっきの話では、直前は『${bestAnswer.slice(0,120)}${bestAnswer.length>120?'…':''}』と答えました。`;
+   return 'さっきの話については、まだ答えた記録がありません。';
   }
   return undefined;
  }
