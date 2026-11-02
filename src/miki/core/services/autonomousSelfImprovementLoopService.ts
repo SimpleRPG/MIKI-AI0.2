@@ -454,6 +454,12 @@ class AutonomousSelfImprovementLoopService {
         }
 
         this.replaceLegacyMisclassifiedTask(request);
+        // P405: remember where this execution's blackboard entries
+        // start; the budget-pause classification below may only look
+        // at entries appended by THIS execution.
+        const entriesBeforeExecution = request.taskId
+          ? taskBlackboardService.get(request.taskId)?.entries.length ?? 0
+          : 0;
         request.attempts += 1;
         request.resourceWaitCount = 0;
         const workflow = request.taskId
@@ -577,7 +583,25 @@ class AutonomousSelfImprovementLoopService {
         // cycle-limit key used to be recognized here, so healthy tasks
         // advancing one budget window at a time burned attempts and
         // were dropped after three windows.
-        const cycleBudgetPaused = workflow.task.status === 'PAUSED' && workflow.task.entries.some(entry => entry.kind === 'CHECKPOINT' && (entry.key === 'coreCycleBudgetExhausted' || entry.key.startsWith('backgroundBudgetPause:') || entry.key.startsWith('backgroundBudgetCycle:')));
+        // P405: classify the pause by the entries THIS execution
+        // appended, not by the task's whole history, and only when
+        // the execution actually dispatched work. The previous
+        // history-wide check treated every later PAUSED of a task
+        // that had once recorded a budget checkpoint as a free
+        // budget continuation: the attempt was refunded, no backoff
+        // was set, and drain re-stepped the same request immediately
+        // (device: TASK-1793625482881-000009 stepped 16 times in
+        // ~11s with dispatched=0 while other queue items starved).
+        // A plateau pause appends no budget checkpoint in its own
+        // execution, so it now falls through to failOrRetry, which
+        // backs off and keeps the attempt. A budget pause with zero
+        // dispatches is not chunked progress either (absolute-cycle
+        // budget trap, foreground block): it takes the same
+        // failOrRetry path instead of spinning.
+        const budgetPausedThisExecution = workflow.task.entries
+          .slice(entriesBeforeExecution)
+          .some(entry => entry.kind === 'CHECKPOINT' && (entry.key === 'coreCycleBudgetExhausted' || entry.key.startsWith('backgroundBudgetPause:') || entry.key.startsWith('backgroundBudgetCycle:')));
+        const cycleBudgetPaused = workflow.task.status === 'PAUSED' && budgetPausedThisExecution && workflow.dispatched > 0;
         if (cycleBudgetPaused) {
           request.attempts -= 1;
           this.state.status = 'RUNNING';
