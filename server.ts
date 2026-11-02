@@ -179,7 +179,7 @@ async function convertJmdict(): Promise<DictionaryManifest> {
   const full = fs.createWriteStream(fullTmp);
   const common = fs.createWriteStream(commonTmp);
   const header = (version: string, name: string) => `{"schemaVersion":1,"source":"JMdict","version":${JSON.stringify(version)},"dictionaryName":${JSON.stringify(name)},"entries":[`;
-  const version = (sourceLastModified || new Date().toISOString()) + (wordnet ? '+wn1' : '');
+  const version = (sourceLastModified || new Date().toISOString()) + (wordnet ? '+wn1' : '') + '+g1';
   full.write(header(version, 'JMdict (full)'));
   common.write(header(version, 'JMdict (common)'));
   let firstFull = true, firstCommon = true, entries = 0, commonEntries = 0, entriesWithConcepts = 0;
@@ -204,12 +204,19 @@ async function convertJmdict(): Promise<DictionaryManifest> {
     const reading = rebs[0];
     const semanticIds = semanticIdsFor(kebs.length ? kebs[0] : reading, pos);
     const conceptField = semanticIds ? { semanticIds } : {};
+    // P402: keep a compact English gloss. Japanese terms alone can
+    // never match English-named code; the gloss is the bridge that
+    // lets a Japanese goal reach paths and symbols (採用 -> adopt).
+    // Clients already carry entry fields through verbatim, and the
+    // version suffix (+g1) makes them re-import once.
+    const glossText = [...new Set([...block.matchAll(/<gloss>([^<]+)<\/gloss>/g)].map((m) => m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").trim()).filter(Boolean))].slice(0, 3).join('; ').slice(0, 100);
+    const glossField = glossText ? { gloss: glossText } : {};
     if (kebs.length) {
-      for (const keb of kebs) emit({ surface: keb, lemma: kebs[0], reading, pos, priority, ...conceptField }, isCommon);
+      for (const keb of kebs) emit({ surface: keb, lemma: kebs[0], reading, pos, priority, ...conceptField, ...glossField }, isCommon);
       // Kana-only lookups (e.g. あさごはん) need the reading as a surface too.
-      if (!kebs.includes(reading)) emit({ surface: reading, lemma: kebs[0], reading, pos, priority, ...conceptField }, isCommon);
+      if (!kebs.includes(reading)) emit({ surface: reading, lemma: kebs[0], reading, pos, priority, ...conceptField, ...glossField }, isCommon);
     } else {
-      emit({ surface: reading, lemma: reading, reading, pos, priority, ...conceptField }, isCommon);
+      emit({ surface: reading, lemma: reading, reading, pos, priority, ...conceptField, ...glossField }, isCommon);
     }
   };
   let buffer = '';

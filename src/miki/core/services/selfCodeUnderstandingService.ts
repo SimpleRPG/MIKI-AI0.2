@@ -111,6 +111,18 @@ const BUILTIN_CALLEE_NAMES=new Set([
 const IMPORT_BINDING_PATTERN=/import\s+(?:type\s+)?(?:([A-Za-z_$][\w$]*)\s*(?:,\s*)?)?(?:\{([^}]+)\})?(?:\*\s+as\s+([A-Za-z_$][\w$]*))?\s*from\s*['"][^'"]+['"]/g;
 
 class SelfCodeUnderstandingService {
+  // P401: per-tree assembly cache and per-(tree, targets) result
+  // cache. Both are keyed by the content fingerprint of the source
+  // tree, so a changed tree can never be served a stale answer.
+  private assemblyCache=new Map<string,{
+    entries:Map<string,CodeUnderstandingEntry>;
+    contractIndex:Map<string,Set<string>>;
+    contractOwners:Map<string,Set<string>>;
+    knownCalleeNames:Set<string>;
+    snapshot:CodeUnderstandingSnapshot;
+  }>();
+  private resultCache=new Map<string,CodeUnderstandingResult>();
+
   get():CodeUnderstandingSnapshot|undefined {
     try {
       const raw=storageService.getItem(KEY);
@@ -372,40 +384,85 @@ class SelfCodeUnderstandingService {
     if(!files.length)return {...empty,reasons:['SOURCE_SNAPSHOT_EMPTY']};
 
     const repoSha256=canonicalSha256(files.map(file=>({path:file.path,sha256:file.contentHash})));
-    const previous=this.get();
-    const current=new Map(files.map(file=>[file.path,file]));
-    const entries=new Map<string,CodeUnderstandingEntry>();
-
-    if(previous){
-      for(const entry of previous.entries){
-        const file=current.get(entry.path);
-        if(file&&file.contentHash===entry.contentHash)entries.set(entry.path,{...entry,importedBy:[]});
-      }
-    }
-    for(const file of files)if(!entries.has(file.path))entries.set(file.path,this.parse(file));
-
-    for(const entry of entries.values())for(const raw of entry.imports){
-      const resolved=this.resolve(entries,entry.path,raw);
-      if(resolved){
-        entries.get(resolved)!.importedBy.push(entry.path);
-        entry.relations.push({kind:'IMPORTS',from:entry.path,to:resolved,line:1,evidence:raw});
-      }
-    }
-    for(const entry of entries.values()){
-      entry.importedBy=[...new Set(entry.importedBy)].sort();
-      entry.relations=this.uniqueRelations(entry.relations);
-    }
-
     const targets=[...new Set(targetPaths.filter(Boolean))].sort();
+
+    // P401: the repository-wide assembly — parsed entries with
+    // resolved imports, the contract index, contract owners and the
+    // callee name set — is a pure function of the source tree, yet it
+    // was rebuilt on every planning call (measured: seconds per call
+    // even when nothing had changed, for any target set). The
+    // assembly is now built once per tree version and reused; per
+    // call, only the target-dependent closure and result tail run.
+    // Finished results are also kept per (tree, targets): while the
+    // tree is unchanged, the understanding answer cannot change.
+    // Calls passing a sourceFiles override use their own keys: their
+    // contents may be placeholders, so their assemblies and results
+    // must never be served to full-content calls, or vice versa.
+    const treeKey=`${sourceFiles?'override|':''}${repoSha256}`;
+    const resultKey=`${treeKey}|${targets.join('|')}`;
+    const cachedResult=this.resultCache.get(resultKey);
+    if(cachedResult)return cachedResult;
+
+    let previous:CodeUnderstandingSnapshot|undefined;
+    let entries:Map<string,CodeUnderstandingEntry>;
+    let contractIndex:Map<string,Set<string>>;
+    let contractOwners:Map<string,Set<string>>;
+    let knownCalleeNames:Set<string>;
+    let assemblyReused=false;
+    const cachedAssembly=this.assemblyCache.get(treeKey);
+    if(cachedAssembly){
+      previous=cachedAssembly.snapshot;
+      entries=cachedAssembly.entries;
+      contractIndex=cachedAssembly.contractIndex;
+      contractOwners=cachedAssembly.contractOwners;
+      knownCalleeNames=cachedAssembly.knownCalleeNames;
+      assemblyReused=true;
+    } else {
+      previous=this.get();
+      const current=new Map(files.map(file=>[file.path,file]));
+      entries=new Map<string,CodeUnderstandingEntry>();
+      if(previous){
+        for(const entry of previous.entries){
+          const file=current.get(entry.path);
+          if(file&&file.contentHash===entry.contentHash)entries.set(entry.path,{...entry,importedBy:[]});
+        }
+      }
+      for(const file of files)if(!entries.has(file.path))entries.set(file.path,this.parse(file));
+      for(const entry of entries.values())for(const raw of entry.imports){
+        const resolved=this.resolve(entries,entry.path,raw);
+        if(resolved){
+          entries.get(resolved)!.importedBy.push(entry.path);
+          entry.relations.push({kind:'IMPORTS',from:entry.path,to:resolved,line:1,evidence:raw});
+        }
+      }
+      for(const entry of entries.values()){
+        entry.importedBy=[...new Set(entry.importedBy)].sort();
+        entry.relations=this.uniqueRelations(entry.relations);
+      }
+      contractIndex=new Map<string,Set<string>>();
+      for(const entry of entries.values())for(const literal of entry.literalContracts){
+        const paths=contractIndex.get(`${literal.role}|${literal.value}`)||new Set<string>();
+        paths.add(entry.path);contractIndex.set(`${literal.role}|${literal.value}`,paths);
+      }
+      contractOwners=new Map<string,Set<string>>();
+      for(const entry of entries.values()){
+        for(const contract of entry.literalContracts){
+          if(contract.role==='OTHER')continue;
+          const ownerKey=`${contract.role}:${contract.value}`;
+          const owners=contractOwners.get(ownerKey)||new Set<string>();owners.add(entry.path);contractOwners.set(ownerKey,owners);
+        }
+      }
+      knownCalleeNames=new Set<string>(BUILTIN_CALLEE_NAMES);
+      for(const entry of entries.values()){
+        for(const symbol of entry.symbols)knownCalleeNames.add(symbol.name);
+        for(const name of entry.exports)knownCalleeNames.add(name);
+      }
+    }
+
     const missing=targets.filter(path=>!entries.has(path));
     if(missing.length)return {...empty,repoSha256,targetPaths:targets,reasons:[`TARGET_NOT_UNDERSTOOD:${missing.join('|')}`]};
 
     const related=new Set<string>();
-    const contractIndex=new Map<string,Set<string>>();
-    for(const entry of entries.values())for(const literal of entry.literalContracts){
-      const paths=contractIndex.get(`${literal.role}|${literal.value}`)||new Set<string>();
-      paths.add(entry.path);contractIndex.set(`${literal.role}|${literal.value}`,paths);
-    }
 
     // P361: budgeted, direction-aware expansion (design doc:
     // Budgeted Evidence Packet). Impact flows mainly along dependents
@@ -457,7 +514,15 @@ class SelfCodeUnderstandingService {
     const key=targets.join('|');
     const reused=Boolean(previous?.targetFingerprints?.[key]===fingerprint);
     const now=Date.now();
-    const snapshot:CodeUnderstandingSnapshot={
+    // P401: on an assembly-cache hit, the stored snapshot already
+    // describes this exact tree; only the target fingerprint record
+    // may need to grow. Recomputing the whole-tree snapshot hash on
+    // every call was part of the repeated cost.
+    const snapshot:CodeUnderstandingSnapshot=assemblyReused&&previous?{
+      ...previous,
+      targetFingerprints:{...(previous.targetFingerprints||{}),[key]:fingerprint},
+      updatedAt:now
+    }:{
       schemaVersion:2,repoSha256,
       snapshotSha256:canonicalSha256([...entries.values()].map(entry=>({
         path:entry.path,contentHash:entry.contentHash,symbols:entry.symbols,relations:entry.relations,literalContracts:entry.literalContracts
@@ -470,16 +535,10 @@ class SelfCodeUnderstandingService {
     const targetFingerprintChanged=previous?.targetFingerprints?.[key]!==fingerprint;
     const snapshotChanged=previous?.snapshotSha256!==snapshot.snapshotSha256;
     if(!previous||snapshotChanged||targetFingerprintChanged)storageService.setItem(KEY,JSON.stringify(snapshot));
+    if(this.assemblyCache.size>=3)this.assemblyCache.clear();
+    this.assemblyCache.set(treeKey,{entries,contractIndex,contractOwners,knownCalleeNames,snapshot});
 
     const targetSet=new Set(targets);
-    const contractOwners=new Map<string,Set<string>>();
-    for(const entry of entries.values()){
-      for(const contract of entry.literalContracts){
-        if(contract.role==='OTHER')continue;
-        const key=`${contract.role}:${contract.value}`;
-        const owners=contractOwners.get(key)||new Set<string>();owners.add(entry.path);contractOwners.set(key,owners);
-      }
-    }
     const executionPaths:ExecutionPathRecord[]=[];
     const unresolvedEdges:string[]=[];
     // P400: a bare CALLS relation counts as unresolved only when the
@@ -491,11 +550,6 @@ class SelfCodeUnderstandingService {
     // edges on ordinary files; edges originating in the target files
     // block the context closure and the requirement contract, so the
     // candidate-generation gate was unreachable for any real target.
-    const knownCalleeNames=new Set<string>(BUILTIN_CALLEE_NAMES);
-    for(const entry of entries.values()){
-      for(const symbol of entry.symbols)knownCalleeNames.add(symbol.name);
-      for(const name of entry.exports)knownCalleeNames.add(name);
-    }
     const contentByPath=new Map(files.map(file=>[file.path,file.content]));
     const calleeNamesFor=(entry:CodeUnderstandingEntry):Set<string>=>{
       const names=new Set(knownCalleeNames);
@@ -536,7 +590,7 @@ class SelfCodeUnderstandingService {
       return {path:entry.path,scope,reasons,symbolIds:entry.symbols.map(symbol=>symbol.id),contractValues:contracts};
     }).sort((a,b)=>a.path.localeCompare(b.path));
 
-    return {
+    const result:CodeUnderstandingResult={
       ready:scopeEntries.every(entry=>entry.parseDiagnostics.length===0),reused,repoSha256,
       targetPaths:targets,relatedPaths:[...related].sort(),
       reasons:scopeEntries.flatMap(entry=>entry.parseDiagnostics.map(reason=>`PARSE_DIAGNOSTIC:${entry.path}:${reason}`)),
@@ -546,6 +600,9 @@ class SelfCodeUnderstandingService {
       contractValues:[...new Set(scopeEntries.flatMap(entry=>entry.literalContracts.map(value=>`${value.role}:${value.value}`)))].sort(),
       executionPaths:this.uniqueExecutionPaths(executionPaths),impactScopes,unresolvedEdges:[...new Set(unresolvedEdges)].sort()
     };
+    if(this.resultCache.size>=8)this.resultCache.clear();
+    this.resultCache.set(resultKey,result);
+    return result;
   }
 }
 export const selfCodeUnderstandingService=new SelfCodeUnderstandingService();

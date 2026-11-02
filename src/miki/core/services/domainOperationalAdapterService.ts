@@ -18,6 +18,9 @@ import { completionJudgeService } from '../../verification/services/completionJu
 import { selfImprovementMetricsService } from '../../improvement/services/selfImprovementMetricsService';
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
+import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
+import { contentTermsFromTokens, japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
+import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 
 export interface DomainOperationalSnapshot {
   domain: MikiDomain;
@@ -73,9 +76,62 @@ class DomainOperationalAdapterService {
           return snapshot(domain,'mikiCognitiveVitalsService',{vitals:mikiCognitiveVitalsService.getSnapshot()});
         case 'selfDevelopment': {
           const query=String(context.target||context.goal||context.goal||'').trim().toLowerCase();
-          const tokens=query.split(/[\\s/._:-]+/).filter(x=>x.length>=2).slice(0,12);
-          const files=selfCodeSpaceService.listSourceFiles();
-          const ranked=files.map(file=>({file,score:tokens.reduce((n,t)=>n+(file.path.toLowerCase().includes(t)?5:0)+(file.content.toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.file.path.localeCompare(b.file.path)).slice(0,3).map(x=>x.file.path);
+          // P402: rank by what the goal is about, not by raw
+          // substrings of the whole sentence. Terms are the split
+          // tokens (file/service identifiers) plus the Japanese
+          // content terms of the shared analysis — the same notion
+          // of content the conversation stack uses (P383). A
+          // Japanese sentence used to survive tokenization as one
+          // unmatchable string, so every goal fell back to the
+          // canonical core trio regardless of its subject.
+          const splitTokens=query.split(/[\\s/._:-]+/).filter(x=>x.length>=2);
+          let contentTerms:string[]=[];
+          try{ contentTerms=contentTermsFromTokens(japaneseAnalysisService.analyze(query).tokens).map(term=>term.toLowerCase()); }catch{ contentTerms=[]; }
+          // Short hiragana fragments (した, くだ…) are grammatical
+          // residue when no dictionary enrichment is available, not
+          // content; drop them so they cannot vote.
+          const japaneseTerms=[...new Set([...splitTokens,...contentTerms])].filter(term=>!(/^[ぁ-ん]+$/.test(term)&&term.length<=2)).slice(0,12);
+          // The code itself is named in English, which Japanese
+          // terms can never match. Bridge each content term through
+          // the dictionary MIKI already holds: its gloss words
+          // (採用 -> adopt, 点検 -> inspection) can hit paths and
+          // symbol names. Without an imported dictionary this
+          // simply yields nothing and ranking stays Japanese-only.
+          const bridgeTerms=new Set<string>();
+          for(const term of contentTerms){
+            if(bridgeTerms.size>=12)break;
+            try{
+              const gloss=japaneseDictionaryService.lookup(term)[0]?.gloss||'';
+              for(const word of (gloss.toLowerCase().match(/[a-z][a-z-]{3,}/g)||[]).slice(0,5)){
+                if(bridgeTerms.size<12)bridgeTerms.add(word.replace(/-/g,''));
+              }
+            }catch{ /* dictionary unavailable */ }
+          }
+          const terms=[...japaneseTerms,...bridgeTerms];
+          // Improvement targets are source code; data files and
+          // ledgers can mention every term without being editable
+          // targets.
+          const files=selfCodeSpaceService.listSourceFiles().filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
+          const entriesByPath=new Map((selfCodeUnderstandingService.getSnapshot()?.entries||[]).map(entry=>[entry.path,entry]));
+          // A short Latin term (ci, ai…) substring-matches unrelated
+          // words everywhere; as content evidence it only counts at
+          // a word boundary.
+          const termMatchers=terms.map(term=>({term,contentPattern:/^[a-z0-9]+$/.test(term)&&term.length<=3?new RegExp(`\\b${term}\\b`):undefined}));
+          const ranked=files.map(file=>{
+            const entry=entriesByPath.get(file.path);
+            const path=file.path.toLowerCase();
+            const role=(entry?.role||'').toLowerCase();
+            const symbolNames=(entry?.symbols||[]).map(symbol=>symbol.name.toLowerCase());
+            const content=file.content.toLowerCase();
+            let score=0;
+            for(const {term,contentPattern} of termMatchers){
+              if(path.includes(term))score+=5;
+              if(role&&role.includes(term))score+=4;
+              if(symbolNames.some(name=>name.includes(term)))score+=3;
+              if(contentPattern?contentPattern.test(content):content.includes(term))score+=1;
+            }
+            return {file,score};
+          }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.file.path.localeCompare(b.file.path)).slice(0,3).map(x=>x.file.path);
           const repositoryContextAssessment=String(context.requestedAssessment||'')==='REPOSITORY_CONTEXT';
           const canonicalCoreTargets=[
             'src/miki/core/services/coreOrchestratorService.ts',

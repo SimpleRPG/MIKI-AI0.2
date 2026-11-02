@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1749,
     "sourceFileCount": 1302,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1215,
-    "relativeImportCandidateCount": 3632,
-    "resolvedRelativeImportCandidateCount": 3616,
+    "relativeImportCandidateCount": 3635,
+    "resolvedRelativeImportCandidateCount": 3619,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -5844,9 +5844,9 @@
     },
     {
       "path": "server.ts",
-      "bytes": 213267,
-      "lines": 4833,
-      "sha256": "f0c49e91146096ce5e85e99ca06a56876c921f65fbd985c088be969cbc25678e",
+      "bytes": 213989,
+      "lines": 4840,
+      "sha256": "5e589e87eb5d9fa9a0b8eb664c703aa244a658b2b3f18075e55011afb720ae75",
       "relativeImportCandidates": [
         {
           "line": 15,
@@ -6101,12 +6101,12 @@
           "resolvedPath": "src/miki/improvement/services/selfImprovementMetricsService.ts"
         },
         {
-          "line": 3636,
+          "line": 3643,
           "specifier": "./chapter_${chapterNumber}",
           "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
-          "line": 3969,
+          "line": 3976,
           "specifier": "./component.cjs",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -15091,9 +15091,9 @@
     },
     {
       "path": "src/miki/core/services/domainOperationalAdapterService.ts",
-      "bytes": 7287,
-      "lines": 101,
-      "sha256": "9b1584d462b49653d37f71e41950e50456581714379b0b0db4579fcf6d52d75e",
+      "bytes": 10814,
+      "lines": 157,
+      "sha256": "6afbd37d8111845800881b198e6931da06f7e33775b397c9a06ac0c49ab54952",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -15214,10 +15214,28 @@
           "specifier": "./selfCodeSpaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
+        },
+        {
+          "line": 21,
+          "specifier": "./selfCodeUnderstandingService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/selfCodeUnderstandingService.ts"
+        },
+        {
+          "line": 22,
+          "specifier": "../../research/services/japaneseAnalysisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
+        },
+        {
+          "line": 23,
+          "specifier": "../../research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 20,
-      "resolvedRelativeImportCount": 20,
+      "relativeImportCandidateCount": 23,
+      "resolvedRelativeImportCount": 23,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -17715,9 +17733,9 @@
     },
     {
       "path": "src/miki/core/services/selfCodeUnderstandingService.ts",
-      "bytes": 27273,
-      "lines": 551,
-      "sha256": "529d8d35c0a269e16a8b4fc59c50c607c0cb0d8978b1664fdc6a2e0bf0c7b4e7",
+      "bytes": 30248,
+      "lines": 608,
+      "sha256": "3584755e3ede619fcc1b8c5f6e81c054ad0b2d24a295d1520f5ad2be915db9bf",
       "relativeImportCandidates": [
         {
           "line": 2,
