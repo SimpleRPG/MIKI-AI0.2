@@ -10,9 +10,23 @@ import { autonomousSelfImprovementLoopService } from './autonomousSelfImprovemen
 import { improvementIntakeRouterService } from './improvementIntakeRouterService';
 import { selfImprovementDirectionService } from './selfImprovementDirectionService';
 import { improvementDebtService } from './improvementDebtService';
+import { adaptiveRoutePlannerService } from './adaptiveRoutePlannerService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
 export type DiscoveredIssueKind='EXECUTION_FAILURE'|'KNOWLEDGE_GAP'|'CAPABILITY_GAP'|'STALLED_TASK'|'DOMAIN_DISCONNECTED'|'CLAIM_CONTRADICTION'|'IMPROVEMENT_DEBT';
+export interface StalledTaskDiagnosis {
+ diagnosedAt:number;
+ originalTaskId:string;
+ originalStatus:string;
+ pausedReason?:string;
+ candidateGenerationReady:boolean;
+ gates:{issueEstablished:boolean;repositoryContextAvailable:boolean;targetFilesKnown:boolean;requiredEvidenceSatisfied:boolean;codeUnderstandingReady:boolean};
+ blockingReasons:string[];
+ recommendedOperations:string[];
+ unresolvedKnowledge:string[];
+ unresolvedCapability:string[];
+ diagnosisError?:string;
+}
 export interface DiscoveredIssue {
  id:string;
  fingerprint:string;
@@ -34,6 +48,7 @@ export interface DiscoveredIssue {
  nextRetryAt?:number;
  exhausted?:boolean;
  lastOutcome?:string;
+ lastDiagnosis?:StalledTaskDiagnosis;
 }
 export interface DiscoveryConfig { enabled:boolean; intervalMinutes:number; maxIssuesPerScan:number; minimumPriority:number; }
 export type DiscoveryScanMode='AUTONOMOUS'|'DIAGNOSTIC';
@@ -262,6 +277,18 @@ class AutonomousIssueDiscoveryService{
     continue;
    }
 
+   // P403: a re-dispatched task that stalls again (PAUSED with a
+   // stall reason) used to fall through to the QUEUED tail below:
+   // the task is not terminal, so no branch counted the recurrence
+   // and retryCount/exhausted never advanced, re-producing the same
+   // stall forever. Count it like a failure so the existing retry
+   // policy (backoff, exhausted at 4 attempts) applies.
+   if(task?.status==='PAUSED'&&this.isStallCandidate(task.status,task.pausedReason)){
+    improvementIntakeRouterService.reject(run.runId);
+    this.releaseForRetry(issue,'TASK_PAUSED_STALL_RECURRED');
+    continue;
+   }
+
    if(!task&&now-queuedAt>=6*60*60*1000){
     improvementIntakeRouterService.reject(run.runId);
     this.releaseForRetry(issue,'TASK_RECORD_MISSING');
@@ -300,8 +327,54 @@ class AutonomousIssueDiscoveryService{
   const runId=(value as Record<string,unknown>).runId;
   return typeof runId==='string'&&runId.trim()?runId:undefined;
  }
+ // P403: before a stalled task is blindly re-executed, recompute
+ // WHY it stalled from its stored blackboard snapshot and carry the
+ // diagnosis on the issue record and into the re-dispatched task's
+ // payload, so the next run (and anyone reading the run record) can
+ // see the gate states instead of repeating the stall blind.
+ private diagnoseStalledTask(issue:DiscoveredIssue):StalledTaskDiagnosis{
+  const original=taskBlackboardService.get(issue.sourceId);
+  const base={
+   diagnosedAt:Date.now(),
+   originalTaskId:issue.sourceId,
+   originalStatus:original?.status||'MISSING',
+   ...(original?.pausedReason?{pausedReason:original.pausedReason}:{})
+  };
+  const closedGates={issueEstablished:false,repositoryContextAvailable:false,targetFilesKnown:false,requiredEvidenceSatisfied:false,codeUnderstandingReady:false};
+  if(!original){
+   return {...base,candidateGenerationReady:false,gates:closedGates,blockingReasons:['ORIGINAL_TASK_RECORD_MISSING'],recommendedOperations:[],unresolvedKnowledge:[],unresolvedCapability:[]};
+  }
+  try{
+   const readiness=adaptiveRoutePlannerService.assessImprovementReadiness(original);
+   const cap=(values:string[])=>values.slice(0,12).map(value=>value.slice(0,300));
+   return {
+    ...base,
+    candidateGenerationReady:readiness.candidateGenerationReady,
+    gates:{
+     issueEstablished:readiness.issueEstablished,
+     repositoryContextAvailable:readiness.repositoryContextAvailable,
+     targetFilesKnown:readiness.targetFilesKnown,
+     requiredEvidenceSatisfied:readiness.requiredEvidenceSatisfied,
+     codeUnderstandingReady:readiness.codeUnderstandingReady
+    },
+    blockingReasons:cap(readiness.blockingReasons),
+    recommendedOperations:readiness.recommendedOperations,
+    unresolvedKnowledge:cap(readiness.unresolvedKnowledge),
+    unresolvedCapability:cap(readiness.unresolvedCapability)
+   };
+  }catch(error){
+   return {...base,candidateGenerationReady:false,gates:closedGates,blockingReasons:[],recommendedOperations:[],unresolvedKnowledge:[],unresolvedCapability:[],diagnosisError:String(error instanceof Error?error.message:error).slice(0,300)};
+  }
+ }
+
  private async dispatchDiscoveredIssue(issue:DiscoveredIssue,priorCases:unknown[],generation:number):Promise<boolean>{
   let run:Awaited<ReturnType<typeof improvementIntakeRouterService.receive>>|undefined;
+  let diagnosis:StalledTaskDiagnosis|undefined;
+  if(issue.kind==='STALLED_TASK'){
+   diagnosis=this.diagnoseStalledTask(issue);
+   issue.lastDiagnosis=diagnosis;
+   this.issues.set(issue.fingerprint,issue);
+  }
   try{
    run=await improvementIntakeRouterService.receive({
     runType:'AUTONOMOUS_DISCOVERY',
@@ -313,7 +386,8 @@ class AutonomousIssueDiscoveryService{
      issueKind:issue.kind,
      detail:issue.detail,
      fingerprint:issue.fingerprint,
-     priorCases
+     priorCases,
+     ...(diagnosis?{diagnosis}:{})
     }
    });
    if(!this.isCurrentGeneration(generation))return false;
@@ -554,7 +628,8 @@ class AutonomousIssueDiscoveryService{
    retryCount:canReset?0:(old?.retryCount||0),
    nextRetryAt:canReset?undefined:old?.nextRetryAt,
    exhausted:canReset?false:old?.exhausted,
-   lastOutcome:canReset?'ISSUE_DETAIL_CHANGED':old?.lastOutcome
+   lastOutcome:canReset?'ISSUE_DETAIL_CHANGED':old?.lastOutcome,
+   lastDiagnosis:old?.lastDiagnosis
   };
   this.issues.set(fingerprint,issue);
   return {...issue};
@@ -568,7 +643,7 @@ class AutonomousIssueDiscoveryService{
  private writeRaw(key:string,raw:string,context:string):void{this.assertWritable();try{storageService.setItem(key,raw);if(storageService.getItem(key)!==raw)throw new Error('STORE_READBACK_MISMATCH');}catch(error){this.blockStore(`${context}:${String(error instanceof Error?error.message:error)}`);throw new Error('AUTONOMOUS_DISCOVERY_STORE_WRITE_VERIFY_FAILED');}}
  private quarantine(sourceKey:string,raw:string,reason:string):boolean{const base=`${sourceKey}_quarantine_v1`;const envelope={version:1,sourceKey,quarantinedAt:Date.now(),reason:reason.slice(0,500),raw};try{let destination=base;const existing=storageService.getItem(base);if(existing!==null){try{const parsed=JSON.parse(existing) as Record<string,unknown>;if(parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw)return true;}catch{}let suffix=0;do{destination=`${base}_${Date.now()}_${suffix++}`;if(suffix>1000)return false;}while(storageService.getItem(destination)!==null);}storageService.setItem(destination,JSON.stringify(envelope));const saved=storageService.getItem(destination);if(saved===null)return false;const parsed=JSON.parse(saved) as Record<string,unknown>;return parsed.version===1&&parsed.sourceKey===sourceKey&&parsed.raw===raw;}catch{return false;}}
  private recoverCorruptSnapshot(sourceKey:string,raw:string,error:unknown):void{const reason=String(error instanceof Error?error.message:error).slice(0,500);if(this.quarantine(sourceKey,raw,reason)){if(this.writesBlocked)return;this.persistenceStatus='RECOVERED_QUARANTINED';this.persistenceReason=`${sourceKey}_QUARANTINED:${reason}`;if(sourceKey===KEY)this.issues.clear();}else this.blockStore(`${sourceKey}_QUARANTINE_FAILED:${reason}`);}
- private parseIssueSnapshot(raw:string):DiscoveredIssue[]{const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed)||parsed.length>500)throw new Error('DISCOVERY_SNAPSHOT_INVALID_ROOT_OR_LIMIT');const ids=new Set<string>();const fingerprints=new Set<string>();for(const item of parsed){if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('DISCOVERY_SNAPSHOT_INVALID_RECORD');const row=item as Record<string,unknown>;if(typeof row.id!=='string'||!row.id.trim()||typeof row.fingerprint!=='string'||!row.fingerprint.trim()||typeof row.kind!=='string'||!ISSUE_KINDS.includes(row.kind as DiscoveredIssueKind)||typeof row.title!=='string'||!row.title.trim()||typeof row.detail!=='string'||typeof row.sourceId!=='string'||!row.sourceId.trim()||typeof row.priority!=='number'||!Number.isFinite(row.priority)||row.priority<0||row.priority>100||typeof row.discoveredAt!=='number'||!Number.isFinite(row.discoveredAt)||row.discoveredAt<0||typeof row.lastSeenAt!=='number'||!Number.isFinite(row.lastSeenAt)||row.lastSeenAt<0||typeof row.occurrences!=='number'||!Number.isInteger(row.occurrences)||row.occurrences<1)throw new Error('DISCOVERY_SNAPSHOT_INVALID_FIELDS');if(ids.has(row.id)||fingerprints.has(row.fingerprint))throw new Error('DISCOVERY_SNAPSHOT_DUPLICATE_IDENTITY');ids.add(row.id);fingerprints.add(row.fingerprint);for(const key of ['changeSetId','requirementContractId','improvementRunId','taskId','lastOutcome'])if(row[key]!==undefined&&typeof row[key]!=='string')throw new Error('DISCOVERY_SNAPSHOT_INVALID_OPTIONAL_STRING');for(const key of ['queuedAt','resolvedAt','nextRetryAt'])if(row[key]!==undefined&&(typeof row[key]!=='number'||!Number.isFinite(row[key])||(row[key] as number)<0))throw new Error('DISCOVERY_SNAPSHOT_INVALID_OPTIONAL_TIME');if(row.retryCount!==undefined&&(typeof row.retryCount!=='number'||!Number.isInteger(row.retryCount)||row.retryCount<0))throw new Error('DISCOVERY_SNAPSHOT_INVALID_RETRY_COUNT');if(row.exhausted!==undefined&&typeof row.exhausted!=='boolean')throw new Error('DISCOVERY_SNAPSHOT_INVALID_EXHAUSTED_FLAG');}return parsed as DiscoveredIssue[];}
+ private parseIssueSnapshot(raw:string):DiscoveredIssue[]{const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed)||parsed.length>500)throw new Error('DISCOVERY_SNAPSHOT_INVALID_ROOT_OR_LIMIT');const ids=new Set<string>();const fingerprints=new Set<string>();for(const item of parsed){if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('DISCOVERY_SNAPSHOT_INVALID_RECORD');const row=item as Record<string,unknown>;if(typeof row.id!=='string'||!row.id.trim()||typeof row.fingerprint!=='string'||!row.fingerprint.trim()||typeof row.kind!=='string'||!ISSUE_KINDS.includes(row.kind as DiscoveredIssueKind)||typeof row.title!=='string'||!row.title.trim()||typeof row.detail!=='string'||typeof row.sourceId!=='string'||!row.sourceId.trim()||typeof row.priority!=='number'||!Number.isFinite(row.priority)||row.priority<0||row.priority>100||typeof row.discoveredAt!=='number'||!Number.isFinite(row.discoveredAt)||row.discoveredAt<0||typeof row.lastSeenAt!=='number'||!Number.isFinite(row.lastSeenAt)||row.lastSeenAt<0||typeof row.occurrences!=='number'||!Number.isInteger(row.occurrences)||row.occurrences<1)throw new Error('DISCOVERY_SNAPSHOT_INVALID_FIELDS');if(ids.has(row.id)||fingerprints.has(row.fingerprint))throw new Error('DISCOVERY_SNAPSHOT_DUPLICATE_IDENTITY');ids.add(row.id);fingerprints.add(row.fingerprint);for(const key of ['changeSetId','requirementContractId','improvementRunId','taskId','lastOutcome'])if(row[key]!==undefined&&typeof row[key]!=='string')throw new Error('DISCOVERY_SNAPSHOT_INVALID_OPTIONAL_STRING');for(const key of ['queuedAt','resolvedAt','nextRetryAt'])if(row[key]!==undefined&&(typeof row[key]!=='number'||!Number.isFinite(row[key])||(row[key] as number)<0))throw new Error('DISCOVERY_SNAPSHOT_INVALID_OPTIONAL_TIME');if(row.retryCount!==undefined&&(typeof row.retryCount!=='number'||!Number.isInteger(row.retryCount)||row.retryCount<0))throw new Error('DISCOVERY_SNAPSHOT_INVALID_RETRY_COUNT');if(row.exhausted!==undefined&&typeof row.exhausted!=='boolean')throw new Error('DISCOVERY_SNAPSHOT_INVALID_EXHAUSTED_FLAG');if(row.lastDiagnosis!==undefined&&(typeof row.lastDiagnosis!=='object'||row.lastDiagnosis===null||Array.isArray(row.lastDiagnosis)))throw new Error('DISCOVERY_SNAPSHOT_INVALID_DIAGNOSIS');}return parsed as DiscoveredIssue[];}
  private parseConfig(raw:string):DiscoveryConfig{const value:unknown=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('DISCOVERY_CONFIG_INVALID_ROOT');const merged={...DEFAULT_CONFIG,...value as Partial<DiscoveryConfig>};if(typeof merged.enabled!=='boolean'||typeof merged.intervalMinutes!=='number'||!Number.isInteger(merged.intervalMinutes)||merged.intervalMinutes<15||merged.intervalMinutes>10080||typeof merged.maxIssuesPerScan!=='number'||!Number.isInteger(merged.maxIssuesPerScan)||merged.maxIssuesPerScan<1||merged.maxIssuesPerScan>20||typeof merged.minimumPriority!=='number'||!Number.isInteger(merged.minimumPriority)||merged.minimumPriority<0||merged.minimumPriority>100)throw new Error('DISCOVERY_CONFIG_INVALID_FIELDS');return merged;}
  private save():void{this.writeRaw(KEY,JSON.stringify(this.list(500)),'DISCOVERY_SNAPSHOT');}
  private load():void{try{const raw=storageService.getItem(KEY);if(raw!==null){try{this.issues.clear();for(const item of this.parseIssueSnapshot(raw))this.issues.set(item.fingerprint,{...item});}catch(error){this.recoverCorruptSnapshot(KEY,raw,error);}}const configRaw=storageService.getItem(CONFIG_KEY);if(configRaw!==null){try{this.config=this.parseConfig(configRaw);}catch(error){this.recoverCorruptSnapshot(CONFIG_KEY,configRaw,error);this.config={...DEFAULT_CONFIG};}}}catch(error){this.blockStore(`DISCOVERY_STORE_READ_FAILED:${String(error instanceof Error?error.message:error)}`);}}

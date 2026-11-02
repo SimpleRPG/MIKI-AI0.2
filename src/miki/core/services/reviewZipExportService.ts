@@ -182,10 +182,10 @@ class ReviewZipExportService {
    }catch{/* best-effort */}
    let currentHypotheses:Array<{cause:string;status:string;weight:number;observations:number}>=[];
    try{
-     const {causalInvestigationService}=await import('../../research/services/causalInvestigationService');
+     const {causalInvestigationService,normalizeCausalProblemKey}=await import('../../research/services/causalInvestigationService');
      const objective=String(input.run.objective||'');
      if(objective){
-       currentHypotheses=causalInvestigationService.list().filter(investigation=>investigation.problem===objective).slice(0,3)
+       currentHypotheses=causalInvestigationService.list().filter(investigation=>normalizeCausalProblemKey(investigation.problem)===normalizeCausalProblemKey(objective)).slice(0,3)
          .flatMap(investigation=>investigation.hypotheses.filter(hypothesis=>hypothesis.status!=='REJECTED')
            .map(hypothesis=>({cause:hypothesis.cause,status:hypothesis.status,weight:hypothesis.weight,observations:hypothesis.observations.length})))
          .slice(0,8);

@@ -9,6 +9,7 @@ import { improvementIntakeRouterService } from './improvementIntakeRouterService
 import type { MikiDomain } from './crossDomainCirculationService';
 import { negativeKnowledgeService } from './negativeKnowledgeService';
 import { plateauDetectorService } from './plateauDetectorService';
+import { causalInvestigationService, normalizeCausalProblemKey } from '../../research/services/causalInvestigationService';
 import { coreResultService, type CoreResult } from './coreResultService';
 import { domainReplyLedgerService } from './domainReplyLedgerService';
 import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
@@ -1148,6 +1149,28 @@ class CoreOrchestratorService {
       });
     }
     taskBlackboardService.append(taskId,'DECISION','core',`coreCycleGuard:${cycles}`,plateau);
+    // P403: a plateau pause leaves no ERROR entry, so the P362 causal
+    // lifecycle (which keys off ERROR entries at ingress) never fired
+    // for stalls, and a stall that happened during a loop-driven
+    // resume never reached ingress post-processing at all. Register
+    // the stall with the causal lifecycle directly instead of adding
+    // a bare ERROR entry: an ERROR without an operationInstanceId
+    // would stay "unresolved" forever (unresolvedTaskErrors) and
+    // block the completion gate if this task is later resumed.
+    // Recurrence of the same stall strengthens the existing
+    // hypothesis, mirroring the ingress feedback loop.
+    const plateauCause=`coreCycleGuard:${plateau.reason}`;
+    const plateauProblemKey=normalizeCausalProblemKey(current.goal);
+    const existingInvestigation=causalInvestigationService.list()
+      .find(x=>normalizeCausalProblemKey(x.problem)===plateauProblemKey&&x.hypotheses.some(h=>h.cause===plateauCause));
+    if(existingInvestigation){
+      const hypothesis=existingInvestigation.hypotheses.find(h=>h.cause===plateauCause)!;
+      causalInvestigationService.updateHypothesis(hypothesis.id,`タスク ${taskId} でも同じ停滞（${plateau.reason}）が再発した`,true);
+      taskBlackboardService.append(taskId,'OBSERVATION','research','causal:investigationCandidate',{investigationId:existingInvestigation.id,hypothesisIds:[hypothesis.id],status:'RECURRED',cause:plateauCause,verificationRequired:true});
+    }else{
+      const investigation=causalInvestigationService.create(current.goal,[plateauCause]);
+      taskBlackboardService.append(taskId,'OBSERVATION','research','causal:investigationCandidate',{investigationId:investigation.id,hypothesisIds:investigation.hypotheses.map(h=>h.id),status:'OPEN',cause:plateauCause,verificationRequired:true});
+    }
     taskBlackboardService.pause(taskId,plateau.reason);
     coreResultService.waiting(reqId,{error:plateau.reason});
     break;
@@ -1164,7 +1187,7 @@ class CoreOrchestratorService {
       ruleVersion:'RUST_CORE_KERNEL_V1'
     });
    }
-   const planningTask=goalDecision.selectedGoal!==current.goal
+   const planningTask=goalDecision.selectedGoal&&goalDecision.selectedGoal!==current.goal
      ? {...current,goal:goalDecision.selectedGoal}
      : current;
    let routes=adaptiveRoutePlannerService.plan(planningTask).filter(route=>{
@@ -1241,6 +1264,37 @@ class CoreOrchestratorService {
        environmentSignature:route.payload.environmentSignature
      }))
    });
+   // P403: assessImprovementReadiness computes the blocking reasons
+   // on every planning cycle, but the result used to be discarded
+   // inside the planner, so a run that stalled before candidate
+   // generation left no record of WHY. Persist the readiness as a
+   // DECISION whenever a self-improvement plan does not advance to
+   // candidate generation, so the run record itself carries the
+   // gate states. (The recompute reuses the planner's own inputs;
+   // the understanding index is cached per tree fingerprint.)
+   if(String(currentPayload.kind||'')==='SELF_IMPROVEMENT'&&!routes.some(route=>route.command==='GENERATE_CANDIDATE')){
+    const readiness=adaptiveRoutePlannerService.assessImprovementReadiness(planningTask);
+    taskBlackboardService.append(taskId,'DECISION','core',`improvementReadiness:${cycles}`,{
+      schemaVersion:1,
+      cycle:cycles,
+      candidateGenerationReady:readiness.candidateGenerationReady,
+      validationReady:readiness.validationReady,
+      reviewPackageReady:readiness.reviewPackageReady,
+      gates:{
+        issueEstablished:readiness.issueEstablished,
+        repositoryContextAvailable:readiness.repositoryContextAvailable,
+        targetFilesKnown:readiness.targetFilesKnown,
+        requiredEvidenceSatisfied:readiness.requiredEvidenceSatisfied,
+        codeUnderstandingReady:readiness.codeUnderstandingReady
+      },
+      blockingReasons:readiness.blockingReasons,
+      recommendedOperations:readiness.recommendedOperations,
+      unresolvedKnowledge:readiness.unresolvedKnowledge,
+      unresolvedCapability:readiness.unresolvedCapability,
+      relatedCodePaths:readiness.relatedCodePaths,
+      codeUnderstandingSnapshotSha256:readiness.codeUnderstandingSnapshotSha256
+    });
+   }
    const proposedRequirements=routes.filter(route=>!DIAGNOSTIC_COMMANDS.has(route.command)).map(route=>{
     const operationInstanceId=String(route.payload.operationInstanceId||'');
     const dedupeKey=String(route.payload.dedupeKey||`${taskId}:${route.command}`);

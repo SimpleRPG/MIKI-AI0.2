@@ -3,6 +3,25 @@ import {storageService} from '../../../services/storageService';
 export interface CausalHypothesis{id:string;problem:string;cause:string;observations:string[];falsifiers:string[];tests:string[];weight:number;status:'OPEN'|'SUPPORTED'|'WEAKENED'|'REJECTED';}
 export interface CausalInvestigation{id:string;problem:string;hypotheses:CausalHypothesis[];createdAt:number;updatedAt:number;}
 const KEY='miki_causal_investigations_v1';
+const PROBLEM_PREFIXES=['停滞タスク:','改善負債:','能力不足:','知識不足:','実行失敗:','18分類未循環:','Claim矛盾:'];
+/**
+ * P403: investigations are matched by goal text, but a re-dispatched
+ * issue carries a diagnostic prefix in its goal (e.g. 「停滞タスク: …」),
+ * which used to sever the match with investigations recorded for the
+ * original goal. Strip the same diagnostic prefixes the issue
+ * discovery service uses so both spellings identify the same problem.
+ */
+export function normalizeCausalProblemKey(problem:string):string{
+ let text=String(problem||'').trim();
+ let changed=true;
+ while(changed){
+  changed=false;
+  for(const prefix of PROBLEM_PREFIXES){
+   if(text.startsWith(prefix)){text=text.slice(prefix.length).trim();changed=true;}
+  }
+ }
+ return text;
+}
 class CausalInvestigationService{
  private xs:CausalInvestigation[]=[];
  constructor(){try{const r=storageService.getItem(KEY);if(r)this.xs=JSON.parse(r)}catch{}}

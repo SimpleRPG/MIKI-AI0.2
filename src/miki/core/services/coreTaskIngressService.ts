@@ -13,7 +13,7 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { evidenceService } from '../../memory/services/evidenceService';
 import { cognitiveQualityService } from './cognitiveQualityService';
 import { causalMemoryLedgerService } from '../../memory/services/causalMemoryLedgerService';
-import { causalInvestigationService } from '../../research/services/causalInvestigationService';
+import { causalInvestigationService, normalizeCausalProblemKey } from '../../research/services/causalInvestigationService';
 import { outcomePredictionService } from './outcomePredictionService';
 import { conversationPragmaticsService } from '../../conversation/services/conversationPragmaticsService';
 export type CoreTaskKind='USER_REQUEST'|'SELF_IMPROVEMENT'|'EXECUTION_EVENT'|'VERIFICATION_EVENT'|'SYSTEM_TASK';
@@ -107,7 +107,7 @@ class CoreTaskIngressService {
   // success without recurrence weakens it. (The investigation created
   // by this very task is excluded — its own failure is the origin of
   // its hypotheses, not an independent observation.)
-  for(const prior of causalInvestigationService.list().filter(x=>x.problem===request.goal&&x.id!==createdInvestigationId)){
+  for(const prior of causalInvestigationService.list().filter(x=>normalizeCausalProblemKey(x.problem)===normalizeCausalProblemKey(request.goal)&&x.id!==createdInvestigationId)){
    for(const h of prior.hypotheses){
     if(h.status==='REJECTED')continue;
     if(outcome==='SUCCESS')causalInvestigationService.updateHypothesis(h.id,`後続タスク ${task.taskId} は成功し、当該原因は再発しなかった`,false);
