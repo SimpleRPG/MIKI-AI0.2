@@ -1,6 +1,6 @@
 MIKI-AI0.2 統合設計書・実装正本
 基準日：2026-10-31
-正本Revision：2026-11-02-P406
+正本Revision：2026-11-03-P407
 対象：SimpleRPG/MIKI-AI0.2
 
 【0. このファイルの位置付け】
@@ -119,7 +119,7 @@ PUSHしただけでは実装完了と判定しない。PUSH後の再監査はCha
 
 ■ 正本メタデータ
 
-- 現行Revision: 2026-11-02-P406
+- 現行Revision: 2026-11-03-P407
 - 完全再帰インベントリの最終基準: 2026-10-09-P222（以下の件数は当該基準時点。P225/P226/P227/P228/P229/P230/P231/P232/P233/P234/P235/P236/P237/P238/P239/P240/P241/P242/P243/P244/P245/P246/P247/P248/P249/P250/P251/P252/P253/P254/P255/P256/P257/P258/P259/P260/P261/P262/P263/P264/P265/P266/P267/P268/P269/P270/P271/P272/P273/P274/P275/P276/P277/P278/P279/P280/P281/P282/P283/P284/P285/P286/P287/P288/P289/P290/P291/P292/P293/P294/P295/P296/P297/P298/P299/P300/P301/P302/P303/P304/P305/P306/P307/P308/P309/P310/P311/P312/P313/P314/P315/P316/P317/P318/P319/P320/P321/P322/P323/P324/P325/P326/P327/P328/P329/P330/P331/P332/P333/P334/P335/P336/P337/P338/P339/P340/P341/P342の対象ファイル変更後に全ファイル件数を再集計したものではない。P332・P333・P335は候補登録のみでソースファイル変更なし。P334/P336ではP299定義の追跡ソースインベントリを再生成するが、P222基準の完全再帰件数は再集計しない。P245でstorageService.ts、P246でsystemLogger.ts、P247でNativeWebViewDiagnosticJournal.javaのPSS戻り値型を修正。P248でstorageService.tsのSQLite大容量値分割、systemLogger.tsの診断ログ上限、domainRouterService.tsの履歴保存集約を修正、P249でAndroidのJava heap拡張要求とAPK revisionログを追加、P250でDomain Routerの100 sequence境界保存を既存50msバッチへ合流、P251で検証スクリプトの型文字列にあった引用符誤記を修正、P252でChatPanelのCORE 18構成追跡を初期折りたたみ表示へ変更、P253で自律改善の期限再試行・Preflight永続ストレージ待機・RequiredAssetの復旧アクション分類を修正、P254で検証スクリプトの索引件数チェックを宣言順の後へ移動、P255でP208 SemanticCandidateのP211未検証候補接続とP213 Counterexample意味IDの肯定側昇格防止を修正。完全再帰インベントリは今回再集計していない。P261でmain.tsxのApp importをstorageService.ready後へ移し、storageService.tsの未永続キー消去競合とhydrate時のdirty key上書きを修正、domainRouterService.tsをsegment/indexによる追記保存・旧履歴安全移行へ変更。P261時点で全tree再帰インベントリは未再集計。P262でACT-R型の記憶活性化・結果feedback、EvidenceQualityGateの登録根拠判定、SOAR型impasse回復を変更した。P264でSOAR回復サブゴールの安定ID・終了状態管理を追加した。P265で一般Knowledge GapのCORE自律調査経路とVerifier後の解決遷移を追加した。P266でIssue DiscoveryのTask結果再照合、関連する過去失敗ケースの改善計画への接続、失敗調査入口のCORE統一を追加した。P267で監視元の終端再照合、成功／失敗Case Memory、計画制約を補強した。P268でREVALIDATION経路を含む計画型をv2へ統一し、失敗・拒否・判定不能の後続イベントを照合対象に加えたが、全tree再帰インベントリは再集計していない）
 - 歴史的な実装索引（P97基準）: `CANONICAL_COMPLETE_IMPLEMENTATION_INVENTORY_P97.json`。
 - P97/P222基準の歴史的分類値: TypeScript/TSX 870ファイル、Android/Rust Native 49ファイル、合計919ファイル、Production静的到達714ソース、検査Script179ファイル、同名ファイル組147組。これらは現行mainを再集計した値ではない。
@@ -13334,3 +13334,9 @@ P406（2026-11-02）部品不足の3断線の是正：合成の復活・不足�
 - 案2（合成の復活）：コード部品の登録（reusableComponentFactoryService.createCodeComponentCandidate）とレジストリ初期シード4件（VBA設計例）に種別 CODE を持たせた。生成側の受け渡しでは Factory の部品IDを各アーティファクトが保持する registryComponentId へ変換してから合成へ渡す。併せて部品パックの環境指紋の突合せを是正した：ランが環境指紋を持たない場合、合成材料は生成対象の環境（ANDROID）で評価する。Factory の材料選別は指紋の完全一致をやめ、カンマ区切りの集合の共通部分で判定する（呼び出し側が環境を特定できない場合は従来どおり特定環境向け部品を材料にしない）。
 - 検証：harness67（案1：UNAVAILABLE→RESOLVE_UNKNOWN→RUN_RESEARCH→再生成が負の知識ブロックを迂回して実際に走ること、材料の変わらないタスクは逃げ道へ回ること）・harness68（案3：検証要求が空のランで調査材料が候補化され、材料なしでは候補が作られないこと）・harness69（案2：候補→検証済み→承認→部品パック→ID変換→合成の両経路（既存部品・能力グラフ）で実際に使えること）全てPASS。回帰 harness57／63／66 PASS、tscエラー0、相対import未解決0。
 - 提案として分離（本節では未実施）：知識系課題がコード生成の梯子へ乗る問題（課題種別で梯子を選ぶ再設計）と、plateau 判定の吸収性（履歴全体への最大連続一致）の是正は、意味論の変更として別途判断する。
+P407（2026-11-03）実行詳細の保存をネイティブ経路へ変更：Blob方式の是正と汎用テキスト書き出しの追加
+- 真因：P404 で追加した「ファイルに保存」ボタンは Blob＋a.download 方式だったが、Capacitor WebView（実機）ではダウンロードが保存されず、成功メッセージだけが表示されることを実地で確認した。一方、ランタイムログ（MIKI_RUNTIME_LOG.txt）はネイティブプラグイン MIKINativeRunner が MediaStore Downloads へ書く方式で確実に保存されていた。ただし既存のファイル系メソッドはファイル名が MIKI_RUNTIME_LOG.txt に固定され、汎用の書き出し手段が無かった。
+- ネイティブ追加（MIKINativeRunnerPlugin.kt）：新しい @PluginMethod writeDownloadTextFile(filename, text) を追加した。filename の検証（空でない・.txt で終わる・/ と \ と .. を含まない・120字以内）と text の検証（空でない・2,000,000字以下）を満たさない場合は reject する。保存先は MediaStore Downloads で、既存 getOrCreateRuntimeLogUri の作法に倣った任意ファイル名版の取得処理（DISPLAY_NAME＋RELATIVE_PATH で検索し、あれば再利用、無ければ IS_PENDING=1 で insert し、書き込み後に 0 へ戻す）を用意した。書き込みモードは上書き（w）で、同名の詳細を再保存すると置き換わる。成功時は success／filename／location（Download）を resolve する。Build.VERSION_CODES.Q 未満は reject し、既存のランタイムログ系メソッドと runtimeLogFileName の挙動は一切変更していない。
+- TS 接続（systemLogger.ts）：RuntimeLogFilePlugin インターフェースに writeDownloadTextFile を追加し、SystemLogger に公開メソッド saveTextFileToDownloads(filename, text): Promise<boolean> を追加した。遅延初期化の作法（dynamic import＋isNativePlatform 判定＋registerPlugin('MIKINativeRunner')）でプラグインを得て呼び、成功で true、プラグイン不可用・reject では例外を外へ漏らさず false を返す。
+- UI 是正（AutonomousImprovementHome.tsx）：saveImprovementRunDetail を非同期化し、まず saveTextFileToDownloads でネイティブ保存を試み、成功した場合のみ成功メッセージ「実行詳細をテキストファイルとして保存しました。」を出す。ネイティブが使えない環境（Web 等）では従来の Blob ダウンロードへフォールバックし、両方失敗した場合は失敗メッセージを出す。現状の「無条件で成功表示」を是正した。ファイル名は従来どおり MIKI_RUN_DETAIL_<taskId>.txt（taskId の安全化も従来どおり）で、コピー機能は無変更。
+- 検証：全体 tsc エラー0、相対 import 未解決0、在庫 --write→--check PASS（新規ファイルなし）。Kotlin のコンパイル確認は VM に Java／Android SDK が無いため未実施（変更は既存パターンの忠実な踏襲に留め、目視で文法と括弧バランスを確認）。最終的なコンパイル証明はプッシュ後の CI APK ビルド、実機でダウンロードフォルダへ保存できることの最終確認は新 APK 導入後となる。

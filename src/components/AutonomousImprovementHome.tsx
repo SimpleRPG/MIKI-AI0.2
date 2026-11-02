@@ -56,6 +56,7 @@ import { LearningArchivePanel } from './LearningArchivePanel';
 import { LearningInspectorPanel } from './LearningInspectorPanel';
 import DevelopmentReviewLifecyclePanel from './self_improvement/DevelopmentReviewLifecyclePanel';
 import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
+import { systemLogger } from '../services/systemLogger';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
 export interface AutonomousImprovementHomeProps {
@@ -636,17 +637,31 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     }
   };
 
-  const saveImprovementRunDetail = (detail: any) => {
+  const saveImprovementRunDetail = async (detail: any) => {
     const text = buildImprovementRunDetailText(detail);
     if (!text) return;
 
+    const taskId = String(detail?.task?.taskId || 'unknown').replace(/[^\w-]+/g, '_');
+    const filename = `MIKI_RUN_DETAIL_${taskId}.txt`;
+
+    // Capacitor WebView では Blob ダウンロードが保存されないため、
+    // ランタイムログと同じネイティブ経路（MediaStore Downloads）で保存する。
+    const savedNatively = await systemLogger.saveTextFileToDownloads(filename, text);
+    if (savedNatively) {
+      setActionMessage({
+        text: '実行詳細をテキストファイルとして保存しました。',
+        type: 'success',
+      });
+      return;
+    }
+
+    // ネイティブが使えない環境（Web 等）では従来の Blob ダウンロードへフォールバックする。
     try {
-      const taskId = String(detail?.task?.taskId || 'unknown').replace(/[^\w-]+/g, '_');
       const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `MIKI_RUN_DETAIL_${taskId}.txt`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1749,
     "sourceFileCount": 1302,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1215,
-    "relativeImportCandidateCount": 3637,
-    "resolvedRelativeImportCandidateCount": 3621,
+    "relativeImportCandidateCount": 3638,
+    "resolvedRelativeImportCandidateCount": 3622,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -176,9 +176,9 @@
     },
     {
       "path": "android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt",
-      "bytes": 43751,
-      "lines": 833,
-      "sha256": "50459cbfbda5c5027140ac59b16a3857eb0fbafbfd8a4c443b0a61d7287ee5a2",
+      "bytes": 47091,
+      "lines": 915,
+      "sha256": "8919fc2ed2011ff27c2b42ee1b7c7800eaa75faa95eb7a19349b90983cf1018c",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -7135,9 +7135,9 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 90419,
-      "lines": 1807,
-      "sha256": "f181ace32a5ee9f11b509f4bf9c75266880e95231f57b33562538e92a05fae3d",
+      "bytes": 91109,
+      "lines": 1822,
+      "sha256": "3c2e35a363f8f313fbc8953fbb9295e6caeb12528e62ef84111e91d20e5618c1",
       "relativeImportCandidates": [
         {
           "line": 48,
@@ -7189,13 +7189,19 @@
         },
         {
           "line": 59,
+          "specifier": "../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 60,
           "specifier": "../utils/isEditableInputActive",
           "resolution": "RESOLVED",
           "resolvedPath": "src/utils/isEditableInputActive.ts"
         }
       ],
-      "relativeImportCandidateCount": 9,
-      "resolvedRelativeImportCount": 9,
+      "relativeImportCandidateCount": 10,
+      "resolvedRelativeImportCount": 10,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -35480,9 +35486,9 @@
     },
     {
       "path": "src/services/systemLogger.ts",
-      "bytes": 41090,
-      "lines": 1020,
-      "sha256": "c2d8d9c0e650852aa1ca78f512a8bc7019f637b5554b226a2f276731f6ca5aa3",
+      "bytes": 42372,
+      "lines": 1047,
+      "sha256": "daa56f031bd65d014f4dfbc212099b06ec86793db8ffd864e437bfa5b0b09b51",
       "relativeImportCandidates": [
         {
           "line": 1,

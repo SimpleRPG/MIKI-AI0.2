@@ -4,6 +4,7 @@ interface RuntimeLogFilePlugin {
   ensureRuntimeLogFile(options?: { filename?: string }): Promise<void>;
   appendRuntimeLog(options: { filename?: string; line: string }): Promise<void>;
   flushNativeWebViewDiagnostics(options?: { filename?: string }): Promise<void>;
+  writeDownloadTextFile(options: { filename: string; text: string }): Promise<void>;
 }
 
 const RUNTIME_LOG_FILE_NAME = 'MIKI_RUNTIME_LOG.txt';
@@ -992,6 +993,32 @@ ${this.exportAsFormattedText()}
 ================================================================================
 `;
     return reportHeader;
+  }
+
+  /**
+   * 任意のテキストファイルを Android の Downloads へ保存する（ネイティブ経由）。
+   * Capacitor WebView では Blob＋a.download が保存されないため、ランタイムログと
+   * 同じ MIKINativeRunner の MediaStore 経由で書き出す。同名ファイルがあれば上書きする。
+   * ネイティブが使えない環境（Web 等）や書き込み失敗時は false を返し、例外は外へ漏らさない。
+   */
+  public async saveTextFileToDownloads(filename: string, text: string): Promise<boolean> {
+    if (typeof window === 'undefined' || !filename || !text) {
+      return false;
+    }
+    try {
+      if (!this.runtimeLogFilePlugin) {
+        const { Capacitor, registerPlugin } = await import('@capacitor/core');
+        if (!Capacitor.isNativePlatform()) {
+          return false;
+        }
+        this.runtimeLogFilePlugin ??= registerPlugin<RuntimeLogFilePlugin>('MIKINativeRunner');
+      }
+      await this.runtimeLogFilePlugin.writeDownloadTextFile({ filename, text });
+      return true;
+    } catch (error) {
+      console.warn('[SystemLogger] download text file save failed', error);
+      return false;
+    }
   }
 
   /**

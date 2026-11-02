@@ -163,6 +163,55 @@ class MIKINativeRunnerPlugin : Plugin() {
         }
     }
 
+    @PluginMethod
+    fun writeDownloadTextFile(call: PluginCall) {
+        val fileName = call.getString("filename").orEmpty()
+        val text = call.getString("text").orEmpty()
+        if (
+            fileName.isEmpty() ||
+            fileName.length > 120 ||
+            !fileName.endsWith(".txt") ||
+            fileName.contains('/') ||
+            fileName.contains('\\') ||
+            fileName.contains("..")
+        ) {
+            call.reject("DOWNLOAD_TEXT_FILE_NAME_INVALID")
+            return
+        }
+        if (text.isEmpty() || text.length > 2_000_000) {
+            call.reject("DOWNLOAD_TEXT_FILE_TEXT_INVALID")
+            return
+        }
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                call.reject("DOWNLOAD_TEXT_FILE_API_UNSUPPORTED")
+                return
+            }
+            val (uri, created) = getOrCreateDownloadTextFileUri(fileName)
+            context.contentResolver.openOutputStream(uri, "w")?.use { output ->
+                output.write(text.toByteArray(Charsets.UTF_8))
+                output.flush()
+            } ?: throw IllegalStateException("DOWNLOAD_TEXT_FILE_OUTPUT_STREAM_UNAVAILABLE")
+            if (created) {
+                context.contentResolver.update(
+                    uri,
+                    ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
+                    null,
+                    null
+                )
+            }
+            call.resolve(JSObject().apply {
+                put("success", true)
+                put("filename", fileName)
+                put("location", Environment.DIRECTORY_DOWNLOADS)
+                put("uri", uri.toString())
+                put("byte_length", text.toByteArray(Charsets.UTF_8).size)
+            })
+        } catch (error: Throwable) {
+            call.reject("DOWNLOAD_TEXT_FILE_WRITE_FAILED", error.message ?: error.toString())
+        }
+    }
+
     private fun validateRuntimeLogFilename(requested: String?) {
         if (requested != null && requested != runtimeLogFileName) {
             throw IllegalArgumentException("RUNTIME_LOG_FILENAME_FORBIDDEN")
@@ -199,6 +248,39 @@ class MIKINativeRunnerPlugin : Plugin() {
         }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
             ?: throw IllegalStateException("RUNTIME_LOG_MEDIASTORE_INSERT_FAILED")
+        return uri to true
+    }
+
+    private fun getOrCreateDownloadTextFileUri(fileName: String): Pair<Uri, Boolean> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            throw IllegalStateException("DOWNLOAD_TEXT_FILE_API_UNSUPPORTED")
+        }
+
+        val resolver = context.contentResolver
+        val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/"
+        resolver.query(
+            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Downloads._ID),
+            "${MediaStore.Downloads.DISPLAY_NAME} = ? AND ${MediaStore.Downloads.RELATIVE_PATH} = ?",
+            arrayOf(fileName, relativePath),
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                return ContentUris.withAppendedId(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    cursor.getLong(0)
+                ) to false
+            }
+        }
+
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+            put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+            put(MediaStore.Downloads.RELATIVE_PATH, relativePath)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw IllegalStateException("DOWNLOAD_TEXT_FILE_MEDIASTORE_INSERT_FAILED")
         return uri to true
     }
 
