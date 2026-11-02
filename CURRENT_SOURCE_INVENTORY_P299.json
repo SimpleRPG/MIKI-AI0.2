@@ -15091,9 +15091,9 @@
     },
     {
       "path": "src/miki/core/services/domainOperationalAdapterService.ts",
-      "bytes": 7273,
+      "bytes": 7287,
       "lines": 101,
-      "sha256": "21ebe793a6e78bb78fb2d274de296f2cf729045d4b73889d9d6b6d081c97187d",
+      "sha256": "9b1584d462b49653d37f71e41950e50456581714379b0b0db4579fcf6d52d75e",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17715,9 +17715,9 @@
     },
     {
       "path": "src/miki/core/services/selfCodeUnderstandingService.ts",
-      "bytes": 24380,
-      "lines": 506,
-      "sha256": "52df1a52e24f5723ee37096455a80932bc2816adfeb4238987530f958466e065",
+      "bytes": 27273,
+      "lines": 551,
+      "sha256": "529d8d35c0a269e16a8b4fc59c50c607c0cb0d8978b1664fdc6a2e0bf0c7b4e7",
       "relativeImportCandidates": [
         {
           "line": 2,

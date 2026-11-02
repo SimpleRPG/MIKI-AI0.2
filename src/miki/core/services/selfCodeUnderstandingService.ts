@@ -96,6 +96,19 @@ const EVENT_PUBLISH_METHODS=new Set(['emit','publish','dispatch','notify']);
 const EVENT_SUBSCRIBE_METHODS=new Set(['on','subscribe','addEventListener','registerHandler']);
 const STORAGE_READ_METHODS=new Set(['getItem','get']);
 const STORAGE_WRITE_METHODS=new Set(['setItem','set','removeItem','delete']);
+// P400: platform globals that may legitimately appear as bare CALLS
+// callees. Together with repository declarations, per-file import
+// bindings and parameter names, these decide whether a bare CALLS
+// relation is genuinely unaccounted for (see ensure()).
+const BUILTIN_CALLEE_NAMES=new Set([
+  'Number','String','Boolean','BigInt','Symbol','Array','Object','Function','Proxy','Reflect',
+  'Error','EvalError','RangeError','ReferenceError','SyntaxError','TypeError','URIError','AggregateError',
+  'RegExp','Promise','Date','parseInt','parseFloat','isNaN','isFinite','encodeURI','encodeURIComponent',
+  'decodeURI','decodeURIComponent','escape','unescape','eval','fetch','setTimeout','clearTimeout',
+  'setInterval','clearInterval','queueMicrotask','structuredClone','atob','btoa','requestAnimationFrame',
+  'cancelAnimationFrame','require','alert','confirm','prompt','postMessage','getComputedStyle','matchMedia',
+]);
+const IMPORT_BINDING_PATTERN=/import\s+(?:type\s+)?(?:([A-Za-z_$][\w$]*)\s*(?:,\s*)?)?(?:\{([^}]+)\})?(?:\*\s+as\s+([A-Za-z_$][\w$]*))?\s*from\s*['"][^'"]+['"]/g;
 
 class SelfCodeUnderstandingService {
   get():CodeUnderstandingSnapshot|undefined {
@@ -469,10 +482,42 @@ class SelfCodeUnderstandingService {
     }
     const executionPaths:ExecutionPathRecord[]=[];
     const unresolvedEdges:string[]=[];
+    // P400: a bare CALLS relation counts as unresolved only when the
+    // callee is accounted for nowhere — not declared anywhere in the
+    // repository, not imported by the calling file, not one of its
+    // parameters, and not a platform builtin. The previous rule
+    // flagged every bare identifier call (Number, String, same-file
+    // helpers, imported functions), which put hundreds of phantom
+    // edges on ordinary files; edges originating in the target files
+    // block the context closure and the requirement contract, so the
+    // candidate-generation gate was unreachable for any real target.
+    const knownCalleeNames=new Set<string>(BUILTIN_CALLEE_NAMES);
+    for(const entry of entries.values()){
+      for(const symbol of entry.symbols)knownCalleeNames.add(symbol.name);
+      for(const name of entry.exports)knownCalleeNames.add(name);
+    }
+    const contentByPath=new Map(files.map(file=>[file.path,file.content]));
+    const calleeNamesFor=(entry:CodeUnderstandingEntry):Set<string>=>{
+      const names=new Set(knownCalleeNames);
+      const content=contentByPath.get(entry.path)||'';
+      for(const match of content.matchAll(IMPORT_BINDING_PATTERN)){
+        if(match[1])names.add(match[1]);
+        if(match[3])names.add(match[3]);
+        if(match[2])for(const part of match[2].split(',')){
+          const clean=part.trim().replace(/^type\s+/,'');
+          if(!clean)continue;
+          const alias=clean.split(/\s+as\s+/);
+          names.add((alias[1]||alias[0]).trim());
+        }
+      }
+      for(const symbol of entry.symbols)for(const parameter of symbol.parameters)if(/^[A-Za-z_$][\w$]*$/.test(parameter))names.add(parameter);
+      return names;
+    };
     for(const entry of scopeEntries){
+      const calleeNames=calleeNamesFor(entry);
       for(const relation of entry.relations){
         executionPaths.push({from:relation.from,to:relation.to,kind:relation.kind,evidence:`${entry.path}:${relation.line}:${relation.evidence}`});
-        if(relation.kind==='CALLS'&&!relation.to.includes('.')&&!relation.to.includes('/'))unresolvedEdges.push(`${entry.path}:${relation.line}:CALLS:${relation.to}`);
+        if(relation.kind==='CALLS'&&!relation.to.includes('.')&&!relation.to.includes('/')&&relation.to!=='import'&&!calleeNames.has(relation.to))unresolvedEdges.push(`${entry.path}:${relation.line}:CALLS:${relation.to}`);
       }
       for(const contract of entry.literalContracts){
         if(contract.role==='OTHER')continue;
