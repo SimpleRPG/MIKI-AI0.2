@@ -396,7 +396,14 @@ class AdaptiveRoutePlannerService {
     );
 
     const blockingReasons:string[]=[];
-    if(requirementContract?.status==='BLOCKED')blockingReasons.push(...requirementContract.unresolved.map(reason=>`REQUIREMENT_CONTRACT:${reason}`));
+    // P412: cite only the unresolved edges that actually block —
+    // those originating in the target files (the P361 rule the
+    // contract itself applies). The contract records scope-wide
+    // edges as well; quoting the whole sorted list made unrelated
+    // files (src/App.tsx in the observed stall) look like the cause.
+    if(requirementContract?.status==='BLOCKED')blockingReasons.push(...requirementContract.unresolved
+      .filter(reason=>!reason.startsWith('UNRESOLVED_EDGE:')||requirementContract.targetPaths.some(target=>reason.startsWith(`UNRESOLVED_EDGE:${target}:`)))
+      .map(reason=>`REQUIREMENT_CONTRACT:${reason}`));
     if(!issueEstablished) blockingReasons.push('IMPROVEMENT_ISSUE_NOT_ESTABLISHED');
     if(!repositoryContextAvailable) blockingReasons.push('REPOSITORY_CONTEXT_MISSING');
     if(!targetFilesKnown) blockingReasons.push('TARGET_FILES_UNKNOWN');

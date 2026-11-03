@@ -12217,9 +12217,9 @@
     },
     {
       "path": "src/miki/core/services/adaptiveRoutePlannerService.ts",
-      "bytes": 144955,
-      "lines": 3218,
-      "sha256": "aad81690715f6b70c92fe220907fa2c99c1115c56226de1ae4235bb7d03543e8",
+      "bytes": 145453,
+      "lines": 3225,
+      "sha256": "9fda3c5301320dbbd837b19fa1d257ea4f1a6df57436453ece6ecdf3e809b6e3",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17751,9 +17751,9 @@
     },
     {
       "path": "src/miki/core/services/selfCodeUnderstandingService.ts",
-      "bytes": 30248,
-      "lines": 608,
-      "sha256": "3584755e3ede619fcc1b8c5f6e81c054ad0b2d24a295d1520f5ad2be915db9bf",
+      "bytes": 33429,
+      "lines": 666,
+      "sha256": "3fe7ff15cb5ebe4f4940512ea7535d1eb5eea9234aa70983a1805b5a737c9ebc",
       "relativeImportCandidates": [
         {
           "line": 2,

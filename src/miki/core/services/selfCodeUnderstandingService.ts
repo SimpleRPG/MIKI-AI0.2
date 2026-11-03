@@ -50,6 +50,12 @@ export interface CodeUnderstandingEntry {
   relations:CodeRelationRecord[];
   literalContracts:CodeLiteralContract[];
   parseDiagnostics:string[];
+  // P412: identifiers bound by any function-like parameter in the
+  // file (declarations, expressions, arrows, inline callbacks),
+  // collected through binding patterns. Symbol parameters only
+  // covered declared functions, so callback parameters (e.g. a
+  // socket handler's ack) looked unaccounted for as bare CALLS.
+  parameterNames?:string[];
   // P363: one-line role extracted deterministically from the file's
   // leading comment (never generated). Lets consumers reason about
   // what a file is for, not only what it exports.
@@ -57,7 +63,10 @@ export interface CodeUnderstandingEntry {
 }
 
 export interface CodeUnderstandingSnapshot {
-  schemaVersion:2;
+  // P412: bumped from 2 — parse() output changed (binding-pattern
+  // symbols, parameterNames), and stored entries are reused by
+  // content hash, so a v2 snapshot must be rebuilt, not reused.
+  schemaVersion:3;
   repoSha256:string;
   snapshotSha256:string;
   entries:CodeUnderstandingEntry[];
@@ -108,7 +117,11 @@ const BUILTIN_CALLEE_NAMES=new Set([
   'setInterval','clearInterval','queueMicrotask','structuredClone','atob','btoa','requestAnimationFrame',
   'cancelAnimationFrame','require','alert','confirm','prompt','postMessage','getComputedStyle','matchMedia',
 ]);
-const IMPORT_BINDING_PATTERN=/import\s+(?:type\s+)?(?:([A-Za-z_$][\w$]*)\s*(?:,\s*)?)?(?:\{([^}]+)\})?(?:\*\s+as\s+([A-Za-z_$][\w$]*))?\s*from\s*['"][^'"]+['"]/g;
+const IDENTIFIER_NAME=/^[A-Za-z_$][\w$]*$/;
+// P412: the binding part may begin immediately after the keyword
+// (import{...}from'...' with no whitespace), which requiring \s+
+// after import missed.
+const IMPORT_BINDING_PATTERN=/import\s*(?:type\s+)?(?:([A-Za-z_$][\w$]*)\s*(?:,\s*)?)?(?:\{([^}]+)\})?(?:\*\s+as\s+([A-Za-z_$][\w$]*))?\s*from\s*['"][^'"]+['"]/g;
 
 class SelfCodeUnderstandingService {
   // P401: per-tree assembly cache and per-(tree, targets) result
@@ -128,7 +141,7 @@ class SelfCodeUnderstandingService {
       const raw=storageService.getItem(KEY);
       if(!raw)return undefined;
       const parsed=JSON.parse(raw) as Partial<CodeUnderstandingSnapshot>;
-      if(parsed.schemaVersion!==2||!Array.isArray(parsed.entries))return undefined;
+      if(parsed.schemaVersion!==3||!Array.isArray(parsed.entries))return undefined;
       return parsed as CodeUnderstandingSnapshot;
     } catch {
       return undefined;
@@ -168,6 +181,20 @@ class SelfCodeUnderstandingService {
     return named.name?this.textOf(named.name,source,160):'';
   }
 
+  // P412: every identifier bound by a (possibly nested) binding
+  // pattern — [messages, setMessages], { createServer:
+  // createViteServer }, destructured parameters. Only the bound
+  // names are returned; an object pattern's property keys are not
+  // bindings and are not collected.
+  private bindingIdentifiers(name:ts.BindingName):string[] {
+    if(ts.isIdentifier(name))return [name.text];
+    const out:string[]=[];
+    for(const element of name.elements){
+      if(ts.isBindingElement(element))out.push(...this.bindingIdentifiers(element.name));
+    }
+    return out;
+  }
+
   private isExported(node:ts.Node):boolean {
     const flags=ts.getCombinedModifierFlags(node as ts.Declaration);
     return Boolean(flags&ts.ModifierFlags.Export)||Boolean(flags&ts.ModifierFlags.Default);
@@ -203,6 +230,7 @@ class SelfCodeUnderstandingService {
     const symbols:CodeSymbolRecord[]=[];
     const relations:CodeRelationRecord[]=[];
     const literalContracts:CodeLiteralContract[]=[];
+    const parameterNames=new Set<string>();
     const ownerStack:string[]=[];
 
     const owner=()=>ownerStack.at(-1)||f.path;
@@ -221,28 +249,49 @@ class SelfCodeUnderstandingService {
         if(arg&&ts.isStringLiteralLike(arg))imports.push(arg.text);
       }
 
+      // P412: parameter bindings of every function-like node, not
+      // only of declared functions — inline callbacks and function
+      // expressions bind names in this file too.
+      const signatureLike=node as ts.SignatureDeclaration;
+      if(Array.isArray(signatureLike.parameters)){
+        for(const parameter of signatureLike.parameters)for(const bound of this.bindingIdentifiers(parameter.name))parameterNames.add(bound);
+      }
+
       const kind=this.symbolKind(node);
       let pushed=false;
       if(kind){
-        const name=this.declarationName(node as ts.Declaration,source);
-        if(name){
+        // P412: a destructuring declaration binds several names at
+        // once. Registering only the pattern text ("[a, b]") left
+        // every bound identifier — useState setters above all — out
+        // of the symbol table, so calls to them counted as
+        // unresolved edges and blocked requirement contracts.
+        const variable=ts.isVariableDeclaration(node)?node:undefined;
+        const names=variable&&(ts.isArrayBindingPattern(variable.name)||ts.isObjectBindingPattern(variable.name))
+          ? this.bindingIdentifiers(variable.name)
+          : [this.declarationName(node as ts.Declaration,source)].filter(name=>name.length>0);
+        if(names.length){
           const parentName=ownerStack.at(-1);
-          const qualifiedName=parentName&&parentName!==f.path?`${parentName}.${name}`:name;
-          const id=`${f.path}#${qualifiedName}`;
           const signature=node as ts.SignatureDeclaration;
           const parameters=Array.isArray(signature.parameters)
             ? signature.parameters.map(parameter=>this.textOf(parameter.name,source,100))
             : [];
-          const record:CodeSymbolRecord={
-            id,path:f.path,name,qualifiedName,kind,
-            exported:this.isExported(node),
-            async:Boolean(ts.getCombinedModifierFlags(node as ts.Declaration)&ts.ModifierFlags.Async),
-            line:this.lineOf(source,node),parameters,
-            returnType:signature.type?this.textOf(signature.type,source,200):undefined
-          };
-          symbols.push(record);
-          if(record.exported)exports.push(name);
-          ownerStack.push(id);
+          const exported=this.isExported(node);
+          const isAsync=Boolean(ts.getCombinedModifierFlags(node as ts.Declaration)&ts.ModifierFlags.Async);
+          const line=this.lineOf(source,node);
+          let ownerId='';
+          for(const name of names){
+            const qualifiedName=parentName&&parentName!==f.path?`${parentName}.${name}`:name;
+            const id=`${f.path}#${qualifiedName}`;
+            symbols.push({
+              id,path:f.path,name,qualifiedName,kind,
+              exported,async:isAsync,
+              line,parameters,
+              returnType:signature.type?this.textOf(signature.type,source,200):undefined
+            });
+            if(exported)exports.push(name);
+            if(!ownerId)ownerId=id;
+          }
+          ownerStack.push(ownerId);
           pushed=true;
 
           if(ts.isClassDeclaration(node)&&node.heritageClauses){
@@ -305,6 +354,7 @@ class SelfCodeUnderstandingService {
       imports:[...new Set(imports)],importedBy:[],exports:[...new Set(exports)],
       symbols,relations:this.uniqueRelations(relations),
       literalContracts:this.uniqueLiterals(literalContracts),parseDiagnostics,
+      parameterNames:[...parameterNames].sort(),
       role:this.extractRole(f.content)
     };
   }
@@ -357,7 +407,7 @@ class SelfCodeUnderstandingService {
       .sort((a,b)=>`${a.from}|${a.kind}|${a.to}`.localeCompare(`${b.from}|${b.kind}|${b.to}`));
   }
 
-  public getSnapshot():CodeUnderstandingSnapshot|undefined{try{const raw=storageService.getItem(KEY);if(!raw)return undefined;const parsed=JSON.parse(raw) as CodeUnderstandingSnapshot;return parsed?.schemaVersion===2?parsed:undefined;}catch{return undefined;}}
+  public getSnapshot():CodeUnderstandingSnapshot|undefined{try{const raw=storageService.getItem(KEY);if(!raw)return undefined;const parsed=JSON.parse(raw) as CodeUnderstandingSnapshot;return parsed?.schemaVersion===3?parsed:undefined;}catch{return undefined;}}
 
   /** P363: record which commit the stored index was built from. */
   public stampSourceCommit(commitSha:string):void{
@@ -523,7 +573,7 @@ class SelfCodeUnderstandingService {
       targetFingerprints:{...(previous.targetFingerprints||{}),[key]:fingerprint},
       updatedAt:now
     }:{
-      schemaVersion:2,repoSha256,
+      schemaVersion:3,repoSha256,
       snapshotSha256:canonicalSha256([...entries.values()].map(entry=>({
         path:entry.path,contentHash:entry.contentHash,symbols:entry.symbols,relations:entry.relations,literalContracts:entry.literalContracts
       }))),
@@ -564,14 +614,22 @@ class SelfCodeUnderstandingService {
           names.add((alias[1]||alias[0]).trim());
         }
       }
-      for(const symbol of entry.symbols)for(const parameter of symbol.parameters)if(/^[A-Za-z_$][\w$]*$/.test(parameter))names.add(parameter);
+      for(const symbol of entry.symbols)for(const parameter of symbol.parameters)if(IDENTIFIER_NAME.test(parameter))names.add(parameter);
+      // P412: parameters of function expressions and inline
+      // callbacks bind names in this file too; parse() collects
+      // them per entry (older snapshots may not carry the field).
+      for(const name of entry.parameterNames||[])names.add(name);
       return names;
     };
     for(const entry of scopeEntries){
       const calleeNames=calleeNamesFor(entry);
       for(const relation of entry.relations){
         executionPaths.push({from:relation.from,to:relation.to,kind:relation.kind,evidence:`${entry.path}:${relation.line}:${relation.evidence}`});
-        if(relation.kind==='CALLS'&&!relation.to.includes('.')&&!relation.to.includes('/')&&relation.to!=='import'&&!calleeNames.has(relation.to))unresolvedEdges.push(`${entry.path}:${relation.line}:CALLS:${relation.to}`);
+        // P412: a CALLS target that is not identifier-shaped is an
+        // expression fragment (a truncated array literal, a cast
+        // expression), not a name — name collection can never
+        // account for it, so it must not count as an unresolved edge.
+        if(relation.kind==='CALLS'&&IDENTIFIER_NAME.test(relation.to)&&!relation.to.includes('.')&&!relation.to.includes('/')&&relation.to!=='import'&&!calleeNames.has(relation.to))unresolvedEdges.push(`${entry.path}:${relation.line}:CALLS:${relation.to}`);
       }
       for(const contract of entry.literalContracts){
         if(contract.role==='OTHER')continue;
