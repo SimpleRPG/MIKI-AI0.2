@@ -7135,9 +7135,9 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 91109,
-      "lines": 1822,
-      "sha256": "3c2e35a363f8f313fbc8953fbb9295e6caeb12528e62ef84111e91d20e5618c1",
+      "bytes": 94337,
+      "lines": 1891,
+      "sha256": "2d62804f5491d66efb70ecd31dd669d24bbbe6135edbdb0fbd3a9325be5c7a05",
       "relativeImportCandidates": [
         {
           "line": 48,

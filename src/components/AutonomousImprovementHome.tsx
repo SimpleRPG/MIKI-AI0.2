@@ -120,6 +120,19 @@ const normalizeRepeatedDiagnosticPrefix = (value: string) => {
   return text || '作業タスク';
 };
 
+// 一覧のテキスト絞り込み: クエリが空なら全件一致。
+// 大文字小文字を区別せず、題名・ID等のいずれかのフィールドに部分一致すれば一致とする。
+const matchesFilterQuery = (
+  query: string,
+  ...fields: Array<string | null | undefined>
+): boolean => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  return fields.some(
+    (field) => typeof field === 'string' && field.toLowerCase().includes(normalizedQuery)
+  );
+};
+
 export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps> = ({
   onOpenSelfImprovementModal,
   onOpenActivityMonitor,
@@ -127,6 +140,8 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const [activeSection, setActiveSection] = useState<MainSection>('status');
   const [refreshTick, setRefreshTick] = useState(0);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [queueFilterQuery, setQueueFilterQuery] = useState('');
+  const [historyFilterQuery, setHistoryFilterQuery] = useState('');
 
   // States from services
   const [coreRuntimes, setCoreRuntimes] = useState<PriorityOneRuntimeItem[]>(() =>
@@ -208,6 +223,26 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
 
     return [...runtimeOnly, ...persisted].slice(0, 100);
   }, [persistedRuns, coreRuntimes]);
+
+  // キュー一覧の絞り込み（元の並び順と番号を保持するため idx を一緒に運ぶ）
+  const filteredQueueRequests = useMemo(
+    () =>
+      loopState.queue
+        .map((req, idx) => ({ req, idx }))
+        .filter(({ req }) =>
+          matchesFilterQuery(queueFilterQuery, req.trigger, req.id, req.runId)
+        ),
+    [loopState.queue, queueFilterQuery]
+  );
+
+  // 履歴一覧の絞り込み
+  const filteredCanonicalRuns = useMemo(
+    () =>
+      canonicalRuns.filter((run) =>
+        matchesFilterQuery(historyFilterQuery, run.title, run.run_id, run.taskId)
+      ),
+    [canonicalRuns, historyFilterQuery]
+  );
   const [externalDirectives, setExternalDirectives] = useState<ExternalDirective[]>(() =>
     typedImprovementUiGatewayService.getExternalDirectives()
   );
@@ -1276,17 +1311,32 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                   待機中キュー詳細 (Autonomous Loop Queue)
                 </h3>
                 <span className="text-xs text-slate-400">
-                  全 {loopState.queue.length} 件
+                  {queueFilterQuery.trim()
+                    ? `全 ${loopState.queue.length} 件中 ${filteredQueueRequests.length} 件`
+                    : `全 ${loopState.queue.length} 件`}
                 </span>
               </div>
 
-              {loopState.queue.length === 0 ? (
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="題名・ID（AIR-… / Run ID）で絞り込み"
+                  value={queueFilterQuery}
+                  onChange={(e) => setQueueFilterQuery(e.target.value)}
+                  className="w-full pl-8 pr-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500"
+                />
+              </div>
+
+              {filteredQueueRequests.length === 0 ? (
                 <div className="p-8 text-center text-xs text-slate-500 bg-slate-950/40 rounded-lg border border-slate-800/40">
-                  待機中のRunはありません
+                  {loopState.queue.length === 0
+                    ? '待機中のRunはありません'
+                    : '絞り込みに一致するRunはありません'}
                 </div>
               ) : (
                 <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl overflow-hidden">
-                  {loopState.queue.map((req, idx) => (
+                  {filteredQueueRequests.map(({ req, idx }) => (
                     <div
                       key={req.id}
                       className="p-4 bg-slate-900/40 hover:bg-slate-800/40 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
@@ -1406,8 +1456,21 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                   <Clock className="w-4 h-4 text-indigo-400" />
-                  Canonical Controller 改善実行履歴 ({canonicalRuns.length}件)
+                  Canonical Controller 改善実行履歴 ({historyFilterQuery.trim()
+                    ? `${filteredCanonicalRuns.length}件 / 全${canonicalRuns.length}件`
+                    : `${canonicalRuns.length}件`})
                 </h3>
+              </div>
+
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="題名・ID（Run ID / Task ID）で絞り込み"
+                  value={historyFilterQuery}
+                  onChange={(e) => setHistoryFilterQuery(e.target.value)}
+                  className="w-full pl-8 pr-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-500"
+                />
               </div>
 
               {canonicalRuns.length === 0 ? (
@@ -1582,7 +1645,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
             );
           })()}
 
-          {canonicalRuns.map((run) => (
+          {filteredCanonicalRuns.map((run) => (
             <div
               key={`${run.run_id || 'no-run'}:${run.taskId || 'no-task'}`}
               className="p-3.5 bg-slate-900/40 hover:bg-slate-800/40 transition text-xs space-y-1.5 cursor-pointer"
@@ -1628,6 +1691,12 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
               </div>
             </div>
           ))}
+
+          {historyFilterQuery.trim() && filteredCanonicalRuns.length === 0 && (
+            <div className="p-6 text-center text-xs text-slate-500">
+              絞り込みに一致する実行履歴はありません
+            </div>
+          )}
                 </div>
               )}
             </div>
