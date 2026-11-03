@@ -218,8 +218,28 @@ export class KnowledgeGapService {
   }
 
   public findOpen(query: string, context: KnowledgeGapDetectionContext = {}): KnowledgeGap | undefined {
-    const semanticKey=this.buildIdentity({query,...context}).semanticKey;
+    const identity=this.buildIdentity({query,...context});
+    const semanticKey=identity.semanticKey;
     const normalized=this.normalize(query);
+    // P409 案1: structured ids are the designed identity of a gap. When the
+    // incoming detection and a stored open gap share a claimId or a
+    // capabilityId, they are the same gap even though each producer phrases
+    // its query text differently (capability revalidation loop vs knowledge
+    // half-life audit). This must be checked before the semanticKey
+    // comparison: missingContent defaults to the query text, so text-keyed
+    // matching alone can never merge producers that word the same target
+    // differently. Ids are compared in their semantic-normalized form,
+    // exactly as buildIdentity stores them.
+    if(identity.claimIds.length||identity.capabilityIds.length){
+      const byStructuredId=this.gaps.find((gap)=>{
+        if(gap.status==='RESOLVED'||gap.status==='BLOCKED')return false;
+        const stored=gap.identity; if(!stored)return false;
+        if(identity.claimIds.length&&stored.claimIds.some(id=>identity.claimIds.includes(id)))return true;
+        if(identity.capabilityIds.length&&stored.capabilityIds.some(id=>identity.capabilityIds.includes(id)))return true;
+        return false;
+      });
+      if(byStructuredId)return byStructuredId;
+    }
     return this.gaps.find((gap)=>{
       if(gap.status==='RESOLVED'||gap.status==='BLOCKED')return false;
       const legacyIdentity=this.buildIdentity({query:gap.query,target:gap.identity?.target,missingContent:gap.identity?.missingContent,conditions:gap.identity?.conditions,environment:gap.identity?.environment,taskId:gap.identity?.taskId,capabilityIds:gap.identity?.capabilityIds,claimIds:gap.identity?.claimIds});

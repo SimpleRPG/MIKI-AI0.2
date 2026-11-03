@@ -86,7 +86,9 @@ class AutonomousIssueDiscoveryService{
    // P366: gaps named required_asset.* are bookkeeping records created by
    // required-asset acquisition itself, not capabilities or knowledge to
    // pursue. Queueing them spawned self-referencing recovery tasks.
-   for(const gap of knowledgeGapService.listOpen(50).filter(gap=>!/required_asset\./i.test(gap.query)))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${gap.query}`,gap.reason||gap.query,70);
+   // P409 案3: strip diagnostic prefixes the query may already carry (e.g.
+   // a previous generation's issue title) so titles never stack prefixes.
+   for(const gap of knowledgeGapService.listOpen(50).filter(gap=>!/required_asset\./i.test(gap.query)))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${this.normalizeDiagnosticPrefixes(gap.query)}`,gap.reason||gap.query,70);
    for(const gap of capabilityGapService.getAllGaps().filter(item=>item.status==='OPEN'&&!/^required_asset\./i.test(item.capabilityId)).slice(0,50))this.upsert('CAPABILITY_GAP',gap.gap_id,`能力不足: ${gap.capabilityId}`,gap.description||gap.current_workaround||gap.capabilityId,80);
    for(const task of taskBlackboardService.list(100).filter(item=>this.isStallCandidate(item.status,item.pausedReason))){
     const goal=this.normalizeDiagnosticPrefixes(task.goal);
@@ -99,7 +101,14 @@ class AutonomousIssueDiscoveryService{
 
    let queued=0;
    if(mode==='AUTONOMOUS'){
-    const candidates=this.list(200).filter(item=>this.isActionableIssue(item)&&!item.resolvedAt&&!item.queuedAt&&!item.exhausted&&(!item.nextRetryAt||item.nextRetryAt<=Date.now())&&item.priority>=this.config.minimumPriority).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
+    // P409 案2: two dispatch-time exclusions the scan-time upsert filters
+    // cannot provide. (1) A KNOWLEDGE_GAP issue whose gap already has an
+    // active CORE task (e.g. submitted by the revalidation loop) must not
+    // be dispatched again. (2) The P366 required_asset exclusion must also
+    // hold for issues persisted by older builds, which the upsert-time
+    // filter never sees.
+    const activeGapIds=this.activeKnowledgeGapIds();
+    const candidates=this.list(200).filter(item=>this.isActionableIssue(item)&&!item.resolvedAt&&!item.queuedAt&&!item.exhausted&&(!item.nextRetryAt||item.nextRetryAt<=Date.now())&&item.priority>=this.config.minimumPriority&&!this.isRequiredAssetBookkeepingIssue(item)&&!(item.kind==='KNOWLEDGE_GAP'&&activeGapIds.has(item.sourceId))).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
     for(const issue of candidates){
      if(autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')break;
      const issueEnvironment=issue.kind==='EXECUTION_FAILURE'
@@ -387,6 +396,11 @@ class AutonomousIssueDiscoveryService{
      detail:issue.detail,
      fingerprint:issue.fingerprint,
      priorCases,
+     // P409 案2: link the task to its knowledge gap with the same payload
+     // keys the capability revalidation loop writes and reads
+     // (autonomousKnowledgeGapId / gapId). Without them the loop could not
+     // see discovery-dispatched tasks and dispatched the same gap twice.
+     ...(issue.kind==='KNOWLEDGE_GAP'?{gapId:issue.sourceId,autonomousKnowledgeGapId:issue.sourceId}:{}),
      ...(diagnosis?{diagnosis}:{})
     }
    });
@@ -572,6 +586,37 @@ class AutonomousIssueDiscoveryService{
   }
  }
 
+ // P409 案2: gap ids that already have a non-terminal CORE task. Mirrors
+ // the revalidation loop's existing-task check (INPUT payload keys
+ // autonomousKnowledgeGapId / gapId, terminal = COMPLETED/FAILED/
+ // CANCELLED) so both dispatchers agree on what "already dispatched"
+ // means.
+ private activeKnowledgeGapIds():Set<string>{
+  const ids=new Set<string>();
+  for(const task of taskBlackboardService.list(200)){
+   if(['COMPLETED','FAILED','CANCELLED'].includes(task.status))continue;
+   const payloadValue=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
+   if(!payloadValue||typeof payloadValue!=='object'||Array.isArray(payloadValue))continue;
+   const payload=payloadValue as Record<string,unknown>;
+   const linked=String(payload.autonomousKnowledgeGapId||payload.gapId||'');
+   if(linked)ids.add(linked);
+  }
+  return ids;
+ }
+ // P409 案2: the P366 required_asset exclusion, evaluated against the
+ // issue's source record (and title, for records whose source is gone) so
+ // it also covers issues persisted before the scan-time filter existed.
+ private isRequiredAssetBookkeepingIssue(issue:DiscoveredIssue):boolean{
+  if(issue.kind==='KNOWLEDGE_GAP'){
+   const gap=knowledgeGapService.getById(issue.sourceId);
+   return /required_asset\./i.test(gap?.query||'')||/required_asset\./i.test(issue.title);
+  }
+  if(issue.kind==='CAPABILITY_GAP'){
+   const gap=capabilityGapService.getAllGaps().find(item=>item.gap_id===issue.sourceId);
+   return /^required_asset\./i.test(gap?.capabilityId||'')||/required_asset\./i.test(issue.title);
+  }
+  return false;
+ }
  private isStallCandidate(status:string,pausedReason?:string):boolean{
   if(status==='FAILED'||status==='WAITING')return true;
   if(status!=='PAUSED')return false;

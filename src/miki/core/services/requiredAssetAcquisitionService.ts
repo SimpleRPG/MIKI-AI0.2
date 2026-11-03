@@ -248,8 +248,17 @@ class RequiredAssetAcquisitionService {
     componentIds: string[];
     reasons: string[];
   }> {
+    // P409 案3: the gap query used to embed the parent task's full
+    // objective text. When the parent was itself a gap-research task, its
+    // goal already contained a previous generation's query, so titles and
+    // queries grew one prefix per generation and every generation minted
+    // a distinct gap. The query is now composed only of what the evidence
+    // need itself is (the requirement); which run/task it belongs to
+    // stays in the structured fields (sourceRequestId = runId, and
+    // request.gapIds), and the objective is handed to research explicitly
+    // below so the research context is not lost.
     const gap = knowledgeGapService.detect({
-      query: `${objective}\n必要Evidence: ${request.requirement}`,
+      query: `必要Evidenceの取得: ${request.requirement}`,
       reason: request.requirement,
       type: 'INSUFFICIENT_EVIDENCE',
       priority: 90,
@@ -273,7 +282,12 @@ class RequiredAssetAcquisitionService {
         }),
       );
 
-      const researched = await researchService.researchGap(gap);
+      // P409 案3: research keeps the full parent context (objective +
+      // requirement, the text the gap query used to carry) through the
+      // explicit query option instead of the gap's stable identity query.
+      const researched = await researchService.researchGap(gap, {
+        query: `${objective}\n必要Evidence: ${request.requirement}`,
+      });
 
       const researchRecord =
         researched && typeof researched === 'object'

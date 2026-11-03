@@ -8503,9 +8503,9 @@
     },
     {
       "path": "src/miki/autonomy/services/autonomousRevalidationLoopService.ts",
-      "bytes": 12485,
-      "lines": 310,
-      "sha256": "ae1fed809d6b5fc2fa74e44c6468363bd911de78e5573f4df0c55278d2382ebb",
+      "bytes": 12930,
+      "lines": 318,
+      "sha256": "b413d44fc4f9ae5010941233898284ed9fc3f9af5fbea4eda0d239a585093187",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12451,9 +12451,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousIssueDiscoveryService.ts",
-      "bytes": 38364,
-      "lines": 651,
-      "sha256": "fc5f58f40c76f0676c82c6ca254807287986fae222999dd64914d8bbc2988d4f",
+      "bytes": 41108,
+      "lines": 696,
+      "sha256": "0e472e18ca34b2ca3598c8bab1cb345462f0c24fcb208065e2ddbbeed9c7f857",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17020,9 +17020,9 @@
     },
     {
       "path": "src/miki/core/services/requiredAssetAcquisitionService.ts",
-      "bytes": 28252,
-      "lines": 751,
-      "sha256": "a2ab6ec6c825524b242366ce7db68b6796f8c001c474edbe5a6b89af0bcbcb46",
+      "bytes": 29179,
+      "lines": 765,
+      "sha256": "4f9cc6b56e3ced467d5af7ff638e8011de63cedded8609c2a3f97d81cdee1bd5",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -19439,9 +19439,9 @@
     },
     {
       "path": "src/miki/execution/services/backgroundWorkerService.ts",
-      "bytes": 81254,
-      "lines": 1589,
-      "sha256": "f8d23122948005d71b22f302481b7892bfe64ab4cb667785ccacedbb609992d5",
+      "bytes": 82054,
+      "lines": 1602,
+      "sha256": "b71095625eb7bf0eeb98d9a7cb18cc4f4ccc60d290e837c6a5a1154ada4666ed",
       "relativeImportCandidates": [
         {
           "line": 10,
@@ -32972,9 +32972,9 @@
     },
     {
       "path": "src/miki/unknown/services/knowledgeGapService.ts",
-      "bytes": 24763,
-      "lines": 392,
-      "sha256": "915af59e7470b1860fdc233bb0ac94bfe5199f7449462a6c43558fcbbfed402a",
+      "bytes": 25992,
+      "lines": 412,
+      "sha256": "826f78120bc07f20885b1b2832d7f5169cce310d763a7464981e20d953b023aa",
       "relativeImportCandidates": [
         {
           "line": 1,

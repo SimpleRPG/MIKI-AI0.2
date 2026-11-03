@@ -1122,7 +1122,20 @@ export class BackgroundWorkerService {
             priority:Math.max(60,Math.min(95,Math.round(record.importance*0.75+record.changeRisk*0.25))),
             sourceRequestId:`knowledge-half-life:${claim.claim_id}`,
             requiredEvidence:['現在の時点で有効な一次資料','元Claimと取得Evidenceの主張単位照合','矛盾する新しい証拠の確認'],
-            reason:`半減期ポリシーに基づく再検証候補。stability=${record.stability}; dueAt=${record.dueAt}; lastVerifiedAt=${record.lastVerifiedAt}。Claim状態は自動で降格せず、既存CORE Research/Verifier経路へ委譲する。`,
+            // P409 案1: measured values (stability / dueAt / lastVerifiedAt)
+            // used to be embedded in the reason; every audit then changed
+            // the merged gap's reason text, and the discovery upsert treats
+            // a changed detail as a reopened issue. The values stay
+            // available from knowledgeHalfLifeService at read time.
+            reason:`半減期ポリシーに基づく再検証候補。Claim状態は自動で降格せず、既存CORE Research/Verifier経路へ委譲する。`,
+            // P409 案1: the claim is the gap's structured identity. The
+            // capability id is the claim's conversation component id, using
+            // the canonical derivation in
+            // conversationComponentCompositionService (compId for claims),
+            // so this gap aggregates with the capability revalidation
+            // loop's gap for the same claim.
+            claimIds:[claim.claim_id],
+            capabilityIds:[`conv.claim.${claim.claim_id.toLowerCase().replace(/[^a-z0-9_]/g,'_')}`],
           });
           staleClaimGapCount++;
         }

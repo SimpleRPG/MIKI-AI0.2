@@ -1,4 +1,4 @@
-import { capabilityConfidenceService, CapabilityConfidence } from '../../capability/services/capabilityConfidenceService';
+import { capabilityConfidenceService } from '../../capability/services/capabilityConfidenceService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { coreTaskIngressService } from '../../core/services/coreTaskIngressService';
@@ -64,7 +64,7 @@ export class AutonomousRevalidationLoopService {
         if (!confidence.revalidationRequired) continue;
         staleCapabilities.push(component.component_id);
         const gap = knowledgeGapService.detect({
-          query: this.buildQuery(component.component_id, confidence, options?.environment),
+          query: this.buildQuery(component.component_id),
           type: confidence.stale ? 'STALE_INFORMATION' : 'WEAK_COMPONENT',
           priority: Math.max(75, Math.min(100, Math.round(100 - confidence.confidence + confidence.failureRisk * 0.25))),
           requiredEvidence: [
@@ -73,6 +73,11 @@ export class AutonomousRevalidationLoopService {
             '必要なら再現可能な実行検証結果',
           ],
           reason: confidence.reason,
+          // P409 案1: the component id is the gap's structured identity, so
+          // re-detections of the same component aggregate into one gap
+          // regardless of how the measured confidence values moved.
+          environment: options?.environment,
+          capabilityIds: [component.component_id],
         });
         staleGapIds.add(gap.id);
       }
@@ -289,13 +294,16 @@ export class AutonomousRevalidationLoopService {
     }
   }
 
-  private buildQuery(componentId: string, confidence: CapabilityConfidence, environment?: string): string {
+  // P409 案1: the query must stay stable for the same component. Measured
+  // values (success rate, failure count, current implementation hash,
+  // environment) used to be embedded here, so every measurement change
+  // minted a new gap for the same component. Those values remain available
+  // at read time from capabilityConfidenceService.evaluate() and are not
+  // part of the gap's identity; the environment is passed to detect() as a
+  // structured field instead of query text.
+  private buildQuery(componentId: string): string {
     return [
       `Miki capability revalidation: ${componentId}`,
-      environment ? `environment=${environment}` : '',
-      `successRate=${confidence.successRate}`,
-      `failures=${confidence.failures}`,
-      confidence.currentImplementationHash ? `currentHash=${confidence.currentImplementationHash}` : '',
       '現在の仕様・公式資料・既知の失敗原因・互換性を調査し、古い経験を現在へ適用できる条件を確認する',
     ].filter(Boolean).join(' / ');
   }
