@@ -14577,9 +14577,9 @@
     },
     {
       "path": "src/miki/core/services/domainContractRegistryService.ts",
-      "bytes": 5274,
-      "lines": 34,
-      "sha256": "77b3d6b8aa8aac5c6a4eb6eb33af5055e47fa6887552dcef30cae56763338bcd",
+      "bytes": 8498,
+      "lines": 75,
+      "sha256": "982c8c2d66baaa9961403d7f4dd1d5f50a2ca6549154c4e7a2e266eafdc95ca7",
       "relativeImportCandidates": [
         {
           "line": 1,
