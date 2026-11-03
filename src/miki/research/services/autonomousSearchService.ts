@@ -514,7 +514,7 @@ export class AutonomousSearchService {
       };
     };
 
-    const attemptSearxng = async (): Promise<{ output: ProviderSearchOutput | null; retryable: boolean }> => {
+    const attemptSearxng = async (): Promise<{ output: ProviderSearchOutput | null; retryable: boolean; empty: boolean }> => {
       try {
         const searxSettings = getSearxngSearchSettings();
         const searxUrl = buildSearxngSearchUrl(searxSettings, safeQuery);
@@ -524,16 +524,19 @@ export class AutonomousSearchService {
           const reason = `HTTP ${searxRes.status}`;
           markProvider('searxng', 'FAILED', reason);
           systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 応答失敗: ${reason}`);
-          return { output: null, retryable: searxRes.status >= 500 };
+          return { output: null, retryable: searxRes.status >= 500, empty: false };
         }
 
         const searxData = await searxRes.json();
         const hits = Array.isArray(searxData?.results) ? searxData.results : [];
 
         if (hits.length === 0) {
+          // P414: no log line here. The 検索結果0件 line is emitted by
+          // runSearxng only when the pass still ends empty after the
+          // retry, so the line keeps its meaning (this search ended
+          // with no results) instead of firing per attempt.
           markProvider('searxng', 'EMPTY');
-          systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 検索結果0件');
-          return { output: null, retryable: false };
+          return { output: null, retryable: true, empty: true };
         }
 
         const results: WebSearchResultItem[] = hits.slice(0, maxResults).map((hit: any) => {
@@ -562,26 +565,38 @@ export class AutonomousSearchService {
         applyContentIndependenceClusters(results);
         markProvider('searxng', 'SUCCEEDED');
         systemLogger.info('SELF_IMPROVEMENT', `🔍 [SearXNG] 検索成功: ${results.length}件`);
-        return { output: { provider: 'searxng', results }, retryable: false };
+        return { output: { provider: 'searxng', results }, retryable: false, empty: false };
       } catch (error: any) {
         const reason = error?.name === 'TimeoutError'
           ? 'タイムアウト'
           : error?.message || String(error);
         markProvider('searxng', 'FAILED', reason);
         systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 探索経路失敗: ${reason}`);
-        return { output: null, retryable: true };
+        return { output: null, retryable: true, empty: false };
       }
     };
 
     // P361: SearXNG is the single research route (P348), so a transient
     // failure must not zero out the whole pass. Retry exactly once, and
     // only for transient causes (network error, timeout, HTTP 5xx).
+    // P414: an empty result set receives the same single retry. Under
+    // engine load or rate limiting SearXNG answers with zero results
+    // for a moment (device-observed 2026-11-04: the same queries,
+    // including the full planner text, returned results when issued
+    // manually moments later), so treating an empty answer as final
+    // made a transient zero permanent for that search while fetch
+    // failures were already retried. A pass that still ends empty
+    // logs 検索結果0件 exactly once here and stays EMPTY downstream.
     const runSearxng = async (): Promise<ProviderSearchOutput | null> => {
-      const first = await attemptSearxng();
-      if (first.output || !first.retryable) return first.output;
-      systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 一時的な失敗のため1回だけ再試行します');
-      const second = await attemptSearxng();
-      return second.output;
+      let attempt = await attemptSearxng();
+      if (!attempt.output && attempt.retryable) {
+        systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 一時的な失敗のため1回だけ再試行します');
+        attempt = await attemptSearxng();
+      }
+      if (!attempt.output && attempt.empty) {
+        systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 検索結果0件');
+      }
+      return attempt.output;
     };
 
     /*
