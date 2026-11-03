@@ -777,6 +777,12 @@ class AdaptiveRoutePlannerService {
             ...(compositionUnavailable ? {compositionGap:true,gapDescriptions} : {}),
             componentGapMeaning,
             useSearch:true,
+            // P410 T3: CORE の生成材料不足では調査は必須である。
+            // 状態決定を会話向け検索ヒューリスティクスと端末の
+            // 検索設定に委ねないよう、調査必須であることと
+            // 調査文脈（意味文）を payload で明示する。
+            researchRequired:true,
+            coreResearchQuery:componentGapMeaning,
             adaptive:true,
             priority:92
           }
@@ -824,6 +830,63 @@ class AdaptiveRoutePlannerService {
             query:researchQuestion,
             unresolvedComponents:unresolved,
             componentGap:true,
+            adaptive:true,
+            priority:94
+          }
+        });
+
+        return this.decorateOperations(task,this.uniqueOperations(routes));
+      }
+
+      /*
+       * P410 T2: 解決状態が RESEARCH_REQUIRED 以外（NO_EVIDENCE /
+       * USER_STOPPED / SEARCH_FAILED）、または質問なしの
+       * RESEARCH_REQUIRED の場合、従来はこのまま後段へ落ち、最終的に
+       * 空の経路を返してタスクは行き止まりになっていた。ここは
+       * 「生成の材料不足」という文脈であり、未知解決が材料を返さな
+       * かったことは調査未実施と等しい。プランナ側で組み立てた質問
+       * （不足内訳・対象ファイル）で RUN_RESEARCH へ進める。
+       * 調査が既に試行済み（解決より後ろに Research の記録がある）
+       * 場合はこの分岐には入らず、後段の検証・継続・再生成の判定に
+       * 委ねる（盲目的な調査の繰り返しにしないため）。
+       */
+      const researchAttemptedAfterResolution=[...task.entries].some((entry,index)=>{
+        if(index<=latestResolution.index) return false;
+        if(entry.domain!=='research') return false;
+        const operation=String(objectValue(entry)?.operation||'');
+        return operation==='EXECUTE_AUTONOMOUS_SEARCH' || operation==='RUN_RESEARCH';
+      });
+
+      if(
+        !latestResearchAfterResolution &&
+        !researchAttemptedAfterResolution &&
+        ['NO_EVIDENCE','USER_STOPPED','SEARCH_FAILED','RESEARCH_REQUIRED'].includes(resolutionStatus)
+      ){
+        const escalationQuestion=
+          researchQuestion ||
+          (gapDescriptions.length>0
+            ? gapDescriptions.join(' / ')
+            : unresolved.length>0
+              ? buildCodeComponentGapMeaning(unresolved)
+              : buildCompositionGapMeaning({
+                  goal:task.goal,
+                  targetPaths:coreTargetPaths,
+                  gapDescriptions,
+                  gapReason:String(gapValue?.synthesisGapReason||''),
+                }));
+
+        routes.push({
+          target:'research',
+          command:'RUN_RESEARCH',
+          reason:`CORE re-evaluated UNKNOWN resolution (${resolutionStatus||'UNKNOWN_STATUS'}) for a code-composition shortage and escalated to Research with a planner-built question because the resolution returned no usable material`,
+          payload:{
+            taskId:task.taskId,
+            query:escalationQuestion,
+            unresolvedComponents:unresolved,
+            componentGap:true,
+            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions} : {}),
+            unknownResolutionStatus:resolutionStatus,
+            coreDirectedResearch:true,
             adaptive:true,
             priority:94
           }
@@ -914,7 +977,12 @@ class AdaptiveRoutePlannerService {
         .map((entry,index)=>({entry,index}))
         .reverse()
         .find(({entry,index})=>{
-          if(index<=latestResearchAfterResolution!.index) return false;
+          // P410 T1: 調査が未実行の場合 latestResearchAfterResolution は
+          // undefined であり、従来はこの .index 参照が TypeError となり
+          // 計画段全体が例外で死んでいた（実機: RESOLVE_UNKNOWN 後の
+          // 空サイクル→plateau→PAUSED/NO_PROGRESS）。基準エントリが
+          // 無い場合は「検証記録なし」として探索を進める。
+          if(index<=(latestResearchAfterResolution?.index ?? -1)) return false;
           if(entry.domain!=='verification') return false;
           if(entry.kind!=='RESULT' && entry.kind!=='OBSERVATION') return false;
 

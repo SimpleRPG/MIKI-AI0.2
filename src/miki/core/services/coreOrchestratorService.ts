@@ -39,7 +39,7 @@ import { workspaceTscAndIsolationE2EService } from '../../selfDevelopment/servic
 import { canaryPostReviewVerificationService } from '../../selfDevelopment/services/canaryPostReviewVerificationService';
 import { autonomousE2EProofSuiteService } from '../../selfDevelopment/services/autonomousE2EProofSuiteService';
 import { storageService } from '../../../services/storageService';
-import { systemLogger } from '../../../services/systemLogger';
+import { systemLogger, errorHeadline } from '../../../services/systemLogger';
 import { cognitiveStateCheckpointService } from '../../autonomy/services/operationalGovernanceService';
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
@@ -376,12 +376,25 @@ class CoreOrchestratorService {
     .catch((error)=>{
       const task=taskBlackboardService.get(taskId);
       const failureTask=task??resumed;
+      // P410 T6: leave the exception headline in the run record too,
+      // not only in the (possibly omitted) log details.
+      try{
+        taskBlackboardService.append(taskId,'ERROR','core','coreTaskException',{
+          schemaVersion:1,
+          stage:'RESUME',
+          errorName:error instanceof Error?error.name:'UnknownError',
+          headline:errorHeadline(error),
+          recordedAt:Date.now()
+        });
+      }catch{/* recording must never mask the original error */}
       const payloadValue=failureTask.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
       const payload=payloadValue&&typeof payloadValue==='object'&&!Array.isArray(payloadValue)
         ? payloadValue as Record<string,unknown> : {};
       systemLogger.error(
         'SYSTEM',
-        `[RUNTIME_FAILURE] CORE task threw: ${taskId}`,
+        // P410 T6: exception headline in the message itself; details
+        // are omitted from exported logs when large.
+        `[RUNTIME_FAILURE] CORE task threw: ${taskId} (${errorHeadline(error)})`,
         {
           taskId,
           requestId:reqId,
@@ -1190,7 +1203,27 @@ class CoreOrchestratorService {
    const planningTask=goalDecision.selectedGoal&&goalDecision.selectedGoal!==current.goal
      ? {...current,goal:goalDecision.selectedGoal}
      : current;
-   let routes=adaptiveRoutePlannerService.plan(planningTask).filter(route=>{
+   // P410 T6: a planner exception used to kill the cycle with no
+   // blackboard record at all (the cycle looked "empty" and fed the
+   // plateau guard). Record the exception headline on the task before
+   // rethrowing, so the run detail shows what actually happened.
+   let plannedRoutes: ReturnType<typeof adaptiveRoutePlannerService.plan>;
+   try{
+     plannedRoutes=adaptiveRoutePlannerService.plan(planningTask);
+   }catch(error){
+     try{
+       taskBlackboardService.append(taskId,'ERROR','core',`corePlanException:${cycles}`,{
+         schemaVersion:1,
+         stage:'PLAN',
+         cycle:cycles,
+         errorName:error instanceof Error?error.name:'UnknownError',
+         headline:errorHeadline(error),
+         recordedAt:Date.now()
+       });
+     }catch{/* recording must never mask the original error */}
+     throw error;
+   }
+   let routes=plannedRoutes.filter(route=>{
      const latestFailure=[...planningTask.entries]
        .reverse()
        .find(entry=>{
@@ -1618,7 +1651,8 @@ class CoreOrchestratorService {
       const task=taskBlackboardService.get(taskId);
       systemLogger.error(
         'SYSTEM',
-        `[RUNTIME_FAILURE] domain dispatch threw: ${taskId}`,
+        // P410 T6: exception headline in the message itself.
+        `[RUNTIME_FAILURE] domain dispatch threw: ${taskId} (${errorHeadline(error)})`,
         {
           taskId,
           cycle:cycles,

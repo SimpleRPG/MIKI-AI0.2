@@ -143,6 +143,19 @@ const MAX_PERSISTED_LOG_CHARS = 512 * 1024;
 const MAX_LOG_MESSAGE_CHARS = 1024;
 const MAX_LOG_DETAIL_CHARS = 768;
 
+/**
+ * P410 T6: one-line exception headline (name + message) for log
+ * message strings. Log details above MAX_LOG_DETAIL_CHARS are omitted
+ * from exported logs, so an exception that exists only inside details
+ * is invisible from outside the device; the headline keeps the kind
+ * and cause readable in the message itself.
+ */
+export function errorHeadline(error: unknown, maxLength = 200): string {
+  const raw = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  const singleLine = raw.replace(/[\r\n\t]+/g, ' ').trim();
+  return singleLine.length > maxLength ? `${singleLine.slice(0, maxLength)}…` : singleLine;
+}
+
 class SystemLogger {
   private logs: SystemLogEntry[] = [];
   private maxLogs = 200;

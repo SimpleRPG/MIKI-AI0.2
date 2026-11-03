@@ -1,5 +1,5 @@
 import { storageService } from '../../../services/storageService';
-import { systemLogger } from '../../../services/systemLogger';
+import { systemLogger, errorHeadline } from '../../../services/systemLogger';
 import { coreTaskIngressService } from './coreTaskIngressService';
 import { taskBlackboardService } from './taskBlackboardService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
@@ -609,6 +609,25 @@ class AutonomousSelfImprovementLoopService {
           this.save();
           continue;
         }
+        // P410 T4: if research dispatched during THIS execution came
+        // back with no admissible evidence because the source backend
+        // was unreachable (SearXNG down: outcome SOURCE_UNAVAILABLE /
+        // NO_RESULT), the missing piece is evidence infrastructure,
+        // not task progress. Parking the request in the existing
+        // WAITING_EVIDENCE ladder (instead of failOrRetry) keeps the
+        // attempt accounting honest, gives the outage a unique,
+        // recorded, retryable reason, and stops the task from
+        // accumulating plateau empty cycles until the backend returns.
+        // Like the P405 budget classification, only entries appended
+        // by THIS execution are inspected.
+        const researchUnavailableOutcome = this.researchUnavailableOutcomeThisExecution(
+          workflow.task,
+          entriesBeforeExecution,
+        );
+        if (researchUnavailableOutcome) {
+          this.waitForEvidence(request, `RESEARCH_SOURCE_UNAVAILABLE:${researchUnavailableOutcome}`, false);
+          continue;
+        }
         this.failOrRetry(request, `WORKFLOW_${workflow.task.status}`);
         continue;
       }
@@ -638,7 +657,9 @@ class AutonomousSelfImprovementLoopService {
 
       systemLogger.error(
         'SELF_IMPROVEMENT',
-        '[RUNTIME_FAILURE] AutonomousLoop cycle stopped',
+        // P410 T6: exception headline in the message itself; details
+        // are omitted from exported logs when large.
+        `[RUNTIME_FAILURE] AutonomousLoop cycle stopped (${errorHeadline(error)})`,
         {
           requestId:activeRequest?.id,
           runId:activeRequest?.runId,
@@ -880,6 +901,48 @@ class AutonomousSelfImprovementLoopService {
       },
       [...new Set([...subgoals.flatMap(subgoal => subgoal.evidenceIds), ...evidenceIds])],
     );
+  }
+
+  /**
+   * P410 T4: returns the research outcome ('SOURCE_UNAVAILABLE' /
+   * 'NO_RESULT') when research dispatched at or after
+   * `entriesBeforeExecution` produced no admissible evidence, else
+   * undefined. Only the current execution's entries are inspected so
+   * a stale outage in the task history cannot reclassify later pauses.
+   */
+  private researchUnavailableOutcomeThisExecution(
+    task: { entries: Array<{ domain: string; kind: string; value: unknown; evidenceIds?: string[] }> },
+    entriesBeforeExecution: number,
+  ): string | undefined {
+    return task.entries
+      .slice(entriesBeforeExecution)
+      .reduce<string | undefined>((found, entry) => {
+        if (found) return found;
+        if (entry.domain !== 'research') return undefined;
+        if (entry.kind !== 'RESULT' && entry.kind !== 'OBSERVATION') return undefined;
+        const value = entry.value && typeof entry.value === 'object'
+          ? entry.value as Record<string, unknown>
+          : undefined;
+        if (!value) return undefined;
+        const operation = String(value.operation || '');
+        if (operation !== 'RUN_RESEARCH' && operation !== 'EXECUTE_AUTONOMOUS_SEARCH') return undefined;
+        const reply = value.reply && typeof value.reply === 'object'
+          ? value.reply as Record<string, unknown>
+          : undefined;
+        const data = reply?.data && typeof reply.data === 'object'
+          ? reply.data as Record<string, unknown>
+          : undefined;
+        const outcome = String(data?.outcome || reply?.outcome || value.outcome || '').toUpperCase();
+        if (outcome !== 'SOURCE_UNAVAILABLE' && outcome !== 'NO_RESULT') return undefined;
+        const admissibleEvidence =
+          (Array.isArray(data?.evidenceIds) ? data.evidenceIds.length : 0) +
+          (Array.isArray(data?.evidence)
+            ? data.evidence.filter(item => item && typeof item === 'object' && (item as Record<string, unknown>).status !== 'REJECTED').length
+            : 0) +
+          (entry.evidenceIds || []).length;
+        if (admissibleEvidence > 0) return undefined;
+        return outcome;
+      }, undefined);
   }
 
   private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string, generation: number): Promise<void> {

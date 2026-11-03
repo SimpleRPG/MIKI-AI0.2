@@ -12217,9 +12217,9 @@
     },
     {
       "path": "src/miki/core/services/adaptiveRoutePlannerService.ts",
-      "bytes": 141338,
-      "lines": 3150,
-      "sha256": "cdd89f19d616ac97c6dbed2c9e9f4e9a7437de9dde6174ac2434effbbe0eb760",
+      "bytes": 144955,
+      "lines": 3218,
+      "sha256": "aad81690715f6b70c92fe220907fa2c99c1115c56226de1ae4235bb7d03543e8",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12546,9 +12546,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 51988,
-      "lines": 1100,
-      "sha256": "fdc579db2e5fcd236fba63646e4873c22ae76b15e1619aee42f97568695b0843",
+      "bytes": 55361,
+      "lines": 1163,
+      "sha256": "dc5cc7a848520a8bb75b94328ff21e7bf75893ce010ce7585125326badf93d24",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -13736,9 +13736,9 @@
     },
     {
       "path": "src/miki/core/services/coreOrchestratorService.ts",
-      "bytes": 116806,
-      "lines": 2057,
-      "sha256": "a73b73fcebaba3586f08009076d9ecadeba207f790f64761fff33511e44da47a",
+      "bytes": 118368,
+      "lines": 2091,
+      "sha256": "d4e88b79517d1d3bb0e615ca88ba7d590fb220ba736f64a7dd566e157b4ee76f",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14606,9 +14606,9 @@
     },
     {
       "path": "src/miki/core/services/domainIntegrationBootstrapService.ts",
-      "bytes": 61471,
+      "bytes": 61647,
       "lines": 909,
-      "sha256": "2d53a04a5e40a07dcc7999cfc877527ecd8eeb6b263420914a616028a0583cc0",
+      "sha256": "63260051c5650af8573592f57032104e169af49438e0b3e54588f9c653e29996",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -15369,9 +15369,9 @@
     },
     {
       "path": "src/miki/core/services/domainRouterService.ts",
-      "bytes": 17365,
-      "lines": 244,
-      "sha256": "eafd72cdab0e1d749cb324285443d2a7a49777809e9b1bffb2a7a30c5998de35",
+      "bytes": 22143,
+      "lines": 348,
+      "sha256": "6b8d9999263a4b2057e150f7239e79d2c3a8c6ead1f91eb2f48d65aa2a427d5e",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -33065,9 +33065,9 @@
     },
     {
       "path": "src/miki/unknown/services/unifiedUnknownResolutionCoordinatorService.ts",
-      "bytes": 6069,
-      "lines": 136,
-      "sha256": "9b04595d151546ea4cbbf6127c9c9ee44d61c495b3ef709ba6bfe990271f3ac3",
+      "bytes": 7877,
+      "lines": 170,
+      "sha256": "b7e3dad7922ad1407dd760a671a7d8f0c6d0f47c6edfb05e16950ca29d838a71",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -35486,9 +35486,9 @@
     },
     {
       "path": "src/services/systemLogger.ts",
-      "bytes": 42372,
-      "lines": 1047,
-      "sha256": "daa56f031bd65d014f4dfbc212099b06ec86793db8ffd864e437bfa5b0b09b51",
+      "bytes": 43021,
+      "lines": 1060,
+      "sha256": "a4424eba6438eb283a6dcdcd1844be30fd630a848e6dee29b5ab436e35269f2d",
       "relativeImportCandidates": [
         {
           "line": 1,

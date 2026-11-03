@@ -48,9 +48,15 @@ const MAX_DEPTH=18;
 // P367: upper bound for one domain handler dispatch (see dispatch()).
 const HANDLER_TIMEOUT_MS=10*60_000;
 const MAX_HISTORY=2000;
+// P410 T5: in-flight dispatch records survive an app backgrounding/kill
+// so an interrupted dispatch is recoverable instead of silently lost,
+// and the handler timeout counts foreground (active) time only.
+const INFLIGHT_KEY='miki_domain_router_inflight_v1';
+const HANDLER_TIMEOUT_SAMPLE_MS=250;
 
 type DomainHistoryEntry={envelope:DomainEnvelope;reply:DomainReply};
 type DomainHistoryIndexEntry={id:string;segmentKey:string;createdAt:number};
+export type DomainInFlightRecord={envelopeId:string;correlationId:string;target:string;command:string;taskId?:string;startedAt:number};
 
 class DomainRouterService {
   private handlers=new Map<MikiDomain,DomainHandler>();
@@ -63,8 +69,10 @@ class DomainRouterService {
   private historyPersistTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingHistoryCheckpoint: Pick<DomainEnvelope, 'command' | 'source' | 'target'> | null = null;
   private historyMigrationStarted=false;
+  private inFlight=new Map<string,DomainInFlightRecord>();
+  private interruptedDispatches:DomainInFlightRecord[]=[];
 
-  constructor(){this.load();}
+  constructor(){this.load();this.recoverInFlight();}
 
   register(domain:MikiDomain,commands:DomainCommand[],handler:DomainHandler):void{
     this.handlers.set(domain,handler);
@@ -101,16 +109,112 @@ class DomainRouterService {
     if(!registration.commands.includes(envelope.command))return this.finish(envelope,{accepted:false,domain:envelope.target,command:envelope.command,error:'DOMAIN_COMMAND_NOT_SUPPORTED',completedAt:Date.now()});
     governanceKernelService.begin(envelope);
     crossDomainCirculationService.record(envelope.source,envelope.target,`ROUTE_${envelope.command}`,envelope.evidenceIds[0]);
+    // P410 T5: persist the in-flight dispatch before awaiting. If the
+    // app is backgrounded/killed mid-dispatch, the record survives and
+    // is surfaced as an interrupted dispatch on the next start instead
+    // of the work vanishing without a trace.
+    this.trackInFlightStart(envelope);
     // P367: handlers were awaited with no timeout, so one hung
     // handler stalled its task at DISPATCH_START forever. Bound the
     // wait; a timeout completes as a retryable rejection and the
     // late handler result is discarded.
+    // P410 T5: the bound counts foreground (active) time only. JS
+    // timers freeze while the app is backgrounded, so a wall-clock
+    // timeout fired immediately on resume and discarded research
+    // that had only just resumed (device: DOMAIN_HANDLER_TIMEOUT
+    // returned ~35 min after dispatch for a 10 min limit).
     const handlerPromise=handler(envelope);
-    const timeoutPromise=new Promise<DomainReply>(resolve=>setTimeout(()=>resolve({accepted:false,domain:envelope.target,command:envelope.command,error:'DOMAIN_HANDLER_TIMEOUT',completedAt:Date.now()}),HANDLER_TIMEOUT_MS));
-    try{return this.finish(envelope,await Promise.race([handlerPromise,timeoutPromise]));}
+    const timeout=this.createHandlerTimeout(envelope);
+    try{return this.finish(envelope,await Promise.race([handlerPromise,timeout.promise]));}
     catch(error){return this.finish(envelope,{accepted:false,domain:envelope.target,command:envelope.command,error:String(error),completedAt:Date.now()});}
-    finally{governanceKernelService.end(envelope);}
+    finally{timeout.cancel();this.trackInFlightEnd(envelope);governanceKernelService.end(envelope);}
   }
+
+  private isDocumentHidden():boolean{
+    return typeof document!=='undefined'&&document.hidden===true;
+  }
+
+  private createHandlerTimeout(envelope:DomainEnvelope):{promise:Promise<DomainReply>;cancel:()=>void}{
+    let timer:ReturnType<typeof setTimeout>|null=null;
+    let settled=false;
+    let activeMs=0;
+    let lastSampleAt=Date.now();
+    let wasHidden=this.isDocumentHidden();
+    const onVisibilityChange=()=>{
+      const now=Date.now();
+      if(this.isDocumentHidden()){
+        if(!wasHidden)activeMs+=now-lastSampleAt;
+        wasHidden=true;
+      }else{
+        wasHidden=false;
+      }
+      lastSampleAt=now;
+    };
+    const promise=new Promise<DomainReply>(resolve=>{
+      const sample=()=>{
+        if(settled)return;
+        const now=Date.now();
+        const hidden=this.isDocumentHidden();
+        if(!hidden&&!wasHidden)activeMs+=now-lastSampleAt;
+        lastSampleAt=now;
+        wasHidden=hidden;
+        if(activeMs>=HANDLER_TIMEOUT_MS){
+          settled=true;
+          resolve({accepted:false,domain:envelope.target,command:envelope.command,error:'DOMAIN_HANDLER_TIMEOUT',completedAt:Date.now()});
+          return;
+        }
+        timer=setTimeout(sample,HANDLER_TIMEOUT_SAMPLE_MS);
+      };
+      timer=setTimeout(sample,HANDLER_TIMEOUT_SAMPLE_MS);
+    });
+    if(typeof document!=='undefined'&&typeof document.addEventListener==='function')document.addEventListener('visibilitychange',onVisibilityChange);
+    return {
+      promise,
+      cancel:()=>{
+        settled=true;
+        if(timer)clearTimeout(timer);
+        if(typeof document!=='undefined'&&typeof document.removeEventListener==='function')document.removeEventListener('visibilitychange',onVisibilityChange);
+      },
+    };
+  }
+
+  private trackInFlightStart(envelope:DomainEnvelope):void{
+    const taskId=typeof envelope.payload?.taskId==='string'?envelope.payload.taskId:undefined;
+    this.inFlight.set(envelope.envelopeId,{envelopeId:envelope.envelopeId,correlationId:envelope.correlationId,target:envelope.target,command:envelope.command,taskId,startedAt:Date.now()});
+    this.persistInFlight();
+  }
+
+  private trackInFlightEnd(envelope:DomainEnvelope):void{
+    if(this.inFlight.delete(envelope.envelopeId))this.persistInFlight();
+  }
+
+  private persistInFlight():void{
+    try{
+      if(this.inFlight.size===0)storageService.removeItem(INFLIGHT_KEY);
+      else storageService.setItem(INFLIGHT_KEY,JSON.stringify([...this.inFlight.values()]));
+    }catch(error){systemLogger.warn('SELF_IMPROVEMENT','[DomainRouter] in-flight persistence failed',String(error));}
+  }
+
+  private recoverInFlight():void{
+    let raw:string|null=null;
+    try{raw=storageService.getItem(INFLIGHT_KEY);}catch{raw=null;}
+    if(!raw)return;
+    try{
+      const parsed:unknown=JSON.parse(raw);
+      if(Array.isArray(parsed)){
+        this.interruptedDispatches=parsed.filter((item):item is DomainInFlightRecord=>
+          Boolean(item&&typeof item==='object'&&typeof (item as DomainInFlightRecord).envelopeId==='string'&&typeof (item as DomainInFlightRecord).startedAt==='number')
+        );
+      }
+    }catch{this.interruptedDispatches=[];}
+    try{storageService.removeItem(INFLIGHT_KEY);}catch{/* best effort */}
+    for(const record of this.interruptedDispatches){
+      systemLogger.warn('SELF_IMPROVEMENT',`[DomainRouter] interrupted dispatch recovered: ${record.target}/${record.command} envelope=${record.envelopeId} ageMs=${Math.max(0,Date.now()-record.startedAt)}`,{...record});
+    }
+  }
+
+  /** P410 T5: dispatches that were in flight when the previous process stopped. */
+  getInterruptedDispatches():DomainInFlightRecord[]{return this.interruptedDispatches.map(record=>({...record}));}
 
   getRegistrations():DomainRegistration[]{return [...this.registrations.values()].map(x=>({...x,commands:[...x.commands]}));}
   getMissingDomains(all:MikiDomain[]):MikiDomain[]{return all.filter(d=>!this.handlers.has(d));}

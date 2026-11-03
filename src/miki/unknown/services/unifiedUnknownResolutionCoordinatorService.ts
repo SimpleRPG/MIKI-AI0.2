@@ -15,6 +15,14 @@ export interface UnifiedUnknownRequest {
   /** 解析Componentが報告した未解決語。キーワード判定に掛からなくても調査根拠にする。 */
   unknownTerms?: string[];
   hasAttachments: boolean;
+  /**
+   * P410 T3: CORE（自律改善）の生成材料不足など、会話ではない文脈から
+   * 「調査が必須」と明示された要求。true の場合、状態決定に会話向け
+   * 検索ヒューリスティクスを使わず RESEARCH_REQUIRED を直接返す。
+   */
+  researchRequired?: boolean;
+  /** researchRequired 時に使う調査クエリ（未指定なら question を使う）。 */
+  coreResearchQuery?: string;
   confirmRetry?: (message: string) => boolean | Promise<boolean>;
   onProgress?: (message: string, details?: Record<string, unknown>) => void;
 }
@@ -50,6 +58,32 @@ class UnifiedUnknownResolutionCoordinatorService {
         status: 'REUSED_SUPPORTED',
         evidenceCount: reused.evidence.length,
         routes,
+      };
+    }
+
+    /*
+     * P410 T3: CORE 文脈で調査必須が明示された場合は、会話向け
+     * ヒューリスティクス（detectNeedForSearch）と端末の検索設定に
+     * 状態決定を委ねない。分類経路へ WEB を含めたうえで
+     * RESEARCH_REQUIRED を直接返す。再試行可否は CORE 側の
+     * 再試行ガバナンス（負の知識の時間窓）が担うため、会話用の
+     * shouldRetryQuery／確認コールバックは使わない（ドメイン経路
+     * には確認手段がなく、従来は USER_STOPPED に化けていた）。
+     */
+    if (request.researchRequired) {
+      const query = String(request.coreResearchQuery || request.question || '').trim();
+      const coreRoutes: ResolutionRoute[] = routes.includes('WEB') ? routes : ['WEB', ...routes];
+      unknownResolutionService.attempt(resolution.id, 'WEB', `CORE指示の調査待ち: ${query}`, { query });
+      request.onProgress?.(`CORE指示によりWeb調査が必要: ${query}`, { unknownId: resolution.id, route: 'WEB' });
+      return {
+        effectiveText: request.question,
+        resolution,
+        status: 'RESEARCH_REQUIRED',
+        evidenceCount: 0,
+        query,
+        researchQuestion: query,
+        unresolvedRequirements: [`RESEARCH_REQUIRED:${query}`],
+        routes: coreRoutes,
       };
     }
 
