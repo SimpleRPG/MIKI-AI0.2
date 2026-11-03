@@ -2,7 +2,7 @@ import { canonicalSha256Object } from '../../core/services/canonicalSha256Servic
 import { semanticGraphCoreP208Service, type SemanticCandidate, type SemanticGraphState } from '../../core/services/semanticGraphCoreP208Service';
 import { semanticDictionaryGraphP209Service } from '../../core/services/semanticDictionaryGraphP209Service';
 import { conversationComponentPipelineService } from './conversationComponentPipelineService';
-import { contentTermsFromTokens } from '../../research/services/japaneseAnalysisService';
+import { contentTermsFromTokens, type JapaneseToken } from '../../research/services/japaneseAnalysisService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { dictionaryBootstrapService } from '../../research/services/dictionaryBootstrapService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
@@ -110,7 +110,7 @@ class ConversationGraphRuntimeP212Service {
    const unknownReceipt=unknownGraphConnectorP211Service.connect({eventKind:'UNKNOWN',subjectId:`unknown:${turnId}`,payload:{taskId,text,candidates:semantic.candidates},confidence:.8,uncertainty:.7,sourceRefs:[inputReceipt.eventSha256],participantDomains:['conversation','research'],relatedNodeIds:[...inputReceipt.createdNodeIds,...gapUnknownNodeIds]});
    researchGraphConnectorP211Service.connect({eventKind:'ACTION',subjectId:`research:${turnId}`,payload:{taskId,question:text,reason:semantic.requiresResearch?'SEMANTIC_CANDIDATE_NOT_ACCEPTED':'LANGUAGE_COMPONENT_GAP',gaps:languageComponents.gaps},confidence:.82,uncertainty:.35,sourceRefs:[inputReceipt.eventSha256],participantDomains:['conversation','unknown','verification'],relatedNodeIds:[...inputReceipt.createdNodeIds,...gapUnknownNodeIds,...unknownReceipt.createdNodeIds]});
   }
-  const selfInquiryAnswer=this.computeSelfInquiry(text);
+  const selfInquiryAnswer=this.computeSelfInquiry(text,{terms:effectiveTerms,tokens:analysis.analysis?.tokens??[],hasQuestion:analysis.analysis?.hasQuestion??false});
   const base={turnId,inputReceiptSha256:inputReceipt.receiptSha256,semanticReceiptSha256:semantic.receiptSha256,usedComponentIds:analysis.usedComponentIds,selectedConceptId:semantic.selected?.conceptId,requiresResearch:semantic.requiresResearch,graphSha256:crossDomainGraphConnectionP211Service.snapshot().graphSha256};
   const receipt={...base,receiptSha256:canonicalSha256Object(base)};this.inputByTask.set(taskId,{...receipt,inputNodeIds:inputReceipt.createdNodeIds,inputSurface:text.slice(0,512),constraintIds:languageComponents.constraintIds,intentIds:languageComponents.intentIds,grammarIds:languageComponents.grammarIds,meaningComponentIds:languageComponents.components.map(component=>component.componentId),contentTerms:effectiveTerms,selfInquiryAnswer});conversationGraphCompletionP214Service.save(crossDomainGraphConnectionP211Service.snapshot());return receipt;
  }
@@ -149,41 +149,136 @@ class ConversationGraphRuntimeP212Service {
  // answered. The computed answer is offered to finalization, which
  // still puts it through the same meaning validation as any
  // candidate (see coreTaskIngressService).
- private computeSelfInquiry(text:string):string|undefined {
+ // P411: intake is no longer limited to the fixed phrasings the
+ // P396 patterns enumerate. The patterns stay as a fast path; a
+ // meaning path (computeSelfInquiryByMeaning) judges the same five
+ // kinds by referent and intent over the analysis this intake
+ // already produced, using the concept assets of P389/P390. Both
+ // paths compute through the same builders below, so the answer
+ // text is identical whichever path fires. A wording with no real
+ // semantic path to a store stays unanswered by design — 言い換え
+ // shares no WordNet synset with 言い回し in the bundled assets,
+ // so it is not aliased to the phrasing store here.
+ private computeSelfInquiry(text:string,semantic?:{terms:string[];tokens:JapaneseToken[];hasQuestion:boolean}):string|undefined {
+  const byPattern=this.computeSelfInquiryByPattern(text);
+  if(byPattern!==undefined)return byPattern;
+  if(!semantic)return undefined;
+  return this.computeSelfInquiryByMeaning(semantic);
+ }
+ private selfInquiryDictionaryAnswer(term:string):string {
+  const hits=japaneseDictionaryService.lookup(term);
+  if(hits.length){const entry=hits[0];const gloss=entry.gloss?entry.gloss.slice(0,80):'';return `『${term}』は辞書に載っています。${entry.reading?`読みは「${entry.reading}」です。`:''}${gloss?`意味は「${gloss}」です。`:''}`.trim()}
+  return `『${term}』は手元の辞書には載っていません。サーバー側の全量辞書に問い合わせておきます。`;
+ }
+ private selfInquirySurfaceCountAnswer():string {
+  const summary=surfaceVariationService.getAllCategoriesSummary();
+  const total=summary.reduce((n,c)=>n+c.totalCount,0);const dynamic=summary.reduce((n,c)=>n+c.dynamicCount,0);
+  return `言い回しは全部で${total}件あります。そのうち、学習で増えたものが${dynamic}件です。`;
+ }
+ private selfInquiryDictionaryCountAnswer():string {
+  const stats=japaneseDictionaryService.getStats();
+  return `辞書には全部で${stats.builtin+stats.personal+stats.imported}件の語が載っています。`;
+ }
+ private selfInquiryClaimCountAnswer():string {
+  return `今、知識として登録されている主張は${claimDatabaseService.listClaims().length}件です。`;
+ }
+ private selfInquiryRecallAnswer():string {
+  const nodes=crossDomainGraphConnectionP211Service.snapshot().nodes||[];
+  // The snapshot's node order is not chronological (P398 device
+  // follow-up: result nodes sit scattered in the array), so pick
+  // the response whose task id is newest rather than the last
+  // array element. Task ids are TASK-<ms>-<sequence>.
+  let bestAnswer: string|undefined;let bestMs=-1;let bestSeq=-1;let bestIndex=-1;
+  nodes.forEach((node,index)=>{const payload=node.payload as {response?:unknown;taskId?:unknown};if(!payload||typeof payload.response!=='string'||!payload.response.trim())return;let ms=-1;let seq=-1;if(typeof payload.taskId==='string'){const parts=payload.taskId.split('-');if(parts.length>=3){ms=Number(parts[1])||-1;seq=Number(parts[2])||-1}}if(ms>bestMs||(ms===bestMs&&seq>bestSeq)||(ms===bestMs&&seq===bestSeq&&index>bestIndex)){bestMs=ms;bestSeq=seq;bestIndex=index;bestAnswer=payload.response.trim()}});
+  if(bestAnswer)return `さっきの話では、直前は『${bestAnswer.slice(0,120)}${bestAnswer.length>120?'…':''}』と答えました。`;
+  return 'さっきの話については、まだ答えた記録がありません。';
+ }
+ private computeSelfInquiryByPattern(text:string):string|undefined {
   const value=text.trim();
   const dictMatch=value.match(/(.{1,24}?)(?:は|って)(?:辞書|じしょ)に(?:ある|載って|入って)/u);
   if(dictMatch){
    const term=dictMatch[1].replace(/^(この|その|あの)/u,'').trim();
-   if(term){
-    const hits=japaneseDictionaryService.lookup(term);
-    if(hits.length){const entry=hits[0];const gloss=entry.gloss?entry.gloss.slice(0,80):'';return `『${term}』は辞書に載っています。${entry.reading?`読みは「${entry.reading}」です。`:''}${gloss?`意味は「${gloss}」です。`:''}`.trim()}
-    return `『${term}』は手元の辞書には載っていません。サーバー側の全量辞書に問い合わせておきます。`;
+   if(term)return this.selfInquiryDictionaryAnswer(term);
+  }
+  if(/(言い回し|表現)は(?:何件|いくつ)/u.test(value))return this.selfInquirySurfaceCountAnswer();
+  if(/(?:辞書|単語)に?は(?:何件|何語|いくつ)/u.test(value))return this.selfInquiryDictionaryCountAnswer();
+  if(/(?:主張|知識)は(?:何件|いくつ)/u.test(value))return this.selfInquiryClaimCountAnswer();
+  if(/さっき(?:何て|なんて|何を|何の話|なんの話|どんな話)/u.test(value)||/(?:何の話|なんの話)(?:してた|だった)/u.test(value)||/前の答え|直前の答え|さっきの答え/u.test(value))return this.selfInquiryRecallAnswer();
+  return undefined;
+ }
+ // P411 meaning path. Referent: which of MIKI's own stores the
+ // question is about. A content term refers directly when it is
+ // the store's own designation (or its reading), and through a
+ // concept when it shares a WordNet synset with the designation
+ // (P389/P390 assets). Following the P390 convention, a concept
+ // match scores 0.8 against a direct match's 1.0, and a candidate
+ // is accepted only at 0.75 or above; a tie between different
+ // kinds abstains rather than guessing. Intent is read from
+ // grammatical features of the analysis, not from phrasing
+ // templates: a quantity interrogative （何+助数詞 is a closed
+ // class; 幾つ is its other form) or a bare count noun asks for a
+ // count, an existence predicate inside a question asks whether a
+ // word is held, and a deictic together with a discourse noun
+ // asks for the previous answer. Requests and outside subjects
+ // carry no store referent, so they never become candidates.
+ private computeSelfInquiryByMeaning(semantic:{terms:string[];tokens:JapaneseToken[];hasQuestion:boolean}):string|undefined {
+  const terms=semantic.terms;const tokens=semantic.tokens;
+  const countIntent=tokens.some(token=>/^何[件個語名冊台人回種本枚匹頭羽]/u.test(token.surface)||token.surface==='数'||token.surface==='件数'||token.surface==='語数'||token.lemma==='幾つ'||token.surface==='幾つ'||token.surface==='いくつ');
+  const existencePredicate=tokens.some(token=>token.lemma==='有る'||token.lemma==='ある'||token.lemma==='入る'||token.surface.startsWith('載'));
+  const deictic=terms.some(term=>term==='さっき'||term==='先ほど'||term==='直前')||tokens.some(token=>token.surface.startsWith('さっき')||token.surface.startsWith('先ほど'));
+  const discourseNoun=tokens.some(token=>token.surface==='話'||token.surface==='答え')||terms.some(term=>term==='答え'||term==='話');
+  const lookupIntent=semantic.hasQuestion&&existencePredicate;
+  const recallIntent=semantic.hasQuestion&&deictic&&discourseNoun;
+  if(!countIntent&&!lookupIntent&&!recallIntent)return undefined;
+  const stores:{kind:'SURFACE'|'DICTIONARY'|'CLAIMS';anchors:string[]}[]=[
+   {kind:'SURFACE',anchors:['言い回し']},
+   {kind:'DICTIONARY',anchors:['辞書']},
+   {kind:'CLAIMS',anchors:['主張','知識']},
+  ];
+  const anchorForms=new Map<string,Set<string>>();const anchorConcepts=new Map<string,Set<string>>();
+  for(const store of stores){
+   const forms=new Set<string>();const concepts=new Set<string>();
+   for(const anchor of store.anchors){
+    forms.add(anchor);
+    const reading=japaneseDictionaryService.lookup(anchor)[0]?.reading;if(reading)forms.add(reading);
+    for(const id of japaneseDictionaryService.conceptIdsFor(anchor))concepts.add(id);
+   }
+   anchorForms.set(store.kind,forms);anchorConcepts.set(store.kind,concepts);
+  }
+  const referentScore=new Map<string,number>();const matchedTerms=new Set<string>();
+  for(const term of terms){
+   const termConcepts=japaneseDictionaryService.conceptIdsFor(term);
+   for(const store of stores){
+    if(anchorForms.get(store.kind)!.has(term)){referentScore.set(store.kind,1);matchedTerms.add(term)}
+    else if(anchorConcepts.get(store.kind)!.size&&termConcepts.some(id=>anchorConcepts.get(store.kind)!.has(id))){if((referentScore.get(store.kind)??0)<0.8)referentScore.set(store.kind,0.8);matchedTerms.add(term)}
    }
   }
-  if(/(言い回し|表現)は(?:何件|いくつ)/u.test(value)){
-   const summary=surfaceVariationService.getAllCategoriesSummary();
-   const total=summary.reduce((n,c)=>n+c.totalCount,0);const dynamic=summary.reduce((n,c)=>n+c.dynamicCount,0);
-   return `言い回しは全部で${total}件あります。そのうち、学習で増えたものが${dynamic}件です。`;
+  type Candidate={kind:string;score:number;answer:()=>string};
+  const candidates:Candidate[]=[];
+  if(countIntent){
+   if(referentScore.has('SURFACE'))candidates.push({kind:'SURFACE_COUNT',score:referentScore.get('SURFACE')!,answer:()=>this.selfInquirySurfaceCountAnswer()});
+   if(referentScore.has('DICTIONARY'))candidates.push({kind:'DICTIONARY_COUNT',score:referentScore.get('DICTIONARY')!,answer:()=>this.selfInquiryDictionaryCountAnswer()});
+   if(referentScore.has('CLAIMS'))candidates.push({kind:'CLAIM_COUNT',score:referentScore.get('CLAIMS')!,answer:()=>this.selfInquiryClaimCountAnswer()});
   }
-  if(/(?:辞書|単語)に?は(?:何件|何語|いくつ)/u.test(value)){
-   const stats=japaneseDictionaryService.getStats();
-   return `辞書には全部で${stats.builtin+stats.personal+stats.imported}件の語が載っています。`;
+  // A quantity interrogative makes the utterance a count question,
+  // so no lookup candidate is built then — otherwise the counter
+  // fragment itself （件 in 何件） would pose as the looked-up word
+  // and tie with the count candidate.
+  if(lookupIntent&&!countIntent&&referentScore.has('DICTIONARY')){
+   const stop=new Set(['有る','ある','載る','入る','幾つ','さっき','先ほど','直前']);
+   const counterOnly=/^[何件個語名冊台人回種本枚匹頭羽数]+$/u;
+   const fromTerms=terms.find(term=>!matchedTerms.has(term)&&!stop.has(term)&&!term.startsWith('何')&&!counterOnly.test(term));
+   const fromTokens=tokens.filter(token=>token.kind==='WORD'&&!token.surface.startsWith('載')&&token.surface!=='ある'&&token.surface!=='有る').map(token=>token.lemma||token.surface).find(term=>!matchedTerms.has(term)&&!stop.has(term)&&!term.startsWith('何')&&!counterOnly.test(term));
+   const target=fromTerms??fromTokens;
+   if(target)candidates.push({kind:'DICTIONARY_LOOKUP',score:referentScore.get('DICTIONARY')!,answer:()=>this.selfInquiryDictionaryAnswer(target)});
   }
-  if(/(?:主張|知識)は(?:何件|いくつ)/u.test(value)){
-   return `今、知識として登録されている主張は${claimDatabaseService.listClaims().length}件です。`;
-  }
-  if(/さっき(?:何て|なんて|何を|何の話|なんの話|どんな話)/u.test(value)||/(?:何の話|なんの話)(?:してた|だった)/u.test(value)||/前の答え|直前の答え|さっきの答え/u.test(value)){
-   const nodes=crossDomainGraphConnectionP211Service.snapshot().nodes||[];
-   // The snapshot's node order is not chronological (P398 device
-   // follow-up: result nodes sit scattered in the array), so pick
-   // the response whose task id is newest rather than the last
-   // array element. Task ids are TASK-<ms>-<sequence>.
-   let bestAnswer: string|undefined;let bestMs=-1;let bestSeq=-1;let bestIndex=-1;
-   nodes.forEach((node,index)=>{const payload=node.payload as {response?:unknown;taskId?:unknown};if(!payload||typeof payload.response!=='string'||!payload.response.trim())return;let ms=-1;let seq=-1;if(typeof payload.taskId==='string'){const parts=payload.taskId.split('-');if(parts.length>=3){ms=Number(parts[1])||-1;seq=Number(parts[2])||-1}}if(ms>bestMs||(ms===bestMs&&seq>bestSeq)||(ms===bestMs&&seq===bestSeq&&index>bestIndex)){bestMs=ms;bestSeq=seq;bestIndex=index;bestAnswer=payload.response.trim()}});
-   if(bestAnswer)return `さっきの話では、直前は『${bestAnswer.slice(0,120)}${bestAnswer.length>120?'…':''}』と答えました。`;
-   return 'さっきの話については、まだ答えた記録がありません。';
-  }
-  return undefined;
+  if(recallIntent)candidates.push({kind:'RECALL',score:1,answer:()=>this.selfInquiryRecallAnswer()});
+  if(!candidates.length)return undefined;
+  candidates.sort((a,b)=>b.score-a.score);
+  const best=candidates[0];
+  if(best.score<0.75)return undefined;
+  if(candidates.length>1&&candidates[1].score===best.score&&candidates[1].kind!==best.kind)return undefined;
+  return best.answer();
  }
  getSelfInquiryAnswer(taskId:string):string|undefined { return this.inputByTask.get(taskId)?.selfInquiryAnswer; }
  getAnswerRequirements(taskId:string,executionResult?:unknown){const input=this.inputByTask.get(taskId);if(!input)return undefined;return{inputSurface:input.inputSurface,intentIds:input.intentIds,constraintIds:input.constraintIds,grammarIds:input.grammarIds,meaningComponentIds:input.meaningComponentIds,contentTerms:input.contentTerms,executionResult}}

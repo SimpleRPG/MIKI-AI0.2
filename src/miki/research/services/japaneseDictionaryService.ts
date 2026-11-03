@@ -90,7 +90,22 @@ class JapaneseDictionaryService {
     const seen = new Set<string>();
     const legacyEntries = results.filter(e => { const id = `${e.source}|${e.normalized}|${e.lemma || ''}|${e.reading || ''}`; if (seen.has(id)) return false; seen.add(id); return true; })
       .sort((a,b) => b.priority - a.priority);
-    return [...graphEntries, ...legacyEntries.filter(entry => !graphEntries.some(graphEntry => graphEntry.normalized === entry.normalized && graphEntry.pos === entry.pos))];
+    // P411: a P209 graph entry shadows legacy entries with the same
+    // normalized+POS, but the graph entry itself carries no gloss and only
+    // the lexeme concept id. The shadowed JMdict entries hold the WordNet
+    // concept ids (wn:...) and the gloss for exactly those basic words, so
+    // discarding them severed every concept path that starts from a graph
+    // word (辞書・主張・知識・質問 ...): conceptIdsFor returned [] and no
+    // concept sibling was reachable from them. Merge the meaning-bearing
+    // fields (semanticIds, gloss) into the graph entry instead.
+    const mergedGraphEntries = graphEntries.map(graphEntry => {
+      const shadowed = legacyEntries.filter(entry => entry.normalized === graphEntry.normalized && entry.pos === graphEntry.pos);
+      if (!shadowed.length) return graphEntry;
+      const semanticIds = [...new Set([...(graphEntry.semanticIds || []), ...shadowed.flatMap(entry => entry.semanticIds || [])])];
+      const gloss = graphEntry.gloss || shadowed.map(entry => entry.gloss).find(value => !!value);
+      return gloss ? { ...graphEntry, semanticIds, gloss } : { ...graphEntry, semanticIds };
+    });
+    return [...mergedGraphEntries, ...legacyEntries.filter(entry => !graphEntries.some(graphEntry => graphEntry.normalized === entry.normalized && graphEntry.pos === entry.pos))];
   }
 
   public has(surface: string): boolean { return this.lookup(surface).length > 0; }

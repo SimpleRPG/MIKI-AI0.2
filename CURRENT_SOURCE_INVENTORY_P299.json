@@ -10316,9 +10316,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 19447,
-      "lines": 194,
-      "sha256": "d6db23f462b71cbacf34b19dd37485f0a9e0443d17976ed46d115cb3a0e8af35",
+      "bytes": 26499,
+      "lines": 289,
+      "sha256": "0a47d2edc774667f2f643fa4bd729a83eec1657015eecea5703f2ebaa040aa3c",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24253,9 +24253,9 @@
     },
     {
       "path": "src/miki/research/services/japaneseDictionaryService.ts",
-      "bytes": 17768,
-      "lines": 262,
-      "sha256": "8feef4f014d91a36b94cefe355bda8ac6744b91d024a1563198230e5e50d30ea",
+      "bytes": 18943,
+      "lines": 277,
+      "sha256": "12edfa72cd5975ff4728cf831fb19dde6ebdaf40312be18d35e410ce6c5280fe",
       "relativeImportCandidates": [
         {
           "line": 1,
