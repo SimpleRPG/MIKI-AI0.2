@@ -60,6 +60,10 @@ export interface AutonomousSearchExecutionResult {
   provider?: string;
   providers: SearchProviderName[];
   providerStatuses: Record<SearchProviderName, SearchProviderStatusRecord>;
+  // P418: pacer snapshot at the end of this search (interval
+  // multiplier, effective interval, cooldown) -- readable material
+  // for later learning, alongside the provider statuses.
+  searchPacer?: SearchPacerSnapshot;
 }
 
 interface ProviderSearchOutput {
@@ -90,9 +94,11 @@ interface SearxngUnresponsiveEngine {
 function classifySearxngUnresponsive(rawEntries: unknown): {
   summary: string;
   allSuspended: boolean;
+  hasCaptchaSuspension: boolean;
 } {
   const list = Array.isArray(rawEntries) ? rawEntries : [];
   const byEngine = new Map<string, SearxngUnresponsiveEngine>();
+  let hasCaptchaSuspension = false;
   for (const entry of list) {
     let engine = '';
     let reason = '';
@@ -133,7 +139,7 @@ function classifySearxngUnresponsive(rawEntries: unknown): {
       tooManyRequests;
     let label: string;
     if (suspended && tooManyRequests) label = '停止中-リクエスト過多';
-    else if (suspended && (lower.includes('captcha') || reason.includes('キャプチャ'))) label = '停止中-CAPTCHA';
+    else if (suspended && (lower.includes('captcha') || reason.includes('キャプチャ'))) { label = '停止中-CAPTCHA'; hasCaptchaSuspension = true; }
     else if (suspended && (/access denied|denied|forbidden|\b40[23]\b/.test(lower) || reason.includes('拒否'))) label = '停止中-アクセス拒否';
     else if (suspended) label = '停止中';
     else if (/timeout|timed out/.test(lower) || reason.includes('タイムアウト')) label = 'タイムアウト';
@@ -151,7 +157,204 @@ function classifySearxngUnresponsive(rawEntries: unknown): {
   return {
     summary: engines.map((item) => `${item.engine}=${item.label}`).join('、'),
     allSuspended: engines.length > 0 && engines.every((item) => item.suspended),
+    // P418: the pacer prices a CAPTCHA-class suspension into a
+    // longer cooldown than a rate/access suspension, so the class
+    // has to survive classification alongside allSuspended.
+    hasCaptchaSuspension,
   };
+}
+
+// P418: search pacer -- one gate for every SearXNG launch.
+// Until P417 each task in the improvement queue fired its searches
+// independently, so MIKI as a whole behaved like a burst client
+// against its own SearXNG: on 2026-11-04 the bursts drove every
+// general engine into rate-limit suspensions at once (brave and
+// google cse both "too many requests", 180s), and the queue kept
+// probing the suspended engines. The pacer turns all SearXNG
+// traffic into one calm caller:
+//   * gate: at most SEARCH_PACER_MAX_CONCURRENT passes run at once
+//     and launches are spaced by an effective start interval
+//     (base 2s, adapted by outcome, see below). A pass is the whole
+//     attempt sequence of one search (P414's retry included); the
+//     gate is acquired once per search and never re-entered by the
+//     retry. Cache hits never reach the gate (they leave no network
+//     trace), and Wikipedia is exempt (large allowance, independent
+//     operator). OpenAlex is budgeted separately (see executeSearch).
+//   * cooldown: when a pass ends with every engine suspended
+//     (P415/P417 classification), SearXNG is not queried again
+//     until the suspension class expires (rate/access class 180s,
+//     CAPTCHA class 600s). A search that arrives during cooldown
+//     returns immediately with the cooldown as its recorded reason
+//     -- the research layer's evidence-wait backoff becomes the
+//     wait, and no probe is wasted on a suspended engine.
+//   * adaptation: suspension-class empties and HTTP 429 double the
+//     interval multiplier (cap x5); a successful SearXNG pass halves
+//     it back toward x1. The multiplier and the effective interval
+//     stay readable via getSearchPacerState() and ride each search
+//     result, as material for later learning.
+//   * lanes: foreground searches (the user's live conversation and
+//     tools) pass the queue ahead of background ones (improvement
+//     loop, workers, audits). A running pass is never interrupted.
+// The state lives in memory only: an app restart resets it, exactly
+// like the SearXNG-side suspension timers it mirrors. There is no
+// resident timer loop -- the single wake timer exists only while
+// callers are queued and clears itself when it fires; every wait is
+// a delay inside the waiting search's own execution.
+export type SearchLane = 'foreground' | 'background';
+
+export type SearchPacerCooldownTier = 'rate' | 'captcha';
+
+export interface SearchPacerSnapshot {
+  baseIntervalMs: number;
+  intervalMultiplier: number;
+  effectiveIntervalMs: number;
+  maxConcurrent: number;
+  inFlight: number;
+  queuedForeground: number;
+  queuedBackground: number;
+  cooldownRemainingMs: number;
+  cooldownTier: '' | SearchPacerCooldownTier;
+  cooldownReason: string;
+}
+
+interface SearchPacerWaiter {
+  lane: SearchLane;
+  grant: () => void;
+}
+
+interface SearxngPassOutcome {
+  output: ProviderSearchOutput | null;
+  emptyReason?: string;
+  suspensionTier?: SearchPacerCooldownTier | null;
+  httpStatus?: number;
+  cooledDown?: boolean;
+}
+
+const SEARCH_PACER_BASE_INTERVAL_MS = 2000;
+const SEARCH_PACER_MAX_CONCURRENT = 2;
+const SEARCH_PACER_MAX_MULTIPLIER = 5;
+const SEARCH_PACER_COOLDOWN_RATE_MS = 180 * 1000;
+const SEARCH_PACER_COOLDOWN_CAPTCHA_MS = 600 * 1000;
+
+const searchPacer = {
+  inFlight: 0,
+  lastStartAt: 0,
+  intervalMultiplier: 1,
+  cooldownUntil: 0,
+  cooldownTier: '' as '' | SearchPacerCooldownTier,
+  cooldownReason: '',
+  queue: [] as SearchPacerWaiter[],
+  wakeTimer: null as ReturnType<typeof setTimeout> | null,
+};
+
+function searchPacerEffectiveIntervalMs(): number {
+  return Math.round(SEARCH_PACER_BASE_INTERVAL_MS * searchPacer.intervalMultiplier);
+}
+
+function searchPacerCooldownRemainingMs(now = Date.now()): number {
+  return Math.max(0, searchPacer.cooldownUntil - now);
+}
+
+function snapshotSearchPacer(): SearchPacerSnapshot {
+  return {
+    baseIntervalMs: SEARCH_PACER_BASE_INTERVAL_MS,
+    intervalMultiplier: searchPacer.intervalMultiplier,
+    effectiveIntervalMs: searchPacerEffectiveIntervalMs(),
+    maxConcurrent: SEARCH_PACER_MAX_CONCURRENT,
+    inFlight: searchPacer.inFlight,
+    queuedForeground: searchPacer.queue.filter((w) => w.lane === 'foreground').length,
+    queuedBackground: searchPacer.queue.filter((w) => w.lane === 'background').length,
+    cooldownRemainingMs: searchPacerCooldownRemainingMs(),
+    cooldownTier: searchPacer.cooldownTier,
+    cooldownReason: searchPacer.cooldownReason,
+  };
+}
+
+function searchPacerScheduleWake(delayMs: number): void {
+  if (searchPacer.wakeTimer) return;
+  searchPacer.wakeTimer = setTimeout(() => {
+    searchPacer.wakeTimer = null;
+    searchPacerPump();
+  }, Math.max(0, delayMs));
+}
+
+function searchPacerPump(): void {
+  while (searchPacer.queue.length > 0) {
+    if (searchPacer.inFlight >= SEARCH_PACER_MAX_CONCURRENT) return;
+    const now = Date.now();
+    const waitMs = searchPacer.lastStartAt + searchPacerEffectiveIntervalMs() - now;
+    if (waitMs > 0) {
+      searchPacerScheduleWake(waitMs);
+      return;
+    }
+    let index = searchPacer.queue.findIndex((w) => w.lane === 'foreground');
+    if (index < 0) index = 0;
+    const [waiter] = searchPacer.queue.splice(index, 1);
+    searchPacer.inFlight += 1;
+    searchPacer.lastStartAt = now;
+    waiter.grant();
+  }
+}
+
+function acquireSearchGate(lane: SearchLane): Promise<void> {
+  return new Promise((resolve) => {
+    searchPacer.queue.push({ lane, grant: resolve });
+    searchPacerPump();
+  });
+}
+
+function releaseSearchGate(): void {
+  searchPacer.inFlight = Math.max(0, searchPacer.inFlight - 1);
+  searchPacerPump();
+}
+
+function searchPacerNotePressure(source: string): void {
+  const next = Math.min(SEARCH_PACER_MAX_MULTIPLIER, searchPacer.intervalMultiplier * 2);
+  if (next !== searchPacer.intervalMultiplier) {
+    searchPacer.intervalMultiplier = next;
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `ℹ️ [検索ペーサー] 制限圧力（${source}）のため発射間隔を実効${searchPacerEffectiveIntervalMs()}ms（倍率${next}）へ拡大`,
+    );
+  }
+}
+
+function searchPacerNoteSuccess(): void {
+  if (searchPacer.intervalMultiplier > 1) {
+    searchPacer.intervalMultiplier = Math.max(1, searchPacer.intervalMultiplier / 2);
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `ℹ️ [検索ペーサー] SearXNG成功を受け発射間隔を実効${searchPacerEffectiveIntervalMs()}ms（倍率${searchPacer.intervalMultiplier}）へ緩和`,
+    );
+  }
+}
+
+function searchPacerStartCooldown(tier: SearchPacerCooldownTier, reasonSummary: string): void {
+  const durationMs =
+    tier === 'captcha' ? SEARCH_PACER_COOLDOWN_CAPTCHA_MS : SEARCH_PACER_COOLDOWN_RATE_MS;
+  const until = Date.now() + durationMs;
+  if (until > searchPacer.cooldownUntil) searchPacer.cooldownUntil = until;
+  searchPacer.cooldownTier = tier;
+  if (reasonSummary) searchPacer.cooldownReason = reasonSummary;
+  systemLogger.info(
+    'SELF_IMPROVEMENT',
+    `⏸️ [検索ペーサー] SearXNG冷却を開始（${tier === 'captcha' ? 'CAPTCHA級' : 'リクエスト過多・アクセス拒否級'}、約${Math.round(durationMs / 1000)}秒）: ${reasonSummary || 'エンジン停止中'}`,
+  );
+}
+
+function resetSearchPacerState(): void {
+  if (searchPacer.wakeTimer) {
+    clearTimeout(searchPacer.wakeTimer);
+    searchPacer.wakeTimer = null;
+  }
+  const waiters = searchPacer.queue.splice(0, searchPacer.queue.length);
+  searchPacer.inFlight = 0;
+  searchPacer.lastStartAt = 0;
+  searchPacer.intervalMultiplier = 1;
+  searchPacer.cooldownUntil = 0;
+  searchPacer.cooldownTier = '';
+  searchPacer.cooldownReason = '';
+  for (const waiter of waiters) waiter.grant();
 }
 
 // P416: free supplemental providers (Wikipedia / OpenAlex) run in
@@ -448,6 +651,22 @@ export class AutonomousSearchService {
     return { ...this.stats };
   }
 
+  // P418: the pacer state is in-memory only by design (an app
+  // restart resets it, like the SearXNG-side suspension timers).
+  public getSearchPacerState(): SearchPacerSnapshot {
+    return snapshotSearchPacer();
+  }
+
+  /**
+   * P418: reset the in-memory search pacer (queued waiters are
+   * granted, interval multiplier and cooldown cleared). Intended
+   * for verification and for an operator reset after a SearXNG-side
+   * settings change; not for use while searches are in flight.
+   */
+  public resetSearchPacer(): void {
+    resetSearchPacerState();
+  }
+
   public getRecentRecords(limit = 20): AutonomousSearchLearningRecord[] {
     try {
       const saved = storageService.getItem(SEARCH_RECORDS_KEY);
@@ -572,6 +791,14 @@ export class AutonomousSearchService {
       maxResults?: number;
       bypassCache?: boolean;
       preferredProvider?: 'auto' | 'searxng';
+      // P418: queue lane at the shared SearXNG gate (default
+      // background). Foreground is for the user's live searches.
+      lane?: SearchLane;
+      // P418: the caller's plan marks an official/scholarly source
+      // intent (researchService threads sourceTierTarget
+      // PRIMARY_OR_OFFICIAL as this flag). Only then does OpenAlex
+      // fire in parallel; otherwise it is a rescue-only provider.
+      officialSourceIntent?: boolean;
     }
   ): Promise<{ results: WebSearchResultItem[]; summary?: string; provider?: string }> {
     const cleanQuery = query.trim();
@@ -646,7 +873,7 @@ export class AutonomousSearchService {
       };
     };
 
-    const attemptSearxng = async (): Promise<{ output: ProviderSearchOutput | null; retryable: boolean; empty: boolean; emptyReason?: string }> => {
+    const attemptSearxng = async (): Promise<{ output: ProviderSearchOutput | null; retryable: boolean; empty: boolean; emptyReason?: string; suspensionTier?: SearchPacerCooldownTier | null; httpStatus?: number }> => {
       try {
         const searxSettings = getSearxngSearchSettings();
         const searxUrl = buildSearxngSearchUrl(searxSettings, safeQuery);
@@ -656,7 +883,7 @@ export class AutonomousSearchService {
           const reason = `HTTP ${searxRes.status}`;
           markProvider('searxng', 'FAILED', reason);
           systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [SearXNG] 応答失敗: ${reason}`);
-          return { output: null, retryable: searxRes.status >= 500, empty: false };
+          return { output: null, retryable: searxRes.status >= 500, empty: false, httpStatus: searxRes.status };
         }
 
         const searxData = await searxRes.json();
@@ -686,6 +913,14 @@ export class AutonomousSearchService {
             retryable: !unresponsive.allSuspended,
             empty: true,
             emptyReason,
+            // P418: when every silent engine is suspended, the
+            // suspension class rides along so the pacer can price
+            // its cooldown (CAPTCHA class waits longer).
+            suspensionTier: unresponsive.allSuspended
+              ? unresponsive.hasCaptchaSuspension
+                ? 'captcha'
+                : 'rate'
+              : null,
           };
         }
 
@@ -743,7 +978,7 @@ export class AutonomousSearchService {
     // repeat the same empty answer. The reason summary is returned
     // alongside so the final log line and the search summary can
     // state what limited the search.
-    const runSearxng = async (): Promise<{ output: ProviderSearchOutput | null; emptyReason?: string }> => {
+    const runSearxng = async (): Promise<SearxngPassOutcome> => {
       let attempt = await attemptSearxng();
       if (!attempt.output && attempt.retryable) {
         systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 一時的な失敗のため1回だけ再試行します');
@@ -760,6 +995,8 @@ export class AutonomousSearchService {
       return {
         output: attempt.output,
         emptyReason: !attempt.output && attempt.empty ? attempt.emptyReason : undefined,
+        suspensionTier: !attempt.output ? attempt.suspensionTier ?? null : null,
+        httpStatus: !attempt.output ? attempt.httpStatus : undefined,
       };
     };
 
@@ -927,23 +1164,71 @@ export class AutonomousSearchService {
       }
     };
 
-    const runSupplements = async (): Promise<ProviderSearchOutput[]> => {
-      const settled = await Promise.allSettled([attemptWikipedia(), attemptOpenAlex()]);
-      return settled.flatMap((entry) =>
-        entry.status === 'fulfilled' && entry.value ? [entry.value] : [],
-      );
-    };
-
     /*
      * P348: 探索経路はSearXNG単一に統一した（Wikipedia／DuckDuckGoへの直接取得は廃止）。
      * P416: ユーザーの方針訂正（2026-11-04：使わないのは「お金がかかる外部」であって
      * 外部そのものではない）を受け、無料・鍵なしの補助ソース（Wikipedia系・OpenAlex）を
      * 方式A（主経路と並列・3秒期限・再試行なし）で再接続した。主経路はSearXNGのままで、
      * 補助は合流と裏付け（独立クラスタ）の補完に留まる。
+     * P418: 発射の交通整理をここに置く。SearXNG は単一ゲート（同時2本・
+     * 開始間隔・優先レーン）を通し、冷却中は発射自体を省略する。
+     * Wikipedia は枠が大きく独立のためゲート対象外で即時並列発射する。
+     * OpenAlex は日次予算の配慮から、公式・学術意図がある場合のみ
+     * 並列発射し、それ以外は主経路が空・失敗・冷却中のときの救済に回す。
      */
-    const supplementsPromise = runSupplements();
-    const searxngRun = await runSearxng();
-    const supplementOutputs = await supplementsPromise;
+    const lane: SearchLane = options?.lane === 'foreground' ? 'foreground' : 'background';
+    const wikipediaPromise = attemptWikipedia();
+    const openAlexParallelPromise =
+      options?.officialSourceIntent === true ? attemptOpenAlex() : null;
+
+    let searxngRun: SearxngPassOutcome;
+    const cooldownRemainingMs = searchPacerCooldownRemainingMs();
+    if (cooldownRemainingMs > 0) {
+      // Cooldown: never hold the caller -- the SearXNG share of this
+      // search returns at once with the cooldown as its reason, and
+      // the supplements below remain available as the rescue route.
+      const remainSec = Math.ceil(cooldownRemainingMs / 1000);
+      const cooledReason = `SearXNG冷却中（残り約${remainSec}秒）: ${searchPacer.cooldownReason || 'エンジン停止中'}`;
+      markProvider('searxng', 'SKIPPED', cooledReason);
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `⏸️ [SearXNG] 冷却中のため発射を省略しました（残り約${remainSec}秒）`,
+      );
+      searxngRun = { output: null, emptyReason: cooledReason, cooledDown: true };
+    } else {
+      await acquireSearchGate(lane);
+      try {
+        searxngRun = await runSearxng();
+      } finally {
+        releaseSearchGate();
+      }
+      // Adaptation and cooldown are driven by the finished pass:
+      // success settles the pace, a full suspension starts the
+      // matching cooldown, an HTTP 429 counts as rate pressure.
+      if (searxngRun.output) {
+        searchPacerNoteSuccess();
+      } else if (searxngRun.suspensionTier) {
+        searchPacerNotePressure('エンジン停止');
+        searchPacerStartCooldown(searxngRun.suspensionTier, searxngRun.emptyReason || '');
+      } else if (searxngRun.httpStatus === 429) {
+        searchPacerNotePressure('HTTP 429');
+      }
+    }
+
+    const wikipediaOutput = await wikipediaPromise;
+    let openAlexOutput: ProviderSearchOutput | null = null;
+    if (openAlexParallelPromise) {
+      openAlexOutput = await openAlexParallelPromise;
+    } else if (!searxngRun.output) {
+      // Budget-aware rescue: the main route contributed nothing, so
+      // spending a little of the shared daily budget is worth it.
+      openAlexOutput = await attemptOpenAlex();
+    } else {
+      markProvider('openalex', 'SKIPPED', '主経路SearXNGが結果を返したため未発射（日次予算の配慮）');
+    }
+    const supplementOutputs: ProviderSearchOutput[] = [];
+    if (wikipediaOutput) supplementOutputs.push(wikipediaOutput);
+    if (openAlexOutput) supplementOutputs.push(openAlexOutput);
     const searxngOutput = searxngRun.output;
     const emptyReason = searxngRun.emptyReason;
     const outputs: ProviderSearchOutput[] = [
@@ -968,6 +1253,7 @@ export class AutonomousSearchService {
       provider: successfulProviders[0] || 'searxng',
       providers: successfulProviders,
       providerStatuses,
+      searchPacer: snapshotSearchPacer(),
     };
 
     this.stats.totalSearches++;

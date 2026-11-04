@@ -1,4 +1,5 @@
 import { unifiedWebResearchService } from './unifiedWebResearchService';
+import type { SearchLane } from './unifiedWebResearchService';
 import { knowledgeGapService, KnowledgeGap } from '../../unknown/services/knowledgeGapService';
 import { evidenceService, EvidenceRecord } from '../../memory/services/evidenceService';
 import { researchStrategyService, ResearchRoute } from './researchStrategyService';
@@ -108,11 +109,11 @@ export class ResearchService {
     return ResearchService.instance;
   }
 
-  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string }): Promise<ResearchResult> {
+  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string; lane?: SearchLane }): Promise<ResearchResult> {
     const text = query.trim();
     if (!text) throw new Error("RESEARCH_QUERY_REQUIRED");
     const gap = knowledgeGapService.detect({ query: text, type: "INSUFFICIENT_EVIDENCE", reason: "通常のWeb知識探索要求をResearchServiceへ統合", priority: 50, sourceRequestId: options?.sourceRequestId });
-    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)) });
+    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)), lane: options?.lane });
   }
 
   /**
@@ -177,6 +178,8 @@ export class ResearchService {
     maxPagesPerPass?: number;
     query?: string;
     continuationRound?: number;
+    // P418: SearXNG gate lane, threaded to every search pass below.
+    lane?: SearchLane;
   }): Promise<ResearchResult> {
     const evidence: EvidenceRecord[] = [];
     const claimIds: string[] = [];
@@ -399,6 +402,13 @@ export class ResearchService {
         const queryStartedAt = Date.now();
         const raw = await unifiedWebResearchService.executePlannedSearch(passQuery, {
           bypassCache: pass > 0,
+          lane: options?.lane,
+          // P418: a PRIMARY_OR_OFFICIAL pass is the scholarly /
+          // official-source intent reaching the search layer; only
+          // then may OpenAlex fire in parallel (budget care).
+          officialSourceIntent:
+            queryPlan.status === 'READY' &&
+            queryPlan.queries[pass]?.sourceTierTarget === 'PRIMARY_OR_OFFICIAL',
         });
         const results = this.normalizeSearchResults(raw);
         searchResults.push(...results);

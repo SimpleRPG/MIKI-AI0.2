@@ -1128,7 +1128,7 @@ export class ToolsService {
           const query = String(params.query || '').trim();
           if (!query) throw new Error('検索クエリが指定されていません');
           const maxResults = params.maxResults ? Number(params.maxResults) : 4;
-          const searchRes = await unifiedWebResearchService.executeSearch(query, { maxResults });
+          const searchRes = await unifiedWebResearchService.executeSearch(query, { maxResults, lane: 'foreground' });
           // 能動学習の実行 (長期記憶・合成データセットへの還元)
           const record = unifiedWebResearchService.learnFromSearch(
             query,

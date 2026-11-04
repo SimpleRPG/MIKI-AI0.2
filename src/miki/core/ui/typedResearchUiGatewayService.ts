@@ -80,7 +80,7 @@ class TypedResearchUiGatewayService {
       kind: 'USER_REQUEST',
       goal: `Research UI requested EXECUTE_AUTONOMOUS_SEARCH: ${query}`,
       source: 'conversation',
-      payload: { operation: 'EXECUTE_AUTONOMOUS_SEARCH', query, options, sourceScreenId: 'AutonomousSearchTab' },
+      payload: { operation: 'EXECUTE_AUTONOMOUS_SEARCH', query, options: { ...(options ?? {}), lane: 'foreground' }, sourceScreenId: 'AutonomousSearchTab' },
       maxCycles: 18,
     });
     if (result.task.status !== 'COMPLETED') throw new Error(`CORE_COMPLETION_REQUIRED:${result.task.status}`);
