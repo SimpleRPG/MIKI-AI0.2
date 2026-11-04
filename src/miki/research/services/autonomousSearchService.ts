@@ -110,14 +110,34 @@ function classifySearxngUnresponsive(rawEntries: unknown): {
     reason = reason.trim();
     if (!engine && !reason) continue;
     const lower = reason.toLowerCase();
-    const suspended = lower.includes('suspended');
+    // P417: on-device SearXNG localizes its reason strings, e.g.
+    // "一時停止: リクエストが多すぎます" for a too-many-requests
+    // suspension. The manual curl checks that informed P415 sent no
+    // language preference and saw the English forms, so the original
+    // English-only patterns filed every real device reason under
+    // その他, allSuspended never stood, and the skip-the-retry rule
+    // never engaged on device (device log 2026-11-04 17:41 JST).
+    // Match the Japanese forms alongside the English ones.
+    const tooManyRequests =
+      /too many requests|429/.test(lower) ||
+      reason.includes('リクエストが多すぎます') ||
+      reason.includes('多すぎます');
+    const suspended =
+      lower.includes('suspended') ||
+      reason.includes('一時停止') ||
+      reason.includes('停止中') ||
+      // A bare too-many-requests answer (no suspension prefix) puts
+      // the engine under a SearXNG suspension from that response on,
+      // so an immediate retry is just as pointless as with the
+      // prefixed form; count it as suspension class as well.
+      tooManyRequests;
     let label: string;
-    if (suspended && /too many requests|429/.test(lower)) label = '停止中-リクエスト過多';
-    else if (suspended && lower.includes('captcha')) label = '停止中-CAPTCHA';
-    else if (suspended && /access denied|denied|forbidden|\b40[23]\b/.test(lower)) label = '停止中-アクセス拒否';
+    if (suspended && tooManyRequests) label = '停止中-リクエスト過多';
+    else if (suspended && (lower.includes('captcha') || reason.includes('キャプチャ'))) label = '停止中-CAPTCHA';
+    else if (suspended && (/access denied|denied|forbidden|\b40[23]\b/.test(lower) || reason.includes('拒否'))) label = '停止中-アクセス拒否';
     else if (suspended) label = '停止中';
-    else if (/timeout|timed out/.test(lower)) label = 'タイムアウト';
-    else if (/pars|xpath/.test(lower)) label = '解析エラー';
+    else if (/timeout|timed out/.test(lower) || reason.includes('タイムアウト')) label = 'タイムアウト';
+    else if (/pars|xpath/.test(lower) || reason.includes('解析エラー')) label = '解析エラー';
     else if (/http|\b[45]\d\d\b/.test(lower)) label = 'HTTPエラー';
     else label = 'その他';
     // Keep the raw text whenever the label alone would lose the
@@ -836,7 +856,26 @@ export class AutonomousSearchService {
           headers: { 'User-Agent': SUPPLEMENTAL_USER_AGENT, Accept: 'application/json' },
         });
         if (!res.ok) {
-          const reason = `HTTP ${res.status}`;
+          // P417: the API explains itself in the error body (JSON
+          // error/message), but the P416 code kept only the status,
+          // so the device's HTTP 400 was unreadable. Carry the
+          // message into the provider status and the log, capped at
+          // 200 chars (the body can embed URLs). A body that cannot
+          // be read or is not JSON leaves the status-only form.
+          let detail = '';
+          try {
+            const body = JSON.parse(await res.text());
+            const message =
+              typeof body?.message === 'string'
+                ? body.message
+                : typeof body?.error === 'string'
+                  ? body.error
+                  : '';
+            detail = message.replace(/\s+/g, ' ').trim().slice(0, 200);
+          } catch {
+            // unreadable or non-JSON body: keep the status only.
+          }
+          const reason = detail ? `HTTP ${res.status}: ${detail}` : `HTTP ${res.status}`;
           markProvider('openalex', 'FAILED', reason);
           systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [OpenAlex] 応答失敗: ${reason}`);
           return null;
