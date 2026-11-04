@@ -578,6 +578,10 @@ class RequiredAssetAcquisitionService {
           'SELF_IMPROVEMENT',
           '[RequiredAssetAcquisition] CLAIM_REEVALUATION',
           JSON.stringify({
+            // P428: carry the reason token itself so the event is
+            // findable in the runtime log under the same string the
+            // recovery reasons use (CLAIM_REEVALUATED:<id>:<outcome>).
+            reason: `CLAIM_REEVALUATED:${claimRoute.claimId}:${reevaluated.outcome}`,
             claimId: claimRoute.claimId,
             attachedEvidenceCount: attachedCount,
             outcome: reevaluated.outcome,
@@ -610,6 +614,19 @@ class RequiredAssetAcquisitionService {
         const settled = settledOutcome || settledStatus;
         if (settled) {
           acquisitionReasons.push(`CLAIM_RESOLVED:${claimRoute.claimId}:${settled}`);
+          // P428: the settlement existed only as a recovery reason;
+          // give it a runtime log line of its own, in the same form
+          // as CLAIM_REEVALUATION above.
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            '[RequiredAssetAcquisition] CLAIM_RESOLVED',
+            JSON.stringify({
+              reason: `CLAIM_RESOLVED:${claimRoute.claimId}:${settled}`,
+              claimId: claimRoute.claimId,
+              settled,
+              outcome: reevaluated.outcome,
+            }),
+          );
           if (!evidenceAcquired) {
             evidenceAcquired = true;
             request.status = 'ACQUIRED';

@@ -82,6 +82,14 @@ const RESOURCE_WAIT_MS = [2 * 60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000];
 const EVIDENCE_WAIT_MS = [2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60_000];
 
 const DISCOVERY_ISSUE_KINDS=new Set(['EXECUTION_FAILURE','KNOWLEDGE_GAP','CAPABILITY_GAP','STALLED_TASK','DOMAIN_DISCONNECTED','CLAIM_CONTRADICTION','IMPROVEMENT_DEBT']);
+// P428: log lines carry triggers and reasons inline so a single
+// runtime log can be mined later; keep each value on one line and
+// bounded in length.
+function truncateForLog(text: string, max: number): string {
+  const flat = String(text).replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max)}...` : flat;
+}
+
 function normalizeDiscoveryIssuePayload(payload:Record<string,unknown>|undefined):Record<string,unknown>|undefined{
   if(!payload)return undefined;
   const normalized={...payload};
@@ -97,6 +105,7 @@ class AutonomousSelfImprovementLoopService {
   private state: AutonomousLoopState = { status: 'IDLE', queue: [], updatedAt: 0 };
   private running = false;
   private sequence = 0;
+  private lastDigestSignature = '';
   private lastLoadDroppedInvalid = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
@@ -119,6 +128,9 @@ class AutonomousSelfImprovementLoopService {
     }
     this.disposed = false;
     try{this.reconcileCancellationRequests();}catch(error){systemLogger.warn('PERSISTENCE','[AutonomousLoop] durable cancellation intent remains pending after restart',{error:String(error instanceof Error?error.message:error)});this.scheduleRecovery(RECOVERY_POLL_MS);return;}
+    // P428: one digest at startup so the persisted queue a restart
+    // recovered is visible in the log from the first screen on.
+    this.logQueueDigest('startup');
     this.scheduleRecovery();
   }
 
@@ -200,6 +212,13 @@ class AutonomousSelfImprovementLoopService {
     this.state.status = 'IDLE';
     this.state.retryAt = undefined;
     this.save();
+    // P428: enqueue record (the duplicate path above returns the
+    // existing request and does not record a new arrival).
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[RUNTIME] AutonomousLoop enqueue: ${item.id} task=${item.taskId || '-'} source=${item.source} priority=${item.priority ?? '-'} queue=${this.state.queue.length}`,
+    );
+    this.logQueueDigest('enqueue', true);
     void this.drain();
     return { ...item };
   }
@@ -384,6 +403,9 @@ class AutonomousSelfImprovementLoopService {
       while (this.state.queue.length > 0) {
         if (!this.isGenerationCurrent(generation)) return;
         const now=Date.now();
+        // P428: read-only count for the selection record below --
+        // how many queued requests are still inside their wait.
+        const waitingCount=this.state.queue.filter(item=>item.nextAttemptAt&&item.nextAttemptAt>now).length;
         const eligibleIndex=this.state.queue.findIndex(item=>!item.nextAttemptAt||item.nextAttemptAt<=now);
         if(eligibleIndex<0){
           const earliest=this.state.queue.reduce((best,item)=>!best||Number(item.nextAttemptAt||0)<Number(best.nextAttemptAt||0)?item:best,undefined as AutonomousImprovementRequest|undefined);
@@ -392,6 +414,7 @@ class AutonomousSelfImprovementLoopService {
           this.state.retryAt=earliest?.nextAttemptAt;
           this.state.activeRequestId=undefined;
           this.save();
+          this.logQueueDigest('waiting');
           break;
         }
         if(eligibleIndex>0)this.state.queue.unshift(this.state.queue.splice(eligibleIndex,1)[0]);
@@ -403,9 +426,14 @@ class AutonomousSelfImprovementLoopService {
         this.state.retryAt=undefined;
         const normalizedPayload=normalizeDiscoveryIssuePayload(request.payload);
         if(normalizedPayload)request.payload=normalizedPayload;
+        // P428: the step record used to carry only the request id,
+        // so a request that was never selected (queue starvation)
+        // left no trace in the runtime log and its taskId never
+        // appeared. Carry the identifiers and the queue shape at
+        // selection time; the prefix and id keep their old form.
         systemLogger.info(
           'SELF_IMPROVEMENT',
-          `[RUNTIME] AutonomousLoop step: ${request.id}`,
+          `[RUNTIME] AutonomousLoop step: ${request.id} task=${request.taskId || '-'} source=${request.source} trigger=${truncateForLog(request.trigger, 80)} queue=${this.state.queue.length} waiting=${waitingCount}`,
         );
         this.state.status = 'RUNNING';
         this.state.activeRequestId = request.id;
@@ -746,6 +774,12 @@ class AutonomousSelfImprovementLoopService {
     request.waitReason=reason;
     this.moveParkedRequestToTail(request);
     this.save();
+    // P428: park record (see logQueueDigest).
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[RUNTIME] AutonomousLoop park: ${request.id} kind=RESOURCE reason=${truncateForLog(reason, 120)} retryAt=${this.state.retryAt ?? '-'}`,
+    );
+    this.logQueueDigest('park-resource');
   }
 
   // P427: round-robin rotation for parked requests. drain selects
@@ -1022,6 +1056,13 @@ class AutonomousSelfImprovementLoopService {
       // it takes the same round-robin rotation as the wait paths.
       this.moveParkedRequestToTail(request);
       this.save();
+      // P428: this park bypasses the waitFor* paths, so it records
+      // its own park line (see logQueueDigest).
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `[RUNTIME] AutonomousLoop park: ${request.id} kind=EVIDENCE reason=${truncateForLog(request.waitReason || '', 120)} retryAt=${request.nextAttemptAt ?? '-'}`,
+      );
+      this.logQueueDigest('park-acquired');
       return;
     }
 
@@ -1102,6 +1143,12 @@ class AutonomousSelfImprovementLoopService {
     request.waitReason=reason;
     this.moveParkedRequestToTail(request);
     this.save();
+    // P428: park record (see logQueueDigest).
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[RUNTIME] AutonomousLoop park: ${request.id} kind=EVIDENCE reason=${truncateForLog(reason, 120)} retryAt=${this.state.retryAt ?? '-'}`,
+    );
+    this.logQueueDigest('park-evidence');
   }
 
   private failOrRetry(request: AutonomousImprovementRequest, reason: string): void {
@@ -1115,6 +1162,13 @@ class AutonomousSelfImprovementLoopService {
       this.state.activeRequestId = undefined;
       this.state.retryAt = undefined;
       this.save();
+      // P428: attempt exhaustion removes the request; record it
+      // like a drop so the end of a request is visible in the log.
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `[RUNTIME] AutonomousLoop drop: ${request.id} task=${request.taskId || '-'} reason=${truncateForLog(`${reason}:MAX_ATTEMPTS`, 120)}`,
+      );
+      this.logQueueDigest('exhausted', true);
       return;
     }
     this.state.status = 'PAUSED';
@@ -1125,6 +1179,12 @@ class AutonomousSelfImprovementLoopService {
     request.waitReason=reason;
     this.moveParkedRequestToTail(request);
     this.save();
+    // P428: park record (see logQueueDigest).
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[RUNTIME] AutonomousLoop park: ${request.id} kind=RETRY reason=${truncateForLog(reason, 120)} retryAt=${this.state.retryAt ?? '-'}`,
+    );
+    this.logQueueDigest('park-retry');
   }
 
   private async resumeOwnedTask(taskId: string) {
@@ -1154,15 +1214,77 @@ class AutonomousSelfImprovementLoopService {
     this.state.lastReason = reason;
     this.state.retryAt = undefined;
     this.save();
+    // P428: drops were previously invisible in the runtime log.
+    if (request) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `[RUNTIME] AutonomousLoop drop: ${request.id} task=${request.taskId || '-'} reason=${truncateForLog(reason, 120)}`,
+      );
+    }
+    this.logQueueDigest('drop', true);
   }
 
   private completeCurrent(reason: string): void {
+    const request = this.state.queue[0];
     this.state.queue.shift();
     this.state.status = 'IDLE';
     this.state.activeRequestId = undefined;
     this.state.lastReason = reason;
     this.state.retryAt = undefined;
     this.save();
+    // P428: completion was previously invisible in the runtime log
+    // (only the removal of the request could be inferred).
+    if (request) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `[RUNTIME] AutonomousLoop complete: ${request.id} task=${request.taskId || '-'} reason=${truncateForLog(reason, 120)}`,
+      );
+    }
+    this.logQueueDigest('complete', true);
+  }
+
+  // P428: state digest for observability. The runtime log is the
+  // user's one artefact a later analysis reads end to end, but queue
+  // composition and per-task state used to live only in run-detail
+  // exports -- a starved request that was never selected left no
+  // trace at all (device: TASK-1793805094648-000336). The digest
+  // rides on the state transitions that already persist (enqueue,
+  // park, completion, drop, waiting, startup); it adds no timers and
+  // no new persistence, and it is signature-suppressed: a snapshot
+  // identical to the last emitted one is not repeated, so digest
+  // lines are bounded by the number of distinct queue/task states,
+  // never by elapsed time. Formatting only reads state already in
+  // memory; a formatting failure must never disturb the loop.
+  private logQueueDigest(context: string, force = false): void {
+    try {
+      const listed = this.state.queue.slice(0, 20).map(item => {
+        const suffix = item.id.split('-').pop() || item.id;
+        return `${suffix}:${item.source}${item.runType ? `/${item.runType}` : ''} a=${item.attempts} w=${item.waitKind || '-'} next=${item.nextAttemptAt ? 1 : 0}`;
+      });
+      const overflow = this.state.queue.length - listed.length;
+      const activeRequest = this.state.activeRequestId
+        ? this.state.queue.find(item => item.id === this.state.activeRequestId)
+        : undefined;
+      let taskPart = 'task=-';
+      if (activeRequest?.taskId) {
+        const task = taskBlackboardService.get(activeRequest.taskId);
+        if (task) {
+          const evidenceCount = new Set(task.entries.flatMap(entry => entry.evidenceIds || [])).size;
+          taskPart = `task=${task.taskId} taskStatus=${task.status} cycle=${task.lastCycle} evidence=${evidenceCount}`;
+        } else {
+          taskPart = `task=${activeRequest.taskId} taskStatus=?`;
+        }
+      }
+      const signature = `${this.state.status}|${listed.join('|')}|+${overflow}|${taskPart}`;
+      if (!force && signature === this.lastDigestSignature) return;
+      this.lastDigestSignature = signature;
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `[RUNTIME] AutonomousLoop digest (${context}): status=${this.state.status} queue=${this.state.queue.length} [${listed.join(' | ')}${overflow > 0 ? ` | +${overflow}` : ''}] ${taskPart}`,
+      );
+    } catch {
+      // Observability only: never let digest formatting fail the loop.
+    }
   }
 
   private assertWritable():void{if(this.writesBlocked)throw new Error('AUTONOMOUS_LOOP_STORE_WRITE_BLOCKED');}
