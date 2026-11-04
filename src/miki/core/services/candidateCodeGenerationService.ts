@@ -32,6 +32,22 @@ import {
   type CodeConstructionGraph,
 } from '../data/codeKnowledge/common';
 export interface CandidateGenerationFile { path:string; candidateContent:string; evidenceIds:string[]; }
+/*
+ * P421（供給3）: 不足記録（candidateGenerationGap）に持たせる契約欄。
+ * 不足が発生した時点で、自己コード索引から導出できる範囲の
+ * 「期待インターフェース」を構造化して確定させる。供給1
+ * （componentSupplyRequestService）は、パッケージ生成時に索引から
+ * 再構成するより、この記録済み契約を優先して使う（対象ファイルが
+ * その後に変わっても、不足時点の契約が要求の正になる）。
+ * 導出できない対象については欄を持たせない（捏造しない）。
+ */
+export interface CandidateGenerationGapContractSignature { name:string; kind:string; parameters:string[]; returnType?:string; }
+export interface CandidateGenerationGapContractTarget { path:string; exports:string[]; signatures:CandidateGenerationGapContractSignature[]; imports:string[]; }
+export interface CandidateGenerationGapContract {
+  targets:CandidateGenerationGapContractTarget[];
+  missingSlots:Array<{ knowledgeId:string; slotName:string; inputKinds:string[] }>;
+  missingComponentIds:string[];
+}
 export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; createdCodeComponentIds?:string[]; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
 class CandidateCodeGenerationService {
  async generate(runId:string):Promise<CandidateGenerationOutcome>{
@@ -1153,8 +1169,15 @@ class CandidateCodeGenerationService {
        * 1本しか読めなかった。計画側の逃げ道（UNKNOWN/Research）が
        * 「何が不足か」を材料にできるよう、計算済みの内訳をタスクの
        * ブラックボードへも残す（台帳の記録は従来どおり）。
+       *
+       * P421: あわせて、不足発生時点の契約欄（対象の既存の公開面と
+       * 生産者不足スロットの期待）を自己コード索引から導出して
+       * 確定させる。部品供給の要求生成はこの記録済み契約を優先し、
+       * パッケージ生成時点の索引からの再構成は契約が無い場合の
+       * フォールバックになる。導出できなければ欄自体を持たせない。
        */
       if(reason==='CODE_COMPOSITION_PLAN_UNAVAILABLE'&&run.taskId){
+        const gapContract=this.buildGapContract(targetPaths,constructionGapRequirements);
         taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGap',{
           operation:'GENERATE_CANDIDATE',
           runId,
@@ -1166,6 +1189,7 @@ class CandidateCodeGenerationService {
             .map(item=>item.question)
             .filter(Boolean),
           targetPaths,
+          ...(gapContract?{contract:gapContract}:{}),
         },[]);
       }
 
@@ -1408,6 +1432,74 @@ class CandidateCodeGenerationService {
  }
 
  private extractResponseText(body:unknown):string{if(typeof body==='string')return body;if(!body||typeof body!=='object')return '';const object=body as Record<string,unknown>;for(const key of ['response','text','content','message','answer']){const value=object[key];if(typeof value==='string')return value;if(value&&typeof value==='object'){const nested=value as Record<string,unknown>;if(typeof nested.content==='string')return nested.content;if(typeof nested.text==='string')return nested.text;}}return '';}
+ /*
+  * P421（供給3）: 不足発生時点の契約欄を導出する。
+  * 対象ファイルについては自己コード索引の既存の公開面（export・
+  * export 済みシグネチャ・import）を、生産者不足については
+  * construction gap の NO_COMPATIBLE_PRODUCER が持つスロット名と
+  * 期待入力種別を、それぞれ構造化して返す。索引に項目が無い対象や
+  * 公開面が空の対象は契約に含めない（導出できないものを捏造しない）。
+  * 全て空なら undefined を返し、gap 記録に contract 自体を持たせない。
+  * 上限は既存の gap 項目の粒度（constructionGaps は12件まで）に
+  * 合わせ、ブラックボード記録が肥大化しない範囲に抑える。
+  * 索引の取得に失敗しても生成の失敗経路自体は壊さない。
+  */
+ private buildGapContract(targetPaths:string[],constructionGapRequirements:string[]):CandidateGenerationGapContract|undefined{
+  const truncate=(value:string,max:number):string=>value.length>max?value.slice(0,max):value;
+  const targets:CandidateGenerationGapContractTarget[]=[];
+  try{
+    let snapshot=selfCodeUnderstandingService.getSnapshot();
+    const coversTargets=(snap:typeof snapshot):boolean=>Boolean(snap?.entries.some(entry=>targetPaths.includes(entry.path)));
+    if(!coversTargets(snapshot)){
+      selfCodeUnderstandingService.ensure(targetPaths,selfCodeSpaceService.listSourceFiles());
+      snapshot=selfCodeUnderstandingService.getSnapshot();
+    }
+    const entriesByPath=new Map((snapshot?.entries??[]).map(entry=>[entry.path,entry]));
+    for(const path of targetPaths.slice(0,8)){
+      const entry=entriesByPath.get(path);
+      if(!entry)continue;
+      const signatures:CandidateGenerationGapContractSignature[]=entry.symbols
+        .filter(symbol=>symbol.exported)
+        .slice(0,16)
+        .map(symbol=>({
+          name:symbol.name,
+          kind:symbol.kind,
+          parameters:(symbol.parameters??[]).slice(0,8).map(parameter=>truncate(String(parameter),120)),
+          ...(symbol.returnType?{returnType:truncate(symbol.returnType,120)}:{}),
+        }));
+      const exportsList=entry.exports.slice(0,32);
+      if(exportsList.length===0&&signatures.length===0)continue;
+      targets.push({path,exports:exportsList,signatures,imports:entry.imports.slice(0,32)});
+    }
+  }catch{
+    // 索引が使えない場合は対象の契約を付けない（理由は呼び出し側の
+    // gap 記録そのものに既にある。ここで例外にして生成を壊さない）。
+  }
+  const missingSlots:CandidateGenerationGapContract['missingSlots']=[];
+  const missingComponentIds:string[]=[];
+  for(const raw of constructionGapRequirements){
+    const body=raw.startsWith('CONSTRUCTION_GAP:')?raw.slice('CONSTRUCTION_GAP:'.length):raw;
+    if(body.startsWith('NO_COMPATIBLE_PRODUCER:')){
+      const rest=body.slice('NO_COMPATIBLE_PRODUCER:'.length);
+      const first=rest.indexOf(':');
+      const second=first>=0?rest.indexOf(':',first+1):-1;
+      if(first<=0||second<0)continue;
+      const knowledgeId=rest.slice(0,first);
+      const slotName=rest.slice(first+1,second);
+      const inputKinds=rest.slice(second+1).split('|').map(value=>truncate(value.trim(),80)).filter(Boolean).slice(0,8);
+      if(knowledgeId&&slotName&&!missingSlots.some(slot=>slot.knowledgeId===knowledgeId&&slot.slotName===slotName)){
+        missingSlots.push({knowledgeId,slotName,inputKinds});
+      }
+      continue;
+    }
+    const match=body.match(/^(?:CODE_COMPONENT_MISSING|CONSTRUCTION_DEFINITION_MISSING|CODE_COMPONENT_UNLINKED):(.+)$/);
+    if(match&&!missingComponentIds.includes(match[1]))missingComponentIds.push(match[1]);
+  }
+  const slots=missingSlots.slice(0,8);
+  const componentIds=missingComponentIds.slice(0,12);
+  if(targets.length===0&&slots.length===0&&componentIds.length===0)return undefined;
+  return {targets,missingSlots:slots,missingComponentIds:componentIds};
+ }
  private parse(text:string):CandidateGenerationFile[]|undefined{const cleaned=text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');const start=cleaned.indexOf('{');const end=cleaned.lastIndexOf('}');const options=[cleaned,start>=0&&end>start?cleaned.slice(start,end+1):''];for(const option of options){if(!option)continue;try{const value=JSON.parse(option);if(!value||!Array.isArray(value.files))continue;const files:CandidateGenerationFile[]=[];for(const row of value.files){if(typeof row?.path!=='string'||typeof row?.candidateContent!=='string')return undefined;files.push({path:row.path,candidateContent:row.candidateContent,evidenceIds:Array.isArray(row.evidenceIds)?row.evidenceIds.filter((x:unknown):x is string=>typeof x==='string'):[]});}return files;}catch{continue;}}return undefined;}
  private record(runId:string,value:Record<string,unknown>):void{const key='miki_candidate_generation_ledger_v2';let ledger:Record<string,unknown>;try{const raw=storageService.getItem(key);const parsed:unknown=raw?JSON.parse(raw):{};ledger=parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed as Record<string,unknown>:{};}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_READ:${error instanceof Error?error.message:String(error)}`);}const record={runId,...value};try{storageService.setItem(key,JSON.stringify({...ledger,[runId]:record}));const reloadedRaw=storageService.getItem(key);const reloaded:unknown=reloadedRaw?JSON.parse(reloadedRaw):undefined;if(!reloaded||typeof reloaded!=='object'||Array.isArray(reloaded)||(reloaded as Record<string,unknown>)[runId]===undefined)throw new Error('RELOAD_MISSING');const expected=canonicalSha256(record);const actual=canonicalSha256((reloaded as Record<string,unknown>)[runId]);if(actual!==expected)throw new Error('RELOAD_HASH_MISMATCH');}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_WRITE:${error instanceof Error?error.message:String(error)}`);}}
  private parseImplementationMaterials(

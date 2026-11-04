@@ -57,6 +57,8 @@ import { LearningInspectorPanel } from './LearningInspectorPanel';
 import DevelopmentReviewLifecyclePanel from './self_improvement/DevelopmentReviewLifecyclePanel';
 import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewayService';
 import { systemLogger } from '../services/systemLogger';
+import { componentSupplyRequestService } from '../miki/core/services/componentSupplyRequestService';
+import { componentSupplyIntakeService } from '../miki/core/services/componentSupplyIntakeService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
 export interface AutonomousImprovementHomeProps {
@@ -258,11 +260,16 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const [coreResults, setCoreResults] = useState<CoreResult[]>(() =>
     typedImprovementUiGatewayService.getCoreResults(50)
   );
+  // P421（供給3）: 部品供給の状態表示。要求台帳（P419）と受入台帳
+  // （P420）の読み出しだけで足りる範囲とし、新しい永続化は増やさない。
+  const [supplyRequests, setSupplyRequests] = useState(() => componentSupplyRequestService.list());
+  const [supplyIntakes, setSupplyIntakes] = useState(() => componentSupplyIntakeService.list());
 
   // Directive creation inputs
   const [newDirectiveText, setNewDirectiveText] = useState('');
   const [newDirectiveFileName, setNewDirectiveFileName] = useState('pasted-directive.txt');
   const directiveFileInputRef = useRef<HTMLInputElement | null>(null);
+  const supplyReplyFileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedDirectiveId, setSelectedDirectiveId] = useState<string | null>(null);
 
   // Execution triggers state
@@ -296,6 +303,8 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       setWorkspaces(typedImprovementUiGatewayService.getWorkspaces());
       setEvidences(typedImprovementUiGatewayService.getValidationEvidence());
       setCoreResults(typedImprovementUiGatewayService.getCoreResults(50));
+      setSupplyRequests(componentSupplyRequestService.list());
+      setSupplyIntakes(componentSupplyIntakeService.list());
     }, 2000);
 
     return () => {
@@ -313,6 +322,8 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     setWorkspaces(typedImprovementUiGatewayService.getWorkspaces());
     setEvidences(typedImprovementUiGatewayService.getValidationEvidence());
     setCoreResults(typedImprovementUiGatewayService.getCoreResults(50));
+    setSupplyRequests(componentSupplyRequestService.list());
+    setSupplyIntakes(componentSupplyIntakeService.list());
     setRefreshTick((prev) => prev + 1);
   };
 
@@ -668,6 +679,72 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       setActionMessage({
         text: '実行詳細をAI用テキストとしてコピーしました。',
         type: 'success',
+      });
+    }
+  };
+
+  // P419（供給1）: 部品不足で止まった Run から、外部AIへ渡す要求
+  // パッケージ（.zip.txt）を作成して Downloads へ保存する手動導線。
+  const createComponentSupplyPackage = async (detail: any) => {
+    const runId = detail?.intake?.runId;
+    if (!runId) {
+      setActionMessage({
+        text: '部品供給パッケージを作成できません: この実行には受付Runが紐付いていません。',
+        type: 'error',
+      });
+      return;
+    }
+    setActionMessage({ text: '部品供給パッケージを作成しています…', type: 'info' });
+    const result = await componentSupplyRequestService.createPackage(runId);
+    if (!result.ok || !result.artifact) {
+      const reasons = result.reasons?.length ? `（${result.reasons.join(' / ')}）` : '';
+      setActionMessage({
+        text: `部品供給パッケージを作成できません: ${result.message}${reasons}`,
+        type: 'error',
+      });
+      return;
+    }
+    const saved = await componentSupplyRequestService.savePackageToDownloads(result.artifact);
+    setActionMessage(
+      saved
+        ? {
+            text: `部品供給パッケージを保存しました: ${result.artifact.fileName}（要求ID: ${result.artifact.requestId}）。このファイルを外部AIへ渡してください。`,
+            type: 'success',
+          }
+        : {
+            text: `部品供給パッケージは作成しましたが、Downloadsへ保存できませんでした（要求ID: ${result.artifact.requestId}）。`,
+            type: 'error',
+          }
+    );
+  };
+
+  // P420（供給2）: 外部AIから返ってきた部品供給の返却物（.zip / .zip.txt）を
+  // 取り込む手動導線。結び付け検証とベースライン照合を通った候補だけが、
+  // 検証待ちの部品候補として新しい実行へ接続される。
+  const handleSupplyReplyFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setActionMessage({ text: '部品供給の返却物を照合しています…', type: 'info' });
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const result = await componentSupplyIntakeService.receiveReply({ fileName: file.name, bytes });
+      if (result.ok && result.record) {
+        setActionMessage({
+          text: `部品供給の返却を受け付けました（要求ID: ${result.record.requestId} / 供給者: ${result.record.supplier?.name ?? '不明'}）。新しい実行 ${result.runId} を作成し、供給部品は検証待ちの候補として接続しました。`,
+          type: 'success',
+        });
+      } else {
+        const reasons = result.reasons?.length ? `（${result.reasons.join(' / ')}）` : '';
+        setActionMessage({
+          text: `部品供給の返却を受け付けられません: ${result.message}${reasons}`,
+          type: 'error',
+        });
+      }
+    } catch (error) {
+      setActionMessage({
+        text: `部品供給の返却を受け付けられません: ${error instanceof Error ? error.message : String(error)}`,
+        type: 'error',
       });
     }
   };
@@ -1066,6 +1143,95 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* P421（供給3）: 部品供給の状態（要求台帳・受入台帳の表示） */}
+            <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Boxes className="w-4 h-4 text-emerald-400" />
+                  部品供給（外部AIへの素材依頼）
+                </h3>
+                <span className="text-[11px] text-slate-400">
+                  要求 {supplyRequests.length} 件 / 受入 {supplyIntakes.length} 件
+                </span>
+              </div>
+
+              {supplyRequests.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500 bg-slate-950/40 rounded-lg border border-slate-800/40">
+                  部品供給の要求はまだありません。部品不足で止まった実行の詳細から「部品供給パッケージ作成」で発行できます
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-800/60 border border-slate-800/60 rounded-lg overflow-hidden">
+                  {supplyRequests.slice(0, 5).map((request) => {
+                    const badge =
+                      request.status === 'RECEIVED'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : request.status === 'REJECTED'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        : request.status === 'CANCELLED'
+                        ? 'bg-slate-700/40 text-slate-300 border border-slate-600/40'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40';
+                    const statusLabel =
+                      request.status === 'ISSUED'
+                        ? '発行済み（返却待ち）'
+                        : request.status === 'RECEIVED'
+                        ? '受入済み'
+                        : request.status === 'REJECTED'
+                        ? '却下'
+                        : '取消';
+                    return (
+                      <div key={request.requestId} className="p-3 bg-slate-900/40 text-xs space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-emerald-300 text-[11px] truncate">{request.requestId}</span>
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${badge}`}>{statusLabel}</span>
+                        </div>
+                        <div className="text-slate-200 font-medium truncate">{request.objective}</div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                          <span>対象: {request.targetFiles.map((file) => file.path).join(', ') || '―'}</span>
+                          <span>発行: {fmtTime(request.issuedAt)}</span>
+                          <span>更新: {fmtTime(request.updatedAt)}</span>
+                        </div>
+                        {request.statusNote && (
+                          <div className="text-[10px] text-slate-400 truncate">注記: {request.statusNote}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {supplyIntakes.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-semibold text-slate-300">受入結果（直近）</div>
+                  <div className="divide-y divide-slate-800/60 border border-slate-800/60 rounded-lg overflow-hidden">
+                    {supplyIntakes.slice(0, 5).map((intake) => (
+                      <div key={intake.intakeId} className="p-3 bg-slate-900/40 text-xs space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-teal-300 text-[11px] truncate">{intake.requestId}</span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${
+                              intake.status === 'RECEIVED'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            }`}
+                          >
+                            {intake.status === 'RECEIVED' ? '受入' : '却下'}（{intake.code}）
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                          <span>供給者: {intake.supplier?.name || '不明'}</span>
+                          <span>受入: {fmtTime(intake.receivedAt)}</span>
+                          {intake.newRunId && <span>新しい実行: {intake.newRunId}</span>}
+                        </div>
+                        {intake.status === 'REJECTED' && intake.reasons.length > 0 && (
+                          <div className="text-[10px] text-rose-300/80 truncate">理由: {intake.reasons[0]}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -1503,6 +1669,29 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                     >
                       <Download className="w-3.5 h-3.5" />
                       ファイルに保存
+                    </button>
+                    <button
+                      onClick={() => createComponentSupplyPackage(detail)}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-semibold flex items-center gap-1.5 transition"
+                      title="部品不足で止まったこの実行について、外部AIへ渡す部品供給パッケージ（.zip.txt）を作成してDownloadsへ保存"
+                    >
+                      <Boxes className="w-3.5 h-3.5" />
+                      部品供給パッケージ作成
+                    </button>
+                    <input
+                      ref={supplyReplyFileInputRef}
+                      type="file"
+                      accept=".zip,.txt,application/zip,text/plain"
+                      onChange={handleSupplyReplyFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => supplyReplyFileInputRef.current?.click()}
+                      className="px-2.5 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-[11px] font-semibold flex items-center gap-1.5 transition"
+                      title="外部AIから返ってきた部品供給の返却物（.zip / .zip.txt）を取り込む。要求との結び付けとベースラインを照合し、通った候補だけが検証待ちの部品候補として新しい実行へ接続される"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      部品供給の返却を取り込む
                     </button>
                     <button
                       onClick={() => copyAllCheckpoints(detail)}
