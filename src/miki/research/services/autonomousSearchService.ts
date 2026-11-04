@@ -40,7 +40,7 @@ export interface AutonomousSearchStats {
   lastSearchAt?:number;
 }
 
-export type SearchProviderName = 'searxng';
+export type SearchProviderName = 'searxng' | 'wikipedia' | 'openalex';
 
 export type SearchProviderExecutionStatus =
   | 'SUCCEEDED'
@@ -134,6 +134,50 @@ function classifySearxngUnresponsive(rawEntries: unknown): {
   };
 }
 
+// P416: free supplemental providers (Wikipedia / OpenAlex) run in
+// parallel with the SearXNG main route under a hard 3-second cap
+// (method A of the 2026-11-04 free-source survey): the main route is
+// never waited on, whatever arrives inside the cap is merged, and a
+// supplement that misses the cap simply does not exist for that
+// search. Supplements get no retry of their own (retries stay
+// centralized in the main route: P361/P414/P415) and a supplement
+// failure never fails the search as a whole.
+const SUPPLEMENTAL_PROVIDER_TIMEOUT_MS = 3000;
+
+// Wikimedia's User-Agent policy asks for an identifiable agent
+// string. This carries the project's public repository URL only --
+// no personal contact information (no mail address) is ever sent.
+const SUPPLEMENTAL_USER_AGENT = 'MIKI-AI/1.0 (https://github.com/SimpleRPG/MIKI-AI0.2)';
+
+// API endpoints are overridable through storage keys (same pattern
+// as miki_searxng_base_url) so the endpoints can be pointed at a
+// stub in verification and, if ever needed, at a mirror in operation.
+function readSupplementalApiUrl(storageKey: string, fallback: string): string {
+  try {
+    const value = storageService.getItem(storageKey);
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  } catch {
+    // fall through to the default endpoint
+  }
+  return fallback;
+}
+
+// OpenAlex returns abstracts as an inverted index (word -> positions).
+// Rebuild the plain text so it can ride the normal snippet field.
+function reconstructOpenAlexAbstract(invertedIndex: unknown): string {
+  if (!invertedIndex || typeof invertedIndex !== 'object') return '';
+  const words: string[] = [];
+  for (const [word, positions] of Object.entries(invertedIndex as Record<string, unknown>)) {
+    if (!Array.isArray(positions)) continue;
+    for (const position of positions) {
+      if (typeof position === 'number' && Number.isInteger(position) && position >= 0) {
+        words[position] = word;
+      }
+    }
+  }
+  return words.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 function canonicalizeSearchUrl(url: string): string {
   const trimmed = String(url || '').trim();
   if (!trimmed) return '';
@@ -216,15 +260,16 @@ export function applyContentIndependenceClusters<T extends { title: string; snip
 }
 
 /**
- * SearXNG単一Providerの結果を、固定ルールで整列・重複排除する。
- * maxResultsは取得上限として扱う。
+ * Provider結果を、固定ルールで整列・重複排除する。
+ * maxResultsは取得上限として扱う（合流上限は成功Provider数に応じて広がるため、
+ * 補助Providerの結果が主経路SearXNGの結果を押し出すことはない）。
  */
 export function mergeSearchResults(
   outputs: ProviderSearchOutput[],
   preferredProvider: 'auto' | SearchProviderName = 'auto',
   maxResults = 4,
 ): WebSearchResultItem[] {
-  const preferredOrder: SearchProviderName[] = ['searxng'];
+  const preferredOrder: SearchProviderName[] = ['searxng', 'wikipedia', 'openalex'];
 
   const rank = new Map(preferredOrder.map((provider, index) => [provider, index]));
   const successfulProviderCount = outputs.filter((output) => output.results.length > 0).length;
@@ -279,6 +324,8 @@ export function mergeSearchResults(
 function createProviderStatuses(): Record<SearchProviderName, SearchProviderStatusRecord> {
   return {
     searxng: { provider: 'searxng', status: 'FAILED', error: 'NOT_RUN' },
+    wikipedia: { provider: 'wikipedia', status: 'FAILED', error: 'NOT_RUN' },
+    openalex: { provider: 'openalex', status: 'FAILED', error: 'NOT_RUN' },
   };
 }
 
@@ -555,6 +602,8 @@ export class AutonomousSearchService {
         providers: [],
         providerStatuses: {
           searxng: { provider: 'searxng', status: 'SKIPPED' },
+          wikipedia: { provider: 'wikipedia', status: 'SKIPPED' },
+          openalex: { provider: 'openalex', status: 'SKIPPED' },
         },
       };
       this.cache.set(cacheKey, { data: mockOutput, timestamp: Date.now() });
@@ -694,29 +743,189 @@ export class AutonomousSearchService {
       };
     };
 
+    // P416: supplemental free providers. Both attempts receive the
+    // same sanitized safeQuery the main route uses -- no unsanitized
+    // text ever leaves through a side channel -- and every fetch is
+    // bounded by SUPPLEMENTAL_PROVIDER_TIMEOUT_MS. Attempts never
+    // throw: any failure is recorded in providerStatuses only.
+    const attemptWikipedia = async (): Promise<ProviderSearchOutput | null> => {
+      try {
+        const langs = ['ja', 'en'] as const;
+        const perLang = await Promise.allSettled(langs.map(async (lang) => {
+          const apiUrl = readSupplementalApiUrl(
+            `miki_wikipedia_${lang}_api_url`,
+            `https://${lang}.wikipedia.org/w/api.php`,
+          );
+          const url = new URL(apiUrl);
+          url.searchParams.set('action', 'query');
+          url.searchParams.set('generator', 'search');
+          url.searchParams.set('gsrsearch', safeQuery);
+          url.searchParams.set('gsrnamespace', '0');
+          url.searchParams.set('gsrlimit', String(maxResults));
+          url.searchParams.set('prop', 'extracts|info');
+          url.searchParams.set('inprop', 'url');
+          url.searchParams.set('exintro', '1');
+          url.searchParams.set('explaintext', '1');
+          url.searchParams.set('format', 'json');
+          url.searchParams.set('formatversion', '2');
+          url.searchParams.set('origin', '*');
+          const res = await fetch(url.toString(), {
+            signal: AbortSignal.timeout(SUPPLEMENTAL_PROVIDER_TIMEOUT_MS),
+            headers: { 'User-Agent': SUPPLEMENTAL_USER_AGENT, Accept: 'application/json' },
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const pages = Array.isArray(data?.query?.pages) ? [...data.query.pages] : [];
+          pages.sort((a: any, b: any) => (a?.index ?? 999) - (b?.index ?? 999));
+          return pages
+            .filter((page: any) => page?.title && page?.fullurl)
+            .slice(0, maxResults)
+            .map((page: any) => ({
+              title: String(page.title),
+              snippet: String(page.extract || '').replace(/\s+/g, ' ').trim().slice(0, 400),
+              url: String(page.fullurl),
+              source: 'Wikipedia (API)',
+            }));
+        }));
+        const flatItems = perLang.flatMap((entry) => (entry.status === 'fulfilled' ? entry.value : []));
+        if (flatItems.length === 0) {
+          const firstRejection = perLang.find((entry) => entry.status === 'rejected') as
+            | PromiseRejectedResult
+            | undefined;
+          if (firstRejection && perLang.every((entry) => entry.status === 'rejected')) {
+            const reason = firstRejection.reason?.name === 'TimeoutError'
+              ? 'タイムアウト'
+              : firstRejection.reason?.message || String(firstRejection.reason);
+            markProvider('wikipedia', 'FAILED', reason);
+            systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [Wikipedia] 探索経路失敗: ${reason}`);
+          } else {
+            markProvider('wikipedia', 'EMPTY');
+          }
+          return null;
+        }
+        const results: WebSearchResultItem[] = flatItems.map((item) => {
+          const canonicalUrl = canonicalizeSearchUrl(item.url);
+          const identity = deriveSourceIdentity('wikipedia', item, canonicalUrl);
+          return { ...item, sourceId: identity.sourceId, independenceClusterId: identity.independenceClusterId };
+        });
+        applyContentIndependenceClusters(results);
+        markProvider('wikipedia', 'SUCCEEDED');
+        systemLogger.info('SELF_IMPROVEMENT', `🔍 [Wikipedia] 検索成功: ${results.length}件`);
+        return { provider: 'wikipedia', results };
+      } catch (error: any) {
+        const reason = error?.name === 'TimeoutError' ? 'タイムアウト' : error?.message || String(error);
+        markProvider('wikipedia', 'FAILED', reason);
+        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [Wikipedia] 探索経路失敗: ${reason}`);
+        return null;
+      }
+    };
+
+    const attemptOpenAlex = async (): Promise<ProviderSearchOutput | null> => {
+      try {
+        const apiUrl = readSupplementalApiUrl('miki_openalex_api_url', 'https://api.openalex.org/works');
+        const url = new URL(apiUrl);
+        url.searchParams.set('search', safeQuery);
+        url.searchParams.set('per-page', String(maxResults));
+        url.searchParams.set('select', 'id,display_name,doi,publication_year,abstract_inverted_index,primary_location');
+        // P416: deliberately no mailto parameter. The polite pool
+        // would transmit a contact mail address to OpenAlex; no user
+        // address is used (and no setting for one is created), so
+        // this provider runs on the anonymous pool by design.
+        const res = await fetch(url.toString(), {
+          signal: AbortSignal.timeout(SUPPLEMENTAL_PROVIDER_TIMEOUT_MS),
+          headers: { 'User-Agent': SUPPLEMENTAL_USER_AGENT, Accept: 'application/json' },
+        });
+        if (!res.ok) {
+          const reason = `HTTP ${res.status}`;
+          markProvider('openalex', 'FAILED', reason);
+          systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [OpenAlex] 応答失敗: ${reason}`);
+          return null;
+        }
+        const data = await res.json();
+        const works = Array.isArray(data?.results) ? data.results : [];
+        const flatItems = works
+          .filter((work: any) => work && (work.display_name || work.title))
+          .slice(0, maxResults)
+          .map((work: any) => {
+            const abstract = reconstructOpenAlexAbstract(work.abstract_inverted_index);
+            const venue = typeof work?.primary_location?.source?.display_name === 'string'
+              ? work.primary_location.source.display_name
+              : '';
+            const year = typeof work?.publication_year === 'number' ? work.publication_year : undefined;
+            const snippet = (abstract || [venue, year ? String(year) : ''].filter(Boolean).join(' · ')).slice(0, 400);
+            const itemUrl =
+              (typeof work.doi === 'string' && work.doi) ||
+              (typeof work?.primary_location?.landing_page_url === 'string' && work.primary_location.landing_page_url) ||
+              (typeof work.id === 'string' && work.id) ||
+              '';
+            return {
+              title: String(work.display_name || work.title),
+              snippet,
+              url: itemUrl,
+              source: 'OpenAlex (API)',
+              ...(year ? { publishedDate: String(year) } : {}),
+            };
+          })
+          .filter((item: { url: string }) => Boolean(item.url));
+        if (flatItems.length === 0) {
+          markProvider('openalex', 'EMPTY');
+          return null;
+        }
+        const results: WebSearchResultItem[] = flatItems.map((item) => {
+          const canonicalUrl = canonicalizeSearchUrl(item.url);
+          const identity = deriveSourceIdentity('openalex', item, canonicalUrl);
+          return { ...item, sourceId: identity.sourceId, independenceClusterId: identity.independenceClusterId };
+        });
+        applyContentIndependenceClusters(results);
+        markProvider('openalex', 'SUCCEEDED');
+        systemLogger.info('SELF_IMPROVEMENT', `🔍 [OpenAlex] 検索成功: ${results.length}件`);
+        return { provider: 'openalex', results };
+      } catch (error: any) {
+        const reason = error?.name === 'TimeoutError' ? 'タイムアウト' : error?.message || String(error);
+        markProvider('openalex', 'FAILED', reason);
+        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [OpenAlex] 探索経路失敗: ${reason}`);
+        return null;
+      }
+    };
+
+    const runSupplements = async (): Promise<ProviderSearchOutput[]> => {
+      const settled = await Promise.allSettled([attemptWikipedia(), attemptOpenAlex()]);
+      return settled.flatMap((entry) =>
+        entry.status === 'fulfilled' && entry.value ? [entry.value] : [],
+      );
+    };
+
     /*
-     * P348: 探索経路はSearXNG単一に統一した。Wikipedia／DuckDuckGoへの直接取得は廃止し、
-     * 固定情報（単語・事実）の取得はSearXNG側のエンジンと検索指定（バング記法等）で担う。
-     * SearXNGが結果を返せない場合は、外部へ直接聞きに行かず、その旨を結果として返す。
+     * P348: 探索経路はSearXNG単一に統一した（Wikipedia／DuckDuckGoへの直接取得は廃止）。
+     * P416: ユーザーの方針訂正（2026-11-04：使わないのは「お金がかかる外部」であって
+     * 外部そのものではない）を受け、無料・鍵なしの補助ソース（Wikipedia系・OpenAlex）を
+     * 方式A（主経路と並列・3秒期限・再試行なし）で再接続した。主経路はSearXNGのままで、
+     * 補助は合流と裏付け（独立クラスタ）の補完に留まる。
      */
+    const supplementsPromise = runSupplements();
     const searxngRun = await runSearxng();
+    const supplementOutputs = await supplementsPromise;
     const searxngOutput = searxngRun.output;
     const emptyReason = searxngRun.emptyReason;
-    const outputs: ProviderSearchOutput[] =
-      searxngOutput && searxngOutput.results.length > 0 ? [searxngOutput] : [];
+    const outputs: ProviderSearchOutput[] = [
+      ...(searxngOutput && searxngOutput.results.length > 0 ? [searxngOutput] : []),
+      ...supplementOutputs,
+    ];
 
     const mergedResults = mergeSearchResults(outputs, preferred, maxResults);
-    const successfulProviders = (['searxng'] as SearchProviderName[]).filter(
+    const successfulProviders = (['searxng', 'wikipedia', 'openalex'] as SearchProviderName[]).filter(
       (provider) => providerStatuses[provider].status === 'SUCCEEDED',
     );
 
+    const providerLabel = (provider: SearchProviderName): string =>
+      provider === 'searxng' ? 'SearXNG' : provider === 'wikipedia' ? 'Wikipedia' : 'OpenAlex';
     const result: AutonomousSearchExecutionResult = {
       results: mergedResults,
       summary:
         mergedResults[0]?.snippet ||
         (successfulProviders.length
-          ? `「${safeQuery}」についてSearXNGから候補を取得しました。`
-          : `「${safeQuery}」についてSearXNGから結果を取得できませんでした。`),
+          ? `「${safeQuery}」について${successfulProviders.map(providerLabel).join('・')}から候補を取得しました。`
+          : `「${safeQuery}」について結果を取得できませんでした。`),
       provider: successfulProviders[0] || 'searxng',
       providers: successfulProviders,
       providerStatuses,
