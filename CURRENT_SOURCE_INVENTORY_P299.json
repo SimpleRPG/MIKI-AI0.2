@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1753,
     "sourceFileCount": 1306,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1219,
-    "relativeImportCandidateCount": 3685,
-    "resolvedRelativeImportCandidateCount": 3669,
+    "relativeImportCandidateCount": 3686,
+    "resolvedRelativeImportCandidateCount": 3670,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -17245,9 +17245,9 @@
     },
     {
       "path": "src/miki/core/services/requiredAssetAcquisitionService.ts",
-      "bytes": 33957,
-      "lines": 856,
-      "sha256": "1fe829ef8d2e6ab35df76eded0d2789d2afea1dc6637a2f7cceabc42069d0ea2",
+      "bytes": 37373,
+      "lines": 921,
+      "sha256": "2e9d9eb2d72220f3bab8b245ba9f0943d446a743c2c50e51ef6693733b96d512",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17322,14 +17322,20 @@
           "resolvedPath": "src/services/evidenceService.ts"
         },
         {
-          "line": 16,
+          "line": 13,
+          "specifier": "../../../services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 17,
           "specifier": "../../research/services/japaneseAnalysisService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
         }
       ],
-      "relativeImportCandidateCount": 13,
-      "resolvedRelativeImportCount": 13,
+      "relativeImportCandidateCount": 14,
+      "resolvedRelativeImportCount": 14,
       "unresolvedRelativeImportCount": 0
     },
     {

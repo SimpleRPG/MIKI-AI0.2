@@ -10,6 +10,7 @@ import { missingAssetValidationService } from './missingAssetValidationService';
 import { missingCapabilityRecoveryService } from './missingCapabilityRecoveryService';
 import { verifierService } from '../../verification/services/verifierService';
 import { evidenceService } from '../../../services/evidenceService';
+import { claimDatabaseService } from '../../../services/claimDatabaseService';
 import {
   japaneseAnalysisService,
   contentTermsFromTokens,
@@ -204,7 +205,17 @@ class RequiredAssetAcquisitionService {
     const uniqueWebEvidenceIds = [...new Set(webEvidenceIds)];
     const uniqueLinkedEvidenceIds = [...new Set(linkedEvidenceIds)];
     const uniqueUnlinkedEvidenceIds = [...new Set(unlinkedEvidenceIds)];
-    const draftAssets=missingAssetSynthesisService.synthesize({runId:input.runId,taskId:input.taskId,objective:input.objective,requirements:expandedReasons,evidenceIds,requestedDrafts});
+    /*
+     * P426 B3 (系譜の数えの統一): draft の系譜は、この呼び出しで
+     * 新規に取れた証拠だけでなく、タスクに既に記録された証拠系譜
+     * （ブラックボードのエントリ evidenceIds の和集合＝実行詳細の
+     * ヘッダー表示と同じ集合）を含む。従来は今回分だけを渡して
+     * いたため、証拠を蓄積済みのタスクでも draft 検証が
+     * evidence=0 になり、その理由が回復全体の理由へ混入して
+     * 「証拠が無い」ように見えていた。読みは一方向で、Claim／
+     * 証拠の台帳へ書き戻すことはしない。
+     */
+    const draftAssets=missingAssetSynthesisService.synthesize({runId:input.runId,taskId:input.taskId,objective:input.objective,requirements:expandedReasons,evidenceIds:[...new Set([...evidenceIds,...this.taskLineageEvidenceIds(input.taskId)])],requestedDrafts});
     const draftValidations=missingAssetValidationService.validateAll(draftAssets);
     for(const validation of draftValidations){missingAssetSynthesisService.updateValidation(validation.draftId,{status:validation.status,validationId:validation.validationId,validationReasons:validation.reasons});}
     const verifiedDrafts=draftAssets.filter(draft=>draftValidations.some(validation=>validation.draftId===draft.draftId&&validation.passed));
@@ -514,7 +525,7 @@ class RequiredAssetAcquisitionService {
       request.evidenceIds = [
         ...new Set([...request.evidenceIds, ...evidenceIds]),
       ];
-      const evidenceAcquired = evidenceIds.length > 0 && unlinkedEvidenceIds.length === 0;
+      let evidenceAcquired = evidenceIds.length > 0 && unlinkedEvidenceIds.length === 0;
       request.status = evidenceAcquired ? 'ACQUIRED' : 'BLOCKED';
 
       systemLogger.info(
@@ -573,6 +584,40 @@ class RequiredAssetAcquisitionService {
             independentEvidenceCount: reevaluated.independentEvidenceCount,
           }),
         );
+
+        /*
+         * P426 B3 (決着の消費): 再評価で Claim が決着したら、この
+         * 回復が取得すべきものは残っていない。決着とは、検証器自身
+         * が従来の厳格なルールのまま昇格させた場合
+         * （SUPPORTED／DEVICE_VERIFIED）と、信念改訂で Claim が
+         * 閉じられた場合（FALSE／SUPERSEDED）を指す。その場合は
+         * 要件を ACQUIRED として回復を終え、ループを CORE の再評価
+         * へ戻す。従来は再評価の結果を理由に記録するだけで、決着
+         * した Claim のタスクも証拠待ちを繰り返していた。接続は
+         * 片方向（回復側が Claim の状態を読むだけ）で、ループ側の
+         * 証拠を Claim の台帳へ書き込むことはしない。未決着
+         * （UNRESOLVED／CONTRADICTED 等）では従来どおり待つ。
+         */
+        const settledOutcome =
+          reevaluated.outcome === 'SUPPORTED' || reevaluated.outcome === 'DEVICE_VERIFIED'
+            ? reevaluated.outcome
+            : undefined;
+        const claimAfter = settledOutcome ? undefined : claimDatabaseService.getClaim(claimRoute.claimId);
+        const settledStatus =
+          claimAfter && (claimAfter.status === 'FALSE' || claimAfter.status === 'SUPERSEDED')
+            ? String(claimAfter.status)
+            : undefined;
+        const settled = settledOutcome || settledStatus;
+        if (settled) {
+          acquisitionReasons.push(`CLAIM_RESOLVED:${claimRoute.claimId}:${settled}`);
+          if (!evidenceAcquired) {
+            evidenceAcquired = true;
+            request.status = 'ACQUIRED';
+            request.lastError = undefined;
+            request.updatedAt = Date.now();
+            this.save();
+          }
+        }
       }
 
       return {
@@ -829,6 +874,26 @@ class RequiredAssetAcquisitionService {
     };
     visit(value, 0);
     return [...new Set(output)];
+  }
+
+  /*
+   * P426 B3: タスクに記録された証拠系譜＝ブラックボードの全
+   * エントリが持つ evidenceIds の和集合。ループ自身がタスクの
+   * 証拠を表示・記録するときの導出（エントリ evidenceIds の
+   * flatMap）と同一にし、数える場所ごとに集合がずれないように
+   * する。
+   */
+  private taskLineageEvidenceIds(taskId?: string): string[] {
+    if (!taskId) return [];
+    const task = taskBlackboardService.get(taskId);
+    if (!task) return [];
+    return [
+      ...new Set(
+        task.entries
+          .flatMap(entry => entry.evidenceIds || [])
+          .filter(id => typeof id === 'string' && id.trim().length > 0),
+      ),
+    ];
   }
 
   private save(): void {
