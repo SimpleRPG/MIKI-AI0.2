@@ -71,6 +71,69 @@ function compareStableText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+// P415: every SearXNG response carries an unresponsive_engines list
+// ([engine, reason] pairs) naming the engines that did not contribute
+// to that answer and why. Until P415 nothing in this codebase read it,
+// so an empty answer arrived with its explanation attached and the
+// explanation was thrown away. The classifier below turns the raw
+// reason strings into short labels; a reason that matches no known
+// class keeps its raw text in the summary so no information is lost.
+// "Suspended:" reasons are SearXNG-side engine suspensions (shipped
+// settings: 180s for too many requests / access denied, 3600s for a
+// CAPTCHA), during which the engine is not queried at all.
+interface SearxngUnresponsiveEngine {
+  engine: string;
+  label: string;
+  suspended: boolean;
+}
+
+function classifySearxngUnresponsive(rawEntries: unknown): {
+  summary: string;
+  allSuspended: boolean;
+} {
+  const list = Array.isArray(rawEntries) ? rawEntries : [];
+  const byEngine = new Map<string, SearxngUnresponsiveEngine>();
+  for (const entry of list) {
+    let engine = '';
+    let reason = '';
+    if (Array.isArray(entry)) {
+      engine = String(entry[0] ?? '');
+      reason = String(entry[1] ?? '');
+    } else if (entry && typeof entry === 'object') {
+      const record = entry as Record<string, unknown>;
+      engine = String(record.engine ?? record.name ?? '');
+      reason = String(record.error ?? record.reason ?? record.message ?? '');
+    } else if (typeof entry === 'string') {
+      reason = entry;
+    }
+    engine = engine.trim();
+    reason = reason.trim();
+    if (!engine && !reason) continue;
+    const lower = reason.toLowerCase();
+    const suspended = lower.includes('suspended');
+    let label: string;
+    if (suspended && /too many requests|429/.test(lower)) label = '停止中-リクエスト過多';
+    else if (suspended && lower.includes('captcha')) label = '停止中-CAPTCHA';
+    else if (suspended && /access denied|denied|forbidden|\b40[23]\b/.test(lower)) label = '停止中-アクセス拒否';
+    else if (suspended) label = '停止中';
+    else if (/timeout|timed out/.test(lower)) label = 'タイムアウト';
+    else if (/pars|xpath/.test(lower)) label = '解析エラー';
+    else if (/http|\b[45]\d\d\b/.test(lower)) label = 'HTTPエラー';
+    else label = 'その他';
+    // Keep the raw text whenever the label alone would lose the
+    // actual reason (generic suspension, HTTP error, unknown text).
+    const keepRaw = label === '停止中' || label === 'HTTPエラー' || label === 'その他';
+    const text = keepRaw && reason ? `${label}（${reason.slice(0, 80)}）` : label;
+    const key = engine || '(unknown)';
+    byEngine.set(key, { engine: key, label: text, suspended });
+  }
+  const engines = [...byEngine.values()].slice(0, 8);
+  return {
+    summary: engines.map((item) => `${item.engine}=${item.label}`).join('、'),
+    allSuspended: engines.length > 0 && engines.every((item) => item.suspended),
+  };
+}
+
 function canonicalizeSearchUrl(url: string): string {
   const trimmed = String(url || '').trim();
   if (!trimmed) return '';
@@ -514,7 +577,7 @@ export class AutonomousSearchService {
       };
     };
 
-    const attemptSearxng = async (): Promise<{ output: ProviderSearchOutput | null; retryable: boolean; empty: boolean }> => {
+    const attemptSearxng = async (): Promise<{ output: ProviderSearchOutput | null; retryable: boolean; empty: boolean; emptyReason?: string }> => {
       try {
         const searxSettings = getSearxngSearchSettings();
         const searxUrl = buildSearxngSearchUrl(searxSettings, safeQuery);
@@ -535,8 +598,26 @@ export class AutonomousSearchService {
           // runSearxng only when the pass still ends empty after the
           // retry, so the line keeps its meaning (this search ended
           // with no results) instead of firing per attempt.
-          markProvider('searxng', 'EMPTY');
-          return { output: null, retryable: true, empty: true };
+          // P415: the same response says WHY it is empty
+          // (unresponsive_engines). Classify and keep that reason: it
+          // rides providerStatuses and the failure summary into the
+          // research record instead of being discarded.
+          const unresponsive = classifySearxngUnresponsive((searxData as any)?.unresponsive_engines);
+          const emptyReason = unresponsive.summary || undefined;
+          markProvider('searxng', 'EMPTY', emptyReason);
+          return {
+            output: null,
+            // P415: P414's single retry stays for empties that look
+            // transient (timeouts, parse errors, mixed causes, or no
+            // reason information at all). When every silent engine is
+            // under a SearXNG suspension (>= 180s by the shipped
+            // settings) an immediate retry cannot succeed, so the
+            // pass ends here and the research layer's evidence-wait
+            // backoff becomes the wait instead.
+            retryable: !unresponsive.allSuspended,
+            empty: true,
+            emptyReason,
+          };
         }
 
         const results: WebSearchResultItem[] = hits.slice(0, maxResults).map((hit: any) => {
@@ -587,16 +668,30 @@ export class AutonomousSearchService {
     // made a transient zero permanent for that search while fetch
     // failures were already retried. A pass that still ends empty
     // logs 検索結果0件 exactly once here and stays EMPTY downstream.
-    const runSearxng = async (): Promise<ProviderSearchOutput | null> => {
+    // P415: that retry is now skipped when the empty answer's reasons
+    // are all SearXNG engine suspensions -- the engines stay silent
+    // for at least 180s, so an immediate second attempt would only
+    // repeat the same empty answer. The reason summary is returned
+    // alongside so the final log line and the search summary can
+    // state what limited the search.
+    const runSearxng = async (): Promise<{ output: ProviderSearchOutput | null; emptyReason?: string }> => {
       let attempt = await attemptSearxng();
       if (!attempt.output && attempt.retryable) {
         systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 一時的な失敗のため1回だけ再試行します');
         attempt = await attemptSearxng();
       }
       if (!attempt.output && attempt.empty) {
-        systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [SearXNG] 検索結果0件');
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          attempt.emptyReason
+            ? `ℹ️ [SearXNG] 検索結果0件（理由: ${attempt.emptyReason}）`
+            : 'ℹ️ [SearXNG] 検索結果0件',
+        );
       }
-      return attempt.output;
+      return {
+        output: attempt.output,
+        emptyReason: !attempt.output && attempt.empty ? attempt.emptyReason : undefined,
+      };
     };
 
     /*
@@ -604,7 +699,9 @@ export class AutonomousSearchService {
      * 固定情報（単語・事実）の取得はSearXNG側のエンジンと検索指定（バング記法等）で担う。
      * SearXNGが結果を返せない場合は、外部へ直接聞きに行かず、その旨を結果として返す。
      */
-    const searxngOutput = await runSearxng();
+    const searxngRun = await runSearxng();
+    const searxngOutput = searxngRun.output;
+    const emptyReason = searxngRun.emptyReason;
     const outputs: ProviderSearchOutput[] =
       searxngOutput && searxngOutput.results.length > 0 ? [searxngOutput] : [];
 
@@ -636,7 +733,14 @@ export class AutonomousSearchService {
 
     return {
       ...result,
-      summary: `「${safeQuery}」の検索に失敗しました（各Providerの状態はproviderStatusesを参照）。`,
+      // P415: when the pass ended empty and SearXNG said why, the
+      // summary carries the classified reasons. This summary is what
+      // researchService copies into ResearchResult.summary, so the
+      // limiting cause stays readable in the run detail (and in the
+      // WAITING_EVIDENCE record) instead of only in this log stream.
+      summary: emptyReason
+        ? `「${safeQuery}」の検索に失敗しました。空の理由: ${emptyReason}（各Providerの状態はproviderStatusesを参照）。`
+        : `「${safeQuery}」の検索に失敗しました（各Providerの状態はproviderStatusesを参照）。`,
     };
   }
 
