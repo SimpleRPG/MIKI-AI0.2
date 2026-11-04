@@ -181,6 +181,7 @@ function buildCompositionGapMeaning(input:{
   gapDescriptions:string[];
   gapReason:string;
   gapContractSummary?:string;
+  liveTargetSummary?:string;
 }):string {
   return [
     '自律コード改善で必要な実装能力（検証済みCODE Component・実装パターン）が不足している。',
@@ -193,7 +194,45 @@ function buildCompositionGapMeaning(input:{
       ? [`gapDescriptions=${input.gapDescriptions.join(' || ')}`]
       : ['gapDescriptions=none recorded (generation did not leave a gap breakdown)']),
     ...(input.gapContractSummary ? [`gapContract=${input.gapContractSummary}`] : []),
+    ...(input.liveTargetSummary ? [`liveTargetSurface=${input.liveTargetSummary}`] : []),
   ].join(' ');
+}
+
+/*
+ * P427 A3 第1段（live 狭窄）: gap 記録が空（内訳・理由・契約の
+ * いずれも無い）でも対象パスが既知なら、自己コード索引の現在
+ * スナップショットから対象の公開面を live に要約して意味文へ
+ * 補う。呼び出し側は「記録が空」のときだけ本関数を使う（記録が
+ * 実在する場合は記録が正であり、live 要約で上書きしない）。
+ * 索引に無い対象・公開面が空の対象は行に出さない（捏造しない）。
+ * 要約の粒度は summarizeGapContract の contractTargets と同型。
+ * 部品供給側の「記録済み契約が無い場合に索引から再構成する」
+ * フォールバック（componentSupplyRequestService）と同型の読み。
+ */
+function liveTargetSurfaceSummary(targetPaths:string[]):string {
+  if(targetPaths.length===0) return '';
+  let entries:Array<{path?:unknown;exports?:unknown}>=[];
+  try {
+    entries=(selfCodeUnderstandingService.getSnapshot()?.entries ?? []) as typeof entries;
+  } catch {
+    entries=[];
+  }
+  const exportsByPath=new Map<string,string[]>();
+  for(const entry of entries){
+    const path=typeof entry?.path==='string' ? entry.path : '';
+    if(!path || exportsByPath.has(path)) continue;
+    const exportsList=Array.isArray(entry?.exports)
+      ? entry.exports.map(value=>String(value)).filter(Boolean).slice(0,16)
+      : [];
+    exportsByPath.set(path,exportsList);
+  }
+  const targetTexts:string[]=[];
+  for(const path of targetPaths.slice(0,8)){
+    const exportsList=exportsByPath.get(path);
+    if(!exportsList || exportsList.length===0) continue;
+    targetTexts.push(`${path}[exports:${exportsList.join('/')}]`);
+  }
+  return targetTexts.join(', ');
 }
 
 /*
@@ -809,6 +848,15 @@ class AdaptiveRoutePlannerService {
         : undefined;
       const gapContractSummary=summarizeGapContract(gapContract);
 
+      // P427 A3 第1段: gap 記録が空（内訳・理由・契約のいずれも
+      // 無い）ときだけ、対象の公開面を自己コード索引から live に
+      // 補う。記録が実在する場合は従来どおり記録が正であり、
+      // 補いは発動しない。
+      const liveTargetSummary=
+        gapDescriptions.length===0 && !String(gapValue?.synthesisGapReason||'') && !gapContractSummary
+          ? liveTargetSurfaceSummary(coreTargetPaths)
+          : '';
+
       const latestResolution=[...task.entries]
         .map((entry,index)=>({entry,index}))
         .reverse()
@@ -832,6 +880,7 @@ class AdaptiveRoutePlannerService {
               gapDescriptions,
               gapReason:String(gapValue?.synthesisGapReason||''),
               gapContractSummary,
+              liveTargetSummary,
             });
 
         routes.push({
@@ -947,6 +996,7 @@ class AdaptiveRoutePlannerService {
                   gapDescriptions,
                   gapReason:String(gapValue?.synthesisGapReason||''),
                   gapContractSummary,
+                  liveTargetSummary,
                 }));
 
         routes.push({

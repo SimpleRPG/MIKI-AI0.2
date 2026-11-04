@@ -12235,9 +12235,9 @@
     },
     {
       "path": "src/miki/core/services/adaptiveRoutePlannerService.ts",
-      "bytes": 150328,
-      "lines": 3312,
-      "sha256": "456a9bd6951e944c0b8ac3046d44255f5b6ce2faf1c4aa14ded7cd26e1f71265",
+      "bytes": 152783,
+      "lines": 3362,
+      "sha256": "4e9cee62a1874b473a5358489537a8bd08b3ff38b999d29b7fb440b07ee282e4",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12564,9 +12564,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 56764,
-      "lines": 1188,
-      "sha256": "51cd02d2e444f5e43b37cfffbc8fb7787993148b06b7285dccc4f94c54f93f4d",
+      "bytes": 58360,
+      "lines": 1216,
+      "sha256": "4a1de6f649ecc2077ab125f3fa0391ace57f4cc4d655e11faa2e5d33191e0146",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -16129,9 +16129,9 @@
     },
     {
       "path": "src/miki/core/services/githubCodeMaterialService.ts",
-      "bytes": 43512,
-      "lines": 1076,
-      "sha256": "cd69768e64df4d8f95988fd50b09aadc2e773254abbf4a2befdd3c89666f8488",
+      "bytes": 46194,
+      "lines": 1139,
+      "sha256": "563edf75580507355d91647f79c4352406bed8f03b7a40f5a4869ba29da10c73",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -18297,9 +18297,9 @@
     },
     {
       "path": "src/miki/core/services/stackExchangeMaterialService.ts",
-      "bytes": 32211,
-      "lines": 832,
-      "sha256": "e7babe60d271b75db769cda43ccba67677f1b8082568d150dd11794cdc19dae3",
+      "bytes": 37391,
+      "lines": 939,
+      "sha256": "c2322240ffc845f9f4a50c13806187e1a0b06875ae8c0aafe9cf216f0e31ed6d",
       "relativeImportCandidates": [
         {
           "line": 1,

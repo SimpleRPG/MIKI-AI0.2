@@ -744,7 +744,30 @@ class AutonomousSelfImprovementLoopService {
     request.nextAttemptAt=this.state.retryAt;
     request.waitKind='RESOURCE';
     request.waitReason=reason;
+    this.moveParkedRequestToTail(request);
     this.save();
+  }
+
+  // P427: round-robin rotation for parked requests. drain selects
+  // the first eligible request in array order, and the queue is only
+  // sorted at enqueue time. A request that parks with a short wait
+  // (notably the 5-second progressed evidence wait) becomes eligible
+  // again during the next request's minutes-long execution, so
+  // without rotation the same predecessors win every selection and a
+  // later arrival starves without bound (device: the priority-70
+  // knowledge-gap request behind six rotating predecessors was never
+  // selected in 24 minutes; see キュー停滞_調査報告). Moving a
+  // parked request to the tail bounds every queued request's wait by
+  // the requests ahead of it: each predecessor that runs and parks
+  // goes behind it, and removals only shorten the line. The enqueue
+  // priority order still decides the first pass. Wait durations, the
+  // ladders and attempt accounting are unchanged; only the array
+  // position of the parked request moves.
+  private moveParkedRequestToTail(request: AutonomousImprovementRequest): void {
+    const index = this.state.queue.indexOf(request);
+    if (index < 0 || index === this.state.queue.length - 1) return;
+    this.state.queue.splice(index, 1);
+    this.state.queue.push(request);
   }
 
   private readRecoverySubgoals(taskId: string): RecoverySubgoalRecord[] {
@@ -995,6 +1018,9 @@ class AutonomousSelfImprovementLoopService {
       this.state.status = 'IDLE';
       this.state.lastReason = request.waitReason;
       this.state.retryAt = request.nextAttemptAt;
+      // P427: this is a park (short wait, request stays queued), so
+      // it takes the same round-robin rotation as the wait paths.
+      this.moveParkedRequestToTail(request);
       this.save();
       return;
     }
@@ -1074,6 +1100,7 @@ class AutonomousSelfImprovementLoopService {
     request.nextAttemptAt=this.state.retryAt;
     request.waitKind='EVIDENCE';
     request.waitReason=reason;
+    this.moveParkedRequestToTail(request);
     this.save();
   }
 
@@ -1096,6 +1123,7 @@ class AutonomousSelfImprovementLoopService {
     request.nextAttemptAt=this.state.retryAt;
     request.waitKind='RETRY';
     request.waitReason=reason;
+    this.moveParkedRequestToTail(request);
     this.save();
   }
 

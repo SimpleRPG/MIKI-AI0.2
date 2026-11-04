@@ -48,18 +48,23 @@ import type { CodeMaterialCollectionContext } from './githubCodeMaterialService'
  * 応答に backoff（秒）が含まれれば、その間は
  * 次の 1 リクエストも送らない（検索に backoff が付いた場合は
  * 回答取得も送らない）。throttle_violation は backoff 扱いで
- * 冷却し、理由を残して静かに引く。再試行はしない。1 回の収集の
- * 消費はサイトあたり「検索 1 回＋回答取得 1 回」を上限とし、
- * 主サイト stackoverflow に加えて、ゲーム開発の文脈信号がある
- * 場合のみ gamedev を足す（最大 2 サイト）。
+ * 冷却し、理由を残して静かに引く。原則として再試行はしないが、
+ * P427 で唯一の例外を入れた: 検索が items=0 のときだけ、
+ * accepted フィルタを外して 1 回だけ広げ直す（消費はサイト
+ * あたり「検索最大 2 回＋回答取得 1 回」となり、予算台帳・
+ * backoff の枠内に収まる）。主サイト stackoverflow に加えて、
+ * ゲーム開発の文脈信号がある場合のみ gamedev を足す（最大 2 サイト）。
  *
  * クエリ整形: Stack Exchange の q はタイトル＋本文へのフリー
- * ワード検索であり、自然文の要点語が効く。P422 の整形資産
- * （契約ファースト／索引語彙の照合／JMdict グロス橋渡し）を
- * 流用しつつ、識別子の完全一致へ寄せすぎず「契約識別子＋グロス
- * 変換語＋問いの要点語」を 1 本のクエリへ統合する（サイトあたり
- * 検索 1 回の予算に合わせるため）。対象言語が対象パスの拡張子
- * から確実な場合のみ tagged を付ける。
+ * ワード検索であり、語数に強く敏感である。P427 で、P422 の整形
+ * 資産（索引語彙の照合／JMdict グロス橋渡し）の優先順位を組み
+ * 替えた: q は最大3語とし、優先順位はグロス変換語（一般英語
+ * 語）→ 問いの要点語 → 契約語（camelCase を分割した一般語
+ * としてのみ）。自己コード索引で確認できる内部識別子は丸ごと
+ * 入れない（Stack Overflow の投稿に存在しないため、含む袋は
+ * 必ず0件になる。分離項目調査の VM 実測で切り分け済み）。
+ * 対象言語が対象パスの拡張子から確実な場合のみ tagged を
+ * 付ける。
  *
  * 使用記録（学習の種）: P422 の台帳と同じ流儀で、材料ごとに
  * 当たったクエリとキーワードの材料源、帰属情報を台帳に残す。
@@ -110,6 +115,23 @@ export interface StackExchangeMaterialUsageRecord {
   usedAt?: number;
 }
 
+/*
+ * P427（学習の段階0）: 収集の試行レベル記録。使用台帳は「当たった
+ * 材料」しか残らないため、チャネルごとの成功率（分母）が永遠に
+ * 計算できなかった。試行記録は収集の出口ごとに status・整形クエリ・
+ * キーワード材料源・消費リクエスト数・取得件数を別のキーへ有界で
+ * 残す。空・失敗・スキップも記録する。挙動を変える消費者はまだ
+ * 置かない（将来の重み付け学習の前提工事）。
+ */
+export interface StackExchangeMaterialAttemptRecord {
+  status: StackExchangeMaterialStatusKind;
+  shapedQuery: string;
+  keywordSources: StackExchangeKeywordSource[];
+  requestsUsed: number;
+  materialCount: number;
+  collectedAt: number;
+}
+
 interface ShapedQuery {
   text: string;
   keywordSources: StackExchangeKeywordSource[];
@@ -133,6 +155,8 @@ interface AnswerPick {
 
 const SETTINGS_KEY = 'miki_stackexchange_material_settings_v1';
 const USAGE_KEY = 'miki_stackexchange_material_usage_v1';
+const ATTEMPTS_KEY = 'miki_stackexchange_material_attempts_v1';
+const ATTEMPTS_LEDGER_CAP = 200;
 const QUOTA_KEY = 'miki_stackexchange_material_quota_v1';
 const API_URL_KEY = 'miki_stackexchange_api_url';
 const DEFAULT_API_BASE = 'https://api.stackexchange.com/2.3';
@@ -301,6 +325,12 @@ class StackExchangeMaterialService {
     return this.loadUsage().slice(-Math.max(1, limit));
   }
 
+  // P427（段階0）: 試行レベル記録の読み出し。使用台帳とは別系統で、
+  // 空・失敗を含む収集の全試行が対象（成功率の分母）。
+  listAttempts(limit = 50): StackExchangeMaterialAttemptRecord[] {
+    return this.loadAttempts().slice(-Math.max(1, limit));
+  }
+
   /*
    * 生成試行へ参照材料として届いた時点で呼ばれる使用印。
    * 台帳に無い sourceId は無視する（Web／GitHub 由来の材料など）。
@@ -322,7 +352,8 @@ class StackExchangeMaterialService {
 
   /*
    * 決定的なクエリ整形。Stack Exchange の q はフリーワード検索の
-   * ため、契約識別子・グロス変換語・問いの要点語を 1 本へ統合する。
+   * ため、グロス変換語・問いの要点語・契約の一般語を最大3語の
+   * 1 本へ統合する（P427。内部識別子の丸ごとは入れない）。
    */
   buildQueries(
     question: string,
@@ -336,12 +367,26 @@ class StackExchangeMaterialService {
     question: string,
     context?: CodeMaterialCollectionContext,
   ): Promise<StackExchangeMaterialOutcome> {
+    // P427（段階0）: 試行記録は収集の全出口（done）で 1 件だけ残す。
+    // 整形前のスキップでは shapedQuery は空になる。
+    let attemptQueryText = '';
+    let attemptKeywordSources: StackExchangeKeywordSource[] = [];
     const done = (
       status: StackExchangeMaterialStatusKind,
       materials: WebImplementationMaterial[],
       requestsUsed: number,
       error?: string,
-    ): StackExchangeMaterialOutcome => ({ materials, status, requestsUsed, ...(error ? { error } : {}) });
+    ): StackExchangeMaterialOutcome => {
+      this.recordAttempt({
+        status,
+        shapedQuery: attemptQueryText,
+        keywordSources: [...attemptKeywordSources],
+        requestsUsed,
+        materialCount: materials.length,
+        collectedAt: Date.now(),
+      });
+      return { materials, status, requestsUsed, ...(error ? { error } : {}) };
+    };
 
     if (!this.getSettings().enabled) {
       return done('SKIPPED', [], 0, 'Stack Exchange材料チャネルは設定で無効です');
@@ -360,6 +405,8 @@ class StackExchangeMaterialService {
     if (!shaped) {
       return done('SKIPPED', [], 0, '問いと契約から検索キーワードを導出できませんでした');
     }
+    attemptQueryText = shaped.text;
+    attemptKeywordSources = [...shaped.keywordSources];
 
     const sites = this.targetSites(safeQuestion, context);
     const deadline = Date.now() + COLLECTION_DEADLINE_MS;
@@ -370,22 +417,45 @@ class StackExchangeMaterialService {
 
     for (const site of sites) {
       if (picks.length >= MAX_MATERIALS || Date.now() > deadline) break;
-      const search = await this.apiGet('/search/advanced', {
+      const searchParams = (accepted: boolean): Record<string, string> => ({
         site,
         q: shaped.text,
-        accepted: 'True',
+        ...(accepted ? { accepted: 'True' } : {}),
         answers: '1',
         order: 'desc',
         sort: 'votes',
         pagesize: '5',
         ...(shaped.tagged && site === PRIMARY_SITE ? { tagged: shaped.tagged } : {}),
       });
+      let search = await this.apiGet('/search/advanced', searchParams(true));
       if (search.kind === 'blocked') {
         // backoff 中・クォータ停止中は発射自体をしていない。
         lastError = search.reason;
         break;
       }
       requestsUsed += search.requestsUsed;
+      if (
+        search.kind === 'ok' &&
+        (Array.isArray(search.data?.items) ? search.data.items.length : 0) === 0
+      ) {
+        // P427: accepted フィルタは母数を大きく削るため、items=0 の
+        // ときだけフィルタを外して 1 回だけ広げ直す（tagged は維持）。
+        // 再検索も apiGet の予算台帳・backoff の枠内であり、消費は
+        // サイトあたり検索最大 2 回＋回答 1 回に収まる。
+        const widened = await this.apiGet('/search/advanced', searchParams(false));
+        if (widened.kind === 'blocked') {
+          lastError = widened.reason;
+          break;
+        }
+        requestsUsed += widened.requestsUsed;
+        if (widened.kind === 'ok') {
+          search = widened;
+        } else {
+          // 広げ直しの失敗で、成功していた初回（0 件）を失敗へ
+          // 格下げはしない。理由だけ残す。
+          lastError = widened.reason;
+        }
+      }
       if (search.kind !== 'ok') {
         lastError = search.reason;
         continue;
@@ -496,10 +566,15 @@ class StackExchangeMaterialService {
     const vocab = this.indexVocabulary();
     const sources = new Set<StackExchangeKeywordSource>();
     const terms: string[] = [];
+    // P427: /search/advanced の q は語数に強く敏感で、珍しい語を
+    // 含む長い袋は実質 AND 的に潰れる（分離項目調査の VM 実測:
+    // 復元形8語はフィルタ全なしでも items=0、短い2語は同じ
+    // フィルタで items=5）。q は最大3語へ絞る。
+    const MAX_QUERY_TERMS = 3;
     const pushTerms = (values: string[], source: StackExchangeKeywordSource, cap: number) => {
       let added = 0;
       for (const value of values) {
-        if (added >= cap || terms.length >= 8) break;
+        if (added >= cap || terms.length >= MAX_QUERY_TERMS) break;
         const term = value.trim();
         if (term.length < 3 || terms.includes(term)) continue;
         terms.push(term);
@@ -507,40 +582,19 @@ class StackExchangeMaterialService {
       }
       if (added > 0) sources.add(source);
     };
+    // 自己コード索引の語彙（export 名・シンボル名の完全一致）で
+    // 確認できる識別子は MIKI 内部の名前であり、Stack Overflow の
+    // 投稿には存在しないことがほぼ確定するため、丸ごとでは q へ
+    // 入れない。
+    const isInternalIdentifier = (term: string): boolean =>
+      vocab.names.has(term.toLowerCase());
 
-    // 1. 契約ファースト: 不足スロット名と対象のシグネチャ名・export 名。
-    const contractRaw: string[] = [];
-    if (contract) {
-      for (const slot of contract.missingSlots ?? []) {
-        if (slot.slotName && slot.slotName.length >= 3) contractRaw.push(slot.slotName);
-      }
-      for (const target of contract.targets ?? []) {
-        for (const signature of target.signatures ?? []) {
-          if (signature.name && signature.name.length >= 3) contractRaw.push(signature.name);
-        }
-        for (const name of target.exports ?? []) {
-          if (name && name.length >= 3) contractRaw.push(name);
-        }
-      }
-    }
-    const cappedContract = unique(contractRaw).slice(0, 4);
-    pushTerms(cappedContract, 'CONTRACT', 3);
-    if (
-      cappedContract.length > 0 &&
-      cappedContract.some(
-        term =>
-          vocab.names.has(term.toLowerCase()) ||
-          splitIdentifierWords(term).some(word => vocab.words.has(word)),
-      )
-    ) {
-      sources.add('INDEX_VOCAB');
-    }
+    // 1. グロス橋渡し（最優先）: 問いの日本語内容語を JMdict
+    // グロスの一般英語語へ。汎用語が短い q の主軸になる。
+    pushTerms(this.glossBridgeWords(question), 'GLOSS', MAX_QUERY_TERMS);
 
-    // 2. グロス橋渡し: 問いの日本語内容語を JMdict グロスの英語語へ。
-    pushTerms(this.glossBridgeWords(question), 'GLOSS', 3);
-
-    // 3. 問いの要点語: 自然文検索が本領のため、日本語の内容語と
-    // 問いに含まれる識別子も要点語として残す。
+    // 2. 問いの要点語: 日本語の内容語と、問いに含まれる識別子の
+    // うち内部識別子でないもの（ライブラリ名等は残す）。
     const questionTerms: string[] = [];
     try {
       for (const term of contentTermsFromTokens(japaneseAnalysisService.analyze(question).tokens)) {
@@ -554,7 +608,36 @@ class StackExchangeMaterialService {
         questionTerms.push(term);
       }
     }
-    pushTerms(questionTerms, 'QUESTION', 3);
+    pushTerms(
+      questionTerms.filter(term => !isInternalIdentifier(term)),
+      'QUESTION',
+      MAX_QUERY_TERMS,
+    );
+
+    // 3. 契約語（最後）: 不足スロット名・シグネチャ名・export 名は
+    // camelCase を分割した一般語としてのみ入れる。内部識別子の
+    // 丸ごとは入れない。分割語は一般英語語として扱う。
+    const contractWords: string[] = [];
+    if (contract) {
+      const contractRaw: string[] = [];
+      for (const slot of contract.missingSlots ?? []) {
+        if (slot.slotName && slot.slotName.length >= 3) contractRaw.push(slot.slotName);
+      }
+      for (const target of contract.targets ?? []) {
+        for (const signature of target.signatures ?? []) {
+          if (signature.name && signature.name.length >= 3) contractRaw.push(signature.name);
+        }
+        for (const name of target.exports ?? []) {
+          if (name && name.length >= 3) contractRaw.push(name);
+        }
+      }
+      for (const raw of unique(contractRaw)) {
+        for (const word of splitIdentifierWords(raw)) {
+          if (!contractWords.includes(word)) contractWords.push(word);
+        }
+      }
+    }
+    pushTerms(contractWords, 'CONTRACT', MAX_QUERY_TERMS);
 
     if (terms.length === 0) return undefined;
 
@@ -801,6 +884,30 @@ class StackExchangeMaterialService {
     } catch {
       // 使用記録は学習の種であり、書けなくても材料収集自体は止めない。
     }
+  }
+
+  private loadAttempts(): StackExchangeMaterialAttemptRecord[] {
+    try {
+      const raw = storageService.getItem(ATTEMPTS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveAttempts(records: StackExchangeMaterialAttemptRecord[]): void {
+    try {
+      storageService.setItem(ATTEMPTS_KEY, JSON.stringify(records.slice(-ATTEMPTS_LEDGER_CAP)));
+    } catch {
+      // 試行記録は学習の種であり、書けなくても材料収集自体は止めない。
+    }
+  }
+
+  private recordAttempt(record: StackExchangeMaterialAttemptRecord): void {
+    const ledger = this.loadAttempts();
+    ledger.push(record);
+    this.saveAttempts(ledger);
   }
 
   private recordUsage(

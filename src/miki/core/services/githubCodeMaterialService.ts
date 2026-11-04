@@ -152,6 +152,23 @@ export interface GitHubCodeMaterialUsageRecord {
   route?: 'direct' | 'relay';
 }
 
+/*
+ * P427（学習の段階0）: 収集の試行レベル記録。使用台帳は「当たった
+ * 材料」しか残らないため、キーワード材料源ごとの成功率（分母）が
+ * 計算できなかった。試行記録は収集の出口ごとに status・発射した
+ * 整形クエリ・キーワード材料源・消費クエリ数・取得件数を別の
+ * キーへ有界で残す。空・失敗・スキップも記録する。挙動を変える
+ * 消費者はまだ置かない（将来の重み付け学習の前提工事）。
+ */
+export interface GitHubCodeMaterialAttemptRecord {
+  status: GitHubCodeMaterialStatusKind;
+  shapedQuery: string;
+  keywordSources: GitHubCodeKeywordSource[];
+  requestsUsed: number;
+  materialCount: number;
+  collectedAt: number;
+}
+
 interface ShapedQuery {
   text: string;
   keywordSources: GitHubCodeKeywordSource[];
@@ -201,6 +218,8 @@ type SearchCodeResult =
 
 const SETTINGS_KEY = 'miki_github_code_material_settings_v1';
 const USAGE_KEY = 'miki_github_code_material_usage_v1';
+const ATTEMPTS_KEY = 'miki_github_code_material_attempts_v1';
+const ATTEMPTS_LEDGER_CAP = 200;
 const API_URL_KEY = 'miki_github_api_url';
 const DEFAULT_API_BASE = 'https://api.github.com';
 const SEARCH_MIN_INTERVAL_MS = 6500;
@@ -357,6 +376,12 @@ class GitHubCodeMaterialService {
     return this.loadUsage().slice(-Math.max(1, limit));
   }
 
+  // P427（段階0）: 試行レベル記録の読み出し。使用台帳とは別系統で、
+  // 空・失敗を含む収集の全試行が対象（成功率の分母）。
+  listAttempts(limit = 50): GitHubCodeMaterialAttemptRecord[] {
+    return this.loadAttempts().slice(-Math.max(1, limit));
+  }
+
   /*
    * 生成段が材料を部品候補に使った時点で呼ばれる使用印。
    * 台帳に無い sourceId は無視する（Web 由来の材料など）。
@@ -398,18 +423,31 @@ class GitHubCodeMaterialService {
     // P424: GitHub の応答を運んだ輸送経路の記録（done の呼び出し
     // 時点までに fireVariant が積む）。
     const routesUsed = new Set<'direct' | 'relay'>();
+    // P427（段階0）: 試行記録は収集の全出口（done）で 1 件だけ残す。
+    // 発射したバリアント（緩和クエリ含む）を fireVariant が積む。
+    const firedQueries: Array<{ text: string; keywordSources: GitHubCodeKeywordSource[] }> = [];
     const done = (
       status: GitHubCodeMaterialStatusKind,
       materials: WebImplementationMaterial[],
       queriesUsed: number,
       error?: string,
-    ): GitHubCodeMaterialOutcome => ({
-      materials,
-      status,
-      queriesUsed,
-      ...(error ? { error } : {}),
-      ...(routesUsed.size > 0 ? { routesUsed: [...routesUsed] } : {}),
-    });
+    ): GitHubCodeMaterialOutcome => {
+      this.recordAttempt({
+        status,
+        shapedQuery: firedQueries.map(query => query.text).join(' || '),
+        keywordSources: [...new Set(firedQueries.flatMap(query => query.keywordSources))],
+        requestsUsed: queriesUsed,
+        materialCount: materials.length,
+        collectedAt: Date.now(),
+      });
+      return {
+        materials,
+        status,
+        queriesUsed,
+        ...(error ? { error } : {}),
+        ...(routesUsed.size > 0 ? { routesUsed: [...routesUsed] } : {}),
+      };
+    };
 
     if (!this.getSettings().enabled) {
       return done('SKIPPED', [], 0, 'GitHubコード材料チャネルは設定で無効です');
@@ -455,6 +493,7 @@ class GitHubCodeMaterialService {
         lastError = result.reason;
         return;
       }
+      firedQueries.push({ text: variant.text, keywordSources: [...variant.keywordSources] });
       queriesUsed += 1;
       if (result.route) routesUsed.add(result.route);
       if (result.kind === 'error') {
@@ -1046,6 +1085,30 @@ class GitHubCodeMaterialService {
     } catch {
       // 使用記録は学習の種であり、書けなくても材料収集自体は止めない。
     }
+  }
+
+  private loadAttempts(): GitHubCodeMaterialAttemptRecord[] {
+    try {
+      const raw = storageService.getItem(ATTEMPTS_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveAttempts(records: GitHubCodeMaterialAttemptRecord[]): void {
+    try {
+      storageService.setItem(ATTEMPTS_KEY, JSON.stringify(records.slice(-ATTEMPTS_LEDGER_CAP)));
+    } catch {
+      // 試行記録は学習の種であり、書けなくても材料収集自体は止めない。
+    }
+  }
+
+  private recordAttempt(record: GitHubCodeMaterialAttemptRecord): void {
+    const ledger = this.loadAttempts();
+    ledger.push(record);
+    this.saveAttempts(ledger);
   }
 
   private recordUsage(
