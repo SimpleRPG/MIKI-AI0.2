@@ -10,6 +10,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { candidateUnknownResolutionService } from './candidateUnknownResolutionService';
 import { githubCodeMaterialService } from './githubCodeMaterialService';
+import { stackExchangeMaterialService } from './stackExchangeMaterialService';
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -863,6 +864,16 @@ class CandidateCodeGenerationService {
   // sourceId（Web 由来の材料）はサービス側で無視される。
   if(acceptedResearchedSourceIds.length>0){
     githubCodeMaterialService.markMaterialsUsed(acceptedResearchedSourceIds);
+  }
+
+  // P423: Stack Exchange の参照材料は参照専用（部品候補化されない）
+  // ため、使用印は「この生成試行の材料として届いた」ことをもって
+  // 付ける。台帳に無い sourceId はサービス側で無視される。
+  const stackExchangeReferenceIds=unknownContext.implementationMaterials
+    .filter(material=>material.provider==='stackexchange_qa')
+    .map(material=>material.sourceId);
+  if(stackExchangeReferenceIds.length>0){
+    stackExchangeMaterialService.markMaterialsUsed(stackExchangeReferenceIds);
   }
 
   /*

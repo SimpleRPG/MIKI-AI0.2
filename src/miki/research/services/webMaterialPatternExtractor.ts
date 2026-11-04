@@ -37,6 +37,11 @@ export const VALID_WEB_REAL_DATA_PROVIDERS = [
   // extracted from a rendered page -- so it joins the whitelist
   // explicitly instead of riding the page-extraction provider names.
   'github_code_search',
+  // P423: know-how reference material collected through the Stack
+  // Exchange API channel (stackExchangeMaterialService). The answers
+  // are real, externally published Q&A fetched over the API, so this
+  // joins the whitelist explicitly as well.
+  'stackexchange_qa',
 ] as const;
 
 export function isRealDataProvider(provider?: string): boolean {
@@ -100,6 +105,19 @@ export interface WebImplementationMaterial {
   // 'INDEX_VOCAB' / 'QUESTION'). The seed record for later
   // query-shaping learning; page-extracted materials leave it unset.
   queryKeywordSources?: string[];
+  // P423: attribution for CC BY-SA material (Stack Exchange).
+  // authorName / authorUrl are the answer author's display name and
+  // profile URL, contentLicense is the license string returned by
+  // the API (e.g. 'CC BY-SA 4.0'). Page-extracted and GitHub
+  // materials leave these unset.
+  authorName?: string;
+  authorUrl?: string;
+  contentLicense?: string;
+  // P423: true when the material is reference-only know-how: its
+  // explanation text may inform generation, but it carries no
+  // copyable code examples (codeExamples is empty by construction)
+  // and must never be turned into a component candidate verbatim.
+  referenceOnly?: boolean;
 }
 
 export class WebMaterialPatternExtractor {

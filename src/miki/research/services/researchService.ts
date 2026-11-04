@@ -24,6 +24,7 @@ import {
   githubCodeMaterialService,
   type CodeMaterialCollectionContext,
 } from '../../core/services/githubCodeMaterialService';
+import { stackExchangeMaterialService } from '../../core/services/stackExchangeMaterialService';
 
 export type { ResearchRoute };
 
@@ -132,9 +133,10 @@ export class ResearchService {
     options?: {
       maxResults?: number;
       maxPages?: number;
-      // P422: shaping context for the GitHub code-material channel
-      // (target paths and, when the caller has it, the P421 gap
-      // contract). Web collection does not use it.
+      // P422/P423: shaping context for the dedicated material
+      // channels (GitHub code search, Stack Exchange). Target paths
+      // and, when the caller has it, the P421 gap contract. Web
+      // collection does not use it.
       codeMaterialContext?: CodeMaterialCollectionContext;
     },
   ): Promise<WebImplementationMaterial[]> {
@@ -152,6 +154,16 @@ export class ResearchService {
     // at the end. With no PAT configured it resolves immediately as
     // SKIPPED and the web result is exactly what it was before.
     const githubPromise = githubCodeMaterialService
+      .collectMaterials(text, options?.codeMaterialContext)
+      .catch(() => null);
+
+    // P423: the Stack Exchange channel runs in parallel too, as the
+    // third material source. It supplies know-how reference material
+    // (how-to explanation and pitfalls, reference-only: no copyable
+    // code examples) under its own daily-quota ledger. It never
+    // holds the web path up either, and when disabled it resolves
+    // immediately as SKIPPED.
+    const stackExchangePromise = stackExchangeMaterialService
       .collectMaterials(text, options?.codeMaterialContext)
       .catch(() => null);
 
@@ -195,6 +207,13 @@ export class ResearchService {
       // order, so the researched web examples are offered first and
       // the code-search examples widen the pool behind them.
       materials.push(...githubOutcome.materials);
+    }
+
+    const stackExchangeOutcome = await stackExchangePromise;
+    if (stackExchangeOutcome && stackExchangeOutcome.materials.length > 0) {
+      // Merge order is Web -> GitHub -> Stack Exchange: real working
+      // code first, know-how reference last (P423).
+      materials.push(...stackExchangeOutcome.materials);
     }
 
     return materials;
