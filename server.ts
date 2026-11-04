@@ -2128,6 +2128,81 @@ app.post('/api/github/file-contents', async (req, res) => {
   }
 });
 
+// P424: GitHub code-search relay. On the device, the WebView's direct
+// fetch to api.github.com fails at the transport level ("Failed to
+// fetch", observed with P422), while this server -- the same device,
+// a different process -- can reach it. Following the
+// /api/github/file-contents and /api/github/push pattern, the client
+// hands over the query and its PAT and this route performs the single
+// GitHub call itself. The GitHub response status, JSON body and
+// rate-limit headers are passed back in the envelope so the client's
+// own rate gate keeps working on the token's real budget. The PAT is
+// used only for the Authorization header of that one call: it is
+// never logged, stored, or echoed in the response. No server-side
+// retry (fetchGitHubJsonWithRetry would hide 429s and the rate
+// headers, and would break the client's no-retry gate discipline).
+app.post('/api/github/code-search', async (req, res) => {
+  try {
+    const { query, perPage, token, githubToken } = req.body || {};
+
+    if (typeof query !== 'string' || !query.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'query is required' });
+    }
+    const authToken = token || githubToken;
+    if (typeof authToken !== 'string' || !authToken) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'githubToken is required' });
+    }
+
+    const per = Math.max(1, Math.min(10, Number(perPage) || 5));
+    const url = new URL('https://api.github.com/search/code');
+    url.searchParams.set('q', query.trim());
+    url.searchParams.set('per_page', String(per));
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(url.toString(), {
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          // Ask for text_matches (fragments), same as the direct call.
+          Accept: 'application/vnd.github.text-match+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'MIKI-AI0.2',
+        },
+      });
+      const rateLimit: { remaining?: string; reset?: string } = {};
+      const remaining = response.headers.get('x-ratelimit-remaining');
+      const reset = response.headers.get('x-ratelimit-reset');
+      if (remaining) rateLimit.remaining = remaining;
+      if (reset) rateLimit.reset = reset;
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+      return res.json({
+        success: true,
+        status: response.status,
+        rateLimit,
+        data,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (err: any) {
+    return res.status(502).json({
+      success: false,
+      error: err?.message || 'GitHub code search relay failed',
+    });
+  }
+});
+
 app.post('/api/github/import', async (req, res) => {
   const requestedProgressId =
     typeof req.body?.progressId === 'string' &&

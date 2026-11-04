@@ -8,6 +8,27 @@ import { reusableComponentFactoryService } from './reusableComponentFactoryServi
 import { missingAssetSynthesisService, type MissingAssetDraftKind } from './missingAssetSynthesisService';
 import { missingAssetValidationService } from './missingAssetValidationService';
 import { missingCapabilityRecoveryService } from './missingCapabilityRecoveryService';
+import { verifierService } from '../../verification/services/verifierService';
+import { evidenceService } from '../../../services/evidenceService';
+import {
+  japaneseAnalysisService,
+  contentTermsFromTokens,
+} from '../../research/services/japaneseAnalysisService';
+
+/*
+ * P425 B1/B2: Claim 文脈の形（正本は claimDatabaseService の
+ * buildClaimContext）。矛盾イベントの購読側が ingress payload で
+ * 運び、ループの証拠回復が受け取る。claimId と結果語だけでは
+ * 主張の内容が分からず、証拠取得が汎用テンプレートへ落ちていた。
+ */
+export interface ClaimEvidenceContext {
+  claimId: string;
+  statement: string;
+  scope?: Record<string, unknown>;
+  source?: string;
+  originSourceId?: string;
+  contradictedBy: Array<{ claimId: string; statement: string }>;
+}
 
 export type RequiredAssetKind = 'EVIDENCE' | 'CAPABILITY' | 'VALIDATION_SCRIPT' | 'RESOURCE_CAPACITY' | 'BACKEND';
 export type RequiredAssetStatus = 'OPEN' | 'ACQUIRING' | 'ACQUIRED' | 'BLOCKED';
@@ -69,6 +90,7 @@ class RequiredAssetAcquisitionService {
     workspaceId?: string;
     reasons: string[];
     objective: string;
+    claimContext?: ClaimEvidenceContext;
   }): Promise<RequiredAssetAcquisitionResult> {
     // P366: the persistent-backend requirement is an environment state,
     // not missing knowledge; never plan knowledge synthesis for it.
@@ -121,7 +143,7 @@ class RequiredAssetAcquisitionService {
         acquired = acquired && outcome.acquired;
         reasons.push(...outcome.reasons);
       } else if (requirement.kind === 'EVIDENCE') {
-        const outcome = await this.acquireEvidence(request, input.objective);
+        const outcome = await this.acquireEvidence(request, input.objective, input.claimContext);
         progressed = progressed || outcome.progressed;
         acquired = acquired && outcome.acquired;
         evidenceIds.push(...outcome.evidenceIds);
@@ -236,7 +258,8 @@ class RequiredAssetAcquisitionService {
 
   private async acquireEvidence(
     request: RequiredAssetRequest,
-    objective: string
+    objective: string,
+    claimContext?: ClaimEvidenceContext
   ): Promise<{
     progressed: boolean;
     acquired: boolean;
@@ -257,6 +280,45 @@ class RequiredAssetAcquisitionService {
     // stays in the structured fields (sourceRequestId = runId, and
     // request.gapIds), and the objective is handed to research explicitly
     // below so the research context is not lost.
+    /*
+     * P425 B2: trigger が claim.* で、Claim 文脈（B1）が届いている
+     * 場合は、証拠取得を Claim 由来にする。gap の同一性に claimIds
+     * を含め、調査クエリは主張文と矛盾相手の主張文から組成する
+     * （調査側の Claim 照合はクエリ内の主張文で行われるため、これ
+     * が証拠を対象 Claim へ attach する機械になる）。Claim 文脈が
+     * 引けない場合は従来の汎用経路のままにする。
+     */
+    const claimRoute = objective.startsWith('claim.') && claimContext && claimContext.statement.trim()
+      ? claimContext
+      : undefined;
+    // 調査側の Claim 照合（findBestMatchingClaim）は空白・句読点で
+    // 区切った語と主張文の部分一致でスコアを付けるため、文をその
+    // まま並べただけでは（特に DISPUTED 主張の減点で）一致に届か
+    // ない。主張文の内容語をキーワード行として併記し、Web 検索と
+    // ローカル照合の両方に効く形にする。解析できない場合は行を
+    // 足さない（従来の組成のまま）。
+    const claimKeywords = claimRoute
+      ? (() => {
+          try {
+            const terms = new Set<string>();
+            for (const text of [claimRoute.statement, ...claimRoute.contradictedBy.map(item => item.statement)]) {
+              for (const term of contentTermsFromTokens(japaneseAnalysisService.analyze(text).tokens)) terms.add(term);
+            }
+            return [...terms].slice(0, 12);
+          } catch { return []; }
+        })()
+      : [];
+    const claimResearchQuery = claimRoute
+      ? [
+          '主張の裏付けと矛盾の解消に必要な証拠を調査する。',
+          `対象主張: ${claimRoute.statement}`,
+          ...(claimRoute.contradictedBy.length
+            ? [`矛盾する主張: ${claimRoute.contradictedBy.map(item => item.statement).join(' / ')}`]
+            : []),
+          ...(claimKeywords.length ? [`調査キーワード: ${claimKeywords.join(' ')}`] : []),
+          '対象主張を支持する証拠と、矛盾する主張との整合性を確認できる出典を優先する。',
+        ].join('\n')
+      : undefined;
     const gap = knowledgeGapService.detect({
       query: `必要Evidenceの取得: ${request.requirement}`,
       reason: request.requirement,
@@ -264,6 +326,9 @@ class RequiredAssetAcquisitionService {
       priority: 90,
       requiredEvidence: [request.requirement],
       sourceRequestId: request.runId,
+      ...(claimRoute
+        ? { claimIds: [claimRoute.claimId, ...claimRoute.contradictedBy.map(item => item.claimId)] }
+        : {}),
     });
     if (!request.gapIds.includes(gap.id)) {
       request.gapIds.push(gap.id);
@@ -285,8 +350,9 @@ class RequiredAssetAcquisitionService {
       // P409 案3: research keeps the full parent context (objective +
       // requirement, the text the gap query used to carry) through the
       // explicit query option instead of the gap's stable identity query.
+      // P425 B2: Claim 経路では主張由来のクエリを渡す。
       const researched = await researchService.researchGap(gap, {
-        query: `${objective}\n必要Evidence: ${request.requirement}`,
+        query: claimResearchQuery ?? `${objective}\n必要Evidence: ${request.requirement}`,
       });
 
       const researchRecord =
@@ -483,6 +549,31 @@ class RequiredAssetAcquisitionService {
             ...(componentIds.length > 0 ? [`COMPONENTS_DISCOVERED:${componentIds.length}`] : []),
             ...componentReasons,
           ];
+
+      /*
+       * P425 B2: Claim 経路では、取得した証拠が対象 Claim の台帳に
+       * 届いたかを確認し、検証器による再評価へ戻す。以前は証拠を
+       * 取ってきても検証器の再評価に接続されておらず、Claim の
+       * 状態は矛盾・未解決のまま放置されていた。再評価の結果は
+       * 理由として残し、ループ側の完了判定（run 系譜の証拠）と
+       * Claim 側の台帳の接続（B3）は本便の対象外とする。
+       */
+      if (claimRoute) {
+        const attachedCount = evidenceService.list({ claimId: claimRoute.claimId }).length;
+        acquisitionReasons.push(`CLAIM_EVIDENCE_ATTACHED:${claimRoute.claimId}:${attachedCount}`);
+        const reevaluated = verifierService.verifyClaim({ claimId: claimRoute.claimId });
+        acquisitionReasons.push(`CLAIM_REEVALUATED:${claimRoute.claimId}:${reevaluated.outcome}`);
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          '[RequiredAssetAcquisition] CLAIM_REEVALUATION',
+          JSON.stringify({
+            claimId: claimRoute.claimId,
+            attachedEvidenceCount: attachedCount,
+            outcome: reevaluated.outcome,
+            independentEvidenceCount: reevaluated.independentEvidenceCount,
+          }),
+        );
+      }
 
       return {
         progressed: true,

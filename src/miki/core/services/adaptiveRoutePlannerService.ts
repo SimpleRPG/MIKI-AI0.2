@@ -180,6 +180,7 @@ function buildCompositionGapMeaning(input:{
   targetPaths:string[];
   gapDescriptions:string[];
   gapReason:string;
+  gapContractSummary?:string;
 }):string {
   return [
     '自律コード改善で必要な実装能力（検証済みCODE Component・実装パターン）が不足している。',
@@ -191,7 +192,58 @@ function buildCompositionGapMeaning(input:{
     ...(input.gapDescriptions.length
       ? [`gapDescriptions=${input.gapDescriptions.join(' || ')}`]
       : ['gapDescriptions=none recorded (generation did not leave a gap breakdown)']),
+    ...(input.gapContractSummary ? [`gapContract=${input.gapContractSummary}`] : []),
   ].join(' ');
+}
+
+/*
+ * P425 A2: P421 の gap 契約欄（candidateGenerationGap.contract）を
+ * 意味文へ取り込むための決定的な要約。契約は不足発生時点で確定した
+ * 「期待インターフェース」であり、不足スロット（生産者のいない知識
+ * スロットと期待入力）と対象ファイルの既存の公開面を、調査意図の
+ * 側でも参照できるようにする。要約は gap 記録自体の粒度上限
+ * （buildGapContract 側の上限）に合わせて切り詰める。形が想定と
+ * 違う・全て空の契約は要約を返さない（捏造しない）。
+ */
+function summarizeGapContract(contract:unknown):string {
+  if(!contract || typeof contract!=='object' || Array.isArray(contract)) return '';
+  const record=contract as Record<string,unknown>;
+  const parts:string[]=[];
+
+  const missingSlots=Array.isArray(record.missingSlots) ? record.missingSlots : [];
+  const slotTexts:string[]=[];
+  for(const slot of missingSlots.slice(0,8)){
+    if(!slot || typeof slot!=='object') continue;
+    const slotRecord=slot as Record<string,unknown>;
+    const slotName=String(slotRecord.slotName||'').trim();
+    if(!slotName) continue;
+    const inputKinds=Array.isArray(slotRecord.inputKinds)
+      ? slotRecord.inputKinds.map(value=>String(value)).filter(Boolean).slice(0,4)
+      : [];
+    slotTexts.push(inputKinds.length ? `${slotName}(inputs:${inputKinds.join('/')})` : slotName);
+  }
+  if(slotTexts.length) parts.push(`missingSlots=${slotTexts.join(', ')}`);
+
+  const missingComponentIds=Array.isArray(record.missingComponentIds)
+    ? record.missingComponentIds.map(value=>String(value)).filter(Boolean).slice(0,12)
+    : [];
+  if(missingComponentIds.length) parts.push(`missingComponentIds=${missingComponentIds.join(', ')}`);
+
+  const targets=Array.isArray(record.targets) ? record.targets : [];
+  const targetTexts:string[]=[];
+  for(const target of targets.slice(0,8)){
+    if(!target || typeof target!=='object') continue;
+    const targetRecord=target as Record<string,unknown>;
+    const path=String(targetRecord.path||'').trim();
+    if(!path) continue;
+    const exportsList=Array.isArray(targetRecord.exports)
+      ? targetRecord.exports.map(value=>String(value)).filter(Boolean).slice(0,16)
+      : [];
+    targetTexts.push(exportsList.length ? `${path}[exports:${exportsList.join('/')}]` : path);
+  }
+  if(targetTexts.length) parts.push(`contractTargets=${targetTexts.join(', ')}`);
+
+  return parts.join(' | ');
 }
 
 function successfulBusinessEntries(task:BlackboardTask):BlackboardEntry[] {
@@ -688,7 +740,8 @@ class AdaptiveRoutePlannerService {
      * まず未解決ComponentをUNKNOWN/Research側へ渡し、
      * その結果をCOREが再評価してからCandidate生成へ戻す。
      */
-    const latestCandidateGenerationError=this.latestOperationError(task,'GENERATE_CANDIDATE');
+    const latestCandidateGenerationErrorEntry=this.latestOperationErrorEntry(task,'GENERATE_CANDIDATE');
+    const latestCandidateGenerationError=latestCandidateGenerationErrorEntry.error;
 
     /*
      * P406: 実機で発生する CODE_COMPOSITION_PLAN_UNAVAILABLE も、
@@ -708,13 +761,17 @@ class AdaptiveRoutePlannerService {
           .filter(Boolean)
         : [];
 
-      const errorIndex=[...task.entries].map((entry,index)=>({entry,index})).reverse()
-        .find(({entry})=>{
-          if(entry.kind!=='ERROR') return false;
-          const value=objectValue(entry);
-          return String(value?.operation||'')==='GENERATE_CANDIDATE'
-            && String(value?.error||'')===latestCandidateGenerationError;
-        })?.index ?? -1;
+      /*
+       * P425 A1: errorIndex は latestOperationError と同じ深い抽出で
+       * 特定したエントリの位置をそのまま使う。以前の浅い述語
+       * （トップレベルの operation と error の完全一致）は実機の
+       * schemaVersion 3 形式（エラーは reply.summary 内）では常に
+       * 一致せず errorIndex=-1 になり、直前の candidateGenerationGap
+       * 探索（index<=errorIndex）が常に対象なしになっていた。
+       * あわせて、解決結果の前後判定（index<=errorIndex はエラー前）
+       * も同じ位置で正しく判定されるようになる。
+       */
+      const errorIndex=latestCandidateGenerationErrorEntry.index;
 
       /*
        * P406: UNAVAILABLE の場合、生成が失敗前に残した不足内訳
@@ -745,6 +802,13 @@ class AdaptiveRoutePlannerService {
           : []),
       ].filter(Boolean);
 
+      // P425 A2: gap 記録の契約欄（P421）を取り込む。要約は意味文へ、
+      // 契約そのものはペイロードへ添えて材料チャネル側の文脈にする。
+      const gapContract=(gapValue?.contract&&typeof gapValue.contract==='object'&&!Array.isArray(gapValue.contract))
+        ? gapValue.contract as Record<string,unknown>
+        : undefined;
+      const gapContractSummary=summarizeGapContract(gapContract);
+
       const latestResolution=[...task.entries]
         .map((entry,index)=>({entry,index}))
         .reverse()
@@ -767,6 +831,7 @@ class AdaptiveRoutePlannerService {
               targetPaths:coreTargetPaths,
               gapDescriptions,
               gapReason:String(gapValue?.synthesisGapReason||''),
+              gapContractSummary,
             });
 
         routes.push({
@@ -781,7 +846,7 @@ class AdaptiveRoutePlannerService {
             unknownTerms:[componentGapMeaning],
             unresolvedComponents:unresolved,
             componentGap:true,
-            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions} : {}),
+            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {})} : {}),
             componentGapMeaning,
             useSearch:true,
             // P410 T3: CORE の生成材料不足では調査は必須である。
@@ -837,6 +902,7 @@ class AdaptiveRoutePlannerService {
             query:researchQuestion,
             unresolvedComponents:unresolved,
             componentGap:true,
+            ...(gapContract ? {gapContract} : {}),
             adaptive:true,
             priority:94
           }
@@ -880,6 +946,7 @@ class AdaptiveRoutePlannerService {
                   targetPaths:coreTargetPaths,
                   gapDescriptions,
                   gapReason:String(gapValue?.synthesisGapReason||''),
+                  gapContractSummary,
                 }));
 
         routes.push({
@@ -891,7 +958,7 @@ class AdaptiveRoutePlannerService {
             query:escalationQuestion,
             unresolvedComponents:unresolved,
             componentGap:true,
-            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions} : {}),
+            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {})} : {}),
             unknownResolutionStatus:resolutionStatus,
             coreDirectedResearch:true,
             adaptive:true,
@@ -2946,18 +3013,34 @@ class AdaptiveRoutePlannerService {
     };
   }
 
-  private latestOperationError(task:BlackboardTask,operation:string):string {
-    for(const entry of [...task.entries].reverse()){
+  /*
+   * P425 A1: エラー文字列の抽出と、その文字列を返したエントリの位置
+   * （index）を単一の走査で返す。実機のドメイン結果エントリは
+   * schemaVersion 3 形式で、エラー文字列はトップレベルではなく
+   * reply（正規化済み応答）の summary 等に内包される。抽出規則は
+   * ここに一本化し、位置の特定が別の浅い述語（トップレベルの
+   * error 完全一致）でずれることを防ぐ。以前は計画側の errorIndex
+   * 特定だけが浅い述語だったため、実機形式では常に対象なし
+   * （index=-1）になり、不足内訳の探索と解決結果の前後判定が
+   * 両方とも歪んでいた。
+   */
+  private latestOperationErrorEntry(
+    task:BlackboardTask,
+    operation:string
+  ):{ error:string; index:number } {
+    const entries=task.entries;
+    for(let index=entries.length-1;index>=0;index--){
+      const entry=entries[index];
       if(entry.kind!=='ERROR') continue;
 
       const value=objectValue(entry);
       if(String(value?.operation||'')!==operation) continue;
 
       const directError=String(value?.error||'').trim();
-      if(directError)return directError;
+      if(directError)return {error:directError,index};
 
       const directSummary=String(value?.summary||'').trim();
-      if(directSummary)return directSummary;
+      if(directSummary)return {error:directSummary,index};
 
       const normalized=value?.normalized;
       if(normalized&&typeof normalized==='object'){
@@ -2966,12 +3049,12 @@ class AdaptiveRoutePlannerService {
         const normalizedError=String(
           normalizedRecord.error||''
         ).trim();
-        if(normalizedError)return normalizedError;
+        if(normalizedError)return {error:normalizedError,index};
 
         const normalizedSummary=String(
           normalizedRecord.summary||''
         ).trim();
-        if(normalizedSummary)return normalizedSummary;
+        if(normalizedSummary)return {error:normalizedSummary,index};
       }
 
       const reply=value?.reply;
@@ -2979,10 +3062,10 @@ class AdaptiveRoutePlannerService {
         const replyRecord=reply as Record<string,unknown>;
 
         const replyError=String(replyRecord.error||'').trim();
-        if(replyError)return replyError;
+        if(replyError)return {error:replyError,index};
 
         const replySummary=String(replyRecord.summary||'').trim();
-        if(replySummary)return replySummary;
+        if(replySummary)return {error:replySummary,index};
 
         const replyNormalized=replyRecord.normalized;
         if(replyNormalized&&typeof replyNormalized==='object'){
@@ -2992,17 +3075,21 @@ class AdaptiveRoutePlannerService {
           const replyNormalizedError=String(
             replyNormalizedRecord.error||''
           ).trim();
-          if(replyNormalizedError)return replyNormalizedError;
+          if(replyNormalizedError)return {error:replyNormalizedError,index};
 
           const replyNormalizedSummary=String(
             replyNormalizedRecord.summary||''
           ).trim();
-          if(replyNormalizedSummary)return replyNormalizedSummary;
+          if(replyNormalizedSummary)return {error:replyNormalizedSummary,index};
         }
       }
     }
 
-    return '';
+    return {error:'',index:-1};
+  }
+
+  private latestOperationError(task:BlackboardTask,operation:string):string {
+    return this.latestOperationErrorEntry(task,operation).error;
   }
 
   private lastOperationFailed(task:BlackboardTask,operation:string):boolean {

@@ -217,10 +217,33 @@ export class SurfaceVariationService {
 
   /**
    * 動的バリエーション（VERIFIED昇格済み）の登録
+   *
+   * P425 C3: 重複排除はカテゴリ内ではなく全カテゴリ横断で行う。
+   * 照合キーは候補文そのものと、出典フラグメント（Web 由来の
+   * sourceProvenance.fragment）の両方の正規化キー。以前は同一
+   * カテゴリ内だけの照合だったため、同じフラグメント由来の文が
+   * 複数のカテゴリへ重複昇格していた。登録したかどうかを戻り値で
+   * 返し、呼び出し側は false の場合に昇格として数えない。
    */
-  public registerDynamicVariant(categoryKey: string, item: VariationItem): void {
+  public registerDynamicVariant(categoryKey: string, item: VariationItem): boolean {
+    const normalizeKey = (text: unknown): string =>
+      String(text || '').normalize('NFKC').replace(/[\s、。！？!?・「」『』（）()]/g, '').toLowerCase();
+    const itemTextKey = normalizeKey(item.text);
+    const itemFragmentKey = normalizeKey(item.sourceProvenance?.fragment);
+    const isDuplicate = (existing: VariationItem): boolean => {
+      if (existing.id === item.id) return true;
+      if (itemTextKey && normalizeKey(existing.text) === itemTextKey) return true;
+      if (itemFragmentKey) {
+        const existingFragmentKey = normalizeKey(existing.sourceProvenance?.fragment);
+        if (existingFragmentKey && existingFragmentKey === itemFragmentKey) return true;
+      }
+      return false;
+    };
+    for (const existingList of this.dynamicVariations.values()) {
+      if (existingList.some(isDuplicate)) return false;
+    }
     const list = this.dynamicVariations.get(categoryKey) || [];
-    if (!list.some((x) => x.id === item.id || x.text === item.text)) {
+    {
       list.push({ ...item, grownSeq: ++this.dynamicSeq });
       // Bounded accumulation: within a category the oldest retire
       // first (array order is registration order); across the whole
@@ -245,6 +268,7 @@ export class SurfaceVariationService {
         total -= 1;
       }
       this.persistDynamicVariations();
+      return true;
     }
   }
 

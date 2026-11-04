@@ -15,6 +15,10 @@ import { answerContentIrService } from './answerContentIrService';
 import { AnswerContentIR } from '../../../types';
 import { bannedTopicsConfigService } from '../../safety/services/bannedTopicsConfigService';
 import { WebExtractedSurfacePattern, isRealDataProvider } from '../../research/services/webMaterialPatternExtractor';
+import {
+  japaneseAnalysisService,
+  contentTermsFromTokens,
+} from '../../research/services/japaneseAnalysisService';
 import { teacherRequestService } from '../../learning/services/teacherRequestService';
 import { privacyGuardrailService } from '../../safety/services/privacyGuardrailService';
 import { apiUrl, getCustomApiHeaders } from '../../../services/api';
@@ -239,6 +243,29 @@ export class SurfaceVariationGrowthService {
 
     const irCheck = answerContentIrService.verifySemanticPreservation(testIr, candidateText);
     const missingOrDistorted = [...irCheck.missingOrDistortedElements];
+
+    /*
+     * P425 C2: シードの内容語との含有（重なり）チェック。
+     * verifySemanticPreservation は結論・条件・否定・確実性の歪み
+     * だけを見ており、話題そのものが無関係な文（例: 製品マニュアル
+     * の安全警告文）を「歪みなし」と通してしまう。言い回しの変種で
+     * あるためには、最低限シードの内容語のどれかを保持している
+     * 必要がある。シードから内容語が2語以上取れるのに候補と1語も
+     * 重ならない場合は、変種ではなく別文として落とす。形態素解析
+     * が失敗する・内容語が取れない場合はこのチェックをしない
+     * （従来の判定へフォールバックし、解析不能を不合格の理由に
+     * しない）。DEFECTIVE_PROBE の候補はシードの語を保ったまま
+     * 破壊されるため、ここでは従来どおり通る／落とされる。
+     */
+    try {
+      const seedTerms = contentTermsFromTokens(japaneseAnalysisService.analyze(seedText).tokens);
+      if (seedTerms.length >= 2) {
+        const candidateTerms = new Set(contentTermsFromTokens(japaneseAnalysisService.analyze(candidateText).tokens));
+        if (!seedTerms.some((term) => candidateTerms.has(term))) {
+          missingOrDistorted.push('【内容不一致】シード文の内容語と候補文に共通する語が無く、言い回しの変種とは認められません');
+        }
+      }
+    } catch { /* 解析不能時は含有チェックをしない */ }
 
     // 否定反転の特別検知
     const candidateHasNegation = /ない|不要|できない|除外|回避|禁止/.test(candidateText);
@@ -493,13 +520,20 @@ export class SurfaceVariationGrowthService {
           // 昇格上限チェック
           if (promotedCount < maxPromotions) {
             // CANDIDATE -> VERIFIED へ昇格し、正式プールへ反映
-            record.status = 'VERIFIED';
-            surfaceVariationService.registerDynamicVariant(weakness.categoryKey, {
+            // P425 C3: 横断重複で登録が落ちた場合は昇格として数えない。
+            const registered = surfaceVariationService.registerDynamicVariant(weakness.categoryKey, {
               id: candidateId,
               text: mut.candidateText,
               sourceType: mut.mutationType === 'GEMINI_GENERATED' ? 'GEMINI_GENERATED' : 'MUTATION',
               sourceProvenance: record.sourceProvenance,
             });
+            if (!registered) {
+              systemLogger.info(
+                'SELF_IMPROVEMENT',
+                `🛡️ [言い回し昇格見送り] 既存の動的変種と重複するため登録しませんでした: 「${mut.candidateText}」`
+              );
+            } else {
+            record.status = 'VERIFIED';
 
             promotedCount++;
             promotedItems.push({
@@ -512,6 +546,7 @@ export class SurfaceVariationGrowthService {
               'SELF_IMPROVEMENT',
               `✨ [言い回し正式昇格(${mut.mutationType})] ${weakness.categoryKey} に新変種を採用 (id:${candidateId}): 「${mut.candidateText}」`
             );
+            }
           }
         } else {
           rejectedCount++;
@@ -628,6 +663,12 @@ export class SurfaceVariationGrowthService {
       processedCount++;
 
       // 既存の言い回しの主旨（シード）に合わせてWebの接続詞・語尾スタイルを適用した新候補文を合成
+      // P425 C1: 候補文は常にシード由来の合成（接続詞前置・語尾変換）
+      // からだけ生まれる。以前の else 節は、抽出された文（抽象化
+      // パターン）をそのまま候補文に差し替えていたため、無関係な
+      // ページの定型文（マニュアルの安全警告文など）が Web 由来の
+      // 「変種」として昇格する穴になっていた。シードから合成でき
+      // ないパターンは候補化せずに終わる。
       let candidateText = '';
       if (pattern.connectorPhrase && !seedItem.text.startsWith(pattern.connectorPhrase)) {
         candidateText = `${pattern.connectorPhrase}、${seedItem.text.replace(/^[、,\s]+/, '')}`;
@@ -636,12 +677,18 @@ export class SurfaceVariationGrowthService {
       } else if (pattern.extractedStyle === 'CASUAL' && (seedItem.text.endsWith('です。') || seedItem.text.endsWith('ます。'))) {
         candidateText = seedItem.text.replace(/です。$/, 'だよ。').replace(/ます。$/, 'るよ。');
       } else {
-        // パターンから抽出された抽象骨組みがそのまま自然な表現の場合
-        candidateText = pattern.abstractedPattern || seedItem.text;
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `🛡️ [Web言い回し破棄] シード文から合成できないパターンのため候補化しません（抽出文の丸ごと採用は廃止）: 「${pattern.abstractedPattern}」`
+        );
+        rejectedCount++;
+        continue;
       }
 
-      if (!candidateText || typeof candidateText !== 'string') {
-        candidateText = seedItem.text;
+      if (!candidateText || typeof candidateText !== 'string' || candidateText === seedItem.text) {
+        // 語尾変換が結果的に原形と一致した場合も、変種ではない。
+        rejectedCount++;
+        continue;
       }
 
       // 厳格な意味保持・文法検査 (基準は緩めない)
@@ -674,8 +721,9 @@ export class SurfaceVariationGrowthService {
       if (vResult.passed) {
         passedCount++;
         if (promotedCount < maxPromotions) {
-          record.status = 'VERIFIED';
-          surfaceVariationService.registerDynamicVariant(targetCategoryKey, {
+          // P425 C3: 横断重複（候補文または出典フラグメントの一致）
+          // で登録が落ちた場合は昇格として数えない。
+          const registered = surfaceVariationService.registerDynamicVariant(targetCategoryKey, {
             id: candidateId,
             text: candidateText,
             sourceType: 'WEB_OBSERVED',
@@ -686,6 +734,14 @@ export class SurfaceVariationGrowthService {
               fragment: pattern.originalFragment,
             },
           });
+
+          if (!registered) {
+            systemLogger.info(
+              'SELF_IMPROVEMENT',
+              `🛡️ [Web言い回し昇格見送り] 既存の動的変種と横断重複するため登録しませんでした: 「${candidateText}」 (出典フラグメント: ${pattern.originalFragment})`
+            );
+          } else {
+          record.status = 'VERIFIED';
 
           promotedCount++;
           promotedItems.push({
@@ -698,6 +754,7 @@ export class SurfaceVariationGrowthService {
             'SELF_IMPROVEMENT',
             `🌐✨ [Web由来言い回し昇格] ${targetCategoryKey} にWeb調査由来の変種を採用 (id:${candidateId}): 「${candidateText}」 (出典: ${pattern.sourceQuery} - ${pattern.sourceUrl})`
           );
+          }
         }
       } else {
         rejectedCount++;

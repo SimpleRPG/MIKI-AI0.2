@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { apiUrl, fetchGitHubFileContents } from '../../../services/api';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import {
@@ -58,6 +59,22 @@ import type { WebImplementationMaterial } from '../../research/services/webMater
  * 材料源（契約欄／グロス変換／索引語彙／問い）」と「生成まで生き残ったか
  * （部品候補に使われたか）」を台帳に残す。重み付けの学習そのものは
  * 本便に含めない（記録まで）。
+ *
+ * P424: サーバー中継フォールバック。実機では WebView から
+ * api.github.com への直接 fetch が輸送レベルで失敗する（Failed to
+ * fetch。P416 の Wikipedia と同系統）一方、同じ端末の Termux
+ * サーバーからは届く。そこで直接 fetch が輸送レベルの失敗
+ * （ネットワーク失敗・タイムアウト）になった場合に限り、サーバーの
+ * 中継ルート（POST /api/github/code-search）へ1回だけ切り替えて
+ * 収集を続ける。HTTP エラー（401/403/429 等、GitHub が応答した
+ * もの）は従来どおり直接の結果として扱い、中継へは切り替えない。
+ * 実ファイル本文も、直接の輸送失敗時に限り既存の
+ * /api/github/file-contents（P352 の実績経路）を中継として流用する。
+ * ミニゲートは輸送経路によらず論理検索1回につき1スロットで効かせ
+ * （レート枠はトークン単位）、中継応答が運ぶレートヘッダも同じ
+ * ゲートへ反映する。どちらの経路で届いたかは結果（routesUsed）・
+ * 使用台帳（route）・ログの経路表記に残す。PAT は中継でも従来の
+ * GitHub 中継と同じくサーバーへ渡すだけで、サーバー側は保持しない。
  */
 
 export type GitHubCodeKeywordSource =
@@ -107,6 +124,9 @@ export interface GitHubCodeMaterialOutcome {
   status: GitHubCodeMaterialStatusKind;
   error?: string;
   queriesUsed: number;
+  // P424: GitHub の応答を運んだ輸送経路（応答が届いた検索のみ。
+  // 直接・中継の両方とも輸送失敗に終わった収集では空になる）。
+  routesUsed?: Array<'direct' | 'relay'>;
 }
 
 export interface GitHubCodeGateSnapshot {
@@ -127,6 +147,9 @@ export interface GitHubCodeMaterialUsageRecord {
   collectedAt: number;
   usedInGeneration: boolean;
   usedAt?: number;
+  // P424: この材料の内容を運んだ輸送経路（実本文が届いた場合は
+  // その経路、断片のみの場合は検索の経路）。P422 以前の記録には無い。
+  route?: 'direct' | 'relay';
 }
 
 interface ShapedQuery {
@@ -144,7 +167,37 @@ interface SearchHit {
   fragment: string;
   keywordSources: GitHubCodeKeywordSource[];
   queryText: string;
+  // P424: このヒットを運んだ検索の輸送経路と、実本文が届いた場合の
+  // その経路、および中継の本文取得（file-contents）が使う既定ブランチ。
+  route: 'direct' | 'relay';
+  bodyRoute?: 'direct' | 'relay';
+  defaultBranch: string;
 }
+
+/*
+ * P424: 1回の論理検索に対する試行結果。response は「GitHub が応答
+ * した」こと（HTTP エラー含む）を、transport は「応答が届かな
+ * かった」こと（ネットワーク失敗・タイムアウト）を表す。中継への
+ * 切り替えは transport の場合に限る。
+ */
+type SearchAttempt =
+  | {
+      kind: 'response';
+      status: number;
+      body: any;
+      rate: { remaining: number; reset: number };
+    }
+  | { kind: 'transport'; reason: string };
+
+type SearchCodeResult =
+  | { kind: 'ok'; items: any[]; route: 'direct' | 'relay' }
+  | { kind: 'blocked'; reason: string }
+  | {
+      kind: 'error';
+      reason: string;
+      rateLimited?: boolean;
+      route?: 'direct' | 'relay';
+    };
 
 const SETTINGS_KEY = 'miki_github_code_material_settings_v1';
 const USAGE_KEY = 'miki_github_code_material_usage_v1';
@@ -153,6 +206,9 @@ const DEFAULT_API_BASE = 'https://api.github.com';
 const SEARCH_MIN_INTERVAL_MS = 6500;
 const SEARCH_TIMEOUT_MS = 8000;
 const CONTENTS_TIMEOUT_MS = 8000;
+// P424: 中継は端末内サーバーへの往復＋サーバーから GitHub への
+// 往復を含むため、直接より長めに取る（サーバー側の上限は15秒）。
+const RELAY_TIMEOUT_MS = 20000;
 const COLLECTION_DEADLINE_MS = 60000;
 const MAX_QUERY_VARIANTS = 3;
 const MAX_HITS = 4;
@@ -339,12 +395,21 @@ class GitHubCodeMaterialService {
     question: string,
     context?: CodeMaterialCollectionContext,
   ): Promise<GitHubCodeMaterialOutcome> {
+    // P424: GitHub の応答を運んだ輸送経路の記録（done の呼び出し
+    // 時点までに fireVariant が積む）。
+    const routesUsed = new Set<'direct' | 'relay'>();
     const done = (
       status: GitHubCodeMaterialStatusKind,
       materials: WebImplementationMaterial[],
       queriesUsed: number,
       error?: string,
-    ): GitHubCodeMaterialOutcome => ({ materials, status, queriesUsed, ...(error ? { error } : {}) });
+    ): GitHubCodeMaterialOutcome => ({
+      materials,
+      status,
+      queriesUsed,
+      ...(error ? { error } : {}),
+      ...(routesUsed.size > 0 ? { routesUsed: [...routesUsed] } : {}),
+    });
 
     if (!this.getSettings().enabled) {
       return done('SKIPPED', [], 0, 'GitHubコード材料チャネルは設定で無効です');
@@ -391,6 +456,7 @@ class GitHubCodeMaterialService {
         return;
       }
       queriesUsed += 1;
+      if (result.route) routesUsed.add(result.route);
       if (result.kind === 'error') {
         lastError = result.reason;
         if (result.rateLimited) rateBlocked = true;
@@ -415,6 +481,8 @@ class GitHubCodeMaterialService {
           fragment,
           keywordSources: variant.keywordSources,
           queryText: variant.text,
+          route: result.route,
+          defaultBranch: String(item.repository?.default_branch || ''),
         });
       }
     };
@@ -440,15 +508,18 @@ class GitHubCodeMaterialService {
     }
 
     const hitList = [...hits.values()];
-    const bodies = new Map<string, string>();
+    const bodies = new Map<string, { text: string; route: 'direct' | 'relay' }>();
     for (const hit of hitList.slice(0, MAX_CONTENTS_FILES)) {
       const body = await this.fetchFileBody(hit, pat);
-      if (body) bodies.set(hit.htmlUrl, body);
+      if (body) {
+        bodies.set(hit.htmlUrl, body);
+        hit.bodyRoute = body.route;
+      }
     }
 
     const materials: WebImplementationMaterial[] = [];
     for (const hit of hitList) {
-      const material = this.buildMaterial(safeQuestion, hit, bodies.get(hit.htmlUrl));
+      const material = this.buildMaterial(safeQuestion, hit, bodies.get(hit.htmlUrl)?.text);
       if (material) materials.push(material);
     }
 
@@ -457,9 +528,19 @@ class GitHubCodeMaterialService {
     }
 
     this.recordUsage(materials, hitList);
+    // P424: 中継が関与した収集はログでも判別できるようにする。
+    const relayedCount = hitList.filter(
+      hit => (hit.bodyRoute ?? hit.route) === 'relay',
+    ).length;
+    const routeSuffix =
+      relayedCount === 0
+        ? ''
+        : relayedCount === hitList.length
+          ? '（サーバー中継経由）'
+          : '（一部サーバー中継経由）';
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🔍 [GitHubコード検索] 実装材料を ${materials.length} 件取得しました（クエリ ${queriesUsed} 本）`,
+      `🔍 [GitHubコード検索] 実装材料を ${materials.length} 件取得しました（クエリ ${queriesUsed} 本）${routeSuffix}`,
     );
     return done('SUCCEEDED', materials, queriesUsed);
   }
@@ -680,33 +761,32 @@ class GitHubCodeMaterialService {
     }
   }
 
-  private noteRateHeaders(res: Response): void {
-    const remaining = Number(res.headers.get('x-ratelimit-remaining'));
-    const reset = Number(res.headers.get('x-ratelimit-reset'));
-    if (Number.isFinite(remaining)) codeSearchGate.remaining = remaining;
-    if (Number.isFinite(reset) && reset > 0) codeSearchGate.resetAt = reset * 1000;
+  /*
+   * レートヘッダの取り込み。直接応答のヘッダと中継エンベロープの
+   * 値のどちらからでも、同じ形（epoch 秒の reset）で受ける。値が
+   * 無い項目はゲートへ反映しない（Number(null) が 0 になり予算切れ
+   * と誤認するのを避ける。GitHub の実応答には常時含まれる）。
+   */
+  private captureRateHeaders(res: Response): { remaining: number; reset: number } {
+    const read = (raw: string | null): number =>
+      raw != null && raw !== '' ? Number(raw) : Number.NaN;
+    return {
+      remaining: read(res.headers.get('x-ratelimit-remaining')),
+      reset: read(res.headers.get('x-ratelimit-reset')),
+    };
   }
 
-  private async readErrorMessage(res: Response): Promise<string> {
-    try {
-      const body = JSON.parse(await res.text());
-      const message = typeof body?.message === 'string' ? body.message : '';
-      return message.replace(/\s+/g, ' ').trim().slice(0, 200);
-    } catch {
-      return '';
-    }
+  private applyRate(rate: { remaining: number; reset: number }): void {
+    if (Number.isFinite(rate.remaining)) codeSearchGate.remaining = rate.remaining;
+    if (Number.isFinite(rate.reset) && rate.reset > 0) codeSearchGate.resetAt = rate.reset * 1000;
   }
 
-  private async searchCode(
-    query: string,
-    pat: string,
-  ): Promise<
-    | { kind: 'ok'; items: any[] }
-    | { kind: 'blocked'; reason: string }
-    | { kind: 'error'; reason: string; rateLimited?: boolean }
-  > {
-    const slot = await this.acquireSearchSlot();
-    if (!slot.ok) return { kind: 'blocked', reason: slot.reason ?? 'GitHubコード検索のゲートで停止しました' };
+  /*
+   * 直接のコード検索。GitHub が応答した場合はその状態をそのまま
+   * 返し、fetch 自体が投げた場合（ネットワーク失敗・タイムアウト）
+   * のみ transport として返す。
+   */
+  private async trySearchDirect(query: string, pat: string): Promise<SearchAttempt> {
     try {
       const url = new URL(`${readGitHubApiBase()}/search/code`);
       url.searchParams.set('q', query);
@@ -721,29 +801,125 @@ class GitHubCodeMaterialService {
           'User-Agent': 'MIKI-AI0.2',
         },
       });
-      this.noteRateHeaders(res);
-      if (res.status === 429) {
-        const detail = await this.readErrorMessage(res);
-        const reason = detail ? `HTTP 429: ${detail}` : 'HTTP 429';
-        codeSearchGate.cooldownUntil =
-          codeSearchGate.resetAt > Date.now() ? codeSearchGate.resetAt : Date.now() + 60000;
-        codeSearchGate.cooldownReason = reason;
-        return { kind: 'error', reason, rateLimited: true };
-      }
-      if (!res.ok) {
-        const detail = await this.readErrorMessage(res);
-        return { kind: 'error', reason: detail ? `HTTP ${res.status}: ${detail}` : `HTTP ${res.status}` };
-      }
-      const data = await res.json();
-      return { kind: 'ok', items: Array.isArray(data?.items) ? data.items : [] };
+      const rate = this.captureRateHeaders(res);
+      const body = await res.json().catch(() => null);
+      return { kind: 'response', status: res.status, body, rate };
     } catch (error: any) {
       const reason = error?.name === 'TimeoutError' ? 'タイムアウト' : error?.message || String(error);
-      return { kind: 'error', reason };
+      return { kind: 'transport', reason };
     }
   }
 
-  private async fetchFileBody(hit: SearchHit, pat: string): Promise<string | undefined> {
+  /*
+   * P424: サーバー中継でのコード検索（POST /api/github/code-search）。
+   * 中継サーバーが GitHub の応答を運べた場合は response（GitHub の
+   * ステータス・本文・レートをエンベロープから復元）、中継自体に
+   * 届かなかった・中継が GitHub へ届かなかった場合は transport。
+   */
+  private async trySearchViaRelay(query: string, pat: string): Promise<SearchAttempt> {
+    try {
+      const res = await fetch(apiUrl('/api/github/code-search'), {
+        method: 'POST',
+        signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, perPage: 5, githubToken: pat }),
+      });
+      const envelope = await res.json().catch(() => null);
+      if (!envelope || envelope.success !== true) {
+        const detail =
+          typeof envelope?.error === 'string' && envelope.error
+            ? envelope.error
+            : `HTTP ${res.status}`;
+        return { kind: 'transport', reason: `サーバー中継に失敗しました: ${detail}` };
+      }
+      const read = (raw: unknown): number =>
+        raw != null && raw !== '' ? Number(raw) : Number.NaN;
+      return {
+        kind: 'response',
+        status: Number(envelope.status) || 0,
+        body: envelope.data ?? null,
+        rate: {
+          remaining: read(envelope.rateLimit?.remaining),
+          reset: read(envelope.rateLimit?.reset),
+        },
+      };
+    } catch (error: any) {
+      const reason =
+        error?.name === 'TimeoutError'
+          ? 'サーバー中継がタイムアウトしました'
+          : `サーバー中継に接続できませんでした: ${error?.message || String(error)}`;
+      return { kind: 'transport', reason };
+    }
+  }
+
+  /*
+   * 直接・中継で共通の応答処理。レートをゲートへ反映し、429 では
+   * 冷却に入る。経路によらず同じ規則で扱うことで、ミニゲートの
+   * 紀律（トークン単位の予算）が輸送経路をまたいで合算される。
+   */
+  private processSearchResponse(
+    attempt: Extract<SearchAttempt, { kind: 'response' }>,
+    route: 'direct' | 'relay',
+  ): SearchCodeResult {
+    this.applyRate(attempt.rate);
+    const message =
+      typeof attempt.body?.message === 'string'
+        ? attempt.body.message.replace(/\s+/g, ' ').trim().slice(0, 200)
+        : '';
+    if (attempt.status === 429) {
+      const reason = message ? `HTTP 429: ${message}` : 'HTTP 429';
+      codeSearchGate.cooldownUntil =
+        codeSearchGate.resetAt > Date.now() ? codeSearchGate.resetAt : Date.now() + 60000;
+      codeSearchGate.cooldownReason = reason;
+      return { kind: 'error', reason, rateLimited: true, route };
+    }
+    if (attempt.status < 200 || attempt.status >= 300) {
+      return {
+        kind: 'error',
+        reason: message ? `HTTP ${attempt.status}: ${message}` : `HTTP ${attempt.status}`,
+        route,
+      };
+    }
+    return {
+      kind: 'ok',
+      items: Array.isArray(attempt.body?.items) ? attempt.body.items : [],
+      route,
+    };
+  }
+
+  private async searchCode(query: string, pat: string): Promise<SearchCodeResult> {
+    // ゲートのスロットは論理検索1回につき1つだけ取る。中継への
+    // 切り替えは同じスロットの中で行い、経路を変えても開始間隔と
+    // 予算の数え方は増えない。
+    const slot = await this.acquireSearchSlot();
+    if (!slot.ok) return { kind: 'blocked', reason: slot.reason ?? 'GitHubコード検索のゲートで停止しました' };
+
+    const direct = await this.trySearchDirect(query, pat);
+    if (direct.kind === 'response') {
+      return this.processSearchResponse(direct, 'direct');
+    }
+    // 輸送レベルの失敗のときだけ中継へ1回切り替える。HTTP エラー
+    // （GitHub が応答したもの）は上の分岐で確定済みであり、ここへ
+    // は来ない。
+    const relay = await this.trySearchViaRelay(query, pat);
+    if (relay.kind === 'response') {
+      return this.processSearchResponse(relay, 'relay');
+    }
+    // どちらの経路でも応答が届かなかった。route は付けない
+    // （routesUsed は「応答を運んだ経路」の記録であり、試行の
+    // 内訳は理由の文面が担う）。
+    return {
+      kind: 'error',
+      reason: `${direct.reason}（直接接続）／${relay.reason}`,
+    };
+  }
+
+  private async fetchFileBody(
+    hit: SearchHit,
+    pat: string,
+  ): Promise<{ text: string; route: 'direct' | 'relay' } | undefined> {
     if (!hit.repoFullName || !hit.path) return undefined;
+    let transportFailed = false;
     try {
       const encodedPath = hit.path.split('/').map(encodeURIComponent).join('/');
       const res = await fetch(
@@ -758,6 +934,8 @@ class GitHubCodeMaterialService {
           },
         },
       );
+      // HTTP エラーは GitHub が応答した結果であり、中継へは
+      // 切り替えない（検索と同じ規則）。
       if (!res.ok) return undefined;
       const data = await res.json();
       if (data?.encoding !== 'base64' || typeof data?.content !== 'string') return undefined;
@@ -767,7 +945,28 @@ class GitHubCodeMaterialService {
       const binary = atob(compact);
       const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
       const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-      return text.slice(0, MAX_CODE_CHARS);
+      return { text: text.slice(0, MAX_CODE_CHARS), route: 'direct' };
+    } catch {
+      transportFailed = true;
+    }
+    if (!transportFailed) return undefined;
+
+    // P424: 直接が輸送レベルで失敗した場合に限り、既存の
+    // /api/github/file-contents（対象リポジトリのアーカイブから
+    // 読む実績経路）を中継として流用する。応答は復号済みの本文
+    // 文字列で返る。内容は既定ブランチ時点のものであり、検索
+    // 索引の断片との僅かなずれは材料の性質上許容する（断片は
+    // evidenceText 側に残る）。
+    try {
+      const result = await fetchGitHubFileContents(`https://github.com/${hit.repoFullName}`, {
+        branch: hit.defaultBranch || undefined,
+        githubToken: pat,
+        items: [{ path: hit.path }],
+      });
+      const file = result.files.find(entry => entry.path === hit.path);
+      if (!file || typeof file.content !== 'string') return undefined;
+      if (file.content.length > MAX_CONTENTS_BYTES) return undefined;
+      return { text: file.content.slice(0, MAX_CODE_CHARS), route: 'relay' };
     } catch {
       return undefined;
     }
@@ -865,6 +1064,9 @@ class GitHubCodeMaterialService {
         keywordSources: [...(material.queryKeywordSources ?? [])] as GitHubCodeKeywordSource[],
         collectedAt: Date.now(),
         usedInGeneration: false,
+        // P424: 内容を運んだ経路（実本文があればその経路、無ければ
+        // 検索の経路）。
+        ...(hit ? { route: hit.bodyRoute ?? hit.route } : {}),
       });
     }
     this.saveUsage(ledger);

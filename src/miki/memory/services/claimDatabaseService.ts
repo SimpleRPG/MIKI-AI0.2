@@ -728,6 +728,41 @@ export class ClaimDatabaseService {
     return this.claims.get(claim_id);
   }
 
+  /*
+   * P425 B1: 矛盾・未解決の検証結果が改善ループへ運ばれるとき、
+   * 主張の内容そのものを文脈として組み立てる。以前は claimId と
+   * 結果語だけが流れ、主張文・矛盾相手は入口で落ちていたため、
+   * 下流では「どの主張が何と矛盾しているのか」が分からず、証拠
+   * 取得が汎用テンプレートに落ちていた。文脈の形はここを正本と
+   * し、購読側（bootstrap）と証拠取得側（requiredAssetAcquisition）
+   * はこの形だけを見る。主張が引けない場合は undefined を返す
+   * （呼び出し側は従来経路へ落ちる）。
+   */
+  public buildClaimContext(claim_id: string): {
+    claimId: string;
+    statement: string;
+    scope?: ClaimScope;
+    source?: string;
+    originSourceId?: string;
+    contradictedBy: Array<{ claimId: string; statement: string }>;
+  } | undefined {
+    const claim = this.claims.get(claim_id);
+    if (!claim) return undefined;
+    const contradictedBy: Array<{ claimId: string; statement: string }> = [];
+    for (const otherId of claim.contradicted_by || []) {
+      const other = this.claims.get(otherId);
+      if (other) contradictedBy.push({ claimId: other.claim_id, statement: other.statement });
+    }
+    return {
+      claimId: claim.claim_id,
+      statement: claim.statement,
+      scope: claim.scope,
+      source: claim.source,
+      originSourceId: claim.origin_source_id,
+      contradictedBy,
+    };
+  }
+
   public searchClaims(query: string, limit = 5): Array<ClaimRecord & { claimText?: string; confidence?: number; freshnessStatus?:'CURRENT'|'REVALIDATION_DUE' }> {
     const qLower = query.toLowerCase();
     const tokens = qLower.split(/[^\p{L}\p{N}_-]+/u).filter((t: string) => t.length >= 2);

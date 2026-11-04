@@ -946,12 +946,37 @@ class AutonomousSelfImprovementLoopService {
   }
 
   private async acquireThenWaitForEvidence(request: AutonomousImprovementRequest, reason: string, generation: number): Promise<void> {
+    // P425 B1/B2: 矛盾イベント由来のリクエストでは、ingress payload
+    // に運ばれた Claim 文脈を証拠取得へそのまま渡す。形が崩れて
+    // いる場合は文脈なしとして従来経路に落とす。
+    const rawClaimContext = request.payload?.claimContext as Record<string, unknown> | undefined;
+    const claimContext = rawClaimContext
+      && typeof rawClaimContext.claimId === 'string'
+      && typeof rawClaimContext.statement === 'string'
+      ? {
+          claimId: rawClaimContext.claimId,
+          statement: rawClaimContext.statement,
+          scope: rawClaimContext.scope as Record<string, unknown> | undefined,
+          source: typeof rawClaimContext.source === 'string' ? rawClaimContext.source : undefined,
+          originSourceId: typeof rawClaimContext.originSourceId === 'string' ? rawClaimContext.originSourceId : undefined,
+          contradictedBy: Array.isArray(rawClaimContext.contradictedBy)
+            ? rawClaimContext.contradictedBy
+                .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+                .map(item => ({
+                  claimId: String(item.claimId || ''),
+                  statement: String(item.statement || ''),
+                }))
+                .filter(item => item.claimId)
+            : [],
+        }
+      : undefined;
     const acquired = await requiredAssetAcquisitionService.acquire({
       runId: request.runId,
       taskId: request.taskId,
       workspaceId: request.workspaceId,
       reasons: reason.split(',').filter(Boolean),
       objective: request.trigger,
+      claimContext,
     });
     if (!this.isGenerationCurrent(generation)) return;
 
