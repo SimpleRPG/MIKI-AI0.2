@@ -9,6 +9,7 @@ import { failureCatalogService } from '../../memory/services/failureCatalogServi
 import { systemLogger } from '../../../services/systemLogger';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
 import { candidateUnknownResolutionService } from './candidateUnknownResolutionService';
+import { githubCodeMaterialService } from './githubCodeMaterialService';
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -788,6 +789,11 @@ class CandidateCodeGenerationService {
       : 'unknown',
     targetPaths,
     sourcePaths:targetFiles.map(file=>file.path),
+    // P422: この試行の契約（対象の公開面と不足スロットの期待）を
+    // 未知解決へ渡し、GitHub コード材料チャネルのクエリ整形を
+    // 契約ファーストにする。gap 記録用に後段でも同じ導出を行うが、
+    // 索引スナップショットは共有されるため二重の解析にはならない。
+    gapContract:this.buildGapContract(targetPaths,constructionGapRequirements),
     requirements:[
       ...effectiveRequirements,
       ...knowledgeRequirement,
@@ -830,6 +836,8 @@ class CandidateCodeGenerationService {
     effectiveValidationRequirements,
   );
 
+  const acceptedResearchedSourceIds:string[]=[];
+
   for(const candidate of researchedCandidates){
     const created=reusableComponentFactoryService.createCodeComponentCandidate({
       purpose:run.objective,
@@ -846,7 +854,15 @@ class CandidateCodeGenerationService {
 
     if(created.accepted&&created.componentId){
       createdCodeComponentIds.push(created.componentId);
+      acceptedResearchedSourceIds.push(...candidate.sourceEpisodeIds);
     }
+  }
+
+  // P422: GitHub コード材料が部品候補まで生き残ったことを使用台帳へ
+  // 印す（学習の種の記録まで。重み付けの学習は行わない）。台帳に無い
+  // sourceId（Web 由来の材料）はサービス側で無視される。
+  if(acceptedResearchedSourceIds.length>0){
+    githubCodeMaterialService.markMaterialsUsed(acceptedResearchedSourceIds);
   }
 
   /*

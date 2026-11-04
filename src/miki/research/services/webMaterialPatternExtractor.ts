@@ -31,6 +31,12 @@ export const VALID_WEB_REAL_DATA_PROVIDERS = [
   // carry this provider. Fabricated/mock/synthetic sources stay
   // excluded by the substring filter in isRealDataProvider.
   'conversation',
+  // P422: implementation material collected through the dedicated
+  // GitHub code-search channel (githubCodeMaterialService). The code
+  // is real, externally published code fetched over the API -- not
+  // extracted from a rendered page -- so it joins the whitelist
+  // explicitly instead of riding the page-extraction provider names.
+  'github_code_search',
 ] as const;
 
 export function isRealDataProvider(provider?: string): boolean {
@@ -88,6 +94,12 @@ export interface WebImplementationMaterial {
   testClues: string[];
   evidenceText: string;
   extractedAt: number;
+  // P422: for materials collected through a dedicated material
+  // channel (not page extraction), which keyword sources shaped the
+  // query that found this material ('CONTRACT' / 'GLOSS' /
+  // 'INDEX_VOCAB' / 'QUESTION'). The seed record for later
+  // query-shaping learning; page-extracted materials leave it unset.
+  queryKeywordSources?: string[];
 }
 
 export class WebMaterialPatternExtractor {

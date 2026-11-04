@@ -20,6 +20,10 @@ import {
   WebMaterialPatternExtractor,
   type WebImplementationMaterial,
 } from './webMaterialPatternExtractor';
+import {
+  githubCodeMaterialService,
+  type CodeMaterialCollectionContext,
+} from '../../core/services/githubCodeMaterialService';
 
 export type { ResearchRoute };
 
@@ -125,7 +129,14 @@ export class ResearchService {
    */
   public async collectImplementationMaterials(
     query: string,
-    options?: { maxResults?: number; maxPages?: number },
+    options?: {
+      maxResults?: number;
+      maxPages?: number;
+      // P422: shaping context for the GitHub code-material channel
+      // (target paths and, when the caller has it, the P421 gap
+      // contract). Web collection does not use it.
+      codeMaterialContext?: CodeMaterialCollectionContext;
+    },
   ): Promise<WebImplementationMaterial[]> {
     const text = query.trim();
     if (!text) return [];
@@ -133,37 +144,57 @@ export class ResearchService {
     const maxResults = Math.max(1, Math.min(6, options?.maxResults ?? 4));
     const maxPages = Math.max(1, Math.min(4, options?.maxPages ?? 3));
 
-    const raw = await unifiedWebResearchService.executePlannedSearch(text);
-    const results = this.normalizeSearchResults(raw).slice(0, maxResults);
-    if (results.length === 0) return [];
-
-    const pages = await unifiedWebResearchService.readSearchResultPages(
-      text,
-      results,
-      { maxPages },
-    );
+    // P422: the GitHub code-search channel runs in parallel with the
+    // web path below -- code material comes from a code-specialized
+    // source, shaped by the gap contract / dictionary gloss bridge,
+    // under its own rate gate. It never holds the web path up: both
+    // start together and the (usually slower) channel is awaited only
+    // at the end. With no PAT configured it resolves immediately as
+    // SKIPPED and the web result is exactly what it was before.
+    const githubPromise = githubCodeMaterialService
+      .collectMaterials(text, options?.codeMaterialContext)
+      .catch(() => null);
 
     const materials: WebImplementationMaterial[] = [];
 
-    for (const page of pages) {
-      if (!page.success || !page.text.trim()) continue;
+    const raw = await unifiedWebResearchService.executePlannedSearch(text);
+    const results = this.normalizeSearchResults(raw).slice(0, maxResults);
 
-      const source = String(page.result.source || '').toLowerCase();
-      const provider =
-        source.includes('searxng') ? 'searxng' :
-        source.includes('wikipedia') ? 'wikipedia' :
-        source.includes('duckduckgo') ? 'duckduckgo' :
-        'headless_webview';
-
-      materials.push(
-        ...WebMaterialPatternExtractor.extractImplementationMaterialsFromWebText({
-          text: page.text,
-          sourceQuery: text,
-          sourceUrl: page.url,
-          provider,
-          fetchMethod: 'headless_webview',
-        }),
+    if (results.length > 0) {
+      const pages = await unifiedWebResearchService.readSearchResultPages(
+        text,
+        results,
+        { maxPages },
       );
+
+      for (const page of pages) {
+        if (!page.success || !page.text.trim()) continue;
+
+        const source = String(page.result.source || '').toLowerCase();
+        const provider =
+          source.includes('searxng') ? 'searxng' :
+          source.includes('wikipedia') ? 'wikipedia' :
+          source.includes('duckduckgo') ? 'duckduckgo' :
+          'headless_webview';
+
+        materials.push(
+          ...WebMaterialPatternExtractor.extractImplementationMaterialsFromWebText({
+            text: page.text,
+            sourceQuery: text,
+            sourceUrl: page.url,
+            provider,
+            fetchMethod: 'headless_webview',
+          }),
+        );
+      }
+    }
+
+    const githubOutcome = await githubPromise;
+    if (githubOutcome && githubOutcome.materials.length > 0) {
+      // Web materials keep priority: generation consumes materials in
+      // order, so the researched web examples are offered first and
+      // the code-search examples widen the pool behind them.
+      materials.push(...githubOutcome.materials);
     }
 
     return materials;

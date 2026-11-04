@@ -6,6 +6,7 @@ import { ResearchService } from '../../research/services/researchService';
 import {
   WebImplementationMaterial,
 } from '../../research/services/webMaterialPatternExtractor';
+import type { CodeSearchGapContract } from './githubCodeMaterialService';
 import { unifiedUnknownResolutionCoordinatorService } from '../../unknown/services/unifiedUnknownResolutionCoordinatorService';
 import { requestTypeCompilerService } from '../../../services/requestTypeCompilerService';
 import { latentIntentMiningService } from '../../unknown/services/latentIntentMiningService';
@@ -31,6 +32,11 @@ export interface CandidateUnknownInput {
   sourcePaths: string[];
   requirements: string[];
   validationRequirements: string[];
+  // P422: when the caller (generation) has already derived the P421
+  // gap contract for this attempt, it rides along so the GitHub
+  // code-material channel can shape its queries contract-first.
+  // Callers without a contract simply omit it.
+  gapContract?: CodeSearchGapContract;
 }
 
 export interface CandidateUnknownItem {
@@ -95,7 +101,16 @@ class CandidateUnknownResolutionService {
           collectedMaterials.push(
             ...(await ResearchService.getInstance().collectImplementationMaterials(
               entry.question,
-              { maxResults: 4, maxPages: 3 },
+              {
+                maxResults: 4,
+                maxPages: 3,
+                // P422: the code-material channel shapes its queries
+                // from this run's targets and gap contract.
+                codeMaterialContext: {
+                  targetPaths: input.targetPaths,
+                  gapContract: input.gapContract,
+                },
+              },
             )),
           );
         } catch {
