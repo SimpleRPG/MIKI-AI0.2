@@ -1309,6 +1309,41 @@ class AdaptiveRoutePlannerService {
         researchVerificationResolved;
 
       if(unknownOrResearchResolved){
+        /*
+         * P432: CODE_COMPOSITION_PLAN_UNAVAILABLE で前回失敗してから
+         * VERIFIED な Component が1件も増えていない場合、GENERATE_CANDIDATE
+         * を再投入しない。未検証の部品を組み立てて完成品扱いにする緩和
+         * は禁止する。増えたかどうかはブラックボードで判定する：失敗
+         * エントリより後ろにある VERIFY_CODE_COMPONENT の成功
+         * （VERIFIED/DEVICE_TESTED/SUCCEEDED）または
+         * APPROVE_REUSABLE_COMPONENTS の成功が、新たに検証済みになっ
+         * た部品の証跡である。増えていない場合は UNKNOWN/Research
+         * に留まり、部品の検証・供給を待つ。
+         */
+        if(compositionUnavailable && !this.hasVerifiedComponentAddedSince(task,latestCandidateGenerationErrorEntry.index)){
+          routes.push({
+            target:'research',
+            command:'RUN_RESEARCH',
+            reason:'CORE withheld GENERATE_CANDIDATE re-dispatch after CODE_COMPOSITION_PLAN_UNAVAILABLE because no VERIFIED Component was added since the failure; staying on Research/component supply instead of blind retry',
+            payload:{
+              taskId:task.taskId,
+              query:researchQuestion || buildCompositionGapMeaning({
+                goal:task.goal,
+                targetPaths:coreTargetPaths,
+                gapDescriptions,
+                gapReason:String(gapValue?.synthesisGapReason||''),
+                gapContractSummary,
+                liveTargetSummary,
+              }),
+              unresolvedComponents:unresolved,
+              componentGap:true,
+              ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {})} : {}),
+              adaptive:true,
+              priority:94
+            }
+          });
+          return this.decorateOperations(task,this.uniqueOperations(routes));
+        }
         const previousCandidate=this.extractCandidateIdentity(latestCandidate);
         const previousRevision=Math.max(
           Number(previousCandidate.candidateRevision||0),
@@ -3140,6 +3175,31 @@ class AdaptiveRoutePlannerService {
 
   private latestOperationError(task:BlackboardTask,operation:string):string {
     return this.latestOperationErrorEntry(task,operation).error;
+  }
+
+  /*
+   * P432: 指定したブラックボード位置より後に、検証済み Component が
+   * 増えたか。証跡は VERIFY_CODE_COMPONENT の成功
+   * （VERIFIED/DEVICE_TESTED/SUCCEEDED）または
+   * APPROVE_REUSABLE_COMPONENTS の成功 Business 結果。
+   */
+  private hasVerifiedComponentAddedSince(task:BlackboardTask,afterIndex:number):boolean {
+    for(let index=afterIndex+1;index<task.entries.length;index++){
+      const entry=task.entries[index];
+      if(entry.kind!=='RESULT'&&entry.kind!=='OBSERVATION') continue;
+      const value=objectValue(entry);
+      const operation=String(value?.operation||'');
+      if(operation==='VERIFY_CODE_COMPONENT'){
+        const status=String(value?.status||'').toUpperCase();
+        if(['SUCCEEDED','DEVICE_TESTED','VERIFIED'].includes(status)) return true;
+        continue;
+      }
+      if(operation==='APPROVE_REUSABLE_COMPONENTS'){
+        const reply=value?.reply&&typeof value.reply==='object'?value.reply as Record<string,unknown>:undefined;
+        if(value?.operationClass==='BUSINESS'&&reply?.operationClass==='BUSINESS'&&['SUCCEEDED','SUCCESS','COMPLETED'].includes(String(reply.status||'').toUpperCase())) return true;
+      }
+    }
+    return false;
   }
 
   private lastOperationFailed(task:BlackboardTask,operation:string):boolean {

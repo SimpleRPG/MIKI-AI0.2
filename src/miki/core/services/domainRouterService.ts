@@ -95,7 +95,15 @@ class DomainRouterService {
 
   async dispatch(envelope:DomainEnvelope):Promise<DomainReply>{
     const envelopeValidation=domainContractRegistryService.validateEnvelope(envelope);
-    if(!envelopeValidation.valid)return {accepted:false,domain:envelope.target,command:envelope.command,error:`DOMAIN_ENVELOPE_CONTRACT_FAILED:${envelopeValidation.reasons.join('|')}`,completedAt:Date.now(),normalized:{status:'REJECTED',operationClass:'DIAGNOSTIC',command:envelope.command,summary:'Domain envelope contract rejected',data:{contractSha256:envelopeValidation.contractSha256,reasons:envelopeValidation.reasons},evidenceIds:[],retryable:false}};
+    // P432: log-only: the contract failure used to return silently, so
+    // a rejected dispatch left no reason in the runtime log. The early
+    // return itself is unchanged (it must not go through finish():
+    // validateReply() inspects operationClass and would erase the
+    // original error).
+    if(!envelopeValidation.valid){
+      systemLogger.warn('SYSTEM', `[RUNTIME] dispatch rejected (contract): ${envelope.target}.${envelope.command} reasons=${envelopeValidation.reasons.join('|')}`);
+      return {accepted:false,domain:envelope.target,command:envelope.command,error:`DOMAIN_ENVELOPE_CONTRACT_FAILED:${envelopeValidation.reasons.join('|')}`,completedAt:Date.now(),normalized:{status:'REJECTED',operationClass:'DIAGNOSTIC',command:envelope.command,summary:'Domain envelope contract rejected',data:{contractSha256:envelopeValidation.contractSha256,reasons:envelopeValidation.reasons},evidenceIds:[],retryable:false}};
+    }
     const coreOnlyDiagnostics=new Set<DomainCommand>(['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION']);
     if(envelope.source!=='core'&&!coreOnlyDiagnostics.has(envelope.command))return this.finish(envelope,{accepted:false,domain:envelope.target,command:envelope.command,error:'CORE_ONLY_BUSINESS_ROUTING',completedAt:Date.now()});
     const resourceBlocked=(envelope.command==='RUN_SELF_IMPROVEMENT'||envelope.command==='RUN_RESEARCH'||(envelope.command==='VALIDATE_CANDIDATE'||envelope.command==='VERIFY_RESEARCH_CLAIMS'))&&!resourceGovernanceService.canRunComponentTests();

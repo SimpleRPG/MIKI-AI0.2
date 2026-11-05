@@ -74,6 +74,12 @@ export interface AutonomousLoopPersistenceState { status:AutonomousLoopPersisten
 const KEY = 'miki_autonomous_self_improvement_loop_v2';
 const LEGACY_KEY = 'miki_autonomous_self_improvement_loop_v1';
 const MAX_ATTEMPTS = 3;
+// P432: queue-length cap. Discovery re-derives its issues from the
+// static state of the code on a later scan, so refusing one more
+// unstarted discovery item at the cap loses nothing (same rationale
+// as the P429 B1 purge); it only stops the queue growing without
+// bound while the app is running.
+const MAX_QUEUE_LENGTH = 100;
 // P429 (B1): an AUTONOMOUS_DISCOVERY request that was never started
 // (attempts===0) and is older than this TTL is purged at load.
 // Discovery re-derives its issues from the static state of the code on
@@ -216,6 +222,22 @@ class AutonomousSelfImprovementLoopService {
     // reject. A blank trigger can only produce a meaningless task, so
     // it is refused here; out-of-range optional fields are sanitized.
     if (!trigger || !trigger.trim()) throw new Error('AUTONOMOUS_LOOP_TRIGGER_REQUIRED');
+    // P432: at the cap, do not add another unstarted SYSTEM
+    // AUTONOMOUS_DISCOVERY item; return an already-queued request
+    // exactly like the duplicate path above. USER_REQUEST and other
+    // non-discovery requests are never dropped by the cap.
+    if (
+      this.state.queue.length >= MAX_QUEUE_LENGTH &&
+      source === 'SYSTEM' &&
+      meta.runType === 'AUTONOMOUS_DISCOVERY'
+    ) {
+      const lowest = this.state.queue.reduce((best, item) =>
+        !best || (item.priority ?? 0) < (best.priority ?? 0) ? item : best,
+        undefined as AutonomousImprovementRequest | undefined);
+      this.save();
+      void this.drain();
+      return { ...(lowest ?? this.state.queue[0]) };
+    }
     const now = Date.now();
     this.sequence += 1;
     const normalizedPayload=normalizeDiscoveryIssuePayload(meta.payload);
@@ -445,6 +467,10 @@ class AutonomousSelfImprovementLoopService {
       try { this.reconcileCancellationRequests(); }
       catch (error) { systemLogger.warn('PERSISTENCE', '[AutonomousLoop] refusing dispatch while cancellation intent remains pending', { error: String(error instanceof Error ? error.message : error) }); this.scheduleRecovery(RECOVERY_POLL_MS); return; }
     }
+    // P432: prune stale discovery requests at drain time too, with the
+    // same predicate load() uses, so the queue cannot grow unbounded
+    // while the app is running.
+    this.purgeStaleDiscoveryRequests(Date.now());
     if (this.writesBlocked || this.state.queue.length === 0) return;
     this.running = true;
     let activeRequest: AutonomousImprovementRequest | undefined;
@@ -1385,6 +1411,30 @@ class AutonomousSelfImprovementLoopService {
     try{storageService.setItem(KEY,serialized);if(storageService.getItem(KEY)!==serialized)throw new Error('STORE_READBACK_MISMATCH');this.state.updatedAt=next.updatedAt;}catch(error){this.blockPersistence(`AUTONOMOUS_LOOP_STORE_WRITE_VERIFY_FAILED:${String(error instanceof Error?error.message:error)}`);throw new Error('AUTONOMOUS_LOOP_STORE_WRITE_VERIFY_FAILED');}
   }
 
+  // P432: the load-time stale-discovery predicate (P429 B1), reused at
+  // drain time so a queue that grows while the app is running is
+  // pruned by the same rule without a new timer or persistence.
+  private isStaleDiscoveryRequest(item: AutonomousImprovementRequest, now: number, activeRequestId?: string, lastTaskId?: string): boolean {
+    return item.attempts === 0 &&
+      item.source === 'SYSTEM' &&
+      item.runType === 'AUTONOMOUS_DISCOVERY' &&
+      item.createdAt <= now - DISCOVERY_UNSTARTED_TTL_MS &&
+      item.id !== activeRequestId &&
+      !(lastTaskId && item.taskId === lastTaskId) &&
+      !(item.payload && item.payload.claimContext !== undefined);
+  }
+
+  private purgeStaleDiscoveryRequests(now: number): number {
+    const before = this.state.queue.length;
+    this.state.queue = this.state.queue.filter(item => !this.isStaleDiscoveryRequest(item, now, this.state.activeRequestId, this.state.lastTaskId));
+    const purged = before - this.state.queue.length;
+    if (purged > 0) {
+      systemLogger.info('SELF_IMPROVEMENT', `[RUNTIME] AutonomousLoop purge: staleDiscovery=${purged} queue=${this.state.queue.length}`);
+      try { this.save(); } catch { /* WRITE_BLOCKED is exposed and further execution is stopped. */ }
+    }
+    return purged;
+  }
+
   private load(): void {
     let sourceKey=KEY;let raw:string|null;
     try{raw=storageService.getItem(KEY);if(raw===null){sourceKey=LEGACY_KEY;raw=storageService.getItem(LEGACY_KEY);}}catch(error){this.blockPersistence(`AUTONOMOUS_LOOP_STORE_READ_FAILED:${String(error instanceof Error?error.message:error)}`);return;}
@@ -1416,7 +1466,7 @@ class AutonomousSelfImprovementLoopService {
       // the active request and its task, claim-context carriers, and
       // anything that is not a SYSTEM AUTONOMOUS_DISCOVERY request
       // (USER_REQUEST / EXTERNAL_DIRECTIVE keep their own lifetimes).
-      if(item.attempts===0&&item.source==='SYSTEM'&&item.runType==='AUTONOMOUS_DISCOVERY'&&item.createdAt<=loadNow-DISCOVERY_UNSTARTED_TTL_MS&&item.id!==parsed.activeRequestId&&!(parsed.lastTaskId&&item.taskId===parsed.lastTaskId)&&!(item.payload&&item.payload.claimContext!==undefined)){staleDiscoveryPurgedCount+=1;return false;}
+      if(this.isStaleDiscoveryRequest(item,loadNow,parsed.activeRequestId,parsed.lastTaskId)){staleDiscoveryPurgedCount+=1;return false;}
       return true;
     });
     const droppedInvalid=this.lastLoadDroppedInvalid;this.state={...parsed,queue:activeQueue};

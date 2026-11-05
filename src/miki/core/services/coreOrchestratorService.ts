@@ -1686,9 +1686,12 @@ class CoreOrchestratorService {
         `[RUNTIME] dispatch OK: ${route.target}.${route.command}`,
       );
     }else{
+      // P432: log-only: carry the rejection reason so a rejected
+      // dispatch is diagnosable from the runtime log.
       systemLogger.warn(
         'SYSTEM',
         `[RUNTIME] dispatch rejected: ${route.target}.${route.command}`,
+        { error: reply.error },
       );
     }
 

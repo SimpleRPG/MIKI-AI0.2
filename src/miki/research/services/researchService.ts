@@ -767,6 +767,27 @@ export class ResearchService {
         if (!adaptive) break;
       }
 
+      /*
+       * P432: gap自身のclaimへ全web証拠を紐付ける。claimContextが無い
+       * 経路では、web証拠がどのclaimにもattachされずADMISSIBLEになら
+       * ないため、ゲートの独立証拠確認が永久に通らなかった。gapに紐
+       * づくclaim（このrunで生まれたもの／過去ラウンドでgapへattach
+       * されたもの）が無ければ、gapの要求文から1件作る。反証
+       * （counterevidence）役割の証拠は対象claimの支持にはしない。
+       * ゲート自体は緩和しない。
+       */
+      const gapClaimId = this.ensureGapClaim(gap, claimIds, evidence);
+      if (gapClaimId) {
+        for (const record of evidence) {
+          if (record.kind !== 'WEB' && record.kind !== 'DOCUMENT') continue;
+          if (record.status === 'REJECTED') continue;
+          if (record.metadata?.research_source_role === 'COUNTEREVIDENCE') continue;
+          evidenceService.attachEvidenceToClaim(record.evidence_id, gapClaimId);
+        }
+        if (!claimIds.includes(gapClaimId)) claimIds.push(gapClaimId);
+        knowledgeGapService.attachResearchClaims(gap.id, [gapClaimId]);
+      }
+
       mikiUnifiedLearningContinuumService.observe({
         domain: 'research',
         key: `knowledge-gap:${gap.id}`,
@@ -879,6 +900,24 @@ export class ResearchService {
         reason: '調査中にエラーが発生したため、Knowledge GapをBLOCKEDにしました。',
       };
     }
+  }
+
+  /*
+   * P432: gapに対応するclaimを返す。無ければgapの要求文から1件作る。
+   * 作成には最初のweb証拠を起点にする。要求文が短すぎる場合やweb
+   * 証拠が無い場合は作れない。
+   */
+  private ensureGapClaim(gap: KnowledgeGap, claimIds: string[], evidence: EvidenceRecord[]): string | undefined {
+    const existing =
+      claimIds[0] ??
+      knowledgeGapService.getById(gap.id)?.researchClaimIds?.[0] ??
+      knowledgeGapService.getById(gap.id)?.identity?.claimIds?.[0];
+    if (existing) return existing;
+    const anchor = evidence.find(item => (item.kind === 'WEB' || item.kind === 'DOCUMENT') && item.status !== 'REJECTED');
+    if (!anchor) return undefined;
+    const statement = gap.query.trim();
+    if (statement.length < 15) return undefined;
+    return evidenceService.registerUnverifiedClaim(anchor.evidence_id, statement);
   }
 
   private linkResearchEvidenceToClaim(

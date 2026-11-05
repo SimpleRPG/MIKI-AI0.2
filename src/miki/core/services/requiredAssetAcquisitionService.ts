@@ -479,6 +479,32 @@ class RequiredAssetAcquisitionService {
         }),
       );
 
+      /*
+       * P432: researchGapが返したweb証拠のうち、gapのclaimへ未紐付の
+       * ものをgap claimへattachする（researchGap側でも同じ紐付けを
+       * 行うが、呼び出し経路によらずここで保証する）。claimが無けれ
+       * ばgapの要求文から1件作る。ゲートは緩和しない。
+       */
+      const gapClaimId =
+        this.extractStringIds(researched, /^claim(?:[_-]?ids?)?$/i)[0] ??
+        knowledgeGapService.getById(gap.id)?.researchClaimIds?.[0] ??
+        knowledgeGapService.getById(gap.id)?.identity?.claimIds?.[0] ??
+        (webEvidenceIds.length > 0 && request.requirement.trim().length >= 15
+          ? evidenceService.registerUnverifiedClaim(webEvidenceIds[0], request.requirement.trim())
+          : undefined);
+      let gapClaimAttachedCount = 0;
+      if (gapClaimId) {
+        for (const evidenceId of webEvidenceIds) {
+          const record = evidenceService.getEvidence(evidenceId);
+          if (!record || record.status === 'REJECTED') continue;
+          if (record.claim_ids.includes(gapClaimId)) continue;
+          if (evidenceService.attachEvidenceToClaim(evidenceId, gapClaimId)) gapClaimAttachedCount += 1;
+        }
+        if (gapClaimAttachedCount > 0) {
+          knowledgeGapService.attachResearchClaims(gap.id, [gapClaimId]);
+        }
+      }
+
       let componentIds = this.extractStringIds(
         researched,
         /component(?:[_-]?ids?)?/i
@@ -582,6 +608,7 @@ class RequiredAssetAcquisitionService {
         ? [`RESEARCH_RETURNED_NO_EVIDENCE_ID:${gap.id}`]
         : [
             ...(unlinkedEvidenceIds.length > 0 ? [`EVIDENCE_RESEARCHED_BUT_UNLINKED:${gap.id}`] : [`EVIDENCE_ACQUIRED:${gap.id}`]),
+            ...(gapClaimAttachedCount > 0 ? [`GAP_CLAIM_EVIDENCE_ATTACHED:${gap.id}:${gapClaimAttachedCount}`] : []),
             ...(localEvidenceIds.length > 0 ? [`LOCAL_EVIDENCE_ACQUIRED:${localEvidenceIds.length}`] : []),
             ...(webEvidenceIds.length > 0 ? [`WEB_EVIDENCE_ACQUIRED:${webEvidenceIds.length}`] : []),
             ...(unlinkedEvidenceIds.length > 0 ? [`EVIDENCE_IDS_UNLINKED:${unlinkedEvidenceIds.length}`] : []),

@@ -583,6 +583,10 @@ const SEARCH_CONFIG_KEY='miki_autonomous_search_config_v1';
 const SEARCH_STATS_KEY='miki_autonomous_search_stats_v1';
 const SEARCH_RECORDS_KEY='miki_autonomous_search_records_v1';
 const UNVERIFIED_RESEARCH_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+// P432: how long a failed page URL is remembered (in-memory only).
+// A URL that just timed out is skipped instead of being re-fetched
+// on every research pass.
+const FAILED_PAGE_URL_MEMORY_MS = 30 * 60 * 1000;
 const DEFAULT_CONFIG:AutonomousSearchConfig={
   enabled:true,autoSearchInChat:true,idleSearchEnabled:true,maxResults:4,allowFallbackMock:false,
   autoLearnToLongTermMemory:true,autoLearnToSyntheticData:false
@@ -595,6 +599,9 @@ export class AutonomousSearchService {
   private config: AutonomousSearchConfig;
   private stats: AutonomousSearchStats;
   private cache: Map<string, { data: AutonomousSearchExecutionResult; timestamp: number }> = new Map();
+  // P432: failed page reads, in-memory only (URL -> failedAt). No
+  // persistence, no timer; stale entries are dropped when re-checked.
+  private failedPageUrls = new Map<string, number>();
 
   constructor() {
     this.config = this.loadConfig();
@@ -1308,8 +1315,20 @@ export class AutonomousSearchService {
     error?: string;
   }>> {
     const maxPages = Math.max(1, Math.min(3, options?.maxPages ?? 2));
+    const readStartedAt = Date.now();
     const readable = results
       .filter((r) => typeof r.url === 'string' && /^https?:\/\//i.test(r.url))
+      .filter((r) => {
+        // P432: skip a URL that failed recently; forget it once the
+        // memory window has passed so it can be tried again later.
+        const failedAt = this.failedPageUrls.get(r.url!);
+        if (failedAt === undefined) return true;
+        if (readStartedAt - failedAt >= FAILED_PAGE_URL_MEMORY_MS) {
+          this.failedPageUrls.delete(r.url!);
+          return true;
+        }
+        return false;
+      })
       .slice(0, maxPages);
 
     // Native WebView rejects overlapping calls; serialize page reads while preserving input order.
@@ -1321,6 +1340,9 @@ export class AutonomousSearchService {
           timeoutMs: options?.timeoutMs,
           renderWaitMs: options?.renderWaitMs,
         });
+        // P432: remember a failed read so the same URL is not
+        // re-fetched on the next research pass.
+        if (!page.success) this.failedPageUrls.set(result.url!, Date.now());
         outputs.push({
           result,
           success: page.success,
@@ -1329,6 +1351,7 @@ export class AutonomousSearchService {
           error: page.error,
         });
       } catch (error) {
+        this.failedPageUrls.set(result.url!, Date.now());
         outputs.push({
           result,
           success: false,
