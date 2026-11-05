@@ -634,21 +634,34 @@ class ComponentSupplyRequestService {
     const instructions = this.buildInstructions(supplyRequest);
 
     // ---- 送出前プライバシー検査（検出したら止める） ----
-    const outboundText = [
-      JSON.stringify(supplyRequest, null, 2),
-      instructions,
-      ...contextEntries.map((entry) => entry.content),
-    ].join('\n');
-    const audit = privacyGuardrailService.auditOutboundContent(outboundText, 'component_supply_package', { autoSanitize: false });
-    if (!audit.allowed) {
-      const reasons = Array.isArray(audit.violations)
-        ? audit.violations.map((v: { message?: string }) => String(v?.message || '')).filter(Boolean)
-        : [];
+    // P430: パート別（要求本体／手順書／文脈ファイルごと）に監査する。
+    // 検出パターンはいずれも改行を跨がないため、パート別監査の検出は
+    // 従来の結合監査（'\n' 区切り）と等価である。遮断時は理由に
+    // 「パート名＋違反の種類＋伏せた断片（先頭最大3文字＋***）」を残し、
+    // 値そのものは理由にも出さない。
+    const auditParts: Array<{ name: string; text: string }> = [
+      { name: 'supply_request.json', text: JSON.stringify(supplyRequest, null, 2) },
+      { name: 'INSTRUCTIONS.md', text: instructions },
+      ...contextEntries.map((entry) => ({ name: entry.name, text: entry.content })),
+    ];
+    const privacyReasons: string[] = [];
+    const privacyMessages: string[] = [];
+    for (const part of auditParts) {
+      const audit = privacyGuardrailService.auditOutboundContent(part.text, 'component_supply_package', { autoSanitize: false });
+      if (audit.allowed) continue;
+      for (const violation of audit.violations) {
+        const violationMessage = String(violation?.message || '');
+        if (violationMessage && !privacyMessages.includes(violationMessage)) privacyMessages.push(violationMessage);
+        const masked = `${String(violation?.snippet ?? '').slice(0, 3)}***`;
+        privacyReasons.push(`${part.name}: ${violationMessage}（${masked}）`);
+      }
+    }
+    if (privacyReasons.length > 0) {
       return {
         ok: false,
         code: 'PRIVACY_BLOCKED',
-        message: `送出前プライバシー検査で検出があったため、パッケージを作成しませんでした。${audit.blockedReason ? ` ${audit.blockedReason}` : ''}`,
-        reasons,
+        message: `送出前プライバシー検査で検出があったため、パッケージを作成しませんでした。 セキュリティ境界違反: ${privacyMessages.slice(0, 2).join(', ')}`,
+        reasons: privacyReasons,
       };
     }
 

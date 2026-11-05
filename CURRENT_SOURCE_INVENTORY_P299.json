@@ -39,9 +39,9 @@
     "trackedPathCountExcludingControlPaths": 1753,
     "sourceFileCount": 1306,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1219,
-    "relativeImportCandidateCount": 3686,
+    "relativeImportCandidateCount": 3687,
     "resolvedRelativeImportCandidateCount": 3670,
-    "unresolvedRelativeImportCandidateCount": 16
+    "unresolvedRelativeImportCandidateCount": 17
   },
   "records": [
     {
@@ -13513,9 +13513,9 @@
     },
     {
       "path": "src/miki/core/services/componentSupplyRequestService.ts",
-      "bytes": 40571,
-      "lines": 827,
-      "sha256": "3a119e0bc79c2c4ddcaf05c3b2dfcdd2db322004525cd3eedbd2daf940588a66",
+      "bytes": 41588,
+      "lines": 840,
+      "sha256": "304c91cb6cfb2dc5f343edfac48eb22389772a729b41ced41fe2c377ebe7e7ed",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -26155,9 +26155,9 @@
     },
     {
       "path": "src/miki/safety/services/privacyGuardrailService.ts",
-      "bytes": 9242,
-      "lines": 248,
-      "sha256": "070b553e41c90ef68adbe83ad565f8d4128fdb9a17f4ff0462fc3d690d5741cc",
+      "bytes": 10919,
+      "lines": 267,
+      "sha256": "c61e54bb7dae671e71bbba806c61ecea4e1aea1706191b96e5cc3232acfd9541",
       "relativeImportCandidates": [
         {
           "line": 6,
@@ -26188,11 +26188,16 @@
           "specifier": "./featureFlagsService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/safety/services/featureFlagsService.ts"
+        },
+        {
+          "line": 139,
+          "specifier": "./data/presets",
+          "resolution": "UNRESOLVED_CANDIDATE"
         }
       ],
-      "relativeImportCandidateCount": 5,
+      "relativeImportCandidateCount": 6,
       "resolvedRelativeImportCount": 5,
-      "unresolvedRelativeImportCount": 0
+      "unresolvedRelativeImportCount": 1
     },
     {
       "path": "src/miki/safety/services/recoveryOrchestratorService.ts",

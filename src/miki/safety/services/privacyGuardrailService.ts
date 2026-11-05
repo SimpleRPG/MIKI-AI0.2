@@ -135,16 +135,25 @@ class PrivacyGuardrailService {
     }
 
     // 3. 社内ファイルパス (Windows/UNC/Linux Home)
-    const pathMatches = text.match(/(?:[A-Za-z]:\\[^<>"|?*\n\r\t]{5,}|\\\\[a-zA-Z0-9._-]+\\[^<>"|?*\n\r\t]+|\/(?:home|Users|data|storage|sdcard|system|mnt|tmp|opt|usr|proc|dev|root)\/[a-zA-Z0-9._\-\/]{4,})/g);
-    if (pathMatches) {
-      for (const snippet of pathMatches) {
-        violations.push({
-          type: 'INTERNAL_PATH',
-          snippet: snippet.slice(0, 35),
-          message: '社内またはローカル実機のファイルパスが検出されました',
-          severity: 'HIGH',
-        });
+    // P430: Linux 形式については、マッチ直前が単語文字またはドットの場合、
+    // 相対 import ('./data/presets') や 'src/data/...' のような相対パスの
+    // 断片であり絶対パスではないため検出しない（自分のコード文脈に遍在
+    // する誤検出の是正）。文字列の先頭・空白・引用符等の直後にある実在の
+    // 絶対パス ('/data/data/com.termux/...' 等) は従来どおり検出する。
+    // Windows / UNC 形式は従来どおり無条件で検出する。
+    const pathPattern = /(?:[A-Za-z]:\\[^<>"|?*\n\r\t]{5,}|\\\\[a-zA-Z0-9._-]+\\[^<>"|?*\n\r\t]+|\/(?:home|Users|data|storage|sdcard|system|mnt|tmp|opt|usr|proc|dev|root)\/[a-zA-Z0-9._\-\/]{4,})/g;
+    for (const pathMatch of text.matchAll(pathPattern)) {
+      const snippet = pathMatch[0];
+      if (snippet.startsWith('/')) {
+        const prev = pathMatch.index > 0 ? text[pathMatch.index - 1] : '';
+        if (/[\w.]/.test(prev)) continue;
       }
+      violations.push({
+        type: 'INTERNAL_PATH',
+        snippet: snippet.slice(0, 35),
+        message: '社内またはローカル実機のファイルパスが検出されました',
+        severity: 'HIGH',
+      });
     }
 
     // 4. プライベートIP / 内部ホスト名
@@ -161,28 +170,38 @@ class PrivacyGuardrailService {
     }
 
     // 5. 個人情報 (メールアドレス、電話番号)
-    const emailMatches = text.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g);
-    if (emailMatches) {
-      for (const snippet of emailMatches) {
-        violations.push({
-          type: 'PII',
-          snippet,
-          message: '個人メールアドレスが検出されました',
-          severity: 'MEDIUM',
-        });
-      }
+    // P430: 例示・予約ドメインは誤検出として除外する。対象は、ドメインに
+    // 'example' のラベルを含むもの (example.com / example.co.jp /
+    // mail.example.com 等) と、RFC 2606 の予約 TLD (.example / .test /
+    // .invalid / .localhost) で終わるもの。それ以外の実在形式の
+    // アドレスは従来どおり検出する。
+    const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+    for (const emailMatch of text.matchAll(emailPattern)) {
+      const snippet = emailMatch[0];
+      const domainLabels = snippet.slice(snippet.lastIndexOf('@') + 1).toLowerCase().split('.');
+      const tld = domainLabels[domainLabels.length - 1];
+      if (domainLabels.includes('example') || tld === 'test' || tld === 'invalid' || tld === 'localhost') continue;
+      violations.push({
+        type: 'PII',
+        snippet,
+        message: '個人メールアドレスが検出されました',
+        severity: 'MEDIUM',
+      });
     }
 
-    const telMatches = text.match(/\b0\d{1,4}-\d{1,4}-\d{4}\b/g);
-    if (telMatches) {
-      for (const snippet of telMatches) {
-        violations.push({
-          type: 'PII',
-          snippet,
-          message: '電話番号が検出されました',
-          severity: 'MEDIUM',
-        });
-      }
+    // P430: 架空番号の定番パターン (末尾 1234-5678、および 0120-123-456 型
+    // の末尾 123-456) は誤検出として除外する。それ以外の番号は従来どおり
+    // 検出する。
+    const telPattern = /\b0\d{1,4}-\d{1,4}-\d{4}\b/g;
+    for (const telMatch of text.matchAll(telPattern)) {
+      const snippet = telMatch[0];
+      if (snippet.endsWith('1234-5678') || snippet.endsWith('123-456')) continue;
+      violations.push({
+        type: 'PII',
+        snippet,
+        message: '電話番号が検出されました',
+        severity: 'MEDIUM',
+      });
     }
 
     // 判定ロジック
