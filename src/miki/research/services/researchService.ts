@@ -11,6 +11,8 @@ import { sourcePageGraphService } from './sourcePageGraphService';
 import { contentTermsFromTokens } from './japaneseAnalysisService';
 import { japaneseAnalysisCompositionService } from '../../conversation/services/japaneseAnalysisCompositionService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
+import type { GapFocusMaterialInput } from './researchQueryPlanningService';
+import { storageService } from '../../../services/storageService';
 import { collectionSourceRegistryService } from '../../core/services/collectionSourceRegistryService';
 import type { VerificationResult } from '../../verification/services/verifierService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
@@ -25,6 +27,9 @@ import {
   type CodeMaterialCollectionContext,
 } from '../../core/services/githubCodeMaterialService';
 import { stackExchangeMaterialService } from '../../core/services/stackExchangeMaterialService';
+
+// P439: 不足スロット向け研究で試した戦略の記録。ギャップごとに3戦略まで。
+const GAP_FOCUS_STRATEGY_LEDGER_KEY='miki_gap_focus_strategy_attempts_v1';
 
 export type { ResearchRoute };
 
@@ -114,11 +119,60 @@ export class ResearchService {
     return ResearchService.instance;
   }
 
-  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string; lane?: SearchLane }): Promise<ResearchResult> {
+  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string; lane?: SearchLane; gapFocus?: GapFocusMaterialInput }): Promise<ResearchResult> {
     const text = query.trim();
     if (!text) throw new Error("RESEARCH_QUERY_REQUIRED");
     const gap = knowledgeGapService.detect({ query: text, type: "INSUFFICIENT_EVIDENCE", reason: "通常のWeb知識探索要求をResearchServiceへ統合", priority: 50, sourceRequestId: options?.sourceRequestId });
-    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)), lane: options?.lane });
+    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)), lane: options?.lane, ...(options?.gapFocus ? { gapFocus: options.gapFocus } : {}) });
+  }
+
+  /*
+   * P439: 不足スロット向けの研究の再試行で、試した戦略を記録して
+   * ローテーションする。戦略は GitHub コード検索 → Stack Exchange →
+   * Web 文書の順。ギャップごとに3戦略までで、超えたら材料探索クエリ
+   * は足さない（同じ調査の繰り返しにしないための歯止め。教師供給への
+   * 導線は既存の供給要求のまま）。記録の読み書きに失敗しても研究自体
+   * は続ける（初回は未試行として扱い、書き込み失敗は無視する）。
+   */
+  private resolveGapFocusStrategy(gapFocus: GapFocusMaterialInput | undefined): GapFocusMaterialInput | undefined {
+    if (!gapFocus) return undefined;
+    const slotNames = (Array.isArray(gapFocus.slotNames) ? gapFocus.slotNames : []).map((value) => String(value || '').trim()).filter(Boolean).slice(0, 3);
+    const targetPaths = (Array.isArray(gapFocus.targetPaths) ? gapFocus.targetPaths : []).map((value) => String(value || '').trim()).filter(Boolean).slice(0, 3);
+    if (slotNames.length === 0 && targetPaths.length === 0) return undefined;
+    const strategies: Array<GapFocusMaterialInput['strategy']> = ['GITHUB_CODE', 'STACK_EXCHANGE', 'WEB_DOCS'];
+    const gapKey = `${slotNames.join(',')}@${targetPaths.join(',')}`.slice(0, 200);
+    const ledger = this.readGapFocusStrategyLedger();
+    const entry = ledger[gapKey];
+    const tried = entry && Array.isArray(entry.strategies)
+      ? entry.strategies.filter((value): value is string => typeof value === 'string')
+      : [];
+    const next = strategies.find((strategy) => !tried.includes(strategy));
+    if (!next) return undefined;
+    ledger[gapKey] = { strategies: [...tried, next], updatedAt: Date.now() };
+    try {
+      storageService.setItem(GAP_FOCUS_STRATEGY_LEDGER_KEY, JSON.stringify(ledger));
+    } catch {
+      // 記録に失敗しても研究自体は続ける。
+    }
+    return {
+      slotNames,
+      targetPaths,
+      strategy: next,
+      ...(typeof gapFocus.gapReason === 'string' && gapFocus.gapReason.trim() ? { gapReason: gapFocus.gapReason.trim() } : {}),
+      ...(typeof gapFocus.nextStep === 'string' && gapFocus.nextStep.trim() ? { nextStep: gapFocus.nextStep.trim() } : {}),
+    };
+  }
+
+  private readGapFocusStrategyLedger(): Record<string, { strategies: string[]; updatedAt: number }> {
+    try {
+      const raw = storageService.getItem(GAP_FOCUS_STRATEGY_LEDGER_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, { strategies: string[]; updatedAt: number }>
+        : {};
+    } catch {
+      return {};
+    }
   }
 
   /**
@@ -230,6 +284,9 @@ export class ResearchService {
     continuationRound?: number;
     // P418: SearXNG gate lane, threaded to every search pass below.
     lane?: SearchLane;
+    // P439: 候補生成の不足記録から来た研究の焦点（不足スロット名・対象
+    // ファイル）。ある場合はスロット向けの材料探索クエリを1本足す。
+    gapFocus?: GapFocusMaterialInput;
   }): Promise<ResearchResult> {
     const evidence: EvidenceRecord[] = [];
     const claimIds: string[] = [];
@@ -283,7 +340,7 @@ export class ResearchService {
     const requestedPasses = Number.isFinite(options?.maxPasses)
       ? Math.max(1, Math.floor(options!.maxPasses!))
       : 2;
-    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery, gap.researchClaimIds || []);
+    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery, gap.researchClaimIds || [], this.resolveGapFocusStrategy(options?.gapFocus));
     const invocationPassLimit = Math.min(
       queryPlan.policy.maxTotalSearchRequests,
       queryPlan.policy.maxQueriesPerPlan,

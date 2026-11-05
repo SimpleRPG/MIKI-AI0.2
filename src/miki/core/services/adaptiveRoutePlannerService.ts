@@ -285,6 +285,78 @@ function summarizeGapContract(contract:unknown):string {
   return parts.join(' | ');
 }
 
+/*
+ * P439: 候補生成の不足記録（candidateGenerationGap）から、研究の再試行へ
+ * 渡す焦点（gapFocus）を作る。載せるのは記録済みの文字列だけ（不足
+ * スロット名・対象ファイル・gapReason・次の一手）で、新しい推測はしない。
+ * スロット名も対象も無い場合は undefined（焦点なし）。
+ */
+export interface GapFocus {
+  slotNames:string[];
+  targetPaths:string[];
+  gapReason?:string;
+  nextStep?:string;
+}
+
+function buildGapFocus(gapValue:Record<string,unknown>|undefined):GapFocus|undefined {
+  if(!gapValue||typeof gapValue!=='object') return undefined;
+  const slotNames:string[]=[];
+  const addSlotName=(value:unknown):void=>{
+    const name=typeof value==='string'?value.trim():'';
+    if(name&&!slotNames.includes(name)) slotNames.push(name);
+  };
+  const contract=gapValue.contract;
+  if(contract&&typeof contract==='object'&&!Array.isArray(contract)){
+    const missingSlots=(contract as Record<string,unknown>).missingSlots;
+    if(Array.isArray(missingSlots)){
+      for(const slot of missingSlots){
+        if(slot&&typeof slot==='object'&&!Array.isArray(slot)) addSlotName((slot as Record<string,unknown>).slotName);
+      }
+    }
+  }
+  const specs=gapValue.missingComponentSpecs;
+  if(Array.isArray(specs)){
+    for(const spec of specs){
+      if(spec&&typeof spec==='object'&&!Array.isArray(spec)) addSlotName((spec as Record<string,unknown>).slotName);
+    }
+  }
+  const targetPaths:string[]=[];
+  const addTarget=(value:unknown):void=>{
+    const path=typeof value==='string'?value.trim():'';
+    if(path&&!targetPaths.includes(path)) targetPaths.push(path);
+  };
+  const recordedTargets=gapValue.targetPaths;
+  if(Array.isArray(recordedTargets)) for(const path of recordedTargets) addTarget(path);
+  if(Array.isArray(specs)){
+    for(const spec of specs){
+      if(spec&&typeof spec==='object'&&!Array.isArray(spec)) addTarget((spec as Record<string,unknown>).targetPath);
+    }
+  }
+  if(slotNames.length===0&&targetPaths.length===0) return undefined;
+  const gapReason=typeof gapValue.synthesisGapReason==='string'&&gapValue.synthesisGapReason.trim()?gapValue.synthesisGapReason.trim():undefined;
+  const nextStep=typeof gapValue.nextStep==='string'&&gapValue.nextStep.trim()?gapValue.nextStep.trim():undefined;
+  return {
+    slotNames:slotNames.slice(0,3),
+    targetPaths:targetPaths.slice(0,3),
+    ...(gapReason?{gapReason}:{}),
+    ...(nextStep?{nextStep}:{}),
+  };
+}
+
+/*
+ * P439: エラーより前に残された最新の candidateGenerationGap の記録を
+ * 読む。readiness 経路では composition 分岐の gapValue が使えないため、
+ * ここで取り直す（P425 A1 と同じく、エラーの位置を基準にする）。
+ */
+function latestCandidateGenerationGapValue(task:BlackboardTask,beforeIndex:number):Record<string,unknown>|undefined {
+  for(let index=Math.min(beforeIndex,task.entries.length-1);index>=0;index--){
+    const entry=task.entries[index];
+    if(entry.kind!=='OBSERVATION'||entry.key!=='candidateGenerationGap') continue;
+    return objectValue(entry);
+  }
+  return undefined;
+}
+
 function successfulBusinessEntries(task:BlackboardTask):BlackboardEntry[] {
   return task.entries.filter(entry => {
     if(entry.kind!=='RESULT') return false;
@@ -869,6 +941,10 @@ class AdaptiveRoutePlannerService {
         ? gapValue.missingComponentSpecs
         : undefined;
 
+      // P439: 研究の再試行へ渡す焦点。不足スロット名・対象ファイル・
+      // gapReason・次の一手（記録済みのものだけ。推測はしない）。
+      const gapFocus=buildGapFocus(gapValue);
+
       // P427 A3 第1段: gap 記録が空（内訳・理由・契約のいずれも
       // 無い）ときだけ、対象の公開面を自己コード索引から live に
       // 補う。記録が実在する場合は従来どおり記録が正であり、
@@ -1360,6 +1436,7 @@ class AdaptiveRoutePlannerService {
               unresolvedComponents:unresolved,
               componentGap:true,
               ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {}),...(missingComponentSpecs ? {missingComponentSpecs} : {})} : {}),
+              ...(gapFocus ? {gapFocus} : {}),
               adaptive:true,
               priority:94
             }
@@ -1692,6 +1769,9 @@ class AdaptiveRoutePlannerService {
       const readinessCandidateGenerationErrorEntry=this.latestOperationErrorEntry(task,'GENERATE_CANDIDATE');
       const readinessCompositionUnavailable=readinessCandidateGenerationErrorEntry.error.startsWith('CODE_COMPOSITION_PLAN_UNAVAILABLE');
       if(readinessCompositionUnavailable && !this.hasVerifiedComponentAddedSince(task,readinessCandidateGenerationErrorEntry.index)){
+        // P439: readiness 経路では composition 分岐の gapValue が使えない
+        // ため、エラーより前の最新の不足記録から焦点を取り直す。
+        const readinessGapFocus=buildGapFocus(latestCandidateGenerationGapValue(task,readinessCandidateGenerationErrorEntry.index));
         routes.push({
           target:'research',
           command:'RUN_RESEARCH',
@@ -1708,6 +1788,7 @@ class AdaptiveRoutePlannerService {
             componentGap:true,
             compositionGap:true,
             gapDescriptions:[],
+            ...(readinessGapFocus ? {gapFocus:readinessGapFocus} : {}),
             adaptive:true,
             priority:94
           }

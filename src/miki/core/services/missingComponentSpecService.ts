@@ -39,7 +39,10 @@ export interface MissingComponentGapContractInput {
     signatures: Array<{ name: string; kind: string; parameters: string[]; returnType?: string }>;
     imports: string[];
   }>;
-  missingSlots?: Array<{ knowledgeId: string; slotName: string; inputKinds: string[] }>;
+  // P439: UNRESOLVED_SLOT の不足から入るスロットには、束ね処理で付けた
+  // 対象ファイル（targetPath）が付くことがある。記録に無い場合は従来
+  // どおり対象1件のときだけ仕様化する。
+  missingSlots?: Array<{ knowledgeId: string; slotName: string; inputKinds: string[]; targetPath?: string }>;
   missingComponentIds?: string[];
 }
 
@@ -119,12 +122,19 @@ class MissingComponentSpecService {
       if (!slot || typeof slot.slotName !== 'string' || !slot.slotName || typeof slot.knowledgeId !== 'string' || !slot.knowledgeId) continue;
       const name = sanitizeIdentifier(`missing_${slot.knowledgeId}_${slot.slotName}`);
       if (!name) continue;
-      // スロットには対象ファイルが付いていない。対象が1件のときだけ
-      // 仕様化し、複数ある場合は推測で対象を決めない。
-      if (!singleTarget) continue;
+      // P439: 契約欄に記録された対象（束ね処理で付けた対応）があれば
+      // それを使う。無ければ従来どおり対象が1件のときだけ仕様化し、
+      // 複数ある場合は推測で対象を決めない。inputKinds は契約欄の記録
+      // そのまま（UNRESOLVED_SLOT 由来は空のまま。推測で補わない）。
+      const recordedTarget =
+        typeof slot.targetPath === 'string' && slot.targetPath.trim()
+          ? slot.targetPath.trim()
+          : undefined;
+      const targetPath = recordedTarget ?? singleTarget;
+      if (!targetPath) continue;
       push({
         name,
-        targetPath: singleTarget,
+        targetPath,
         inputKinds: Array.isArray(slot.inputKinds) ? slot.inputKinds.filter((value): value is string => typeof value === 'string') : [],
         expectedBehavior: expectedBehaviorFor(slot.slotName),
         source: 'MISSING_SLOT',

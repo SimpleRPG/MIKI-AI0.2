@@ -48,7 +48,7 @@ export interface CandidateGenerationGapContractSignature { name:string; kind:str
 export interface CandidateGenerationGapContractTarget { path:string; exports:string[]; signatures:CandidateGenerationGapContractSignature[]; imports:string[]; }
 export interface CandidateGenerationGapContract {
   targets:CandidateGenerationGapContractTarget[];
-  missingSlots:Array<{ knowledgeId:string; slotName:string; inputKinds:string[] }>;
+  missingSlots:Array<{ knowledgeId:string; slotName:string; inputKinds:string[]; targetPath?:string }>;
   missingComponentIds:string[];
 }
 export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; createdCodeComponentIds?:string[]; supplyEvidenceIds?:string[]; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
@@ -515,7 +515,12 @@ class CandidateCodeGenerationService {
    * 全targetが決定論的に構築できた場合だけ一括Candidate化する。
    * 1ファイルでも不足する場合は部分生成せず、既存の
    * CONSTRUCTION_GAP -> Unknown -> Researchへ戻す。
+   *
+   * P439: 束ね処理で失敗したとき、各対象の未解決スロットは対象ファイル
+   * との対応を付けて残す。単一Graphの未解決スロットだけでは、対象が
+   * 複数ある場合にどのファイルの不足か分からず仕様化できないため。
    */
+  const bundleUnresolvedSlots:Array<{slot:string;targetPath:string}>=[];
   if(targetFiles.length>1){
     const bundle=reusableComponentFactoryService.buildConstructionGraphBundle({
       goal:run.objective,
@@ -582,6 +587,14 @@ class CandidateCodeGenerationService {
           render,
         };
       });
+
+      // P439: 束ねが失敗したときの未解決スロットを、対象ファイルとの
+      // 対応付きで残す（束ねが成功した場合はこの後の早期復帰で使われない）。
+      for(const item of renderedBundle){
+        for(const slot of item.validation.unresolvedSlots){
+          bundleUnresolvedSlots.push({slot,targetPath:item.targetPath});
+        }
+      }
 
       const bundleValid=
         renderedBundle.length===targetFiles.length &&
@@ -739,6 +752,11 @@ class CandidateCodeGenerationService {
    ...constructionValidation.errors,
    ...constructionValidation.unresolvedSlots.map(
     slot=>`UNRESOLVED_SLOT:${slot}`
+   ),
+   // P439: 束ね処理の対象ごとの未解決スロット。対象ファイルとの対応を
+   // 付けた形で残し、buildGapContract で UNRESOLVED_SLOT として読む。
+   ...bundleUnresolvedSlots.map(
+    item=>`UNRESOLVED_SLOT:${item.slot}@${item.targetPath}`
    ),
   ]
    .filter(Boolean)
@@ -1251,19 +1269,22 @@ class CandidateCodeGenerationService {
        * 計画側・供給側は「計画が作れない」ではなく「この名前の
        * 部品が無い」として次へ進める。
        */
+      // P439: 不足記録は gapRecord として一度だけ組み立てる。後で次の一手
+      // （nextStep）が決まったら、同じ内容に nextStep を足して再度載せる。
+      const gapRecord={
+        operation:'GENERATE_CANDIDATE',
+        runId,
+        reason:'CODE_COMPOSITION_PLAN_UNAVAILABLE',
+        synthesisGapReason:synthesisPlan.source.gapReason||'',
+        blockedReason:synthesisPlan.blockedReason||'',
+        constructionGaps:constructionGapRequirements,
+        unknownQuestions,
+        targetPaths,
+        missingComponentSpecs,
+        ...(gapContract?{contract:gapContract}:{}),
+      };
       if(run.taskId){
-        taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGap',{
-          operation:'GENERATE_CANDIDATE',
-          runId,
-          reason:'CODE_COMPOSITION_PLAN_UNAVAILABLE',
-          synthesisGapReason:synthesisPlan.source.gapReason||'',
-          blockedReason:synthesisPlan.blockedReason||'',
-          constructionGaps:constructionGapRequirements,
-          unknownQuestions,
-          targetPaths,
-          missingComponentSpecs,
-          ...(gapContract?{contract:gapContract}:{}),
-        },[]);
+        taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGap',gapRecord,[]);
       }
 
       /*
@@ -1318,9 +1339,25 @@ class CandidateCodeGenerationService {
        * なら能力グラフ自体の空振り。composition がある成功時はこの
        * 分岐に入らないため出ない。
        */
+      /*
+       * P439: 診断から次の一手を1つに決める。候補ができていれば検証、
+       * 仕様が導出できていなければスロット向けの材料研究、仕様はあるが
+       * 候補が作れず却下があるなら仕様・材料の見直し、却下が無ければ
+       * 仕様向けの材料研究。台帳・ブラックボード・ログに残し、プランナー
+       * と研究側が毎回診断をやり直さなくて済むようにする。
+       */
+      const nextStep=
+        createdCodeComponentIds.length>0
+          ? 'VERIFY_CANDIDATE'
+          : missingComponentSpecs.length===0
+            ? 'RESEARCH_MATERIAL_FOR_SLOT'
+            : specResult.rejections.length>0
+              ? 'REVISE_SPEC_OR_DROP_MATERIAL'
+              : 'RESEARCH_MATERIAL_FOR_SPEC';
+
       systemLogger.warn(
         'SELF_IMPROVEMENT',
-        `[CandidateGeneration] ${runId}: specs=${missingComponentSpecs.length} created=${specCreatedIds.length} rejections=${specResult.rejections.length} gapReason=${synthesisPlan.source.gapReason || 'none'} blockedReason=${synthesisPlan.blockedReason || 'none'}`
+        `[CandidateGeneration] ${runId}: specs=${missingComponentSpecs.length} created=${specCreatedIds.length} rejections=${specResult.rejections.length} gapReason=${synthesisPlan.source.gapReason || 'none'} blockedReason=${synthesisPlan.blockedReason || 'none'} next=${nextStep}`
       );
 
       const reason=specCreatedIds.length>0
@@ -1337,6 +1374,7 @@ class CandidateCodeGenerationService {
         attemptCount:1,
         status:'BLOCKED',
         reason,
+        nextStep,
         createdCodeComponentIds,
         missingComponentSpecs,
         missingComponentRejections:specResult.rejections,
@@ -1351,6 +1389,19 @@ class CandidateCodeGenerationService {
           synthesisPlan
         }))
       });
+
+      // P439: 次の一手が決まった不足記録をブラックボードへも残す。
+      // プランナーはエラーより前の最新の candidateGenerationGap を読む
+      // ため、この追記が次の一手付きの記録として使われる。
+      if(run.taskId){
+        taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGap',{
+          ...gapRecord,
+          nextStep,
+          specs:missingComponentSpecs.length,
+          created:specCreatedIds.length,
+          rejections:specResult.rejections.length,
+        },[]);
+      }
 
       return {
         accepted:false,
@@ -1691,10 +1742,13 @@ class CandidateCodeGenerationService {
         const explicitPath=example.targetPath&&input.targetPaths.includes(example.targetPath)
           ? example.targetPath
           : undefined;
+        // P439: 例に対象が付いていなくても、言語が仕様の対象ファイルの
+        // 言語と一致すれば、その仕様の対象に使える。対象は仕様が既に
+        // 決めているため、ここで対象を推測していることにはならない。
+        // 言語が合わない例は従来どおり捨てる。
         const path=explicitPath||(
-          input.targetPaths.length===1 &&
-          this.codeLanguageMatchesTarget(example.language,input.targetPaths[0])
-            ? input.targetPaths[0]
+          this.codeLanguageMatchesTarget(example.language,spec.targetPath)
+            ? spec.targetPath
             : ''
         );
         if(path!==spec.targetPath)continue;
@@ -1777,6 +1831,26 @@ class CandidateCodeGenerationService {
   const missingComponentIds:string[]=[];
   for(const raw of constructionGapRequirements){
     const body=raw.startsWith('CONSTRUCTION_GAP:')?raw.slice('CONSTRUCTION_GAP:'.length):raw;
+    // P439: 未解決スロット（UNRESOLVED_SLOT:<nodeId>:<slotName>[@<targetPath>]）
+    // を契約欄の missingSlots に入れる。従来はこの形が読まれず捨てられて
+    // いたため、実機で一番出ている不足が specs=0 のままだった。
+    // @<targetPath> が付いている場合は対象も一緒に保持する（束ね処理で
+    // 付けた対応。記録に無い場合は従来どおり対象1件のときだけ仕様化する）。
+    if(body.startsWith('UNRESOLVED_SLOT:')){
+      const rest=body.slice('UNRESOLVED_SLOT:'.length);
+      const atIndex=rest.lastIndexOf('@');
+      const head=atIndex>0?rest.slice(0,atIndex):rest;
+      const targetPath=atIndex>0?rest.slice(atIndex+1).trim():'';
+      const first=head.indexOf(':');
+      if(first<=0)continue;
+      const knowledgeId=head.slice(0,first).trim();
+      const slotName=head.slice(first+1).trim();
+      if(!knowledgeId||!slotName)continue;
+      if(!missingSlots.some(slot=>slot.knowledgeId===knowledgeId&&slot.slotName===slotName&&slot.targetPath===(targetPath||undefined))){
+        missingSlots.push({knowledgeId,slotName,inputKinds:[],...(targetPath?{targetPath}:{})});
+      }
+      continue;
+    }
     if(body.startsWith('NO_COMPATIBLE_PRODUCER:')){
       const rest=body.slice('NO_COMPATIBLE_PRODUCER:'.length);
       const first=rest.indexOf(':');

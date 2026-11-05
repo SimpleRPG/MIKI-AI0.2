@@ -7,6 +7,14 @@ export type QueryIntentType='BASELINE'|'OFFICIAL_SPECIFICATION'|'CURRENT_ENVIRON
 export type QueryReadiness='READY'|'TOO_BROAD'|'TOO_NARROW'|'AMBIGUOUS'|'ENVIRONMENT_MISMATCH'|'PRIVACY_BLOCKED'|'DUPLICATE_QUERY';
 export type EnvironmentApplicability='DIRECTLY_APPLICABLE'|'APPLICABLE_WITH_ADAPTATION'|'REFERENCE_ONLY'|'NOT_APPLICABLE'|'ENVIRONMENT_UNKNOWN'|'CONFLICTING_ENVIRONMENT'|'REQUIRES_DEVICE_TEST'|'REQUIRES_EXTERNAL_ENVIRONMENT';
 export interface EnvironmentFingerprint {os:string;device:string;architecture:string;runtime:string;executionLocation:string;apiLevel?:string;runtimeVersion?:string;requiredCapabilities:string[];requiredPermissions:string[];desktopUiRequired:boolean;dockerRequired:boolean;rootRequired:boolean;}
+export interface GapFocusMaterialInput {
+  slotNames:string[];
+  targetPaths:string[];
+  // 戦略は researchService 側で試行記録から決める。ここでは未指定でよい。
+  strategy?:'GITHUB_CODE'|'STACK_EXCHANGE'|'WEB_DOCS';
+  gapReason?:string;
+  nextStep?:string;
+}
 export interface ResearchQueryIntent {queryId:string;queryPlanId:string;parentQueryId?:string;researchQuestionId:string;intentType:QueryIntentType;targetClaimIds:string[];missingEvidenceType:string;environmentConstraints:EnvironmentFingerprint;sourceTierTarget:string;language:string;termsIncluded:string[];termsExcluded:string[];exactPhrases:string[];siteOrDomainConstraints:string[];timeConstraint?:string;expectedEvidence:string;stopCondition:string;createdBy:'CORE_18_DOMAINS';createdAt:number;queryText:string;readiness:QueryReadiness;applicability:EnvironmentApplicability;validationReasons:string[];}
 export interface QueryPlanningPolicy {enabled:boolean;maxQueriesPerPlan:number;maxRevisionPerQuery:number;maxParallelQueries:number;maxTotalSearchRequests:number;maxQueryExecutionTimeMs:number;maxCandidateUrlsPerQuery:number;stopWhenEvidenceSatisfied:boolean;preferOfficialSources:boolean;requireCurrentEnvironmentCheck:boolean;requireCounterEvidenceSearch:boolean;linkAutoIndependentSourcePolicy:boolean;updatedAt:number;}
 export interface ResearchQueryPlan {queryPlanId:string;researchQuestionId:string;canonicalResearchIntent:string;environment:EnvironmentFingerprint;policy:QueryPlanningPolicy;queries:ResearchQueryIntent[];usedQueryPatternIds:string[];excludedQueryPatternIds:string[];queryPatternSelectionId:string;queryPatternSelectionSha256:string;status:'DRAFT'|'READY'|'BLOCKED'|'RUNNING'|'COMPLETED'|'STOPPED';planSha256:string;createdAt:number;updatedAt:number;}
@@ -24,7 +32,20 @@ class ResearchQueryPlanningService {
  savePolicy(input:QueryPlanningPolicy):{policy:QueryPlanningPolicy;receiptId:string;policySha256:string}{const policy=this.normalizePolicy({...input,updatedAt:Date.now()});storageService.setItem(POLICY_KEY,JSON.stringify(policy));const policySha256=canonicalSha256Object(policy);return {policy,receiptId:`RQPR-${policySha256.slice(0,20)}`,policySha256};}
  listPlans():ResearchQueryPlan[]{return (()=>{const raw=storageService.getItem(PLAN_KEY);try{return raw?JSON.parse(raw) as ResearchQueryPlan[]:[];}catch{return [];}})();}
  listRevisionPairs():QueryRevisionPair[]{return (()=>{const raw=storageService.getItem(REVISION_KEY);try{return raw?JSON.parse(raw) as QueryRevisionPair[]:[];}catch{return [];}})();}
- buildPlan(question:string,targetClaimIds:string[]=[]):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object({intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',intent,'全体条件を保持した基準検索']);
+ buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus?{intent,environment:DEVICE,policy,gapFocus}:{intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',intent,'全体条件を保持した基準検索']);
+/*
+ * P439: 不足スロット向けの材料探索クエリを1本足す（gapFocus がある場合）。
+ * 戦略ごとに探索先を変える（GitHub コード検索／Stack Exchange／Web 文書）。
+ * 基準検索の直後に入れるため、最大クエリ数で切られても残る。
+ * gapFocus を渡さない既存の呼び出しは従来の計画のまま。
+ */
+if(gapFocus&&Array.isArray(gapFocus.slotNames)&&gapFocus.slotNames.length>0){
+  const slotText=gapFocus.slotNames.map(value=>String(value||'').trim()).filter(Boolean).slice(0,3).join(' ');
+  const targetText=(Array.isArray(gapFocus.targetPaths)?gapFocus.targetPaths:[]).map(path=>String(path||'').split('/').pop()||'').filter(Boolean).slice(0,3).join(' ');
+  const siteHint=gapFocus.strategy==='GITHUB_CODE'?'site:github.com':gapFocus.strategy==='STACK_EXCHANGE'?'site:stackoverflow.com':'';
+  const materialQuery=[slotText,'TypeScript implementation example',targetText,siteHint].map(value=>value.trim()).filter(Boolean).join(' ');
+  if(materialQuery)specs.push(['IMPLEMENTATION_EXAMPLE',materialQuery,'不足スロット向け実装材料']);
+}
 
 const implementationRequired=/(?:実装|実装方法|実装例|部品|component|pattern|algorithm|implementation|implement|code|コード|修正|追加|作成|生成)/i.test(intent);
 if(implementationRequired){

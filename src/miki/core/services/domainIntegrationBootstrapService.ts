@@ -8,6 +8,7 @@ import { capabilityRustKernelService } from '../../capability/services/capabilit
 import { strategyRustKernelService } from '../../strategy/services/strategyRustKernelService';
 import { learningRustKernelService } from '../../learning/services/learningRustKernelService';
 import { researchRustKernelService } from '../../research/services/researchRustKernelService';
+import type { GapFocusMaterialInput } from '../../research/services/researchQueryPlanningService';
 import { unknownRustKernelService } from '../../unknown/services/unknownRustKernelService';
 import { promotionRustKernelService } from '../../promotion/services/promotionRustKernelService';
 import { candidateStructuralAnalysisService } from '../../selfDevelopment/services/candidateStructuralAnalysisService';
@@ -222,6 +223,26 @@ class DomainIntegrationBootstrapService{
   return [];
  }
 
+ /*
+  * P439: RUN_RESEARCH のペイロードに載った不足の焦点（gapFocus）を、
+  * researchService へ渡せる形に整える。記録済みの文字列（不足スロット名・
+  * 対象ファイル・gapReason・次の一手）だけを通し、形が違うものは捨てる。
+  * 戦略は researchService 側で試行記録から決めるため、ここでは決めない。
+  */
+ private parseGapFocus(value:unknown):GapFocusMaterialInput|undefined{
+  if(!value||typeof value!=='object'||Array.isArray(value))return undefined;
+  const record=value as Record<string,unknown>;
+  const slotNames=Array.isArray(record.slotNames)?record.slotNames.map(item=>String(item||'').trim()).filter(Boolean).slice(0,3):[];
+  const targetPaths=Array.isArray(record.targetPaths)?record.targetPaths.map(item=>String(item||'').trim()).filter(Boolean).slice(0,3):[];
+  if(slotNames.length===0&&targetPaths.length===0)return undefined;
+  return {
+   slotNames,
+   targetPaths,
+   ...(typeof record.gapReason==='string'&&record.gapReason.trim()?{gapReason:record.gapReason.trim()}:{}),
+   ...(typeof record.nextStep==='string'&&record.nextStep.trim()?{nextStep:record.nextStep.trim()}:{}),
+  };
+ }
+
  private async handle(domain:MikiDomain,envelope:DomainEnvelope):Promise<DomainReply>{
   const done=(result:unknown):DomainReply=>({accepted:true,domain,command:envelope.command,result,completedAt:Date.now()});
   if(envelope.command==='ANALYZE_OWNED_DOMAIN'&&['promotion','unknown','research','learning','strategy','capability','improvement','autonomy','selfAwareness','experience','safety','conversation'].includes(domain)){
@@ -317,7 +338,10 @@ class DomainIntegrationBootstrapService{
    const query=typeof envelope.payload.query==='string'?envelope.payload.query.trim():'';
    if(!gap&&!query)return {accepted:false,domain,command:envelope.command,error:'RESEARCH_QUERY_OR_GAP_REQUIRED',completedAt:Date.now()};
    if(!gap&&query){
-    const result=await researchService.executeSearch(query, typeof envelope.payload.options==='object'&&envelope.payload.options!==null ? envelope.payload.options as any : undefined);
+    // P439: 不足の焦点（gapFocus）がペイロードにあれば、材料探索クエリの
+    // ために researchService へ渡す。無ければ従来どおり。
+    const gapFocus=this.parseGapFocus(envelope.payload.gapFocus);
+    const result=await researchService.executeSearch(query, {...(typeof envelope.payload.options==='object'&&envelope.payload.options!==null ? envelope.payload.options as any : {}), ...(gapFocus?{gapFocus}:{})});
     return done({
       operation:'EXECUTE_AUTONOMOUS_SEARCH',
       operationClass:'BUSINESS',
@@ -336,12 +360,16 @@ class DomainIntegrationBootstrapService{
    const requestedRound = Number.isFinite(Number(envelope.payload.continuationRound))
      ? Math.max(0, Math.floor(Number(envelope.payload.continuationRound)))
      : 0;
+   // P439: 不足の焦点（gapFocus）がペイロードにあれば、材料探索クエリの
+   // ために researchService へ渡す。無ければ従来どおり。
+   const gapFocus = this.parseGapFocus(envelope.payload.gapFocus);
    return done(await researchService.researchGap(gap,{
      adaptive,
      query: requestedQuery || undefined,
      continuationRound: requestedRound,
      maxPasses: Number.isFinite(Number(envelope.payload.maxPasses)) ? Number(envelope.payload.maxPasses) : undefined,
-     maxPagesPerPass: Number.isFinite(Number(envelope.payload.maxPagesPerPass)) ? Number(envelope.payload.maxPagesPerPass) : undefined
+     maxPagesPerPass: Number.isFinite(Number(envelope.payload.maxPagesPerPass)) ? Number(envelope.payload.maxPagesPerPass) : undefined,
+     ...(gapFocus ? { gapFocus } : {})
    }));
   }
   if(domain==='autonomy'&&envelope.command==='SAVE_AUTONOMY_CONFIG'){
