@@ -7,6 +7,8 @@ import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/service
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { webTermLearningService } from './webTermLearningService';
 import { webContentUnderstandingService } from './webContentUnderstandingService';
+import { wordAssociationGraphService } from '../../memory/services/wordAssociationGraphService';
+import { systemLogger } from '../../../services/systemLogger';
 import { sourcePageGraphService } from './sourcePageGraphService';
 import { contentTermsFromTokens } from './japaneseAnalysisService';
 import { japaneseAnalysisCompositionService } from '../../conversation/services/japaneseAnalysisCompositionService';
@@ -30,6 +32,25 @@ import { stackExchangeMaterialService } from '../../core/services/stackExchangeM
 
 // P439: 不足スロット向け研究で試した戦略の記録。ギャップごとに3戦略まで。
 const GAP_FOCUS_STRATEGY_LEDGER_KEY='miki_gap_focus_strategy_attempts_v1';
+
+// P440 D5: 勉強の測定値の置き場所（verifierService・
+// reusableComponentFactoryService・domainIntegrationBootstrapService と
+// 同じキー・同じ形）。ここでは読むだけ（書くのは各測定点）。
+const STUDY_MEASUREMENT_KEY = 'miki_study_measurement_v1';
+function readStudyMeasurement(): Record<string, number> {
+  try {
+    const raw = storageService.getItem(STUDY_MEASUREMENT_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: Record<string, number> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value)) out[key] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 export type { ResearchRoute };
 
@@ -294,6 +315,8 @@ export class ResearchService {
     const learnedTermComponentIds: string[] = [];
     const learnedTermComponentClaims: Array<{ componentId: string; claimId: string }> = [];
     const learnedSemanticComponentClaims: Array<{ componentId: string; claimId: string; unitId: string }> = [];
+    // P440 D5: この調査ランでの学習進捗の集計（診断ログ用）。
+    const termLearningTotals = { terms: 0, glossed: 0, dupes: 0, needsGloss: 0 };
     const claimIdByNormalizedStatement = new Map<string, string>();
     const reusablePriorClaimStatuses = new Set(['UNVERIFIED', 'SUPPORTED']);
 
@@ -686,6 +709,21 @@ export class ResearchService {
                 learnedTermComponentClaims.push({ componentId, claimId: pageClaimId });
               }
             }
+
+            // P440 1-C: 同一ページに共起した gloss 付き用語から連想の
+            // 辺を生やす。gloss 付きだけを対象にする（意味の裏付けが
+            // ある用語同士の共起だけを辺にする）。
+            const glossedTerms = termLearning.terms
+              .filter((item) => item.gloss)
+              .map((item) => item.term);
+            if (glossedTerms.length > 1) {
+              wordAssociationGraphService.recordCooccurrences(glossedTerms);
+            }
+            // P440 D5: 学習進捗の集計。
+            termLearningTotals.terms += termLearning.terms.length;
+            termLearningTotals.glossed += termLearning.glossedCount;
+            termLearningTotals.dupes += termLearning.duplicateCount;
+            termLearningTotals.needsGloss += termLearning.needsGlossCount;
           }
         }
 
@@ -897,6 +935,16 @@ export class ResearchService {
             : hasAnyResults
               ? (coverageSatisfied ? 'NOT_FOUND_AFTER_COVERAGE' : 'INSUFFICIENT_SEARCH')
               : (roundsCompleted > 0 ? 'NO_RESULT' : 'SOURCE_UNAVAILABLE');
+
+      // P440 D5: 学習進捗の診断ログ1行。固定長サマリ（全文ログ化はしない）。
+      // promotions は知識部品の VERIFIED 昇格の累計（測定ストアから読む）。
+      if (termLearningTotals.terms > 0) {
+        const measurement = readStudyMeasurement();
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[StudyProgress] terms=${termLearningTotals.terms} glossed=${termLearningTotals.glossed} dupes=${termLearningTotals.dupes} promotions=${measurement.knowledgePromotions ?? 0}`,
+        );
+      }
 
       researchStrategyService.recordOutcome(gap.type, 'WEB_SEARCH', evidence.some(item => item.status !== 'REJECTED'), Date.now() - startedAt);
       return {

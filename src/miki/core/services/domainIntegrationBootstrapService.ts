@@ -50,8 +50,35 @@ import { safeImprovementPipelineService } from '../../improvement/services/safeI
 import { executionRunnerService } from '../../execution/services/executionRunnerService';
 import { androidNativeRunnerAdapterService } from '../../execution/services/androidNativeRunnerAdapterService';
 import { externalRunnerAdapterService } from '../../execution/services/externalRunnerAdapterService';
+import { knowledgeHalfLifeService } from '../../memory/services/knowledgeHalfLifeService';
 
 const BASE_COMMANDS:DomainCommand[]=['HEALTH_CHECK','DESCRIBE','GET_STATUS','ASSESS_DOMAIN','PARTICIPATE','VERIFY_CONNECTION'];
+
+// P440 D5: 勉強の測定値の置き場所（verifierService・
+// reusableComponentFactoryService・researchService と同じキー・同じ形）。
+const STUDY_MEASUREMENT_KEY = 'miki_study_measurement_v1';
+
+// P440 D5: 勉強の測定値の累計。数値だけを置く。測定の永続化失敗は
+// 呼び出し元の処理を止めない。
+function incrementStudyMeasurement(patch: Record<string, number>): void {
+  try {
+    const raw = storageService.getItem(STUDY_MEASUREMENT_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    const current: Record<string, number> =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, number>)
+        : {};
+    const next: Record<string, number> = { ...current };
+    for (const [key, value] of Object.entries(patch)) {
+      const base = typeof next[key] === 'number' ? next[key] : 0;
+      next[key] = base + value;
+    }
+    next.updatedAt = Date.now();
+    storageService.setItem(STUDY_MEASUREMENT_KEY, JSON.stringify(next));
+  } catch {
+    // 測定の永続化失敗は呼び出し元の処理を止めない。
+  }
+}
 
 class DomainIntegrationBootstrapService{
  private initialized=false;
@@ -629,6 +656,62 @@ class DomainIntegrationBootstrapService{
    // 部品IDと到達状態を1行残す（検証コードの追加ではない）。
    systemLogger.info('SELF_IMPROVEMENT',`🧩 [VerifyCodeComponent] ${componentIds.join(',')}: ${results.map(r=>`${r.componentId}=${r.status}`).join(', ')}`);
 
+   // P440 3-A/D4: 検証の結果を学習と使用実績に返す。
+   // VERIFIED なら成功パターンを ACCEPTED_PATTERN（局所スコープ）として
+   // 記録し、FAILED なら却下を FAILURE_PATTERN として記録する。昇格
+   // そのものは既存のゲートが決めるため、ここでは記録だけを行う。
+   // 記録の失敗は検証結果を変えない。
+   try{
+     const {reusableComponentFactoryService}=await import('./reusableComponentFactoryService');
+     for(const item of results){
+       if(item.status!=='VERIFIED'&&item.status!=='FAILED')continue;
+       const succeeded=item.status==='VERIFIED';
+       const candidateSha=componentRegistryService.getComponent(item.componentId)?.implementation_hash||item.componentId;
+       try{
+         if(succeeded){
+           reviewLearningArtifactService.deriveAcceptedFromInternalVerification({
+             specId:item.componentId,
+             candidateSha,
+             approach:`VERIFY_CODE_COMPONENT passed: ${item.componentId}`,
+           });
+         }else{
+           reviewLearningArtifactService.deriveFromInternalVerification({
+             specId:item.componentId,
+             failedStage:'VERIFY_CODE_COMPONENT',
+             reason:item.reason||'VERIFICATION_FAILED',
+             candidateSha,
+           });
+         }
+       }catch{
+         // 学習アーティファクトの記録失敗は検証結果を変えない。
+       }
+       const linked=reusableComponentFactoryService.findCodeComponentByRegistryId(item.componentId);
+       if(linked){
+         try{
+           reusableComponentFactoryService.recordUsage({
+             componentIds:[linked.componentId],
+             taskId:decisionId||item.componentId,
+             candidateId:item.componentId,
+             selectionMode:'COMPOSE_MULTIPLE',
+             validationResult:succeeded?'PASSED':'FAILED',
+             outcome:succeeded?'SUCCEEDED':'FAILED',
+             coreDecisionId:decisionId||item.componentId,
+           });
+         }catch{
+           // 使用実績の記録失敗は検証結果を変えない。
+         }
+       }
+       try{
+         // カウントだけを部品キーで記録する（半減期の計算式は変えない）。
+         knowledgeHalfLifeService.observe(`component:${item.componentId}`,succeeded?'SUCCESS':'FAILURE',false);
+       }catch{
+         // 半減期の記録失敗は検証結果を変えない。
+       }
+     }
+   }catch{
+     // 学習・使用実績の記録失敗は検証結果を変えない。
+   }
+
    // P436: 検証の実行自体を EXECUTION 証拠として登録し、その id を
    // 返却に載せる（VALIDATE_CANDIDATE の P369 と同じ手口）。載せないと
    // 成功時の返却が証拠 0 件になり、契約で
@@ -916,6 +999,24 @@ if(domain==='promotion'&&envelope.command==='CREATE_REVIEW_PACKAGE'){
    const expectedHash=String(envelope.payload.candidateManifestSha256||workspace.candidateRevisionSha256);
    if(expectedHash!==workspace.candidateRevisionSha256)return {accepted:false,domain,command:envelope.command,error:'CANDIDATE_MANIFEST_SHA_MISMATCH',completedAt:Date.now()};
    const result=await candidateValidationRunnerService.run(workspaceId);
+   // P440 D5: 検証通過率の集計。受領書（miki_candidate_validation_receipts_v1）
+   // は受領書であって集計ではないため、別キーに数える。
+   incrementStudyMeasurement(result.passed?{validationPassed:1}:{validationFailed:1});
+   // P440 3-A: 内部検証の却下を学習アーティファクトとして記録する。
+   // 検証の判定自体には影響しない（学習アーティファクトは候補生成の
+   // 文脈に載るだけ）。記録の失敗は検証結果を変えない。
+   if(!result.passed){
+     try{
+       reviewLearningArtifactService.deriveFromInternalVerification({
+         specId:candidateId,
+         failedStage:result.failedChecks?.[0]||'VALIDATE_CANDIDATE',
+         reason:result.reasons.join('|')||'VALIDATION_FAILED',
+         candidateSha:workspace.candidateRevisionSha256,
+       });
+     }catch{
+       // 学習アーティファクトの記録失敗は検証結果を変えない。
+     }
+   }
    // P369: register the validation run itself as EXECUTION evidence
    // and carry its id in the reply. Validation results used to live
    // only in the validation runner's own store, which the evidence

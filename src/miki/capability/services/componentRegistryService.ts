@@ -525,7 +525,10 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
         return {
           decision: 'DUPLICATE',
           matchedComponentId: id,
-          reason: `完全一致ハッシュ (${rawHash}) が既存部品『${id}』と重複しています。新規登録は行いません。`,
+          // P440 D8(b): 32bit簡易ハッシュのため衝突の可能性がある。SHA-256
+          // への切り替えは影響範囲が大きいため、ここでは理由に明記する
+          // だけに留める。
+          reason: `完全一致ハッシュ (${rawHash}) が既存部品『${id}』と重複しています。新規登録は行いません。（32bit簡易ハッシュのため衝突の可能性あり）`,
         };
       }
     }
@@ -537,7 +540,7 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
         return {
           decision: 'DUPLICATE',
           matchedComponentId: id,
-          reason: `正規化ハッシュ (${normHash}) が既存部品『${id}』と同一です（空白・コメント差分のみ）。既存部品をREUSEしてください。`,
+          reason: `正規化ハッシュ (${normHash}) が既存部品『${id}』と同一です（空白・コメント差分のみ）。既存部品をREUSEしてください。（32bit簡易ハッシュのため衝突の可能性あり）`,
         };
       }
     }

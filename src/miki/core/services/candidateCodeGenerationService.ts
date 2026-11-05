@@ -59,6 +59,30 @@ export interface CandidateGenerationOutcome { accepted:boolean; runId:string; wo
  * REUSE で却下された」とを、生成台帳と gap の記録で区別するためのもの。
  */
 export interface MissingComponentCandidateRejection { kind:'ADAPTER'|'SPEC'; specName:string; targetPath:string; decision:string; reason:string; matchedRegistryComponentId?:string; }
+
+/*
+ * P440 D1/D5: 台帳の集計層。繰り返し止まるギャップから「次に学ぶべき
+ * トピック」を決めるための読み手。集計結果は台帳とは別キー・別ストア
+ * （miki_candidate_generation_ledger_summary_v1）に置く。
+ * トピック化の閾値（同一キー3回以上）は新規の設計判断として明記する
+ * （根拠のある既存定数はない）。
+ * topStudyTopics は P439 の gapFocus と同じ形（記録済み文字列だけ）
+ * で、研究に渡せる。
+ */
+export interface CandidateGenerationLedgerSummary {
+  totalRuns: number;
+  specsKnownRuns: number;
+  specsPositiveRuns: number;
+  specsPositiveRate: number;
+  createdRuns: number;
+  byReason: Array<{ key: string; count: number }>;
+  byDecision: Array<{ key: string; count: number }>;
+  byNextStep: Array<{ key: string; count: number }>;
+  bySpecKey: Array<{ key: string; slotName: string; targetPath: string; count: number }>;
+  topStudyTopics: Array<{ slotNames: string[]; targetPaths: string[]; gapReason?: string; nextStep?: string; count: number }>;
+  updatedAt: number;
+}
+
 class CandidateCodeGenerationService {
  async generate(runId:string):Promise<CandidateGenerationOutcome>{
   const run=improvementIntakeRouterService.get(runId);if(!run)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};
@@ -1025,6 +1049,29 @@ class CandidateCodeGenerationService {
   });
 
   /*
+   * P440 D4: 計画で使われた知識・コード部品の使用実績を記録する。
+   * recordUsage の呼び出し元が0件で usageCount／successCount／
+   * failureCount が初期値のままだったため。outcome はこの時点では未定
+   * （PENDING）で、成功・失敗は検証の結果から updateOutcome へ渡す
+   * （verifyResearchKnowledge・VERIFY_CODE_COMPONENT）。
+   * 記録の失敗は生成を止めない。
+   */
+  if (componentPack.usedKnowledgeComponentIds.length > 0 || componentPack.usedCodeComponentIds.length > 0) {
+    try {
+      reusableComponentFactoryService.recordUsage({
+        componentIds: [...componentPack.usedKnowledgeComponentIds, ...componentPack.usedCodeComponentIds],
+        taskId: run.taskId || run.runId,
+        selectionMode: 'COMPOSE_MULTIPLE',
+        validationResult: 'NOT_RUN',
+        outcome: 'PENDING',
+        coreDecisionId: run.runId,
+      });
+    } catch (error) {
+      systemLogger.warn('SELF_IMPROVEMENT', '[CandidateGeneration] P440 recordUsage failed', error);
+    }
+  }
+
+  /*
    * Learning Artifactは実行可能CODEではない。
    * 既存Compositionの制約・修正知識としてだけ渡す。
    * unresolvedConflictsは命令化せず、未解決状態として明示する。
@@ -1873,6 +1920,142 @@ class CandidateCodeGenerationService {
   return {targets,missingSlots:slots,missingComponentIds:componentIds};
  }
  private parse(text:string):CandidateGenerationFile[]|undefined{const cleaned=text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');const start=cleaned.indexOf('{');const end=cleaned.lastIndexOf('}');const options=[cleaned,start>=0&&end>start?cleaned.slice(start,end+1):''];for(const option of options){if(!option)continue;try{const value=JSON.parse(option);if(!value||!Array.isArray(value.files))continue;const files:CandidateGenerationFile[]=[];for(const row of value.files){if(typeof row?.path!=='string'||typeof row?.candidateContent!=='string')return undefined;files.push({path:row.path,candidateContent:row.candidateContent,evidenceIds:Array.isArray(row.evidenceIds)?row.evidenceIds.filter((x:unknown):x is string=>typeof x==='string'):[]});}return files;}catch{continue;}}return undefined;}
+
+ public listLedger(): Array<Record<string, unknown>> {
+   const key = 'miki_candidate_generation_ledger_v2';
+   try {
+     const raw = storageService.getItem(key);
+     const parsed: unknown = raw ? JSON.parse(raw) : {};
+     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
+     return Object.values(parsed as Record<string, unknown>).filter(
+       (value): value is Record<string, unknown> =>
+         Boolean(value) && typeof value === 'object' && !Array.isArray(value),
+     );
+   } catch {
+     return [];
+   }
+ }
+
+ public readLedgerSummary(): CandidateGenerationLedgerSummary | undefined {
+   try {
+     const raw = storageService.getItem('miki_candidate_generation_ledger_summary_v1');
+     if (!raw) return undefined;
+     const parsed: unknown = JSON.parse(raw);
+     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+     return parsed as CandidateGenerationLedgerSummary;
+   } catch {
+     return undefined;
+   }
+ }
+
+ public summarizeLedger(threshold = 3): CandidateGenerationLedgerSummary {
+   const records = this.listLedger();
+   const countBy = (keyFn: (record: Record<string, unknown>) => string): Array<{ key: string; count: number }> => {
+     const counts = new Map<string, number>();
+     for (const record of records) {
+       const key = keyFn(record);
+       counts.set(key, (counts.get(key) ?? 0) + 1);
+     }
+     return [...counts.entries()]
+       .map(([key, count]) => ({ key, count }))
+       .sort((a, b) => b.count - a.count);
+   };
+
+   let specsKnownRuns = 0;
+   let specsPositiveRuns = 0;
+   let createdRuns = 0;
+   const specKeyCounts = new Map<string, {
+     key: string; slotName: string; targetPath: string; count: number;
+     gapReasons: Map<string, number>; nextSteps: Map<string, number>;
+   }>();
+   const decisionCounts = new Map<string, number>();
+   for (const record of records) {
+     const specs = record.missingComponentSpecs;
+     if (Array.isArray(specs)) {
+       specsKnownRuns++;
+       if (specs.length > 0) specsPositiveRuns++;
+       for (const spec of specs) {
+         if (!spec || typeof spec !== 'object' || Array.isArray(spec)) continue;
+         const specRecord = spec as Record<string, unknown>;
+         const slotName = typeof specRecord.slotName === 'string' ? specRecord.slotName : '';
+         const name = typeof specRecord.name === 'string' ? specRecord.name : '';
+         const targetPath = typeof specRecord.targetPath === 'string' ? specRecord.targetPath : '';
+         const key = `${slotName || name}@${targetPath}`;
+         const entry = specKeyCounts.get(key) ?? {
+           key, slotName: slotName || name, targetPath, count: 0,
+           gapReasons: new Map<string, number>(), nextSteps: new Map<string, number>(),
+         };
+         entry.count++;
+         const reason = typeof record.reason === 'string' ? record.reason : '';
+         if (reason) entry.gapReasons.set(reason, (entry.gapReasons.get(reason) ?? 0) + 1);
+         const nextStep = typeof record.nextStep === 'string' ? record.nextStep : '';
+         if (nextStep) entry.nextSteps.set(nextStep, (entry.nextSteps.get(nextStep) ?? 0) + 1);
+         specKeyCounts.set(key, entry);
+       }
+     }
+     const created = record.createdCodeComponentIds;
+     if (Array.isArray(created) && created.length > 0) createdRuns++;
+     const rejections = record.missingComponentRejections;
+     if (Array.isArray(rejections)) {
+       for (const rejection of rejections) {
+         if (!rejection || typeof rejection !== 'object' || Array.isArray(rejection)) continue;
+         const decision = typeof (rejection as Record<string, unknown>).decision === 'string'
+           ? String((rejection as Record<string, unknown>).decision)
+           : 'UNKNOWN';
+         decisionCounts.set(decision, (decisionCounts.get(decision) ?? 0) + 1);
+       }
+     }
+   }
+
+   const bySpecKey = [...specKeyCounts.values()]
+     .map(({ key, slotName, targetPath, count }) => ({ key, slotName, targetPath, count }))
+     .sort((a, b) => b.count - a.count);
+   const topOf = (counts: Map<string, number>): string | undefined =>
+     [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+   const topStudyTopics = [...specKeyCounts.values()]
+     .filter((entry) => entry.count >= threshold)
+     .sort((a, b) => b.count - a.count)
+     .slice(0, 8)
+     .map((entry) => ({
+       slotNames: entry.slotName ? [entry.slotName] : [],
+       targetPaths: entry.targetPath ? [entry.targetPath] : [],
+       gapReason: topOf(entry.gapReasons),
+       nextStep: topOf(entry.nextSteps),
+       count: entry.count,
+     }));
+
+   const summary: CandidateGenerationLedgerSummary = {
+     totalRuns: records.length,
+     specsKnownRuns,
+     specsPositiveRuns,
+     specsPositiveRate: specsKnownRuns > 0
+       ? Math.round((specsPositiveRuns / specsKnownRuns) * 1000) / 1000
+       : 0,
+     createdRuns,
+     byReason: countBy((record) =>
+       typeof record.reason === 'string' && record.reason ? record.reason : 'UNKNOWN'),
+     byDecision: [...decisionCounts.entries()]
+       .map(([key, count]) => ({ key, count }))
+       .sort((a, b) => b.count - a.count),
+     byNextStep: countBy((record) =>
+       typeof record.nextStep === 'string' && record.nextStep ? record.nextStep : 'UNKNOWN'),
+     bySpecKey,
+     topStudyTopics,
+     updatedAt: Date.now(),
+   };
+
+   // 集計は台帳とは別キーに置く。永続化に失敗しても集計結果は返す。
+   try {
+     storageService.setItem(
+       'miki_candidate_generation_ledger_summary_v1',
+       JSON.stringify(summary),
+     );
+   } catch {
+    /* 集計の永続化失敗は呼び出し元に伝えない */
+   }
+   return summary;
+ }
+
  private record(runId:string,value:Record<string,unknown>):void{const key='miki_candidate_generation_ledger_v2';let ledger:Record<string,unknown>;try{const raw=storageService.getItem(key);const parsed:unknown=raw?JSON.parse(raw):{};ledger=parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed as Record<string,unknown>:{};}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_READ:${error instanceof Error?error.message:String(error)}`);}const record={runId,...value};try{storageService.setItem(key,JSON.stringify({...ledger,[runId]:record}));const reloadedRaw=storageService.getItem(key);const reloaded:unknown=reloadedRaw?JSON.parse(reloadedRaw):undefined;if(!reloaded||typeof reloaded!=='object'||Array.isArray(reloaded)||(reloaded as Record<string,unknown>)[runId]===undefined)throw new Error('RELOAD_MISSING');const expected=canonicalSha256(record);const actual=canonicalSha256((reloaded as Record<string,unknown>)[runId]);if(actual!==expected)throw new Error('RELOAD_HASH_MISMATCH');}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_WRITE:${error instanceof Error?error.message:String(error)}`);}}
  private parseImplementationMaterials(
   materials: import('../../research/services/webMaterialPatternExtractor').WebImplementationMaterial[],

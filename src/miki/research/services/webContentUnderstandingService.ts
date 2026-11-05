@@ -70,6 +70,51 @@ interface SentenceSegment {
 
 const MAX_PAGE_UNITS = 8;
 
+/*
+ * P440 1-A: ボイラープレート（ナビゲーション等の定型断片）の除外リスト。
+ * 観測された定型文言だけを exact match で除く決定論的なもので、意味の
+ * 推測ではない。文全体がこのいずれかと一致するものだけを除くため、
+ * 本文の文を誤って落とすことはない。
+ */
+const BOILERPLATE_PHRASES = new Set([
+  'skip to content',
+  'skip to main content',
+  'skip to navigation',
+  'jump to content',
+  'navigation menu',
+  'main menu',
+  'table of contents',
+  'back to top',
+  'privacy policy',
+  'terms of service',
+  'terms of use',
+  'cookie policy',
+  'all rights reserved',
+  'sign in',
+  'log in',
+  'sign up',
+  'follow us',
+  'subscribe',
+  'newsletter',
+  'advertisement',
+  'breadcrumb',
+  'サイトマップ',
+  'お問い合わせ',
+  'ログイン',
+  '会員登録',
+  'トップページ',
+]);
+
+function isBoilerplate(statement: string): boolean {
+  const normalized = normalizeText(statement);
+  if (BOILERPLATE_PHRASES.has(normalized)) return true;
+  // P440 1-A: 短い断片の下限。40文字未満で3語未満の文は、見出し・
+  // ナビゲーション断片であることがほとんど（本文の短文は通常これより
+  // 長いか、3語以上ある）。exact match と組み合わせた決定論的な判定。
+  const words = normalized.split(/\s+/).filter(Boolean);
+  return statement.length < 40 && words.length < 3;
+}
+
 function normalizeText(value: string): string {
   return value.normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -139,17 +184,23 @@ export function extractWebSemanticUnits(
   text: string,
   maxUnits = MAX_PAGE_UNITS,
   sourceKey = '',
-): WebSemanticUnit[] {
+): { units: WebSemanticUnit[]; skippedBoilerplate: number } {
   const limit = Number.isFinite(maxUnits)
     ? Math.max(0, Math.min(MAX_PAGE_UNITS, Math.floor(maxUnits)))
     : MAX_PAGE_UNITS;
-  if (!text.trim() || limit === 0) return [];
+  if (!text.trim() || limit === 0) return { units: [], skippedBoilerplate: 0 };
 
   const units: WebSemanticUnit[] = [];
+  let skippedBoilerplate = 0;
   for (const segment of sentenceSegments(text)) {
     const statement = segment.statement;
     if (statement.length < 15 || statement.length > 500 || isCodeLike(statement)) continue;
     if (/^(?:目次|参考文献|copyright|all rights reserved)\b/i.test(statement)) continue;
+    // P440 1-A: ナビゲーション等のボイラープレート断片を除く。
+    if (isBoilerplate(statement)) {
+      skippedBoilerplate++;
+      continue;
+    }
 
     const polarity: WebSemanticPolarity =
       /ない|ません|ではない|でない|なく|禁止|不可|\bnot\b|\bnever\b|\bcannot\b|\bcan't\b|\bno\b/i.test(statement)
@@ -280,7 +331,7 @@ export function extractWebSemanticUnits(
     units.push({ unitId, ...unitBase });
     if (units.length >= limit) break;
   }
-  return units;
+  return { units, skippedBoilerplate };
 }
 
 export class WebContentUnderstandingService {
@@ -302,10 +353,11 @@ export class WebContentUnderstandingService {
     };
     if (!input.text.trim() || !input.url.trim() || !input.evidenceId.trim()) return empty;
 
-    const units = extractWebSemanticUnits(input.text, input.maxUnits, input.url);
+    const { units, skippedBoilerplate } = extractWebSemanticUnits(input.text, input.maxUnits, input.url);
     const components: KnowledgeComponentArtifact[] = [];
     const componentClaims: WebSemanticComponentClaim[] = [];
-    let skippedUnits = 0;
+    // P440 1-A: ボイラープレートで除いた件数も skippedUnits に数える。
+    let skippedUnits = skippedBoilerplate;
 
     for (const unit of units) {
       const claimId = input.registerClaim(unit.statement);

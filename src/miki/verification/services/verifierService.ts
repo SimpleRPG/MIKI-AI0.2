@@ -1,8 +1,13 @@
 import { ClaimRecord, ClaimVerificationStatus } from '../../../types';
 import { claimDatabaseService } from '../../../services/claimDatabaseService';
 import { evidenceService, EvidenceRecord } from '../../../services/evidenceService';
+import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { claimVerificationEventService } from './claimVerificationEventService';
+
+// P440 D5: 勉強の測定値の置き場所（reusableComponentFactoryService・
+// domainIntegrationBootstrapService・researchService と同じキー・同じ形）。
+const STUDY_MEASUREMENT_KEY = 'miki_study_measurement_v1';
 
 export type VerificationOutcome =
   | 'SUPPORTED'
@@ -106,6 +111,23 @@ export class VerifierService {
 
     const promoted = outcome === 'SUPPORTED' || outcome === 'DEVICE_VERIFIED';
 
+    // P440 D5: 検証結果の内訳を永続化カウンタに残す（測定の集計層）。
+    // UNRESOLVED の内訳（クラスタ不足／ADMISSIBLE なし／反証あり／鮮度）
+    // も区別して残す。測定の永続化失敗は検証結果を変えない。
+    this.incrementStudyMeasurement(
+      outcome === 'SUPPORTED'
+        ? { supportedPromotions: 1 }
+        : outcome === 'DEVICE_VERIFIED'
+          ? { deviceVerifiedPromotions: 1 }
+          : outcome === 'CONTRADICTED'
+            ? { contradictedPromotions: 1 }
+            : stale
+              ? { unresolvedStale: 1 }
+              : admissible.length === 0
+                ? { unresolvedNoAdmissible: 1 }
+                : { unresolvedClusterShortage: 1 },
+    );
+
     claimVerificationEventService.publish({
       claimId: claim.claim_id,
       outcome,
@@ -144,6 +166,27 @@ export class VerifierService {
         maxAgeDays: params.maxAgeDays,
       })
     );
+  }
+
+  // P440 D5: 勉強の測定値の累計。数値だけを置く。
+  private incrementStudyMeasurement(patch: Record<string, number>): void {
+    try {
+      const raw = storageService.getItem(STUDY_MEASUREMENT_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : {};
+      const current: Record<string, number> =
+        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, number>)
+          : {};
+      const next: Record<string, number> = { ...current };
+      for (const [key, value] of Object.entries(patch)) {
+        const base = typeof next[key] === 'number' ? next[key] : 0;
+        next[key] = base + value;
+      }
+      next.updatedAt = Date.now();
+      storageService.setItem(STUDY_MEASUREMENT_KEY, JSON.stringify(next));
+    } catch {
+      // 測定の永続化失敗は検証結果を変えない。
+    }
   }
 
   private collectEvidence(claimId: string, evidenceIds?: string[]): EvidenceRecord[] {

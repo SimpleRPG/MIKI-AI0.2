@@ -4,6 +4,7 @@ import { canonicalSha256Object } from './canonicalSha256Service';
 import { reviewLearningArtifactService, type ReviewLearningArtifact } from './reviewLearningArtifactService';
 import type { ReviewLearningEpisode } from './reviewDecisionLearningService';
 import { verifierService } from '../../verification/services/verifierService';
+import { knowledgeHalfLifeService } from '../../memory/services/knowledgeHalfLifeService';
 import { webSemanticRuleLearningService } from '../../research/services/webSemanticRuleLearningService';
 import { componentRegistryService } from '../../../services/componentRegistryService';
 import { commonCodeKnowledge, additionalCommonCodeKnowledge, type CodeConstructionProfile, type CodeComponentDefinition, type CodeKnowledgeDefinition, type CodeConstructionBinding, type CodeConstructionGraph, type CodeConstructionNode, isCompatibleConstructionKind } from '../data/codeKnowledge/common';
@@ -45,6 +46,9 @@ interface ConstructionSearchState { nodes:Set<string>; bindings:CodeConstruction
 interface ConstructionGraphPlan { nodeIds:string[]; bindings:CodeConstructionBinding[]; rootNodeId?:string; score:number; unresolved:string[]; }
 
 const COMPONENT_KEY='miki_reusable_component_repository_v1';const RECEIPT_KEY='miki_component_usage_receipts_v1';
+// P440 D5: 勉強の測定値の置き場所（verifierService・
+// domainIntegrationBootstrapService・researchService と同じキー・同じ形）。
+const STUDY_MEASUREMENT_KEY='miki_study_measurement_v1';
 
 const CONSTRUCTION_KNOWLEDGE_ID_ALIASES:Record<string,string>={
   'code.javascript.node-readdir':'code.node.fs-readdir',
@@ -367,7 +371,10 @@ class ReusableComponentFactoryService{
     if(existing.contradictionRefs.length>0){
       existing.lifecycleStatus='CONFLICT';
       existing.verificationStatus='CONFLICT';
-    }else if(input.verificationStatus){
+      // P440 D8(a): verificationStatus の直接書き換えで VERIFIED への
+      // 迂回を塞ぐ。VERIFIED への昇格は verifyResearchKnowledge の
+      // ゲートだけが行う。'VERIFIED' の入力は無視する。
+    }else if(input.verificationStatus&&input.verificationStatus!=='VERIFIED'){
       existing.verificationStatus=input.verificationStatus;
     }
     existing.updatedAt=Date.now();
@@ -400,7 +407,7 @@ class ReusableComponentFactoryService{
     evidenceRefs,
     sourceUrls,
     sourceArtifactIds,
-    verificationStatus:contradictionRefs.length>0?'CONFLICT':input.verificationStatus||'UNVERIFIED',
+    verificationStatus:contradictionRefs.length>0?'CONFLICT':(input.verificationStatus&&input.verificationStatus!=='VERIFIED'?input.verificationStatus:'UNVERIFIED'),
     contradictionRefs,
     freshnessPolicy:'REVALIDATE_ON_ENVIRONMENT_CHANGE'
   };
@@ -455,6 +462,20 @@ class ReusableComponentFactoryService{
 
   item.updatedAt=Date.now();
   storageService.setItem(COMPONENT_KEY,JSON.stringify(items));
+
+  // P440 D4/D5: 知識部品の検証結果を、使用実績と測定に返す。検証済み
+  // （VERIFIED）なら成功、矛盾（CONFLICT）なら失敗として記録する。
+  // 未確定の場合は何もしない（成功・失敗のどちらでもないため）。
+  if(verified||conflicted){
+    this.updateOutcome([componentId],verified?'SUCCEEDED':'FAILED');
+    this.incrementStudyMeasurement(verified?{knowledgePromotions:1}:{knowledgeConflicts:1});
+    try{
+      // カウントだけを部品キーで記録する（半減期の計算式は変えない）。
+      knowledgeHalfLifeService.observe(`component:${componentId}`,verified?'SUCCESS':'FAILURE',false);
+    }catch{
+      // 半減期の記録失敗は検証結果を変えない。
+    }
+  }
 
   if(verified&&item.componentType==='WEB_SEMANTIC_PROPOSITION'){
    try{
@@ -830,7 +851,42 @@ class ReusableComponentFactoryService{
   };
  }
 
- storeCandidates(items:AnyReusableComponent[]):{componentIds:string[];persistenceReceiptId:string;reloaded:boolean}{const existing=this.read<AnyReusableComponent>(COMPONENT_KEY);const merged=[...items,...existing.filter(item=>!items.some(next=>next.canonicalSha256===item.canonicalSha256))].slice(0,1000);storageService.setItem(COMPONENT_KEY,JSON.stringify(merged));const loaded=this.read<AnyReusableComponent>(COMPONENT_KEY);const reloaded=items.every(item=>loaded.some(saved=>saved.componentId===item.componentId&&saved.canonicalSha256===item.canonicalSha256));if(!reloaded)throw new Error('COMPONENT_REPOSITORY_PERSISTENCE_FAILED');return {componentIds:items.map(x=>x.componentId),persistenceReceiptId:`CPR-${canonicalSha256Object({ids:items.map(x=>x.componentId),at:Date.now()}).slice(0,20)}`,reloaded};}
+ storeCandidates(items:AnyReusableComponent[]):{componentIds:string[];persistenceReceiptId:string;reloaded:boolean}{const existing=this.read<AnyReusableComponent>(COMPONENT_KEY);const merged=[...items,...existing.filter(item=>!items.some(next=>next.canonicalSha256===item.canonicalSha256))];
+ // P440 D4: 1000件キャップの退避は「新しいもの優先」から「有用性優先」へ。
+ // 新規分は必ず残し、古いものは successCount／usageCount／更新日時の順で
+ // 残す。使われない知識が溜まらず、有用な古い知識が押し出されない。
+ const kept=merged.length>1000?this.keepMostUsefulForEviction(merged,items):merged;
+ storageService.setItem(COMPONENT_KEY,JSON.stringify(kept));const loaded=this.read<AnyReusableComponent>(COMPONENT_KEY);const reloaded=items.every(item=>loaded.some(saved=>saved.componentId===item.componentId&&saved.canonicalSha256===item.canonicalSha256));if(!reloaded)throw new Error('COMPONENT_REPOSITORY_PERSISTENCE_FAILED');return {componentIds:items.map(x=>x.componentId),persistenceReceiptId:`CPR-${canonicalSha256Object({ids:items.map(x=>x.componentId),at:Date.now()}).slice(0,20)}`,reloaded};}
+ // P440 D4: 退避時の有用性順。fresh（今回の新規分）は必ず残す。
+ private keepMostUsefulForEviction(merged:AnyReusableComponent[],fresh:AnyReusableComponent[]):AnyReusableComponent[]{
+   const freshIds=new Set(fresh.map(item=>item.componentId));
+   return [...merged].sort((a,b)=>{
+     const aFresh=freshIds.has(a.componentId)?1:0;
+     const bFresh=freshIds.has(b.componentId)?1:0;
+     if(aFresh!==bFresh)return bFresh-aFresh;
+     if((b.successCount||0)!==(a.successCount||0))return (b.successCount||0)-(a.successCount||0);
+     if((b.usageCount||0)!==(a.usageCount||0))return (b.usageCount||0)-(a.usageCount||0);
+     return (b.updatedAt||0)-(a.updatedAt||0);
+   }).slice(0,1000);
+ }
+ // P440 D5: 勉強の測定値（verifierService・domainIntegrationBootstrapService・
+ // researchService と同じキー・同じ形）。数値の累計だけを置く。
+ private incrementStudyMeasurement(patch:Record<string,number>):void{
+   try{
+     const raw=storageService.getItem(STUDY_MEASUREMENT_KEY);
+     const parsed:unknown=raw?JSON.parse(raw):{};
+     const current:Record<string,number>=parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed as Record<string,number>:{};
+     const next:Record<string,number>={...current};
+     for(const [key,value] of Object.entries(patch)){
+       const base=typeof next[key]==='number'?next[key]:0;
+       next[key]=base+value;
+     }
+     next.updatedAt=Date.now();
+     storageService.setItem(STUDY_MEASUREMENT_KEY,JSON.stringify(next));
+   }catch{
+     // 測定の永続化失敗は呼び出し元の処理を止めない。
+   }
+ }
  /*
   * P406: 環境指紋はカンマ区切りの集合（例 'MIKI_RUNTIME,ANDROID'）。
   * 完全一致で判定すると、対象環境を含む部品まで環境不一致で
