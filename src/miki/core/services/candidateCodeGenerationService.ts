@@ -1256,6 +1256,8 @@ class CandidateCodeGenerationService {
         usedContents:[
           ...researchedCandidates.map(candidate=>candidate.candidateContent),
           ...suppliedCandidates.map(candidate=>candidate.candidateContent),
+          // P435: 検証に失敗した候補の内容も除外対象にする（修正3）。
+          ...this.failedCandidateContents(failureFeedback),
         ],
       });
       createdCodeComponentIds.push(...specCreatedIds);
@@ -1529,6 +1531,32 @@ class CandidateCodeGenerationService {
   * その仕様は飛ばす（推測で補わない）。できた候補は全て
   * CANDIDATEとして登録し、compositionの材料にはしない。
   */
+ /*
+  * P435（修正3）: 検証に失敗した候補の実装本文を集める。失敗した
+  * componentId の Artifact から FILE_CONTENT_BEGIN..END の内容を
+  * 抜き出し、usedContents と同じ扱いで次回の材料選択から外す。
+  * 内容が読めない部品は黙って飛ばす（生成を壊さない）。
+  */
+ private failedCandidateContents(failureFeedback:Record<string,unknown>|undefined):string[]{
+  if(!failureFeedback)return [];
+  const contents:string[]=[];
+  for(const id of this.strings(failureFeedback.componentIds)){
+   try{
+    const artifact=componentArtifactStoreService.get(id);
+    if(!artifact)continue;
+    const implementation=artifact.implementation_txt||'';
+    const begin=implementation.indexOf('FILE_CONTENT_BEGIN');
+    const end=implementation.indexOf('FILE_CONTENT_END');
+    if(begin<0||end<=begin)continue;
+    const content=implementation.slice(begin+'FILE_CONTENT_BEGIN'.length,end).trim();
+    if(content)contents.push(content);
+   }catch{
+    // 失敗部品の内容が読めない場合は除外しない。
+   }
+  }
+  return contents;
+ }
+
  private buildMissingComponentCandidates(input:{
   objective:string;
   specs:MissingComponentSpec[];
@@ -1546,11 +1574,14 @@ class CandidateCodeGenerationService {
     const target=targetByPath.get(spec.targetPath);
     if(!target)continue;
 
-    const adapter=missingComponentSpecService.buildAdapterDraft(
+    const adapterDraft=missingComponentSpecService.buildAdapterDraft(
       spec,
       target.content,
       input.validationRequirements,
     );
+    // P435（修正3）: 検証に失敗した内容と同じつなぎは作り直さない。
+    // used には研究・供給済みの内容と失敗した候補の内容が入っている。
+    const adapter=adapterDraft&&!used.has(adapterDraft.implementation.trim())?adapterDraft:undefined;
     if(adapter){
       const created=reusableComponentFactoryService.createCodeComponentCandidate({
         purpose:`${spec.name}: ${input.objective}`,
@@ -1591,6 +1622,7 @@ class CandidateCodeGenerationService {
         const validation=[
           `MISSING_COMPONENT_SPEC=${spec.name}`,
           ...(spec.expectedBehavior?[`EXPECTED_BEHAVIOR=${spec.expectedBehavior}`]:[]),
+          ...(spec.outputType?[`EXPECTED_OUTPUT=${spec.outputType}`]:[]),
           ...input.validationRequirements,
         ].join('\n');
         const created=reusableComponentFactoryService.createCodeComponentCandidate({

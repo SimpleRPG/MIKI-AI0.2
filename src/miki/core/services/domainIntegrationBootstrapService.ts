@@ -677,7 +677,11 @@ class DomainIntegrationBootstrapService{
      result.reasons.some(reason =>
        reason==='NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION' ||
        reason==='CONSTRUCTION_GRAPH_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION' ||
-       reason==='CONSTRUCTION_GRAPH_MULTI_FILE_CODE_COMPONENT_CANDIDATES_CREATED_AWAITING_VERIFICATION'
+       reason==='CONSTRUCTION_GRAPH_MULTI_FILE_CODE_COMPONENT_CANDIDATES_CREATED_AWAITING_VERIFICATION' ||
+       // P435: P433で作られた不足部品候補も検証待ちとして受け取る。
+       // 入れないと accepted:false / FAILED になり、検証の駆動役が
+       // ERROR エントリを見ないため VERIFY_CODE_COMPONENT が計画されない。
+       reason==='MISSING_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION'
      );
 
    if(!result.accepted){

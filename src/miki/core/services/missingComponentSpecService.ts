@@ -23,6 +23,9 @@ export interface MissingComponentSpec {
   targetPath: string;
   inputKinds: string[];
   expectedBehavior: string;
+  // P435: 契約欄の signatures.returnType から拾った出力の型。
+  // 契約欄になければ undefined のまま（推測で補わない）。
+  outputType?: string;
   source: 'MISSING_COMPONENT_ID' | 'MISSING_SLOT';
   knowledgeId?: string;
   slotName?: string;
@@ -82,6 +85,19 @@ class MissingComponentSpecService {
     const expectedBehaviorFor = (key: string): string =>
       (gap.unknownQuestions ?? []).find((question) => question.includes(key)) || '';
 
+    // P435: 契約欄の signatures.returnType を仕様の出力として拾う。
+    // 契約欄に記録がなければ undefined（推測で補わない）。
+    const returnTypeFor = (id: string): string | undefined => {
+      for (const target of gap.contract?.targets ?? []) {
+        for (const signature of target?.signatures ?? []) {
+          if (signature?.name === id && typeof signature.returnType === 'string' && signature.returnType.trim()) {
+            return signature.returnType.trim().slice(0, 120);
+          }
+        }
+      }
+      return undefined;
+    };
+
     for (const id of gap.contract?.missingComponentIds ?? []) {
       if (typeof id !== 'string' || !id.trim()) continue;
       const name = sanitizeIdentifier(id);
@@ -93,6 +109,7 @@ class MissingComponentSpecService {
         targetPath,
         inputKinds: [],
         expectedBehavior: expectedBehaviorFor(id),
+        outputType: returnTypeFor(id),
         source: 'MISSING_COMPONENT_ID',
         missingComponentId: id,
       });
@@ -132,6 +149,7 @@ class MissingComponentSpecService {
         targetPath,
         inputKinds: [],
         expectedBehavior: expectedBehaviorFor(id),
+        outputType: returnTypeFor(id),
         source: 'MISSING_COMPONENT_ID',
         missingComponentId: id,
       });
@@ -169,6 +187,7 @@ class MissingComponentSpecService {
         `MISSING_COMPONENT_ADAPTER=${spec.name}`,
         `SOURCE_VERIFIED_COMPONENT=${source.componentId}`,
         ...(spec.expectedBehavior ? [`EXPECTED_BEHAVIOR=${spec.expectedBehavior}`] : []),
+        ...(spec.outputType ? [`EXPECTED_OUTPUT=${spec.outputType}`] : []),
         ...validationRequirements,
       ].join('\n'),
       sourceComponentId: source.componentId,
