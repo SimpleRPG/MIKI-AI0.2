@@ -74,6 +74,19 @@ export interface AutonomousLoopPersistenceState { status:AutonomousLoopPersisten
 const KEY = 'miki_autonomous_self_improvement_loop_v2';
 const LEGACY_KEY = 'miki_autonomous_self_improvement_loop_v1';
 const MAX_ATTEMPTS = 3;
+// P429 (B1): an AUTONOMOUS_DISCOVERY request that was never started
+// (attempts===0) and is older than this TTL is purged at load.
+// Discovery re-derives its issues from the static state of the code on
+// every scan, so dropping the queue item loses nothing: a still-real
+// issue is dispatched again by a later scan. 24h comfortably covers
+// every discovery reconcile window that could still revive the item
+// (missing-run release at queuedAt+30min, missing-task release at
+// queuedAt+6h, release backoff ladder of 15/30/60 minutes up to
+// exhaustion at 4 attempts), so the item is only dropped after all of
+// them have passed without it ever being selected. The discovery
+// service reuses the same TTL as its post-exhaustion re-dispatch
+// guard (A1), keeping both sides on one horizon.
+export const DISCOVERY_UNSTARTED_TTL_MS = 24 * 60 * 60 * 1000;
 // P367: consecutive resource waits before a request is dropped
 // visibly instead of stalling the queue forever (see waitForResource).
 const MAX_RESOURCE_WAITS = 30;
@@ -88,6 +101,25 @@ const DISCOVERY_ISSUE_KINDS=new Set(['EXECUTION_FAILURE','KNOWLEDGE_GAP','CAPABI
 function truncateForLog(text: string, max: number): string {
   const flat = String(text).replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max)}...` : flat;
+}
+
+// P429 (A1): identity keys of an AUTONOMOUS_DISCOVERY request, used to
+// recognise a re-dispatch of an issue that is already queued. On the
+// discovery path the router's sourceId is the issue id and the payload
+// carries issueId / fingerprint; any of them identifies the issue.
+// Returns an empty list for every other request kind, in which case
+// only the exact (trigger, source, runId) duplicate check applies.
+function discoveryIssueIdentities(
+  source: AutonomousImprovementRequest['source'],
+  carrier: { runType?: string; sourceId?: string; payload?: Record<string, unknown> }
+): string[] {
+  if (source !== 'SYSTEM' || carrier.runType !== 'AUTONOMOUS_DISCOVERY') return [];
+  const identities: string[] = [];
+  const payload = carrier.payload;
+  if (payload && typeof payload.issueId === 'string' && payload.issueId.trim()) identities.push(`issue:${payload.issueId}`);
+  if (payload && typeof payload.fingerprint === 'string' && payload.fingerprint.trim()) identities.push(`fp:${payload.fingerprint}`);
+  if (typeof carrier.sourceId === 'string' && carrier.sourceId.trim()) identities.push(`issue:${carrier.sourceId}`);
+  return identities;
 }
 
 function normalizeDiscoveryIssuePayload(payload:Record<string,unknown>|undefined):Record<string,unknown>|undefined{
@@ -162,6 +194,23 @@ class AutonomousSelfImprovementLoopService {
       this.save();
       void this.drain();
       return { ...duplicate };
+    }
+    // P429 (A1): a discovery issue that is released and re-dispatched
+    // arrives with a fresh runId, so the exact-match check above cannot
+    // see that the same issue is already queued. When the incoming
+    // request carries the issue identity, a queued request for the same
+    // issue is the duplicate, whatever its runId. Requests without a
+    // readable identity keep the previous behavior only.
+    const incomingIdentities = discoveryIssueIdentities(source, meta);
+    if (incomingIdentities.length > 0) {
+      const issueDuplicate = this.state.queue.find(item =>
+        discoveryIssueIdentities(item.source, item).some(identity => incomingIdentities.includes(identity))
+      );
+      if (issueDuplicate) {
+        this.save();
+        void this.drain();
+        return { ...issueDuplicate };
+      }
     }
     // P371: never persist a request this service's own loader would
     // reject. A blank trigger can only produce a meaningless task, so
@@ -1330,8 +1379,36 @@ class AutonomousSelfImprovementLoopService {
     if(raw===null)return;
     let parsed:AutonomousLoopState;
     try{parsed=this.parseState(raw);}catch(error){const reason=String(error instanceof Error?error.message:error).slice(0,500);this.state={status:'IDLE',queue:[],updatedAt:0};if(this.quarantine(sourceKey,raw,reason)){this.persistenceStatus='RECOVERED_QUARANTINED';this.persistenceReason=`${sourceKey}_QUARANTINED:${reason}`;}else this.blockPersistence(`${sourceKey}_QUARANTINE_FAILED:${reason}`);return;}
-    const activeQueue=parsed.queue.filter(item=>item.attempts<MAX_ATTEMPTS);const purgedCount=parsed.queue.length-activeQueue.length;const droppedInvalid=this.lastLoadDroppedInvalid;this.state={...parsed,queue:activeQueue};
-    if(purgedCount>0||droppedInvalid>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;const parts:string[]=[];if(droppedInvalid>0)parts.push(`INVALID_REQUESTS_DROPPED:${droppedInvalid}`);if(purgedCount>0)parts.push(`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`);this.state.lastReason=parts.join(':');try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
+    // P429 (C1): the blackboard persists only the newest 200 tasks
+    // (taskBlackboardService MAX_TASKS), so a queued request whose task
+    // overflowed that window can never resume -- the task record is
+    // gone (enqueue creates the task before the request, so a missing
+    // task breaks the request<->task invariant). Never-attempted
+    // requests carrying such a taskId are purged here. Requests
+    // without a taskId (direct-submit shapes) are not touched. Safe
+    // side: if the persisted task set cannot be read, or reads empty,
+    // C1 is skipped entirely rather than risking live requests.
+    let persistedTaskIds:Set<string>|null=null;
+    try{
+      const ids=new Set<string>();
+      for(const task of taskBlackboardService.list(100000))ids.add(task.taskId);
+      if(ids.size>0)persistedTaskIds=ids;
+    }catch{persistedTaskIds=null;}
+    const loadNow=Date.now();
+    let purgedCount=0;let orphanedPurgedCount=0;let staleDiscoveryPurgedCount=0;
+    const activeQueue=parsed.queue.filter(item=>{
+      if(item.attempts>=MAX_ATTEMPTS){purgedCount+=1;return false;}
+      if(persistedTaskIds&&item.attempts===0&&typeof item.taskId==='string'&&item.taskId&&!persistedTaskIds.has(item.taskId)){orphanedPurgedCount+=1;return false;}
+      // P429 (B1): unstarted discovery requests older than
+      // DISCOVERY_UNSTARTED_TTL_MS. Never dropped: attempted requests,
+      // the active request and its task, claim-context carriers, and
+      // anything that is not a SYSTEM AUTONOMOUS_DISCOVERY request
+      // (USER_REQUEST / EXTERNAL_DIRECTIVE keep their own lifetimes).
+      if(item.attempts===0&&item.source==='SYSTEM'&&item.runType==='AUTONOMOUS_DISCOVERY'&&item.createdAt<=loadNow-DISCOVERY_UNSTARTED_TTL_MS&&item.id!==parsed.activeRequestId&&!(parsed.lastTaskId&&item.taskId===parsed.lastTaskId)&&!(item.payload&&item.payload.claimContext!==undefined)){staleDiscoveryPurgedCount+=1;return false;}
+      return true;
+    });
+    const droppedInvalid=this.lastLoadDroppedInvalid;this.state={...parsed,queue:activeQueue};
+    if(purgedCount>0||droppedInvalid>0||orphanedPurgedCount>0||staleDiscoveryPurgedCount>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;const parts:string[]=[];if(droppedInvalid>0)parts.push(`INVALID_REQUESTS_DROPPED:${droppedInvalid}`);if(purgedCount>0)parts.push(`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`);if(orphanedPurgedCount>0)parts.push(`ORPHANED_REQUESTS_PURGED:${orphanedPurgedCount}`);if(staleDiscoveryPurgedCount>0)parts.push(`STALE_DISCOVERY_REQUESTS_PURGED:${staleDiscoveryPurgedCount}`);this.state.lastReason=parts.join(':');if(orphanedPurgedCount>0||staleDiscoveryPurgedCount>0){systemLogger.info('SELF_IMPROVEMENT',`[RUNTIME] AutonomousLoop purge: orphaned=${orphanedPurgedCount} staleDiscovery=${staleDiscoveryPurgedCount} queue=${activeQueue.length}`);}try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
   }
 }
 

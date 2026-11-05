@@ -12469,9 +12469,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousIssueDiscoveryService.ts",
-      "bytes": 41108,
-      "lines": 696,
-      "sha256": "0e472e18ca34b2ca3598c8bab1cb345462f0c24fcb208065e2ddbbeed9c7f857",
+      "bytes": 42017,
+      "lines": 710,
+      "sha256": "946e079e83a53aa27a5e80fb2bc2b41441bb0e92622b15b2d9e680e93f11f401",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12564,9 +12564,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 64879,
-      "lines": 1338,
-      "sha256": "d88fa5b0146266a037f8c06c8d1f7aeaa837d8933003d924218b7890139a63e3",
+      "bytes": 70035,
+      "lines": 1415,
+      "sha256": "0d84c647f1e3c36c0a696026909da36f8941addcaabebe10983e6b77c37d4917",
       "relativeImportCandidates": [
         {
           "line": 1,
