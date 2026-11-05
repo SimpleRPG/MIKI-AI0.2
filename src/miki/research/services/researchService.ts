@@ -13,7 +13,7 @@ import { sourcePageGraphService } from './sourcePageGraphService';
 import { contentTermsFromTokens } from './japaneseAnalysisService';
 import { japaneseAnalysisCompositionService } from '../../conversation/services/japaneseAnalysisCompositionService';
 import { researchQueryPlanningService } from './researchQueryPlanningService';
-import type { GapFocusMaterialInput } from './researchQueryPlanningService';
+import type { GapFocusMaterialInput, ResearchQueryExclusion, IndependentEvidenceFocus } from './researchQueryPlanningService';
 import { storageService } from '../../../services/storageService';
 import { collectionSourceRegistryService } from '../../core/services/collectionSourceRegistryService';
 import type { VerificationResult } from '../../verification/services/verifierService';
@@ -196,6 +196,95 @@ export class ResearchService {
     }
   }
 
+  /*
+   * P440 D6: 既存の証拠から除外条件を作る。既読 URL と既存クラスタの
+   * ホスト（cluster_web_<host> と URL のホスト）を除外対象にする。
+   * 除外しすぎて結果が0件になるリスクがあるため、ホストは最大3件、
+   * URL は最大10件に限定する。除外後に0件なら除外を緩める
+   * フォールバックは入れず、ログで様子を見る。
+   */
+  private buildSourceExclusion(claimIds: string[]): ResearchQueryExclusion {
+    const hosts = new Set<string>();
+    const urls = new Set<string>();
+    for (const claimId of claimIds) {
+      for (const record of evidenceService.list({ claimId })) {
+        if (record.status === 'REJECTED') continue;
+        if (record.url) {
+          urls.add(record.url);
+          try {
+            const host = new URL(record.url).hostname.toLowerCase().replace(/^www\./, '');
+            if (host) hosts.add(host);
+          } catch { /* URL が壊れていても除外は止めない */ }
+        }
+        const cluster = record.independence_cluster_id || '';
+        if (cluster.startsWith('cluster_web_')) {
+          const webHost = cluster.slice('cluster_web_'.length).toLowerCase();
+          if (webHost && webHost !== 'unknown') hosts.add(webHost);
+        }
+      }
+    }
+    return { excludedHosts: [...hosts].slice(0, 3), excludedUrls: [...urls].slice(0, 10) };
+  }
+
+  /*
+   * P440 D6/1-B: UNRESOLVED の主張のうち独立クラスタが2未満のものを
+   * 独立出典の追加探索の対象にする。試行回数は既存の改訂上限
+   * （maxRevisionPerQuery: 2）に合わせ、上限に達したら探索しない。
+   * SearXNG の冷却や検索回数の上限には、既存の検索ペーサーと
+   * 冷却中の省略をそのまま使う（ここでは追加の検索はしない）。
+   */
+  private buildIndependentEvidenceFocus(claimIds: string[], baseQuery: string): IndependentEvidenceFocus | undefined {
+    const short: string[] = [];
+    let needed = 0;
+    for (const claimId of claimIds) {
+      const claim = claimDatabaseService.getClaim(claimId);
+      if (!claim || claim.status !== 'UNRESOLVED') continue;
+      const evidenceIds = evidenceService.list({ claimId })
+        .filter(record => record.status !== 'REJECTED')
+        .map(record => record.evidence_id);
+      const clusters = evidenceService.getIndependentClusterCount(evidenceIds);
+      if (clusters < 2) {
+        short.push(claimId);
+        needed = Math.max(needed, 2 - clusters);
+      }
+    }
+    if (short.length === 0) return undefined;
+    const attempts = this.countIndependentEvidenceAttempts(baseQuery);
+    const maxAttempts = researchQueryPlanningService.getPolicy().maxRevisionPerQuery;
+    if (attempts >= maxAttempts) {
+      systemLogger.info('SELF_IMPROVEMENT', `[Research] independent evidence search skipped: attempts=${attempts} >= maxRevisionPerQuery=${maxAttempts}`);
+      return undefined;
+    }
+    return { claimIds: short, neededClusters: needed };
+  }
+
+  // P440 D6: 同一の研究意図に対する独立証拠クエリの試行回数を数える。
+  // queryText に 'independent source evidence' を含む成果記録を数える。
+  private countIndependentEvidenceAttempts(baseQuery: string): number {
+    const normalized = baseQuery.normalize('NFKC').replace(/\s+/g, ' ').trim();
+    let count = 0;
+    for (const plan of researchQueryPlanningService.listPlans()) {
+      if (plan.canonicalResearchIntent !== normalized) continue;
+      for (const outcome of researchQueryOutcomeLearningService.list(plan.queryPlanId)) {
+        if (outcome.queryText.includes('independent source evidence')) count++;
+      }
+    }
+    return count;
+  }
+
+  // P440 D6: 検索結果が除外条件に当たるかどうか（既読 URL または
+  // 既存クラスタのホスト）。URL が無い結果は除外しない。
+  private isExcludedSearchResult(result: { url?: string }, exclusion: ResearchQueryExclusion): boolean {
+    if (!result.url) return false;
+    if (exclusion.excludedUrls.includes(result.url)) return true;
+    try {
+      const host = new URL(result.url).hostname.toLowerCase().replace(/^www\./, '');
+      return exclusion.excludedHosts.includes(host);
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * 自律コード改善が必要とする実装材料をResearch正規経路から収集する。
    *
@@ -363,16 +452,23 @@ export class ResearchService {
     const requestedPasses = Number.isFinite(options?.maxPasses)
       ? Math.max(1, Math.floor(options!.maxPasses!))
       : 2;
-    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery, gap.researchClaimIds || [], this.resolveGapFocusStrategy(options?.gapFocus));
+    // P440 D6: 既存クラスタ・既読 URL の除外条件と、独立証拠の追加探索
+    // の対象を計画に渡す。除外はホスト・URL ともに件数を限定する。
+    const sourceExclusion = this.buildSourceExclusion(gap.researchClaimIds || []);
+    const independentFocus = this.buildIndependentEvidenceFocus(gap.researchClaimIds || [], baseQuery);
+    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery, gap.researchClaimIds || [], this.resolveGapFocusStrategy(options?.gapFocus), sourceExclusion, independentFocus);
     const invocationPassLimit = Math.min(
       queryPlan.policy.maxTotalSearchRequests,
       queryPlan.policy.maxQueriesPerPlan,
       adaptive ? Math.max(requestedPasses, queryPlan.queries.length) : Math.min(3, requestedPasses),
     );
     const maxPagesPerPass = Math.max(1, Math.min(3, options?.maxPagesPerPass ?? 2));
+    // P440 D6: 試行済み戦略を避けて経路を選ぶ（ローテーション）。
+    // 強制経路の場合は記録しない。
     const strategy = options?.forceRoute
       ? { route: options.forceRoute, reason: '呼び出し元が明示的にこの研究経路を要求しました。', alternatives: [] as ResearchRoute[] }
-      : researchStrategyService.chooseRoute(gap.type, gap.query);
+      : researchStrategyService.chooseRoute(gap.type, gap.query, undefined, researchStrategyService.triedGapRoutes(gap.id));
+    if (!options?.forceRoute) researchStrategyService.recordGapRouteAttempt(gap.id, strategy.route);
 
     // P360: 収集レシートを発行し、この調査ランで記録するEvidenceへIDを載せる（収集台帳への最小接続）
     const collectionReceipt = collectionSourceRegistryService.record({
@@ -519,7 +615,13 @@ export class ResearchService {
         const focus = reasons.length > 0
           ? [...new Set(reasons)].slice(0, 4).join(' / ')
           : 'independent evidence / official documentation / counterevidence / compatibility';
-        return `${baseQuery} / adaptive research round ${continuationRound + round + 1} / ${focus}`;
+        const adaptiveQuery = `${baseQuery} / adaptive research round ${continuationRound + round + 1} / ${focus}`;
+        // P440 D6: 適応クエリにも既存クラスタのホスト除外を載せる
+        // （単語数24の上限を超えない場合のみ）。
+        const siteExclusions = sourceExclusion.excludedHosts.slice(0, 2).map(host => `-site:${host}`).join(' ');
+        return siteExclusions && `${adaptiveQuery} ${siteExclusions}`.split(/\s+/).filter(Boolean).length <= 24
+          ? `${adaptiveQuery} ${siteExclusions}`
+          : adaptiveQuery;
       };
 
       for (let pass = 0; pass < invocationPassLimit; pass++) {
@@ -540,7 +642,15 @@ export class ResearchService {
             queryPlan.status === 'READY' &&
             queryPlan.queries[pass]?.sourceTierTarget === 'PRIMARY_OR_OFFICIAL',
         });
-        const results = this.normalizeSearchResults(raw);
+        const rawResults = this.normalizeSearchResults(raw);
+        // P440 D6: 既読URL・既存クラスタのホストを検索結果から除外する
+        // （同じ出典の繰り返しを避ける）。除外しすぎて0件になっても
+        // フォールバックはしない（ログで様子を見る）。件数だけログに出す。
+        const results = rawResults.filter(result => !this.isExcludedSearchResult(result, sourceExclusion));
+        const excludedResultCount = rawResults.length - results.length;
+        if (excludedResultCount > 0) {
+          systemLogger.info('SELF_IMPROVEMENT', `[Research] excluded ${excludedResultCount} known-source results (hosts=${sourceExclusion.excludedHosts.length}, urls=${sourceExclusion.excludedUrls.length})`);
+        }
         searchResults.push(...results);
         if (typeof (raw as any)?.summary === 'string') summary = (raw as any).summary;
 

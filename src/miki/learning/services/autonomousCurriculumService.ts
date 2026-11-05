@@ -14,15 +14,26 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { evidenceService } from '../../memory/services/evidenceService';
+import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 
 export interface CapabilityBoundaryItem {
   id: string;
-  domain: 'VBA_SYSTEM' | 'CODE_ARCHITECTURE' | 'NUANCED_JAPANESE' | 'COMPLEX_REASONING' | 'EMOTIONAL_SUPPORT';
+  domain: 'VBA_SYSTEM' | 'CODE_ARCHITECTURE' | 'NUANCED_JAPANESE' | 'COMPLEX_REASONING' | 'EMOTIONAL_SUPPORT' | 'CODE_GENERATION';
   topic: string;
   confidenceScore: number; // 0.0 - 1.0 (低いほど能力境界・未知領域)
   detectedReason: string;
   createdAt: number;
   status: 'IDENTIFIED' | 'CURRICULUM_ACTIVE' | 'GRADUATED';
+  // P440 D2: 境界の題材となった記録済みの不足文字列（gapFocus／
+  // nextStep／却下理由の集計結果）。汎用定型文ではなく、この記録だけ
+  // をカリキュラムの題材にする。
+  sourceMaterial?: {
+    slotNames: string[];
+    targetPaths: string[];
+    gapReason?: string;
+    nextStep?: string;
+    count: number;
+  };
 }
 
 export interface SyntheticCurriculumUnit {
@@ -126,12 +137,17 @@ export class AutonomousCurriculumService {
 
   /**
    * 能力境界をリアルタイム検出・登録
+   *
+   * P440 D2: 境界は繰り返し止まるギャップの集計結果（D1）に基づく
+   * 場合にだけ呼ぶこと。sourceMaterial には記録済みの不足文字列だけ
+   * を渡す（推測で補わない）。
    */
-  public registerOrUpdateBoundary(topic: string, domain: CapabilityBoundaryItem['domain'], confidence: number, reason: string): CapabilityBoundaryItem {
+  public registerOrUpdateBoundary(topic: string, domain: CapabilityBoundaryItem['domain'], confidence: number, reason: string, sourceMaterial?: CapabilityBoundaryItem['sourceMaterial']): CapabilityBoundaryItem {
     const existing = this.boundaries.find((b) => b.topic.toLowerCase() === topic.toLowerCase());
     if (existing) {
       existing.confidenceScore = confidence;
       existing.detectedReason = reason;
+      if (sourceMaterial) existing.sourceMaterial = sourceMaterial;
       this.saveData();
       return existing;
     }
@@ -144,6 +160,7 @@ export class AutonomousCurriculumService {
       detectedReason: reason,
       createdAt: Date.now(),
       status: 'IDENTIFIED',
+      ...(sourceMaterial ? { sourceMaterial } : {}),
     };
     this.boundaries.unshift(newItem);
     this.saveData();
@@ -154,10 +171,33 @@ export class AutonomousCurriculumService {
 
   /**
    * 未知領域に対する自律カリキュラム（模擬訓練ユニット）を自動生成
+   *
+   * P440 D2: 題材は境界の sourceMaterial（記録済みの不足文字列）だけ。
+   * 記録が無い場合は従来の汎用定型文になるが、その場合は題材が記録
+   * 由来ではないことが分かるよう、expectedKeyPoints に印を付ける。
+   * 同じ境界のカリキュラムが既にある場合は作り直さない。
    */
   public generateCurriculumForBoundary(boundaryId: string): SyntheticCurriculumUnit[] {
     const boundary = this.boundaries.find((b) => b.id === boundaryId);
     if (!boundary) return [];
+    const existingUnits = this.curriculums.filter((c) => c.boundaryId === boundaryId);
+    if (existingUnits.length > 0) return existingUnits;
+
+    const material = boundary.sourceMaterial;
+    const recordedPoints = material
+      ? [
+          ...material.slotNames.map((slot) => `不足スロット: ${slot}`),
+          ...material.targetPaths.map((path) => `対象ファイル: ${path}`),
+          ...(material.gapReason ? [`不足理由: ${material.gapReason}`] : []),
+          ...(material.nextStep ? [`次の一手: ${material.nextStep}`] : []),
+        ]
+      : [];
+    const keyPointsLevel1 = recordedPoints.length > 0
+      ? recordedPoints.slice(0, 3)
+      : ['前提条件の明示（記録済みの題材なし・汎用定型文）', '典型エラーの予防', '安全なデフォルト値の採用'];
+    const keyPointsLevel2 = recordedPoints.length > 0
+      ? recordedPoints
+      : ['実動可能な構成（記録済みの題材なし・汎用定型文）', '境界値ガード', 'ゼロ省略デリバリー'];
 
     const units: SyntheticCurriculumUnit[] = [
       {
@@ -166,7 +206,7 @@ export class AutonomousCurriculumService {
         topic: boundary.topic,
         difficultyLevel: 1,
         syntheticPrompt: `「${boundary.topic}」について、初学者が直面しやすい落とし穴と基本原則を簡潔に回答せよ。`,
-        expectedKeyPoints: ['前提条件の明示', '典型エラーの予防', '安全なデフォルト値の採用'],
+        expectedKeyPoints: keyPointsLevel1,
         evaluationCriteria: '専門用語を平易に噛み砕き、危険な落とし穴を漏れなく指摘できているか。',
       },
       {
@@ -175,7 +215,7 @@ export class AutonomousCurriculumService {
         topic: boundary.topic,
         difficultyLevel: 2,
         syntheticPrompt: `実際の運用シナリオにおいて「${boundary.topic}」を適用した具体的コード例・対話例を提示せよ。`,
-        expectedKeyPoints: ['実動可能な構成', '境界値ガード', 'ゼロ省略デリバリー'],
+        expectedKeyPoints: keyPointsLevel2,
         evaluationCriteria: '省略記号を使わず、コピー＆ペーストで即安全実行できる完全な構成か。',
       },
     ];
@@ -204,12 +244,10 @@ export class AutonomousCurriculumService {
     // 自己シミュレーションは「訓練通過」であって、正式な能力獲得証明ではない。
     // 独立した実行証拠がない限り境界をGRADUATEDへ進めない。
 
-    // 第34章: 獲得ノウハウを高密度マイクロルールへロスレス圧縮
-    this.compressKnowledge(unit.topic, [
-      `要件: ${unit.expectedKeyPoints.join(' / ')}`,
-      `基準: ${unit.evaluationCriteria}`,
-      `自己シミュレーションスコア: ${Math.round(simulatedScore * 100)}点（正式検証ではない）`,
-    ]);
+    // P440 D2: 自己シミュレーションの合格は「訓練通過」の印として残す
+    // だけで、圧縮はしない。圧縮は EXTERNALLY_VERIFIED のユニットだけに
+    // 限定し、recordExternalVerification の中で行う。自己シミュレーション
+    // の結果が無標識でスキル化され、検証を迂回する経路を作らないため。
 
     this.saveData();
 
@@ -242,6 +280,13 @@ export class AutonomousCurriculumService {
     unit.simulatedScore = normalized;
     boundary.confidenceScore = Math.min(0.99, Math.max(boundary.confidenceScore, normalized));
     if (boundary.confidenceScore >= 0.85) boundary.status = 'GRADUATED';
+    // P440 D2: 圧縮は外部検証を通過したユニットだけに行う。
+    // 第34章の技能圧縮は、ここでのみ呼ぶ。
+    this.compressKnowledge(unit.topic, [
+      `要件: ${unit.expectedKeyPoints.join(' / ')}`,
+      `基準: ${unit.evaluationCriteria}`,
+      `外部検証証拠: ${evidenceId}`,
+    ]);
     this.saveData();
     systemLogger.info('SELF_IMPROVEMENT', `🎓 [能力境界検証] ${boundaryId} を独立証拠 ${evidenceId} により正式卒業へ更新`);
     return true;
@@ -249,6 +294,12 @@ export class AutonomousCurriculumService {
 
   /**
    * 第34章: 技能の高密度マイクロルール圧縮 (Skill Compression)
+   *
+   * P440 D2: 圧縮は EXTERNALLY_VERIFIED のユニットだけに限定する。
+   * 呼び出しは recordExternalVerification の中からのみ行う。
+   * portableHash は内容ハッシュ（同一内容は同一ハッシュになり、
+   * 重複抑止・同一性照合ができる）。compressionRatio は実測ではなく
+   * 表示用の値である。
    */
   public compressKnowledge(skillName: string, points: string[]): CompressedSkillArtifact {
     const deterministicLogic = points.map((p, i) => `[Rule-${i + 1}] ${p}`).join('\n');
@@ -258,9 +309,9 @@ export class AutonomousCurriculumService {
       domain: 'CROSS_DOMAIN',
       originalRulesCount: points.length,
       compressedDeterministicLogic: deterministicLogic,
-      compressionRatio: 0.28, // 約72%省サイズ化
+      compressionRatio: 0.28, // 表示用の値（実測ではない）。圧縮率の実測は未実装。
       createdAt: Date.now(),
-      portableHash: `miki-ir-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      portableHash: canonicalSha256(deterministicLogic),
     };
 
     this.compressedSkills.unshift(artifact);

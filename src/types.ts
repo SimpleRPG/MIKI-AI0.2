@@ -100,7 +100,33 @@ export type CodeImprovementExperiencePayload = any;
 export type CodeProcedureIR = any;
 export type CodeProposal = any;
 export type CodeSkeletonTemplate = any;
-export type CodeUnderstandingIR = any;
+// P440 D3: CodeUnderstandingIR は any ではなく、理解確認で使う
+// comprehensionQA と procedures の形を型で固定する。
+// impactPredictions は changeImpactSimulatorService が読む任意項目。
+// 追加の任意フィールドは将来の利用者が足してよい。
+export interface CodeUnderstandingProcedure {
+  procedureName: string;
+  calls: string[];
+  reads: string[];
+  writes: string[];
+  external_dependencies: string[];
+  side_effects: string[];
+  variables?: string[];
+}
+export interface CodeUnderstandingQA {
+  question: string;
+  answer: string;
+  criteria: string;
+}
+export interface CodeUnderstandingIR {
+  id: string;
+  sourceLanguage: string;
+  procedures: CodeUnderstandingProcedure[];
+  globalVariables: string[];
+  comprehensionQA: CodeUnderstandingQA[];
+  impactPredictions?: Array<{ targetProcedure: string; affectedCallers: string[]; testCasesToRerun: string[] }>;
+  [key: string]: unknown;
+}
 export type CompiledRequestType = any;
 export type CompletionChecklist = any;
 export type CompletionEvaluation = any;

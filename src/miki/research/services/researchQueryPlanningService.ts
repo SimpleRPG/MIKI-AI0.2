@@ -15,6 +15,20 @@ export interface GapFocusMaterialInput {
   gapReason?:string;
   nextStep?:string;
 }
+
+// P440 D6: 既存クラスタ・既読 URL の除外条件。同じ出典の繰り返しを
+// 避けるため、既存の証拠クラスタのホストと既読 URL を渡す。
+export interface ResearchQueryExclusion {
+  excludedHosts:string[];
+  excludedUrls:string[];
+}
+
+// P440 D6/1-B: 独立証拠の追加探索の対象。既存の証拠クラスタとは
+// 別の独立出典を探す主張と、不足しているクラスタ数。
+export interface IndependentEvidenceFocus {
+  claimIds:string[];
+  neededClusters:number;
+}
 export interface ResearchQueryIntent {queryId:string;queryPlanId:string;parentQueryId?:string;researchQuestionId:string;intentType:QueryIntentType;targetClaimIds:string[];missingEvidenceType:string;environmentConstraints:EnvironmentFingerprint;sourceTierTarget:string;language:string;termsIncluded:string[];termsExcluded:string[];exactPhrases:string[];siteOrDomainConstraints:string[];timeConstraint?:string;expectedEvidence:string;stopCondition:string;createdBy:'CORE_18_DOMAINS';createdAt:number;queryText:string;readiness:QueryReadiness;applicability:EnvironmentApplicability;validationReasons:string[];}
 export interface QueryPlanningPolicy {enabled:boolean;maxQueriesPerPlan:number;maxRevisionPerQuery:number;maxParallelQueries:number;maxTotalSearchRequests:number;maxQueryExecutionTimeMs:number;maxCandidateUrlsPerQuery:number;stopWhenEvidenceSatisfied:boolean;preferOfficialSources:boolean;requireCurrentEnvironmentCheck:boolean;requireCounterEvidenceSearch:boolean;linkAutoIndependentSourcePolicy:boolean;updatedAt:number;}
 export interface ResearchQueryPlan {queryPlanId:string;researchQuestionId:string;canonicalResearchIntent:string;environment:EnvironmentFingerprint;policy:QueryPlanningPolicy;queries:ResearchQueryIntent[];usedQueryPatternIds:string[];excludedQueryPatternIds:string[];queryPatternSelectionId:string;queryPatternSelectionSha256:string;status:'DRAFT'|'READY'|'BLOCKED'|'RUNNING'|'COMPLETED'|'STOPPED';planSha256:string;createdAt:number;updatedAt:number;}
@@ -32,7 +46,7 @@ class ResearchQueryPlanningService {
  savePolicy(input:QueryPlanningPolicy):{policy:QueryPlanningPolicy;receiptId:string;policySha256:string}{const policy=this.normalizePolicy({...input,updatedAt:Date.now()});storageService.setItem(POLICY_KEY,JSON.stringify(policy));const policySha256=canonicalSha256Object(policy);return {policy,receiptId:`RQPR-${policySha256.slice(0,20)}`,policySha256};}
  listPlans():ResearchQueryPlan[]{return (()=>{const raw=storageService.getItem(PLAN_KEY);try{return raw?JSON.parse(raw) as ResearchQueryPlan[]:[];}catch{return [];}})();}
  listRevisionPairs():QueryRevisionPair[]{return (()=>{const raw=storageService.getItem(REVISION_KEY);try{return raw?JSON.parse(raw) as QueryRevisionPair[]:[];}catch{return [];}})();}
- buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus?{intent,environment:DEVICE,policy,gapFocus}:{intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',intent,'全体条件を保持した基準検索']);
+ buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput,exclusion?:ResearchQueryExclusion,independentFocus?:IndependentEvidenceFocus):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus?{intent,environment:DEVICE,policy,gapFocus}:{intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',intent,'全体条件を保持した基準検索']);
 /*
  * P439: 不足スロット向けの材料探索クエリを1本足す（gapFocus がある場合）。
  * 戦略ごとに探索先を変える（GitHub コード検索／Stack Exchange／Web 文書）。
@@ -47,6 +61,18 @@ if(gapFocus&&Array.isArray(gapFocus.slotNames)&&gapFocus.slotNames.length>0){
   if(materialQuery)specs.push(['IMPLEMENTATION_EXAMPLE',materialQuery,'不足スロット向け実装材料']);
 }
 
+/*
+ * P440 D6/1-B: 独立証拠の追加探索クエリを1本足す（independentFocus
+ * がある場合）。既存の証拠クラスタとは別の独立出典を探す意図を載せる。
+ * intent を先頭に置くため、基準検索との意図の一致は保たれる。
+ * なお queryPlanId のハッシュには exclusion・independentFocus を含め
+ * ない。除外条件を変えた再試行も同一の計画として改訂履歴に残る。
+ */
+if(independentFocus&&Array.isArray(independentFocus.claimIds)&&independentFocus.claimIds.length>0){
+  const independentQuery=`${intent} independent source evidence official documentation counterevidence`;
+  specs.push(['PRIMARY_SOURCE',independentQuery,'独立出典の追加証拠']);
+}
+
 const implementationRequired=/(?:実装|実装方法|実装例|部品|component|pattern|algorithm|implementation|implement|code|コード|修正|追加|作成|生成)/i.test(intent);
 if(implementationRequired){
   specs.push([
@@ -56,9 +82,21 @@ if(implementationRequired){
   ]);
 }
 
-if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${intent} official specification documentation`,'一次・公式情報']);if(policy.requireCurrentEnvironmentCheck)specs.push(['CURRENT_ENVIRONMENT',`${intent} Android arm64 Termux compatibility`,'Galaxy S25環境適合']);if(policy.requireCounterEvidenceSearch)specs.push(['COUNTEREVIDENCE',`${intent} limitation unsupported known issue`,'反証・制限']);const webPolicy=webResearchPolicyService.get();if(webPolicy.requirePrimarySource&&!specs.some(x=>x[0]==='PRIMARY_SOURCE'||x[0]==='OFFICIAL_SPECIFICATION'))specs.push(['PRIMARY_SOURCE',`${intent} primary source`,'一次情報']);const unique=new Map<string,[QueryIntentType,string,string]>();for(const item of specs){const key=normalize(item[1]).toLowerCase();if(!unique.has(key))unique.set(key,item);}const chosen=[...unique.values()].slice(0,policy.maxQueriesPerPlan);const queries=chosen.map((item,index)=>this.makeQuery(queryPlanId,researchQuestionId,intent,item[0],item[1],item[2],index,targetClaimIds));const patternSelection=queryPatternSelectionService.select(intent,chosen.map(item=>item[0]),DEVICE,Math.min(3,policy.maxQueriesPerPlan));const status=policy.enabled&&queries.every(q=>q.readiness==='READY')?'READY':'BLOCKED';const base= {queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries,usedQueryPatternIds:patternSelection.selectedPatternIds,excludedQueryPatternIds:patternSelection.excludedPatternIds,queryPatternSelectionId:patternSelection.selectionId,queryPatternSelectionSha256:patternSelection.selectionSha256,status:status as ResearchQueryPlan['status'],createdAt:Date.now(),updatedAt:Date.now()};const plan:{planSha256:string}&typeof base={...base,planSha256:canonicalSha256Object(base)};const plans=[plan,...this.listPlans().filter(x=>x.queryPlanId!==plan.queryPlanId)].slice(0,100);storageService.setItem(PLAN_KEY,JSON.stringify(plans));return plan;}
+if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${intent} official specification documentation`,'一次・公式情報']);if(policy.requireCurrentEnvironmentCheck)specs.push(['CURRENT_ENVIRONMENT',`${intent} Android arm64 Termux compatibility`,'Galaxy S25環境適合']);if(policy.requireCounterEvidenceSearch)specs.push(['COUNTEREVIDENCE',`${intent} limitation unsupported known issue`,'反証・制限']);const webPolicy=webResearchPolicyService.get();if(webPolicy.requirePrimarySource&&!specs.some(x=>x[0]==='PRIMARY_SOURCE'||x[0]==='OFFICIAL_SPECIFICATION'))specs.push(['PRIMARY_SOURCE',`${intent} primary source`,'一次情報']);const unique=new Map<string,[QueryIntentType,string,string]>();for(const item of specs){const key=normalize(item[1]).toLowerCase();if(!unique.has(key))unique.set(key,item);}const chosen=[...unique.values()].slice(0,policy.maxQueriesPerPlan);const queries=chosen.map((item,index)=>this.makeQuery(queryPlanId,researchQuestionId,intent,item[0],item[1],item[2],index,targetClaimIds,exclusion));const patternSelection=queryPatternSelectionService.select(intent,chosen.map(item=>item[0]),DEVICE,Math.min(3,policy.maxQueriesPerPlan));const status=policy.enabled&&queries.every(q=>q.readiness==='READY')?'READY':'BLOCKED';const base= {queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries,usedQueryPatternIds:patternSelection.selectedPatternIds,excludedQueryPatternIds:patternSelection.excludedPatternIds,queryPatternSelectionId:patternSelection.selectionId,queryPatternSelectionSha256:patternSelection.selectionSha256,status:status as ResearchQueryPlan['status'],createdAt:Date.now(),updatedAt:Date.now()};const plan:{planSha256:string}&typeof base={...base,planSha256:canonicalSha256Object(base)};const plans=[plan,...this.listPlans().filter(x=>x.queryPlanId!==plan.queryPlanId)].slice(0,100);storageService.setItem(PLAN_KEY,JSON.stringify(plans));return plan;}
  reviseQuery(planId:string,queryId:string,revisedText:string,reason:string,beforeOutcome:Record<string,unknown>):QueryRevisionPair {const plan=this.listPlans().find(x=>x.queryPlanId===planId);const query=plan?.queries.find(x=>x.queryId===queryId);if(!plan||!query)throw new Error('QUERY_NOT_FOUND');const revised=normalize(revisedText);if(!revised||revised===query.queryText)throw new Error('QUERY_REVISION_REQUIRED');const before=new Set(query.queryText.split(/\s+/));const after=new Set(revised.split(/\s+/));const base={queryId,originalQuery:query.queryText,revisedQuery:revised,revisionReason:normalize(reason)||'UNSPECIFIED',termsAdded:[...after].filter(x=>!before.has(x)),termsRemoved:[...before].filter(x=>!after.has(x)),beforeOutcome,resultingEvidenceIds:[],acceptedByCore:false,createdAt:Date.now()};const pair:{revisionPairId:string;pairSha256:string}&typeof base={...base,pairSha256:canonicalSha256Object(base),revisionPairId:''};pair.revisionPairId=`QRP-${pair.pairSha256.slice(0,20)}`;storageService.setItem(REVISION_KEY,JSON.stringify([pair,...this.listRevisionPairs()].slice(0,500)));return pair;}
- private makeQuery(planId:string,rqid:string,canonical:string,intentType:QueryIntentType,text:string,expected:string,index:number,targetClaimIds:string[]=[]):ResearchQueryIntent {const queryText=normalize(text);const validation=this.validate(queryText,canonical,intentType);const queryId=`RQI-${canonicalSha256Object({planId,intentType,queryText,index}).slice(0,20)}`;return {queryId,queryPlanId:planId,researchQuestionId:rqid,intentType,targetClaimIds:[...new Set(targetClaimIds.filter(Boolean))],missingEvidenceType:expected,environmentConstraints:DEVICE,sourceTierTarget:intentType.includes('OFFICIAL')||intentType==='PRIMARY_SOURCE'?'PRIMARY_OR_OFFICIAL':'ANY_VERIFIABLE',language:'ja',termsIncluded:queryText.split(/\s+/),termsExcluded:[],exactPhrases:[],siteOrDomainConstraints:extractSiteConstraints(queryText),expectedEvidence:expected,stopCondition:'EVIDENCE_SATISFIED_OR_BUDGET_REACHED',createdBy:'CORE_18_DOMAINS',createdAt:Date.now(),queryText,readiness:validation.readiness,applicability:validation.applicability,validationReasons:validation.reasons};}
+ private makeQuery(planId:string,rqid:string,canonical:string,intentType:QueryIntentType,text:string,expected:string,index:number,targetClaimIds:string[]=[],exclusion?:ResearchQueryExclusion):ResearchQueryIntent {const queryText=normalize(text);
+ /*
+  * P440 D6: 既存クラスタ由来の除外をクエリに載せる。termsExcluded は
+  * これまで常に空だったため、ここに除外ホストを入れる。クエリ文には
+  * -site: を最大2件まで足す（単語数24の上限を超えない場合のみ）。
+  * ただしクエリ自体が site: で指定しているホストは除外しない
+  * （材料探索の site:github.com 等と矛盾するため）。
+  */
+ const excludedHosts=[...new Set((exclusion?.excludedHosts??[]).map(host=>String(host||'').toLowerCase().replace(/^www\./,'').trim()).filter(Boolean))].slice(0,8);
+ const positiveSites=new Set([...queryText.matchAll(/(?:^|\s)site:([^\s]+)/gi)].map(m=>m[1].toLowerCase()));
+ const siteExclusions=excludedHosts.filter(host=>!positiveSites.has(host)).slice(0,2).map(host=>`-site:${host}`).join(' ');
+ const finalQueryText=siteExclusions&&`${queryText} ${siteExclusions}`.split(/\s+/).filter(Boolean).length<=24?`${queryText} ${siteExclusions}`:queryText;
+ const validation=this.validate(finalQueryText,canonical,intentType);const queryId=`RQI-${canonicalSha256Object({planId,intentType,queryText:finalQueryText,index}).slice(0,20)}`;return {queryId,queryPlanId:planId,researchQuestionId:rqid,intentType,targetClaimIds:[...new Set(targetClaimIds.filter(Boolean))],missingEvidenceType:expected,environmentConstraints:DEVICE,sourceTierTarget:intentType.includes('OFFICIAL')||intentType==='PRIMARY_SOURCE'?'PRIMARY_OR_OFFICIAL':'ANY_VERIFIABLE',language:'ja',termsIncluded:finalQueryText.split(/\s+/),termsExcluded:excludedHosts,exactPhrases:[],siteOrDomainConstraints:extractSiteConstraints(finalQueryText),expectedEvidence:expected,stopCondition:'EVIDENCE_SATISFIED_OR_BUDGET_REACHED',createdBy:'CORE_18_DOMAINS',createdAt:Date.now(),queryText:finalQueryText,readiness:validation.readiness,applicability:validation.applicability,validationReasons:validation.reasons};}
  private validate(query:string,canonical:string,type:QueryIntentType):{readiness:QueryReadiness;applicability:EnvironmentApplicability;reasons:string[]}{const reasons:string[]=[];if(/(?:api[_-]?key|token|password|secret)\s*[=:]\s*\S+/i.test(query))return {readiness:'PRIVACY_BLOCKED',applicability:'ENVIRONMENT_UNKNOWN',reasons:['SECRET_LIKE_TEXT_DETECTED']};const words=query.split(/\s+/).filter(Boolean);if(words.length<2)reasons.push('QUERY_TOO_BROAD');if(words.length>24)reasons.push('QUERY_TOO_NARROW');if(!normalize(query).toLowerCase().includes(normalize(canonical).toLowerCase().slice(0,Math.min(12,canonical.length)).toLowerCase()))reasons.push('CANONICAL_INTENT_WEAK_MATCH');const pcOnly=/\b(?:windows|x64|docker|desktop only)\b/i.test(query)&&!/android|termux|arm64/i.test(query);return {readiness:reasons.includes('QUERY_TOO_BROAD')?'TOO_BROAD':reasons.includes('QUERY_TOO_NARROW')?'TOO_NARROW':'READY',applicability:pcOnly?'REFERENCE_ONLY':type==='CURRENT_ENVIRONMENT'?'DIRECTLY_APPLICABLE':'ENVIRONMENT_UNKNOWN',reasons};}
  private normalizePolicy(value:QueryPlanningPolicy):QueryPlanningPolicy{return {...DEFAULT_POLICY,...value,maxQueriesPerPlan:clamp(value.maxQueriesPerPlan,1,20),maxRevisionPerQuery:clamp(value.maxRevisionPerQuery,0,5),maxParallelQueries:clamp(value.maxParallelQueries,1,3),maxTotalSearchRequests:clamp(value.maxTotalSearchRequests,1,50),maxQueryExecutionTimeMs:clamp(value.maxQueryExecutionTimeMs,10000,600000),maxCandidateUrlsPerQuery:clamp(value.maxCandidateUrlsPerQuery,1,50)};}
 }

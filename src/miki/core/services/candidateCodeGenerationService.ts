@@ -20,6 +20,10 @@ import { astCandidateTransformationService, type AstCandidateOperation } from '.
 import { integratedGenerationPlanService } from '../../selfDevelopment/services/integratedGenerationPlanService';
 import { taskBlackboardService } from './taskBlackboardService';
 import { missingComponentSpecService, type MissingComponentSpec } from './missingComponentSpecService';
+import { wordAssociationGraphService } from '../../memory/services/wordAssociationGraphService';
+import { autonomousCurriculumService } from '../../learning/services/autonomousCurriculumService';
+import { codeComprehensionQuizService } from '../../learning/services/codeComprehensionQuizService';
+import type { WebImplementationMaterial } from '../../research/services/webMaterialPatternExtractor';
 import { semanticRequirementCompilerService } from './semanticRequirementCompilerService';
 import { codeGenerationQualityPlannerService } from './codeGenerationQualityPlannerService';
 import { requirementConsistencyGraphService } from './requirementConsistencyGraphService';
@@ -1450,6 +1454,13 @@ class CandidateCodeGenerationService {
         },[]);
       }
 
+      // P440 D2/D3: 止まった生成の記録が残った後に、勉強の仕組みを回す。
+      // D2: 集計（D1）に基づく境界の登録と、記録済み文字列だけを題材に
+      // したカリキュラムの生成。D3: 対象ファイルの理解確認の自己テスト。
+      // いずれも失敗しても生成の返却は変えない。
+      this.registerStudyBoundariesFromLedger();
+      this.runComprehensionSelfTests(targetFiles);
+
       return {
         accepted:false,
         runId,
@@ -1781,7 +1792,17 @@ class CandidateCodeGenerationService {
       }
     }
 
-    for(const material of input.materials){
+    // P440 2-A: 材料を連想の関連度で並べ替える（並び替えだけ。採用基準
+    // は変えない）。仕様の目的・対象ファイルと材料の実装方針・出典
+    // クエリ・証拠文の関連度を計算し、関連度が高い順に試す。関連度の
+    // 計算に失敗した材料は 0 点として末尾に回す。
+    // なお WebImplementationMaterial には verificationStatus が無いため、
+    // 検証済み優先は plan() 側の usedKnowledgeComponentIds の順序付け
+    // で行う（reusableComponentFactoryService.plan を参照）。
+    const specText = [spec.name, spec.expectedBehavior ?? '', input.objective, spec.targetPath].filter(Boolean).join(' / ');
+    const rankedMaterials = [...input.materials].sort((a, b) =>
+      this.materialRelatednessScore(specText, b) - this.materialRelatednessScore(specText, a));
+    for(const material of rankedMaterials){
       let createdForSpec=false;
       for(const example of material.codeExamples){
         const code=example.code.trim();
@@ -1841,6 +1862,58 @@ class CandidateCodeGenerationService {
     }
   }
   return {createdIds,rejections};
+ }
+
+ // P440 2-A: 仕様と材料の連想の関連度（0〜1）。失敗時は 0。
+ private materialRelatednessScore(specText: string, material: WebImplementationMaterial): number {
+   try {
+     const materialText = [material.implementationApproach, material.sourceQuery, material.evidenceText].filter(Boolean).join(' / ');
+     return wordAssociationGraphService.calculateRelatedness(specText, materialText).score;
+   } catch {
+     return 0;
+   }
+ }
+
+ // P440 D2: 集計（D1）の「次に学ぶべきトピック」に基づくだけ境界を
+ // 登録し、記録済みの不足文字列だけを題材にしたカリキュラムを作る。
+ // 既に同じ境界のカリキュラムがあれば作り直さない。
+ private registerStudyBoundariesFromLedger(): void {
+   try {
+     const summary = this.summarizeLedger();
+     for (const topic of summary.topStudyTopics) {
+       const topicText = [...topic.slotNames, ...topic.targetPaths].filter(Boolean).join(' / ');
+       if (!topicText) continue;
+       // confidence は繰り返し回数から決める勉強の信号であり、検証の
+       // 点数ではない。理由にも回数を残す。
+       const confidence = Math.min(0.9, 0.3 + topic.count * 0.1);
+       const boundary = autonomousCurriculumService.registerOrUpdateBoundary(topicText, 'CODE_GENERATION', confidence, `repeated gap: ${topic.gapReason ?? 'UNKNOWN'} count=${topic.count}`, {
+         slotNames: topic.slotNames,
+         targetPaths: topic.targetPaths,
+         gapReason: topic.gapReason,
+         nextStep: topic.nextStep,
+         count: topic.count,
+       });
+       const existing = autonomousCurriculumService.getCurriculums().some(unit => unit.boundaryId === boundary.id);
+       if (!existing) {
+         autonomousCurriculumService.generateCurriculumForBoundary(boundary.id);
+       }
+     }
+   } catch {
+     // 境界登録・カリキュラム生成の失敗は生成の返却を止めない。
+   }
+ }
+
+ // P440 D3: 対象ファイルの理解確認の自己テストを実行する。結果は
+ // 学習専用台帳にだけ残り、検証の証拠にはならない。
+ private runComprehensionSelfTests(targetFiles: Array<{ path: string; content: string }>): void {
+   try {
+     for (const file of targetFiles.slice(0, 3)) {
+       if (!file.content.trim()) continue;
+       codeComprehensionQuizService.runSelfTest({ code: file.content, id: file.path });
+     }
+   } catch {
+     // 自己テストの失敗は生成の返却を止めない。
+   }
  }
 
  private buildGapContract(targetPaths:string[],constructionGapRequirements:string[]):CandidateGenerationGapContract|undefined{
@@ -2023,6 +2096,25 @@ class CandidateCodeGenerationService {
        nextStep: topOf(entry.nextSteps),
        count: entry.count,
      }));
+
+   // P440 D3: 理解確認で不一致が多かったトピックも「次に学ぶべき
+   // トピック」に入れる（学習専用台帳の集計だけを読む）。
+   try {
+     for (const mismatch of codeComprehensionQuizService.listTopicMismatches()) {
+       if (mismatch.mismatches < threshold) continue;
+       topStudyTopics.push({
+         slotNames: [],
+         targetPaths: [mismatch.topic],
+         gapReason: 'COMPREHENSION_MISMATCH',
+         nextStep: 'STUDY_TOPIC',
+         count: mismatch.mismatches,
+       });
+     }
+     topStudyTopics.sort((a, b) => b.count - a.count);
+   } catch {
+     // 自己テスト台帳の読み失敗は集計を止めない。
+   }
+   if (topStudyTopics.length > 8) topStudyTopics.splice(8);
 
    const summary: CandidateGenerationLedgerSummary = {
      totalRuns: records.length,

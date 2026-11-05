@@ -712,6 +712,46 @@ class DomainIntegrationBootstrapService{
      // 学習・使用実績の記録失敗は検証結果を変えない。
    }
 
+   // P440 D2: 卒業の呼び出し元。VERIFIED になった部品に対応する境界が
+   // あれば、既存の外部証拠ゲート（recordExternalVerification）で卒業を
+   // 試みる。証拠は evidenceService.list() から、kind==='EXECUTION' かつ
+   // status==='ADMISSIBLE' かつ metadata.component_id が部品IDと一致し
+   // metadata.passed===true かつ metadata.assertion_status==='PASS' の
+   // ものを探す。verifyEvidence は status が DISCOVERED のため使えない。
+   // score は固定値 0.9（証拠ゲートが実質の判定で、score は 0.85 の閾値
+   // を超えるための固定値）。卒業の失敗は検証結果を変えない。
+   // 境界と部品の対応付けは、境界の topic に部品の targetPath
+   // （testReferences の先頭、無ければレジストリの entry_point）が
+   // 含まれることで行う。
+   try{
+     const {autonomousCurriculumService}=await import('../../learning/services/autonomousCurriculumService');
+     const {evidenceService}=await import('../../memory/services/evidenceService');
+     const {reusableComponentFactoryService:graduationFactoryService}=await import('./reusableComponentFactoryService');
+     for(const item of results){
+       if(item.status!=='VERIFIED')continue;
+       const linked=graduationFactoryService.findCodeComponentByRegistryId(item.componentId);
+       const registryComponent=componentRegistryService.getComponent(item.componentId);
+       const targetPath=linked?.testReferences?.[0]||registryComponent?.entry_point||'';
+       if(!targetPath)continue;
+       const graduationEvidence=evidenceService.list().find(evidence=>
+         evidence.kind==='EXECUTION'
+         && evidence.status==='ADMISSIBLE'
+         && evidence.metadata?.component_id===item.componentId
+         && evidence.metadata?.passed===true
+         && evidence.metadata?.assertion_status==='PASS'
+       );
+       if(!graduationEvidence)continue;
+       for(const boundary of autonomousCurriculumService.getAllBoundaries()){
+         if(!boundary.topic.includes(targetPath))continue;
+         for(const unit of autonomousCurriculumService.getCurriculums().filter(unit=>unit.boundaryId===boundary.id)){
+           autonomousCurriculumService.recordExternalVerification(boundary.id,unit.id,graduationEvidence.evidence_id,0.9);
+         }
+       }
+     }
+   }catch{
+     // 卒業の試みの失敗は検証結果を変えない。
+   }
+
    // P436: 検証の実行自体を EXECUTION 証拠として登録し、その id を
    // 返却に載せる（VALIDATE_CANDIDATE の P369 と同じ手口）。載せないと
    // 成功時の返却が証拠 0 件になり、契約で

@@ -27,6 +27,12 @@ export interface ResearchStrategyDecision {
   alternatives: ResearchRoute[];
 }
 
+// P440 D6: ギャップごとの試行済み戦略の台帳。
+// 戦略数「3」は材料チャネル数（GitHub／Stack Exchange／Web 文書）に
+// 根拠づける。台帳は1ギャップあたり最大4戦略まで記録する。
+const ROUTE_ATTEMPT_KEY = 'miki_research_route_attempts_v1';
+const MAX_ROUTE_ATTEMPTS_PER_GAP = 4;
+
 /**
  * Research経路の選択と結果学習だけを担当する層。
  * 真偽判定・Claim昇格・実行権限は持たない。
@@ -42,7 +48,10 @@ export class ResearchStrategyService {
     return this.instance || (this.instance = new ResearchStrategyService());
   }
 
-  public chooseRoute(type: KnowledgeGapType, query: string, availableRoutes?: ResearchRoute[]): ResearchStrategyDecision {
+  // P440 D6: 同一入力に同一経路を返すだけでは戦略が回らないため、
+  // 試行済み戦略を入力に含める。最上位の経路が試行済みなら、未試行の
+  // 次点を選ぶ（全て試行済みなら最上位のまま）。
+  public chooseRoute(type: KnowledgeGapType, query: string, availableRoutes?: ResearchRoute[], triedRoutes: ResearchRoute[] = []): ResearchStrategyDecision {
     const routes = availableRoutes?.length ? [...availableRoutes] : this.defaultRoutes(type, query);
     if (!routes.length) {
       return { route: 'LOCAL_CLAIM', reason: '利用可能なResearch経路がありません。', alternatives: [] };
@@ -51,17 +60,39 @@ export class ResearchStrategyService {
     const ranked = routes
       .map(route => ({ route, score: this.score(type, route) }))
       .sort((a, b) => b.score - a.score);
-    const selected = ranked[0].route;
+    const tried = new Set(triedRoutes);
+    const selectedEntry = ranked.find(item => !tried.has(item.route)) ?? ranked[0];
+    const selected = selectedEntry.route;
     const stat = this.getRouteStats(type, selected);
-    const reason = stat.attempts > 0
+    let reason = stat.attempts > 0
       ? `過去実績 ${stat.successes}/${stat.attempts} 成功、平均 ${Math.round(stat.totalDurationMs / stat.attempts)}ms を基に選択しました。`
       : `このKnowledge Gap種別の初期Research経路として ${selected} を選択しました。`;
+    if (tried.size > 0 && !tried.has(selected)) reason += ` 試行済み経路（${[...tried].join(',')}）を避けて回しました。`;
+    else if (tried.has(selected)) reason += ' 試行済み経路が全てのため最上位を再試行します。';
 
     return {
       route: selected,
       reason,
-      alternatives: ranked.slice(1).map(item => item.route),
+      alternatives: ranked.filter(item => item.route !== selected).map(item => item.route),
     };
+  }
+
+  // P440 D6: ギャップごとの試行済み戦略を読み、記録する。
+  public triedGapRoutes(gapId: string): ResearchRoute[] {
+    try {
+      const raw = storageService.getItem(ROUTE_ATTEMPT_KEY);
+      const records = raw ? JSON.parse(raw) as Record<string, ResearchRoute[]> : {};
+      return records[gapId] ?? [];
+    } catch { return []; }
+  }
+
+  public recordGapRouteAttempt(gapId: string, route: ResearchRoute): void {
+    try {
+      const raw = storageService.getItem(ROUTE_ATTEMPT_KEY);
+      const records = raw ? JSON.parse(raw) as Record<string, ResearchRoute[]> : {};
+      records[gapId] = [...new Set([...(records[gapId] ?? []), route])].slice(-MAX_ROUTE_ATTEMPTS_PER_GAP);
+      storageService.setItem(ROUTE_ATTEMPT_KEY, JSON.stringify(records));
+    } catch { /* learning is non-authoritative */ }
   }
 
   public assessMeaningfulness(input: {
