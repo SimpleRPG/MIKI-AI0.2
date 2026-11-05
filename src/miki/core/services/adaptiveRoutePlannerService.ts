@@ -839,6 +839,21 @@ class AdaptiveRoutePlannerService {
         ...(Array.isArray(gapValue?.unknownQuestions)
           ? gapValue.unknownQuestions.map(value=>String(value))
           : []),
+        // P433: 不足部品の仕様（名前・対象）が導出済みなら、不足の
+        // 意味文に名前で載せる。「計画が作れない」ではなく「この
+        // 名前の部品が無い」として調査・供給へ渡す。
+        ...(Array.isArray(gapValue?.missingComponentSpecs)
+          ? gapValue.missingComponentSpecs
+            .map((value:unknown)=>{
+              if(!value||typeof value!=='object'||Array.isArray(value))return '';
+              const record=value as Record<string,unknown>;
+              const name=String(record.name||'').trim();
+              if(!name)return '';
+              const targetPath=String(record.targetPath||'').trim();
+              return targetPath?`missingComponentSpec=${name}@${targetPath}`:`missingComponentSpec=${name}`;
+            })
+            .filter(Boolean)
+          : []),
       ].filter(Boolean);
 
       // P425 A2: gap 記録の契約欄（P421）を取り込む。要約は意味文へ、
@@ -847,6 +862,12 @@ class AdaptiveRoutePlannerService {
         ? gapValue.contract as Record<string,unknown>
         : undefined;
       const gapContractSummary=summarizeGapContract(gapContract);
+
+      // P433: 不足部品の仕様（名前・対象）が導出済みなら、調査・
+      // 供給へのペイロードにも契約欄と同じ扱いで載せる。
+      const missingComponentSpecs=Array.isArray(gapValue?.missingComponentSpecs)
+        ? gapValue.missingComponentSpecs
+        : undefined;
 
       // P427 A3 第1段: gap 記録が空（内訳・理由・契約のいずれも
       // 無い）ときだけ、対象の公開面を自己コード索引から live に
@@ -895,7 +916,7 @@ class AdaptiveRoutePlannerService {
             unknownTerms:[componentGapMeaning],
             unresolvedComponents:unresolved,
             componentGap:true,
-            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {})} : {}),
+            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {}),...(missingComponentSpecs ? {missingComponentSpecs} : {})} : {}),
             componentGapMeaning,
             useSearch:true,
             // P410 T3: CORE の生成材料不足では調査は必須である。
@@ -952,6 +973,7 @@ class AdaptiveRoutePlannerService {
             unresolvedComponents:unresolved,
             componentGap:true,
             ...(gapContract ? {gapContract} : {}),
+            ...(missingComponentSpecs ? {missingComponentSpecs} : {}),
             adaptive:true,
             priority:94
           }
@@ -1008,7 +1030,7 @@ class AdaptiveRoutePlannerService {
             query:escalationQuestion,
             unresolvedComponents:unresolved,
             componentGap:true,
-            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {})} : {}),
+            ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {}),...(missingComponentSpecs ? {missingComponentSpecs} : {})} : {}),
             unknownResolutionStatus:resolutionStatus,
             coreDirectedResearch:true,
             adaptive:true,
@@ -1337,7 +1359,7 @@ class AdaptiveRoutePlannerService {
               }),
               unresolvedComponents:unresolved,
               componentGap:true,
-              ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {})} : {}),
+              ...(compositionUnavailable ? {compositionGap:true,gapDescriptions,...(gapContract ? {gapContract} : {}),...(missingComponentSpecs ? {missingComponentSpecs} : {})} : {}),
               adaptive:true,
               priority:94
             }

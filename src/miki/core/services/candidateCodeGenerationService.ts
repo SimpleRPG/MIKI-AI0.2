@@ -19,6 +19,7 @@ import { codeConstructionRendererService } from './codeConstructionRendererServi
 import { astCandidateTransformationService, type AstCandidateOperation } from '../../selfDevelopment/services/astCandidateTransformationService';
 import { integratedGenerationPlanService } from '../../selfDevelopment/services/integratedGenerationPlanService';
 import { taskBlackboardService } from './taskBlackboardService';
+import { missingComponentSpecService, type MissingComponentSpec } from './missingComponentSpecService';
 import { semanticRequirementCompilerService } from './semanticRequirementCompilerService';
 import { codeGenerationQualityPlannerService } from './codeGenerationQualityPlannerService';
 import { requirementConsistencyGraphService } from './requirementConsistencyGraphService';
@@ -1187,9 +1188,22 @@ class CandidateCodeGenerationService {
       : [];
 
     if(!composition || componentIds.length===0){
-      const reason=createdCodeComponentIds.length>0
-        ? 'NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION'
-        : 'CODE_COMPOSITION_PLAN_UNAVAILABLE';
+      /*
+       * P433: 不足の一周・第1段。計画が作れないとき、不足の内訳から
+       * 「作るべき部品の仕様」を名前・インターフェース付きで導出する。
+       * 導出できない場合は仕様を作らない（捏造しない）。仕様化が
+       * できない限り、作る工程には入らない。
+       */
+      const gapContract=this.buildGapContract(targetPaths,constructionGapRequirements);
+      const unknownQuestions=unknownContext.items
+        .map(item=>item.question)
+        .filter(Boolean);
+      const missingComponentSpecs=missingComponentSpecService.deriveMissingComponentSpecs({
+        constructionGaps:constructionGapRequirements,
+        unknownQuestions,
+        contract:gapContract,
+        targetPaths,
+      });
 
       /*
        * P406: 不足の内訳は生成台帳の中だけにあり、計画側は理由文字列
@@ -1202,35 +1216,69 @@ class CandidateCodeGenerationService {
        * 確定させる。部品供給の要求生成はこの記録済み契約を優先し、
        * パッケージ生成時点の索引からの再構成は契約が無い場合の
        * フォールバックになる。導出できなければ欄自体を持たせない。
+       *
+       * P433: あわせて、導出した不足部品の仕様も同じ記録に載せる。
+       * 計画側・供給側は「計画が作れない」ではなく「この名前の
+       * 部品が無い」として次へ進める。
        */
-      if(reason==='CODE_COMPOSITION_PLAN_UNAVAILABLE'&&run.taskId){
-        const gapContract=this.buildGapContract(targetPaths,constructionGapRequirements);
+      if(run.taskId){
         taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGap',{
           operation:'GENERATE_CANDIDATE',
           runId,
-          reason,
+          reason:'CODE_COMPOSITION_PLAN_UNAVAILABLE',
           synthesisGapReason:synthesisPlan.source.gapReason||'',
           blockedReason:synthesisPlan.blockedReason||'',
           constructionGaps:constructionGapRequirements,
-          unknownQuestions:unknownContext.items
-            .map(item=>item.question)
-            .filter(Boolean),
+          unknownQuestions,
           targetPaths,
+          missingComponentSpecs,
           ...(gapContract?{contract:gapContract}:{}),
         },[]);
       }
+
+      /*
+       * P433: 不足の一周・第2段。仕様が導出できた不足部品について、
+       * 組み立ての工程内で作る。材料は明示的なものだけ（研究の
+       * codeExamplesのうち未使用のもの、または検証済み部品からの
+       * つなぎ）。研究の文章からコードを推測しない。できた案は
+       * 教師の供給物と同じ扱いでCANDIDATEとして登録し、このrunの
+       * compositionの材料にはしない。検証は既存の梯子
+       * （VALIDATE_CANDIDATE → Regression → Canary → VERIFIED）が
+       * 駆動する。作れなければ従来どおりResearch／教師供給へ回す。
+       */
+      const specCreatedIds=this.buildMissingComponentCandidates({
+        objective:run.objective,
+        specs:missingComponentSpecs,
+        materials:unknownContext.implementationMaterials,
+        targetFiles,
+        targetPaths,
+        validationRequirements:effectiveValidationRequirements,
+        usedContents:[
+          ...researchedCandidates.map(candidate=>candidate.candidateContent),
+          ...suppliedCandidates.map(candidate=>candidate.candidateContent),
+        ],
+      });
+      createdCodeComponentIds.push(...specCreatedIds);
+
+      const reason=specCreatedIds.length>0
+        ? 'MISSING_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION'
+        : createdCodeComponentIds.length>0
+          ? 'NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION'
+          : 'CODE_COMPOSITION_PLAN_UNAVAILABLE';
 
       this.record(runId,{
         attemptCount:1,
         status:'BLOCKED',
         reason,
         createdCodeComponentIds,
+        missingComponentSpecs,
         unknownContext,
         responseHash:canonicalSha256(JSON.stringify({
           runId,
           reason,
           componentIds,
           createdCodeComponentIds,
+          missingComponentSpecs,
           synthesisPlan
         }))
       });
@@ -1471,6 +1519,105 @@ class CandidateCodeGenerationService {
   * 合わせ、ブラックボード記録が肥大化しない範囲に抑える。
   * 索引の取得に失敗しても生成の失敗経路自体は壊さない。
   */
+ /*
+  * P433: 不足の一周・第2段。導出済みの不足部品の仕様ごとに、
+  * 組み立ての工程内で候補を作る。仕様1件につき候補は最大1件。
+  * (a) つなぎ：検証済み部品がその名前を公開している場合だけ
+  * 再エクスポートする候補。(b) 未使用の明示的codeExample：
+  * 研究で収集済みのcodeExamplesのうち、既に候補化されたもの
+  * 以外で、仕様の対象に合うものだけ。どちらも作れなければ
+  * その仕様は飛ばす（推測で補わない）。できた候補は全て
+  * CANDIDATEとして登録し、compositionの材料にはしない。
+  */
+ private buildMissingComponentCandidates(input:{
+  objective:string;
+  specs:MissingComponentSpec[];
+  materials: import('../../research/services/webMaterialPatternExtractor').WebImplementationMaterial[];
+  targetFiles:Array<{path:string;content:string}>;
+  targetPaths:string[];
+  validationRequirements:string[];
+  usedContents:string[];
+ }):string[]{
+  const createdIds:string[]=[];
+  if(input.specs.length===0)return createdIds;
+  const targetByPath=new Map(input.targetFiles.map(file=>[file.path,file]));
+  const used=new Set(input.usedContents.map(content=>content.trim()).filter(Boolean));
+  for(const spec of input.specs){
+    const target=targetByPath.get(spec.targetPath);
+    if(!target)continue;
+
+    const adapter=missingComponentSpecService.buildAdapterDraft(
+      spec,
+      target.content,
+      input.validationRequirements,
+    );
+    if(adapter){
+      const created=reusableComponentFactoryService.createCodeComponentCandidate({
+        purpose:`${spec.name}: ${input.objective}`,
+        implementation:adapter.implementation,
+        targetPath:spec.targetPath,
+        tests:adapter.tests,
+        validation:adapter.validation,
+        componentType:'MISSING_COMPONENT_ADAPTER_CANDIDATE',
+        dependencies:[adapter.sourceComponentId],
+        supportedEnvironments:['ANDROID'],
+        entryPoint:spec.targetPath,
+        sourceEpisodeIds:[],
+      });
+      if(created.accepted&&created.componentId){
+        createdIds.push(created.componentId);
+        continue;
+      }
+    }
+
+    for(const material of input.materials){
+      let createdForSpec=false;
+      for(const example of material.codeExamples){
+        const code=example.code.trim();
+        if(!code||used.has(code))continue;
+        const explicitPath=example.targetPath&&input.targetPaths.includes(example.targetPath)
+          ? example.targetPath
+          : undefined;
+        const path=explicitPath||(
+          input.targetPaths.length===1 &&
+          this.codeLanguageMatchesTarget(example.language,input.targetPaths[0])
+            ? input.targetPaths[0]
+            : ''
+        );
+        if(path!==spec.targetPath)continue;
+        const tests=material.testClues.length>0
+          ? material.testClues.join('\n')
+          : `Validate implementation for ${path} against missing-component spec ${spec.name}.`;
+        const validation=[
+          `MISSING_COMPONENT_SPEC=${spec.name}`,
+          ...(spec.expectedBehavior?[`EXPECTED_BEHAVIOR=${spec.expectedBehavior}`]:[]),
+          ...input.validationRequirements,
+        ].join('\n');
+        const created=reusableComponentFactoryService.createCodeComponentCandidate({
+          purpose:`${spec.name}: ${input.objective}`,
+          implementation:code,
+          targetPath:path,
+          tests,
+          validation,
+          componentType:'MISSING_COMPONENT_SPEC_CANDIDATE',
+          dependencies:material.dependencies,
+          supportedEnvironments:['ANDROID'],
+          entryPoint:path,
+          sourceEpisodeIds:[material.sourceId],
+        });
+        if(created.accepted&&created.componentId){
+          createdIds.push(created.componentId);
+          used.add(code);
+          createdForSpec=true;
+        }
+        break;
+      }
+      if(createdForSpec)break;
+    }
+  }
+  return createdIds;
+ }
+
  private buildGapContract(targetPaths:string[],constructionGapRequirements:string[]):CandidateGenerationGapContract|undefined{
   const truncate=(value:string,max:number):string=>value.length>max?value.slice(0,max):value;
   const targets:CandidateGenerationGapContractTarget[]=[];
