@@ -103,7 +103,11 @@ export class CapabilityGraphService {
       (!allowedKinds || allowedKinds.has(String(c.componentKind || ''))) &&
       this.supportsEnvironment(c, environment)
     );
-    if (!all.length) return undefined;
+    if (!all.length) {
+      // P438: 計画が返せない理由をログに出す。戻り値の型は変えない。
+      systemLogger.warn('TOOLS', `[CapabilityGraph] plan unavailable: no VERIFIED components (kinds=${allowedKinds ? [...allowedKinds].join(',') : 'any'}, environment=${environment || 'none'})`);
+      return undefined;
+    }
 
     const learned = capabilityLearningService.findPreferredComponentSets(goal, environment);
     const learnedBoost = new Map<string, number>();
@@ -125,7 +129,11 @@ export class CapabilityGraphService {
     })
       .filter(x => x.score > 0 && x.risk < 80)
       .sort((a, b) => b.score - a.score || a.component.component_id.localeCompare(b.component.component_id));
-    if (!scored.length) return undefined;
+    if (!scored.length) {
+      // P438: 計画が返せない理由をログに出す。戻り値の型は変えない。
+      systemLogger.warn('TOOLS', `[CapabilityGraph] plan unavailable: no components scored above 0 (candidates=${all.length}, environment=${environment || 'none'})`);
+      return undefined;
+    }
 
     const selected: ComponentTxtPackage[] = [];
     const reasons: string[] = [];
@@ -151,7 +159,11 @@ export class CapabilityGraphService {
     const dependencySet = new Set(selected.flatMap(c => c.dependencies || []));
     const ids = new Set(selected.map(c => c.component_id));
     const missing = [...dependencySet].filter(dep => !ids.has(dep) && !all.some(c => c.component_id === dep));
-    if (missing.length) return undefined;
+    if (missing.length) {
+      // P438: 計画が返せない理由をログに出す。戻り値の型は変えない。
+      systemLogger.warn('TOOLS', `[CapabilityGraph] plan unavailable: unresolved dependencies (${missing.join(', ')})`);
+      return undefined;
+    }
 
     const total = selected.reduce((sum, c) => sum + this.score(c, query), 0);
     const planId = `CAP-${this.hash(`${query}|${selected.map(c => c.component_id).join('|')}`)}`;

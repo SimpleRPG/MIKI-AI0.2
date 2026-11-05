@@ -344,6 +344,19 @@ class ComponentSupplyRequestService {
   // ------------------------------------------------------------------
   // 要求パッケージ生成（本体）
   // ------------------------------------------------------------------
+  /**
+   * 要求パッケージ作成の失敗をランタイムログへ残す（診断用のみ）。
+   * 失敗時は UI にも同じ理由が出るが、実機ログには何も残らないため、
+   * 「供給が一度も通っていない」原因の切り分けができなかった
+   * （LOG_45 の PRIVACY_BLOCKED は境界側の行しか残らず、どの
+   * パートが引っかかったか分からなかった）。reasons は既に伏せ字化
+   * されたもの（PRIVACY_BLOCKED は先頭3文字＋***）か、リポジトリ
+   * 相対パスだけであり、生の機密値は含まない。
+   */
+  private logCreateBlocked(code: ComponentSupplyCreateCode, message: string, reasons?: string[]): void {
+    systemLogger.warn('SELF_IMPROVEMENT', `[部品供給 要求作成却下] code=${code} ${message}`, { reasons: reasons ?? [] });
+  }
+
   public async createPackage(runId: string): Promise<ComponentSupplyCreateResult> {
     const run = improvementIntakeRouterService.get(runId);
     if (!run) {
@@ -351,6 +364,7 @@ class ComponentSupplyRequestService {
     }
     const gap = this.findGap(run);
     if (!gap) {
+      this.logCreateBlocked('GAP_NOT_FOUND', 'この Run には候補生成の不足記録がありません');
       return {
         ok: false,
         code: 'GAP_NOT_FOUND',
@@ -360,6 +374,7 @@ class ComponentSupplyRequestService {
 
     const targetPaths = this.resolveTargetPaths(run, gap);
     if (targetPaths.length === 0) {
+      this.logCreateBlocked('NO_TARGET_FILES', '対象ファイルが特定できません');
       return { ok: false, code: 'NO_TARGET_FILES', message: '対象ファイルが特定できません（不足記録・計画・payload のいずれにも対象がありません）。' };
     }
 
@@ -387,6 +402,7 @@ class ComponentSupplyRequestService {
       missing.push(`${path}（自己コード空間に存在しないファイルです）`);
     }
     if (missing.length > 0) {
+      this.logCreateBlocked('TARGET_FILE_NOT_FOUND', '対象ファイルの一部が自己コード空間にありません', missing);
       return {
         ok: false,
         code: 'TARGET_FILE_NOT_FOUND',
@@ -426,6 +442,7 @@ class ComponentSupplyRequestService {
       }
     });
     if (targetBytes > CONTEXT_BUDGET_BYTES) {
+      this.logCreateBlocked('CONTEXT_TOO_LARGE', '対象ファイルの文脈が上限を超えました', contextEntries.map((entry) => `${entry.path}: ${entry.includedBytes} bytes`));
       return {
         ok: false,
         code: 'CONTEXT_TOO_LARGE',
@@ -699,6 +716,7 @@ class ComponentSupplyRequestService {
       }
     }
     if (privacyReasons.length > 0) {
+      this.logCreateBlocked('PRIVACY_BLOCKED', '送出前プライバシー検査で検出がありました', privacyReasons);
       return {
         ok: false,
         code: 'PRIVACY_BLOCKED',

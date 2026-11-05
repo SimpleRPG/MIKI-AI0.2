@@ -115,7 +115,30 @@ class CandidateCodeGenerationService {
    }
   }
   const probe=await autonomousCandidatePreparationService.prepareForRun(runId,[],sourceOverride);const targetPaths=probe.targetPaths;
-  if(targetPaths.length===0)return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
+  if(targetPaths.length===0){
+    /*
+     * P438: 対象が解決できない run でも不足記録を残す。従来はここで
+     * 早期復帰し candidateGenerationGap が残らなかったため、供給
+     * パッケージの生成が GAP_NOT_FOUND で作れなかった。分かる範囲
+     * だけを記録し、対象や仕様は推測で補わない。解決済み対象は
+     * targetPaths=[]、要求された対象は requestedTargetPaths に分け、
+     * 解決できなかった対象は probe.missingPaths のまま載せる。
+     * constructionGaps／unknownQuestions／missingComponentSpecs は
+     * この時点では計算できないため載せない（読む側は
+     * Array.isArray で守られているため、欠けていても壊れない）。
+     */
+    if(run.taskId){
+      taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGap',{
+        operation:'GENERATE_CANDIDATE',
+        runId,
+        reason:probe.reason||'TARGET_FILES_NOT_RESOLVED',
+        targetPaths:[],
+        requestedTargetPaths:this.strings(run.payload.targetFiles).map(value=>value.trim()).filter(Boolean),
+        missingPaths:probe.missingPaths,
+      },[]);
+    }
+    return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
+  }
   const sources=new Map(currentSourceFiles.map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
   if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
   const preparedRun=improvementIntakeRouterService.get(runId);
@@ -1283,6 +1306,22 @@ class CandidateCodeGenerationService {
         },[]);
       }
       createdCodeComponentIds.push(...specCreatedIds);
+
+      /*
+       * P438: 関門A〜Cのどこで止まったかを実行ログで区別できるようにする。
+       * 台帳の record() と同じ材料（仕様の導出件数・候補の作成件数・却下
+       * 件数・合成の gapReason／blockedReason）を、失敗時に1行だけ出す。
+       * 読み方：specs=0 なら関門A（仕様が導出できていない）、specs>0
+       * かつ created=0 かつ rejections>0 なら関門C（レジストリで却下）、
+       * specs>0 かつ created=0 かつ rejections=0 なら関門B（材料が無く
+       * 候補が作れていない）、gapReason=CAPABILITY_GRAPH_UNAVAILABLE
+       * なら能力グラフ自体の空振り。composition がある成功時はこの
+       * 分岐に入らないため出ない。
+       */
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `[CandidateGeneration] ${runId}: specs=${missingComponentSpecs.length} created=${specCreatedIds.length} rejections=${specResult.rejections.length} gapReason=${synthesisPlan.source.gapReason || 'none'} blockedReason=${synthesisPlan.blockedReason || 'none'}`
+      );
 
       const reason=specCreatedIds.length>0
         ? 'MISSING_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION'

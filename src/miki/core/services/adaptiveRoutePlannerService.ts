@@ -1679,21 +1679,56 @@ class AdaptiveRoutePlannerService {
         }
       });
     } else if(!latestCandidate && readiness.candidateGenerationReady) {
-      routes.push({
-        target:'selfDevelopment',command:'GENERATE_CANDIDATE',
-        reason:'Core readiness assessment satisfied candidate-generation preconditions',
-        payload:{
-          taskId:task.taskId,runId:this.resolveCoreRunId(task,input),goal:task.goal,
-          candidateRevision:Number(input.candidateRevision||1),
-          targetFiles:coreTargetPaths,
-          astTransformations:specContractCompilerService.compileAllDeterministicAstOperations(task.goal,coreTargetPaths),
-          requirements:input.requirements,
-          prohibitions:input.prohibitions,
-          invariants:input.invariants,
-          validationRequirements:input.validationRequirements,
-          adaptive:true,priority:80
-        }
-      });
+      /*
+       * P438: P432 の再投入ガードと同じ条件を readiness 経路にも付ける。
+       * 前回の GENERATE_CANDIDATE が CODE_COMPOSITION_PLAN_UNAVAILABLE で
+       * 失敗してから VERIFIED な Component が1件も増えていない場合、
+       * 同じ生成を再投入しない。未検証の部品を組み立てて完成品扱いに
+       * する緩和は禁止する。増えていない場合は P432 ガードと同じく
+       * Research へ回し、部品の検証・供給を待つ。P432 ガードの変数
+       * （compositionUnavailable 等）は composition 分岐のスコープ内に
+       * あるため、ここでは同じヘルパーで取り直す。
+       */
+      const readinessCandidateGenerationErrorEntry=this.latestOperationErrorEntry(task,'GENERATE_CANDIDATE');
+      const readinessCompositionUnavailable=readinessCandidateGenerationErrorEntry.error.startsWith('CODE_COMPOSITION_PLAN_UNAVAILABLE');
+      if(readinessCompositionUnavailable && !this.hasVerifiedComponentAddedSince(task,readinessCandidateGenerationErrorEntry.index)){
+        routes.push({
+          target:'research',
+          command:'RUN_RESEARCH',
+          reason:'CORE withheld GENERATE_CANDIDATE re-dispatch after CODE_COMPOSITION_PLAN_UNAVAILABLE because no VERIFIED Component was added since the failure; staying on Research/component supply instead of blind retry',
+          payload:{
+            taskId:task.taskId,
+            query:buildCompositionGapMeaning({
+              goal:task.goal,
+              targetPaths:coreTargetPaths,
+              gapDescriptions:[],
+              gapReason:readinessCandidateGenerationErrorEntry.error,
+            }),
+            unresolvedComponents:[],
+            componentGap:true,
+            compositionGap:true,
+            gapDescriptions:[],
+            adaptive:true,
+            priority:94
+          }
+        });
+      } else {
+        routes.push({
+          target:'selfDevelopment',command:'GENERATE_CANDIDATE',
+          reason:'Core readiness assessment satisfied candidate-generation preconditions',
+          payload:{
+            taskId:task.taskId,runId:this.resolveCoreRunId(task,input),goal:task.goal,
+            candidateRevision:Number(input.candidateRevision||1),
+            targetFiles:coreTargetPaths,
+            astTransformations:specContractCompilerService.compileAllDeterministicAstOperations(task.goal,coreTargetPaths),
+            requirements:input.requirements,
+            prohibitions:input.prohibitions,
+            invariants:input.invariants,
+            validationRequirements:input.validationRequirements,
+            adaptive:true,priority:80
+          }
+        });
+      }
     } else if(
       latestCandidate &&
       this.lastOperationFailedAfter(

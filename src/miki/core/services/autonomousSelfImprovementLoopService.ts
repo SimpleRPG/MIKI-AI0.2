@@ -232,14 +232,28 @@ class AutonomousSelfImprovementLoopService {
     // AUTONOMOUS_DISCOVERY item; return an already-queued request
     // exactly like the duplicate path above. USER_REQUEST and other
     // non-discovery requests are never dropped by the cap.
+    // P438: the claim-event direct submit (domainIntegrationBootstrap:
+    // `claim.UNRESOLVED:<id>` / `claim.CONTRADICTED:<id>`, source SYSTEM,
+    // no runType) is the same class — the claim is also recorded as a
+    // discovery issue (recordContradiction), so refusing the direct
+    // item loses nothing: the discovery service dispatches it later
+    // as AUTONOMOUS_DISCOVERY. Without this, one VERIFY_RESEARCH_CLAIMS
+    // run enqueues one item per claim event and the queue grows past
+    // the cap in seconds (LOG_48: 197 -> 228 in ~16s).
+    const isCapGated =
+      source === 'SYSTEM' &&
+      (meta.runType === 'AUTONOMOUS_DISCOVERY' || trigger.startsWith('claim.'));
     if (
       this.state.queue.length >= MAX_QUEUE_LENGTH &&
-      source === 'SYSTEM' &&
-      meta.runType === 'AUTONOMOUS_DISCOVERY'
+      isCapGated
     ) {
       const lowest = this.state.queue.reduce((best, item) =>
         !best || (item.priority ?? 0) < (best.priority ?? 0) ? item : best,
         undefined as AutonomousImprovementRequest | undefined);
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `[RUNTIME] AutonomousLoop enqueue refused at cap: trigger=${truncateForLog(trigger, 80)} source=${source} runType=${meta.runType ?? '-'} queue=${this.state.queue.length}`,
+      );
       this.save();
       void this.drain();
       return { ...(lowest ?? this.state.queue[0]) };
@@ -1430,6 +1444,22 @@ class AutonomousSelfImprovementLoopService {
       !(item.payload && item.payload.claimContext !== undefined);
   }
 
+  // P438: load-time cap trim candidate — the same class the P432 cap
+  // refuses at enqueue (unstarted SYSTEM discovery items), minus the
+  // 24h age condition: a queue persisted by a pre-cap build can hold
+  // young items above the cap, and discovery re-derives them on a
+  // later scan. Attempted items, the active request and its task,
+  // claim-context carriers, and non-discovery requests are never
+  // trimmed.
+  private isCapTrimmable(item: AutonomousImprovementRequest, activeRequestId?: string, lastTaskId?: string): boolean {
+    return item.attempts === 0 &&
+      item.source === 'SYSTEM' &&
+      item.runType === 'AUTONOMOUS_DISCOVERY' &&
+      item.id !== activeRequestId &&
+      !(lastTaskId && item.taskId === lastTaskId) &&
+      !(item.payload && item.payload.claimContext !== undefined);
+  }
+
   private purgeStaleDiscoveryRequests(now: number): number {
     const before = this.state.queue.length;
     this.state.queue = this.state.queue.filter(item => !this.isStaleDiscoveryRequest(item, now, this.state.activeRequestId, this.state.lastTaskId));
@@ -1475,8 +1505,23 @@ class AutonomousSelfImprovementLoopService {
       if(this.isStaleDiscoveryRequest(item,loadNow,parsed.activeRequestId,parsed.lastTaskId)){staleDiscoveryPurgedCount+=1;return false;}
       return true;
     });
-    const droppedInvalid=this.lastLoadDroppedInvalid;this.state={...parsed,queue:activeQueue};
-    if(purgedCount>0||droppedInvalid>0||orphanedPurgedCount>0||staleDiscoveryPurgedCount>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;const parts:string[]=[];if(droppedInvalid>0)parts.push(`INVALID_REQUESTS_DROPPED:${droppedInvalid}`);if(purgedCount>0)parts.push(`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`);if(orphanedPurgedCount>0)parts.push(`ORPHANED_REQUESTS_PURGED:${orphanedPurgedCount}`);if(staleDiscoveryPurgedCount>0)parts.push(`STALE_DISCOVERY_REQUESTS_PURGED:${staleDiscoveryPurgedCount}`);this.state.lastReason=parts.join(':');if(orphanedPurgedCount>0||staleDiscoveryPurgedCount>0){systemLogger.info('SELF_IMPROVEMENT',`[RUNTIME] AutonomousLoop purge: orphaned=${orphanedPurgedCount} staleDiscovery=${staleDiscoveryPurgedCount} queue=${activeQueue.length}`);}try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
+    const droppedInvalid=this.lastLoadDroppedInvalid;
+    // P438: the P432 cap gates new enqueues, but a queue persisted by
+    // an older (pre-cap) build can already exceed it — LOG_48 restored
+    // 386 items and started at 196 after the purge above. Trim only
+    // unstarted discovery items (the same class the cap refuses) from
+    // the tail, so the restored queue starts at or under the cap when
+    // enough trimmable items exist, without touching user requests,
+    // attempted items, or in-flight work.
+    let capTrimmedCount=0;
+    if(activeQueue.length>MAX_QUEUE_LENGTH){
+      let over=activeQueue.length-MAX_QUEUE_LENGTH;
+      for(let i=activeQueue.length-1;i>=0&&over>0;i--){
+        if(this.isCapTrimmable(activeQueue[i],parsed.activeRequestId,parsed.lastTaskId)){activeQueue.splice(i,1);over-=1;capTrimmedCount+=1;}
+      }
+    }
+    this.state={...parsed,queue:activeQueue};
+    if(purgedCount>0||droppedInvalid>0||orphanedPurgedCount>0||staleDiscoveryPurgedCount>0||capTrimmedCount>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;const parts:string[]=[];if(droppedInvalid>0)parts.push(`INVALID_REQUESTS_DROPPED:${droppedInvalid}`);if(purgedCount>0)parts.push(`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`);if(orphanedPurgedCount>0)parts.push(`ORPHANED_REQUESTS_PURGED:${orphanedPurgedCount}`);if(staleDiscoveryPurgedCount>0)parts.push(`STALE_DISCOVERY_REQUESTS_PURGED:${staleDiscoveryPurgedCount}`);if(capTrimmedCount>0)parts.push(`CAP_TRIMMED:${capTrimmedCount}`);this.state.lastReason=parts.join(':');if(orphanedPurgedCount>0||staleDiscoveryPurgedCount>0||capTrimmedCount>0){systemLogger.info('SELF_IMPROVEMENT',`[RUNTIME] AutonomousLoop purge: orphaned=${orphanedPurgedCount} staleDiscovery=${staleDiscoveryPurgedCount} capTrimmed=${capTrimmedCount} queue=${activeQueue.length}`);}try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
   }
 }
 

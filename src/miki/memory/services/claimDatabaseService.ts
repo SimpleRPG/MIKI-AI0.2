@@ -197,10 +197,15 @@ export class ClaimDatabaseService {
 
     // 6.4 矛盾の早期検出
     const contradictions = this.detectContradictions(newClaim);
-    if (contradictions.length > 0) {
-      newClaim.contradicted_by = contradictions.map((c) => c.claim_id);
+    // P438: 出典・クラスタ／種別が違う「弱い矛盾」は DISPUTED にしない。
+    // contradicted_by にも relations にも入れず、ログにだけ残す。
+    const hardContradictions = contradictions.filter((c) => !c.suppressedReason);
+    const suppressedContradictions = contradictions.filter((c) => c.suppressedReason);
+    if (hardContradictions.length > 0) {
+      newClaim.contradicted_by = hardContradictions.map((c) => c.claim.claim_id);
       newClaim.status = 'DISPUTED';
-      for (const old of contradictions) {
+      for (const item of hardContradictions) {
+        const old = item.claim;
         if (!old.contradicted_by) old.contradicted_by = [];
         if (!old.contradicted_by.includes(claim_id)) old.contradicted_by.push(claim_id);
         this.relations.push({
@@ -212,7 +217,13 @@ export class ClaimDatabaseService {
       }
       systemLogger.warn(
         'SELF_IMPROVEMENT',
-        `⚠️ [6.4 矛盾検知] 主張 ${claim_id} と既存主張 [${newClaim.contradicted_by.join(', ')}] の間に矛盾を検出しました`
+        `⚠️ [6.4 矛盾検知] 主張 ${claim_id} と既存主張 [${newClaim.contradicted_by.join(', ')}] の間に矛盾を検出しました pair=${hardContradictions.map((c) => c.matchedPair).join(', ')}`
+      );
+    }
+    if (suppressedContradictions.length > 0) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🔎 [6.4 弱い矛盾] 主張 ${claim_id} と既存主張 [${suppressedContradictions.map((c) => c.claim.claim_id).join(', ')}] は対立語（pair=${suppressedContradictions.map((c) => c.matchedPair).join(', ')}）が一致しましたが、${suppressedContradictions.map((c) => c.suppressedReason).join('／')} のため DISPUTED にしませんでした`
       );
     }
 
@@ -264,7 +275,7 @@ export class ClaimDatabaseService {
     const existingConfidence=Math.round(Math.max(0,Math.min(100,statusScore(existing)+maturityScore(existing)/4+(existingClusters.length>0?10:0)))*100)/100;
     const candidateConfidence=Math.round(Math.max(0,Math.min(100,statusScore(candidate)+maturityScore(candidate)/4+evidenceQuality*20+(independentEvidenceClusters.length>0?15:0)+(candidateVerified?15:0)))*100)/100;
 
-    const contradiction=this.detectContradictions(candidate).some(x=>x.claim_id===existing.claim_id)
+    const contradiction=this.detectContradictions(candidate).some(x=>!x.suppressedReason && x.claim.claim_id===existing.claim_id)
       || existing.contradicted_by?.includes(candidate.claim_id)
       || candidate.contradicted_by?.includes(existing.claim_id);
 
@@ -346,9 +357,14 @@ export class ClaimDatabaseService {
 
   /**
    * 6.4 矛盾検出ロジック (決定論的・非LLM)
+   *
+   * P438: 返り値を「一致した対立語ペア」と「抑制理由」を含む形に変えた。
+   * 出典・クラスタが異なるペア（話題が違う可能性が高い）は DISPUTED に
+   * せず、「弱い矛盾」として suppressedReason 付きで返す。信号は捨てず、
+   * 呼び出し側がログに残す。kind が異なる場合も同様に弱い矛盾扱いにする。
    */
-  public detectContradictions(candidate: ClaimRecord): ClaimRecord[] {
-    const contradictoryList: ClaimRecord[] = [];
+  public detectContradictions(candidate: ClaimRecord): Array<{ claim: ClaimRecord; matchedPair: string; suppressedReason?: string }> {
+    const contradictoryList: Array<{ claim: ClaimRecord; matchedPair: string; suppressedReason?: string }> = [];
     const candStmt = candidate.statement.toLowerCase();
 
     for (const [, existing] of this.claims) {
@@ -359,7 +375,7 @@ export class ClaimDatabaseService {
         // 但し、同一エンティティについて現実と創作を混同している発言は警告
         if (candidate.world === 'REAL' && existing.world === 'FICTION') {
           if (candStmt.includes(existing.statement.toLowerCase())) {
-            contradictoryList.push(existing);
+            contradictoryList.push({ claim: existing, matchedPair: '世界区分の混同' });
           }
         }
         continue;
@@ -367,28 +383,70 @@ export class ClaimDatabaseService {
 
       // 同一世界内での論理的否定・対立検出
       const existingStmt = existing.statement.toLowerCase();
-      const isOppositeCondition =
-        (this.hasBoundaryTerm(candStmt, '発生する') && this.hasBoundaryTerm(existingStmt, '発生しない')) ||
-        (this.hasBoundaryTerm(candStmt, '発生しない') && this.hasBoundaryTerm(existingStmt, '発生する')) ||
-        (this.hasBoundaryTerm(candStmt, 'できない') && this.hasBoundaryTerm(existingStmt, 'できる')) ||
-        (this.hasBoundaryTerm(candStmt, 'できる') && this.hasBoundaryTerm(existingStmt, 'できない')) ||
-        (this.hasBoundaryTerm(candStmt, '高速化する') && this.hasBoundaryTerm(existingStmt, '低速化する')) ||
-        (this.hasBoundaryTerm(candStmt, '低速化する') && this.hasBoundaryTerm(existingStmt, '高速化する')) ||
-        (this.hasBoundaryTerm(candStmt, '推奨') && this.hasBoundaryTerm(existingStmt, '非推奨')) ||
-        (this.hasBoundaryTerm(candStmt, '非推奨') && this.hasBoundaryTerm(existingStmt, '推奨')) ||
-        (this.hasBoundaryTerm(candStmt, '真') && this.hasBoundaryTerm(existingStmt, '偽')) ||
-        (this.hasBoundaryTerm(candStmt, '偽') && this.hasBoundaryTerm(existingStmt, '真'));
+      const matchedPair = this.matchedOppositePair(candStmt, existingStmt);
 
-      if (isOppositeCondition) {
+      if (matchedPair) {
         // スコープが完全重複しているか確認
         const scopeOverlap = this.isScopeOverlapping(candidate.scope, existing.scope);
         if (scopeOverlap) {
-          contradictoryList.push(existing);
+          // P438: 出典・クラスタ／種別による話題の区別。出典が違う
+          // ペアは「矛盾」と断定せず弱い矛盾として残す。
+          const suppressedReason = this.topicMismatchReason(candidate, existing);
+          contradictoryList.push(
+            suppressedReason
+              ? { claim: existing, matchedPair, suppressedReason }
+              : { claim: existing, matchedPair }
+          );
         }
       }
     }
 
     return contradictoryList;
+  }
+
+  /**
+   * P438: 一致した対立語ペアを1つ返す。一致がなければ '' を返す。
+   * 10通りのペアは P436 時点のものと同じ。
+   */
+  private matchedOppositePair(candStmt: string, existingStmt: string): string {
+    const pairs: Array<[string, string, string]> = [
+      ['発生する', '発生しない', '発生する／発生しない'],
+      ['できない', 'できる', 'できない／できる'],
+      ['高速化する', '低速化する', '高速化する／低速化する'],
+      ['推奨', '非推奨', '推奨／非推奨'],
+      ['真', '偽', '真／偽'],
+    ];
+    for (const [a, b, label] of pairs) {
+      if (
+        (this.hasBoundaryTerm(candStmt, a) && this.hasBoundaryTerm(existingStmt, b)) ||
+        (this.hasBoundaryTerm(candStmt, b) && this.hasBoundaryTerm(existingStmt, a))
+      ) {
+        return label;
+      }
+    }
+    return '';
+  }
+
+  /**
+   * P438: 話題が違う可能性が高いペアかどうかを、出典・クラスタと種別
+   * で判定する。研究経路の主張では independence_cluster_id が
+   * `cluster_${origin_source_id}` になるため、クラスタの違いは出典の
+   * 違いとほぼ同義。抑制する場合は理由文を返し、しない場合は undefined。
+   * 「矛盾がないと断定する」のではなく「このペアだけでは矛盾と断定
+   * しない」という扱いであり、未検証のものを検証済みとして扱う変更
+   * ではない。
+   */
+  private topicMismatchReason(candidate: ClaimRecord, existing: ClaimRecord): string | undefined {
+    if (candidate.kind !== existing.kind) {
+      return `種別不一致（${candidate.kind} vs ${existing.kind}）`;
+    }
+    if (
+      candidate.independence_cluster_id !== existing.independence_cluster_id &&
+      candidate.origin_source_id !== existing.origin_source_id
+    ) {
+      return `出典不一致（${candidate.independence_cluster_id || 'unknown'} vs ${existing.independence_cluster_id || 'unknown'}）`;
+    }
+    return undefined;
   }
 
   /**
@@ -400,8 +458,17 @@ export class ClaimDatabaseService {
    * あれば、その出現は対立語としての使用とみなす。
    * 「推奨」は直前に「非」が付く出現（＝「非推奨」）を「推奨」として
    * 数えない。完全な解決にはならないが、誤検出を減らすための絞り込みである。
+   *
+   * P438: 独立語（推奨／非推奨、真／偽、発生する／発生しない、
+   * 高速化する／低速化する）に限定して、直前の文字も見る両側チェック
+   * を足す。対立語が別の語の末尾として使われている出現を除外する。
+   * 「できる／できない」は動詞の接尾辞として正しく使われるため、
+   * 前方境界チェックは適用しない。
    */
   private hasBoundaryTerm(statement: string, term: string): boolean {
+    // P438: 両側チェックの対象は独立語に限定する。
+    const twoSidedTerms = new Set(['推奨', '非推奨', '真', '偽', '発生する', '発生しない', '高速化する', '低速化する']);
+    const checkBefore = twoSidedTerms.has(term);
     let index = statement.indexOf(term);
     while (index >= 0) {
       if (term === '推奨' && index > 0 && statement[index - 1] === '非') {
@@ -415,6 +482,16 @@ export class ClaimDatabaseService {
         'はがをにへともでかのはやよなさ'.includes(after) ||
         after === 'す' || after === 'し' || after === 'せ'
       ) {
+        if (checkBefore && index > 0) {
+          const before = statement[index - 1];
+          const beforeOk =
+            /[\s、。！？「」『』（）［］｛｝・…—―,.;:!?]/.test(before) ||
+            'はがをにへともでかのはや'.includes(before);
+          if (!beforeOk) {
+            index = statement.indexOf(term, index + term.length);
+            continue;
+          }
+        }
         return true;
       }
       index = statement.indexOf(term, index + term.length);
