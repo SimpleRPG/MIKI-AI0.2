@@ -1250,13 +1250,23 @@ export class AutonomousSearchService {
 
     const providerLabel = (provider: SearchProviderName): string =>
       provider === 'searxng' ? 'SearXNG' : provider === 'wikipedia' ? 'Wikipedia' : 'OpenAlex';
+    // P436: 冷却中の検索で補助が拾ったかどうかが要約に残らないため、
+    // 各Providerの状態の内訳を要約に載せる。冷却そのものを減らす
+    // 変更（発射間隔の延長など）は行わない。
+    const providerSummary = (['searxng', 'wikipedia', 'openalex'] as SearchProviderName[])
+      .map((provider) => {
+        const record = providerStatuses[provider];
+        return `${providerLabel(provider)}:${record.status}${record.error ? `（${record.error}）` : ''}`;
+      })
+      .join('／');
+    const baseSummary =
+      mergedResults[0]?.snippet ||
+      (successfulProviders.length
+        ? `「${safeQuery}」について${successfulProviders.map(providerLabel).join('・')}から候補を取得しました。`
+        : `「${safeQuery}」について結果を取得できませんでした。`);
     const result: AutonomousSearchExecutionResult = {
       results: mergedResults,
-      summary:
-        mergedResults[0]?.snippet ||
-        (successfulProviders.length
-          ? `「${safeQuery}」について${successfulProviders.map(providerLabel).join('・')}から候補を取得しました。`
-          : `「${safeQuery}」について結果を取得できませんでした。`),
+      summary: `${baseSummary}（${providerSummary}）`,
       provider: successfulProviders[0] || 'searxng',
       providers: successfulProviders,
       providerStatuses,
@@ -1280,8 +1290,8 @@ export class AutonomousSearchService {
       // limiting cause stays readable in the run detail (and in the
       // WAITING_EVIDENCE record) instead of only in this log stream.
       summary: emptyReason
-        ? `「${safeQuery}」の検索に失敗しました。空の理由: ${emptyReason}（各Providerの状態はproviderStatusesを参照）。`
-        : `「${safeQuery}」の検索に失敗しました（各Providerの状態はproviderStatusesを参照）。`,
+        ? `「${safeQuery}」の検索に失敗しました。空の理由: ${emptyReason}（${providerSummary}）。`
+        : `「${safeQuery}」の検索に失敗しました（${providerSummary}）。`,
     };
   }
 
@@ -1316,8 +1326,24 @@ export class AutonomousSearchService {
   }>> {
     const maxPages = Math.max(1, Math.min(3, options?.maxPages ?? 2));
     const readStartedAt = Date.now();
+    // P436: PDF は HeadlessWebView（描画経由）の取得対象から外す。
+    // 巨大な PDF を10秒で描画して読むのは事実上無理があり、失敗1件
+    // あたり10秒を直列で消費する。素の fetch での PDF テキスト抽出は
+    // この経路にはないため、取得は行わずスニペットのみで扱う。
+    // 失敗ではなく意図的なスキップのため、失敗URL記憶には残さない。
+    const isPdfUrl = (url: string): boolean => {
+      try {
+        return new URL(url).pathname.toLowerCase().endsWith('.pdf');
+      } catch {
+        return url.split(/[?#]/)[0]?.toLowerCase().endsWith('.pdf') ?? false;
+      }
+    };
+    const pdfSkipped = results.filter(
+      (r) => typeof r.url === 'string' && /^https?:\/\//i.test(r.url) && isPdfUrl(r.url),
+    );
     const readable = results
       .filter((r) => typeof r.url === 'string' && /^https?:\/\//i.test(r.url))
+      .filter((r) => !isPdfUrl(r.url!))
       .filter((r) => {
         // P432: skip a URL that failed recently; forget it once the
         // memory window has passed so it can be tried again later.
@@ -1362,10 +1388,22 @@ export class AutonomousSearchService {
       }
     }
 
+    // P436: スキップした PDF は取得なしの結果として残す。利用側は
+    // success:false のため本文抽出を飛ばし、スニペットだけが残る。
+    for (const result of pdfSkipped) {
+      outputs.push({
+        result,
+        success: false,
+        text: '',
+        url: result.url!,
+        error: 'PDF_SKIPPED: PDFは描画経由の取得対象外のため、スニペットのみで扱います',
+      });
+    }
+
     const successCount = outputs.filter((o) => o.success && o.text.trim()).length;
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `📖 [Research Read] 「${query}」の検索結果${readable.length}件を読み取り、${successCount}件の本文取得に成功`
+      `📖 [Research Read] 「${query}」の検索結果${readable.length}件を読み取り、${successCount}件の本文取得に成功${pdfSkipped.length > 0 ? `（PDF ${pdfSkipped.length}件は描画対象外のためスキップ）` : ''}`
     );
     return outputs;
   }

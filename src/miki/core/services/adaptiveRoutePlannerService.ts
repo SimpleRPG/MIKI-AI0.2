@@ -1468,7 +1468,7 @@ class AdaptiveRoutePlannerService {
         : undefined;
 
     const latestCodeComponentVerificationStatus =
-      String(latestCodeComponentVerificationValue?.status || '').toUpperCase();
+      this.replyResultStatus(latestCodeComponentVerificationValue);
 
     const codeComponentVerificationWaiting =
       createdCodeComponentIds.length > 0 &&
@@ -2902,6 +2902,33 @@ class AdaptiveRoutePlannerService {
     return objectValue(task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')||({} as BlackboardEntry))||{};
   }
 
+  /*
+   * P436: ブラックボードの dispatch 結果エントリから状態を読む。
+   * エントリ値は {schemaVersion, ..., operation, ..., reply: normalized}
+   * で、トップレベルに status はない。状態は reply.normalized.status
+   * か reply.data.status（domain 結果の status）、または reply.status
+   * （normalized そのもの）の中にある。isSuccessfulOperationEntry と
+   * 同じ reply 経由の読み方にそろえる。
+   */
+  private replyResultStatus(value:Record<string,unknown>|undefined):string {
+    if(!value) return '';
+    const reply=value.reply&&typeof value.reply==='object'&&!Array.isArray(value.reply)
+      ? value.reply as Record<string,unknown>
+      : undefined;
+    if(reply){
+      const normalized=reply.normalized&&typeof reply.normalized==='object'&&!Array.isArray(reply.normalized)
+        ? reply.normalized as Record<string,unknown>
+        : undefined;
+      if(normalized&&typeof normalized.status==='string'&&normalized.status.trim()) return normalized.status.toUpperCase();
+      const data=reply.data&&typeof reply.data==='object'&&!Array.isArray(reply.data)
+        ? reply.data as Record<string,unknown>
+        : undefined;
+      if(data&&typeof data.status==='string'&&data.status.trim()) return data.status.toUpperCase();
+      if(typeof reply.status==='string'&&reply.status.trim()) return reply.status.toUpperCase();
+    }
+    return String(value.status||'').toUpperCase();
+  }
+
   private isSuccessfulOperationEntry(entry:BlackboardEntry,operation:string):boolean {
     const value=objectValue(entry);
     if(!value||String(value.operation||'')!==operation)return false;
@@ -3231,7 +3258,7 @@ class AdaptiveRoutePlannerService {
       const value=objectValue(entry);
       const operation=String(value?.operation||'');
       if(operation==='VERIFY_CODE_COMPONENT'){
-        const status=String(value?.status||'').toUpperCase();
+        const status=this.replyResultStatus(value);
         if(['SUCCEEDED','DEVICE_TESTED','VERIFIED'].includes(status)) return true;
         continue;
       }

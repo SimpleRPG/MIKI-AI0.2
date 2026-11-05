@@ -368,16 +368,16 @@ export class ClaimDatabaseService {
       // 同一世界内での論理的否定・対立検出
       const existingStmt = existing.statement.toLowerCase();
       const isOppositeCondition =
-        (candStmt.includes('発生する') && existingStmt.includes('発生しない')) ||
-        (candStmt.includes('発生しない') && existingStmt.includes('発生する')) ||
-        (candStmt.includes('できない') && existingStmt.includes('できる')) ||
-        (candStmt.includes('できる') && existingStmt.includes('できない')) ||
-        (candStmt.includes('高速化する') && existingStmt.includes('低速化する')) ||
-        (candStmt.includes('低速化する') && existingStmt.includes('高速化する')) ||
-        (candStmt.includes('推奨') && existingStmt.includes('非推奨')) ||
-        (candStmt.includes('非推奨') && existingStmt.includes('推奨')) ||
-        (candStmt.includes('真') && existingStmt.includes('偽')) ||
-        (candStmt.includes('偽') && existingStmt.includes('真'));
+        (this.hasBoundaryTerm(candStmt, '発生する') && this.hasBoundaryTerm(existingStmt, '発生しない')) ||
+        (this.hasBoundaryTerm(candStmt, '発生しない') && this.hasBoundaryTerm(existingStmt, '発生する')) ||
+        (this.hasBoundaryTerm(candStmt, 'できない') && this.hasBoundaryTerm(existingStmt, 'できる')) ||
+        (this.hasBoundaryTerm(candStmt, 'できる') && this.hasBoundaryTerm(existingStmt, 'できない')) ||
+        (this.hasBoundaryTerm(candStmt, '高速化する') && this.hasBoundaryTerm(existingStmt, '低速化する')) ||
+        (this.hasBoundaryTerm(candStmt, '低速化する') && this.hasBoundaryTerm(existingStmt, '高速化する')) ||
+        (this.hasBoundaryTerm(candStmt, '推奨') && this.hasBoundaryTerm(existingStmt, '非推奨')) ||
+        (this.hasBoundaryTerm(candStmt, '非推奨') && this.hasBoundaryTerm(existingStmt, '推奨')) ||
+        (this.hasBoundaryTerm(candStmt, '真') && this.hasBoundaryTerm(existingStmt, '偽')) ||
+        (this.hasBoundaryTerm(candStmt, '偽') && this.hasBoundaryTerm(existingStmt, '真'));
 
       if (isOppositeCondition) {
         // スコープが完全重複しているか確認
@@ -389,6 +389,37 @@ export class ClaimDatabaseService {
     }
 
     return contradictoryList;
+  }
+
+  /**
+   * P436: 対立語の一致は部分文字列ではなく語境界付きで行う。
+   * 「信頼できる」の「できる」や「できるだけ」の「できる」のような、
+   * 別の語の一部としての出現を除外する。日本語の形態素解析は重いため、
+   * 出現の直後の文字で判定する簡易な境界チェックとする。直後が文末・
+   * 句読点・空白・助詞・動詞「する」の活用（す／し／せ）のいずれかで
+   * あれば、その出現は対立語としての使用とみなす。
+   * 「推奨」は直前に「非」が付く出現（＝「非推奨」）を「推奨」として
+   * 数えない。完全な解決にはならないが、誤検出を減らすための絞り込みである。
+   */
+  private hasBoundaryTerm(statement: string, term: string): boolean {
+    let index = statement.indexOf(term);
+    while (index >= 0) {
+      if (term === '推奨' && index > 0 && statement[index - 1] === '非') {
+        index = statement.indexOf(term, index + term.length);
+        continue;
+      }
+      const after = statement[index + term.length];
+      if (
+        after === undefined ||
+        /[\s、。！？「」『』（）［］｛｝・…—―,.;:!?]/.test(after) ||
+        'はがをにへともでかのはやよなさ'.includes(after) ||
+        after === 'す' || after === 'し' || after === 'せ'
+      ) {
+        return true;
+      }
+      index = statement.indexOf(term, index + term.length);
+    }
+    return false;
   }
 
   /**

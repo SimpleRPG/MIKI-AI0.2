@@ -51,7 +51,14 @@ export interface CandidateGenerationGapContract {
   missingSlots:Array<{ knowledgeId:string; slotName:string; inputKinds:string[] }>;
   missingComponentIds:string[];
 }
-export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; createdCodeComponentIds?:string[]; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
+export interface CandidateGenerationOutcome { accepted:boolean; runId:string; workspaceId?:string; files:CandidateGenerationFile[]; reasons:string[]; responseHash?:string; attemptCount?:number; createdCodeComponentIds?:string[]; supplyEvidenceIds?:string[]; learningLineage?:{sourcePackageId?:string;externalReviewId?:string;candidateRevision:number;requestedChanges:string[];userReason?:string;usedLearningArtifactIds:string[];ignoredLearningArtifactIds:string[];appliedFailurePatternIds:string[];appliedCorrectionPairIds:string[];appliedComponentPatternIds:string[];learningContextSha256:string;componentPackId?:string;usedKnowledgeComponentIds?:string[];usedCodeComponentIds?:string[];usedConversationComponentIds?:string[];excludedComponentIds?:string[];componentContextSha256?:string}; }
+
+/*
+ * P436: 不足部品の候補作成時に、レジストリの判定で却下された理由の記録。
+ * 「仕様が導出できなかった」と「仕様はあったが EXTEND／DUPLICATE／
+ * REUSE で却下された」とを、生成台帳と gap の記録で区別するためのもの。
+ */
+export interface MissingComponentCandidateRejection { kind:'ADAPTER'|'SPEC'; specName:string; targetPath:string; decision:string; reason:string; matchedRegistryComponentId?:string; }
 class CandidateCodeGenerationService {
  async generate(runId:string):Promise<CandidateGenerationOutcome>{
   const run=improvementIntakeRouterService.get(runId);if(!run)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};
@@ -1246,7 +1253,7 @@ class CandidateCodeGenerationService {
        * （VALIDATE_CANDIDATE → Regression → Canary → VERIFIED）が
        * 駆動する。作れなければ従来どおりResearch／教師供給へ回す。
        */
-      const specCreatedIds=this.buildMissingComponentCandidates({
+      const specResult=this.buildMissingComponentCandidates({
         objective:run.objective,
         specs:missingComponentSpecs,
         materials:unknownContext.implementationMaterials,
@@ -1260,6 +1267,21 @@ class CandidateCodeGenerationService {
           ...this.failedCandidateContents(failureFeedback),
         ],
       });
+      const specCreatedIds=specResult.createdIds;
+      /*
+       * P436: 却下された理由を gap の OBSERVATION に残す。
+       * 「仕様が導出できなかった」と「仕様はあったが EXTEND／
+       * DUPLICATE／REUSE で却下された」とを、ログ上で区別できる
+       * ようにする。台帳への記録は下の record() で行う。
+       */
+      if(run.taskId&&specResult.rejections.length>0){
+        taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGapRejections',{
+          operation:'GENERATE_CANDIDATE',
+          runId,
+          reason:'MISSING_COMPONENT_CANDIDATE_REJECTED',
+          rejections:specResult.rejections,
+        },[]);
+      }
       createdCodeComponentIds.push(...specCreatedIds);
 
       const reason=specCreatedIds.length>0
@@ -1268,12 +1290,18 @@ class CandidateCodeGenerationService {
           ? 'NEW_CODE_COMPONENT_CANDIDATE_CREATED_AWAITING_VERIFICATION'
           : 'CODE_COMPOSITION_PLAN_UNAVAILABLE';
 
+      // P436: 受入時に登録された受入証拠を、生成の返却に含める。
+      // 学習の発動は VALIDATE_CANDIDATE 経由のまま（sources に
+      // selfDevelopment は足さない）。
+      const supplyEvidenceIds=this.strings(run.payload.supplyEvidenceIds);
       this.record(runId,{
         attemptCount:1,
         status:'BLOCKED',
         reason,
         createdCodeComponentIds,
         missingComponentSpecs,
+        missingComponentRejections:specResult.rejections,
+        supplyEvidenceIds,
         unknownContext,
         responseHash:canonicalSha256(JSON.stringify({
           runId,
@@ -1291,7 +1319,8 @@ class CandidateCodeGenerationService {
         files:[],
         reasons:[reason],
         attemptCount:1,
-        createdCodeComponentIds
+        createdCodeComponentIds,
+        supplyEvidenceIds
       };
     }
 
@@ -1565,9 +1594,10 @@ class CandidateCodeGenerationService {
   targetPaths:string[];
   validationRequirements:string[];
   usedContents:string[];
- }):string[]{
+ }):{createdIds:string[];rejections:MissingComponentCandidateRejection[]}{
   const createdIds:string[]=[];
-  if(input.specs.length===0)return createdIds;
+  const rejections:MissingComponentCandidateRejection[]=[];
+  if(input.specs.length===0)return {createdIds,rejections};
   const targetByPath=new Map(input.targetFiles.map(file=>[file.path,file]));
   const used=new Set(input.usedContents.map(content=>content.trim()).filter(Boolean));
   for(const spec of input.specs){
@@ -1598,6 +1628,19 @@ class CandidateCodeGenerationService {
       if(created.accepted&&created.componentId){
         createdIds.push(created.componentId);
         continue;
+      }
+      // P436: レジストリの判定で却下された理由を残す。accepted が
+      // false の場合のみ記録し、材料の使い回し（used）による
+      // スキップは却下ではないため記録しない。
+      if(!created.accepted){
+        rejections.push({
+          kind:'ADAPTER',
+          specName:spec.name,
+          targetPath:spec.targetPath,
+          decision:created.decision||'',
+          reason:created.reason||'',
+          ...(created.matchedRegistryComponentId?{matchedRegistryComponentId:created.matchedRegistryComponentId}:{}),
+        });
       }
     }
 
@@ -1641,13 +1684,23 @@ class CandidateCodeGenerationService {
           createdIds.push(created.componentId);
           used.add(code);
           createdForSpec=true;
+        }else if(!created.accepted){
+          // P436: レジストリの判定で却下された理由を残す。
+          rejections.push({
+            kind:'SPEC',
+            specName:spec.name,
+            targetPath:path,
+            decision:created.decision||'',
+            reason:created.reason||'',
+            ...(created.matchedRegistryComponentId?{matchedRegistryComponentId:created.matchedRegistryComponentId}:{}),
+          });
         }
         break;
       }
       if(createdForSpec)break;
     }
   }
-  return createdIds;
+  return {createdIds,rejections};
  }
 
  private buildGapContract(targetPaths:string[],constructionGapRequirements:string[]):CandidateGenerationGapContract|undefined{

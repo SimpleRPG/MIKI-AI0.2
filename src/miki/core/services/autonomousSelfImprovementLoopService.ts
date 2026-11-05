@@ -222,6 +222,12 @@ class AutonomousSelfImprovementLoopService {
     // reject. A blank trigger can only produce a meaningless task, so
     // it is refused here; out-of-range optional fields are sanitized.
     if (!trigger || !trigger.trim()) throw new Error('AUTONOMOUS_LOOP_TRIGGER_REQUIRED');
+    // P436: 上限で断る前に、drain と同じ述語で古い発見リクエストを
+    // 先に掃除する。enqueue は同期のため drain() の完了は待てないが、
+    // purgeStaleDiscoveryRequests は同期で、掃除時は自身で保存する。
+    // 空きができればこのまま追加へ進み、上限到達の瞬間に来た発見
+    // リクエストの取りこぼしを防ぐ。
+    this.purgeStaleDiscoveryRequests(Date.now());
     // P432: at the cap, do not add another unstarted SYSTEM
     // AUTONOMOUS_DISCOVERY item; return an already-queued request
     // exactly like the duplicate path above. USER_REQUEST and other

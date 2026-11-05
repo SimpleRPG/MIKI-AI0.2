@@ -597,6 +597,24 @@ class DomainIntegrationBootstrapService{
    const succeeded=results.length>0 && results.every(x=>x.status==='DEVICE_TESTED'||x.status==='VERIFIED');
    const failed=results.some(x=>x.status==='FAILED');
 
+   // P436: 検証の梯子が実機で回ったことをログで確認できるよう、
+   // 部品IDと到達状態を1行残す（検証コードの追加ではない）。
+   systemLogger.info('SELF_IMPROVEMENT',`🧩 [VerifyCodeComponent] ${componentIds.join(',')}: ${results.map(r=>`${r.componentId}=${r.status}`).join(', ')}`);
+
+   // P436: 検証の実行自体を EXECUTION 証拠として登録し、その id を
+   // 返却に載せる（VALIDATE_CANDIDATE の P369 と同じ手口）。載せないと
+   // 成功時の返却が証拠 0 件になり、契約で
+   // BUSINESS_SUCCESS_EVIDENCE_REQUIRED として無効になり、梯子の完了
+   // シグナルだけが消える。
+   const verifyEvidence=EvidenceService.getInstance().recordExecutionEvidence({
+     title:`Code component verification ${succeeded?'SUCCEEDED':failed?'FAILED':'WAITING_EXECUTION'}: ${componentIds.join(',')}`,
+     snippet:JSON.stringify({componentIds,statuses:results.map(r=>`${r.componentId}=${r.status}`)}).slice(0,4000),
+     source:'domainIntegrationBootstrapService',
+     sourceId:decisionId||'',
+     independenceClusterId:`code_component_verification_${decisionId||componentIds.join('_')}`,
+     metadata:{component_id:'domainIntegrationBootstrapService',passed:succeeded,environment,runner:'core-domain-handler',observed_at:Date.now(),result_summary:succeeded?'Code component verification succeeded':failed?'Code component verification failed':'Code component verification waiting execution',assertion_status:succeeded?'PASS':'FAIL'}
+   });
+
    return done({
      operation:'VERIFY_CODE_COMPONENT',
      operationClass:'BUSINESS',
@@ -604,7 +622,7 @@ class DomainIntegrationBootstrapService{
      componentIds,
      results,
      taskId:decisionId||undefined,
-     evidenceIds:[]
+     evidenceIds:[verifyEvidence.evidence_id]
    });
   }
 
@@ -691,7 +709,7 @@ class DomainIntegrationBootstrapService{
        command:envelope.command,
        status:awaitingVerification?'PENDING_VERIFICATION':'FAILED',
        error:awaitingVerification?undefined:(result.reasons.join('|')||'CANDIDATE_GENERATION_FAILED'),
-       result:{operation:'GENERATE_CANDIDATE',operationClass:'BUSINESS',...result,runId:run.runId,evidenceIds:[]},
+       result:{operation:'GENERATE_CANDIDATE',operationClass:'BUSINESS',...result,runId:run.runId,evidenceIds:[...(result.supplyEvidenceIds||[])]},
        completedAt:Date.now()
      };
    }

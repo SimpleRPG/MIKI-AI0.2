@@ -544,6 +544,12 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
 
     // 3. 仕様・目的の類似度検査
     for (const [id, comp] of this.components) {
+      // P436: 検証に失敗して REJECTED になった部品や、置き換え済み
+      // (SUPERSEDED) の部品は、EXTEND／REUSE の相手にしない。
+      // 残しておくと、そのファイルへの新規候補が恒久的に止められて
+      // しまう。DEPRECATED は一度 VERIFIED になった部品のため対象に残す。
+      // ハッシュ一致の DUPLICATE 判定（1・2段階）は変えない。
+      if (comp.status === 'REJECTED' || comp.status === 'SUPERSEDED') continue;
       if (comp.entry_point === params.entryPoint) {
         return {
           decision: 'EXTEND',

@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { evidenceService } from '../../memory/services/evidenceService';
 import { componentSupplyRequestService } from './componentSupplyRequestService';
 import { improvementIntakeRouterService, type ImprovementIntakeRun } from './improvementIntakeRouterService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
@@ -550,6 +551,26 @@ class ComponentSupplyIntakeService {
         if (carried.length > 0) payload[key] = carried;
       }
     }
+
+    // P436: 受入記録自体を EXECUTION 証拠として登録し、run payload に
+    // 載せる。P369 と同じ手口（検証実行証拠の登録）。受入の事実が証拠
+    // として残り、生成の返却に含められるようになる。登録に失敗しても
+    // 受入自体は止めない（証拠なしの従来どおりの payload で進む）。
+    // 学習の発動は VALIDATE_CANDIDATE 経由のまま（sources に
+    // selfDevelopment は足さない）。
+    const supplyEvidenceIds: string[] = [];
+    try {
+      const supplyEvidence = evidenceService.recordExecutionEvidence({
+        title: `部品供給の受入 ${intakeId}`,
+        snippet: `供給要求 ${requestId} の返却パッケージ ${sourceFileName} を受け付け、候補 ${implementationCandidates.length} 件を検証待ちとして新規実行へ接続した（供給者: ${supplier.name}）。`,
+        source: 'component_supply_intake',
+        sourceId: intakeId,
+      });
+      supplyEvidenceIds.push(supplyEvidence.evidence_id);
+    } catch {
+      // 証拠の登録に失敗しても受入は続ける。
+    }
+    if (supplyEvidenceIds.length > 0) payload.supplyEvidenceIds = supplyEvidenceIds;
 
     let run: ImprovementIntakeRun;
     try {
