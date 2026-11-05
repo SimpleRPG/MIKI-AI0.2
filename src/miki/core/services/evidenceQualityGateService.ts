@@ -1,4 +1,4 @@
-import type { BlackboardTask } from './taskBlackboardService';
+import { unresolvedTaskErrors, type BlackboardTask } from './taskBlackboardService';
 import { evidenceService, type EvidenceRecord } from '../../memory/services/evidenceService';
 import { coreLineageReadModelService } from './coreLineageReadModelService';
 import { domainReplyLedgerService } from './domainReplyLedgerService';
@@ -50,7 +50,16 @@ class EvidenceQualityGateService{
   const hasVerifiedExecution=verifiedExecutionEvidenceIds.length>0;
   const independentSupport=hasIndependentResearch||hasVerifiedExecution;
   const hasResult=task.entries.some(entry=>entry.kind==='RESULT');
-  const hasError=task.entries.some(entry=>entry.kind==='ERROR');
+  // P431 R1: the error test uses the same recoverable semantics as
+  // the planning and completion gates (unresolvedTaskErrors): an
+  // ERROR that a later successful result superseded no longer
+  // blocks. The previous raw existence check
+  // (entries.some(kind === 'ERROR')) made the gate permanently
+  // unpassable for any task that had ever recorded a failure --
+  // generation failures are recorded as ERROR entries, so one failed
+  // generation vetoed completion forever, while the other gates had
+  // already accepted the recovery.
+  const hasError=unresolvedTaskErrors(task).length>0;
   const reasons:string[]=[];let score=0;
   if(hasUsableEvidence)score+=35;
   else if(evidenceIds.length===0)reasons.push('EVIDENCE_ID_MISSING');

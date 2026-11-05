@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1753,
     "sourceFileCount": 1306,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1219,
-    "relativeImportCandidateCount": 3687,
-    "resolvedRelativeImportCandidateCount": 3670,
+    "relativeImportCandidateCount": 3688,
+    "resolvedRelativeImportCandidateCount": 3671,
     "unresolvedRelativeImportCandidateCount": 17
   },
   "records": [
@@ -12469,9 +12469,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousIssueDiscoveryService.ts",
-      "bytes": 42017,
-      "lines": 710,
-      "sha256": "946e079e83a53aa27a5e80fb2bc2b41441bb0e92622b15b2d9e680e93f11f401",
+      "bytes": 42971,
+      "lines": 724,
+      "sha256": "8d32fe3e8c8bf01c66bad9e4825476608039f1e17cf1855c5075f22f62fa5e49",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12553,20 +12553,26 @@
         },
         {
           "line": 14,
+          "specifier": "../../memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 15,
           "specifier": "../../../types/evidenceSelfImprovementTypes",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types/evidenceSelfImprovementTypes.ts"
         }
       ],
-      "relativeImportCandidateCount": 14,
-      "resolvedRelativeImportCount": 14,
+      "relativeImportCandidateCount": 15,
+      "resolvedRelativeImportCount": 15,
       "unresolvedRelativeImportCount": 0
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 70035,
-      "lines": 1415,
-      "sha256": "0d84c647f1e3c36c0a696026909da36f8941addcaabebe10983e6b77c37d4917",
+      "bytes": 70782,
+      "lines": 1427,
+      "sha256": "5785c8e663bc06612892041d37e930e26a8bdc5a413080314afd874797a89645",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -15616,9 +15622,9 @@
     },
     {
       "path": "src/miki/core/services/evidenceQualityGateService.ts",
-      "bytes": 4842,
-      "lines": 67,
-      "sha256": "8fd660d7e41eed0f1c1d6b54bc5f30b75bfb781c56b815946e1ac29845f19585",
+      "bytes": 5400,
+      "lines": 76,
+      "sha256": "31d8652b70fad43f492aa1750a64937152b756fdc46fa08cd69f8666716ccc39",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17245,9 +17251,9 @@
     },
     {
       "path": "src/miki/core/services/requiredAssetAcquisitionService.ts",
-      "bytes": 38206,
-      "lines": 938,
-      "sha256": "6b3f4979b89d98e5ce380d79016055c6a993613e2482ca3b028fcbf32e3b73ea",
+      "bytes": 43307,
+      "lines": 1031,
+      "sha256": "6e1f7a3e55cfde9ae34a5a05847b8cf8e44ca7d5e395858998dea99a12bb7edf",
       "relativeImportCandidates": [
         {
           "line": 1,

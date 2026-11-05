@@ -292,14 +292,23 @@ class RequiredAssetAcquisitionService {
     // request.gapIds), and the objective is handed to research explicitly
     // below so the research context is not lost.
     /*
-     * P425 B2: trigger が claim.* で、Claim 文脈（B1）が届いている
-     * 場合は、証拠取得を Claim 由来にする。gap の同一性に claimIds
-     * を含め、調査クエリは主張文と矛盾相手の主張文から組成する
-     * （調査側の Claim 照合はクエリ内の主張文で行われるため、これ
-     * が証拠を対象 Claim へ attach する機械になる）。Claim 文脈が
-     * 引けない場合は従来の汎用経路のままにする。
+     * P425 B2: Claim 文脈（B1）が届いている場合は、証拠取得を Claim
+     * 由来にする。gap の同一性に claimIds を含め、調査クエリは主張
+     * 文と矛盾相手の主張文から組成する（調査側の Claim 照合はクエ
+     * リ内の主張文で行われるため、これが証拠を対象 Claim へ
+     * attach する機械になる）。Claim 文脈が引けない場合は従来の
+     * 汎用経路のままにする。
+     * P431 R2: 当初は trigger が claim.* で始まることも条件だった
+     * が、それは「Claim のタスクである」ことの代理指標にすぎない。
+     * 発見経路（P431 で claimContext を payload に載せるように
+     * なった）の trigger は issue タイトル（Claim矛盾: …）のため
+     * 代理指標で落ち、実機の主流経路では B2 が一度も発動しなかっ
+     * た。claimContext は Claim が対象である場合にだけ（直接経路
+     * の購読側、発見経路の dispatch のどちらでも）claimDatabase
+     * から組み立てられて載るので、その存在自体が直接の信号であ
+     * る。直接経路の挙動は不変（従来どおり文脈ありで Claim 経路）。
      */
-    const claimRoute = objective.startsWith('claim.') && claimContext && claimContext.statement.trim()
+    const claimRoute = claimContext && claimContext.statement.trim()
       ? claimContext
       : undefined;
     // 調査側の Claim 照合（findBestMatchingClaim）は空白・句読点で
@@ -362,8 +371,27 @@ class RequiredAssetAcquisitionService {
       // requirement, the text the gap query used to carry) through the
       // explicit query option instead of the gap's stable identity query.
       // P425 B2: Claim 経路では主張由来のクエリを渡す。
+      // P431 R3: the generic route's query is now composed from the
+      // task's real subject matter (composeEvidenceResearchQuery);
+      // the previous composition appended the requirement token
+      // (`必要Evidence: <REASON_CODE>`) to the raw trigger, so the
+      // research text was internal codes plus, for issue tasks, a
+      // bare title like `Claim矛盾: CLM-…` with no searchable
+      // content at all. And the dispatch now pins the route to
+      // WEB_SEARCH (the same forceRoute pattern executeSearch uses):
+      // whether evidence is missing has already been decided by the
+      // completion gate that sent us here, so re-asking the
+      // chat-oriented search-need judgment -- against the gap's
+      // identity label, which is a reason token by design (P409) --
+      // only ever answered "no search" and returned from LOCAL
+      // matching with zero records, deterministically, for every
+      // task. LOCAL matching inside researchGap still runs first;
+      // forceRoute only removes the LOCAL-only early return. Scope
+      // is this acquisition dispatch only; the need judgment itself
+      // is untouched.
       const researched = await researchService.researchGap(gap, {
-        query: claimResearchQuery ?? `${objective}\n必要Evidence: ${request.requirement}`,
+        query: claimResearchQuery ?? this.composeEvidenceResearchQuery(request, objective),
+        forceRoute: 'WEB_SEARCH',
       });
 
       const researchRecord =
@@ -666,6 +694,71 @@ class RequiredAssetAcquisitionService {
         reasons: [`EVIDENCE_ACQUISITION_FAILED:${request.lastError}`],
       };
     }
+  }
+
+  /*
+   * P431 R3: compose the recovery-research query from the task's real
+   * subject matter. Sources, in order: the knowledge gap the task
+   * was dispatched for (linked from the task's intake payload with
+   * the same keys the discovery / revalidation dispatchers write),
+   * the issue detail recorded on the task, and the objective / goal
+   * with diagnostic prefixes stripped. Internal identifiers (claim /
+   * gap / task ids) and reason codes are not searchable content and
+   * are never used as query material; the requirement itself stays
+   * in the structured fields (gap identity, request record). The
+   * result is capped so a stacked historical text cannot grow the
+   * query without bound (the P409 failure mode).
+   */
+  private composeEvidenceResearchQuery(request: RequiredAssetRequest, objective: string): string {
+    const candidates: string[] = [];
+    const task = request.taskId ? taskBlackboardService.get(request.taskId) : undefined;
+    const payloadValue = task?.entries.find(entry => entry.kind === 'INPUT' && entry.key === 'payload')?.value;
+    const payload = payloadValue && typeof payloadValue === 'object' && !Array.isArray(payloadValue)
+      ? payloadValue as Record<string, unknown>
+      : undefined;
+    const linkedGapId = String(payload?.autonomousKnowledgeGapId || payload?.gapId || '').trim();
+    if (linkedGapId) {
+      const linked = knowledgeGapService.getById(linkedGapId);
+      if (linked) {
+        candidates.push(linked.query);
+        if (linked.reason && linked.reason !== linked.query) candidates.push(linked.reason);
+      }
+    }
+    if (typeof payload?.detail === 'string') candidates.push(payload.detail);
+    candidates.push(objective);
+    if (task?.goal && task.goal !== objective) candidates.push(task.goal);
+    const lines: string[] = [];
+    for (const raw of candidates) {
+      const line = this.researchSubjectLine(raw);
+      if (line && !lines.includes(line)) lines.push(line);
+      if (lines.join('\n').length >= 800) break;
+    }
+    return lines.join('\n').slice(0, 800) || objective;
+  }
+
+  private researchSubjectLine(raw: string): string {
+    let text = String(raw || '').replace(/\s+/g, ' ').trim();
+    // Strip stacked diagnostic prefixes (issue titles and
+    // outcome-prefixed details carry them); what remains is the
+    // subject itself. Mirrors the discovery service's prefix list.
+    const prefixes = ['停滞タスク:', '改善負債:', '能力不足:', '知識不足:', '実行失敗:', '18分類未循環:', 'Claim矛盾:', 'CONTRADICTED:', 'UNRESOLVED:'];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const prefix of prefixes) {
+        if (text.startsWith(prefix)) {
+          text = text.slice(prefix.length).trim();
+          changed = true;
+        }
+      }
+    }
+    if (!text) return '';
+    // A bare internal identifier or an all-caps reason code is not a
+    // subject; searching for it can only reproduce the zero-evidence
+    // outcome this composition exists to end.
+    if (/^(?:CLM|GAP|TASK|ISSUE|RUN|AIR|EVD)-[\w-]+$/.test(text)) return '';
+    if (/^[A-Z][A-Z0-9_]{3,}$/.test(text)) return '';
+    return text;
   }
 
   private acquireCapabilityRecord(request: RequiredAssetRequest, objective: string): { progressed: boolean; acquired: boolean; reasons: string[] } {

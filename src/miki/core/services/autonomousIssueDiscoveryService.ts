@@ -11,6 +11,7 @@ import { improvementIntakeRouterService } from './improvementIntakeRouterService
 import { selfImprovementDirectionService } from './selfImprovementDirectionService';
 import { improvementDebtService } from './improvementDebtService';
 import { adaptiveRoutePlannerService } from './adaptiveRoutePlannerService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 
 export type DiscoveredIssueKind='EXECUTION_FAILURE'|'KNOWLEDGE_GAP'|'CAPABILITY_GAP'|'STALLED_TASK'|'DOMAIN_DISCONNECTED'|'CLAIM_CONTRADICTION'|'IMPROVEMENT_DEBT';
@@ -406,6 +407,19 @@ class AutonomousIssueDiscoveryService{
      // (autonomousKnowledgeGapId / gapId). Without them the loop could not
      // see discovery-dispatched tasks and dispatched the same gap twice.
      ...(issue.kind==='KNOWLEDGE_GAP'?{gapId:issue.sourceId,autonomousKnowledgeGapId:issue.sourceId}:{}),
+     // P431 R2: a CLAIM_CONTRADICTION issue's sourceId IS the claim id
+     // (recordContradiction is called with it), so the claim context
+     // the direct-submit path carries (domainIntegrationBootstrap:
+     // buildClaimContext at the verification event) is rebuilt here,
+     // at dispatch time, in the same shape. Without it, discovery-path
+     // claim tasks -- the mainstream on device -- reached evidence
+     // recovery with only the title string, and the P425 B2 claim
+     // route / P426 B3 settlement consumption could never fire. The
+     // context is rebuilt per dispatch rather than stored on the
+     // issue record so it reflects the claim's current state.
+     ...(issue.kind==='CLAIM_CONTRADICTION'
+      ?(()=>{const claimContext=claimDatabaseService.buildClaimContext(issue.sourceId);return claimContext?{claimContext}:{};})()
+      :{}),
      ...(diagnosis?{diagnosis}:{})
     }
    });

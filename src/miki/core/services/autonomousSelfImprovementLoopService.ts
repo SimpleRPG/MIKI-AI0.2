@@ -702,7 +702,7 @@ class AutonomousSelfImprovementLoopService {
           entriesBeforeExecution,
         );
         if (researchUnavailableOutcome) {
-          this.waitForEvidence(request, `RESEARCH_SOURCE_UNAVAILABLE:${researchUnavailableOutcome}`, false);
+          this.waitForEvidence(request, `RESEARCH_SOURCE_UNAVAILABLE:${researchUnavailableOutcome}`);
           continue;
         }
         this.failOrRetry(request, `WORKFLOW_${workflow.task.status}`);
@@ -1153,7 +1153,6 @@ class AutonomousSelfImprovementLoopService {
     this.waitForEvidence(
       request,
       acquired.reasons.join(',') || reason,
-      acquired.progressed,
     );
 
     if(request.taskId){
@@ -1181,12 +1180,25 @@ class AutonomousSelfImprovementLoopService {
     }
   }
 
-  private waitForEvidence(request: AutonomousImprovementRequest, reason: string, progressed = false): void {
+  private waitForEvidence(request: AutonomousImprovementRequest, reason: string): void {
     request.evidenceWaitCount = (request.evidenceWaitCount || 0) + 1;
     const index = Math.min(request.evidenceWaitCount - 1, EVIDENCE_WAIT_MS.length - 1);
     this.state.status = 'WAITING_EVIDENCE';
     this.state.lastReason = reason;
-    this.state.retryAt = Date.now() + (progressed ? 5_000 : EVIDENCE_WAIT_MS[index]);
+    // P431 R3: every evidence wait follows the P410 backoff ladder.
+    // The previous short-circuit (progressed ? 5_000 : ladder) keyed
+    // the 5-second retry on the acquisition's `progressed` flag, but
+    // acquire() reports progress whenever the acquisition machinery
+    // ran -- including a research dispatch that returned zero
+    // evidence and changed nothing. On device that made an unchanged
+    // failure re-run the same research -> same rejection cycle every
+    // ~5 seconds (recordedAt -> retryAt was 5,063-5,392 ms for every
+    // park), a hot loop wearing the shape of a wait. The one
+    // legitimate short wait is the acquired case in
+    // acquireThenWaitForEvidence (asset in hand, prompt CORE
+    // re-evaluation), which keeps its own 5-second park and does not
+    // pass through here.
+    this.state.retryAt = Date.now() + EVIDENCE_WAIT_MS[index];
     request.nextAttemptAt=this.state.retryAt;
     request.waitKind='EVIDENCE';
     request.waitReason=reason;
