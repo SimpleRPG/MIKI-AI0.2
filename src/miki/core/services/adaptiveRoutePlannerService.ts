@@ -1892,6 +1892,24 @@ class AdaptiveRoutePlannerService {
     return this.decorateOperations(task,this.uniqueOperations(routes));
   }
 
+  /*
+   * P434: 教師返却物の申し送り（supplyNotes）を学習へ接続する。
+   * 供給の受入で作られた run のタスクには、受入時の payload が
+   * INPUT/payload として載っている（enqueue 時に run payload を
+   * そのままタスク作成へ渡す）。その中に supplyNotes があれば、
+   * LEARN_FROM_CORE_RESULT の lesson に教師の申し送りとして添える。
+   * 学習の受け口（observe への lesson 受け渡し）は変えない。
+   * 申し送りが無ければ何も足さない。学習記録が膨らまないよう
+   * 500 字までに切る。
+   */
+  private supplyNotesForLearning(task:BlackboardTask):string {
+    const payloadEntry=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload');
+    if(!payloadEntry) return '';
+    const value=objectValue(payloadEntry);
+    const notes=value&&typeof value.supplyNotes==='string'?value.supplyNotes.trim():'';
+    return notes.slice(0,500);
+  }
+
   private planLearningFromCompletedResults(task:BlackboardTask):PlannedRoute[] {
     const routes:PlannedRoute[]=[]; const sources=['research','execution','verification'] as const;
 
@@ -2005,6 +2023,7 @@ class AdaptiveRoutePlannerService {
       }
     }
 
+    const supplyNotes=this.supplyNotesForLearning(task);
     for(const entry of [...successfulBusinessEntries(task)].reverse()){
       if(!sources.includes(entry.domain as typeof sources[number])) continue; const value=objectValue(entry); if(!value) continue;
       const sourceOperation=String(value.operation||''); const sourceOperationInstanceId=String(value.operationInstanceId||'');
@@ -2028,7 +2047,7 @@ class AdaptiveRoutePlannerService {
       }
       const rawOutcome=String(reply.status||'SUCCEEDED').toUpperCase(); const outcome=rawOutcome==='FAILED'||rawOutcome==='REJECTED'?'FAILURE':'SUCCESS';
       const capabilityIds=Array.isArray(data.capabilityIds)?data.capabilityIds.map(String).filter(Boolean):[]; const concepts=`${task.goal} ${sourceOperation}`.split(/[^\p{L}\p{N}_-]+/u).filter(Boolean).slice(0,12);
-      routes.push({target:'learning',command:'LEARN_FROM_CORE_RESULT',reason:`CORE selected learning from evidence-producing ${entry.domain}:${sourceOperation}`,payload:{taskId:task.taskId,sourceDomain:entry.domain,sourceOperation,sourceOperationInstanceId,evidenceIds,outcome,verified,learningDomain:'system',key:`${entry.domain}:${sourceOperation}:${sourceOperationInstanceId}`,input:task.goal,concepts,capabilityIds,lesson:`${entry.domain}:${sourceOperation} -> unified learning; verified=${verified}`,adaptive:true,priority:90}}); break;
+      routes.push({target:'learning',command:'LEARN_FROM_CORE_RESULT',reason:`CORE selected learning from evidence-producing ${entry.domain}:${sourceOperation}`,payload:{taskId:task.taskId,sourceDomain:entry.domain,sourceOperation,sourceOperationInstanceId,evidenceIds,outcome,verified,learningDomain:'system',key:`${entry.domain}:${sourceOperation}:${sourceOperationInstanceId}`,input:task.goal,concepts,capabilityIds,lesson:`${entry.domain}:${sourceOperation} -> unified learning; verified=${verified}${supplyNotes?`\n教師の申し送り: ${supplyNotes}`:''}`,adaptive:true,priority:90}}); break;
     } return routes;
   }
 

@@ -35,6 +35,10 @@ import { sha256HexFromText } from './canonicalSha256Service';
  *    期待インターフェース）があれば、wantedComponents の構築では
  *    その記録済み契約を優先し、索引からの再構成は契約が無い場合の
  *    フォールバックとする。supply_request.json の形は変えない。
+ *  - P434: 不足記録に P433 の「作るべき部品の仕様」
+ *    （missingComponentSpecs）があれば、供給パッケージ
+ *    （supply_request.json と INSTRUCTIONS.md）へそのまま載せる。
+ *    仕様が無ければ何も足さない。
  */
 
 export type ComponentSupplyRequestStatus = 'ISSUED' | 'RECEIVED' | 'REJECTED' | 'CANCELLED';
@@ -106,6 +110,20 @@ interface CandidateGenerationGapContractRecord {
   missingComponentIds?: string[];
 }
 
+// P434: P433で不足記録に載るようになった「作るべき部品の仕様」
+// （読み取り専用の写し。正の定義は missingComponentSpecService の
+// MissingComponentSpec）。
+interface MissingComponentSpecRecord {
+  name?: string;
+  targetPath?: string;
+  inputKinds?: string[];
+  expectedBehavior?: string;
+  source?: string;
+  knowledgeId?: string;
+  slotName?: string;
+  missingComponentId?: string;
+}
+
 interface CandidateGenerationGapRecord {
   operation?: string;
   runId?: string;
@@ -115,6 +133,8 @@ interface CandidateGenerationGapRecord {
   constructionGaps?: string[];
   unknownQuestions?: string[];
   targetPaths?: string[];
+  // P433で不足記録に載るようになった「作るべき部品の仕様」。
+  missingComponentSpecs?: MissingComponentSpecRecord[];
   // P421: 不足発生時点で生成段が確定させた契約欄（読み取り専用の写し。
   // 正の定義は candidateCodeGenerationService の CandidateGenerationGapContract）。
   contract?: CandidateGenerationGapContractRecord;
@@ -467,6 +487,27 @@ class ComponentSupplyRequestService {
       ].filter(Boolean).join('\n'),
     };
 
+    // P434: P433で不足記録に載るようになった「作るべき部品の仕様」
+    // を、仕様がある場合だけ供給パッケージへ載せる。仕様が無ければ
+    // 何も足さない（従来どおり）。名前・対象ファイルが無い仕様は
+    // 載せない（推測で補わない）。仕様が持つのは名前・対象ファイル・
+    // 期待する入力種別・期待する振る舞いまでであり、出力や前提／
+    // 事後条件は仕様に無いので足さない。
+    const missingComponentSpecs = (Array.isArray(gap.missingComponentSpecs) ? gap.missingComponentSpecs : [])
+      .filter((spec) =>
+        Boolean(spec) && typeof spec.name === 'string' && Boolean(spec.name.trim()) &&
+        typeof spec.targetPath === 'string' && Boolean(spec.targetPath.trim()))
+      .map((spec) => ({
+        name: (spec.name as string).trim(),
+        targetPath: (spec.targetPath as string).trim(),
+        inputKinds: this.stringList(spec.inputKinds),
+        expectedBehavior: typeof spec.expectedBehavior === 'string' ? spec.expectedBehavior : '',
+        source: typeof spec.source === 'string' ? spec.source : '',
+        ...(typeof spec.knowledgeId === 'string' && spec.knowledgeId ? { knowledgeId: spec.knowledgeId } : {}),
+        ...(typeof spec.slotName === 'string' && spec.slotName ? { slotName: spec.slotName } : {}),
+        ...(typeof spec.missingComponentId === 'string' && spec.missingComponentId ? { missingComponentId: spec.missingComponentId } : {}),
+      }));
+
     // ---- wantedComponents ----
     // P421: 不足記録に契約欄があれば、それを期待インターフェースの
     // 正とする（不足発生時点の確定値であり、対象ファイルがその後に
@@ -574,6 +615,7 @@ class ComponentSupplyRequestService {
       origin: { taskId: run.taskId ?? '', runId: run.runId, taskGoal: run.objective },
       gapSummary,
       wantedComponents,
+      ...(missingComponentSpecs.length > 0 ? { missingComponentSpecs } : {}),
       targetFiles: targetPaths.map((path) => ({
         path,
         baselineSha256: sha256HexFromText(targetContents.get(path)!),
@@ -778,6 +820,18 @@ class ComponentSupplyRequestService {
     };
     const targetFiles = supplyRequest.targetFiles as Array<{ path: string }>;
     const listOr = (items: string[], fallback: string) => (items.length ? items.map((item) => `- ${item}`).join('\n') : `- ${fallback}`);
+    // P434: 仕様がある場合だけ、手順書にも「作るべき部品の仕様」を載せる。
+    // 仕様が無ければ何も足さない。
+    const missingSpecs = (supplyRequest.missingComponentSpecs as Array<{ name: string; targetPath: string; inputKinds: string[]; expectedBehavior: string }> | undefined) ?? [];
+    const missingSpecLines = missingSpecs.length > 0
+      ? [
+          '',
+          '## 作るべき部品の仕様（不足部品）',
+          '',
+          'MIKI の生成段が「どういう部品がないか」を名前付きで特定したものです。この仕様に沿う部品の素材を優先してください。詳細は supply_request.json の missingComponentSpecs を読んでください。',
+          ...missingSpecs.map((spec) => `- ${spec.name}（対象: ${spec.targetPath}）${Array.isArray(spec.inputKinds) && spec.inputKinds.length ? ` / 期待する入力: ${spec.inputKinds.join(', ')}` : ''}${typeof spec.expectedBehavior === 'string' && spec.expectedBehavior ? ` / 期待する振る舞い: ${spec.expectedBehavior}` : ''}`),
+        ]
+      : [];
     return [
       '# MIKI 部品供給リクエストへの回答方法',
       '',
@@ -802,6 +856,7 @@ class ComponentSupplyRequestService {
       '',
       '詳細は supply_request.json の gapSummary / wantedComponents を読んでください。',
       'wantedComponents の expectedInterface（inputs / outputs / entryPoint / exports）が、部品に期待する契約です。',
+      ...missingSpecLines,
       '',
       '## 返し方',
       '',
