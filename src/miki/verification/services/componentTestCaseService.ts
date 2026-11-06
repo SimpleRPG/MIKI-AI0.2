@@ -100,14 +100,11 @@ export class ComponentTestCaseService {
    * の固定文言は testAssertionService で INCONCLUSIVE になり、Suite が
    * BLOCKED になる。NORMAL/BOUNDARY/REGRESSION/PERMISSION は
    * ASSERT: NON_EMPTY（G1 の具体的な CONTAINS と組み合わせる）。
-   * PERMISSION の試験条件は実行環境そのもの（権限なしサンドボックス
-   * で非空の出力を得ること）。弱い判定のため、G3 では本物の権限
-   * テストを入れること。
-   * INVALID は生成部品では Suite 対象外にする。合成関数は全入力を
-   * 受理する全体関数で、前提条件の検証も安全な失敗の観測点もない
-   * ため、失敗する入力が存在せず SAFE_FAILURE は常に INCONCLUSIVE
-   * になる。黙って外すのではなく理由をログに残し、G3 で入力検証
-   * が入ったら再有効化すること。他の部品の INVALID は従来通り残す。
+   * P443(G3): INVALID は入力検証を持つ生成部品では Suite 対象にする。
+   * G3 の実装は要求の検証を持ち（[P443] マーカー）、要求なしの入力に
+   * 安全に失敗できる（REQUEST_INCOMPLETE）。検証を持たない旧骨格だけ
+   * 対象外のままにする。合成時に INVALID の宣言ケースが出る部品は
+   * そちらが優先され、ここでは追加しない。
    */
   private generateMissingCases(component: ComponentTxtPackage, declared: ComponentTestCase[]): ComponentTestCase[] {
     const present = new Set(declared.map(c => c.category));
@@ -135,9 +132,18 @@ export class ComponentTestCaseService {
     );
   }
 
-  /** 決定論的テンプレート合成で作られた骨格部品かどうか（出所で判別）。 */
+  /**
+   * 決定論的テンプレート合成で作られた部品のうち、入力検証を持たない
+   * 旧骨格かどうか。G3 の実装には [P443] の検証マーカーが含まれ、
+   * 要求なしの入力に安全に失敗できるため、旧骨格だけ INVALID の
+   * 対象外にする（P442 の方針を G3 で緩和するのではなく、検証を
+   * 持つ部品にだけ再有効化する）。
+   */
   private isGeneratedSkeletonComponent(component: ComponentTxtPackage): boolean {
-    return typeof component.sources_txt === 'string' && component.sources_txt.includes('deterministic template synthesis');
+    const sources = typeof component.sources_txt === 'string' ? component.sources_txt : '';
+    if (!sources.includes('deterministic template synthesis')) return false;
+    const impl = typeof component.implementation_txt === 'string' ? component.implementation_txt : '';
+    return !impl.includes('[P443]');
   }
 
 

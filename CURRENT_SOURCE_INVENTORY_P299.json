@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1754,
-    "sourceFileCount": 1307,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1220,
-    "relativeImportCandidateCount": 3720,
-    "resolvedRelativeImportCandidateCount": 3704,
+    "trackedPathCountExcludingControlPaths": 1755,
+    "sourceFileCount": 1308,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1221,
+    "relativeImportCandidateCount": 3722,
+    "resolvedRelativeImportCandidateCount": 3706,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -27553,9 +27553,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/atomicComponentTemplateSynthesisService.ts",
-      "bytes": 2598,
-      "lines": 43,
-      "sha256": "22e7f2c09e00d0e1e4e44e24bd03a277db1ead708b4cc3e23f5d0380af771532",
+      "bytes": 4480,
+      "lines": 55,
+      "sha256": "566edd397749eea81db54fe01c5c90f71c7e008405e38a579d6db4a46bc6ba7d",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27568,10 +27568,16 @@
           "specifier": "./capabilityContractSynthesisService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/capabilityContractSynthesisService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "./generatedComponentTemplateSpecService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/generatedComponentTemplateSpecService.ts"
         }
       ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -29675,6 +29681,16 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/selfDevelopment/services/generatedComponentTemplateSpecService.ts",
+      "bytes": 23047,
+      "lines": 443,
+      "sha256": "1ca14c3bcc028c25defa29d1bbf81aca2861c28062a911b570a2407b03f4b3ba",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/selfDevelopment/services/generatedComponentVerificationRegistrationService.ts",
       "bytes": 4129,
       "lines": 20,
@@ -29705,9 +29721,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/generatedComponentWorkerSandboxService.ts",
-      "bytes": 3145,
-      "lines": 33,
-      "sha256": "e56746c2dbf5d052a99ab8d29eeb09efdf87fcd9e968fcd1d488a414d38b9a31",
+      "bytes": 4027,
+      "lines": 41,
+      "sha256": "b6531b7c8de76e783b9fc4eed39d97b207420f08c2c4084d1e8a1f16f02f30dc",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -29726,10 +29742,16 @@
           "specifier": "./atomicComponentTemplateSynthesisService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/atomicComponentTemplateSynthesisService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "./generatedComponentTemplateSpecService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/generatedComponentTemplateSpecService.ts"
         }
       ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -30176,9 +30198,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts",
-      "bytes": 13264,
+      "bytes": 13271,
       "lines": 82,
-      "sha256": "e26f68cfc0f961058fde841500c61dce8134a18b98eb17ce7e09dcdf98dd6af2",
+      "sha256": "9346187853f52d4dd51181e3156835502a823adfaeafa5048c033d2864213737",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -34175,9 +34197,9 @@
     },
     {
       "path": "src/miki/verification/services/componentTestCaseService.ts",
-      "bytes": 9381,
-      "lines": 205,
-      "sha256": "4c5ab5a7f916ad4d457d551006a90511e691b1130c1d8e235f5f9b4423424adc",
+      "bytes": 9648,
+      "lines": 211,
+      "sha256": "b8bc2ffb1f54c553e98f51eefc421df044a7c4c1988c0218232ab0117ff543a7",
       "relativeImportCandidates": [
         {
           "line": 1,

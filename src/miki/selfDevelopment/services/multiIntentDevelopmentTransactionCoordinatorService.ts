@@ -48,21 +48,21 @@ generatedComponents.push(verification.component.component_id);const token=develo
     const gate=componentPromotionService.createGate(componentId,'EXTERNAL_RUNNER');
     if(!gate){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P441] ${componentId}: Regression Gateを作成できませんでした`);return false;}
     systemLogger.info('TOOLS',`🔁 [P441] ${componentId}: Regression Gate ${gate.suite_id} を作成しました（サンドボックス証拠の材料）`);
-    // サンドボックスは NORMAL/EMPTY/BOUNDARY の3入力だけを実行する。
-    // REGRESSION は以前に成功した NORMAL 入力の再実行（サーバが2回
-    // 実行で決定性を照合済み）、PERMISSION は権限なしサンドボックス
-    // での実行そのものが試験条件。どちらも NORMAL の実測出力を流用
-    // する。INVALID は生成部品では実行不能のため Suite 対象外（V1参照）。
-    // 証拠のないケースに結果を捏造して載せることはしない。
-    const inputOrder=['NORMAL','EMPTY','BOUNDARY'] as const;
+    // P443(G3): サンドボックスは NORMAL/EMPTY/BOUNDARY/INVALID/PERMISSION
+    // の5入力を実行する。INVALID は要求なし（安全な失敗の観測点）、
+    // PERMISSION は allowed: false の拒否（実測の拒否）。REGRESSION は
+    // 以前に成功した NORMAL 入力の再実行（サーバが2回実行で決定性を
+    // 照合済み）で、NORMAL の実測出力を流用する。証拠のないケースに
+    // 結果を捏造して載せることはしない。
+    const inputOrder=['NORMAL','EMPTY','BOUNDARY','INVALID','PERMISSION'] as const;
     let advanced=false;
     for(const binding of gate.case_bindings){
       const testCase=cases.find(item=>item.test_case_id===binding.test_case_id);
       if(!testCase){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P442] ${componentId}: Suite要求 ${binding.request_id} に対応するテストケースがありません`);continue;}
       const category=testCase.category;
       let runIndex=-1;
-      if(category==='NORMAL'||category==='EMPTY'||category==='BOUNDARY')runIndex=inputOrder.indexOf(category);
-      else if(category==='REGRESSION'||category==='PERMISSION')runIndex=0;
+      if(category==='NORMAL'||category==='EMPTY'||category==='BOUNDARY'||category==='INVALID'||category==='PERMISSION')runIndex=inputOrder.indexOf(category);
+      else if(category==='REGRESSION')runIndex=0;
       else{systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P442] ${componentId}: ${category} はサンドボックス証拠がなく結果を載せません（証拠の捏造はしない）`);continue;}
       const run=evidence.runs.find(item=>item.caseId===inputOrder[runIndex]);
       const output=evidence.outputs?.[runIndex];
