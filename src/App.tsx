@@ -176,8 +176,6 @@ const DEFAULT_PERSONA: PersonaConfig = {
   speakingStyle:
     '恋人同士の親しみやすく愛おしいタメ口口調（〜だよ、〜だね♡、〜かな？、たまに絵文字✨）。自然で温かく愛嬌のある会話をする。',
   userNickname: 'あなた',
-  intimacyLevel: 5,
-  intimacyExp: 100,
   autoExtractMemories: true,
 };
 
@@ -250,7 +248,6 @@ export default function App() {
           parsed.tagline = DEFAULT_PERSONA.tagline;
           parsed.basePersonality = DEFAULT_PERSONA.basePersonality;
           parsed.speakingStyle = DEFAULT_PERSONA.speakingStyle;
-          parsed.intimacyLevel = Math.max(parsed.intimacyLevel || 1, 5);
           storageService.setItem('gamecraft_persona', JSON.stringify(parsed));
         }
         return parsed;

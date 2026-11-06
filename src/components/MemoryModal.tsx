@@ -826,7 +826,6 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
       memories,
       stats: {
         totalMemories: memories.length,
-        intimacyLevel: persona.intimacyLevel,
       },
     };
     const jsonStr = JSON.stringify(backupData, null, 2);
@@ -1003,9 +1002,6 @@ export const MemoryModal: React.FC<MemoryModalProps> = ({
             <div className="min-w-0">
               <h2 className="text-sm sm:text-base font-bold text-slate-100 flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <span>{persona.name} の教育・記憶 ＆ 自己進化</span>
-                <span className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 font-semibold border border-pink-500/30 shrink-0">
-                  親愛度 Lv.{persona.intimacyLevel}
-                </span>
               </h2>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate sm:whitespace-normal">
                 教えたいことを入力するだけで、全推論モデルに即座に教育・反映されます

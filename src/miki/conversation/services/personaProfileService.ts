@@ -83,8 +83,6 @@ const BIBI_PROFILE: PersonaProfile = {
   // PROVISIONAL (P454): Kiria has not decided how Bibi addresses him yet.
   // Editable later from the persona settings / memory modal.
   userNickname: 'きりあ',
-  // PROVISIONAL (P454): Bibi starts as a new acquaintance.
-  extras: { intimacyLevel: 1, intimacyExp: 0 },
 };
 
 const AVATAR_TEXT_BY_ID: Record<string, string> = {
@@ -92,12 +90,18 @@ const AVATAR_TEXT_BY_ID: Record<string, string> = {
   'miki-circle': '●',
   'miki-spark': '✦',
   'miki-cube': '◆',
-  'bibi-default': '🎀',
+  'bibi-default': '🐝',
 };
 
 // PersonaConfig keys that are mapped explicitly between the two shapes;
 // everything else round-trips through PersonaProfile.extras.
 const CONFIG_MAPPED_KEYS = new Set(['id', 'name', 'avatar', 'tagline', 'basePersonality', 'speakingStyle', 'userNickname']);
+
+// P455: intimacy was display-only decoration (nothing in generation read
+// it and nothing ever drove the exp), and Kiria decided to retire it.
+// Saved data may still carry these keys; they are dropped on read and
+// never round-tripped back into storage.
+const RETIRED_CONFIG_KEYS = new Set(['intimacyLevel', 'intimacyExp']);
 
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 const has = (text: string, words: string[]) => words.some(word => text.includes(word));
@@ -237,7 +241,7 @@ class PersonaProfileService {
       if (configId && active.configId && configId !== active.configId) return;
       const extras: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(config)) {
-        if (!CONFIG_MAPPED_KEYS.has(key) && value !== undefined) extras[key] = value;
+        if (!CONFIG_MAPPED_KEYS.has(key) && !RETIRED_CONFIG_KEYS.has(key) && value !== undefined) extras[key] = value;
       }
       const next: PersonaProfile = {
         ...active,
@@ -302,9 +306,27 @@ class PersonaProfileService {
   private ensureRoster(): PersonaRoster {
     const existing = this.readRoster();
     if (existing) {
+      let profiles = existing.profiles;
+      let changed = false;
       // Rosters built before Bibi existed gain her on first read.
-      if (!existing.profiles.some(p => p.profileId === BIBI_PROFILE_ID)) {
-        const next: PersonaRoster = { ...existing, profiles: [...existing.profiles, this.buildBibiProfile()] };
+      if (!profiles.some(p => p.profileId === BIBI_PROFILE_ID)) {
+        profiles = [...profiles, this.buildBibiProfile()];
+        changed = true;
+      }
+      // P455: Bibi's avatar became the bee (her name comes from bees:
+      // swarms of parts, code and bugs). Profiles built under P454 hold
+      // avatarId 'bibi-default', which resolves through AVATAR_TEXT_BY_ID
+      // and picks the bee up automatically; only a profile that captured
+      // the old provisional emoji itself as the id needs a rewrite.
+      profiles = profiles.map(p => {
+        if (p.profileId === BIBI_PROFILE_ID && p.avatarId === '🎀') {
+          changed = true;
+          return { ...p, avatarId: BIBI_PROFILE.avatarId };
+        }
+        return p;
+      });
+      if (changed) {
+        const next: PersonaRoster = { ...existing, profiles };
         storageService.setItem(ROSTER_KEY, JSON.stringify(next));
         return next;
       }
@@ -337,8 +359,9 @@ class PersonaProfileService {
     const legacy = this.readLegacyConfig();
     if (!legacy) return base;
     const extras: Record<string, unknown> = { ...(base.extras ?? {}) };
+    for (const key of RETIRED_CONFIG_KEYS) delete extras[key];
     for (const [key, value] of Object.entries(legacy)) {
-      if (!CONFIG_MAPPED_KEYS.has(key) && key !== 'color' && value !== undefined) extras[key] = value;
+      if (!CONFIG_MAPPED_KEYS.has(key) && !RETIRED_CONFIG_KEYS.has(key) && key !== 'color' && value !== undefined) extras[key] = value;
     }
     if (typeof legacy.color === 'string') extras.color = legacy.color;
     return {
@@ -364,6 +387,13 @@ class PersonaProfileService {
     if (!value || typeof value !== 'object') throw new Error('PERSONA_PROFILE_INVALID');
     const row = value as Partial<PersonaProfile>;
     if (row.schemaVersion !== 1 || !row.profileId || !row.name || !row.personalityText || !row.avatarId) throw new Error('PERSONA_PROFILE_INVALID');
+    // P455: drop retired keys from stored extras so they fade out of
+    // storage on the next persist instead of round-tripping forever.
+    if (row.extras && typeof row.extras === 'object') {
+      const extras: Record<string, unknown> = { ...row.extras };
+      for (const key of RETIRED_CONFIG_KEYS) delete extras[key];
+      row.extras = extras;
+    }
     return row as PersonaProfile;
   }
 

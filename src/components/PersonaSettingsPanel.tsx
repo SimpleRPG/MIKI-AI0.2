@@ -7,7 +7,7 @@ const AVATARS = [
   { id: 'miki-circle', label: 'サークル', icon: '●' },
   { id: 'miki-spark', label: 'スパーク', icon: '✦' },
   { id: 'miki-cube', label: 'キューブ', icon: '◆' },
-  { id: 'bibi-default', label: 'ビービー', icon: '🎀' },
+  { id: 'bibi-default', label: 'ビービー', icon: '🐝' },
 ];
 
 export const PersonaSettingsPanel: React.FC = () => {

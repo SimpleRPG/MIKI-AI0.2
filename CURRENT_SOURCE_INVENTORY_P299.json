@@ -6132,9 +6132,9 @@
     },
     {
       "path": "src/App.tsx",
-      "bytes": 92390,
-      "lines": 2133,
-      "sha256": "227cc7be097d529c8d8748b1e1299d2e17d177e3180a8ceacbdcfe9badcd4e8f",
+      "bytes": 92277,
+      "lines": 2130,
+      "sha256": "c1ace835000974068c6208604db236baabe02bdf2f789ad9b18397c50504c79d",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -7641,9 +7641,9 @@
     },
     {
       "path": "src/components/Header.tsx",
-      "bytes": 12567,
-      "lines": 275,
-      "sha256": "16c0bdc7ccef53eaa378c2ac3bfe566404109e26c31c1e9a715d17a17241391a",
+      "bytes": 12373,
+      "lines": 272,
+      "sha256": "b0df4ec602b7936274687e6efcec034b7e5b6286b625c95bc0f78d90be6371e7",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -7725,9 +7725,9 @@
     },
     {
       "path": "src/components/MemoryModal.tsx",
-      "bytes": 196751,
-      "lines": 3504,
-      "sha256": "b3e6f96dbc77694eb5e2f5cf42500c8a2a6d06dc9620f6ab90bdbb0b308e213f",
+      "bytes": 196461,
+      "lines": 3500,
+      "sha256": "b6a6acd76ef14dc3e19c0ce1e164f435da750c1163ea13465b7d1ccf10311ea1",
       "relativeImportCandidates": [
         {
           "line": 56,
@@ -7768,7 +7768,7 @@
       "path": "src/components/PersonaSettingsPanel.tsx",
       "bytes": 5835,
       "lines": 64,
-      "sha256": "891a01e41d3b1d305c7bd4dd39d21d0a380810d02e389d840cd94ebc12812cb4",
+      "sha256": "c4b408323f56f91a983af3168a7eb884d66255c42b653c45f883ee2c7e79fdd1",
       "relativeImportCandidates": [
         {
           "line": 3,
@@ -11055,9 +11055,9 @@
     },
     {
       "path": "src/miki/conversation/services/personaProfileService.ts",
-      "bytes": 17776,
-      "lines": 407,
-      "sha256": "12c0c03a80ef2652419afe557e72dfc4a10c26dd9607a85d306b465b25cf99b4",
+      "bytes": 19202,
+      "lines": 437,
+      "sha256": "7f9165547d4c82b430fdb2b667c533f23dd8232b3f5eaa2247faa3cba4e74b5f",
       "relativeImportCandidates": [
         {
           "line": 1,

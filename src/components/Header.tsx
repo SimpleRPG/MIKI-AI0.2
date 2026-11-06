@@ -78,9 +78,6 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <span className="text-base leading-none">{persona.avatar}</span>
           <span className="font-bold text-slate-100 text-xs sm:text-sm tracking-tight">{persona.name}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-500/15 text-pink-400 font-semibold border border-pink-500/30">
-            Lv.{persona.intimacyLevel}
-          </span>
           <Brain className="w-3.5 h-3.5 text-pink-400 group-hover:scale-110 transition-transform hidden sm:inline" />
         </button>
 
