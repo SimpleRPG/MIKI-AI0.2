@@ -262,11 +262,18 @@ class ComponentSupplyRequestService {
   }
 
   private resolveTargetPaths(run: ImprovementIntakeRun, gap: CandidateGenerationGapRecord): string[] {
-    const candidates = [
-      ...(Array.isArray(gap.targetPaths) ? gap.targetPaths : []),
-      ...(run.implementationPlan?.targetPaths ?? []),
-      ...this.payloadStrings(run, 'targetFiles'),
-    ];
+    // P446: 不足記録に対象が残っている場合はそれを正とする。不足記録の
+    // targetPaths は generate() が解決済みの対象だけを入れたもので、計画や
+    // payload にはスナップショットに無い対象が残っていることがある。
+    // 全部を足すと TARGET_FILE_NOT_FOUND で却下され、不足記録を残した意味が
+    // なくなる。不足記録に対象が無い場合だけ従来どおり計画・payload を見る。
+    const fromGap = Array.isArray(gap.targetPaths) ? gap.targetPaths : [];
+    const candidates = fromGap.length > 0
+      ? fromGap
+      : [
+        ...(run.implementationPlan?.targetPaths ?? []),
+        ...this.payloadStrings(run, 'targetFiles'),
+      ];
     const seen = new Set<string>();
     const resolved: string[] = [];
     for (const path of candidates) {

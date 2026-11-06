@@ -1,4 +1,4 @@
-import { improvementIntakeRouterService } from './improvementIntakeRouterService';
+import { improvementIntakeRouterService, type ImprovementIntakeRun } from './improvementIntakeRouterService';
 import { autonomousCandidatePreparationService } from './autonomousCandidatePreparationService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
@@ -168,7 +168,24 @@ class CandidateCodeGenerationService {
     return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
   }
   const sources=new Map(currentSourceFiles.map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
-  if(targetFiles.length!==targetPaths.length)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
+  if(targetFiles.length!==targetPaths.length){
+    /*
+     * P446: スナップショットに無い対象があって早期復帰する run でも
+     * 不足記録を残す。P438 と同じ形（解決済み対象・要求された対象・
+     * 解決できなかった対象を分ける）で、供給パッケージは解決済み
+     * 対象から作れるようにする。
+     */
+    const resolvedSnapshotPaths=targetFiles.map(file=>file.path);
+    this.appendGenerationGap(run,{
+      operation:'GENERATE_CANDIDATE',
+      runId,
+      reason:'SOURCE_SNAPSHOT_INCOMPLETE',
+      targetPaths:resolvedSnapshotPaths,
+      requestedTargetPaths:targetPaths,
+      missingPaths:targetPaths.filter(path=>!resolvedSnapshotPaths.includes(path)),
+    });
+    return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
+  }
   const preparedRun=improvementIntakeRouterService.get(runId);
   if(!preparedRun)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND_AFTER_PREPARATION']};
   const implementationPlan=preparedRun.implementationPlan;
@@ -391,6 +408,12 @@ class CandidateCodeGenerationService {
 
   if(unresolvedKnowledgeComponentIds.length>0){
     const reason=`CODE_COMPOSITION_COMPONENT_UNRESOLVED:${unresolvedKnowledgeComponentIds.join(',')}`;
+    /*
+     * P446: パックが使う知識部品が解決できない run でも不足記録を
+     * 残す。不足している部品は名前で特定できるため、供給パッケージ
+     * はその部品の素材を要求できる。
+     */
+    this.recordComponentMissingGap(run,reason,unresolvedKnowledgeComponentIds,targetPaths);
     return {
       accepted:false,
       runId,
@@ -1520,6 +1543,12 @@ class CandidateCodeGenerationService {
           runId,componentIds,unresolved
         }))
       });
+      /*
+       * P446: レジストリに無い部品があって早期復帰する run でも
+       * 不足記録を残す。台帳の記録だけでは供給パッケージは作れ
+       * ないため、ブラックボードへも同じ不足を残す。
+       */
+      this.recordComponentMissingGap(run,reason,unresolved,targetPaths);
       return {
         accepted:false,
         runId,
@@ -1558,6 +1587,17 @@ class CandidateCodeGenerationService {
           runId,componentIds,reason:('reason' in materialized ? materialized.reason : 'MATERIALIZATION_FAILED')
         }))
       });
+      /*
+       * P446: 実装の素材そのものが無い失敗だけ不足記録を残す。
+       * 成果物が無い・実装本文が空の部品は、教師が素材を供給する
+       * ことで直せる不足である。対象違い・重複・変化なしなどの
+       * 組み立て上の不具合は不足ではないため記録を作らない。
+       */
+      const materializedReason='reason' in materialized ? materialized.reason : 'MATERIALIZATION_FAILED';
+      const missingMaterialMatch=materializedReason.match(/^CODE_COMPONENT_(?:ARTIFACT_NOT_FOUND|IMPLEMENTATION_EMPTY):(.+)$/);
+      if(missingMaterialMatch){
+        this.recordComponentMissingGap(run,materializedReason,[missingMaterialMatch[1]],targetPaths);
+      }
       return {
         accepted:false,
         runId,
@@ -1914,6 +1954,43 @@ class CandidateCodeGenerationService {
    } catch {
      // 自己テストの失敗は生成の返却を止めない。
    }
+ }
+
+ /*
+  * P446: GENERATE_CANDIDATE に到達する前に早期復帰する経路でも、
+  * 特定できた不足を既存の不足記録（candidateGenerationGap）と
+  * 同じ形で残す。供給パッケージの作成はこの記録からしか作れ
+  * ないため、記録が無い run は GAP_NOT_FOUND で却下されていた。
+  * 対象が分からない経路・不足ではない理由（計画の不備・品質
+  * ゲートの失敗・重複など）には記録を作らない。
+  * 診断用に1行だけログを出す（P438 の関門区別ログと同じ意図）。
+  */
+ private appendGenerationGap(run:ImprovementIntakeRun,gap:Record<string,unknown>):void{
+  if(!run.taskId)return;
+  taskBlackboardService.append(run.taskId,'OBSERVATION','selfDevelopment','candidateGenerationGap',gap,[]);
+  systemLogger.warn('SELF_IMPROVEMENT',`[P446] ${run.runId}: gap recorded reason=${String(gap.reason||'')} targets=${Array.isArray(gap.targetPaths)?(gap.targetPaths as string[]).length:0}`);
+ }
+
+ /*
+  * P446: 部品そのものが無い早期復帰（未解決の部品・実装の素材が
+  * 無い部品）用の不足記録。既存の内訳（CONSTRUCTION_GAP:
+  * CODE_COMPONENT_MISSING）と契約欄・仕様導出を再利用し、推測で
+  * 補わない（対象が決まらなければ仕様は空のまま）。
+  */
+ private recordComponentMissingGap(run:ImprovementIntakeRun,reason:string,missingIds:string[],targetPaths:string[]):void{
+  const constructionGaps=missingIds.map(id=>`CONSTRUCTION_GAP:CODE_COMPONENT_MISSING:${id}`);
+  const gapContract=this.buildGapContract(targetPaths,constructionGaps);
+  const missingComponentSpecs=missingComponentSpecService.deriveMissingComponentSpecs({constructionGaps,unknownQuestions:[],contract:gapContract,targetPaths});
+  this.appendGenerationGap(run,{
+   operation:'GENERATE_CANDIDATE',
+   runId:run.runId,
+   reason,
+   constructionGaps,
+   unknownQuestions:[],
+   targetPaths,
+   missingComponentSpecs,
+   ...(gapContract?{contract:gapContract}:{}),
+  });
  }
 
  private buildGapContract(targetPaths:string[],constructionGapRequirements:string[]):CandidateGenerationGapContract|undefined{
