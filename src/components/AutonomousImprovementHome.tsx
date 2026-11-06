@@ -1176,7 +1176,8 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                 </button>
               </div>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                アプリを閉じている間も、自律改善ループと背景サイクルを {backgroundStatus.intervalMinutes} 分間隔で回し続けます。
+                アプリを閉じている間も、自律改善ループと背景サイクルを回し続けます。
+                現在の実効間隔は {backgroundStatus.adaptiveIntervalMinutes} 分です（端末の余裕に応じて自動調整：{backgroundStatus.adaptiveTier === 'ample' ? '余裕あり' : backgroundStatus.adaptiveTier === 'moderate' ? '普通' : '控えめ'}。充電中や残量が多いほど短くなります。上限 {backgroundStatus.intervalMinutes} 分）。
                 OFFにすると背景の定期実行はすべて止まります。この設定は再起動後も維持されます。
               </p>
             </div>

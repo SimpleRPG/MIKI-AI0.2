@@ -7150,9 +7150,9 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 107860,
-      "lines": 2114,
-      "sha256": "70f2040f155c7665eea5368be6b3bf6be9ec513dec0ca5e351ca9d6e7031545c",
+      "bytes": 108191,
+      "lines": 2115,
+      "sha256": "6fc0a893a583c7b1e72a74ab75d31b5aaa74ee32353d81c28045d81271e0c69c",
       "relativeImportCandidates": [
         {
           "line": 48,
@@ -19917,9 +19917,9 @@
     },
     {
       "path": "src/miki/execution/services/backgroundWorkerService.ts",
-      "bytes": 84116,
-      "lines": 1631,
-      "sha256": "252d0a5a1b896530adb89d9f9f8f974f6df5798746672b3ad0620ade29c41028",
+      "bytes": 88693,
+      "lines": 1706,
+      "sha256": "7720c643ada01d2f9420b445b638e26360b841223d9b2cd98048a97397a30d57",
       "relativeImportCandidates": [
         {
           "line": 10,

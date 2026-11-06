@@ -138,7 +138,10 @@ export class BackgroundWorkerService {
     nightTimeOnly: false,
   };
 
-  private intervalMinutes: number = 60; // 変更前: 360 (Termux/PC常時運用向けに1時間ごとに緩和)
+  private intervalMinutes: number = 60; // 変更前: 360 (Termux/PC常時運用向けに1時間ごとに緩和)。P451: 適応間隔の上限 (天井) として扱う
+  // P451: 直近にスケジュールへ反映した実効間隔 (分)。端末状態の変化で
+  // 実効間隔が変わったときだけ再スケジュールするための差分検出に使う。
+  private lastAdaptiveIntervalMinutes: number | null = null;
   private executionLogs: BackgroundTaskExecutionLog[] = [];
   private isRegistered: boolean = true;
   private isExecutingNow: boolean = false;
@@ -248,7 +251,9 @@ export class BackgroundWorkerService {
     if (!nativeWorkManagerService.isAndroidNative()) return;
     try {
       if (this.isRegistered) {
-        await nativeWorkManagerService.schedule(this.intervalMinutes, this.constraints);
+        // P451: WorkManager へ渡す間隔も実効間隔 (適応) にする。
+        // プラットフォームの床は 15 分 (ネイティブ側でもクランプ済み)。
+        await nativeWorkManagerService.schedule(this.getAdaptiveIntervalMinutes(), this.constraints);
       } else {
         await nativeWorkManagerService.cancel();
       }
@@ -328,6 +333,8 @@ export class BackgroundWorkerService {
             if (!battery.charging && this.currentSleepState === 'deep') {
               this.abortDeepSleepExecution('充電器が切断されたため深い睡眠処理を安全に中断しました');
             }
+            // P451: 充電状態は適応間隔の段を左右するため再評価する
+            this.refreshAdaptiveSchedule();
           });
 
           battery.addEventListener('levelchange', () => {
@@ -335,7 +342,13 @@ export class BackgroundWorkerService {
             if (this.batteryState.level <= 30 && this.currentSleepState === 'deep') {
               this.abortDeepSleepExecution('バッテリー残量が30%以下に低下したため深い睡眠処理を中断しました');
             }
+            // P451: 残量の段が変わったら適応間隔を再評価する
+            this.refreshAdaptiveSchedule();
           });
+
+          // P451: Battery API の初回解決値で適応間隔を実値に組み直す
+          // (コンストラクタ時点のバッテリー状態は楽観的な既定値のため)
+          this.refreshAdaptiveSchedule();
         })
         .catch(() => {
           this.batteryState.supported = false;
@@ -477,8 +490,58 @@ export class BackgroundWorkerService {
     };
   }
 
+  /**
+   * P451: 端末の余裕の段 (tier)。きりあの意向「端末の余裕があるなら
+   * その余裕の分だけ渡していい」に基づく適応間隔の段階。
+   * - ample (余裕あり): 充電中、または残量80%以上
+   * - moderate (普通): 非充電で残量50%以上
+   * - low (控えめ): それ以外 (ハードウェア条件の床より上)
+   * 温度が warm のときは1段控えめにし、hot / critical では low 固定。
+   * ハードウェア条件の床 (20%以下・42℃以上では回さない) は従来の
+   * ゲート判定が担い、ここでは歩調だけを決める。
+   */
+  public getAdaptiveTier(): 'ample' | 'moderate' | 'low' {
+    const c = this.getExecutionConditions();
+    if (c.thermalState === 'hot' || c.thermalState === 'critical') return 'low';
+    const levelPct = Math.round(c.batteryLevel * 100);
+    let tier: 'ample' | 'moderate' | 'low' =
+      c.isCharging || levelPct >= 80 ? 'ample' : levelPct >= 50 ? 'moderate' : 'low';
+    if (c.thermalState === 'warm') {
+      tier = tier === 'ample' ? 'moderate' : 'low';
+    }
+    return tier;
+  }
+
+  /**
+   * P451: 現在の実効間隔 (分)。段の基準間隔 (ample 15 / moderate 30 /
+   * low 60) を、保存済みの intervalMinutes を上限としてクランプする。
+   * 適応は保存値を上書きしない (計算値のみ)。下限は WorkManager の
+   * periodic 最小間隔に合わせた 15 分。
+   */
+  public getAdaptiveIntervalMinutes(): number {
+    const tier = this.getAdaptiveTier();
+    const base = tier === 'ample' ? 15 : tier === 'moderate' ? 30 : 60;
+    return Math.max(15, Math.min(base, this.intervalMinutes || 60));
+  }
+
+  /**
+   * P451: 端末状態の変化に追従してスケジュールを組み直す。
+   * 実効間隔が変わったときだけ次回予約と WorkManager 登録を更新する
+   * (バッテリー残量の 1% 変化ごとのイベント発火に対するデバウンス)。
+   */
+  private refreshAdaptiveSchedule(): void {
+    const effective = this.getAdaptiveIntervalMinutes();
+    if (this.lastAdaptiveIntervalMinutes === effective) return;
+    this.lastAdaptiveIntervalMinutes = effective;
+    if (!this.isRegistered) return;
+    this.scheduleNextRun();
+    this.syncNativeWorkManagerSchedule();
+    systemLogger.info('SELF_IMPROVEMENT', `[P451] Adaptive background interval -> ${effective}m (tier=${this.getAdaptiveTier()}, battery=${this.batteryState.level}%, charging=${this.batteryState.charging}, thermal=${this.thermalState})`);
+  }
+
   private scheduleNextRun(): void {
-    const nextRun = Date.now() + this.intervalMinutes * 60 * 1000;
+    // P451: 次回予約は固定の intervalMinutes ではなく実効間隔 (適応) で行う
+    const nextRun = Date.now() + this.getAdaptiveIntervalMinutes() * 60 * 1000;
     this.nextScheduledRunTimestamp = nextRun;
 
     if (this.schedulerTimer) clearInterval(this.schedulerTimer);
@@ -595,9 +658,13 @@ export class BackgroundWorkerService {
         // すれば dispatch も止まる。オートパイロット有効時は従来どおり
         // オートパイロット側の間隔を優先する。
         const enabled = autopilotEnabled || this.isRegistered;
+        // P451: オートパイロット OFF 時 (背景実行の門) の dispatch 間隔は
+        // 固定の 60 分床ではなく実効間隔 (適応・最小15分) を使う。
+        // オートパイロット ON 時は従来どおりオートパイロット側の
+        // 明示設定 (既定360・最小60) を尊重する。
         const intervalMinutes = autopilotEnabled
           ? Math.max(60, Math.min(10080, Number(autopilot.intervalMinutes) || 360))
-          : Math.max(60, Math.min(10080, this.intervalMinutes || 60));
+          : Math.min(10080, this.getAdaptiveIntervalMinutes());
         const lastKey = 'miki_autopilot_last_native_dispatch_v1';
         const pendingKey = 'miki_autopilot_pending_dispatch_v1';
         const lastDispatch = Number(storageService.getItem(lastKey) || 0);
@@ -1393,7 +1460,7 @@ export class BackgroundWorkerService {
 
       this.executionLogs.unshift(logRecord);
       this.lastRunTimestamp = Date.now();
-      this.nextScheduledRunTimestamp = Date.now() + this.intervalMinutes * 60 * 1000;
+      this.nextScheduledRunTimestamp = Date.now() + this.getAdaptiveIntervalMinutes() * 60 * 1000;
       this.saveState();
 
       // A completed maintenance cycle is a review/discovery input, never an execution failure.
@@ -1537,6 +1604,9 @@ class MikiAutonomousWorker(appContext: Context, workerParams: WorkerParameters) 
       lastRunTimestamp: this.lastRunTimestamp,
       nextScheduledRunTimestamp: this.nextScheduledRunTimestamp,
       intervalMinutes: this.intervalMinutes,
+      // P451: 適応間隔の現在値 (実効間隔と段)。UI の実効間隔表示用。
+      adaptiveIntervalMinutes: this.getAdaptiveIntervalMinutes(),
+      adaptiveTier: this.getAdaptiveTier(),
       constraints: { ...this.constraints },
       currentBatteryState: { ...this.batteryState },
       currentNetworkState: { ...this.networkState },
@@ -1558,7 +1628,10 @@ class MikiAutonomousWorker(appContext: Context, workerParams: WorkerParameters) 
   }
 
   public updateInterval(minutes: number): void {
+    // P451: intervalMinutes は適応間隔の上限 (天井)。実効間隔は
+    // getAdaptiveIntervalMinutes() が段と上限から都度計算する。
     this.intervalMinutes = Math.max(15, minutes);
+    this.lastAdaptiveIntervalMinutes = this.getAdaptiveIntervalMinutes();
     this.scheduleNextRun();
     this.saveState();
     this.syncNativeWorkManagerSchedule();
@@ -1612,6 +1685,8 @@ class MikiAutonomousWorker(appContext: Context, workerParams: WorkerParameters) 
     if ((state === 'hot' || state === 'critical') && this.currentSleepState === 'deep') {
       this.abortDeepSleepExecution(`端末発熱 (${state}) が検知されたため深い睡眠処理を安全に中断しました`);
     }
+    // P451: 温度状態も適応間隔の段を左右するため再評価する
+    this.refreshAdaptiveSchedule();
   }
 
   public setMockWifi(isWifi: boolean): void {
