@@ -19,7 +19,7 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { longTermMemoryService } from '../../memory/services/longTermMemoryService';
 import { latentIntentMiningService } from '../../unknown/services/latentIntentMiningService';
 import { answerContentIrService } from '../../conversation/services/answerContentIrService';
-import { unknownResearchConversationBridgeService } from '../../conversation/services/unknownResearchConversationBridgeService';
+import { unknownResearchConversationBridgeService, selectUnverifiedPresentation, buildUnverifiedConclusion } from '../../conversation/services/unknownResearchConversationBridgeService';
 import { conversationUnknownVocabularyService } from '../../conversation/services/conversationUnknownVocabularyService';
 import { conversationUserFactRecallService, looksInterrogative, UserFactIntakeSummary } from '../../conversation/services/conversationUserFactRecallService';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
@@ -97,6 +97,18 @@ export interface ConversationCoreResult {
 function memoryReasonLabel(m: any): string {
   const content = String(m?.content || '').slice(0, 100);
   return m?.source === 'user_statement' ? `あなたが話していた内容: ${content}` : `関連記憶: ${content}`;
+}
+
+/**
+ * P457 (G): 素の事実質問の形か。検索要否判定（detectNeedForSearch）の
+ * パターンに当たらない事実質問（「〜はいつ開放されるの？」等）でも、
+ * 未解決に落ちた場合は即時調査へ進めるための入口フォールバック。
+ * 疑問詞＋疑問形、または「とは」を含む定義照会を対象にする。
+ */
+function isFactualQuestionForm(prompt: string): boolean {
+  if (prompt.includes('とは')) return true;
+  if (!/[？?]/.test(prompt)) return false;
+  return /(?:いつ|どこ|だれ|誰|何|なに|いくつ|いくら|なぜ|どうして|どうやって|どんな|どれ|どちら)/.test(prompt);
 }
 
 /**
@@ -190,7 +202,14 @@ export class ConversationCoreService {
       const researched = await unknownResearchConversationBridgeService.resolveAndRespond({
         question: prompt,
         unknownTerms,
-        useSearch: /調べ|検索|最新|現在/.test(prompt),
+        // P457 (G): 調査入口の統一。明示の検索語がある場合だけでなく、
+        // 検索要否判定（「Xとは？」等の定義・事実照会を含む）が調査対象と
+        // 判定した場合も、未知語の問い合わせ自体も、同じ調査経路へ進める。
+        // 従来は /調べ|検索|最新|現在/ のみで、「とは？」形では検索が発動しなかった。
+        useSearch:
+          /調べ|検索|最新|現在/.test(prompt) ||
+          unifiedWebResearchService.detectNeedForSearch(prompt).needsSearch ||
+          explicitUnknownInquiry,
       });
       const nextState = { ...state, currentTopic: unknownTerms.join('、') };
       const status: ConversationCoreResult['status'] = ['REUSED_SUPPORTED', 'LOCAL_EVIDENCE'].includes(researched.status) ? 'RESOLVED' : 'UNRESOLVED';
@@ -576,16 +595,37 @@ export class ConversationCoreService {
       let researchPerformed = false;
       let researchEvidenceCount = 0;
       let researchSummary: string | undefined;
+      // P457 (H): 未検証提示（2段構えの1段目）に使う出典と要約。
+      // 出典（URL）付きの調査結果が得られた場合だけ埋まる。
+      let unverifiedSources: Array<{ title: string; url: string }> = [];
+      let unverifiedSummary = '';
       let researchNextAction = 'この知識ギャップを調査キューに残し、公式資料・再現実験などで証拠を補います。';
 
+      // P457 (G): 調査入口の統一。検索要否判定に加え、素の事実質問の形でも
+      // 即時調査へ進める（従来は判定パターンに当たらない事実質問では
+      // 検索自体が発動しなかった）。
       const searchNeed = unifiedWebResearchService.detectNeedForSearch(prompt);
-      if (searchNeed.needsSearch) {
+      if (searchNeed.needsSearch || isFactualQuestionForm(prompt)) {
         researchPerformed = true;
         t = performance.now();
         try {
           const research = await researchService.researchGap(gap);
           researchEvidenceCount = research.evidence.length;
           researchSummary = research.summary;
+          // P457 (H): 未検証提示（2段構えの1段目）の材料を選ぶ。出典は
+          // researchGap の Evidence 側から、照会との関連性を確認して取る
+          // （出典の無い・無関係な証拠は1段目でも提示に使わない）。
+          {
+            const presentation = selectUnverifiedPresentation(
+              research.evidence || [],
+              research.researchQuery || gap.query,
+              researchSummary,
+            );
+            if (presentation) {
+              unverifiedSources = presentation.sources;
+              unverifiedSummary = presentation.summary;
+            }
+          }
           stages.research = Math.round(performance.now() - t);
           const requireFreshResearch = /(?:最新|今日|本日|現在|latest|today|current|recent)/i.test(prompt);
           const verification = verifierService.verifyMany({
@@ -743,6 +783,20 @@ export class ConversationCoreService {
           certainty: verifiedResearchOutcome === 'DEVICE_VERIFIED' ? 'CERTAIN' : 'HIGH_CONFIDENCE',
           worldScope: verifiedClaim.world,
           nextActions: latent.suggestedProactiveAction ? [latent.suggestedProactiveAction] : [],
+          detailLevel: 'STANDARD',
+        });
+      } else if (unverifiedSources.length > 0 && unverifiedSummary) {
+        // P457 (H): 2段構えの1段目。検証昇格には届かなかった調査結果を、
+        // 未検証であることを明示し出典を添えて提示する。検証済みの答えとは
+        // 文面（未検証の明示＋出典）でも状態（status は UNRESOLVED のまま）でも
+        // 区別する。検証ゲート（昇格条件）自体は変更していない。
+        reason = `${reason}; unverified_research_presented`;
+        ir = answerContentIrService.buildAnswerIR({
+          conclusion: buildUnverifiedConclusion({ summary: unverifiedSummary, sources: unverifiedSources }),
+          target: compiled.target,
+          reasons: unverifiedSources.map((s) => `出典: ${s.title}（${s.url}）`),
+          exceptions: ['調査結果は未検証です'],
+          certainty: 'UNKNOWN',
           detailLevel: 'STANDARD',
         });
       } else {

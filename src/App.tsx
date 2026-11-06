@@ -1308,7 +1308,7 @@ export default function App() {
         taskConversationFeedbackService.publishStarted(pipelineRes.taskExecution.task_id);
       }
 
-      const needsToolPass = /計算|計算して|\d+[+*\-/]\d+|VBA|Excel|コード|マクロ|集計|重複/u.test(text);
+      const needsToolPass = /計算|計算して|\d[\d,]*\s*[+*\-/×÷]\s*\d|VBA|Excel|コード|マクロ|集計|重複/u.test(text);
       const cpuCandidateTools = needsToolPass
         ? toolsService.detectCandidateToolsForPrompt(text, { workspaceFiles })
         : [];

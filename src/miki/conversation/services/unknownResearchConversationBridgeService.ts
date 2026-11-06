@@ -1,5 +1,198 @@
 import { unifiedUnknownResolutionCoordinatorService, type UnifiedUnknownResult } from '../../unknown/services/unifiedUnknownResolutionCoordinatorService';
 import { runtimeConversationCompositionService } from './runtimeConversationCompositionService';
-export interface UnknownResearchConversationResult{resolution:UnifiedUnknownResult;surfaceText:string;status:UnifiedUnknownResult['status'];returnedToConversation:true;}
-class UnknownResearchConversationBridgeService{async resolveAndRespond(input:{question:string;unknownTerms:string[];useSearch:boolean}):Promise<UnknownResearchConversationResult>{const resolution=await unifiedUnknownResolutionCoordinatorService.resolveForChat({question:input.question,useSearch:input.useSearch,unknownTerms:input.unknownTerms,hasAttachments:false});const evidenceText=resolution.effectiveText||resolution.researchQuestion||input.question;const completed=['REUSED_SUPPORTED','LOCAL_EVIDENCE','RESEARCHED_UNVERIFIED'].includes(resolution.status);const ir={conclusion:completed?evidenceText:`「${input.unknownTerms.join('、')}」は現時点で確認できません`,target:input.unknownTerms[0]||'',reasons:completed?[`未知語解決の状態は${resolution.status}です`]:[],conditions:[],exceptions:resolution.status==='RESEARCHED_UNVERIFIED'?['調査結果は未検証です']:[],next_actions:completed?[]:['検索または追加資料で確認します'],certainty:completed&&resolution.status!=='RESEARCHED_UNVERIFIED'?'LIKELY':'UNKNOWN',detail_level:'STANDARD',interaction_mode:'NORMAL',world_scope:'REAL'} as const;const composed=runtimeConversationCompositionService.compose(ir,'GENERAL_ANSWER');return{resolution,surfaceText:composed.surfaceText,status:resolution.status,returnedToConversation:true};}}
-export const unknownResearchConversationBridgeService=new UnknownResearchConversationBridgeService();
+import { researchService } from '../../research/services/researchService';
+import type { EvidenceRecord } from '../../memory/services/evidenceService';
+
+export interface UnknownResearchConversationResult {
+  resolution: UnifiedUnknownResult;
+  surfaceText: string;
+  status: UnifiedUnknownResult['status'];
+  returnedToConversation: true;
+  /** P457 (H): 未検証の出典付き提示を行った場合の出典。 */
+  unverifiedSources?: Array<{ title: string; url: string }>;
+}
+
+interface SourceRef {
+  title: string;
+  url: string;
+}
+
+export interface UnverifiedPresentation {
+  summary: string;
+  sources: SourceRef[];
+}
+
+/** 照会の主要語。全体・空白区切り・「の」区切りの順に、長いものから使う。 */
+function queryTerms(query: string): string[] {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  const parts = q
+    .split(/[\s、。・/／「」『』（）()]+/)
+    .flatMap((part) => part.split('の'))
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 2);
+  return [...new Set([q, ...parts])].sort((a, b) => b.length - a.length);
+}
+
+/**
+ * P457 (H): 未検証提示（2段構えの1段目）の材料を選ぶ。
+ * - 出典は URL を持つ証拠だけ。出典の無い情報は1段目でも出さない。
+ * - 証拠のタイトル・抜粋に照会の主要語が含まれるものだけを使う。
+ *   検索基盤に実質到達できていない場合に、無関係な記事が証拠として
+ *   残ることがあり（プロバイダのフォールバック等）、それを出典として
+ *   提示してしまわないための関連性ガード。
+ * - 要約は調査要約を優先するが、失敗文（「検索に失敗しました」等）や
+ *   照会と無関係な要約は使わず、出典先頭の抜粋に倒す。
+ * 材料が揃わなければ null（提示せず、従来の未解決の返しに倒す）。
+ */
+export function selectUnverifiedPresentation(
+  evidence: EvidenceRecord[],
+  query: string,
+  researchSummary?: string,
+): UnverifiedPresentation | null {
+  const terms = queryTerms(query);
+  const isRelevant = (text: string) => terms.length === 0 || terms.some((t) => text.includes(t));
+  const usable = (evidence || []).filter(
+    (ev) => ev.status !== 'REJECTED' && String(ev.url || '').trim() && isRelevant(`${ev.title || ''} ${ev.snippet || ''}`),
+  );
+  if (usable.length === 0) return null;
+  const seen = new Set<string>();
+  const sources: SourceRef[] = [];
+  for (const ev of usable) {
+    const url = String(ev.url || '').trim();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    sources.push({ title: String(ev.title || '').trim() || url, url });
+    if (sources.length >= 2) break;
+  }
+  let summary = '';
+  const rawSummary = typeof researchSummary === 'string' ? researchSummary.trim() : '';
+  if (rawSummary && !/検索に失敗|失敗しました/.test(rawSummary) && isRelevant(rawSummary)) {
+    summary = rawSummary.replace(/[。．]\s*$/, '').slice(0, 120);
+  }
+  if (!summary) {
+    summary = String(usable[0].snippet || '').trim().replace(/[。．]\s*$/, '').slice(0, 120);
+  }
+  if (!summary) return null;
+  return { summary, sources };
+}
+
+/**
+ * P457 (H): 未検証提示の結論文。検証済みの答えと混同されないよう、
+ * 未検証の明示と出典を、表層の候補選択で落ちない結論側に含める。
+ */
+export function buildUnverifiedConclusion(presentation: UnverifiedPresentation): string {
+  const sourceText = presentation.sources
+    .map((s) => `「${s.title}」（${s.url}）`)
+    .join('、');
+  return `調べてみたら、${presentation.summary}という情報があったよ。まだ裏付けは取れてないけど。出典は${sourceText}だよ。`;
+}
+
+class UnknownResearchConversationBridgeService {
+  async resolveAndRespond(input: { question: string; unknownTerms: string[]; useSearch: boolean }): Promise<UnknownResearchConversationResult> {
+    const resolution = await unifiedUnknownResolutionCoordinatorService.resolveForChat({
+      question: input.question,
+      useSearch: input.useSearch,
+      unknownTerms: input.unknownTerms,
+      hasAttachments: false,
+    });
+    let status = resolution.status;
+    let unverifiedSources: SourceRef[] | undefined;
+    let unverifiedSummary = '';
+    let researchedEvidenceCount = resolution.evidenceCount;
+
+    /*
+     * P457 (G): 調査が必要と判定されたら、会話の場で実際に調査まで実行する。
+     * 従来は RESEARCH_REQUIRED（調査待ち）のまま「確認できません」で終わり、
+     * 検索自体が発動しなかった。
+     * P457 (H): 出典（URL）付きの結果が得られたら、未検証であることを明示し
+     * 出典を添えて提示する（2段構えの1段目）。検証済みの答えとは status でも
+     * 文面でも区別し、昇格は既存の検証ゲートに委ねたままにする。
+     * 出典が得られない・調査基盤に到達できない場合は提示せず、調査キューに
+     * 残した旨を会話の言葉で返す。
+     */
+    if (status === 'RESEARCH_REQUIRED' && resolution.query) {
+      try {
+        const research = await researchService.executeSearch(resolution.query, { maxResults: 2 });
+        const presentation = selectUnverifiedPresentation(research.evidence || [], resolution.query, research.summary);
+        if (presentation) {
+          unverifiedSummary = presentation.summary;
+          unverifiedSources = presentation.sources;
+          researchedEvidenceCount = (research.evidence || []).filter((ev) => ev.status !== 'REJECTED').length;
+          status = 'RESEARCHED_UNVERIFIED';
+        }
+      } catch {
+        // 調査基盤に到達できない環境では、キュー投入済みの返答に倒す。
+      }
+    }
+
+    const termsLabel = input.unknownTerms.join('、');
+    let ir: any;
+    if (status === 'REUSED_SUPPORTED') {
+      // 検証済みの過去調査の再利用。本文（タイトル・snippet・URL 付き）をそのまま提示する。
+      ir = {
+        conclusion: resolution.effectiveText || resolution.researchQuestion || input.question,
+        target: input.unknownTerms[0] || '',
+        reasons: [],
+        conditions: [],
+        exceptions: [],
+        next_actions: [],
+        certainty: 'LIKELY',
+        detail_level: 'STANDARD',
+        interaction_mode: 'NORMAL',
+        world_scope: 'REAL',
+      };
+    } else if (status === 'RESEARCHED_UNVERIFIED' && unverifiedSources) {
+      ir = {
+        conclusion: buildUnverifiedConclusion({ summary: unverifiedSummary, sources: unverifiedSources }),
+        target: input.unknownTerms[0] || '',
+        reasons: unverifiedSources.map((s) => `出典: ${s.title}（${s.url}）`),
+        conditions: [],
+        exceptions: ['調査結果は未検証です'],
+        next_actions: [],
+        certainty: 'UNKNOWN',
+        detail_level: 'STANDARD',
+        interaction_mode: 'NORMAL',
+        world_scope: 'REAL',
+      };
+    } else if (status === 'RESEARCH_REQUIRED') {
+      // 調査キュー（未知解決レコード）へ投入済み。到達できなかった旨を自然に返す。
+      ir = {
+        conclusion: `「${termsLabel}」はまだ確認できていないよ。調べるキューに入れておいたから、後でもう一度聞いてみて。`,
+        target: input.unknownTerms[0] || '',
+        reasons: [],
+        conditions: [],
+        exceptions: [],
+        next_actions: [],
+        certainty: 'UNKNOWN',
+        detail_level: 'STANDARD',
+        interaction_mode: 'NORMAL',
+        world_scope: 'REAL',
+      };
+    } else {
+      ir = {
+        conclusion: `「${termsLabel}」はまだ確認できていないよ。`,
+        target: input.unknownTerms[0] || '',
+        reasons: [],
+        conditions: [],
+        exceptions: [],
+        next_actions: [],
+        certainty: 'UNKNOWN',
+        detail_level: 'STANDARD',
+        interaction_mode: 'NORMAL',
+        world_scope: 'REAL',
+      };
+    }
+
+    const composed = runtimeConversationCompositionService.compose(ir, 'GENERAL_ANSWER');
+    return {
+      resolution: status === resolution.status ? resolution : { ...resolution, status, evidenceCount: researchedEvidenceCount },
+      surfaceText: composed.surfaceText,
+      status,
+      returnedToConversation: true,
+      ...(unverifiedSources ? { unverifiedSources } : {}),
+    };
+  }
+}
+
+export const unknownResearchConversationBridgeService = new UnknownResearchConversationBridgeService();

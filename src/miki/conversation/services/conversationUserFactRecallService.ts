@@ -145,6 +145,15 @@ function topicLabelOf(c: UserFactCandidate): string {
   return c.entity || c.attribute || c.summary;
 }
 
+function buildMatch(chosen: UserFactCandidate): UserFactRecallMatch {
+  const topicLabel = topicLabelOf(chosen);
+  const answerText =
+    chosen.value && chosen.value !== chosen.entity
+      ? `あなたが言っていた${topicLabel}は「${chosen.value}」だよ。`
+      : `あなたが話していたのは「${chosen.summary}」だよ。`;
+  return { candidate: chosen, topicLabel, answerText, reasonLabel: chosen.reasonLabel };
+}
+
 export class ConversationUserFactRecallService {
   /**
    * 本人が伝えた事実への聞き返しに、保持済みの事実で答えられるかを判定する。
@@ -152,22 +161,74 @@ export class ConversationUserFactRecallService {
    */
   public matchRecall(prompt: string, memories: any[], stateSummaries?: string[]): UserFactRecallMatch | null {
     if (!isRecallForm(prompt)) return null;
+    const candidates = collectCandidates(memories, stateSummaries);
+    if (candidates.length === 0) return null;
+
+    // P457 (E): 値からの逆引き。「逃げ場がないって何の武器だっけ？」のように
+    // 保持済みの値（名前など）そのものを指す聞き返しは、値の完全一致で引く。
+    const byValue = this.matchByValue(prompt, candidates);
+    if (byValue) return byValue;
+
     const key = extractRecallKey(prompt);
     if (!key) return null;
-    const candidates = collectCandidates(memories, stateSummaries);
+
+    // P457 (E): 「AのB」分解照合。直接（対象=A・属性=B）が無ければ、
+    // カテゴリ経由（値=A の事実の対象が持つ属性=B）を引く。
+    // 例:「弓の名前は？」→ 値「弓」の対象=メイン武器 → その名前属性を引く。
+    const decomposed = key.match(/^(.+?)の(.+)$/);
+    if (decomposed) {
+      const [, a, b] = decomposed;
+      const direct = candidates.find((c) => c.entity === a && c.attribute === b);
+      if (direct) return buildMatch(direct);
+      const bridge = candidates.find((c) => c.value === a && c.entity);
+      if (bridge?.entity) {
+        const via = candidates.find((c) => c.entity === bridge.entity && c.attribute === b);
+        if (via) return buildMatch(via);
+      }
+    }
+
     const matches = candidates.filter((c) => matchesKey(key, c));
     if (matches.length === 0) return null;
     let chosen = matches[0];
     if (/いくつ/.test(prompt)) {
       const numeric = matches.find((c) => c.value && /[0-9]/.test(c.value));
       if (numeric) chosen = numeric;
+    } else if (!decomposed) {
+      // P457 (E): 対象そのものへの聞き返し（「メイン武器って何だっけ？」）では、
+      // 名前などの属性事実より、対象の値そのもの（属性なし→カテゴリの順）を優先する。
+      const plain = matches.find((c) => !c.attribute);
+      const category = matches.find((c) => c.attribute === 'カテゴリ');
+      if (plain) chosen = plain;
+      else if (category && chosen.attribute && chosen.attribute !== 'カテゴリ') chosen = category;
     }
-    const topicLabel = topicLabelOf(chosen);
-    const answerText =
-      chosen.value && chosen.value !== chosen.entity
-        ? `あなたが言っていた${topicLabel}は「${chosen.value}」だよ。`
-        : `あなたが話していたのは「${chosen.summary}」だよ。`;
-    return { candidate: chosen, topicLabel, answerText, reasonLabel: chosen.reasonLabel };
+    return buildMatch(chosen);
+  }
+
+  /**
+   * P457 (E): 値の完全一致による逆引き。値を持つ候補に対象が結びついて
+   * いるときだけ答え、対象のない候補では従来経路へ委ねる（null）。
+   * 答えには対象と属性を明示し、カテゴリの事実があれば併記する。
+   */
+  private matchByValue(prompt: string, candidates: UserFactCandidate[]): UserFactRecallMatch | null {
+    const m = prompt.trim().match(/^(.{2,24}?)(?:って|は)(?:何|なに)/);
+    if (!m) return null;
+    const subject = m[1]
+      .replace(/^(?:じゃあ|それじゃあ|ねえ|そういえば|あのさ)[、,]?\s*/, '')
+      .replace(/^(?:僕の|私の|おれの|オレの|ぼくの|自分の)/, '')
+      .trim();
+    if (!subject) return null;
+    const hit = candidates.find((c) => c.value === subject && c.entity);
+    if (!hit || !hit.entity) return null;
+    const topicLabel = hit.attribute && hit.attribute !== '数値' ? `${hit.entity}の${hit.attribute}` : hit.entity;
+    let answerText =
+      hit.attribute && hit.attribute !== '数値'
+        ? `あなたが言っていた「${hit.value}」は、${hit.entity}の${hit.attribute}だよ。`
+        : `あなたが言っていた「${hit.value}」は、${hit.entity}のことだよ。`;
+    const category = candidates.find((c) => c.entity === hit.entity && c.attribute === 'カテゴリ');
+    if (category?.value && category.value !== hit.value) {
+      answerText += `${hit.entity}のカテゴリは「${category.value}」だよ。`;
+    }
+    return { candidate: hit, topicLabel, answerText, reasonLabel: hit.reasonLabel };
   }
 
   /**

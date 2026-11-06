@@ -38,7 +38,9 @@ class SafeMathEvaluator {
   private pos = 0;
   private expr = '';
 
-  public evaluate(rawExpr: string): { result: number; formatted: string; expression: string } {
+  // P457 (F): 呼び出し側（App）が見る success フラグを契約に含める。
+  // これが無かったため計算結果が製品経路で一度も表示されなかった。
+  public evaluate(rawExpr: string): { result: number; formatted: string; expression: string; success: true } {
     const cleaned = this.preprocess(rawExpr);
     if (!cleaned) {
       throw new Error('数式が空または解釈できません');
@@ -64,6 +66,7 @@ class SafeMathEvaluator {
       result: rounded,
       formatted,
       expression: cleaned,
+      success: true,
     };
   }
 
@@ -74,6 +77,10 @@ class SafeMathEvaluator {
     let s = input.trim();
     // 全角英数・記号の半角化
     s = s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+    // P457 (F): 桁区切りカンマを除去する（「1,137×1.5」が「137×1.5」に
+    // 化ける抽出バグの受け側対策も兼ねる）。3桁区切りの形だけを対象にし、
+    // 関数引数のカンマ等は壊さない。
+    s = s.replace(/\d{1,3}(?:,\d{3})+(?:\.\d+)?/g, (num) => num.replace(/,/g, ''));
     s = s.replace(/×/g, '*').replace(/÷/g, '/').replace(/＋/g, '+').replace(/−|ー/g, '-');
     s = s.replace(/（/g, '(').replace(/）/g, ')').replace(/％/g, '%');
     s = s.replace(/√\s*(\d+(?:\.\d+)?)/g, 'sqrt($1)');
@@ -706,15 +713,18 @@ export class ToolsService {
 
     // 1. 数値計算ツール判定 (tool_safe_calculator)
     // 式、計算依頼、税込・税別、四則演算、割引等
+    // P457 (F): 数値は桁区切りカンマ付き（1,137 等）も1つの数として扱う。
+    // これが無かったため「1,137×1.5」の抽出が「137×1.5」に化けていた。
+    const NUM = String.raw`(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?`;
     const isMathPattern =
-      /\b(\d+(?:\.\d+)?\s*[\+\-\*\/\^%×÷＋−]\s*\d+(?:\.\d+)?|\d+\s*[\*x\/\÷]\s*\d+)/i.test(p) ||
+      new RegExp(String.raw`\b(${NUM}\s*[\+\-\*\/\^%×÷＋−]\s*${NUM}|\d+\s*[\*x\/\÷]\s*\d+)`, 'i').test(p) ||
       /(計算|何割|何パーセント|税込み|税込|税別|平方根|合計|平均|階乗|対数|方程式|\bsqrt\b|\bsin\b|\bcos\b|√)/i.test(p) ||
       /\d+\s*円?の(?:税込|税別|\d+割|\d+%)/.test(p);
 
     if (isMathPattern) {
       // プロンプトから数式らしき部分を抽出試行
       let extractedExpr = '';
-      const exprMatch = p.match(/(\d+(?:\.\d+)?\s*[\+\-\*\/\^%×÷＋−]\s*[\d\.\s\+\-\*\/\^%×÷＋−\(\)]+)/);
+      const exprMatch = p.match(new RegExp(String.raw`(${NUM}\s*[\+\-\*\/\^%×÷＋−]\s*[\d\.,\s\+\-\*\/\^%×÷＋−\(\)]+)`));
       if (exprMatch) {
         extractedExpr = exprMatch[0].trim();
       } else {
