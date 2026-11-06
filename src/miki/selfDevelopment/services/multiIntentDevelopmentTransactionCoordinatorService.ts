@@ -3,7 +3,8 @@ import { semanticUnderstandingV2OrchestratorService } from './semanticUnderstand
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';import { isolatedCandidateWorkspaceService } from '../../core/services/isolatedCandidateWorkspaceService';import { specializedDevelopmentExecutorDispatcherService } from './specializedDevelopmentExecutorDispatcherService';import { deterministicGoalSemanticsService } from './deterministicGoalSemanticsService';import { conceptOntologyService } from './conceptOntologyService';import { repositoryGroundedHypothesisService } from './repositoryGroundedHypothesisService';import { capabilityContractSynthesisService } from './capabilityContractSynthesisService';import { atomicComponentTemplateSynthesisService } from './atomicComponentTemplateSynthesisService';import { generatedComponentVerificationRegistrationService } from './generatedComponentVerificationRegistrationService';import { semanticTransactionReviewEvidenceService } from './semanticTransactionReviewEvidenceService';
 import { generatedComponentWorkerSandboxService } from './generatedComponentWorkerSandboxService';
 import { executionRunnerService } from '../../execution/services/executionRunnerService';
-import { componentRegressionService } from '../../verification/services/componentRegressionService';
+import { componentRegressionService, RegressionSuite } from '../../verification/services/componentRegressionService';
+import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { componentPromotionService } from '../../promotion/services/componentPromotionService';
 import { componentTestCaseService } from '../../verification/services/componentTestCaseService';
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
@@ -54,11 +55,17 @@ generatedComponents.push(driven.componentId);const token=developmentResumeTokenS
     const artifactSnapshotKey=componentArtifactStoreService.getManifest(componentId)?.snapshot_key||'';
     if(!artifactSnapshotKey){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P441] ${componentId}: Artifact snapshotがなく、サンドボックス証拠を正式ルートへ載せられません`);return false;}
     const cases=componentTestCaseService.generateForComponent(componentId);
-    // Gate を先に作る。plan() が各テストケースの実行要求（QUEUED）を
-    // 作るため、submitResult の宛先がここで決まる。
-    const gate=componentPromotionService.createGate(componentId,'EXTERNAL_RUNNER');
+    // P447: 既存の未完了 Gate があれば再利用する。createGate を無条件に
+    // 呼ぶと plan() が同じ suite_id で Suite を上書きし、前の Gate の
+    // 要求が QUEUED のまま孤児になる（P441 からの挙動）。探し方は
+    // VERIFY_CODE_COMPONENT 経路（domainIntegrationBootstrapService.ts:
+    // 507-515）と同じ。終わっている Suite は使い回さず新しく作る。
+    // Gate の要求（QUEUED）が submitResult の宛先になる。
+    const existingGate=this.findReusableGate(componentId,'EXTERNAL_RUNNER');
+    const gate=existingGate??componentPromotionService.createGate(componentId,'EXTERNAL_RUNNER');
     if(!gate){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P441] ${componentId}: Regression Gateを作成できませんでした`);return false;}
-    systemLogger.info('TOOLS',`🔁 [P441] ${componentId}: Regression Gate ${gate.suite_id} を作成しました（サンドボックス証拠の材料）`);
+    if(existingGate)systemLogger.info('TOOLS',`🔁 [P447] ${componentId}: 既存の未完了 Gate ${gate.suite_id} を再利用します（新規作成しません）`);
+    else systemLogger.info('TOOLS',`🔁 [P441] ${componentId}: Regression Gate ${gate.suite_id} を作成しました（サンドボックス証拠の材料）`);
     // P443(G3)+P445: サンドボックスは NORMAL/EMPTY/BOUNDARY/INVALID/
     // PERMISSION/REGRESSION の6入力を実行する。INVALID は要求なし
     // （安全な失敗の観測点）、PERMISSION は allowed: false の拒否
@@ -91,5 +98,32 @@ generatedComponents.push(driven.componentId);const token=developmentResumeTokenS
     const suite=componentRegressionService.refresh(gate.suite_id);
     systemLogger.info('TOOLS',`🔁 [P442] ${componentId}: Regression Suite ${gate.suite_id} status=${suite?.status} passed=${suite?.passed_count}/${gate.request_ids.length}`);
     return advanced;
+  }
+
+  /**
+   * P447: 再利用できる未完了の Regression Gate を探す。なければ undefined。
+   * 探し方は VERIFY_CODE_COMPONENT 経路と同じ（component_id・
+   * implementation_hash・environment が一致する最新のもの）。再利用は
+   * refresh 後の status が PLANNED/RUNNING で、QUEUED の要求が残って
+   * いる場合に限る（markSubmitted の宛先がある場合だけ）。終わって
+   * いる Suite（PASSED/FAILED/BLOCKED）は使い回さず、新しく作る。
+   * なお advance の時点では verifyAndRegister が部品を ANALYZED へ
+   * 登録し直した直後のため、部品状態による DEVICE_TESTED の早期復帰
+   * はここでは判定できない（registerComponent は状態チェックなしの
+   * 上書き）。その分岐は入れない。
+   */
+  private findReusableGate(componentId:string,environment:RegressionSuite['environment']):RegressionSuite|undefined{
+    const component=componentRegistryService.getComponent(componentId);
+    if(!component?.implementation_hash)return undefined;
+    const existing=componentRegressionService.list()
+      .filter(suite=>suite.component_id===componentId&&suite.implementation_hash===component.implementation_hash&&suite.environment===environment)
+      .sort((a,b)=>b.created_at-a.created_at)[0];
+    if(!existing)return undefined;
+    const refreshed=componentRegressionService.refresh(existing.suite_id);
+    if(!refreshed)return undefined;
+    if(refreshed.status!=='PLANNED'&&refreshed.status!=='RUNNING')return undefined;
+    const hasQueued=refreshed.case_bindings.some(binding=>executionRunnerService.getRequest(binding.request_id)?.status==='QUEUED');
+    if(!hasQueued)return undefined;
+    return refreshed;
   }}
 export const multiIntentDevelopmentTransactionCoordinatorService=new MultiIntentDevelopmentTransactionCoordinatorService();
