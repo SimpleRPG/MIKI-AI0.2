@@ -128,7 +128,10 @@ export function getShallowSleepUnmetReasons(c: BackgroundExecutionConditions): s
  */
 export class BackgroundWorkerService {
   private constraints: WorkManagerConstraints = {
-    requiresCharging: true,
+    // P450: 充電必須だと WorkManager の発火窓が極小になるため既定を外す。
+    // バッテリー保護は Worker 自身のハードウェア判定 (20%以上または
+    // 充電中・42℃未満) が担う。
+    requiresCharging: false,
     requiresDeviceIdle: false, // 睡眠判定で厳格に制御
     requiresUnmeteredWifi: false, // 設計思想 Master v5.4 第19.6項: モバイル回線時も自律学習を許可 (既定false)
     batteryNotLow: true,
@@ -231,7 +234,9 @@ export class BackgroundWorkerService {
     }
 
     // 3. Android ネイティブ環境であれば WorkManager ジョブを同期
-    if (this.isRegistered && nativeWorkManagerService.isAndroidNative()) {
+    // P450: OFF が永続化されている場合も、残っている登録を確実に
+    // 解除するため、登録状態によらず同期する (中身が分岐する)。
+    if (nativeWorkManagerService.isAndroidNative()) {
       this.syncNativeWorkManagerSchedule();
     }
   }
@@ -264,8 +269,19 @@ export class BackgroundWorkerService {
       const savedConfig = storageService.getItem(WORK_MANAGER_CONFIG_KEY);
       if (savedConfig) {
         const parsed = JSON.parse(savedConfig);
-        this.intervalMinutes = parsed.intervalMinutes || 360;
+        this.intervalMinutes = parsed.intervalMinutes || 60;
         this.lastRunTimestamp = parsed.lastRunTimestamp || 0;
+        // P450: バックグラウンド実行のオンオフを復元する (既定ON)。
+        // 保存されていない場合は既定の true のまま。
+        if (typeof parsed.registered === 'boolean') {
+          this.isRegistered = parsed.registered;
+        }
+        // P450: 制約の移行。旧既定 (requiresCharging: true) が端末に
+        // 保存されたまま残っていると WorkManager が充電中にしか動けない
+        // ため、移行フラグがない保存済み制約は一度だけ新既定へ寄せる。
+        if (parsed.constraintsV2 !== true) {
+          this.constraints = { ...this.constraints, requiresCharging: false };
+        }
       }
     } catch (e) {
       console.warn('Failed to load WorkManager state:', e);
@@ -282,6 +298,9 @@ export class BackgroundWorkerService {
         JSON.stringify({
           intervalMinutes: this.intervalMinutes,
           lastRunTimestamp: this.lastRunTimestamp,
+          // P450: バックグラウンド実行のオンオフと制約移行フラグを永続化
+          registered: this.isRegistered,
+          constraintsV2: true,
         })
       );
     } catch (e) {
@@ -562,13 +581,23 @@ export class BackgroundWorkerService {
     const logId = 'bg_' + startTime + '_' + Math.random().toString(36).substring(2, 6);
 
     // Android WorkManager may wake a headless WebView while the app UI is closed.
-    // Re-emit the existing CORE ingress event only when the configured autopilot interval is due.
+    // Re-emit the existing CORE ingress event only when the configured interval is due.
     if (triggerSource === 'android_intent' || triggerSource === 'periodic_scheduled') {
       try {
         const autopilotRaw = storageService.getItem('miki_autopilot_config_v1');
         const autopilot = autopilotRaw ? JSON.parse(autopilotRaw) as Record<string, unknown> : {};
-        const enabled = autopilot.enabled === true;
-        const intervalMinutes = Math.max(60, Math.min(10080, Number(autopilot.intervalMinutes) || 360));
+        const autopilotEnabled = autopilot.enabled === true;
+        // P450: 門の整理。以前はオートパイロット有効のときだけ dispatch
+        // していたため、背景サイクルが回っても改善ループの入口が
+        // 叩かれなかった。きりあの承認（基本自由に後ろで回してよい、
+        // 設定でオンオフ）に基づき、背景実行が有効 (isRegistered) なら
+        // オートパイロットが OFF でも dispatch する。背景実行を OFF に
+        // すれば dispatch も止まる。オートパイロット有効時は従来どおり
+        // オートパイロット側の間隔を優先する。
+        const enabled = autopilotEnabled || this.isRegistered;
+        const intervalMinutes = autopilotEnabled
+          ? Math.max(60, Math.min(10080, Number(autopilot.intervalMinutes) || 360))
+          : Math.max(60, Math.min(10080, this.intervalMinutes || 60));
         const lastKey = 'miki_autopilot_last_native_dispatch_v1';
         const pendingKey = 'miki_autopilot_pending_dispatch_v1';
         const lastDispatch = Number(storageService.getItem(lastKey) || 0);

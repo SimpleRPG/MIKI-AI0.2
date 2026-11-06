@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1759,
-    "sourceFileCount": 1312,
+    "trackedPathCountExcludingControlPaths": 1761,
+    "sourceFileCount": 1314,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1225,
-    "relativeImportCandidateCount": 3751,
-    "resolvedRelativeImportCandidateCount": 3735,
+    "relativeImportCandidateCount": 3752,
+    "resolvedRelativeImportCandidateCount": 3736,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -136,9 +136,9 @@
     },
     {
       "path": "android/app/src/main/AndroidManifest.xml",
-      "bytes": 1789,
-      "lines": 45,
-      "sha256": "a51dcb9068b54c00a9162156c4aa6c0157209e631b5b9e875ff45f80b782c675",
+      "bytes": 2277,
+      "lines": 54,
+      "sha256": "e759ef9ed9697f2acd404e063400ae7046e7495df0844dd61917b400fcf7f696",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -186,9 +186,19 @@
     },
     {
       "path": "android/app/src/main/java/com/miki/ai/MainActivity.java",
-      "bytes": 7926,
-      "lines": 214,
-      "sha256": "5b20b365a821442a4a144375fc8334816d2d76da17b7f65754869e132301d8c4",
+      "bytes": 7985,
+      "lines": 215,
+      "sha256": "3e4c5f993fdb28d33c2ce26f6b0e870847a34e8e268e58b3f84c2e31d0e15cc5",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "android/app/src/main/java/com/miki/ai/MikiBackgroundServicePlugin.kt",
+      "bytes": 4556,
+      "lines": 121,
+      "sha256": "c0e62e476cb513ad1590c0b13d9a6729ce594b9ef0610e47529aa3cc22769b2c",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -199,6 +209,16 @@
       "bytes": 17505,
       "lines": 349,
       "sha256": "5c3303f96550c4ae2186cd3eee233897716873fb8fd32d637cd2fc358de00846",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "android/app/src/main/java/com/miki/ai/MikiKeepAliveService.kt",
+      "bytes": 5215,
+      "lines": 130,
+      "sha256": "90960e49d738ad882371e5565b7d5ff1b4485c02439c10d58b34f01e8b068aa2",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -7130,9 +7150,9 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 105667,
-      "lines": 2080,
-      "sha256": "d74025c9d8d656a98d193f0e20ae952b1d3e6b3cbf299e192201d195ac0bdaa8",
+      "bytes": 107860,
+      "lines": 2114,
+      "sha256": "70f2040f155c7665eea5368be6b3bf6be9ec513dec0ca5e351ca9d6e7031545c",
       "relativeImportCandidates": [
         {
           "line": 48,
@@ -7202,13 +7222,19 @@
         },
         {
           "line": 62,
+          "specifier": "../miki/execution/services/backgroundWorkerService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/backgroundWorkerService.ts"
+        },
+        {
+          "line": 63,
           "specifier": "../utils/isEditableInputActive",
           "resolution": "RESOLVED",
           "resolvedPath": "src/utils/isEditableInputActive.ts"
         }
       ],
-      "relativeImportCandidateCount": 12,
-      "resolvedRelativeImportCount": 12,
+      "relativeImportCandidateCount": 13,
+      "resolvedRelativeImportCount": 13,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -19891,9 +19917,9 @@
     },
     {
       "path": "src/miki/execution/services/backgroundWorkerService.ts",
-      "bytes": 82054,
-      "lines": 1602,
-      "sha256": "b71095625eb7bf0eeb98d9a7cb18cc4f4ccc60d290e837c6a5a1154ada4666ed",
+      "bytes": 84116,
+      "lines": 1631,
+      "sha256": "252d0a5a1b896530adb89d9f9f8f974f6df5798746672b3ad0620ade29c41028",
       "relativeImportCandidates": [
         {
           "line": 10,

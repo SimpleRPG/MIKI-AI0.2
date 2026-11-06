@@ -59,6 +59,7 @@ import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewaySer
 import { systemLogger } from '../services/systemLogger';
 import { componentSupplyRequestService } from '../miki/core/services/componentSupplyRequestService';
 import { componentSupplyIntakeService } from '../miki/core/services/componentSupplyIntakeService';
+import { backgroundWorkerService } from '../miki/execution/services/backgroundWorkerService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
 export interface AutonomousImprovementHomeProps {
@@ -264,6 +265,13 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   // （P420）の読み出しだけで足りる範囲とし、新しい永続化は増やさない。
   const [supplyRequests, setSupplyRequests] = useState(() => componentSupplyRequestService.list());
   const [supplyIntakes, setSupplyIntakes] = useState(() => componentSupplyIntakeService.list());
+
+  // P450: バックグラウンド実行のオンオフ (既定ON、サービス側で永続化)
+  const [backgroundStatus, setBackgroundStatus] = useState(() => backgroundWorkerService.getStatus());
+  const toggleBackgroundExecution = (next: boolean) => {
+    backgroundWorkerService.toggleRegistered(next);
+    setBackgroundStatus(backgroundWorkerService.getStatus());
+  };
 
   // Directive creation inputs
   const [newDirectiveText, setNewDirectiveText] = useState('');
@@ -1145,6 +1153,32 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* P450: バックグラウンド実行のオンオフ */}
+            <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  バックグラウンド実行
+                </h3>
+                <button
+                  onClick={() => toggleBackgroundExecution(!backgroundStatus.isRegistered)}
+                  className="flex items-center gap-2"
+                  title="アプリを閉じている間の自律改善ループと背景サイクルの実行を切り替えます"
+                >
+                  <span className="text-[11px] font-bold text-slate-300">
+                    {backgroundStatus.isRegistered ? 'ON' : 'OFF'}
+                  </span>
+                  <span className={`h-7 w-12 rounded-full p-1 transition ${backgroundStatus.isRegistered ? 'bg-emerald-600' : 'bg-slate-700'}`}>
+                    <span className={`block h-5 w-5 rounded-full bg-white transition ${backgroundStatus.isRegistered ? 'translate-x-5' : ''}`} />
+                  </span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                アプリを閉じている間も、自律改善ループと背景サイクルを {backgroundStatus.intervalMinutes} 分間隔で回し続けます。
+                OFFにすると背景の定期実行はすべて止まります。この設定は再起動後も維持されます。
+              </p>
             </div>
 
             {/* P421（供給3）: 部品供給の状態（要求台帳・受入台帳の表示） */}
