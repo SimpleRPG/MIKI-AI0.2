@@ -7,13 +7,34 @@ const AVATARS = [
   { id: 'miki-circle', label: 'サークル', icon: '●' },
   { id: 'miki-spark', label: 'スパーク', icon: '✦' },
   { id: 'miki-cube', label: 'キューブ', icon: '◆' },
+  { id: 'bibi-default', label: 'ビービー', icon: '🎀' },
 ];
 
 export const PersonaSettingsPanel: React.FC = () => {
   const [profile, setProfile] = useState<PersonaProfile>(() => typedPersonaUiGatewayService.getProfile());
+  const [profiles, setProfiles] = useState<PersonaProfile[]>(() => typedPersonaUiGatewayService.listProfiles());
+  const [activeId, setActiveId] = useState<string>(() => typedPersonaUiGatewayService.getActiveProfileId());
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const preview = useMemo(() => typedPersonaUiGatewayService.preview(profile), [profile]);
+
+  const refreshRoster = () => {
+    setProfiles(typedPersonaUiGatewayService.listProfiles());
+    setActiveId(typedPersonaUiGatewayService.getActiveProfileId());
+  };
+
+  const switchPersona = async (profileId: string) => {
+    if (profileId === activeId || busy) return;
+    setBusy(true);
+    setNotice('');
+    const result = await typedPersonaUiGatewayService.switchProfile(profileId);
+    setBusy(false);
+    setNotice(`${result.summary}${result.taskId ? ` / Task ${result.taskId}` : ''}`);
+    if (result.status === 'SUCCESS' && result.profile) {
+      setProfile(result.profile);
+      refreshRoster();
+    }
+  };
 
   const save = async () => {
     setBusy(true);
@@ -22,6 +43,7 @@ export const PersonaSettingsPanel: React.FC = () => {
     setBusy(false);
     setNotice(`${result.summary}${result.taskId ? ` / Task ${result.taskId}` : ''}${result.receipt ? ` / Receipt ${result.receipt.receiptId}` : ''}`);
     if (result.profile) setProfile(result.profile);
+    refreshRoster();
   };
 
   const reset = () => {
@@ -31,6 +53,7 @@ export const PersonaSettingsPanel: React.FC = () => {
 
   return <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900 p-4">
     <div><h2 className="text-base font-bold">会話・人格</h2><p className="mt-1 text-xs leading-5 text-slate-400">名前、話し方の性格、既存アイコンだけを設定します。事実判定、安全、Evidence、coreの権限は変更しません。</p></div>
+    <div><p className="text-sm font-semibold">話す相手</p><p className="mt-1 text-xs leading-5 text-slate-400">知識・記憶・会話の経緯は全員で共有です。違うのは性格と話し方だけです。</p><div className="mt-2 grid grid-cols-2 gap-3">{profiles.map(item => <button key={item.profileId} type="button" disabled={busy} onClick={() => { void switchPersona(item.profileId); }} aria-pressed={item.profileId === activeId} className={`min-h-14 rounded-2xl border px-3 text-left ${item.profileId === activeId ? 'border-pink-400 bg-pink-950/60' : 'border-slate-700 bg-slate-950'}`}><span className="block text-sm font-bold">{item.name}</span><span className="mt-0.5 block text-[11px] leading-4 text-slate-400">{item.profileId === activeId ? '今この相手と話しています' : 'タップで切り替え'}</span></button>)}</div></div>
     <label className="block text-sm font-semibold">名前<input value={profile.name} maxLength={40} onChange={e => setProfile(x => ({ ...x, name: e.target.value }))} className="mt-2 min-h-12 w-full rounded-2xl border border-slate-700 bg-slate-950 px-3" /></label>
     <label className="block text-sm font-semibold">性格<textarea value={profile.personalityText} maxLength={500} rows={4} onChange={e => setProfile(x => ({ ...x, personalityText: e.target.value }))} placeholder="例: 親しみやすく、率直で、簡潔かつ丁寧" className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 p-3" /><span className="mt-1 block text-right text-[11px] text-slate-500">{profile.personalityText.length} / 500</span></label>
     <div><p className="text-sm font-semibold">アイコン</p><div className="mt-2 grid grid-cols-2 gap-3">{AVATARS.map(item => <button key={item.id} type="button" onClick={() => setProfile(x => ({ ...x, avatarId: item.id }))} aria-pressed={profile.avatarId === item.id} className={`min-h-14 rounded-2xl border px-3 text-left ${profile.avatarId === item.id ? 'border-indigo-400 bg-indigo-950' : 'border-slate-700 bg-slate-950'}`}><span className="mr-2 text-lg">{item.icon}</span>{item.label}</button>)}</div></div>

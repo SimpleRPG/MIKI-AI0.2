@@ -104,6 +104,7 @@ import { counterfactualWorkSimulatorService } from './miki/unknown/services/coun
 import { personalApiGatewayService } from './miki/execution/services/personalApiGatewayService';
 import { longTermMemoryService } from './miki/memory/services/longTermMemoryService';
 import { conversationFactIntakeService } from './miki/conversation/services/conversationFactIntakeService';
+import { personaProfileService } from './miki/conversation/services/personaProfileService';
 import { codeVerificationService } from './miki/verification/services/codeVerificationService';
 import { falsificationService, classifyClaimEpistemology } from './miki/verification/services/falsificationService';
 import { counterfactualReasoningService } from './miki/unknown/services/counterfactualReasoningService';
@@ -241,7 +242,11 @@ export default function App() {
       const saved = storageService.getItem('gamecraft_persona');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.basePersonality?.includes('親友') || parsed.tagline?.includes('相棒') || !parsed.tagline?.includes('恋人')) {
+        // P454: the lover-persona reset migration belongs to Miki only.
+        // When Bibi is the active persona her saved config must survive a
+        // restart untouched (her tagline never contains 恋人 by design).
+        const isMikiPersona = (parsed.id ?? DEFAULT_PERSONA.id) === DEFAULT_PERSONA.id;
+        if (isMikiPersona && (parsed.basePersonality?.includes('親友') || parsed.tagline?.includes('相棒') || !parsed.tagline?.includes('恋人'))) {
           parsed.tagline = DEFAULT_PERSONA.tagline;
           parsed.basePersonality = DEFAULT_PERSONA.basePersonality;
           parsed.speakingStyle = DEFAULT_PERSONA.speakingStyle;
@@ -530,7 +535,25 @@ export default function App() {
   // Save Persona & Memories & Messages & Files to storageService
   useEffect(() => {
     storageService.setItem('gamecraft_persona', JSON.stringify(persona));
+    // P454: keep the persona roster's active profile in step with App-side
+    // edits (memory modal etc.), so they survive switching persona.
+    personaProfileService.syncActiveFromPersonaConfig(persona);
   }, [persona]);
+
+  // P454: follow persona switches / profile saves made from the settings
+  // panel, so the header, chat speaker names and memory tab update at once.
+  // Knowledge, memories and conversation history are shared and untouched.
+  useEffect(() => {
+    const handler = () => {
+      try {
+        setPersona(personaProfileService.getActivePersonaConfig());
+      } catch (e) {
+        console.warn('Failed to sync persona from profile service:', e);
+      }
+    };
+    window.addEventListener('miki-persona-profile-updated', handler);
+    return () => window.removeEventListener('miki-persona-profile-updated', handler);
+  }, []);
 
   useEffect(() => {
     storageService.setMemories(memories);

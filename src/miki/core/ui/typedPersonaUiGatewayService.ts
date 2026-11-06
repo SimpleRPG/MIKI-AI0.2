@@ -14,6 +14,28 @@ class TypedPersonaUiGatewayService {
   getProfile(): PersonaProfile { return personaProfileService.get(); }
   getDefaultProfile(): PersonaProfile { return personaProfileService.getDefault(); }
   preview(profile: PersonaProfile) { return personaProfileService.preview(profile); }
+  // P454: persona roster (Miki / Bibi share one brain; only the persona differs).
+  listProfiles(): PersonaProfile[] { return personaProfileService.listProfiles(); }
+  getActiveProfileId(): string { return personaProfileService.getActiveProfileId(); }
+
+  async switchProfile(profileId: string): Promise<PersonaUiSaveResult> {
+    await appRuntimeLifecycleService.waitForCoreRoutingReady();
+    const target = personaProfileService.listProfiles().find(p => p.profileId === profileId);
+    if (!target) return { status: 'FAILED', summary: '切り替え先の人格が見つかりません。' };
+    const core = await coreTaskIngressService.submit({
+      kind: 'USER_REQUEST',
+      goal: '話す相手（人格）を切り替える',
+      source: 'conversation',
+      payload: { operation: 'SWITCH_PERSONA_PROFILE', requestedBy: 'PERSONA_SETTINGS_UI', profileId, name: target.name },
+    });
+    if (core.task.status !== 'COMPLETED') return { status: 'BLOCKED', taskId: core.task.taskId, summary: 'coreが切り替えを完了確定していません。' };
+    try {
+      const profile = personaProfileService.switchProfile(profileId);
+      return { status: 'SUCCESS', taskId: core.task.taskId, summary: `話す相手を${profile.name}に切り替えました。`, profile };
+    } catch (error) {
+      return { status: 'FAILED', taskId: core.task.taskId, summary: error instanceof Error ? error.message : 'PERSONA_PROFILE_SWITCH_FAILED' };
+    }
+  }
 
   async saveProfile(input: Pick<PersonaProfile, 'name' | 'personalityText' | 'avatarId'>): Promise<PersonaUiSaveResult> {
     await appRuntimeLifecycleService.waitForCoreRoutingReady();
