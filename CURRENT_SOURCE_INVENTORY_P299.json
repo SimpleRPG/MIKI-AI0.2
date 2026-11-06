@@ -29769,9 +29769,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/generatedComponentWorkerSandboxService.ts",
-      "bytes": 4027,
-      "lines": 41,
-      "sha256": "b6531b7c8de76e783b9fc4eed39d97b207420f08c2c4084d1e8a1f16f02f30dc",
+      "bytes": 4517,
+      "lines": 46,
+      "sha256": "b80a2e7889588d692746240de4fb444143518e5c5c8c9eaa65de62aeb14f1e3f",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -30246,9 +30246,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts",
-      "bytes": 14165,
-      "lines": 93,
-      "sha256": "32f418c05fe606293ced1c02b1f835cd5a69e09c38d47f0d47e6654d2b885a21",
+      "bytes": 14409,
+      "lines": 95,
+      "sha256": "d0db10719483a4d20723551db05c7562f6028294349143856d157f76ef14a3bb",
       "relativeImportCandidates": [
         {
           "line": 1,
