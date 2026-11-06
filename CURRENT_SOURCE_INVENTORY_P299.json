@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1755,
-    "sourceFileCount": 1308,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1221,
-    "relativeImportCandidateCount": 3722,
-    "resolvedRelativeImportCandidateCount": 3706,
+    "trackedPathCountExcludingControlPaths": 1757,
+    "sourceFileCount": 1310,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1223,
+    "relativeImportCandidateCount": 3735,
+    "resolvedRelativeImportCandidateCount": 3719,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -23975,9 +23975,9 @@
     },
     {
       "path": "src/miki/promotion/services/componentPromotionService.ts",
-      "bytes": 8425,
-      "lines": 118,
-      "sha256": "2933006de9c2c37cd3cdd5c6a4dfa95b083f6565ef1f1403b65b7eac67f6559c",
+      "bytes": 8929,
+      "lines": 123,
+      "sha256": "86e9a9743ac2fb80f2e22d17db2eb8a26ef7f4b2294f05439b709a6cde3ebef8",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -24014,10 +24014,16 @@
           "specifier": "../../capability/services/componentArtifactStoreService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/componentArtifactStoreService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "../../selfDevelopment/services/dynamicTemplateRegistryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/dynamicTemplateRegistryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -28157,9 +28163,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/capabilityContractSynthesisService.ts",
-      "bytes": 1770,
-      "lines": 4,
-      "sha256": "3e53bc103ebfbb8abb8a2794fd025b64db4f4c931421c8c6160d6bf6883bd145",
+      "bytes": 1934,
+      "lines": 10,
+      "sha256": "e46490221192f545b2c8d682cef2be58de51a43ced90b360240f626709dab751",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -28172,10 +28178,16 @@
           "specifier": "../../capability/services/componentRegistryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/componentRegistryService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "./dynamicTemplateRegistryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/dynamicTemplateRegistryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -28499,9 +28511,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/conceptOntologyService.ts",
-      "bytes": 1890,
-      "lines": 4,
-      "sha256": "51fd7593b44509b4b27d97297cdaa2b233bdacd4204fd7bbdad5509261b60ee4",
+      "bytes": 2857,
+      "lines": 9,
+      "sha256": "5ac35288df276174430525d5b47ef827853cd89a9b7f0548fdbc63d92040d05a",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -29183,6 +29195,35 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/selfDevelopment/services/dynamicTemplateRegistryService.ts",
+      "bytes": 12895,
+      "lines": 278,
+      "sha256": "b4e311e3366ebc2ea5dab0dc6de168f2cf026c8a8f46b32698c4593f9d464af3",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../core/data/codeKnowledge/deterministicDevelopmentSemantics",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/data/codeKnowledge/deterministicDevelopmentSemantics.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/selfDevelopment/services/environmentRecoveryService.ts",
       "bytes": 2085,
       "lines": 4,
@@ -29682,12 +29723,19 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/generatedComponentTemplateSpecService.ts",
-      "bytes": 23047,
-      "lines": 443,
-      "sha256": "1ca14c3bcc028c25defa29d1bbf81aca2861c28062a911b570a2407b03f4b3ba",
-      "relativeImportCandidates": [],
-      "relativeImportCandidateCount": 0,
-      "resolvedRelativeImportCount": 0,
+      "bytes": 25101,
+      "lines": 474,
+      "sha256": "0c740aa8acc05054d83762ad07f55d5fe5ab8d2e045c9de19935daa0b2786983",
+      "relativeImportCandidates": [
+        {
+          "line": 43,
+          "specifier": "./dynamicTemplateRegistryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/dynamicTemplateRegistryService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -30198,9 +30246,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts",
-      "bytes": 13271,
-      "lines": 82,
-      "sha256": "9346187853f52d4dd51181e3156835502a823adfaeafa5048c033d2864213737",
+      "bytes": 14165,
+      "lines": 93,
+      "sha256": "32f418c05fe606293ced1c02b1f835cd5a69e09c38d47f0d47e6654d2b885a21",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -32122,6 +32170,59 @@
       ],
       "relativeImportCandidateCount": 2,
       "resolvedRelativeImportCount": 2,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/selfDevelopment/services/templateCreationService.ts",
+      "bytes": 10848,
+      "lines": 212,
+      "sha256": "167f2eeca55a6b1f4383cc9c7eb589eae9a8cd08025e58057029d7fffb05438d",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../capability/services/componentRegistryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/capability/services/componentRegistryService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "./dynamicTemplateRegistryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/dynamicTemplateRegistryService.ts"
+        },
+        {
+          "line": 5,
+          "specifier": "./atomicComponentTemplateSynthesisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/atomicComponentTemplateSynthesisService.ts"
+        },
+        {
+          "line": 6,
+          "specifier": "./multiIntentDevelopmentTransactionCoordinatorService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "./capabilityContractSynthesisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/capabilityContractSynthesisService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {

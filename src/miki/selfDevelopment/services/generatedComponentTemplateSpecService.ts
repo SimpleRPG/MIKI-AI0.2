@@ -22,16 +22,27 @@
  *   全体を失敗にするため、生成関数は決して throw しない。
  * - 決定論のみ。Date.now / Math.random / fetch( / XMLHttpRequest /
  *   eval( は生成コードに含めない（登録時の静的検査と同じ条件）。
- * - JSON/CSV の3個は現行の能力オントロジーに名前がなく、どの操作名
- *   からも選ばれない（capabilityContractSynthesisService.templates()）。
- *   推測で選択の正規表現を追加しない。ここでは中身（実処理コードと
- *   フィクスチャ）だけを用意し、選択は能力が名前を持つとき（P444の
- *   テンプレート作成）に決める。
+ * - JSON/CSV の3個は P444 で能力オントロジーに名前ができ、選択規則も
+ *   動的レジストリに入った（capabilityContractSynthesisService は
+ *   レジストリの selectTemplates を読む）。
  * - TEST_UNIQUENESS / TEST_ROUNDTRIP は編集ではなくテスト要件のため
  *   操作コードは作らない。往復性はサーバの2回実行・決定性照合で、
  *   一意性は冪等チェック（同じ要求の再適用は無変更）で担保する。
+ * - [P444] 提案されたテンプレートの仕様は動的レジストリ
+ *   (dynamicTemplateRegistryService) から読む。TEMPLATE_SPECS は
+ *   既存10個の正本で、提案はここに書かない。getTemplateSpec /
+ *   operationCodeFor は、静的テーブルにないIDをレジストリで引く。
+ *   仕様の参照はゲートではない（選べるのは VERIFIED だけ、という
+ *   ゲートは選択規則側）。自分の部品を作るときは CANDIDATE の
+ *   仕様も読む（そうしないと部品が作れない）。
+ * - [P444] CONFIG 種別は KEY_VALUE 文書（.env/.ini など）の操作。
+ *   repositoryArtifactAdapterService が CONFIG 文書を編集可能な
+ *   KEY_VALUE 文書と分類しているのが根拠。CONFIG_KEY_SET のような
+ *   新しいテンプレートは作成フローで提案する。
  */
-export type TemplateKind = 'TS' | 'JSON' | 'CSV' | 'TEST';
+import { dynamicTemplateRegistryService } from './dynamicTemplateRegistryService';
+
+export type TemplateKind = 'TS' | 'JSON' | 'CSV' | 'CONFIG' | 'TEST';
 
 export interface TemplateOperationSpec {
   kind: TemplateKind;
@@ -100,7 +111,19 @@ export const TEMPLATE_SPECS: Record<string, TemplateOperationSpec> = {
 };
 
 export function templateKind(templateId: string): TemplateKind {
-  return TEMPLATE_SPECS[templateId]?.kind ?? 'TS';
+  return getTemplateSpec(templateId)?.kind ?? 'TS';
+}
+
+/**
+ * [P444] テンプレートの仕様。静的テーブルにないIDは動的レジストリ
+ * （提案されたテンプレート）から読む。見つからなければ undefined。
+ */
+export function getTemplateSpec(templateId: string): TemplateOperationSpec | undefined {
+  const builtin = TEMPLATE_SPECS[templateId];
+  if (builtin) return builtin;
+  const proposed = dynamicTemplateRegistryService.getTemplate(templateId);
+  if (!proposed) return undefined;
+  return { kind: proposed.kind, params: [...proposed.params], fixtureParams: { ...proposed.fixtureParams } };
 }
 
 export function isOperationTemplate(templateId: string): boolean {
@@ -117,6 +140,7 @@ export const TS_FIXTURE_SOURCE =
   'export const generatedItems: string[] = [];\nexport const generatedConfig: Record<string, unknown> = {};\n';
 export const JSON_FIXTURE_SOURCE = '{"generatedItems": [], "generatedConfig": {}}';
 export const CSV_FIXTURE_SOURCE = 'id,name\n1,alpha\n';
+export const CONFIG_FIXTURE_SOURCE = 'EXISTING_KEY=existing\n';
 
 export interface SandboxFixture {
   kind: TemplateKind;
@@ -134,7 +158,7 @@ export interface SandboxFixture {
  * 契約のテンプレート一覧からサンドボックス入力の素材を作る。
  * 標準パラメータは試験用フィクスチャ（固定値）で、生成関数そのものは
  * 任意の request.operations を受け付ける汎用実装である。
- * 契約は選択上つねに単一種別（TS/JSON/CSV のいずれか）なので、種別が
+ * 契約は選択上つねに単一種別（TS/JSON/CSV/CONFIG のいずれか）なので、種別が
  * 混ざる契約は先頭の操作テンプレートの種別で文書を作り、他種別の操作
  * は安全に失敗する（INVALID_JSON 等）。推測で混在契約は作らない。
  */
@@ -142,7 +166,7 @@ export function buildSandboxFixture(templateIds: string[]): SandboxFixture {
   const kind = templateKind(firstOperationTemplate(templateIds) ?? templateIds[0] ?? 'TS_FUNCTION_CREATE');
   const operations: Record<string, Record<string, unknown>> = {};
   for (const id of templateIds) {
-    const spec = TEMPLATE_SPECS[id];
+    const spec = getTemplateSpec(id);
     if (spec && isOperationTemplate(id)) operations[id] = { ...spec.fixtureParams };
   }
   const normalRequest: Record<string, unknown> = { operations };
@@ -158,6 +182,11 @@ export function buildSandboxFixture(templateIds: string[]): SandboxFixture {
     let rows = '';
     for (let n = 1000; n < 1500; n++) rows += n + ',pad\n';
     boundarySource = CSV_FIXTURE_SOURCE + rows;
+  } else if (kind === 'CONFIG') {
+    // [P444] KEY_VALUE 文書。境界入力はコメント行で水増しする（操作は
+    // コメント行を見ないため、NORMAL と同じく先頭操作が APPLIED になる）。
+    normalSource = CONFIG_FIXTURE_SOURCE;
+    boundarySource = CONFIG_FIXTURE_SOURCE + '# ' + 'x'.repeat(4096) + '\n';
   }
   return { kind, normalSource, boundarySource, normalRequest, permissionRequest };
 }
@@ -438,6 +467,8 @@ export function operationCodeFor(templateId: string): string {
   }
 }`;
     default:
-      return '';
+      // [P444] 静的テーブルにないIDは動的レジストリ（提案された
+      // テンプレート）の実処理コード。なければ空文字（TEST 系と同じ扱い）。
+      return dynamicTemplateRegistryService.getTemplate(templateId)?.operationCode ?? '';
   }
 }
