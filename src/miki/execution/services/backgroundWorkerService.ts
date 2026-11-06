@@ -608,6 +608,52 @@ export class BackgroundWorkerService {
   }
 
   /**
+   * P452 [4]: 記憶の統合・整理（浅い睡眠 Step 1 の本体）。
+   * 長期記憶の自律監査（SUPERSEDED・EXPIRED・未検証の選別）に、
+   * 関連記憶のグラフリンク構築を適用した更新後リストを返す純粋な処理。
+   * 結果の反映方法（React state へ返すか storage へ保存し直すか）は呼び出し側が決める。
+   */
+  private runMemoryConsolidation(mems: MemoryItem[]): {
+    updatedMemories: MemoryItem[];
+    activeCount: number;
+    graphLinks: number;
+    audit: ReturnType<typeof longTermMemoryService.auditAndConsolidateMemories>;
+  } {
+    const activeMems = mems.filter((m) => m.active !== false);
+
+    // 設計思想 8章: 長期記憶の自律監査とライフサイクル整理 (SUPERSEDED・EXPIRED・未検証の選別)
+    const audit = longTermMemoryService.auditAndConsolidateMemories(mems);
+    let graphLinks = 0;
+
+    const updatedMemories = audit.updatedMemories.map((target) => {
+      if (target.prerequisiteMemoryIds && target.prerequisiteMemoryIds.length > 0) {
+        return target;
+      }
+      const targetVec = target.domainVector || calculateDomainVector(target.content);
+      const related = activeMems
+        .filter((other) => other.id !== target.id)
+        .map((other) => {
+          const otherVec = other.domainVector || calculateDomainVector(other.content);
+          const sim = calculateCosineSimilarity(targetVec, otherVec);
+          return { other, sim };
+        })
+        .filter((res) => res.sim > 0.65)
+        .slice(0, 2);
+
+      if (related.length > 0) {
+        graphLinks++;
+        return {
+          ...target,
+          relatedMemoryIds: Array.from(new Set([...(target.relatedMemoryIds || []), ...related.map((r) => r.other.id)])),
+        };
+      }
+      return target;
+    });
+
+    return { updatedMemories, activeCount: activeMems.length, graphLinks, audit };
+  }
+
+  /**
    * 自律バックグラウンド処理サイクルを実行
    * 設計思想「浅い睡眠 / 深い睡眠」による厳格な2段階ゲート制御
    *
@@ -735,43 +781,27 @@ export class BackgroundWorkerService {
       }
 
       // Step 1: 記憶の統合・整理 & 知識グラフリンク構築
-      if (context?.memories && context?.onUpdateMemories) {
-        const mems = context.memories;
-        const activeMems = mems.filter((m) => m.active !== false);
-
-        // 設計思想 8章: 長期記憶の自律監査とライフサイクル整理 (SUPERSEDED・EXPIRED・未検証の選別)
-        const memoryAudit = longTermMemoryService.auditAndConsolidateMemories(mems);
-
-        context.onUpdateMemories((prev) => {
-          return memoryAudit.updatedMemories.map((target) => {
-            if (target.prerequisiteMemoryIds && target.prerequisiteMemoryIds.length > 0) {
-              return target;
-            }
-            const targetVec = target.domainVector || calculateDomainVector(target.content);
-            const related = activeMems
-              .filter((other) => other.id !== target.id)
-              .map((other) => {
-                const otherVec = other.domainVector || calculateDomainVector(other.content);
-                const sim = calculateCosineSimilarity(targetVec, otherVec);
-                return { other, sim };
-              })
-              .filter((res) => res.sim > 0.65)
-              .slice(0, 2);
-
-            if (related.length > 0) {
-              graphLinksCreated++;
-              return {
-                ...target,
-                relatedMemoryIds: Array.from(new Set([...(target.relatedMemoryIds || []), ...related.map((r) => r.other.id)])),
-              };
-            }
-            return target;
-          });
-        });
-        consolidatedCount = activeMems.length;
+      // P452 [4]: 従来は context（React state 由来の memories）が渡された場合にしか
+      // 動かず、全ての背景呼び出し元（WorkManager・定期スケジューラ）は context を
+      // 渡さないため常時スキップされていた。context が無い場合は storage から直接
+      // 読み、整理結果を storage へ保存し直すことで、背景実行でも記憶整理を駆動する。
+      const hasContextMemories = Boolean(context?.memories && context?.onUpdateMemories);
+      const step1Source: MemoryItem[] = hasContextMemories
+        ? (context?.memories as MemoryItem[])
+        : storageService.getMemories();
+      if (step1Source.length > 0) {
+        const consolidation = this.runMemoryConsolidation(step1Source);
+        if (hasContextMemories && context?.onUpdateMemories) {
+          const updated = consolidation.updatedMemories;
+          context.onUpdateMemories(() => updated);
+        } else {
+          storageService.setMemories(consolidation.updatedMemories);
+        }
+        consolidatedCount = consolidation.activeCount;
+        graphLinksCreated += consolidation.graphLinks;
         systemLogger.info(
           'SELF_IMPROVEMENT',
-          `[8章 記憶監査] 長期記憶=${memoryAudit.longTermCount}件, 置換済み=${memoryAudit.supersededCount}件, 期限切れ=${memoryAudit.expiredCount}件, 未検証=${memoryAudit.unverifiedCount}件`
+          `[8章 記憶監査] 長期記憶=${consolidation.audit.longTermCount}件, 置換済み=${consolidation.audit.supersededCount}件, 期限切れ=${consolidation.audit.expiredCount}件, 未検証=${consolidation.audit.unverifiedCount}件`
         );
       }
 

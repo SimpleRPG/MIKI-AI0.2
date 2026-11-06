@@ -88,6 +88,17 @@ export interface ConversationCoreResult {
 }
 
 /**
+ * P452: 回答の根拠欄に出す記憶の出所表記。
+ * ユーザー本人の発言由来（source: 'user_statement'）の事実は、その発言自体が
+ * 出所であるため「あなたが話していた内容」として文脈提示する。世界の事実として
+ * 断定する conclusion には使わず、reasons（文脈）でのみ参照する線引き。
+ */
+function memoryReasonLabel(m: any): string {
+  const content = String(m?.content || '').slice(0, 100);
+  return m?.source === 'user_statement' ? `あなたが話していた内容: ${content}` : `関連記憶: ${content}`;
+}
+
+/**
  * 設計思想書の概念地図を実行経路へ落とす中央オーケストレーター。
  *
  * 入力 → 会話状態/参照解決 → 記憶/主張 → 要求型 → 判断 → 部品 → 検証 → Answer IR → 表層
@@ -261,6 +272,20 @@ export class ConversationCoreService {
         { limit: 5, onlyApprovedForFacts: true }
       );
       relevantMemories = memoryResult.scoredMemories.map((m: any) => m.memory).filter(Boolean);
+    }
+    // P452: ユーザー本人の発言由来の事実（数値・経緯）を、会話状態に「言っていた内容」
+    // として新しい順に最大10件保持し、後続ターンの返答材料にする。confirmedFacts
+    // （確定事項）とは別枠にし、未検証のまま確定扱いにしない。
+    if (memories.length > 0) {
+      const userFactSummaries = memories
+        .filter((m: any) => m?.source === 'user_statement' && m?.active !== false && !m?.replacedBy)
+        .sort((a: any, b: any) => (Number(b?.timestamp ?? b?.createdAt ?? 0) - Number(a?.timestamp ?? a?.createdAt ?? 0)))
+        .map((m: any) => String(m.factSummary || m.content || '').slice(0, 60))
+        .filter(Boolean)
+        .slice(0, 10);
+      if (userFactSummaries.length > 0) {
+        (nextState as any).recentUserFactSummaries = userFactSummaries;
+      }
     }
     stages.knowledge = Math.round(performance.now() - t);
 
@@ -436,7 +461,7 @@ export class ConversationCoreService {
       reason = 'user_teaching_recorded';
     } else if (claimMatch.hasMatch && claimMatch.bestClaim && claimMatch.confidence !== 'UNVERIFIED') {
       const claim = claimMatch.bestClaim;
-      const memoryReasons = relevantMemories.slice(0, 2).map((m: any) => `関連記憶: ${String(m.content || '').slice(0, 100)}`);
+      const memoryReasons = relevantMemories.slice(0, 2).map((m: any) => memoryReasonLabel(m));
       ir = answerContentIrService.buildAnswerIR({
         conclusion: claim.statement,
         target: compiled.target,
@@ -677,7 +702,7 @@ export class ConversationCoreService {
               : '現在の端末内知識だけでは、信頼できる結論を確定できません。',
           target: compiled.target,
           reasons: [
-            ...relevantMemories.slice(0, 2).map((m: any) => `関連記憶: ${String(m.content || '').slice(0, 100)}`),
+            ...relevantMemories.slice(0, 2).map((m: any) => memoryReasonLabel(m)),
           ...researchReasons,
           ],
           exceptions: [reason, `Knowledge Gap: ${gap.id}`],

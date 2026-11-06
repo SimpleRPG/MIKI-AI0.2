@@ -103,6 +103,7 @@ import { knowledgeOperatingSystemService } from './miki/selfAwareness/services/k
 import { counterfactualWorkSimulatorService } from './miki/unknown/services/counterfactualWorkSimulatorService';
 import { personalApiGatewayService } from './miki/execution/services/personalApiGatewayService';
 import { longTermMemoryService } from './miki/memory/services/longTermMemoryService';
+import { conversationFactIntakeService } from './miki/conversation/services/conversationFactIntakeService';
 import { codeVerificationService } from './miki/verification/services/codeVerificationService';
 import { falsificationService, classifyClaimEpistemology } from './miki/verification/services/falsificationService';
 import { counterfactualReasoningService } from './miki/unknown/services/counterfactualReasoningService';
@@ -614,69 +615,6 @@ export default function App() {
       window.removeEventListener('miki:notification-action', handleCustomAction);
     };
   }, []);
-
-  // Heuristic memory auto extractor
-  const autoExtractMemory = (userText: string) => {
-    const text = userText.trim();
-    const patterns = [
-      { pat: /(?:私|僕|自分|おれ|オレ)は?(.+?)(?:が好き|が作りたい|を開発したい|に興味がある)/, cat: 'preference' as const, suffix: 'が好き・興味がある' },
-      { pat: /(?:ジャンルは|好みなのは)(.+?)(?:がいい|が好き|にして)/, cat: 'preference' as const, suffix: 'のジャンルが好き' },
-      { pat: /(?:名前|呼び名)は?(.+?)(?:だよ|です|って呼んで)/, cat: 'profile' as const, suffix: '' },
-      { pat: /(?:今日|昨日|最近)(.+?)(?:だった|したよ|があった)/, cat: 'chat' as const, suffix: '' },
-    ];
-
-    for (const item of patterns) {
-      const match = text.match(item.pat);
-      if (match && match[1]) {
-        const raw = match[1].trim();
-        if (raw.length > 1 && raw.length < 50) {
-          const finalContent = item.suffix ? raw + item.suffix : match[0].trim();
-          const exists = memories.some((m) => m.content.includes(raw));
-          if (!exists) {
-            // 設計思想 25: 自動抽出記憶は importance: 2、approved: false で生成し、自己承認ループを断つ
-            const newMem = enrichMemoryMetadata(
-              {
-                id: 'mem_auto_' + Date.now(),
-                category: item.cat,
-                content: finalContent,
-                importance: 2,
-                pinned: false,
-                active: true,
-                approved: false,
-                source: 'auto',
-                tags: [item.cat, 'auto_extracted', 'unverified'],
-              },
-              {
-                rawUserText: text,
-                sourceRef: 'user_chat',
-                existingMemories: memories,
-              }
-            );
-            // 設計思想 Master v5.2 第15章6節: 関連記憶グラフの自動リンク拡張 (Semantic Link Expansion)
-            const { updatedTarget, modifiedNeighbors } = longTermMemoryService.autoLinkRelatedMemories(newMem, memories);
-            storageService.saveMemoryItem(updatedTarget);
-            modifiedNeighbors.forEach((neighbor) => storageService.saveMemoryItem(neighbor));
-
-            setMemories((prev) => {
-              const neighborMap = new Map(modifiedNeighbors.map((n) => [n.id, n]));
-              const updatedList = prev.map((m) => neighborMap.get(m.id) || m);
-              return [updatedTarget, ...updatedList];
-            });
-
-            // 設計思想 Master v5.0 第14章: 新規記憶のLLM実埋め込みベクトルを非同期生成
-            embeddingService
-              .ensureMemoryEmbedding(updatedTarget)
-              .then((embeddedMem) => {
-                if (embeddedMem.embeddingVector && embeddedMem.embeddingVector.length > 0) {
-                  setMemories((prev) => prev.map((m) => (m.id === embeddedMem.id ? embeddedMem : m)));
-                }
-              })
-              .catch(() => {});
-          }
-        }
-      }
-    }
-  };
 
   // Start fresh blank project
   const handleNewBlankProject = () => {
@@ -1279,7 +1217,44 @@ export default function App() {
         return msg;
       }));
 
-      const activeMemories = memories.filter((m) => m.active);
+      // P452: 会話の理解の土台。ユーザーの発言から事実・数値・経緯を取り込み、
+      // 記憶へ保存して、当ターンの会話コアの参照にも含める。取り込んだ事実は
+      // 本人の発言が出所（source: 'user_statement'、未承認のまま）であり、
+      // 文脈参照には使うが世界の事実としての断定には使わない線引き。
+      let intakeBaseMemories = memories;
+      try {
+        const intake = conversationFactIntakeService.intakeFromUserText(text, memories);
+        if (intake.added.length > 0 || intake.replaced > 0 || intake.invalidated > 0) {
+          let linkedList = intake.updatedMemories;
+          for (const addedMem of intake.added) {
+            // 設計思想 Master v5.2 第15章6節: 関連記憶グラフの自動リンク拡張 (Semantic Link Expansion)
+            const { updatedTarget, modifiedNeighbors } = longTermMemoryService.autoLinkRelatedMemories(addedMem, linkedList);
+            storageService.saveMemoryItem(updatedTarget);
+            modifiedNeighbors.forEach((neighbor) => storageService.saveMemoryItem(neighbor));
+            const neighborMap = new Map(modifiedNeighbors.map((n) => [n.id, n]));
+            linkedList = linkedList.map((m) => (m.id === updatedTarget.id ? updatedTarget : neighborMap.get(m.id) || m));
+            // 設計思想 Master v5.0 第14章: 新規記憶の埋め込みベクトルを非同期生成
+            embeddingService
+              .ensureMemoryEmbedding(updatedTarget)
+              .then((embeddedMem) => {
+                if (embeddedMem.embeddingVector && embeddedMem.embeddingVector.length > 0) {
+                  setMemories((prev) => prev.map((m) => (m.id === embeddedMem.id ? embeddedMem : m)));
+                }
+              })
+              .catch(() => {});
+          }
+          intakeBaseMemories = linkedList;
+          setMemories(linkedList);
+          systemLogger.info(
+            'CHAT',
+            `[P452] Fact intake: added=${intake.added.length} replaced=${intake.replaced} invalidated=${intake.invalidated}`
+          );
+        }
+      } catch (intakeErr) {
+        console.warn('Fact intake failed:', intakeErr);
+      }
+
+      const activeMemories = intakeBaseMemories.filter((m) => m.active);
 
       // COREモードでは、旧来のシャドー解析群を実行しない。
       // それらはLLM経路の比較・観測用であり、通常のCORE応答には不要なため、
