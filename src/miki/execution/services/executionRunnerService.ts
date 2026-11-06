@@ -291,6 +291,10 @@ export class ExecutionRunnerService {
       assertionReason: assertion.reason,
     });
     if (verification?.evidenceId) request.evidence_id = verification.evidenceId;
+    // P442(V3): 受理された実行結果だけから成功/失敗回数を更新する。
+    // INCONCLUSIVE はこの手前で早期復帰するため数えない（要求拒否も
+    // 同様）。success_count は正式昇格の証拠ゲート（実測10件）の材料。
+    componentRegistryService.recordExecutionOutcome(request.component_id, input.implementation_hash, assertion.status === 'PASS' ? 'SUCCESS' : 'FAILURE');
     this.save();
 
     executionEventBusService.publish({

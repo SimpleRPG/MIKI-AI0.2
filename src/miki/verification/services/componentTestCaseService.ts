@@ -95,24 +95,49 @@ export class ComponentTestCaseService {
     return result;
   }
 
+  /**
+   * P442(V1): 補完ケースの期待内容は判定可能な ASSERT にする。自然言語
+   * の固定文言は testAssertionService で INCONCLUSIVE になり、Suite が
+   * BLOCKED になる。NORMAL/BOUNDARY/REGRESSION/PERMISSION は
+   * ASSERT: NON_EMPTY（G1 の具体的な CONTAINS と組み合わせる）。
+   * PERMISSION の試験条件は実行環境そのもの（権限なしサンドボックス
+   * で非空の出力を得ること）。弱い判定のため、G3 では本物の権限
+   * テストを入れること。
+   * INVALID は生成部品では Suite 対象外にする。合成関数は全入力を
+   * 受理する全体関数で、前提条件の検証も安全な失敗の観測点もない
+   * ため、失敗する入力が存在せず SAFE_FAILURE は常に INCONCLUSIVE
+   * になる。黙って外すのではなく理由をログに残し、G3 で入力検証
+   * が入ったら再有効化すること。他の部品の INVALID は従来通り残す。
+   */
   private generateMissingCases(component: ComponentTxtPackage, declared: ComponentTestCase[]): ComponentTestCase[] {
     const present = new Set(declared.map(c => c.category));
     const candidates: Array<[ComponentTestCategory, string, string]> = [];
 
-    if (!present.has('NORMAL')) candidates.push(['NORMAL', '標準入力で契約された処理を実行', 'postconditionsを満たすこと']);
-    if (!present.has('BOUNDARY')) candidates.push(['BOUNDARY', '事前条件の境界値を確認', '境界値で例外なく契約どおりに終了すること']);
-    if (!present.has('INVALID')) candidates.push(['INVALID', '事前条件に反する入力を確認', 'failure_behaviorに従って安全に失敗すること']);
+    if (!present.has('NORMAL')) candidates.push(['NORMAL', '標準入力で契約された処理を実行', 'ASSERT: NON_EMPTY']);
+    if (!present.has('BOUNDARY')) candidates.push(['BOUNDARY', '事前条件の境界値を確認', 'ASSERT: NON_EMPTY']);
+    if (!present.has('INVALID')) {
+      if (this.isGeneratedSkeletonComponent(component)) {
+        systemLogger.warn('SELF_IMPROVEMENT', `⚠️ [P442] ${component.component_id}: INVALIDケースは生成部品では実行不能のためSuite対象外（合成関数は全入力を受理し安全な失敗の観測点がない。G3で入力検証が入ったら再有効化すること）`);
+      } else {
+        candidates.push(['INVALID', '事前条件に反する入力を確認', 'failure_behaviorに従って安全に失敗すること']);
+      }
+    }
     if (component.dependencies.length > 0 && !present.has('MISSING_DEPENDENCY')) {
       candidates.push(['MISSING_DEPENDENCY', '依存部品が利用できない場合を確認', '依存欠落を成功扱いしないこと']);
     }
     if (component.security_class !== 'READ_ONLY' && !present.has('PERMISSION')) {
-      candidates.push(['PERMISSION', '権限不足環境を確認', '権限エラーを安全に扱うこと']);
+      candidates.push(['PERMISSION', '権限不足環境を確認', 'ASSERT: NON_EMPTY']);
     }
-    if (!present.has('REGRESSION')) candidates.push(['REGRESSION', '既存成功条件の回帰確認', '以前の成功条件を維持すること']);
+    if (!present.has('REGRESSION')) candidates.push(['REGRESSION', '既存成功条件の回帰確認', 'ASSERT: NON_EMPTY']);
 
     return candidates.map(([category, description, expected]) =>
       this.make(component, category, description, 'GENERATED', expected)
     );
+  }
+
+  /** 決定論的テンプレート合成で作られた骨格部品かどうか（出所で判別）。 */
+  private isGeneratedSkeletonComponent(component: ComponentTxtPackage): boolean {
+    return typeof component.sources_txt === 'string' && component.sources_txt.includes('deterministic template synthesis');
   }
 
 

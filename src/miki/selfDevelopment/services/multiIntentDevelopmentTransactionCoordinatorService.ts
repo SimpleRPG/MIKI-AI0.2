@@ -2,7 +2,8 @@ import { clarificationLifecycleService } from './clarificationLifecycleService';
 import { semanticUnderstandingV2OrchestratorService } from './semanticUnderstandingV2OrchestratorService';
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';import { isolatedCandidateWorkspaceService } from '../../core/services/isolatedCandidateWorkspaceService';import { specializedDevelopmentExecutorDispatcherService } from './specializedDevelopmentExecutorDispatcherService';import { deterministicGoalSemanticsService } from './deterministicGoalSemanticsService';import { conceptOntologyService } from './conceptOntologyService';import { repositoryGroundedHypothesisService } from './repositoryGroundedHypothesisService';import { capabilityContractSynthesisService } from './capabilityContractSynthesisService';import { atomicComponentTemplateSynthesisService } from './atomicComponentTemplateSynthesisService';import { generatedComponentVerificationRegistrationService } from './generatedComponentVerificationRegistrationService';import { semanticTransactionReviewEvidenceService } from './semanticTransactionReviewEvidenceService';
 import { generatedComponentWorkerSandboxService } from './generatedComponentWorkerSandboxService';
-import { componentVerificationService } from '../../verification/services/componentVerificationService';
+import { executionRunnerService } from '../../execution/services/executionRunnerService';
+import { componentRegressionService } from '../../verification/services/componentRegressionService';
 import { componentPromotionService } from '../../promotion/services/componentPromotionService';
 import { componentTestCaseService } from '../../verification/services/componentTestCaseService';
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
@@ -22,12 +23,15 @@ if(!workerEvidence.passed)continue;
 if(!this.advanceGeneratedComponentViaSandboxEvidence(synthesized,workerEvidence))continue;
 generatedComponents.push(verification.component.component_id);const token=developmentResumeTokenService.issue({instructionId:request.instructionId,blockedTaskId:hypothesis.id,missingCapabilityId:contract.capabilityId,generatedComponentId:verification.component.component_id,validatedImplementationHash:verification.component.implementation_hash});resumeTokens.push(token.tokenId);}const specialized=await specializedDevelopmentExecutorDispatcherService.execute(request,request.instructionId);if(specialized){const specializedValue=specialized as any;const transactionId=`TX-${canonicalSha256({request:request.instructionId,hypotheses:accepted.map(value=>value.id),kind:specializedValue.kind}).slice(0,24)}`;if(specializedValue.requiresOriginalPipeline===true){const blockedReasons=Array.isArray(specializedValue.plan?.blockedReasons)?specializedValue.plan.blockedReasons:[];const continuationInstruction=[request.instructionText,'','[DETERMINISTIC_PREFLIGHT]',`TRANSACTION_ID=${transactionId}`,`DOMAIN=${String(specializedValue.kind||'UNKNOWN')}`,`PREFLIGHT_WORKSPACE_ID=${String(specializedValue.workspace?.workspaceId||'')}`,`TARGET_PATHS=${JSON.stringify(specializedValue.plan?.targets||request.targetPaths)}`,`ACCEPTANCE_GATES=${JSON.stringify(specializedValue.plan?.gates||specializedValue.manifest?.requiredChecks||[])}`,`CANDIDATE_OPERATIONS=${JSON.stringify(specializedValue.plan?.candidateOperations||[])}`,`BLOCKED_REASONS=${JSON.stringify(blockedReasons)}`].join('\n');const result={transactionId,semantics,concepts,hypotheses,generatedComponents,resumeTokens,specialized,preflightWorkspaceId:specializedValue.workspace?.workspaceId,continuationInstruction,continueWithOriginalPipeline:blockedReasons.length===0,reasons:blockedReasons};semanticTransactionReviewEvidenceService.create(request.instructionId,result);return result;}const result={transactionId,semantics,concepts,hypotheses,generatedComponents,resumeTokens,specialized,workspace:specializedValue.workspace,continueWithOriginalPipeline:false,reasons:[]};semanticTransactionReviewEvidenceService.create(request.instructionId,result);return result;}const transactionId=`TX-${canonicalSha256({request:request.instructionId,hypotheses:accepted.map(value=>value.id)}).slice(0,24)}`;const result={transactionId,semantics,concepts,hypotheses,generatedComponents,resumeTokens,continueWithOriginalPipeline:true,reasons:accepted.length?[]:['NO_GROUNDED_HYPOTHESIS']};semanticTransactionReviewEvidenceService.create(request.instructionId,result);return result;}
   /**
-   * P441(C): サンドボックス実行証拠を正式ルートの材料にする。
-   * サンドボックスが実際に実行した NORMAL / BOUNDARY ケースについて、
-   * 既存の componentVerificationService.verifyExecution へサーバの
-   * 実行結果をそのまま渡す。verifyExecution は部品・テストケース・
-   * ハッシュ・Artifact の照合を行い、実行証拠を ADMISSIBLE として
-   * 記録し、PASS なら ANALYZED -> DEVICE_TESTED へ進める。
+   * P441(C)+P442(V3): サンドボックス実行証拠を正式ルートの材料にする。
+   * サンドボックスが実際に実行したケースについて、Regression Gate の
+   * 実行要求へ submitResult 経由で結果を載せる。submitResult が
+   * expected_summary の ASSERT を再評価し、PASS なら verifyExecution
+   * （ANALYZED -> DEVICE_TESTED）と execution.completed/failed
+   * イベント発行・success_count 更新まで行う。P441 の直結
+   * verifyExecution 呼び出しはやめた（要求が QUEUED のまま残り、
+   * Suite が PASSED にならず、イベントも success_count も増えない
+   * ため）。サンドボックスの自己申告をそのまま PASS にしない。
    * サンドボックス成功だけでは VERIFIED にはならない。VERIFIED は
    * Regression Gate + Canary を通った promoteIfSafeForCanary のみ。
    * Regression Gate (suite) もここで作り、後続パイプラインの材料に
@@ -39,23 +43,40 @@ generatedComponents.push(verification.component.component_id);const token=develo
     const artifactSnapshotKey=componentArtifactStoreService.getManifest(componentId)?.snapshot_key||'';
     if(!artifactSnapshotKey){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P441] ${componentId}: Artifact snapshotがなく、サンドボックス証拠を正式ルートへ載せられません`);return false;}
     const cases=componentTestCaseService.generateForComponent(componentId);
+    // Gate を先に作る。plan() が各テストケースの実行要求（QUEUED）を
+    // 作るため、submitResult の宛先がここで決まる。
+    const gate=componentPromotionService.createGate(componentId,'EXTERNAL_RUNNER');
+    if(!gate){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P441] ${componentId}: Regression Gateを作成できませんでした`);return false;}
+    systemLogger.info('TOOLS',`🔁 [P441] ${componentId}: Regression Gate ${gate.suite_id} を作成しました（サンドボックス証拠の材料）`);
+    // サンドボックスは NORMAL/EMPTY/BOUNDARY の3入力だけを実行する。
+    // REGRESSION は以前に成功した NORMAL 入力の再実行（サーバが2回
+    // 実行で決定性を照合済み）、PERMISSION は権限なしサンドボックス
+    // での実行そのものが試験条件。どちらも NORMAL の実測出力を流用
+    // する。INVALID は生成部品では実行不能のため Suite 対象外（V1参照）。
+    // 証拠のないケースに結果を捏造して載せることはしない。
     const inputOrder=['NORMAL','EMPTY','BOUNDARY'] as const;
     let advanced=false;
-    for(const category of ['NORMAL','BOUNDARY'] as const){
-      const testCase=cases.find(item=>item.category===category);
-      if(!testCase)continue;
-      const runIndex=inputOrder.indexOf(category);
-      const run=evidence.runs.find(item=>item.caseId===category);
+    for(const binding of gate.case_bindings){
+      const testCase=cases.find(item=>item.test_case_id===binding.test_case_id);
+      if(!testCase){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P442] ${componentId}: Suite要求 ${binding.request_id} に対応するテストケースがありません`);continue;}
+      const category=testCase.category;
+      let runIndex=-1;
+      if(category==='NORMAL'||category==='EMPTY'||category==='BOUNDARY')runIndex=inputOrder.indexOf(category);
+      else if(category==='REGRESSION'||category==='PERMISSION')runIndex=0;
+      else{systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P442] ${componentId}: ${category} はサンドボックス証拠がなく結果を載せません（証拠の捏造はしない）`);continue;}
+      const run=evidence.runs.find(item=>item.caseId===inputOrder[runIndex]);
       const output=evidence.outputs?.[runIndex];
-      const casePassed=evidence.passed&&!!run&&!run.error;
-      const outputSummary=output!==undefined?JSON.stringify(output):`sandbox ${category} run: ${run?.error||'no output'}`;
-      const verification=componentVerificationService.verifyExecution({componentId,implementationHash:evidence.implementationHash,environment:'EXTERNAL_RUNNER',testCategory:category,passed:casePassed,outputSummary,errorMessage:run?.error,durationMs:run?.durationMs,runnerId:'component-worker-sandbox',artifactSnapshotKey,testCaseId:testCase.test_case_id,expectedSummary:testCase.expected_summary,assertionStatus:casePassed?'PASS':'FAIL',assertionRule:casePassed?'SANDBOX_CHECKS_ALL_TRUE':'SANDBOX_CHECK_FAILED',assertionReason:casePassed?`worker sandbox checks all true (${Object.keys(evidence.checks).filter(key=>evidence.checks[key]).join(',')}); evidence=${evidence.evidenceId}`:`worker sandbox did not pass (${evidence.reasons.join('; ')||'no reason'})`});
-      if(verification.nextStatus==='DEVICE_TESTED')advanced=true;
-      if(!verification.accepted)systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P441] ${componentId}: サンドボックス証拠の検証受け入れに失敗 (${category}): ${verification.reason}`);
+      if(!run||output===undefined){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P442] ${componentId}: ${category} のサンドボックス実行結果がなく結果を載せません`);continue;}
+      const casePassed=evidence.passed&&!run.error;
+      const submitted=executionRunnerService.markSubmitted(binding.request_id);
+      if(!submitted){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P442] ${componentId}: ${category} の実行要求 ${binding.request_id} がQUEUEDでなく結果を載せられません`);continue;}
+      const result=executionRunnerService.submitResult({request_id:binding.request_id,passed:casePassed,output_summary:JSON.stringify(output),error_message:run.error,duration_ms:run.durationMs,environment:'EXTERNAL_RUNNER',runner_id:'component-worker-sandbox',implementation_hash:evidence.implementationHash,artifact_snapshot_key:artifactSnapshotKey,test_case_id:testCase.test_case_id});
+      if(!result.accepted){systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P442] ${componentId}: ${category} の実行結果を受け入れられません: ${result.reason}`);continue;}
+      if(result.verification?.nextStatus==='DEVICE_TESTED')advanced=true;
+      if(!result.verification)systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P442] ${componentId}: ${category} はAssertion INCONCLUSIVEのため検証成功として扱いません: ${result.reason}`);
     }
-    const gate=componentPromotionService.createGate(componentId,'EXTERNAL_RUNNER');
-    if(gate)systemLogger.info('TOOLS',`🔁 [P441] ${componentId}: Regression Gate ${gate.suite_id} を作成しました（サンドボックス証拠の材料）`);
-    else systemLogger.warn('SELF_IMPROVEMENT',`⚠️ [P441] ${componentId}: Regression Gateを作成できませんでした`);
+    const suite=componentRegressionService.refresh(gate.suite_id);
+    systemLogger.info('TOOLS',`🔁 [P442] ${componentId}: Regression Suite ${gate.suite_id} status=${suite?.status} passed=${suite?.passed_count}/${gate.request_ids.length}`);
     return advanced;
   }}
 export const multiIntentDevelopmentTransactionCoordinatorService=new MultiIntentDevelopmentTransactionCoordinatorService();
