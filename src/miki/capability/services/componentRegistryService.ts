@@ -14,22 +14,18 @@ import {
   PromotionEvidenceInput,
   PromotionEvaluationResult,
 } from '../../promotion/services/evidenceBasedPromotionGateService';
+import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 
 const COMPONENT_REGISTRY_STORAGE_KEY = 'miki_component_registry_v1';
 
 /**
- * 簡易ハッシュ計算 (SHA-256ライクな決定論的ハッシュ文字列)
+ * P441(B): コードハッシュは canonical SHA-256 に統一する。
+ * 旧32bit簡易ハッシュ (h_xxxxxxxx) と canonicalSha256 (64桁) の
+ * 二重規格では、生成部品が advanceComponentStatus の照合を通れず
+ * 正式な梯子を上れなかった。旧関数は廃止し、全箇所で
+ * canonicalSha256 を使う。既存保存データの旧形式は
+ * migrateLegacyCodeHashes() で読み込み時に移行する。
  */
-function computeCodeHash(code: string): string {
-  let hash = 0;
-  const clean = code.trim();
-  for (let i = 0; i < clean.length; i++) {
-    const char = clean.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash |= 0;
-  }
-  return `h_${Math.abs(hash).toString(16).padStart(8, '0')}`;
-}
 
 /**
  * 空白・コメントを除去した正規化コード
@@ -62,6 +58,7 @@ export class ComponentRegistryService {
 
   private constructor() {
     this.loadFromStorage();
+    this.migrateLegacyCodeHashes();
     this.migrateIllustrativeSeedVerification();
     this.reconcileArtifactIndex();
     if (this.components.size === 0) {
@@ -169,8 +166,8 @@ export class ComponentRegistryService {
         validation_txt: validation,
         sources_txt: 'Runtime adapter implementation + deterministic analyzer provider.',
         history_txt: '2026-09-20: unified under common Conversation Component Pipeline.',
-        implementation_hash: computeCodeHash(implementation),
-        validation_hash: computeCodeHash(validation),
+        implementation_hash: canonicalSha256(implementation),
+        validation_hash: canonicalSha256(validation),
         success_count: 0,
         failure_count: 0,
         created_at: Date.now(),
@@ -217,8 +214,8 @@ export class ComponentRegistryService {
       validation_txt: validation,
       sources_txt: 'Native Android allow-list adapter; implementation is not executable source text.',
       history_txt: 'Created as P0-5 real-device E2E smoke component.\nNo DEVICE_TESTED/VERIFIED claim before actual Android execution evidence.',
-      implementation_hash: computeCodeHash(implementation),
-      validation_hash: computeCodeHash(validation),
+      implementation_hash: canonicalSha256(implementation),
+      validation_hash: canonicalSha256(validation),
       success_count: 0,
       failure_count: 0,
       created_at: Date.now(),
@@ -256,7 +253,7 @@ export class ComponentRegistryService {
       validation_txt: validation,
       sources_txt: 'WorksApplications/Sudachi; WorksApplications/SudachiDict; Android Native allow-list adapter.',
       history_txt: 'Created for P0-5 Android real-device E2E. No self-simulation promotion.',
-      implementation_hash: computeCodeHash(implementation), validation_hash: computeCodeHash(validation),
+      implementation_hash: canonicalSha256(implementation), validation_hash: canonicalSha256(validation),
       success_count: 0, failure_count: 0, created_at: Date.now(), updated_at: Date.now(),
     };
     this.components.set(componentId, pkg);
@@ -491,8 +488,8 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
     ];
 
     for (const pkg of seedPackages) {
-      pkg.implementation_hash = computeCodeHash(pkg.implementation_txt);
-      pkg.validation_hash = computeCodeHash(pkg.validation_txt);
+      pkg.implementation_hash = canonicalSha256(pkg.implementation_txt);
+      pkg.validation_hash = canonicalSha256(pkg.validation_txt);
       this.components.set(pkg.component_id, pkg);
     }
 
@@ -515,9 +512,9 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
     matchedComponentId?: string;
     reason: string;
   } {
-    const rawHash = computeCodeHash(params.implementationCode);
+    const rawHash = canonicalSha256(params.implementationCode);
     const normCode = normalizeCode(params.implementationCode);
-    const normHash = computeCodeHash(normCode);
+    const normHash = canonicalSha256(normCode);
 
     // 1. 完全一致ハッシュ検査
     for (const [id, comp] of this.components) {
@@ -525,22 +522,21 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
         return {
           decision: 'DUPLICATE',
           matchedComponentId: id,
-          // P440 D8(b): 32bit簡易ハッシュのため衝突の可能性がある。SHA-256
-          // への切り替えは影響範囲が大きいため、ここでは理由に明記する
-          // だけに留める。
-          reason: `完全一致ハッシュ (${rawHash}) が既存部品『${id}』と重複しています。新規登録は行いません。（32bit簡易ハッシュのため衝突の可能性あり）`,
+          // P441(B): ハッシュは canonical SHA-256 に統一済みのため、
+          // 32bit簡易ハッシュ時代の衝突の留保は不要。
+          reason: `完全一致ハッシュ (${rawHash}) が既存部品『${id}』と重複しています。新規登録は行いません。`,
         };
       }
     }
 
     // 2. 正規化ハッシュ検査 (空白・コメント違いの同一コード)
     for (const [id, comp] of this.components) {
-      const compNormHash = computeCodeHash(normalizeCode(comp.implementation_txt));
+      const compNormHash = canonicalSha256(normalizeCode(comp.implementation_txt));
       if (compNormHash === normHash) {
         return {
           decision: 'DUPLICATE',
           matchedComponentId: id,
-          reason: `正規化ハッシュ (${normHash}) が既存部品『${id}』と同一です（空白・コメント差分のみ）。既存部品をREUSEしてください。（32bit簡易ハッシュのため衝突の可能性あり）`,
+          reason: `正規化ハッシュ (${normHash}) が既存部品『${id}』と同一です（空白・コメント差分のみ）。既存部品をREUSEしてください。`,
         };
       }
     }
@@ -620,7 +616,7 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
     }
 
     // 9.6 検証原則: コードハッシュと検証結果ハッシュの照合
-    const currentCodeHash = computeCodeHash(comp.implementation_txt);
+    const currentCodeHash = canonicalSha256(comp.implementation_txt);
     if (comp.implementation_hash && comp.implementation_hash !== currentCodeHash) {
       return {
         success: false,
@@ -660,7 +656,7 @@ VERIFICATION_NOTE: 設計例であり実機検証未実施`,
     comp.status = targetStatus;
     const gateLog = evaluationResult ? ` [EvidenceGate: ${evaluationResult.summary}]` : '';
     comp.validation_txt += `\n[${new Date().toISOString()}] ${prev} -> ${targetStatus}: ${verificationLog}${gateLog}`;
-    comp.validation_hash = computeCodeHash(comp.validation_txt);
+    comp.validation_hash = canonicalSha256(comp.validation_txt);
     comp.updated_at = Date.now();
     componentVersionHistoryService.updateStatus(
       comp.component_id,
@@ -935,6 +931,37 @@ ${outputComp.implementation_txt}
    * 実ユーザー部品は component_id と旧サンプル固有の validation marker が
    * 一致する場合だけ対象にし、DEVICE_TESTED の実績を持つデータは触らない。
    */
+  /**
+   * P441(B): 旧32bit簡易ハッシュ (h_xxxxxxxx) で保存された部品を
+   * canonical SHA-256 へ移行する。単純置換だけでは既存部品が全て
+   * 「ハッシュ不一致」で遷移不能になるため、読み込み時に
+   * implementation_txt / validation_txt から再計算して保存し直す。
+   * アーティファクト索引も新ハッシュへ同期する。同期しないと
+   * reconcileArtifactIndex が不一致と見なして検証状態を失効させる。
+   * 移行はログに残す。
+   */
+  private migrateLegacyCodeHashes(): void {
+    const isLegacy = (value: string | undefined): boolean =>
+      !value || value.startsWith('h_') || !/^[a-f0-9]{64}$/i.test(value);
+    let migrated = 0;
+    for (const component of this.components.values()) {
+      if (!isLegacy(component.implementation_hash) && !isLegacy(component.validation_hash)) continue;
+      if (component.implementation_txt) {
+        component.implementation_hash = canonicalSha256(component.implementation_txt);
+      }
+      if (component.validation_txt) {
+        component.validation_hash = canonicalSha256(component.validation_txt);
+      }
+      component.updated_at = Date.now();
+      componentArtifactStoreService.save(component);
+      migrated++;
+    }
+    if (migrated > 0) {
+      this.saveToStorage();
+      systemLogger.info('TOOLS', `🔑 [P441 HashMigration] ${migrated}件の旧ハッシュ(h_形式)をcanonical SHA-256へ移行しました`);
+    }
+  }
+
   private migrateIllustrativeSeedVerification(): void {
     const seedIds = new Set([
       'vba.header_locator',
@@ -956,7 +983,7 @@ ${outputComp.implementation_txt}
         .replace(/STATUS: VERIFIED/g, 'STATUS: ANALYZED')
         .replace(/ALL_TESTS_PASSED: true/g, 'ALL_TESTS_PASSED: false')
         + '\nVERIFICATION_NOTE: 旧サンプル検証記録を無効化。実機検証未実施。';
-      component.validation_hash = computeCodeHash(component.validation_txt);
+      component.validation_hash = canonicalSha256(component.validation_txt);
       component.updated_at = Date.now();
       changed = true;
     }
@@ -977,7 +1004,7 @@ ${outputComp.implementation_txt}
         const previous = component.status;
         component.status = 'ANALYZED';
         component.validation_txt += `\n[${new Date().toISOString()}] ${previous} -> ANALYZED: TXT正本とRegistryの実装hash不一致。過去の検証を失効し、再検証を要求。`;
-        component.validation_hash = computeCodeHash(component.validation_txt);
+        component.validation_hash = canonicalSha256(component.validation_txt);
         component.updated_at = Date.now();
         invalidated++;
       }

@@ -39,9 +39,9 @@
     "trackedPathCountExcludingControlPaths": 1754,
     "sourceFileCount": 1307,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1220,
-    "relativeImportCandidateCount": 3713,
-    "resolvedRelativeImportCandidateCount": 3696,
-    "unresolvedRelativeImportCandidateCount": 17
+    "relativeImportCandidateCount": 3719,
+    "resolvedRelativeImportCandidateCount": 3703,
+    "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
     {
@@ -5844,9 +5844,9 @@
     },
     {
       "path": "server.ts",
-      "bytes": 216862,
-      "lines": 4915,
-      "sha256": "c94e43cd1416b56c0b5fa09ccda4ebe63b0f995679003425ebe055a59b329bc8",
+      "bytes": 213572,
+      "lines": 4906,
+      "sha256": "3147db30ece74d6174666d83ab097d34621462fcdecb805a47071a9027afb4fb",
       "relativeImportCandidates": [
         {
           "line": 15,
@@ -6104,16 +6104,11 @@
           "line": 3718,
           "specifier": "./chapter_${chapterNumber}",
           "resolution": "UNRESOLVED_CANDIDATE"
-        },
-        {
-          "line": 4051,
-          "specifier": "./component.cjs",
-          "resolution": "UNRESOLVED_CANDIDATE"
         }
       ],
-      "relativeImportCandidateCount": 44,
+      "relativeImportCandidateCount": 43,
       "resolvedRelativeImportCount": 42,
-      "unresolvedRelativeImportCount": 2
+      "unresolvedRelativeImportCount": 1
     },
     {
       "path": "src/App.tsx",
@@ -9329,9 +9324,9 @@
     },
     {
       "path": "src/miki/capability/services/componentRegistryService.ts",
-      "bytes": 45369,
-      "lines": 1002,
-      "sha256": "92d14a8ed84daeb368b106505a54f78db73d306705dd50c088512b147a0a8fdf",
+      "bytes": 46858,
+      "lines": 1029,
+      "sha256": "d074beb2f119a0d443cd7218f4241a88049ca51bbd9e33caf12ead057d89c0f9",
       "relativeImportCandidates": [
         {
           "line": 7,
@@ -9368,10 +9363,16 @@
           "specifier": "../../promotion/services/evidenceBasedPromotionGateService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/promotion/services/evidenceBasedPromotionGateService.ts"
+        },
+        {
+          "line": 17,
+          "specifier": "../../core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -29675,9 +29676,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/generatedComponentVerificationRegistrationService.ts",
-      "bytes": 2814,
-      "lines": 3,
-      "sha256": "50628e902c19bbec3994214dac8e663f48a66cfc0adfad5857a9de33f2363d30",
+      "bytes": 3695,
+      "lines": 15,
+      "sha256": "3a6d676fc4d2458abedef3183c4451ba9dc6b62af9dfcc0f1bc49b750ba3a7b6",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -29704,9 +29705,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/generatedComponentWorkerSandboxService.ts",
-      "bytes": 2493,
-      "lines": 7,
-      "sha256": "12b9a93232414e644686757cf2d3f8457274b4c8a1700c90dfe83abe3f5bbec4",
+      "bytes": 3145,
+      "lines": 33,
+      "sha256": "e56746c2dbf5d052a99ab8d29eeb09efdf87fcd9e968fcd1d488a414d38b9a31",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -29722,19 +29723,13 @@
         },
         {
           "line": 3,
-          "specifier": "../../capability/services/componentRegistryService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/capability/services/componentRegistryService.ts"
-        },
-        {
-          "line": 4,
           "specifier": "./atomicComponentTemplateSynthesisService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/atomicComponentTemplateSynthesisService.ts"
         }
       ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -30181,9 +30176,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/multiIntentDevelopmentTransactionCoordinatorService.ts",
-      "bytes": 6374,
-      "lines": 9,
-      "sha256": "35a1b48ea209c6b3c7274d2815f65d165fd51e0628b71b161034866359091199",
+      "bytes": 11224,
+      "lines": 61,
+      "sha256": "572904fac869a974818ed98d8f6360e64006737ce3746f88d058a2c373cd594e",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -30265,25 +30260,67 @@
         },
         {
           "line": 5,
+          "specifier": "../../verification/services/componentVerificationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/verification/services/componentVerificationService.ts"
+        },
+        {
+          "line": 6,
+          "specifier": "../../promotion/services/componentPromotionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/promotion/services/componentPromotionService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "../../verification/services/componentTestCaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/verification/services/componentTestCaseService.ts"
+        },
+        {
+          "line": 8,
+          "specifier": "../../capability/services/componentArtifactStoreService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/capability/services/componentArtifactStoreService.ts"
+        },
+        {
+          "line": 9,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 10,
+          "specifier": "./generatedComponentWorkerSandboxService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/generatedComponentWorkerSandboxService.ts"
+        },
+        {
+          "line": 11,
+          "specifier": "./atomicComponentTemplateSynthesisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/atomicComponentTemplateSynthesisService.ts"
+        },
+        {
+          "line": 12,
           "specifier": "./generatedComponentSandboxExecutionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/generatedComponentSandboxExecutionService.ts"
         },
         {
-          "line": 6,
+          "line": 13,
           "specifier": "./developmentResumeTokenService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/developmentResumeTokenService.ts"
         },
         {
-          "line": 6,
+          "line": 13,
           "specifier": "./unifiedDevelopmentRequestModel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/unifiedDevelopmentRequestModel.ts"
         }
       ],
-      "relativeImportCandidateCount": 16,
-      "resolvedRelativeImportCount": 16,
+      "relativeImportCandidateCount": 23,
+      "resolvedRelativeImportCount": 23,
       "unresolvedRelativeImportCount": 0
     },
     {
