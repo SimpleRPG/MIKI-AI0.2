@@ -2,6 +2,7 @@ import { componentRegistryService } from '../../../services/componentRegistrySer
 import { systemLogger } from '../../../services/systemLogger';
 import { ComponentTestCategory, ComponentTxtPackage } from '../../../types';
 import { hardeningRegressionCandidateService } from '../../../services/hardeningRegressionCandidateService';
+import { teacherVerificationEvidenceService } from './teacherVerificationEvidenceService';
 
 export interface ComponentTestCase {
   test_case_id: string;
@@ -107,6 +108,15 @@ export class ComponentTestCaseService {
    * そちらが優先され、ここでは追加しない。
    */
   private generateMissingCases(component: ComponentTxtPackage, declared: ComponentTestCase[]): ComponentTestCase[] {
+    /*
+     * P449（§8 決めること1の案イ）: TVE（教師検証証拠）付きの部品では
+     * 自動補完を行わない。教師が実際に実行した検査だけがケースになる。
+     * ファイル差し替えの部品に PERMISSION（権限不足環境）の実行検査は
+     * 意味がなく、形だけの検査は証拠の質を下げるため。
+     */
+    if (teacherVerificationEvidenceService.hasRounds(component.component_id)) {
+      return [];
+    }
     const present = new Set(declared.map(c => c.category));
     const candidates: Array<[ComponentTestCategory, string, string]> = [];
 

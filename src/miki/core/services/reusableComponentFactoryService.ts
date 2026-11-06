@@ -555,16 +555,15 @@ class ReusableComponentFactoryService{
     'FILE_CONTENT_END',
   ].join('\\n');
 
-  const implementationHash=(() => {
-    let hash=0;
-    const clean=implementation.trim();
-    for(let i=0;i<clean.length;i++){
-      const char=clean.charCodeAt(i);
-      hash=((hash<<5)-hash)+char;
-      hash|=0;
-    }
-    return `h_${Math.abs(hash).toString(16).padStart(8,'0')}`;
-  })();
+  /*
+   * P449: 実装ハッシュを canonicalSha256(implementation_txt) に統一する。
+   * P441 でハッシュ規格を統一したはずの残りで、旧式 FNV の `h_` 形式の
+   * ままだったため、advanceComponentStatus の 9.6 照合
+   * （canonicalSha256(implementation_txt) との比較）が供給候補では
+   * すべて却下されていた。実装本文が変われば component_id も変わる
+   * （ID にハッシュを含む）ため、既存の登録済み部品の ID は変わらない。
+   */
+  const implementationHash=canonicalSha256Object(implementationTxt);
 
   const base={
     component_id:`CC-${implementationHash}-${now.toString(36)}`,
@@ -596,6 +595,14 @@ class ReusableComponentFactoryService{
     validation_hash:'',
     test_count:1,
     validation_count:1,
+    /*
+     * P449: success_count / failure_count を 0 で初期化する。
+     * verifyAndRegister（生成部品）と同じ。初期化がないと
+     * recordExecutionOutcome の `success_count += 1` が NaN になり、
+     * VERIFIED 昇格の証拠ゲート（実測10件）が永久に通らない。
+     */
+    success_count:0,
+    failure_count:0,
     created_at:now,
     updated_at:now,
     source_episode_ids:input.sourceEpisodeIds||[],

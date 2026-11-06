@@ -3,6 +3,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { evidenceService } from '../../memory/services/evidenceService';
 import { componentSupplyRequestService } from './componentSupplyRequestService';
+import { teacherVerificationEvidenceService, type TeacherVerificationRound } from '../../verification/services/teacherVerificationEvidenceService';
 import { improvementIntakeRouterService, type ImprovementIntakeRun } from './improvementIntakeRouterService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { sha256HexFromText } from './canonicalSha256Service';
@@ -54,6 +55,7 @@ export type ComponentSupplyIntakeCode =
   | 'CANDIDATE_PATH_OUT_OF_SCOPE'
   | 'CANDIDATE_FILE_MISSING'
   | 'CANDIDATE_FIELDS_MISSING'
+  | 'TEACHER_VERIFICATION_INVALID'
   | 'BASELINE_MISMATCH'
   | 'RUN_CREATE_FAILED';
 
@@ -82,6 +84,16 @@ export interface ComponentSupplyIntakeRecord {
   originRunId?: string;
   newRunId?: string;
   receivedAt: number;
+  /** P449: 受入時に検証済みの TVE（教師検証証拠）の要約。候補ごと。 */
+  teacherVerification?: Array<{
+    path: string;
+    verifier: string;
+    verifiedAt: string;
+    rounds: number;
+    implementationSha256: string;
+  }>;
+  /** P449: TVE が無効だったため候補単位で落とした理由。 */
+  teacherVerificationDropped?: string[];
 }
 
 export interface ComponentSupplyIntakeResult {
@@ -109,6 +121,10 @@ interface ReplyCandidate {
   publicInterfaces?: unknown;
   tests?: unknown;
   validation?: unknown;
+  /** P449: 教師検証証拠（TVE）。任意。1ラウンド分。 */
+  teacherVerification?: unknown;
+  /** P449: 追加の TVE ラウンド（Canary 用の新規検証ラウンド等）。任意。 */
+  teacherVerificationRounds?: unknown;
 }
 
 const LEDGER_KEY = 'miki_component_supply_intake_ledger_v1';
@@ -177,6 +193,8 @@ class ComponentSupplyIntakeService {
       reasons: [...record.reasons],
       candidatePaths: [...record.candidatePaths],
       supplier: record.supplier ? { ...record.supplier } : undefined,
+      teacherVerification: record.teacherVerification ? record.teacherVerification.map((item) => ({ ...item })) : undefined,
+      teacherVerificationDropped: record.teacherVerificationDropped ? [...record.teacherVerificationDropped] : undefined,
     };
   }
 
@@ -435,6 +453,9 @@ class ComponentSupplyIntakeService {
     const scopeReasons: string[] = [];
     const fileReasons: string[] = [];
     const contents = new Map<string, string>();
+    // P449: 候補ごとに検証済みの TVE ラウンド（1ラウンド目＋追加ラウンド）。
+    const verifiedTve = new Map<string, { round: TeacherVerificationRound; extraRounds: TeacherVerificationRound[] }>();
+    const tveReasons: string[] = [];
     for (const candidate of candidates) {
       const path = typeof candidate.path === 'string' ? candidate.path.trim() : '';
       if (!path) {
@@ -476,6 +497,54 @@ class ComponentSupplyIntakeService {
         continue;
       }
       contents.set(path, content);
+
+      /*
+       * P449: TVE（教師検証証拠）の検証。候補単位で行う。
+       * teacherVerification / teacherVerificationRounds が無い候補は
+       * 従来どおり（TVE なし）で通す。TVE があるのに検証に通らない
+       * 候補は、その候補だけを落とす（パッケージ全体の却下ではない）。
+       * 検証条件は teacherVerificationEvidenceService.parseRound に集約。
+       */
+      if (candidate.teacherVerification !== undefined || candidate.teacherVerificationRounds !== undefined) {
+        const parsed = teacherVerificationEvidenceService.parseRound(candidate.teacherVerification, {
+          candidateContent: content,
+          targetPaths,
+        });
+        if (parsed.ok === false) {
+          tveReasons.push(`${path}: TVE の検証に失敗しました（${parsed.reason}）`);
+          contents.delete(path);
+          const at = candidatePaths.indexOf(path);
+          if (at >= 0) candidatePaths.splice(at, 1);
+          continue;
+        }
+        const extraRounds: TeacherVerificationRound[] = [];
+        let extraFailed: string | undefined;
+        if (candidate.teacherVerificationRounds !== undefined) {
+          if (!Array.isArray(candidate.teacherVerificationRounds)) {
+            extraFailed = 'teacherVerificationRounds が配列ではありません';
+          } else {
+            for (const rawRound of candidate.teacherVerificationRounds) {
+              const parsedExtra = teacherVerificationEvidenceService.parseRound(rawRound, {
+                candidateContent: content,
+                targetPaths,
+              });
+              if (parsedExtra.ok === false) {
+                extraFailed = parsedExtra.reason;
+                break;
+              }
+              extraRounds.push(parsedExtra.round);
+            }
+          }
+        }
+        if (extraFailed) {
+          tveReasons.push(`${path}: 追加の TVE ラウンドの検証に失敗しました（${extraFailed}）`);
+          contents.delete(path);
+          const at = candidatePaths.indexOf(path);
+          if (at >= 0) candidatePaths.splice(at, 1);
+          continue;
+        }
+        verifiedTve.set(path, { round: parsed.round, extraRounds });
+      }
     }
     if (scopeReasons.length > 0) {
       return reject('CANDIDATE_PATH_OUT_OF_SCOPE', '要求の対象ファイル以外の候補が含まれています。対象外のファイルは受け付けません。', scopeReasons, { ...boundCtx, candidatePaths });
@@ -485,6 +554,9 @@ class ComponentSupplyIntakeService {
     }
     if (fileReasons.length > 0) {
       return reject('CANDIDATE_FILE_MISSING', '候補の実体ファイルに問題があります。', fileReasons, { ...boundCtx, candidatePaths });
+    }
+    if (tveReasons.length > 0 && candidatePaths.length === 0) {
+      return reject('TEACHER_VERIFICATION_INVALID', '教師検証証拠（TVE）の検証に通った候補が1件もありません。TVE のハッシュ・コマンド・検証結果を確認してください。', tveReasons, { ...boundCtx, candidatePaths });
     }
 
     // ---- ベースライン照合（古い前提で作られた返却を混ぜない） ----
@@ -509,7 +581,12 @@ class ComponentSupplyIntakeService {
     // ---- 候補受け口への接続（新規 run の payload へ） ----
     // 出所の刻印: 各候補に供給エピソード（この受入記録）を刻む。
     // 生成段はこれを部品候補の sourceEpisodeIds へそのまま引き継ぐ。
-    const implementationCandidates = candidates.map((candidate) => {
+    // P449: TVE の検証で落とした候補は run payload に載せない。落とした候補は
+    // candidatePaths から外れている（contents からも消えている）ため、生き残った
+    // candidatePaths のものだけを載せる。素通しで map すると、落とした候補が
+    // 空の candidateContent で生成段へ届いてしまう。
+    const survivingPaths = new Set(candidatePaths);
+    const implementationCandidates = candidates.filter((candidate) => survivingPaths.has(String(candidate.path).trim())).map((candidate) => {
       const path = String(candidate.path).trim();
       const entry: Record<string, unknown> = {
         path,
@@ -530,6 +607,12 @@ class ComponentSupplyIntakeService {
       if (environments.length > 0) entry.supportedEnvironments = environments;
       if (typeof candidate.entryPoint === 'string' && candidate.entryPoint.trim()) entry.entryPoint = candidate.entryPoint.trim();
       if (typeof candidate.purpose === 'string' && candidate.purpose.trim()) entry.purpose = candidate.purpose.trim();
+      // P449: 検証済みの TVE ラウンドを run payload へ載せて generate() へ運ぶ。
+      const tve = verifiedTve.get(path);
+      if (tve) {
+        entry.teacherVerification = tve.round;
+        if (tve.extraRounds.length > 0) entry.teacherVerificationRounds = tve.extraRounds;
+      }
       return entry;
     });
 
@@ -603,6 +686,18 @@ class ComponentSupplyIntakeService {
       originRunId: request.runId,
       newRunId: run.runId,
       receivedAt,
+      ...(verifiedTve.size > 0
+        ? {
+            teacherVerification: [...verifiedTve.entries()].map(([path, tve]) => ({
+              path,
+              verifier: tve.round.verifier,
+              verifiedAt: tve.round.verifiedAt,
+              rounds: 1 + tve.extraRounds.length,
+              implementationSha256: tve.round.implementationSha256,
+            })),
+          }
+        : {}),
+      ...(tveReasons.length > 0 ? { teacherVerificationDropped: tveReasons } : {}),
     };
     this.ledger.set(intakeId, record);
     this.save();
@@ -611,6 +706,9 @@ class ComponentSupplyIntakeService {
       'RECEIVED',
       `受入 ${intakeId}（供給者: ${supplier.name}）→ 新規Run ${run.runId}`,
     );
+    if (verifiedTve.size > 0) {
+      systemLogger.info('SELF_IMPROVEMENT', `[P449] TVE verified: ${[...verifiedTve.entries()].map(([path, tve]) => `${path} rounds=${1 + tve.extraRounds.length} checks=${tve.round.checks.length}`).join(', ')}`, { intakeId });
+    }
     systemLogger.info('SELF_IMPROVEMENT', `[部品供給 受入] ${intakeId} request=${requestId} supplier=${supplier.name} → 新規Run ${run.runId}（候補は検証待ちの部品候補として生成段へ接続）`, { candidatePaths });
     return {
       ok: true,

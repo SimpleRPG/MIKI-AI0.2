@@ -14,6 +14,7 @@ import { stackExchangeMaterialService } from './stackExchangeMaterialService';
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
+import { teacherVerificationEvidenceService } from '../../verification/services/teacherVerificationEvidenceService';
 import { ComponentCompositionService } from '../../capability/services/componentCompositionService';
 import { codeConstructionRendererService } from './codeConstructionRendererService';
 import { astCandidateTransformationService, type AstCandidateOperation } from '../../selfDevelopment/services/astCandidateTransformationService';
@@ -1012,6 +1013,13 @@ class CandidateCodeGenerationService {
 
     if(created.accepted&&created.componentId){
       createdCodeComponentIds.push(created.componentId);
+      // P449: TVE（教師検証証拠）付きの供給候補は、静的検証が通れば
+      // ANALYZED へ進め、実行チェックから宣言テストケースを合成して
+      // tests_txt に載せ、ラウンドを TVE 保管へ預ける。3件とも同じ
+      // 扱いで、1件ずつ梯子を通せる（束縛は1件で足りるが、残り2件も
+      // 同じ仕組みで VERIFIED まで通す）。静的検証が通らなければ
+      // CANDIDATE のままにし、ラウンドは預けない（Gate へは進まない）。
+      this.applyTeacherVerification(created.componentId, candidate);
     }
   }
 
@@ -2433,6 +2441,102 @@ class CandidateCodeGenerationService {
     );
  }
 
+ /*
+  * P449: 供給候補に付いた TVE（教師検証証拠）を適用する。
+  *
+  * 受入時に検証済みの TVE だけがここまで来るが、ここでも改めて検証する
+  * （run payload は受入後に変わり得るため）。静的チェックが通れば
+  * CANDIDATE → ANALYZED へ進め、実行チェックから宣言テストケースを
+  * 合成して tests_txt に載せ、ラウンドを TVE 保管へ預ける。静的検証が
+  * 通らない、または遷移に失敗した場合は CANDIDATE のままにし、
+  * ラウンドは預けない（Gate へは進まない）。3件の候補はすべて同じ
+  * 扱いで、1件ずつ梯子を通せる。
+  */
+ private applyTeacherVerification(
+  componentId:string,
+  candidate:{
+    path:string;
+    candidateContent:string;
+    tests:string;
+    teacherVerification?:unknown;
+    teacherVerificationRounds?:unknown;
+  },
+ ):void{
+  if(candidate.teacherVerification===undefined&&candidate.teacherVerificationRounds===undefined)return;
+  const expected={candidateContent:candidate.candidateContent,targetPaths:[candidate.path]};
+  const parsed=teacherVerificationEvidenceService.parseRound(candidate.teacherVerification,expected);
+  if(parsed.ok===false){
+    systemLogger.warn('SELF_IMPROVEMENT',`[P449] TVE invalid for ${componentId}: ${parsed.reason}`);
+    return;
+  }
+  const rounds=[parsed.round];
+  if(candidate.teacherVerificationRounds!==undefined){
+    if(!Array.isArray(candidate.teacherVerificationRounds)){
+      systemLogger.warn('SELF_IMPROVEMENT',`[P449] TVE extra rounds are not an array for ${componentId}`);
+      return;
+    }
+    for(const raw of candidate.teacherVerificationRounds){
+      const extra=teacherVerificationEvidenceService.parseRound(raw,expected);
+      if(extra.ok===false){
+        systemLogger.warn('SELF_IMPROVEMENT',`[P449] TVE extra round invalid for ${componentId}: ${extra.reason}`);
+        return;
+      }
+      rounds.push(extra.round);
+    }
+  }
+  if(!teacherVerificationEvidenceService.staticChecksPassed(rounds[0])){
+    systemLogger.warn('SELF_IMPROVEMENT',`[P449] TVE static checks not passed for ${componentId}; stays CANDIDATE`);
+    return;
+  }
+  const synthesized=this.synthesizeTestsFromTve(rounds[0]);
+  if(synthesized.length===0){
+    systemLogger.warn('SELF_IMPROVEMENT',`[P449] TVE has no executable checks for ${componentId}; stays CANDIDATE`);
+    return;
+  }
+  const advanced=componentRegistryService.advanceComponentStatus(
+    componentId,
+    'ANALYZED',
+    '[P449] Teacher verification (static checks) passed',
+  );
+  if(!advanced.success){
+    systemLogger.warn('SELF_IMPROVEMENT',`[P449] ANALYZED transition failed for ${componentId}: ${advanced.message}`);
+    return;
+  }
+  teacherVerificationEvidenceService.storeRounds(componentId,rounds);
+  const registered=componentRegistryService.getComponent(componentId);
+  if(registered){
+    // 宣言テストケースを TVE の実行チェックから合成したものに置き換える。
+    // 元の自然言語の tests は記録として後ろに残す（宣言の解析には影響しない）。
+    componentRegistryService.registerComponent({
+      ...registered,
+      tests_txt:[...synthesized,'',candidate.tests].join('\n'),
+      updated_at:Date.now(),
+    });
+  }
+  systemLogger.info('SELF_IMPROVEMENT',`[P449] TVE applied: ${componentId} cases=${synthesized.length} rounds=${rounds.length} -> ANALYZED`);
+ }
+
+ /*
+  * P449: TVE の実行チェック（SMOKE_EXECUTION）から宣言テストケースを
+  * 合成する。1チェック＝1ケース。ASSERT は出力抜粋の先頭マーカー
+  * （例：`SMOKE_PASS_NORMAL:` の `SMOKE_PASS_NORMAL`）の CONTAINS と
+  * する。同じカテゴリが複数ある場合は先頭の1件だけを使う。
+  */
+ private synthesizeTestsFromTve(round:{checks:Array<{kind:string;testCase?:string;outputExcerpt:string}>}):string[]{
+  const lines:string[]=[];
+  const seen=new Set<string>();
+  for(const check of round.checks){
+    if(check.kind!=='SMOKE_EXECUTION'||!check.testCase)continue;
+    const category=check.testCase.trim().toUpperCase();
+    if(seen.has(category))continue;
+    const marker=check.outputExcerpt.match(/^\s*([A-Z][A-Z0-9_]+)\s*:/)?.[1];
+    if(!marker)continue;
+    seen.add(category);
+    lines.push(`TEST_CASE: ${category}, ASSERT: CONTAINS "${marker}"`);
+  }
+  return lines;
+ }
+
  private parseImplementationCandidates(
   value:unknown,
   targetPaths:string[],
@@ -2457,6 +2561,10 @@ class CandidateCodeGenerationService {
   uiEventEntrypoints?:string[];
   sourceEpisodeIds?:string[];
   sourceLearningArtifactIds?:string[];
+  /** P449: 教師検証証拠（TVE）。受入時に検証済みのものだけがここまで来る。 */
+  teacherVerification?:unknown;
+  /** P449: 追加の TVE ラウンド。 */
+  teacherVerificationRounds?:unknown;
 }>{
   if(!Array.isArray(value))return [];
 
@@ -2485,6 +2593,8 @@ class CandidateCodeGenerationService {
       uiEventEntrypoints:this.strings(item.uiEventEntrypoints),
       sourceEpisodeIds:this.strings(item.sourceEpisodeIds),
       sourceLearningArtifactIds:this.strings(item.sourceLearningArtifactIds),
+      teacherVerification:item.teacherVerification,
+      teacherVerificationRounds:Array.isArray(item.teacherVerificationRounds)?item.teacherVerificationRounds:undefined,
     }))
     .filter(item=>
       allowed.has(item.path)&&

@@ -48,7 +48,8 @@ import { taskBlackboardService } from './taskBlackboardService';
 import { coreOrchestratorService } from './coreOrchestratorService';
 import type { ExecutionEvent } from '../../execution/services/executionEventBusService';
 import { safeImprovementPipelineService } from '../../improvement/services/safeImprovementPipelineService';
-import { executionRunnerService } from '../../execution/services/executionRunnerService';
+import { executionRunnerService, type ExecutionRequest } from '../../execution/services/executionRunnerService';
+import { teacherVerificationEvidenceService } from '../../verification/services/teacherVerificationEvidenceService';
 import { androidNativeRunnerAdapterService } from '../../execution/services/androidNativeRunnerAdapterService';
 import { externalRunnerAdapterService } from '../../execution/services/externalRunnerAdapterService';
 import { knowledgeHalfLifeService } from '../../memory/services/knowledgeHalfLifeService';
@@ -117,6 +118,46 @@ class DomainIntegrationBootstrapService{
  dispose():void{
   for(const domain of MIKI_DOMAINS)domainRouterService.unregister(domain);conversationCompositionResearchSchedulerService.dispose();autonomousIssueDiscoveryService.dispose();autonomousCapabilityInnovationService.dispose();templateInventionService.dispose();productionScaleWorkerService.dispose();autonomousSelfImprovementLoopService.dispose();for(const unsubscribe of this.unsubscribers)unsubscribe();this.unsubscribers=[];this.initialized=false;}
  getStatus(){return {initialized:this.initialized,registered:domainRouterService.getRegistrations(),missing:domainRouterService.getMissingDomains([...MIKI_DOMAINS]),coverage:crossDomainCirculationService.getCoverage(),connectivityAudit:domainParticipationService.getLastAudit()};}
+
+ /*
+  * P449: TVE（教師検証証拠）の提出。現在のラウンドから、要求の
+  * カテゴリに対応する実行チェックを取り、既存の submitResult 経路で
+  * 提出する。runner_id は 'teacher-verification' で識別する。
+  * submitResult の照合（要求の存在・状態、テストケース ID の一致、
+  * 実装ハッシュの一致、artifact snapshot の一致、環境の一致）と
+  * ASSERT 評価はそのまま行われる。ハッシュ・artifact・テストケースの
+  * いずれかが合わなければ却下される。対応するチェックが無い場合や
+  * 提出が却下された場合は false を返し、呼び出し元は従来の送出へ落ちる。
+  */
+ private submitTeacherVerification(request: ExecutionRequest): boolean {
+  try {
+   const check = teacherVerificationEvidenceService.getCheckForCategory(
+    request.component_id,
+    request.test_category,
+   );
+   if (!check) return false;
+   const result = executionRunnerService.submitResult({
+    request_id: request.request_id,
+    passed: check.passed,
+    output_summary: check.outputExcerpt,
+    environment: request.environment,
+    runner_id: 'teacher-verification',
+    implementation_hash: request.implementation_hash,
+    artifact_snapshot_key: request.artifact_snapshot_key,
+    test_case_id: request.test_case_id,
+    duration_ms: 5,
+   });
+   if (result.accepted) {
+    systemLogger.info('SELF_IMPROVEMENT', `[P449] TVE submitted: ${request.component_id} case=${request.test_category} runner=teacher-verification`);
+    return true;
+   }
+   systemLogger.warn('SELF_IMPROVEMENT', `[P449] TVE submit rejected: ${request.component_id} case=${request.test_category} reason=${result.reason ?? ''}`);
+   return false;
+  } catch (error) {
+   systemLogger.warn('SELF_IMPROVEMENT', `[P449] TVE submit failed: ${request.component_id} case=${request.test_category}: ${String(error)}`);
+   return false;
+  }
+ }
 
  private async handleExecutionEvent(event:ExecutionEvent):Promise<void>{
   try{
@@ -524,7 +565,40 @@ class DomainIntegrationBootstrapService{
        reason:'COMPONENT_REGRESSION_GATE_CREATE_FAILED'
      };
 
-     const refreshed=componentRegressionService.refresh(suite.suite_id) || suite;
+     const refreshed0=componentRegressionService.refresh(suite.suite_id) || suite;
+
+     /*
+      * P449: Canary 中の TVE 新規ラウンド。Suite が PASSED で Canary が
+      * CANARY 段階のとき、未使用の TVE ラウンドが残っていれば新しい
+      * Gate を作り直す（同じ suite_id で新しい QUEUED 要求ができる）。
+      * そのラウンドをこの駆動で提出する。ラウンドが無ければ従来どおり
+      * 待機する。Suite の上書きは実装ハッシュが変わらないため、
+      * promoteIfSafeForCanary の照合には影響しない。
+      */
+     let refreshed=refreshed0;
+     if(refreshed.status==='PASSED'){
+       const canaryRunning=safeImprovementPipelineService.list()
+         .filter(run =>
+           run.new_component_mode===true &&
+           run.stage==='CANARY' &&
+           run.component_id===componentId &&
+           run.environment===environment &&
+           run.implementation_hash===component.implementation_hash
+         )
+         .sort((a,b)=>b.updated_at-a.updated_at)[0];
+       if(canaryRunning&&teacherVerificationEvidenceService.hasUnusedRound(componentId)){
+         const newSuite=componentPromotionService.createGate(
+           componentId,
+           environment,
+           decisionId || undefined
+         );
+         if(newSuite){
+           teacherVerificationEvidenceService.advanceRound(componentId);
+           refreshed=componentRegressionService.refresh(newSuite.suite_id) || newSuite;
+           systemLogger.info('SELF_IMPROVEMENT',`[P449] TVE new round gate: ${componentId} suite=${newSuite.suite_id} canary=${canaryRunning.run_id}`);
+         }
+       }
+     }
 
      /*
       * NEW_COMPONENT のRegression Suiteは通常Candidate用の
@@ -548,16 +622,25 @@ class DomainIntegrationBootstrapService{
          const submitted=executionRunnerService.markSubmitted(nextRegressionRequest.request_id);
 
          if(submitted?.status==='SUBMITTED'){
-           if(
-             submitted.environment==='ANDROID' &&
-             androidNativeRunnerAdapterService.isAvailable()
-           ){
-             void androidNativeRunnerAdapterService.dispatch(submitted);
-           }else if(
-             submitted.environment!=='TERMUX' &&
-             externalRunnerAdapterService.isEnabled()
-           ){
-             void externalRunnerAdapterService.dispatch(submitted);
+           /*
+            * P449: TVE ラウンドがある部品は、Native / 外部 Runner へ送らず、
+            * 教師検証証拠を既存の submitResult 経路で提出する。提出が
+            * 却下された場合（TVE のチェックが無いカテゴリ等）は従来の
+            * 送出へ落ちる。TVE が無い部品は従来どおり。
+            */
+           const tveSubmitted=this.submitTeacherVerification(submitted);
+           if(!tveSubmitted){
+             if(
+               submitted.environment==='ANDROID' &&
+               androidNativeRunnerAdapterService.isAvailable()
+             ){
+               void androidNativeRunnerAdapterService.dispatch(submitted);
+             }else if(
+               submitted.environment!=='TERMUX' &&
+               externalRunnerAdapterService.isEnabled()
+             ){
+               void externalRunnerAdapterService.dispatch(submitted);
+             }
            }
          }
        }
