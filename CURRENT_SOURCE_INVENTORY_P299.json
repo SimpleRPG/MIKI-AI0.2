@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1764,
-    "sourceFileCount": 1317,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1228,
-    "relativeImportCandidateCount": 3776,
-    "resolvedRelativeImportCandidateCount": 3760,
+    "trackedPathCountExcludingControlPaths": 1765,
+    "sourceFileCount": 1318,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1229,
+    "relativeImportCandidateCount": 3777,
+    "resolvedRelativeImportCandidateCount": 3761,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -6132,9 +6132,9 @@
     },
     {
       "path": "src/App.tsx",
-      "bytes": 92277,
-      "lines": 2130,
-      "sha256": "c1ace835000974068c6208604db236baabe02bdf2f789ad9b18397c50504c79d",
+      "bytes": 92835,
+      "lines": 2140,
+      "sha256": "3fd956e944161329b9b6eaa2e185fbb969454cbb64a0e85542928ccb505553b5",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -10633,9 +10633,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationStateService.ts",
-      "bytes": 56643,
-      "lines": 1177,
-      "sha256": "8fe47eaaa789961a94991ee5b151331e5833955fb08cd514a56413f4d61628a6",
+      "bytes": 58682,
+      "lines": 1214,
+      "sha256": "5c3497bbdbfcf0c5f63a7b85ffd91f16bdced45865fbcfbeec228a6ea9a1ab1e",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10668,25 +10668,7 @@
           "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         },
         {
-          "line": 445,
-          "specifier": "../../../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 453,
-          "specifier": "../../../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 464,
-          "specifier": "../../../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 478,
+          "line": 482,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
@@ -10698,49 +10680,67 @@
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 512,
+          "line": 501,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 513,
+          "line": 515,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 524,
+          "line": 527,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 539,
+          "line": 549,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 548,
+          "line": 550,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 592,
+          "line": 561,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 645,
+          "line": 576,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 645,
+          "line": 585,
+          "specifier": "../../../types",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/types.ts"
+        },
+        {
+          "line": 629,
+          "specifier": "../../../types",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/types.ts"
+        },
+        {
+          "line": 682,
+          "specifier": "../../../types",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/types.ts"
+        },
+        {
+          "line": 682,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
@@ -10823,6 +10823,16 @@
       ],
       "relativeImportCandidateCount": 3,
       "resolvedRelativeImportCount": 3,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/conversation/services/conversationUserFactRecallService.ts",
+      "bytes": 8591,
+      "lines": 192,
+      "sha256": "731db0e786b32a1efaf120fd39aed472680d8ee2278c1c2a83f721814b680f4f",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -26045,9 +26055,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 50814,
-      "lines": 880,
-      "sha256": "1475f9258a25addddc9fc0d957d398041c936b3ac48944f2b866cbba58d4750b",
+      "bytes": 53898,
+      "lines": 930,
+      "sha256": "b3db608f8f92facbfaa97cbee7f57f208a658f2e72f4d5dcb092bfdbfdb5138a",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -26105,241 +26115,247 @@
         },
         {
           "line": 24,
+          "specifier": "../../conversation/services/conversationUserFactRecallService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationUserFactRecallService.ts"
+        },
+        {
+          "line": 25,
           "specifier": "../../strategy/services/conversationStrategyService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/strategy/services/conversationStrategyService.ts"
         },
         {
-          "line": 25,
+          "line": 26,
           "specifier": "../../conversation/services/conversationStateService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationStateService.ts"
         },
         {
-          "line": 26,
+          "line": 27,
           "specifier": "../../capability/services/componentRegistryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/componentRegistryService.ts"
         },
         {
-          "line": 27,
+          "line": 28,
           "specifier": "../../capability/services/capabilityGraphService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/capabilityGraphService.ts"
         },
         {
-          "line": 28,
+          "line": 29,
           "specifier": "../../capability/services/componentCompositionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/componentCompositionService.ts"
         },
         {
-          "line": 29,
+          "line": 30,
           "specifier": "../../strategy/services/unifiedDecisionEngineService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/strategy/services/unifiedDecisionEngineService.ts"
         },
         {
-          "line": 30,
+          "line": 31,
           "specifier": "../../selfAwareness/services/affectionDynamicsService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/affectionDynamicsService.ts"
         },
         {
-          "line": 31,
+          "line": 32,
           "specifier": "../../../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         },
         {
-          "line": 32,
+          "line": 33,
           "specifier": "../../research/services/unifiedWebResearchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/unifiedWebResearchService.ts"
         },
         {
-          "line": 33,
+          "line": 34,
           "specifier": "../../unknown/services/knowledgeGapService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
         },
         {
-          "line": 34,
+          "line": 35,
           "specifier": "../../research/services/researchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchService.ts"
         },
         {
-          "line": 35,
+          "line": 36,
           "specifier": "../../verification/services/verifierService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verifierService.ts"
         },
         {
-          "line": 36,
+          "line": 37,
           "specifier": "../../core/services/reusableComponentFactoryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/reusableComponentFactoryService.ts"
         },
         {
-          "line": 37,
+          "line": 38,
           "specifier": "../../capability/services/capabilityReuseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/capabilityReuseService.ts"
         },
         {
-          "line": 38,
+          "line": 39,
           "specifier": "../../memory/services/failureMemoryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/failureMemoryService.ts"
         },
         {
-          "line": 39,
+          "line": 40,
           "specifier": "../../conversation/services/conversationComponentPipelineService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationComponentPipelineService.ts"
         },
         {
-          "line": 40,
+          "line": 41,
           "specifier": "../../research/services/japaneseAnalysisService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
         },
         {
-          "line": 41,
+          "line": 42,
           "specifier": "../../conversation/services/runtimeConversationCompositionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/runtimeConversationCompositionService.ts"
         },
         {
-          "line": 42,
+          "line": 43,
           "specifier": "../../conversation/services/hybridConversationEngineService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/hybridConversationEngineService.ts"
         },
         {
-          "line": 43,
+          "line": 44,
           "specifier": "../../strategy/services/implementationSelectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/strategy/services/implementationSelectionService.ts"
         },
         {
-          "line": 44,
+          "line": 45,
           "specifier": "../../selfDevelopment/services/nonLlmCodeSynthesisService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/nonLlmCodeSynthesisService.ts"
         },
         {
-          "line": 45,
+          "line": 46,
           "specifier": "../../strategy/services/answerPlanService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/strategy/services/answerPlanService.ts"
         },
         {
-          "line": 46,
+          "line": 47,
           "specifier": "../../verification/services/formalConstraintSolverService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/formalConstraintSolverService.ts"
         },
         {
-          "line": 47,
+          "line": 48,
           "specifier": "../../capability/services/deterministicCapabilityExecutionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/deterministicCapabilityExecutionService.ts"
         },
         {
-          "line": 48,
+          "line": 49,
           "specifier": "../../experience/services/unifiedMikiExperienceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/experience/services/unifiedMikiExperienceService.ts"
         },
         {
-          "line": 49,
+          "line": 50,
           "specifier": "../../learning/services/mikiUnifiedLearningContinuumService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts"
         },
         {
-          "line": 50,
+          "line": 51,
           "specifier": "../../promotion/services/verifiedKnowledgePromotionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/promotion/services/verifiedKnowledgePromotionService.ts"
         },
         {
-          "line": 51,
+          "line": 52,
           "specifier": "../../promotion/services/verifiedCapabilityPromotionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/promotion/services/verifiedCapabilityPromotionService.ts"
         },
         {
-          "line": 52,
+          "line": 53,
           "specifier": "../../unknown/services/unknownTaskDecompositionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/unknown/services/unknownTaskDecompositionService.ts"
         },
         {
-          "line": 53,
+          "line": 54,
           "specifier": "../../memory/services/causalMemoryLedgerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/causalMemoryLedgerService.ts"
         },
         {
-          "line": 54,
+          "line": 55,
           "specifier": "./bannedTopicsConfigService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/safety/services/bannedTopicsConfigService.ts"
         },
         {
-          "line": 55,
+          "line": 56,
           "specifier": "../../promotion/services/evidenceBasedPromotionGateService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/promotion/services/evidenceBasedPromotionGateService.ts"
         },
         {
-          "line": 56,
+          "line": 57,
           "specifier": "../../capability/services/capabilityGapService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/capabilityGapService.ts"
         },
         {
-          "line": 57,
+          "line": 58,
           "specifier": "../../selfDevelopment/services/mikiAutonomousDevStudioService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/mikiAutonomousDevStudioService.ts"
         },
         {
-          "line": 58,
+          "line": 59,
           "specifier": "../../conversation/services/surfaceVariationGrowthService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/surfaceVariationGrowthService.ts"
         },
         {
-          "line": 59,
+          "line": 60,
           "specifier": "../../selfAwareness/services/mikiReasoningTemplateService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/mikiReasoningTemplateService.ts"
         },
         {
-          "line": 60,
+          "line": 61,
           "specifier": "../../learning/services/mikiConversationLearningService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/learning/services/mikiConversationLearningService.ts"
         },
         {
-          "line": 61,
+          "line": 62,
           "specifier": "../../conversation/services/conversationComponentCompositionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationComponentCompositionService.ts"
         },
         {
-          "line": 62,
+          "line": 63,
           "specifier": "../../learning/services/mikiUnifiedLearningContinuumService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/learning/services/mikiUnifiedLearningContinuumService.ts"
         }
       ],
-      "relativeImportCandidateCount": 48,
-      "resolvedRelativeImportCount": 48,
+      "relativeImportCandidateCount": 49,
+      "resolvedRelativeImportCount": 49,
       "unresolvedRelativeImportCount": 0
     },
     {

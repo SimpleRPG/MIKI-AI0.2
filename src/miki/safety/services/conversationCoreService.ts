@@ -21,6 +21,7 @@ import { latentIntentMiningService } from '../../unknown/services/latentIntentMi
 import { answerContentIrService } from '../../conversation/services/answerContentIrService';
 import { unknownResearchConversationBridgeService } from '../../conversation/services/unknownResearchConversationBridgeService';
 import { conversationUnknownVocabularyService } from '../../conversation/services/conversationUnknownVocabularyService';
+import { conversationUserFactRecallService, looksInterrogative, UserFactIntakeSummary } from '../../conversation/services/conversationUserFactRecallService';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -125,6 +126,8 @@ export class ConversationCoreService {
     persona?: string;
     conversationId?: string;
     messageId?: string;
+    /** P456: 当ターンの P452 事実取り込み結果（受領応答 B に使う）。 */
+    userFactIntake?: UserFactIntakeSummary;
   }): Promise<ConversationCoreResult> {
     const started = performance.now();
     const prompt = params.prompt.trim().replace(/\s+/g, ' ');
@@ -175,7 +178,15 @@ export class ConversationCoreService {
       ? vocabulary.unknowns.map((item: any) => String(item.term || '')).filter(Boolean).slice(0, 3)
       : [];
     const explicitUnknownInquiry = unknownTerms.length > 0 && /意味|定義|とは|何|調べ|検索|教えて|使い方/.test(prompt);
-    if (explicitUnknownInquiry) {
+    // P456 (A): 本人が伝えた事実への聞き返しは、未知語の調査橋より先に
+    // 保持済みの本人発言由来の事実で照合する。一致したときだけ想起経路へ進み、
+    // 一致しなければ従来経路（調査橋・Claim 照合・分からない）に委ねる。
+    const userFactRecall = conversationUserFactRecallService.matchRecall(
+      prompt,
+      memories,
+      (state as any).recentUserFactSummaries
+    );
+    if (explicitUnknownInquiry && !userFactRecall) {
       const researched = await unknownResearchConversationBridgeService.resolveAndRespond({
         question: prompt,
         unknownTerms,
@@ -407,6 +418,18 @@ export class ConversationCoreService {
       appliedReasoningResult = mikiReasoningTemplateService.evaluateAndApply(prompt, nextState);
     }
 
+    // P456 (B): 当ターンに事実が取り込まれた宣言文には、診断文ではなく
+    // 取り込んだ内容を踏まえた受領応答を返す。問いかけ・依頼が混ざる発話や
+    // 想起（A）が成立するターンでは出さない（優先順位は結論段の分岐順で担保）。
+    const acknowledgementText = !looksInterrogative(prompt)
+      ? conversationUserFactRecallService.buildAcknowledgementText(params.userFactIntake)
+      : null;
+    const acknowledgementReasons = (params.userFactIntake?.addedSummaries || [])
+      .map((s) => String(s || '').trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((s) => `あなたが話していた内容: ${s.slice(0, 100)}`);
+
     // 7. Answer IR。Claimが弱い場合は「不明」を不明のまま表現する。
     let ir;
     let skeleton: AnswerSkeletonType = 'GENERAL_ANSWER';
@@ -459,6 +482,19 @@ export class ConversationCoreService {
       skeleton = 'GENERAL_ANSWER';
       status = 'RESOLVED';
       reason = 'user_teaching_recorded';
+    } else if (userFactRecall) {
+      // P456 (A): 事実想起。本人の発言を「あなたが話していた内容」として返す。
+      // 世界の事実としての断定には使わない（根拠も出所表記に統一する）。
+      ir = answerContentIrService.buildAnswerIR({
+        conclusion: userFactRecall.answerText,
+        target: userFactRecall.topicLabel,
+        reasons: [userFactRecall.reasonLabel],
+        certainty: 'CERTAIN',
+        detailLevel: 'STANDARD',
+      });
+      skeleton = 'GENERAL_ANSWER';
+      status = 'RESOLVED';
+      reason = 'user_fact_recall';
     } else if (claimMatch.hasMatch && claimMatch.bestClaim && claimMatch.confidence !== 'UNVERIFIED') {
       const claim = claimMatch.bestClaim;
       const memoryReasons = relevantMemories.slice(0, 2).map((m: any) => memoryReasonLabel(m));
@@ -484,6 +520,8 @@ export class ConversationCoreService {
         casualConclusion = 'どういたしまして！お役に立てて何よりです。';
       } else if (/おはよう/i.test(prompt)) {
         casualConclusion = 'おはようございます！今日も一日頑張りましょう。';
+      } else if (/元気/.test(prompt)) {
+        casualConclusion = '元気ですよ！声をかけてくれてありがとうございます。';
       } else {
         casualConclusion = 'こんにちは！本日もよろしくお願いいたします。準備万全です。';
       }
@@ -506,6 +544,20 @@ export class ConversationCoreService {
       skeleton = 'GENERAL_ANSWER';
       status = 'RESOLVED';
       reason = isFatigue ? 'empathy_fatigue_resolved' : 'casual_chat_resolved';
+    } else if (acknowledgementText) {
+      // P456 (B): 事実伝達への受領応答。雑談・想起・Claim 等の既存の解決が
+      // どれも無い宣言文ターンで、取り込んだ内容をそのまま受け取って返す。
+      // 受領は断定ではなく、根拠も出所表記（あなたが話していた内容）に留める。
+      ir = answerContentIrService.buildAnswerIR({
+        conclusion: acknowledgementText,
+        target: 'あなたが話していた内容の受領',
+        reasons: acknowledgementReasons,
+        certainty: 'CERTAIN',
+        detailLevel: 'STANDARD',
+      });
+      skeleton = 'GENERAL_ANSWER';
+      status = 'RESOLVED';
+      reason = 'user_fact_acknowledged';
     } else {
       status = 'UNRESOLVED';
       reason = claimMatch.unmetReason || 'knowledge_gap';
@@ -694,20 +746,18 @@ export class ConversationCoreService {
           detailLevel: 'STANDARD',
         });
       } else {
+        // P456 (C): 未解決返答の表層分離。ユーザー向け文面は「分からない」を
+        // 会話の言葉で返すだけにし、内部診断（理由トークン、Knowledge Gap ID、
+        // 記憶本文の引用、調査の工程説明）は表層 IR に載せない。診断は
+        // result.reason / result.knowledgeGapId / ログ / Gap レコード側に残る。
+        // 「分からないと言う」姿勢自体は維持し、作話で埋めない。
         ir = answerContentIrService.buildAnswerIR({
           conclusion: researchPerformed && researchEvidenceCount > 0
-            ? '調査結果は取得できましたが、現時点では検証済みの結論として確定していません。'
+            ? '調べてみたけれど、確かな答えとして言える情報までは見つからなかったよ。'
             : relevantMemories.length > 0
-              ? '関連する記憶は見つかりましたが、正式な主張として十分に確定できません。'
-              : '現在の端末内知識だけでは、信頼できる結論を確定できません。',
+              ? '関連しそうな内容は覚えているけれど、確かな答えとして言えるほどは確認できていないよ。'
+              : 'ごめん、今の知識ではそれには答えられないよ。',
           target: compiled.target,
-          reasons: [
-            ...relevantMemories.slice(0, 2).map((m: any) => memoryReasonLabel(m)),
-          ...researchReasons,
-          ],
-          exceptions: [reason, `Knowledge Gap: ${gap.id}`],
-          conditions: ['前提として、検索結果・記憶・生成情報は証拠候補であり、検証なしに真実として昇格させません。'],
-          nextActions: [researchNextAction],
           certainty: 'UNKNOWN',
           detailLevel: 'STANDARD',
         });

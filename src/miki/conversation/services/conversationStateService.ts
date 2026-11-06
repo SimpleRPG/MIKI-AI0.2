@@ -88,6 +88,37 @@ export function adaptExplanationDetailLevel(
   };
 }
 
+// P456 (D): 文単位の雑談判定に使う文節パターン。
+// 雑談の文節（挨拶・感謝・疲労・相づち）か、意図を持たないつなぎの文節だけで
+// 発話が構成され、強い意図（質問・依頼・作業指示）が混ざらなければ雑談。
+const CASUAL_SEGMENT_PATTERN =
+  /おはよう|こんにちは|こんばんは|お疲れ|おつかれ|ありがとう|ありがと|感謝|疲れた|つかれた|しんどい|だるい|つらい|眠い|ねむい|もう無理|限界|元気|分かった|わかった|了解|そっか|そうか|ただいま|おやすみ|バイバイ|またね|やあ|ハロー|サンキュー/;
+const CASUAL_FILLER_PATTERN =
+  /^(?:みき|みきちゃん|ねえ|ねえねえ|今日は|今日|ちょっと|うん|はい|あの|えっと|うんうん)[〜ー\s]*$/;
+const CASUAL_STRONG_INTENT_PATTERN =
+  /だっけ|教えて|調べて|知りたい|聞きたい|お願い|作って|書いて|実装|計算|実行|ですか|ますか|でしょうか|何|いつ|どこ|誰|なぜ|なんで|いくつ|どっち|どちら|コード|エラー|バグ/;
+
+function isCasualBySegments(p: string): boolean {
+  if (p.length > 40) return false;
+  if (CASUAL_STRONG_INTENT_PATTERN.test(p)) return false;
+  const segments = p
+    .split(/[。、，,！!？?\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (segments.length === 0) return false;
+  let hasCasual = false;
+  for (const seg of segments) {
+    if (CASUAL_SEGMENT_PATTERN.test(seg)) {
+      hasCasual = true;
+      continue;
+    }
+    if (CASUAL_FILLER_PATTERN.test(seg)) continue;
+    // 雑談でもつなぎでもない文節（事実の伝達・質問の内容）があれば雑談にしない
+    return false;
+  }
+  return hasCasual;
+}
+
 export function isCasualGreetingOrShortSocial(prompt: string): boolean {
   if (!prompt) return false;
   const p = prompt.trim();
@@ -100,6 +131,12 @@ export function isCasualGreetingOrShortSocial(prompt: string): boolean {
     )
   ) {
     return false;
+  }
+
+  // P456 (D): 発話全体への完全一致で外れる日常文（「今日はちょっと疲れたよ」
+  // 「分かった、ありがとう」「みき、元気？」等）を、文単位の判定で拾う。
+  if (isCasualBySegments(p)) {
+    return true;
   }
 
   // 疑問符で終わる、または疑問詞がある場合は質問の可能性が高い（「元気？」等の単なる挨拶を除く）

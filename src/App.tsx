@@ -1242,8 +1242,17 @@ export default function App() {
       // 本人の発言が出所（source: 'user_statement'、未承認のまま）であり、
       // 文脈参照には使うが世界の事実としての断定には使わない線引き。
       let intakeBaseMemories = memories;
+      // P456 (B): 当ターンの取り込み結果を会話コアへ渡し、受領応答に使う。
+      let userFactIntakeForCore: { addedSummaries: string[]; replaced: number; invalidated: number } | undefined;
       try {
         const intake = conversationFactIntakeService.intakeFromUserText(text, memories);
+        if (intake.added.length > 0) {
+          userFactIntakeForCore = {
+            addedSummaries: intake.added.map((m) => String(m.factSummary || m.content || '')).filter(Boolean),
+            replaced: intake.replaced,
+            invalidated: intake.invalidated,
+          };
+        }
         if (intake.added.length > 0 || intake.replaced > 0 || intake.invalidated > 0) {
           let linkedList = intake.updatedMemories;
           for (const addedMem of intake.added) {
@@ -1289,6 +1298,7 @@ export default function App() {
         memories: activeMemories,
         recentMessages: messages,
         messageId: userMsg.id,
+        userFactIntake: userFactIntakeForCore,
       });
 
       if (abortController.signal.aborted) return;
