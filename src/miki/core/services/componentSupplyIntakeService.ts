@@ -5,6 +5,7 @@ import { evidenceService } from '../../memory/services/evidenceService';
 import { componentSupplyRequestService } from './componentSupplyRequestService';
 import { teacherVerificationEvidenceService, type TeacherVerificationRound } from '../../verification/services/teacherVerificationEvidenceService';
 import { improvementIntakeRouterService, type ImprovementIntakeRun } from './improvementIntakeRouterService';
+import { TEACHER_RETURN_PRIORITY } from './autonomousSelfImprovementLoopService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { sha256HexFromText } from './canonicalSha256Service';
 
@@ -622,6 +623,9 @@ class ComponentSupplyIntakeService {
       implementationCandidates,
       supplyRequestId: requestId,
       supplyIntakeId: intakeId,
+      // P453: 教師返却由来の刻印。キュー側（ループ）が同点時の並び順と
+      // 復元時の引き上げで識別するための印。
+      teacherReturn: true,
       supplier: { name: supplier.name, ...(supplier.model ? { model: supplier.model } : {}), ...(supplier.suppliedAt ? { suppliedAt: supplier.suppliedAt } : {}) },
       supplyTrustLevel: 'SEMI_TRUSTED_EXTERNAL_AI',
       ...(typeof manifest.notes === 'string' && manifest.notes.trim() ? { supplyNotes: manifest.notes.trim() } : {}),
@@ -661,7 +665,10 @@ class ComponentSupplyIntakeService {
         runType: 'USER_REQUEST',
         sourceId: requestId,
         objective: originRun?.objective ?? `部品供給の受入（要求 ${requestId}）`,
-        priority: originRun?.priority ?? 50,
+        // P453: 教師から返ってきた素材の run は優先度を返却帯
+        // （TEACHER_RETURN_PRIORITY）以上にする。元 run の優先度が
+        // それより高い場合は元の値を尊重する。
+        priority: Math.max(originRun?.priority ?? 50, TEACHER_RETURN_PRIORITY),
         relatedRunIds: [request.runId],
         payload,
       });

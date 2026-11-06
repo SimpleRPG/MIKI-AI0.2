@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1762,
-    "sourceFileCount": 1315,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1226,
-    "relativeImportCandidateCount": 3755,
-    "resolvedRelativeImportCandidateCount": 3739,
+    "trackedPathCountExcludingControlPaths": 1764,
+    "sourceFileCount": 1317,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1228,
+    "relativeImportCandidateCount": 3774,
+    "resolvedRelativeImportCandidateCount": 3758,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -7156,91 +7156,103 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 108191,
-      "lines": 2115,
-      "sha256": "6fc0a893a583c7b1e72a74ab75d31b5aaa74ee32353d81c28045d81271e0c69c",
+      "bytes": 121137,
+      "lines": 2325,
+      "sha256": "8e5322c554efc783a5f5e104925b83bade7374c4a61c493b636a7054a37c0f52",
       "relativeImportCandidates": [
         {
-          "line": 48,
+          "line": 49,
           "specifier": "../miki/core/ui/typedImprovementUiGatewayService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/ui/typedImprovementUiGatewayService.ts"
         },
         {
-          "line": 52,
+          "line": 53,
           "specifier": "../miki/core/mikiInteractionBus",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/mikiInteractionBus.ts"
         },
         {
-          "line": 53,
+          "line": 54,
           "specifier": "./ReviewPackageLibrary",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/ReviewPackageLibrary.tsx"
         },
         {
-          "line": 54,
+          "line": 55,
           "specifier": "./SelfCodeSpaceScreen",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/SelfCodeSpaceScreen.tsx"
         },
         {
-          "line": 55,
+          "line": 56,
           "specifier": "./LearningArchivePanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/LearningArchivePanel.tsx"
         },
         {
-          "line": 56,
+          "line": 57,
           "specifier": "./LearningInspectorPanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/LearningInspectorPanel.tsx"
         },
         {
-          "line": 57,
+          "line": 58,
           "specifier": "./self_improvement/DevelopmentReviewLifecyclePanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/self_improvement/DevelopmentReviewLifecyclePanel.tsx"
         },
         {
-          "line": 58,
+          "line": 59,
           "specifier": "../miki/core/ui/typedCoreUiGatewayService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/ui/typedCoreUiGatewayService.ts"
         },
         {
-          "line": 59,
+          "line": 60,
           "specifier": "../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         },
         {
-          "line": 60,
+          "line": 61,
           "specifier": "../miki/core/services/componentSupplyRequestService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/componentSupplyRequestService.ts"
         },
         {
-          "line": 61,
+          "line": 62,
           "specifier": "../miki/core/services/componentSupplyIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/componentSupplyIntakeService.ts"
         },
         {
-          "line": 62,
+          "line": 63,
+          "specifier": "../miki/core/services/contradictionResolutionRequestService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/contradictionResolutionRequestService.ts"
+        },
+        {
+          "line": 64,
+          "specifier": "../miki/core/services/contradictionResolutionIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/contradictionResolutionIntakeService.ts"
+        },
+        {
+          "line": 65,
           "specifier": "../miki/execution/services/backgroundWorkerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/execution/services/backgroundWorkerService.ts"
         },
         {
-          "line": 63,
+          "line": 66,
           "specifier": "../utils/isEditableInputActive",
           "resolution": "RESOLVED",
           "resolvedPath": "src/utils/isEditableInputActive.ts"
         }
       ],
-      "relativeImportCandidateCount": 13,
-      "resolvedRelativeImportCount": 13,
+      "relativeImportCandidateCount": 15,
+      "resolvedRelativeImportCount": 15,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -12626,9 +12638,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 76245,
-      "lines": 1528,
-      "sha256": "5a0e684ffbe4be193a69087fbe297d28476629cb4cd78b4c79c8dc715699a8bb",
+      "bytes": 81306,
+      "lines": 1611,
+      "sha256": "48e690784d96115a89c969450f0d0b48eb7172285481984dac6298eb9c20aaaa",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -13570,9 +13582,9 @@
     },
     {
       "path": "src/miki/core/services/componentSupplyIntakeService.ts",
-      "bytes": 36298,
-      "lines": 724,
-      "sha256": "3fe0620edb6549f0210a29fa488ab1199c0393939970f59f639ba73593bf09bd",
+      "bytes": 36837,
+      "lines": 731,
+      "sha256": "2fdfa063299b3ae4499eac72c32bc550d4442dee66a70b24cb0a235fa68660ad",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -13612,19 +13624,25 @@
         },
         {
           "line": 8,
+          "specifier": "./autonomousSelfImprovementLoopService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/autonomousSelfImprovementLoopService.ts"
+        },
+        {
+          "line": 9,
           "specifier": "./selfCodeSpaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
         },
         {
-          "line": 9,
+          "line": 10,
           "specifier": "./canonicalSha256Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         }
       ],
-      "relativeImportCandidateCount": 8,
-      "resolvedRelativeImportCount": 8,
+      "relativeImportCandidateCount": 9,
+      "resolvedRelativeImportCount": 9,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -13771,6 +13789,124 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/services/contradictionResolutionIntakeService.ts",
+      "bytes": 32999,
+      "lines": 680,
+      "sha256": "047e42ff6a65553f7fa38125e9a22e28abb25d43640991c300bdaaf5ea13e2d8",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "../../memory/services/evidenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/evidenceService.ts"
+        },
+        {
+          "line": 5,
+          "specifier": "../../memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 6,
+          "specifier": "../../verification/services/verifierService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/verification/services/verifierService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "./contradictionResolutionRequestService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/contradictionResolutionRequestService.ts"
+        },
+        {
+          "line": 8,
+          "specifier": "./autonomousSelfImprovementLoopService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/autonomousSelfImprovementLoopService.ts"
+        },
+        {
+          "line": 9,
+          "specifier": "./canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 8,
+      "resolvedRelativeImportCount": 8,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/services/contradictionResolutionRequestService.ts",
+      "bytes": 30654,
+      "lines": 620,
+      "sha256": "b9994ddb04b0b9c0e22ea733c018fe35a1009270d425cc1f3b61f29f4b0773e4",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "../../memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 5,
+          "specifier": "../../memory/services/evidenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/evidenceService.ts"
+        },
+        {
+          "line": 6,
+          "specifier": "./autonomousIssueDiscoveryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/autonomousIssueDiscoveryService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "./autonomousSelfImprovementLoopService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/autonomousSelfImprovementLoopService.ts"
+        },
+        {
+          "line": 8,
+          "specifier": "../../safety/services/privacyGuardrailService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/safety/services/privacyGuardrailService.ts"
+        },
+        {
+          "line": 9,
+          "specifier": "./canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 8,
+      "resolvedRelativeImportCount": 8,
       "unresolvedRelativeImportCount": 0
     },
     {

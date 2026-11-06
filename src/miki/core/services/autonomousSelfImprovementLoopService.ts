@@ -139,6 +139,37 @@ function normalizeDiscoveryIssuePayload(payload:Record<string,unknown>|undefined
   return normalized;
 }
 
+// P453: 教師（外部AI）から返ってきた素材で生まれた run／キュー項目の
+// 優先度帯。既存の分布（発見項目の矛盾95・実行失敗90・能力不足80…）の
+// 上に置く。ユーザーが教師へ聞いて返ってきた＝人の手が入った素材は、
+// 自動発見より先に処理する（きりあの意向「返されたものは優先度高めに
+// していい」）。
+export const TEACHER_RETURN_PRIORITY = 100;
+
+// P453: 教師返却由来の項目の識別は payload の刻印で行う（供給受入が
+// supplyIntakeId を、矛盾解決の受入が contradictionResolutionIntakeId
+// を刻み、将来の受入は teacherReturn を刻む）。刻印が無い項目を推測で
+// 返却由来扱いにはしない。
+export function isTeacherReturnRequest(item:{payload?:Record<string,unknown>}):boolean{
+  const payload=item.payload;
+  if(!payload)return false;
+  return payload.teacherReturn===true
+    ||(typeof payload.supplyIntakeId==='string'&&payload.supplyIntakeId.length>0)
+    ||(typeof payload.contradictionResolutionIntakeId==='string'&&payload.contradictionResolutionIntakeId.length>0);
+}
+
+// P453: キューの並び順（enqueue の再ソートと load の復元で共有）。
+// 優先度 desc → 教師返却由来 desc → createdAt asc → id asc。
+// 返却由来を同点で前へ出すのは、enqueue のたびの全体再ソートで古い
+// 同点項目が常に前に戻り、新しい返却 run が実効的に後れ続けた実績
+// （001 の受入 run が優先度95でも1時間以上未選択）への対処。
+function compareQueueRequests(left:AutonomousImprovementRequest,right:AutonomousImprovementRequest):number{
+  return (right.priority||0)-(left.priority||0)
+    ||Number(isTeacherReturnRequest(right))-Number(isTeacherReturnRequest(left))
+    ||left.createdAt-right.createdAt
+    ||left.id.localeCompare(right.id);
+}
+
 class AutonomousSelfImprovementLoopService {
   private state: AutonomousLoopState = { status: 'IDLE', queue: [], updatedAt: 0 };
   private running = false;
@@ -295,11 +326,7 @@ class AutonomousSelfImprovementLoopService {
     }
     item.taskId=task.taskId;
     this.state.queue.push(item);
-    this.state.queue.sort((left, right) =>
-      (right.priority || 0) - (left.priority || 0) ||
-      left.createdAt - right.createdAt ||
-      left.id.localeCompare(right.id)
-    );
+    this.state.queue.sort(compareQueueRequests);
     this.state.status = 'IDLE';
     this.state.retryAt = undefined;
     this.save();
@@ -403,6 +430,48 @@ class AutonomousSelfImprovementLoopService {
       this.state = priorState;
       throw error;
     }
+  }
+
+  /*
+   * P453: 教師の回答（矛盾解決の取り込み）が対象 Claim に証拠を届けた
+   * とき、その Claim を文脈に持つ park 中の項目の待ちを解く。「待って
+   * いた証拠が届いた」状態であり、既存の回復経路（acquire→再評価→
+   * 決着の消費→CORE 再評価）が即時に走るようにするための接続であって、
+   * キュー全体の排出規則（試行回数・証拠待ちラダー）は変えない。
+   * 待ちが解けるのは claimContext の claimId／矛盾相手が対象に含まれる
+   * 項目だけ。戻り値は待ちを解いた件数。
+   */
+  public expediteRequestsForClaims(claimIds: string[]): number {
+    this.assertWritable();
+    const targets = new Set(claimIds.filter((id) => typeof id === 'string' && id.length > 0));
+    if (targets.size === 0) return 0;
+    let expedited = 0;
+    for (const item of this.state.queue) {
+      if (item.id === this.state.activeRequestId) continue;
+      const context = item.payload?.claimContext as Record<string, unknown> | undefined;
+      if (!context || typeof context.claimId !== 'string') continue;
+      const linked: unknown[] = [context.claimId];
+      if (Array.isArray(context.contradictedBy)) {
+        for (const other of context.contradictedBy) {
+          if (other && typeof other === 'object') linked.push((other as Record<string, unknown>).claimId);
+        }
+      }
+      if (!linked.some((id) => typeof id === 'string' && targets.has(id))) continue;
+      if (item.nextAttemptAt !== undefined || item.waitKind !== undefined || item.waitReason !== undefined) {
+        item.nextAttemptAt = undefined;
+        item.waitKind = undefined;
+        item.waitReason = undefined;
+        expedited += 1;
+      }
+    }
+    if (expedited > 0) {
+      this.state.status = 'IDLE';
+      this.state.retryAt = undefined;
+      this.save();
+      systemLogger.info('SELF_IMPROVEMENT', `[矛盾解決] 教師回答の取り込みで証拠待ちを解除: ${expedited} 件`);
+      void this.drain();
+    }
+    return expedited;
   }
 
   public resume(): void {
@@ -1520,8 +1589,22 @@ class AutonomousSelfImprovementLoopService {
         if(this.isCapTrimmable(activeQueue[i],parsed.activeRequestId,parsed.lastTaskId)){activeQueue.splice(i,1);over-=1;capTrimmedCount+=1;}
       }
     }
+    // P453: 教師返却由来と刻印で識別できる既存項目は、優先度を返却帯
+    // （TEACHER_RETURN_PRIORITY）へ引き上げ、enqueue と同じ比較で
+    // 並べ直す。enqueue が毎回全体を再ソートする既存挙動と整合する
+    // ため、復元順への依存は生まない。これにより、旧ビルドで滞留した
+    // 返却 run（例: 001 の受入 run、payload に supplyIntakeId を持つ）
+    // も、次回起動から同点の非返却項目より先に処理される。
+    let teacherReturnLiftedCount=0;
+    for(const item of activeQueue){
+      if(isTeacherReturnRequest(item)&&(item.priority??0)<TEACHER_RETURN_PRIORITY){
+        item.priority=TEACHER_RETURN_PRIORITY;
+        teacherReturnLiftedCount+=1;
+      }
+    }
+    activeQueue.sort(compareQueueRequests);
     this.state={...parsed,queue:activeQueue};
-    if(purgedCount>0||droppedInvalid>0||orphanedPurgedCount>0||staleDiscoveryPurgedCount>0||capTrimmedCount>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;const parts:string[]=[];if(droppedInvalid>0)parts.push(`INVALID_REQUESTS_DROPPED:${droppedInvalid}`);if(purgedCount>0)parts.push(`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`);if(orphanedPurgedCount>0)parts.push(`ORPHANED_REQUESTS_PURGED:${orphanedPurgedCount}`);if(staleDiscoveryPurgedCount>0)parts.push(`STALE_DISCOVERY_REQUESTS_PURGED:${staleDiscoveryPurgedCount}`);if(capTrimmedCount>0)parts.push(`CAP_TRIMMED:${capTrimmedCount}`);this.state.lastReason=parts.join(':');if(orphanedPurgedCount>0||staleDiscoveryPurgedCount>0||capTrimmedCount>0){systemLogger.info('SELF_IMPROVEMENT',`[RUNTIME] AutonomousLoop purge: orphaned=${orphanedPurgedCount} staleDiscovery=${staleDiscoveryPurgedCount} capTrimmed=${capTrimmedCount} queue=${activeQueue.length}`);}try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
+    if(purgedCount>0||droppedInvalid>0||orphanedPurgedCount>0||staleDiscoveryPurgedCount>0||capTrimmedCount>0||teacherReturnLiftedCount>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;const parts:string[]=[];if(droppedInvalid>0)parts.push(`INVALID_REQUESTS_DROPPED:${droppedInvalid}`);if(purgedCount>0)parts.push(`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`);if(orphanedPurgedCount>0)parts.push(`ORPHANED_REQUESTS_PURGED:${orphanedPurgedCount}`);if(staleDiscoveryPurgedCount>0)parts.push(`STALE_DISCOVERY_REQUESTS_PURGED:${staleDiscoveryPurgedCount}`);if(capTrimmedCount>0)parts.push(`CAP_TRIMMED:${capTrimmedCount}`);if(teacherReturnLiftedCount>0)parts.push(`TEACHER_RETURN_PRIORITY_LIFTED:${teacherReturnLiftedCount}`);this.state.lastReason=parts.join(':');if(orphanedPurgedCount>0||staleDiscoveryPurgedCount>0||capTrimmedCount>0){systemLogger.info('SELF_IMPROVEMENT',`[RUNTIME] AutonomousLoop purge: orphaned=${orphanedPurgedCount} staleDiscovery=${staleDiscoveryPurgedCount} capTrimmed=${capTrimmedCount} queue=${activeQueue.length}`);}if(teacherReturnLiftedCount>0){systemLogger.info('SELF_IMPROVEMENT',`[RUNTIME] AutonomousLoop teacher-return priority lifted: ${teacherReturnLiftedCount} 件 queue=${activeQueue.length}`);}try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
   }
 }
 

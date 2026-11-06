@@ -33,6 +33,7 @@ import {
   Shield,
   Send,
   Boxes,
+  Scale,
 } from 'lucide-react';
 
 import {
@@ -59,6 +60,8 @@ import { typedCoreUiGatewayService } from '../miki/core/ui/typedCoreUiGatewaySer
 import { systemLogger } from '../services/systemLogger';
 import { componentSupplyRequestService } from '../miki/core/services/componentSupplyRequestService';
 import { componentSupplyIntakeService } from '../miki/core/services/componentSupplyIntakeService';
+import { contradictionResolutionRequestService } from '../miki/core/services/contradictionResolutionRequestService';
+import { contradictionResolutionIntakeService } from '../miki/core/services/contradictionResolutionIntakeService';
 import { backgroundWorkerService } from '../miki/execution/services/backgroundWorkerService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
@@ -266,6 +269,12 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const [supplyRequests, setSupplyRequests] = useState(() => componentSupplyRequestService.list());
   const [supplyIntakes, setSupplyIntakes] = useState(() => componentSupplyIntakeService.list());
 
+  // P453: Claim矛盾の教師解決の状態表示（要求・受入台帳の読み出しと、
+  // 未決着ペアの件数）。
+  const [contradictionRequests, setContradictionRequests] = useState(() => contradictionResolutionRequestService.list());
+  const [contradictionIntakes, setContradictionIntakes] = useState(() => contradictionResolutionIntakeService.list());
+  const [unresolvedPairCount, setUnresolvedPairCount] = useState(() => contradictionResolutionRequestService.countUnresolvedPairs());
+
   // P450: バックグラウンド実行のオンオフ (既定ON、サービス側で永続化)
   const [backgroundStatus, setBackgroundStatus] = useState(() => backgroundWorkerService.getStatus());
   const toggleBackgroundExecution = (next: boolean) => {
@@ -278,6 +287,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const [newDirectiveFileName, setNewDirectiveFileName] = useState('pasted-directive.txt');
   const directiveFileInputRef = useRef<HTMLInputElement | null>(null);
   const supplyReplyFileInputRef = useRef<HTMLInputElement | null>(null);
+  const contradictionReplyFileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedDirectiveId, setSelectedDirectiveId] = useState<string | null>(null);
 
   // Execution triggers state
@@ -313,6 +323,9 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       setCoreResults(typedImprovementUiGatewayService.getCoreResults(50));
       setSupplyRequests(componentSupplyRequestService.list());
       setSupplyIntakes(componentSupplyIntakeService.list());
+      setContradictionRequests(contradictionResolutionRequestService.list());
+      setContradictionIntakes(contradictionResolutionIntakeService.list());
+      setUnresolvedPairCount(contradictionResolutionRequestService.countUnresolvedPairs());
     }, 2000);
 
     return () => {
@@ -332,6 +345,9 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     setCoreResults(typedImprovementUiGatewayService.getCoreResults(50));
     setSupplyRequests(componentSupplyRequestService.list());
     setSupplyIntakes(componentSupplyIntakeService.list());
+    setContradictionRequests(contradictionResolutionRequestService.list());
+    setContradictionIntakes(contradictionResolutionIntakeService.list());
+    setUnresolvedPairCount(contradictionResolutionRequestService.countUnresolvedPairs());
     setRefreshTick((prev) => prev + 1);
   };
 
@@ -755,6 +771,78 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
         type: 'error',
       });
     }
+  };
+
+  // P453（矛盾解決1）: 未決着の Claim 矛盾をまとめた要求パッケージを作成し、
+  // Downloads へ保存する手動導線。パッケージはキューではなく Claim DB の
+  // 未決着ペアから組み立てる。
+  const createContradictionPackage = async () => {
+    setActionMessage({ text: '矛盾パッケージを作成しています…', type: 'info' });
+    try {
+      const result = await contradictionResolutionRequestService.createPackage();
+      if (!result.ok || !result.artifact) {
+        const reasons = result.reasons?.length ? `（${result.reasons.join(' / ')}）` : '';
+        setActionMessage({
+          text: `矛盾パッケージを作成できません: ${result.message}${reasons}`,
+          type: 'error',
+        });
+        return;
+      }
+      const saved = await contradictionResolutionRequestService.savePackageToDownloads(result.artifact);
+      setActionMessage(
+        saved
+          ? {
+              text: `矛盾パッケージを保存しました: ${result.artifact.fileName}（要求ID: ${result.artifact.requestId}、矛盾 ${result.artifact.items.length} 件）。このファイルを外部AI（教師）へ渡してください。`,
+              type: 'success',
+            }
+          : {
+              text: `矛盾パッケージは作成しましたが、Downloadsへ保存できませんでした（要求ID: ${result.artifact.requestId}）。`,
+              type: 'error',
+            }
+      );
+    } catch (error) {
+      setActionMessage({
+        text: `矛盾パッケージを作成できません: ${error instanceof Error ? error.message : String(error)}`,
+        type: 'error',
+      });
+    }
+    triggerRefresh();
+  };
+
+  // P453（矛盾解決2）: 教師の一括回答（.zip / .zip.txt）を取り込む手動導線。
+  // 回答は証拠として既存の検証・信念改訂経路へ提出され、関門を通った
+  // 場合にだけ矛盾が解消される。
+  const handleContradictionReplyFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setActionMessage({ text: '矛盾への一括回答を照合しています…', type: 'info' });
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const result = await contradictionResolutionIntakeService.receiveReply({ fileName: file.name, bytes });
+      if (result.ok && result.record) {
+        const settled = result.record.items.filter((item) => item.outcome === 'SETTLED').length;
+        const attached = result.record.items.filter((item) => item.outcome === 'EVIDENCE_ATTACHED' || item.outcome === 'MERGED_CANDIDATE_REGISTERED').length;
+        const held = result.record.items.filter((item) => item.outcome === 'HELD').length;
+        const errors = result.record.items.filter((item) => item.outcome === 'ERROR').length;
+        setActionMessage({
+          text: `矛盾への一括回答を受け付けました（決着 ${settled} 件／証拠付加 ${attached} 件／保留 ${held} 件${errors > 0 ? `／処理失敗 ${errors} 件` : ''}）。決着した矛盾は背景ループの再評価で完了へ進みます。`,
+          type: 'success',
+        });
+      } else {
+        const reasons = result.reasons?.length ? `（${result.reasons.join(' / ')}）` : '';
+        setActionMessage({
+          text: `矛盾への一括回答を受け付けられません: ${result.message}${reasons}`,
+          type: 'error',
+        });
+      }
+    } catch (error) {
+      setActionMessage({
+        text: `矛盾への一括回答を受け付けられません: ${error instanceof Error ? error.message : String(error)}`,
+        type: 'error',
+      });
+    }
+    triggerRefresh();
   };
 
   const saveImprovementRunDetail = async (detail: any) => {
@@ -1266,6 +1354,128 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* P453: Claim矛盾の教師解決（要求・受入の手動導線と台帳表示） */}
+            <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Scale className="w-4 h-4 text-sky-400" />
+                  Claim矛盾の教師解決
+                </h3>
+                <span className="text-[11px] text-slate-400">
+                  未決着 {unresolvedPairCount} 件 / 要求 {contradictionRequests.length} 件 / 受入 {contradictionIntakes.length} 件
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                矛盾したまま自動調査では決着できない Claim のペアをまとめてパッケージにし、外部AI（教師）に判断を聞けます。
+                返ってきた回答は証拠として記録され、既存の検証・信念改訂の関門を通った場合にだけ矛盾が解消されます。回答だけで主張が確定することはありません。判断保留のペアはそのまま残ります。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={createContradictionPackage}
+                  className="px-3 py-1.5 rounded-lg bg-sky-600/80 hover:bg-sky-600 text-white text-[11px] font-bold flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  矛盾パッケージを作成
+                </button>
+                <button
+                  onClick={() => contradictionReplyFileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold flex items-center gap-1.5 border border-slate-700"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  矛盾の回答を取り込む
+                </button>
+                <input
+                  ref={contradictionReplyFileInputRef}
+                  type="file"
+                  accept=".zip,.txt,application/zip,text/plain"
+                  className="hidden"
+                  onChange={handleContradictionReplyFileChange}
+                />
+              </div>
+
+              {contradictionRequests.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500 bg-slate-950/40 rounded-lg border border-slate-800/40">
+                  矛盾解決の要求はまだありません。「矛盾パッケージを作成」で発行できます
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-800/60 border border-slate-800/60 rounded-lg overflow-hidden">
+                  {contradictionRequests.slice(0, 5).map((request) => {
+                    const badge =
+                      request.status === 'RECEIVED'
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        : request.status === 'REJECTED'
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        : request.status === 'CANCELLED'
+                        ? 'bg-slate-700/40 text-slate-300 border border-slate-600/40'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40';
+                    const statusLabel =
+                      request.status === 'ISSUED'
+                        ? '発行済み（回答待ち）'
+                        : request.status === 'RECEIVED'
+                        ? '受入済み'
+                        : request.status === 'REJECTED'
+                        ? '却下'
+                        : '取消';
+                    return (
+                      <div key={request.requestId} className="p-3 bg-slate-900/40 text-xs space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-sky-300 text-[11px] truncate">{request.requestId}</span>
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${badge}`}>{statusLabel}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                          <span>矛盾: {request.items.length} 件{request.omittedPairCount > 0 ? `（他 ${request.omittedPairCount} 件は次回）` : ''}</span>
+                          <span>発行: {fmtTime(request.issuedAt)}</span>
+                          <span>更新: {fmtTime(request.updatedAt)}</span>
+                        </div>
+                        {request.statusNote && (
+                          <div className="text-[10px] text-slate-400 truncate">注記: {request.statusNote}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {contradictionIntakes.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-semibold text-slate-300">受入結果（直近）</div>
+                  <div className="divide-y divide-slate-800/60 border border-slate-800/60 rounded-lg overflow-hidden">
+                    {contradictionIntakes.slice(0, 5).map((intake) => {
+                      const settled = intake.items.filter((item) => item.outcome === 'SETTLED').length;
+                      const attached = intake.items.filter((item) => item.outcome === 'EVIDENCE_ATTACHED' || item.outcome === 'MERGED_CANDIDATE_REGISTERED').length;
+                      const held = intake.items.filter((item) => item.outcome === 'HELD').length;
+                      return (
+                        <div key={intake.intakeId} className="p-3 bg-slate-900/40 text-xs space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-teal-300 text-[11px] truncate">{intake.requestId}</span>
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${
+                                intake.status === 'RECEIVED'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                              }`}
+                            >
+                              {intake.status === 'RECEIVED' ? '受入' : '却下'}（{intake.code}）
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                            <span>回答者: {intake.teacher?.name || '不明'}</span>
+                            <span>受入: {fmtTime(intake.receivedAt)}</span>
+                            {intake.status === 'RECEIVED' && (
+                              <span>決着 {settled} 件／証拠付加 {attached} 件／保留 {held} 件／待ち解除 {intake.expeditedCount} 件</span>
+                            )}
+                          </div>
+                          {intake.status === 'REJECTED' && intake.reasons.length > 0 && (
+                            <div className="text-[10px] text-rose-300/80 truncate">理由: {intake.reasons[0]}</div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
