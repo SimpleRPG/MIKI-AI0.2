@@ -46,6 +46,18 @@ export interface TemplateRegistryEntry {
   rationale: string;
   createdAt: number;
   updatedAt: number;
+  /**
+   * [P448] サンドボックス用の種文書。REMOVE 系のテンプレートは
+   * 除去する要素が入った文書でないと NORMAL が SKIPPED になるため、
+   * 導出時に元のフィクスチャ値から作った種をここに持つ。
+   * ない場合は buildSandboxFixture が標準フィクスチャを使う。
+   */
+  fixtureSeedSource?: string;
+  /**
+   * [P448] このテンプレートを導出した元のテンプレートID
+   * （逆操作の導出の場合）。導出でないものは undefined。
+   */
+  derivedFrom?: string;
 }
 
 export interface TemplateSelectionRule {
@@ -55,6 +67,11 @@ export interface TemplateSelectionRule {
   origin: 'BUILTIN' | 'PROPOSED';
   /** 提案された規則の場合、そのテンプレートID。 */
   sourceTemplateId: string | null;
+  /**
+   * [P448] 複数テンプレートの規則の場合、そのテンプレートID一覧。
+   * 全テンプレートが VERIFIED になったときに規則を有効化する。
+   */
+  sourceTemplateIds?: string[];
 }
 
 export interface TemplateGapRecord {
@@ -76,6 +93,17 @@ const TEMPLATE_REGISTRY_STORAGE_KEY = 'miki_template_registry_v1';
 const DEFAULT_TEMPLATES = ['TS_FUNCTION_CREATE', 'TEST_UNIQUENESS'];
 
 /**
+ * [P448] 除去を求める操作の行動の語。操作名にこれを含む場合、
+ * 除去しないテンプレートだけの規則は当てない（REMOVE を求める操作に
+ * APPEND の部品を渡すのは誤りのため）。語幹で判定する
+ * （REMOVAL は REMOVE を含まないため、REMOVE ではなく REMOV
+ * で判定する。DELETION も同じ）。導出規則の行動の語と
+ * 同じ集合（templateInventionService の INVENTION_ACTION_GROUP と
+ * 同じ意味。片方を変えたらもう片方も変えること）。
+ */
+export const REMOVE_ACTION_RE = /REMOV|DELET|DROP|UNSET|DISCONNECT/;
+
+/**
  * builtin の選択規則。capabilityContractSynthesisService.templates()
  * の旧・正規表現分岐をそのまま移行したもの（順序も同じ意味）。
  * ただし JSON/CSV は P444 で前に置いた。JSON_DATA_EXPANSION と
@@ -83,7 +111,7 @@ const DEFAULT_TEMPLATES = ['TS_FUNCTION_CREATE', 'TEST_UNIQUENESS'];
  * 規則より後ろだとそちらに取られてしまう。旧い能力名に JSON/CSV を
  * 含むものはないため、既存の選択は変わらない。
  */
-const BUILTIN_RULES: TemplateSelectionRule[] = [
+export const BUILTIN_RULES: TemplateSelectionRule[] = [
   { pattern: 'MIGRATION|PERSISTENCE|ROUNDTRIP', templateIds: ['TS_FUNCTION_CREATE', 'TEST_ROUNDTRIP'], status: 'VERIFIED', origin: 'BUILTIN', sourceTemplateId: null },
   { pattern: 'JSON', templateIds: ['JSON_ARRAY_APPEND', 'JSON_PROPERTY_ADD', 'TEST_UNIQUENESS'], status: 'VERIFIED', origin: 'BUILTIN', sourceTemplateId: null },
   { pattern: 'CSV', templateIds: ['CSV_ROW_APPEND', 'TEST_UNIQUENESS'], status: 'VERIFIED', origin: 'BUILTIN', sourceTemplateId: null },
@@ -184,6 +212,12 @@ class DynamicTemplateRegistryService {
    */
   public selectTemplates(operation: string): string[] {
     const store = this.load();
+    // [P448] 除去を求める操作に、除去しないテンプレートだけの規則は
+    // 当てない。builtin の規則はどれも APPEND/CREATE 系だけなので、
+    // REMOVE 系の操作はここで全部飛ばされ、不足として記録される
+    // （発明の材料になる）。導出した REMOVE 規則は除去テンプレートを
+    // 含むため飛ばされない。
+    const wantsRemoval = REMOVE_ACTION_RE.test(operation);
     for (const rule of store.rules) {
       if (rule.status !== 'VERIFIED') continue;
       let matches = false;
@@ -194,6 +228,7 @@ class DynamicTemplateRegistryService {
         continue;
       }
       if (!matches) continue;
+      if (wantsRemoval && !rule.templateIds.some((id) => REMOVE_ACTION_RE.test(id))) continue;
       const notUsable = rule.templateIds.filter((id) => !this.isUsable(id));
       if (notUsable.length > 0) {
         systemLogger.warn('SELF_IMPROVEMENT', `⚠️ [P444] ${operation}: 規則 ${rule.pattern} を飛ばします（テンプレート ${notUsable.join(',')} が未検証）`);
@@ -253,6 +288,32 @@ class DynamicTemplateRegistryService {
   }
 
   /**
+   * [P448] 複数テンプレートの選択規則を CANDIDATE として保存する。
+   * storeProposal が作る規則は1テンプレート用（[templateId,
+   * TEST_UNIQUENESS]）のため、導出した規則（1つの操作から1〜3個の
+   * テンプレート）のような複数テンプレートの規則にはこちらを使う。
+   * 規則は、含む操作テンプレートがすべて VERIFIED になったときに
+   * activateTemplateForComponent で有効化される。
+   */
+  public storeRule(rule: { pattern: string; templateIds: string[]; sourceTemplateIds: string[] }): { accepted: boolean; reason: string } {
+    const store = this.load();
+    if (store.rules.some((existing) => existing.pattern === rule.pattern)) {
+      return { accepted: false, reason: `RULE_ALREADY_EXISTS: ${rule.pattern}` };
+    }
+    store.rules.push({
+      pattern: rule.pattern,
+      templateIds: [...rule.templateIds],
+      status: 'CANDIDATE',
+      origin: 'PROPOSED',
+      sourceTemplateId: null,
+      sourceTemplateIds: [...rule.sourceTemplateIds],
+    });
+    this.save();
+    systemLogger.info('TOOLS', `🧩 [P448] テンプレート選択規則を提案として登録しました: ${rule.pattern} (CANDIDATE、テンプレート ${rule.templateIds.join(',')})`);
+    return { accepted: true, reason: 'PROPOSED' };
+  }
+
+  /**
    * 登録ゲート。部品が VERIFIED になったら、その部品が作った
    * テンプレートを VERIFIED にする。promoteIfSafeForCanary の成功直後
    * に呼ぶ（新しい昇格入口は作らない。ここは昇格ではなく登録）。
@@ -270,7 +331,19 @@ class DynamicTemplateRegistryService {
       activated.push(entry.templateId);
       systemLogger.info('TOOLS', `🧩 [P444] テンプレートを有効化しました: ${entry.templateId} (部品 ${componentId} が VERIFIED)`);
     }
-    if (activated.length > 0) this.save();
+    if (activated.length > 0) {
+      // [P448] 複数テンプレートの規則は、全テンプレートが VERIFIED に
+      // なったときに有効化する（1つだけ VERIFIED では発火しない）。
+      for (const rule of store.rules) {
+        if (rule.status !== 'CANDIDATE' || !rule.sourceTemplateIds || rule.sourceTemplateIds.length === 0) continue;
+        const allVerified = rule.sourceTemplateIds.every((id) => this.isUsable(id));
+        if (allVerified) {
+          rule.status = 'VERIFIED';
+          systemLogger.info('TOOLS', `🧩 [P448] テンプレート選択規則を有効化しました: ${rule.pattern} (テンプレート ${rule.sourceTemplateIds.join(',')} がすべて VERIFIED)`);
+        }
+      }
+      this.save();
+    }
     return activated;
   }
 }

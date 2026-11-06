@@ -57,6 +57,14 @@ export interface TemplateProposalInput {
   operationCode: string;
   selectionPattern: string | null;
   rationale: string;
+  /**
+   * [P448] サンドボックス用の種文書。REMOVE 系のテンプレートは
+   * 除去する要素が入った文書でないと NORMAL が SKIPPED になるため、
+   * 導出時に元のフィクスチャ値から作った種をここで渡す。
+   */
+  fixtureSeedSource?: string;
+  /** [P448] このテンプレートを導出した元のテンプレートID。 */
+  derivedFrom?: string;
 }
 
 export interface TemplateProposalResult {
@@ -146,6 +154,10 @@ class TemplateCreationService {
       rationale: input.rationale,
       createdAt: now,
       updatedAt: now,
+      // [P448] 種と導出元は任意。ない場合は undefined のままにする
+      // （storeProposal のスプレッドでそのまま保存される）。
+      fixtureSeedSource: input.fixtureSeedSource,
+      derivedFrom: input.derivedFrom,
     };
     const stored = dynamicTemplateRegistryService.storeProposal(entry);
     if (!stored.accepted) return { accepted: false, templateId, reason: stored.reason };

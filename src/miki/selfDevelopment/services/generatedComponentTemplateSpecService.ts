@@ -50,6 +50,13 @@ export interface TemplateOperationSpec {
   params: string[];
   /** サンドボックス用の決定論的な標準パラメータ（試験用フィクスチャ）。 */
   fixtureParams: Record<string, unknown>;
+  /**
+   * [P448] サンドボックス用の種文書。REMOVE 系のテンプレートは
+   * 除去する要素が入った文書でないと NORMAL が SKIPPED になるため、
+   * 導出時に元のフィクスチャ値から作った種をここに持つ。
+   * ない場合は buildSandboxFixture が標準フィクスチャを使う。
+   */
+  fixtureSeedSource?: string;
 }
 
 /**
@@ -123,7 +130,7 @@ export function getTemplateSpec(templateId: string): TemplateOperationSpec | und
   if (builtin) return builtin;
   const proposed = dynamicTemplateRegistryService.getTemplate(templateId);
   if (!proposed) return undefined;
-  return { kind: proposed.kind, params: [...proposed.params], fixtureParams: { ...proposed.fixtureParams } };
+  return { kind: proposed.kind, params: [...proposed.params], fixtureParams: { ...proposed.fixtureParams }, fixtureSeedSource: proposed.fixtureSeedSource };
 }
 
 export function isOperationTemplate(templateId: string): boolean {
@@ -187,6 +194,36 @@ export function buildSandboxFixture(templateIds: string[]): SandboxFixture {
     // コメント行を見ないため、NORMAL と同じく先頭操作が APPLIED になる）。
     normalSource = CONFIG_FIXTURE_SOURCE;
     boundarySource = CONFIG_FIXTURE_SOURCE + '# ' + 'x'.repeat(4096) + '\n';
+  }
+  // [P448] 先頭の操作テンプレートに種（fixtureSeedSource）があれば、
+  // それを NORMAL 入力の source にする。REMOVE 系のテンプレートは
+  // 除去する要素が入った文書でないと NORMAL が SKIPPED になって
+  // APPLIED の assertion が通らないため。境界入力は種に種別ごとの
+  // 水増しを足して作り直す（既存の境界の作り方と同じ）。
+  const firstSpec = getTemplateSpec(firstOperationTemplate(templateIds) ?? templateIds[0] ?? 'TS_FUNCTION_CREATE');
+  const seedSource = firstSpec?.fixtureSeedSource;
+  if (seedSource) {
+    normalSource = seedSource;
+    if (kind === 'TS') {
+      boundarySource = seedSource + '// ' + 'x'.repeat(4096) + '\n';
+    } else if (kind === 'JSON') {
+      try {
+        const doc = JSON.parse(seedSource) as Record<string, unknown>;
+        const items = (doc as { generatedItems?: unknown }).generatedItems;
+        if (Array.isArray(items)) {
+          for (let i = 0; i < 1200; i++) items.push('x');
+        }
+        boundarySource = JSON.stringify(doc);
+      } catch {
+        boundarySource = seedSource;
+      }
+    } else if (kind === 'CSV') {
+      let rows = '';
+      for (let n = 1000; n < 1500; n++) rows += n + ',pad\n';
+      boundarySource = seedSource + rows;
+    } else if (kind === 'CONFIG') {
+      boundarySource = seedSource + '# ' + 'x'.repeat(4096) + '\n';
+    }
   }
   return { kind, normalSource, boundarySource, normalRequest, permissionRequest };
 }

@@ -31,6 +31,7 @@ import { autonomousSelfImprovementLoopService } from './autonomousSelfImprovemen
 import { selfImprovementIngressService } from './selfImprovementIngressService';
 import { autonomousIssueDiscoveryService } from './autonomousIssueDiscoveryService';
 import { autonomousCapabilityInnovationService } from '../../selfDevelopment/services/autonomousCapabilityInnovationService';
+import { templateInventionService } from '../../selfDevelopment/services/templateInventionService';
 import { domainSequentialConnectionService } from './domainSequentialConnectionService';
 import { MIKI_DOMAINS } from './domainCatalogService';
 import { persistenceReceiptLedgerService } from './persistenceReceiptLedgerService';
@@ -96,7 +97,7 @@ class DomainIntegrationBootstrapService{
   const connectivityAudit=await domainParticipationService.auditAll();
   if(!connectivityAudit.passed)throw new Error('DOMAIN_CONNECTIVITY_AUDIT_FAILED');
   autonomousSelfImprovementLoopService.initialize();
-  autonomousIssueDiscoveryService.initialize();autonomousCapabilityInnovationService.initialize();
+  autonomousIssueDiscoveryService.initialize();autonomousCapabilityInnovationService.initialize();templateInventionService.initialize();
   conversationCompositionResearchSchedulerService.initialize();
   const recovery=blackboardRecoveryService.recoverInterrupted();
   if(recovery.recovered.length>0)systemLogger.info('SELF_IMPROVEMENT',`[DomainIntegration] interrupted tasks recovered: ${recovery.recovered.length}`);
@@ -114,7 +115,7 @@ class DomainIntegrationBootstrapService{
  }
 
  dispose():void{
-  for(const domain of MIKI_DOMAINS)domainRouterService.unregister(domain);conversationCompositionResearchSchedulerService.dispose();autonomousIssueDiscoveryService.dispose();autonomousCapabilityInnovationService.dispose();productionScaleWorkerService.dispose();autonomousSelfImprovementLoopService.dispose();for(const unsubscribe of this.unsubscribers)unsubscribe();this.unsubscribers=[];this.initialized=false;}
+  for(const domain of MIKI_DOMAINS)domainRouterService.unregister(domain);conversationCompositionResearchSchedulerService.dispose();autonomousIssueDiscoveryService.dispose();autonomousCapabilityInnovationService.dispose();templateInventionService.dispose();productionScaleWorkerService.dispose();autonomousSelfImprovementLoopService.dispose();for(const unsubscribe of this.unsubscribers)unsubscribe();this.unsubscribers=[];this.initialized=false;}
  getStatus(){return {initialized:this.initialized,registered:domainRouterService.getRegistrations(),missing:domainRouterService.getMissingDomains([...MIKI_DOMAINS]),coverage:crossDomainCirculationService.getCoverage(),connectivityAudit:domainParticipationService.getLastAudit()};}
 
  private async handleExecutionEvent(event:ExecutionEvent):Promise<void>{
