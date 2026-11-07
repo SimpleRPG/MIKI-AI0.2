@@ -14,13 +14,29 @@
  * - softEllipse: 中心から周辺へ滑らかに薄くなる楕円。柔らかい影や
  *   頬の色づきなど、ベタ塗りでは出せない表現に使う。
  *
+ * P467: 高速化。従来はピクセルを塗るたびに色コードの解析と関数
+ * 呼び出しをしており、イラストサイズでは描画が重かった。色の解釈は
+ * 図形ごとに1回だけにし、塗りは横方向の帯（スパン）単位でバッファへ
+ * 直接書く。不透明な塗りはブレンド計算自体を省略する。
+ * 実測（P138、Node実行環境）: ILLUSTRATION_2D 約334ms → 約84ms、
+ * ILLUSTRATION_25D 約508ms → 約173ms。残りの主コストは縮小と
+ * PNG エンコード、柔らかい楕円の画素計算。
+ *
  * 座標はすべて論理座標（出力サイズ基準）で渡す。ss 倍の変換は
  * このクラスの中だけで行う。
  */
 
-function parseHexColor(hex: string): [number, number, number] {
+type Rgb = [number, number, number];
+
+const colorCache = new Map<string, Rgb>();
+
+function parseHexColor(hex: string): Rgb {
+  const cached = colorCache.get(hex);
+  if (cached) return cached;
   const x = hex.replace('#', '');
-  return [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2, 4), 16), parseInt(x.slice(4, 6), 16)];
+  const rgb: Rgb = [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2, 4), 16), parseInt(x.slice(4, 6), 16)];
+  colorCache.set(hex, rgb);
+  return rgb;
 }
 
 export class RasterCanvas {
@@ -38,58 +54,105 @@ export class RasterCanvas {
     this.rgba = new Uint8Array(this.pixelWidth * this.pixelHeight * 4);
   }
 
-  /** 論理座標の1点（内部では ss 倍解像度の画素）を source-over で塗る。 */
-  public px(x: number, y: number, color: string, alpha = 1): void {
-    const ss = this.supersample;
-    const ix = Math.floor(x * ss);
-    const iy = Math.floor(y * ss);
+  /** 内部座標（ss倍解像度）の1画素へ source-over で書く。 */
+  private blendPixel(ix: number, iy: number, rgb: Rgb, sa: number): void {
     if (ix < 0 || iy < 0 || ix >= this.pixelWidth || iy >= this.pixelHeight) return;
-    const [r, g, b] = parseHexColor(color);
-    const sa = Math.max(0, Math.min(1, alpha));
+    const buf = this.rgba;
     const i = (iy * this.pixelWidth + ix) * 4;
-    const da = this.rgba[i + 3] / 255;
+    if (sa >= 0.999) {
+      buf[i] = rgb[0];
+      buf[i + 1] = rgb[1];
+      buf[i + 2] = rgb[2];
+      buf[i + 3] = 255;
+      return;
+    }
+    if (sa <= 0) return;
+    const da = buf[i + 3] / 255;
     const outA = sa + da * (1 - sa);
     if (outA <= 0) return;
-    this.rgba[i] = Math.round((r * sa + this.rgba[i] * da * (1 - sa)) / outA);
-    this.rgba[i + 1] = Math.round((g * sa + this.rgba[i + 1] * da * (1 - sa)) / outA);
-    this.rgba[i + 2] = Math.round((b * sa + this.rgba[i + 2] * da * (1 - sa)) / outA);
-    this.rgba[i + 3] = Math.round(outA * 255);
+    const dstScale = (da * (1 - sa)) / outA;
+    const srcScale = sa / outA;
+    buf[i] = Math.round(rgb[0] * srcScale + buf[i] * dstScale);
+    buf[i + 1] = Math.round(rgb[1] * srcScale + buf[i + 1] * dstScale);
+    buf[i + 2] = Math.round(rgb[2] * srcScale + buf[i + 2] * dstScale);
+    buf[i + 3] = Math.round(outA * 255);
+  }
+
+  /** 内部座標の横帯 [x0, x1] を一括で塗る（塗りの主経路）。 */
+  private blendSpan(iy: number, x0: number, x1: number, rgb: Rgb, sa: number): void {
+    if (iy < 0 || iy >= this.pixelHeight) return;
+    const start = Math.max(0, x0);
+    const end = Math.min(this.pixelWidth - 1, x1);
+    if (end < start) return;
+    const buf = this.rgba;
+    const rowBase = iy * this.pixelWidth * 4;
+    if (sa >= 0.999) {
+      for (let ix = start; ix <= end; ix++) {
+        const i = rowBase + ix * 4;
+        buf[i] = rgb[0];
+        buf[i + 1] = rgb[1];
+        buf[i + 2] = rgb[2];
+        buf[i + 3] = 255;
+      }
+      return;
+    }
+    if (sa <= 0) return;
+    for (let ix = start; ix <= end; ix++) {
+      const i = rowBase + ix * 4;
+      const da = buf[i + 3] / 255;
+      const outA = sa + da * (1 - sa);
+      if (outA <= 0) continue;
+      const dstScale = (da * (1 - sa)) / outA;
+      const srcScale = sa / outA;
+      buf[i] = Math.round(rgb[0] * srcScale + buf[i] * dstScale);
+      buf[i + 1] = Math.round(rgb[1] * srcScale + buf[i + 1] * dstScale);
+      buf[i + 2] = Math.round(rgb[2] * srcScale + buf[i + 2] * dstScale);
+      buf[i + 3] = Math.round(outA * 255);
+    }
+  }
+
+  /** 論理座標の1点を塗る（小さな部品用。大きな塗りは図形メソッドを使う）。 */
+  public px(x: number, y: number, color: string, alpha = 1): void {
+    const ss = this.supersample;
+    this.blendPixel(Math.floor(x * ss), Math.floor(y * ss), parseHexColor(color), Math.max(0, Math.min(1, alpha)));
   }
 
   public ellipse(cx: number, cy: number, rx: number, ry: number, color: string, alpha = 1): void {
     if (rx <= 0 || ry <= 0) return;
+    const rgb = parseHexColor(color);
+    const sa = Math.max(0, Math.min(1, alpha));
     const ss = this.supersample;
-    const x0 = Math.floor((cx - rx) * ss);
-    const x1 = Math.ceil((cx + rx) * ss);
-    const y0 = Math.floor((cy - ry) * ss);
-    const y1 = Math.ceil((cy + ry) * ss);
+    const cyPx = cy * ss;
+    const ryPx = ry * ss;
+    const y0 = Math.max(0, Math.floor(cyPx - ryPx));
+    const y1 = Math.min(this.pixelHeight - 1, Math.ceil(cyPx + ryPx));
     for (let iy = y0; iy <= y1; iy++) {
-      for (let ix = x0; ix <= x1; ix++) {
-        const lx = (ix + 0.5) / ss;
-        const ly = (iy + 0.5) / ss;
-        if (((lx - cx) / rx) ** 2 + ((ly - cy) / ry) ** 2 <= 1) {
-          this.px(lx, ly, color, alpha);
-        }
-      }
+      const ly = (iy + 0.5) / ss;
+      const t = (ly - cy) / ry;
+      const half = rx * Math.sqrt(Math.max(0, 1 - t * t));
+      const x0 = Math.floor((cx - half) * ss);
+      const x1 = Math.ceil((cx + half) * ss);
+      this.blendSpan(iy, x0, x1, rgb, sa);
     }
   }
 
   /** 周辺へ向けて滑らかに薄くなる楕円（柔らかい影・色づき用）。 */
   public softEllipse(cx: number, cy: number, rx: number, ry: number, color: string, maxAlpha = 1): void {
     if (rx <= 0 || ry <= 0) return;
+    const rgb = parseHexColor(color);
     const ss = this.supersample;
-    const x0 = Math.floor((cx - rx) * ss);
-    const x1 = Math.ceil((cx + rx) * ss);
-    const y0 = Math.floor((cy - ry) * ss);
-    const y1 = Math.ceil((cy + ry) * ss);
+    const x0 = Math.max(0, Math.floor((cx - rx) * ss));
+    const x1 = Math.min(this.pixelWidth - 1, Math.ceil((cx + rx) * ss));
+    const y0 = Math.max(0, Math.floor((cy - ry) * ss));
+    const y1 = Math.min(this.pixelHeight - 1, Math.ceil((cy + ry) * ss));
     for (let iy = y0; iy <= y1; iy++) {
+      const ly = (iy + 0.5) / ss;
       for (let ix = x0; ix <= x1; ix++) {
         const lx = (ix + 0.5) / ss;
-        const ly = (iy + 0.5) / ss;
         const d2 = ((lx - cx) / rx) ** 2 + ((ly - cy) / ry) ** 2;
         if (d2 <= 1) {
           const falloff = (1 - d2) * (1 - d2);
-          this.px(lx, ly, color, maxAlpha * falloff);
+          this.blendPixel(ix, iy, rgb, maxAlpha * falloff);
         }
       }
     }
@@ -97,10 +160,12 @@ export class RasterCanvas {
 
   public poly(points: number[][], color: string, alpha = 1): void {
     if (points.length < 3) return;
+    const rgb = parseHexColor(color);
+    const sa = Math.max(0, Math.min(1, alpha));
     const ss = this.supersample;
     const ys = points.map((p) => p[1] * ss);
-    const yMin = Math.floor(Math.min(...ys));
-    const yMax = Math.ceil(Math.max(...ys));
+    const yMin = Math.max(0, Math.floor(Math.min(...ys)));
+    const yMax = Math.min(this.pixelHeight - 1, Math.ceil(Math.max(...ys)));
     for (let iy = yMin; iy <= yMax; iy++) {
       const ly = (iy + 0.5) / ss;
       const xs: number[] = [];
@@ -113,21 +178,32 @@ export class RasterCanvas {
       }
       xs.sort((p, q) => p - q);
       for (let i = 0; i + 1 < xs.length; i += 2) {
-        const xStart = Math.ceil(xs[i] * ss);
-        const xEnd = Math.floor(xs[i + 1] * ss);
-        for (let ix = xStart; ix <= xEnd; ix++) {
-          this.px((ix + 0.5) / ss, ly, color, alpha);
-        }
+        this.blendSpan(iy, Math.ceil(xs[i] * ss), Math.floor(xs[i + 1] * ss), rgb, sa);
       }
     }
   }
 
   public line(x0: number, y0: number, x1: number, y1: number, color: string, alpha = 1, width = 1): void {
+    const rgb = parseHexColor(color);
+    const sa = Math.max(0, Math.min(1, alpha));
     const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1) * this.supersample;
+    const r = width / 2;
     for (let i = 0; i <= n; i++) {
       const x = x0 + ((x1 - x0) * i) / n;
       const y = y0 + ((y1 - y0) * i) / n;
-      this.ellipse(x, y, width / 2, width / 2, color, alpha);
+      // 円のスタンプもスパンで塗る
+      const ss = this.supersample;
+      const cyPx = y * ss;
+      const rPx = r * ss;
+      const yy0 = Math.max(0, Math.floor(cyPx - rPx));
+      const yy1 = Math.min(this.pixelHeight - 1, Math.ceil(cyPx + rPx));
+      for (let iy = yy0; iy <= yy1; iy++) {
+        const ly = (iy + 0.5) / ss;
+        const t = (ly - y) / r;
+        if (Math.abs(t) > 1) continue;
+        const half = r * Math.sqrt(1 - t * t);
+        this.blendSpan(iy, Math.floor((x - half) * ss), Math.ceil((x + half) * ss), rgb, sa);
+      }
     }
   }
 
