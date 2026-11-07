@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { knowledgeConnectivityService } from '../../memory/services/knowledgeConnectivityService';
 import { evidenceService, type EvidenceRecord } from '../../memory/services/evidenceService';
 import { autonomousIssueDiscoveryService } from './autonomousIssueDiscoveryService';
 import { autonomousSelfImprovementLoopService } from './autonomousSelfImprovementLoopService';
@@ -324,7 +325,22 @@ class ContradictionResolutionRequestService {
   }
 
   public async createPackage(): Promise<ContradictionResolutionCreateResult> {
-    const allPairs = this.enumeratePairs();
+    const enumerated = this.enumeratePairs();
+    // P474: 接続性で並び替える。会話・タスク・gap に繋がる Claim を
+    // 含むペアを先にし、両側とも孤立したペアは後ろへ（上限で切り捨て
+    // られる場合も孤立ペアから落ちる）。教師の判断コストを、使われ
+    // 見込みのある知識に先に使うための順序付けで、除外ではない。
+    const allPairs = enumerated
+      .map((pair, index) => ({
+        pair,
+        index,
+        rank: Math.min(
+          knowledgeConnectivityService.rankOf(pair.claimA.claim_id),
+          knowledgeConnectivityService.rankOf(pair.claimB.claim_id),
+        ),
+      }))
+      .sort((a, b) => a.rank - b.rank || a.index - b.index)
+      .map((entry) => entry.pair);
     if (allPairs.length === 0) {
       this.logCreateBlocked('NO_UNRESOLVED_CONTRADICTIONS', '未決着の Claim 矛盾がありません');
       return {

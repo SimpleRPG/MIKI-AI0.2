@@ -35,6 +35,7 @@ import {
   Boxes,
   Scale,
   BookOpen,
+  Network,
 } from 'lucide-react';
 
 import {
@@ -64,6 +65,7 @@ import { componentSupplyIntakeService } from '../miki/core/services/componentSup
 import { contradictionResolutionRequestService } from '../miki/core/services/contradictionResolutionRequestService';
 import { contradictionResolutionIntakeService } from '../miki/core/services/contradictionResolutionIntakeService';
 import { teacherMaterialIntakeService } from '../miki/core/services/teacherMaterialIntakeService';
+import { knowledgeConnectivityService } from '../miki/memory/services/knowledgeConnectivityService';
 import { backgroundWorkerService } from '../miki/execution/services/backgroundWorkerService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
@@ -276,6 +278,18 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const [contradictionRequests, setContradictionRequests] = useState(() => contradictionResolutionRequestService.list());
   const [contradictionIntakes, setContradictionIntakes] = useState(() => contradictionResolutionIntakeService.list());
   const [teacherIntakes, setTeacherIntakes] = useState(() => teacherMaterialIntakeService.list());
+  const [connectivitySummary, setConnectivitySummary] = useState(() => {
+    try { return knowledgeConnectivityService.summarize(); } catch { return null; }
+  });
+  const [orphanedClaims, setOrphanedClaims] = useState(() => {
+    try { return knowledgeConnectivityService.listOrphaned(50); } catch { return []; }
+  });
+  const refreshConnectivity = () => {
+    try {
+      setConnectivitySummary(knowledgeConnectivityService.summarize());
+      setOrphanedClaims(knowledgeConnectivityService.listOrphaned(50));
+    } catch { /* 集計に失敗した場合は前回の表示を維持する */ }
+  };
   const [unresolvedPairCount, setUnresolvedPairCount] = useState(() => contradictionResolutionRequestService.countUnresolvedPairs());
 
   // P450: バックグラウンド実行のオンオフ (既定ON、サービス側で永続化)
@@ -330,6 +344,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       setContradictionRequests(contradictionResolutionRequestService.list());
       setContradictionIntakes(contradictionResolutionIntakeService.list());
       setTeacherIntakes(teacherMaterialIntakeService.list());
+      refreshConnectivity();
       setUnresolvedPairCount(contradictionResolutionRequestService.countUnresolvedPairs());
     }, 2000);
 
@@ -353,6 +368,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     setContradictionRequests(contradictionResolutionRequestService.list());
     setContradictionIntakes(contradictionResolutionIntakeService.list());
     setTeacherIntakes(teacherMaterialIntakeService.list());
+    refreshConnectivity();
     setUnresolvedPairCount(contradictionResolutionRequestService.countUnresolvedPairs());
     setRefreshTick((prev) => prev + 1);
   };
@@ -1585,6 +1601,48 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                         {intake.status === 'REJECTED' && intake.reasons.length > 0 && (
                           <div className="text-[10px] text-rose-300/80 truncate">理由: {intake.reasons[0]}</div>
                         )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Network className="w-4 h-4 text-teal-400" />
+                  知識の棚卸し（接続性）
+                </h3>
+                {connectivitySummary && (
+                  <span className="text-[11px] text-slate-400">全 {connectivitySummary.total} 件</span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                知識（Claim）が会話・タスク・調査の必要と繋がっているかを数えた棚卸しです。孤立は「出所がウェブ検索のみで、開いている調査課題の対象でもなく、他の知識との関係も連想もなく、14日以上動きがない」知識です。ここでは表示だけを行い、自動で削除はしません。
+              </p>
+              {connectivitySummary ? (
+                <div className="flex flex-wrap gap-2 text-[11px]">
+                  <span className="px-2 py-1 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">接続あり {connectivitySummary.connected} 件</span>
+                  <span className="px-2 py-1 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">弱い {connectivitySummary.weak} 件</span>
+                  <span className="px-2 py-1 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30">孤立 {connectivitySummary.orphaned} 件</span>
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500">集計できませんでした</div>
+              )}
+              {orphanedClaims.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-semibold text-slate-300">孤立した知識（古い順・最大10件）</div>
+                  <div className="divide-y divide-slate-800/60 border border-slate-800/60 rounded-lg overflow-hidden">
+                    {orphanedClaims.slice(0, 10).map((claim) => (
+                      <div key={claim.claimId} className="p-3 bg-slate-900/40 text-xs space-y-1">
+                        <div className="text-slate-200 leading-relaxed">{claim.statement.length > 140 ? `${claim.statement.slice(0, 140)}…` : claim.statement}</div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                          <span className="font-mono">{claim.claimId}</span>
+                          <span>出所: {claim.source}</span>
+                          <span>状態: {claim.status} / {claim.maturity}</span>
+                          <span>経過: {claim.ageDays} 日</span>
+                        </div>
                       </div>
                     ))}
                   </div>

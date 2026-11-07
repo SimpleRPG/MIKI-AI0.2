@@ -622,7 +622,10 @@ export class ConversationCoreService {
         query: compiled.target || prompt,
         reason,
         sourceRequestId: compiled.requestId,
-        priority: dialogueAct === 'REQUEST_RECOMMENDATION' ? 70 : 50,
+        // P474: 会話から生まれた gap は「使われ見込み」が定義上ある
+        // （目の前の対話の必要）。在庫の後始末より先に処理されるよう、
+        // 既定より高めの優先度で登録する。
+        priority: dialogueAct === 'REQUEST_RECOMMENDATION' ? 80 : 65,
       });
 
       let researchPerformed = false;
