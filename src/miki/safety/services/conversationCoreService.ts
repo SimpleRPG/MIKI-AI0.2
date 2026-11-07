@@ -21,6 +21,8 @@ import { latentIntentMiningService } from '../../unknown/services/latentIntentMi
 import { answerContentIrService } from '../../conversation/services/answerContentIrService';
 import { unknownResearchConversationBridgeService, selectUnverifiedPresentation, buildUnverifiedConclusion } from '../../conversation/services/unknownResearchConversationBridgeService';
 import { conversationUnknownVocabularyService } from '../../conversation/services/conversationUnknownVocabularyService';
+import { conversationImageObservationService } from '../../conversation/services/conversationImageObservationService';
+import { scopedVersionedMemoryService } from '../../memory/services/scopedVersionedMemoryService';
 import { conversationUserFactRecallService, looksInterrogative, UserFactIntakeSummary } from '../../conversation/services/conversationUserFactRecallService';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
@@ -183,7 +185,38 @@ export class ConversationCoreService {
 
     // 1. 会話状態・対話行為・参照解決
     let t = performance.now();
-    const interpretation = hybridConversationEngineService.interpret(prompt, state);
+    // P466: 画像添付があれば観察する。従来は添付が入口で捨てられて
+    // いた。観察文はこのターンの意味文脈に入れ、統治メモリにも
+    // 「見たものの証跡」として残す（観察は色・明暗・大まかな形まで。
+    // 物や文字の同定はしない）。
+    let imageObservationText: string | null = null;
+    const imageAttachment = (params.attachedFiles || []).find(
+      (f: any) => typeof f?.content === 'string' && f.content.startsWith('data:image/'),
+    );
+    if (imageAttachment) {
+      const observation = await conversationImageObservationService.observe(imageAttachment.content);
+      if (observation) {
+        imageObservationText = observation.text;
+        try {
+          scopedVersionedMemoryService.propose({
+            subject: '画像の観察',
+            content: observation.text,
+            kind: 'EVIDENCE',
+            scope: { type: 'CONVERSATION', id: params.conversationId || 'active' },
+            source: { turnIds: [], fileIds: [], evidenceIds: [] },
+            confidence: 0.6,
+          });
+        } catch { /* 記録は補助経路 */ }
+      }
+    }
+
+    const interpretation = hybridConversationEngineService.interpret(
+      prompt,
+      state,
+      imageObservationText
+        ? [{ turnId: `image-observation-${params.messageId || 'current'}`, text: imageObservationText, entities: [] }]
+        : [],
+    );
     const dialogueAct = interpretation.dialogueAct;
     const vocabulary = (interpretation as any).vocabulary || (interpretation.semantic as any)?.vocabulary || conversationUnknownVocabularyService.assess(prompt, { allowResearch: true });
     const unknownTerms = Array.isArray(vocabulary?.unknowns)
