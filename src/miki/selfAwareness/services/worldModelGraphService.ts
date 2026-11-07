@@ -3,6 +3,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
+import { componentRegistryService } from '../../capability/services/componentRegistryService';
 
 /*
  * P465: 世界モデル（実体と型つき関係のグラフ）。
@@ -60,10 +61,41 @@ export interface WorldHypothesisRecord {
   createdAt: number;
 }
 
+/**
+ * P478: 部品と実体の橋。Claim（知っていること）と部品（できること）は
+ * 台帳も検証の物差しも別だが、実行の瞬間には結びついていなければ
+ * ならない。このリンクは「この部品は、この実体（の振る舞い・用途）に
+ * 関わる」という対応で、由来は2通り:
+ * - KNOWLEDGE_REF: 部品の検証記録にある knowledge=<id> 参照（末尾
+ *   セグメントを概念実体として登録してリンク）
+ * - TEXT_MATCH: 既存の実体名が部品の名前・目的・検証記録などに現れる
+ * リンクは同期のたびに現在の部品台帳から作り直す（陳腐化させない）。
+ */
+export interface WorldComponentLink {
+  componentId: string;
+  componentName: string;
+  entityName: string;
+  basis: 'KNOWLEDGE_REF' | 'TEXT_MATCH';
+  matchedText: string;
+  componentStatus: string;
+  updatedAt: number;
+}
+
+export interface WorldComponentHit {
+  componentId: string;
+  componentName: string;
+  componentStatus: string;
+  entityName: string;
+  basis: 'KNOWLEDGE_REF' | 'TEXT_MATCH';
+  /** 関係経由で見つかった場合、起点になった実体名。直接リンクでは無し。 */
+  viaEntity?: string;
+}
+
 interface WorldModelState {
   entities: WorldEntity[];
   relations: WorldRelation[];
   hypotheses: WorldHypothesisRecord[];
+  componentLinks: WorldComponentLink[];
 }
 
 const STORAGE_KEY = 'miki_world_model_graph_v1';
@@ -108,11 +140,12 @@ class WorldModelGraphService {
           entities: Array.isArray(p.entities) ? p.entities : [],
           relations: Array.isArray(p.relations) ? p.relations : [],
           hypotheses: Array.isArray(p.hypotheses) ? p.hypotheses : [],
+          componentLinks: Array.isArray(p.componentLinks) ? p.componentLinks : [],
         };
         return this.state;
       }
     } catch { /* 破損時は空から始める */ }
-    this.state = { entities: [], relations: [], hypotheses: [] };
+    this.state = { entities: [], relations: [], hypotheses: [], componentLinks: [] };
     return this.state;
   }
 
@@ -185,6 +218,191 @@ class WorldModelGraphService {
     );
   }
 
+  // ------------------------------------------------------------------
+  // P478: 知識（Claim）と部品の橋
+  // ------------------------------------------------------------------
+
+  public componentLinks(): WorldComponentLink[] {
+    return [...(this.load().componentLinks || [])];
+  }
+
+  /**
+   * 現在の部品台帳から、部品—実体リンクを作り直す。REJECTED の部品は
+   * 除外。1部品あたり最大8リンク（長い実体名を優先し、部分一致の
+   * 誤爆を抑える）。
+   */
+  public syncComponentLinks(): { components: number; links: number } {
+    const state = this.load();
+    const components = (componentRegistryService.getAllComponents() as any[]).filter(
+      (c) => c && c.component_id && c.status !== 'REJECTED',
+    );
+    const entityNames = state.entities
+      .map((e) => e.name)
+      .filter((n) => n.length >= 2)
+      .sort((a, b) => b.length - a.length);
+    const next: WorldComponentLink[] = [];
+    const now = Date.now();
+    for (const comp of components) {
+      const text = [
+        comp.component_id,
+        comp.name,
+        comp.purpose,
+        comp.description,
+        comp.validation_txt,
+        comp.history_txt,
+        Array.isArray(comp.appliesWhen) ? comp.appliesWhen.join(' ') : '',
+      ]
+        .map((v) => String(v || ''))
+        .join('\n');
+      const linked = new Set<string>();
+      const push = (entityName: string, basis: WorldComponentLink['basis'], matchedText: string) => {
+        if (linked.has(entityName) || linked.size >= 8) return;
+        linked.add(entityName);
+        next.push({
+          componentId: String(comp.component_id),
+          componentName: String(comp.name || comp.component_id),
+          entityName,
+          basis,
+          matchedText,
+          componentStatus: String(comp.status || ''),
+          updatedAt: now,
+        });
+      };
+      // KNOWLEDGE_REF: knowledge=<id> の末尾セグメントを概念実体にする
+      const knowledgeRefs = new Set<string>();
+      for (const m of text.matchAll(/knowledge=([a-zA-Z0-9._-]+)/g)) knowledgeRefs.add(m[1]);
+      for (const ref of knowledgeRefs) {
+        const segment = ref.split('.').pop() || ref;
+        const entity = this.registerEntity(segment);
+        if (entity) push(entity.name, 'KNOWLEDGE_REF', ref);
+      }
+      // TEXT_MATCH: 既存の実体名が部品のテキストに現れる
+      for (const name of entityNames) {
+        if (linked.size >= 8) break;
+        if (text.includes(name)) push(name, 'TEXT_MATCH', name);
+      }
+    }
+    state.componentLinks = next;
+    this.save();
+    if (next.length > 0) {
+      systemLogger.info('SELF_IMPROVEMENT', `🌐🧩 [WorldModel] 部品—知識リンクを同期: 部品${components.length}件中リンク${next.length}件`);
+    }
+    return { components: components.length, links: next.length };
+  }
+
+  /**
+   * 実体に関わる部品を引く。直接リンクに加え、関係で隣り合う実体に
+   * リンクされた部品も「関係経由（viaEntity）」として候補に入れる。
+   * 並びは直接リンク優先、次に部品の検証段階が高い順。
+   */
+  public componentsForEntity(entityName: string): WorldComponentHit[] {
+    const state = this.load();
+    const links = state.componentLinks || [];
+    const hits = new Map<string, WorldComponentHit>();
+    const addHits = (name: string, via?: string) => {
+      for (const link of links) {
+        if (link.entityName !== name) continue;
+        const hit: WorldComponentHit = {
+          componentId: link.componentId,
+          componentName: link.componentName,
+          componentStatus: link.componentStatus,
+          entityName: name,
+          basis: link.basis,
+          ...(via ? { viaEntity: via } : {}),
+        };
+        const prev = hits.get(link.componentId);
+        if (!prev || (prev.viaEntity && !via)) hits.set(link.componentId, hit);
+      }
+    };
+    addHits(entityName);
+    const neighbors = new Set<string>();
+    for (const r of state.relations) {
+      if (r.from === entityName) neighbors.add(r.to);
+      if (r.to === entityName) neighbors.add(r.from);
+    }
+    for (const n of neighbors) addHits(n, entityName);
+    const rank = (s: string): number =>
+      ({ VERIFIED: 0, DEVICE_TESTED: 1, CLOUD_TESTED: 2, ANALYZED: 3, CANDIDATE: 4, COLLECTED: 5 } as Record<string, number>)[s] ?? 6;
+    return [...hits.values()].sort(
+      (a, b) =>
+        (a.viaEntity ? 1 : 0) - (b.viaEntity ? 1 : 0) ||
+        rank(a.componentStatus) - rank(b.componentStatus) ||
+        a.componentId.localeCompare(b.componentId),
+    );
+  }
+
+  /** Claim から、その知識を実装する部品を引く（Claim→関係→実体→部品）。 */
+  public componentsForClaim(claimId: string): WorldComponentHit[] {
+    const state = this.load();
+    const entities = new Set<string>();
+    for (const r of state.relations) {
+      if (r.sourceClaimIds.includes(claimId)) {
+        entities.add(r.from);
+        entities.add(r.to);
+      }
+    }
+    const byId = new Map<string, WorldComponentHit>();
+    for (const name of entities) {
+      for (const hit of this.componentsForEntity(name)) {
+        if (!byId.has(hit.componentId)) byId.set(hit.componentId, hit);
+      }
+    }
+    return [...byId.values()];
+  }
+
+  /** 部品から、その根拠になっている知識（Claim）を引く（部品→実体→関係→Claim）。 */
+  public claimsForComponent(componentId: string): Array<{ claimId: string; statement: string; status: string }> {
+    const state = this.load();
+    const entities = new Set(
+      (state.componentLinks || []).filter((l) => l.componentId === componentId).map((l) => l.entityName),
+    );
+    const claimIds = new Set<string>();
+    for (const r of state.relations) {
+      if (entities.has(r.from) || entities.has(r.to)) {
+        for (const id of r.sourceClaimIds) claimIds.add(id);
+      }
+    }
+    return [...claimIds].map((id) => {
+      const claim: any = claimDatabaseService.getClaim(id);
+      return {
+        claimId: id,
+        statement: claim ? String(claim.statement || '') : '',
+        status: claim ? String(claim.status || '') : '',
+      };
+    });
+  }
+
+  /** 目標テキストに実体名が含まれる部品候補（計画層が使う素朴な入口）。 */
+  public suggestComponentsForGoal(goalText: string): WorldComponentHit[] {
+    const state = this.load();
+    const byId = new Map<string, WorldComponentHit>();
+    for (const e of state.entities) {
+      if (e.name.length < 2 || !goalText.includes(e.name)) continue;
+      for (const hit of this.componentsForEntity(e.name)) {
+        if (!byId.has(hit.componentId)) byId.set(hit.componentId, hit);
+      }
+    }
+    return [...byId.values()];
+  }
+
+  /**
+   * 能力計画のスコア付け用: 目標に現れる実体へリンクされた部品への
+   * 加点表。直接リンク 25、関係経由 12（既存の知識ブーストと同程度の
+   * 「候補に割り込む」強さに留め、支配はしない）。
+   */
+  public rankComponentsForGoal(goalText: string): Map<string, number> {
+    const state = this.load();
+    const boost = new Map<string, number>();
+    for (const e of state.entities) {
+      if (e.name.length < 2 || !goalText.includes(e.name)) continue;
+      for (const hit of this.componentsForEntity(e.name)) {
+        const value = hit.viaEntity ? 12 : 25;
+        boost.set(hit.componentId, Math.max(boost.get(hit.componentId) || 0, value));
+      }
+    }
+    return boost;
+  }
+
   /**
    * 検証済み Claim の文面から、型つき関係を決定論的に抽出する。
    * 未検証の主張は世界の事実として取り込まない。
@@ -223,6 +441,10 @@ class WorldModelGraphService {
     if (added > 0) {
       systemLogger.info('SELF_IMPROVEMENT', `🌐 [WorldModel] 検証済みClaimから関係を${added}件抽出（実体${this.load().entities.length}件・関係${this.load().relations.length}件）`);
     }
+    // P478: 世界が育つたびに部品との橋も張り直す（定期経路に相乗り）。
+    try {
+      this.syncComponentLinks();
+    } catch { /* 橋の同期失敗は抽出を止めない */ }
     return { added, scanned: claims.length };
   }
 
@@ -330,6 +552,27 @@ class WorldModelGraphService {
       }
     }
     return results;
+  }
+
+  /**
+   * P478: 予測に「使える部品」を付けて返す。「木を殴るとどうなる？」
+   * への予測（果物が落ちる）と、それを担える部品が、知識と道具の橋を
+   * 渡って一組で返る。予測がモデルの推測である点は predict と同じ。
+   */
+  public predictWithComponents(
+    entityName: string,
+    maxDepth = 2,
+  ): {
+    entity: string;
+    components: WorldComponentHit[];
+    predictions: Array<{ entity: string; path: string[]; type: WorldRelationType; confidence: number; components: WorldComponentHit[] }>;
+  } {
+    const predictions = this.predict(entityName, maxDepth);
+    return {
+      entity: entityName,
+      components: this.componentsForEntity(entityName),
+      predictions: predictions.map((p) => ({ ...p, components: this.componentsForEntity(p.entity) })),
+    };
   }
 }
 

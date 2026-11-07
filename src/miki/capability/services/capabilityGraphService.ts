@@ -7,6 +7,7 @@ import { executionRouteRankingService } from '../../strategy/services/executionR
 import { verifiedKnowledgePromotionService } from '../../promotion/services/verifiedKnowledgePromotionService';
 import { verifiedCapabilityPromotionService } from '../../promotion/services/verifiedCapabilityPromotionService';
 import { capabilityConfidenceService } from './capabilityConfidenceService';
+import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 
 export interface CapabilityNode {
   component_id: string;
@@ -117,6 +118,12 @@ export class CapabilityGraphService {
     const routeScores = environment ? new Map(executionRouteRankingService.rank(all.map(c => c.component_id), environment).map(x => [x.component_id, x])) : new Map();
     const knowledgeBoosts = verifiedKnowledgePromotionService.rankCapabilityKnowledge(all.map(c => c.component_id), goal);
     const verifiedCapabilityBoosts = verifiedCapabilityPromotionService.rank(all.map(c => c.component_id), goal);
+    // P478: 世界モデルの知識—部品リンクによる加点。目標に現れる実体へ
+    // リンクされた部品（＝その知識を実装する部品）を候補に割り込ませる。
+    let worldModelBoosts = new Map<string, number>();
+    try {
+      worldModelBoosts = worldModelGraphService.rankComponentsForGoal(goal);
+    } catch { /* 世界モデルの失敗は計画を止めない */ }
     const confidenceMap = capabilityConfidenceService.rank(all.map(c => c.component_id), environment);
     const scored = all.map(c => {
       const risk = environment ? failureMemoryService.assessRisk(c.component_id, environment, c.implementation_hash).risk_score : 0;
@@ -125,7 +132,7 @@ export class CapabilityGraphService {
       const knowledgeBoost = (knowledgeBoosts.get(c.component_id) || 0) + (verifiedCapabilityBoosts.get(c.component_id) || 0);
       const confidence = confidenceMap.get(c.component_id);
       const confidenceBoost = confidence?.revalidationRequired ? 0 : Math.max(0, ((confidence?.confidence || 50) - 50) * 0.8);
-      return { component: c, risk, score: this.score(c, query) + (learnedBoost.get(c.component_id) || 0) + routeBoost + knowledgeBoost + confidenceBoost - risk * 1.2, confidence };
+      return { component: c, risk, score: this.score(c, query) + (learnedBoost.get(c.component_id) || 0) + routeBoost + knowledgeBoost + confidenceBoost + (worldModelBoosts.get(c.component_id) || 0) - risk * 1.2, confidence };
     })
       .filter(x => x.score > 0 && x.risk < 80)
       .sort((a, b) => b.score - a.score || a.component.component_id.localeCompare(b.component.component_id));
@@ -143,7 +150,7 @@ export class CapabilityGraphService {
         selected.push(item.component);
         const learned = learnedBoost.has(item.component.component_id);
         const route = environment ? executionRouteRankingService.score(item.component.component_id, environment) : undefined;
-        reasons.push(`${item.component.component_id}: 目的/ID/入口/タグ一致 score=${item.score.toFixed(1)} risk=${item.risk}${learned ? ' + 学習済み実績優先' : ''}${knowledgeBoosts.has(item.component.component_id) ? ' + 検証済み知識ブースト' : ''}${item.confidence?.revalidationRequired ? ' + 再検証要求(信頼度ブースト停止)' : ` + 信頼度(${item.confidence?.confidence ?? 0})`}${route ? ` + 経路評価(${route.reason})` : ''}`);
+        reasons.push(`${item.component.component_id}: 目的/ID/入口/タグ一致 score=${item.score.toFixed(1)} risk=${item.risk}${learned ? ' + 学習済み実績優先' : ''}${knowledgeBoosts.has(item.component.component_id) ? ' + 検証済み知識ブースト' : ''}${worldModelBoosts.has(item.component.component_id) ? ' + 世界モデル知識リンク' : ''}${item.confidence?.revalidationRequired ? ' + 再検証要求(信頼度ブースト停止)' : ` + 信頼度(${item.confidence?.confidence ?? 0})`}${route ? ` + 経路評価(${route.reason})` : ''}`);
         continue;
       }
       const composable = selected.some(prev => this.matchOutputsToInputs(prev, item.component).length > 0);
@@ -151,7 +158,7 @@ export class CapabilityGraphService {
       if (composable || sameDomain) {
         selected.push(item.component);
         const route = environment ? executionRouteRankingService.score(item.component.component_id, environment) : undefined;
-        reasons.push(`${item.component.component_id}: ${composable ? 'I/O合成可能' : '同一目的領域'} risk=${item.risk}${learnedBoost.has(item.component.component_id) ? ' + 学習済み実績優先' : ''}${knowledgeBoosts.has(item.component.component_id) ? ' + 検証済み知識ブースト' : ''}${item.confidence?.revalidationRequired ? ' + 再検証要求(信頼度ブースト停止)' : ` + 信頼度(${item.confidence?.confidence ?? 0})`}${route ? ` + 経路評価(${route.reason})` : ''}`);
+        reasons.push(`${item.component.component_id}: ${composable ? 'I/O合成可能' : '同一目的領域'} risk=${item.risk}${learnedBoost.has(item.component.component_id) ? ' + 学習済み実績優先' : ''}${knowledgeBoosts.has(item.component.component_id) ? ' + 検証済み知識ブースト' : ''}${worldModelBoosts.has(item.component.component_id) ? ' + 世界モデル知識リンク' : ''}${item.confidence?.revalidationRequired ? ' + 再検証要求(信頼度ブースト停止)' : ` + 信頼度(${item.confidence?.confidence ?? 0})`}${route ? ` + 経路評価(${route.reason})` : ''}`);
       }
     }
 

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1773,
     "sourceFileCount": 1326,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1237,
-    "relativeImportCandidateCount": 3811,
-    "resolvedRelativeImportCandidateCount": 3795,
+    "relativeImportCandidateCount": 3813,
+    "resolvedRelativeImportCandidateCount": 3797,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -9014,9 +9014,9 @@
     },
     {
       "path": "src/miki/capability/services/capabilityGraphService.ts",
-      "bytes": 12533,
-      "lines": 260,
-      "sha256": "c29a338138263bb2fb5fb3698653178549eb6d25bc902f0d909b5113ac58a4c0",
+      "bytes": 13283,
+      "lines": 267,
+      "sha256": "755a98b47835199be5afa1f12eef3247489b166a38b7c87f678fc48c9b2d2bbd",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -9071,10 +9071,16 @@
           "specifier": "./capabilityConfidenceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/capabilityConfidenceService.ts"
+        },
+        {
+          "line": 10,
+          "specifier": "../../selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
         }
       ],
-      "relativeImportCandidateCount": 9,
-      "resolvedRelativeImportCount": 9,
+      "relativeImportCandidateCount": 10,
+      "resolvedRelativeImportCount": 10,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27627,9 +27633,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/worldModelGraphService.ts",
-      "bytes": 13548,
-      "lines": 336,
-      "sha256": "9df4238f35a5fe232a77cd87ee305740c0685e5a628ee847bb24a876a05fbd5d",
+      "bytes": 23628,
+      "lines": 579,
+      "sha256": "e3c1cc00b6f0677d5ea83f68acb70f4852fb9f6754fd3e9ad1e4e9809a27c1ed",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27660,10 +27666,16 @@
           "specifier": "../../unknown/services/knowledgeGapService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
+        },
+        {
+          "line": 6,
+          "specifier": "../../capability/services/componentRegistryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/capability/services/componentRegistryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
+      "relativeImportCandidateCount": 6,
+      "resolvedRelativeImportCount": 6,
       "unresolvedRelativeImportCount": 0
     },
     {
