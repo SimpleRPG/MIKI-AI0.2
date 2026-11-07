@@ -21,6 +21,9 @@ export interface ConversationInterpretation {
   reason: string;
   semantic: ReturnType<typeof semanticUnderstandingV2OrchestratorService.analyze>;
   continuationTaskIds: string[];
+  // P462: 未知語の評価はここで1回だけ行い、結果を返す（従来はコア側で
+  // 再計算されていた）。
+  vocabulary: ReturnType<typeof conversationUnknownVocabularyService.assess>;
 }
 
 /** 第92/94章: 会話を意味処理と表層生成へ分解し、既知領域ではLLMを呼ばない。 */
@@ -46,7 +49,7 @@ export class HybridConversationEngineService {
     const blocking = anaphora.confidence === 'ambiguous' || !semantic.ready;
     const known = dialogueAct !== 'CASUAL_CHAT' || analysis.contentTokens.length > 0;
     const reason = !semantic.ready ? `意味制約未確定: ${semantic.clarification.reasons.join(',') || semantic.frame.unknowns.join(',')}` : blocking ? '参照解決が曖昧' : known ? '規則・辞書・状態から解釈可能' : '未知表現のためフォールバック候補';
-    return { dialogueAct, stage, anaphora, tokens: analysis.contentTokens, skeleton, deterministic: known && !blocking, llmFallbackNeeded: blocking || !known, reason, semantic, continuationTaskIds };
+    return { dialogueAct, stage, anaphora, tokens: analysis.contentTokens, skeleton, deterministic: known && !blocking, llmFallbackNeeded: blocking || !known, reason, semantic, continuationTaskIds, vocabulary };
   }
 
   render(ir: Parameters<typeof answerContentIrService.generateSurfaceTextFromIR>[0], skeleton: AnswerSkeletonType) {

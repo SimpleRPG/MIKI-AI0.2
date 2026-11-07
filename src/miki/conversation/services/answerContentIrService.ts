@@ -374,6 +374,23 @@ export class AnswerContentIrService {
       }
     }
 
+    // 5. P462: 内部情報の混入検査（サービス名・内部ID・内部指標が
+    // 表層文に出ていないか）。応答は相手が使うためのもので、内部の
+    // 過程や識別子は見せない。
+    let internalInfoPreserved = true;
+    const internalLeakPatterns: Array<[RegExp, string]> = [
+      [/[A-Za-z][A-Za-z0-9]*Service\b/, 'サービス名'],
+      [/\b(?:RQP|RQO|RQI|CLM|GAP)-[A-Za-z0-9][A-Za-z0-9-]{3,}/, '内部ID'],
+      [/情報利得/, '内部指標（情報利得）'],
+      [/semanticKey|queryPlanId|claim_id|gapId/, '内部キー'],
+    ];
+    for (const [pattern, label] of internalLeakPatterns) {
+      if (pattern.test(safeText)) {
+        internalInfoPreserved = false;
+        missingOrDistorted.push(`【内部情報混入】表層文に内部の${label}が含まれています`);
+      }
+    }
+
     const isPreserved = missingOrDistorted.length === 0;
 
     if (!isPreserved) {
@@ -395,6 +412,7 @@ export class AnswerContentIrService {
         negationPreserved,
         certaintyPreserved,
         worldScopePreserved,
+        internalInfoPreserved,
       },
       missingOrDistortedElements: missingOrDistorted,
     };

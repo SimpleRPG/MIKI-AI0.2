@@ -1,5 +1,6 @@
 import type { MemoryItem } from '../../../types';
 import { enrichMemoryMetadata } from '../../../utils/memoryRetrieval';
+import { scopedVersionedMemoryService } from '../../memory/services/scopedVersionedMemoryService';
 
 /**
  * P452: 会話の理解の土台 ― ユーザー発言からの事実取り込み。
@@ -466,6 +467,11 @@ export class ConversationFactIntakeService {
           mem.active = false;
           (mem as any).invalidatedByUser = true;
           invalidated++;
+          // P462: 訂正を統治メモリにも伝播させる（この事実を出所に持つ
+          // 記録を無効化する）。伝播の失敗で取り込み自体は止めない。
+          try {
+            scopedVersionedMemoryService.invalidateBySource(mem.id, 'ユーザー訂正による無効化');
+          } catch { /* 伝播は補助経路 */ }
         }
       }
     }
@@ -519,11 +525,30 @@ export class ConversationFactIntakeService {
           if (old.factValue === fact.value) return;
           old.replacedBy = id;
           replaced++;
+          try {
+            scopedVersionedMemoryService.invalidateBySource(old.id, 'ユーザー訂正（言い直し）による置換');
+          } catch { /* 伝播は補助経路 */ }
         }
       }
 
       added.push(item);
       updated.unshift(item);
+
+      // P462: 統治メモリ（scopedVersionedMemory）へも「本人の発言の
+      // 証跡」として記録する。これまで読み手（タスク前の文脈構築）だけが
+      // あり、通常経路の書き手が存在しなかった。信念ではなく証跡
+      // （kind: EVIDENCE）として置き、出所に MemoryItem の id を持たせ、
+      // 訂正時の invalidateBySource で辿れるようにする。
+      try {
+        scopedVersionedMemoryService.propose({
+          subject: fact.entity || 'ユーザー発言',
+          content: fact.statement,
+          kind: 'EVIDENCE',
+          scope: { type: 'CONVERSATION', id: 'user' },
+          source: { turnIds: [id], fileIds: [], evidenceIds: [] },
+          confidence: 0.5,
+        });
+      } catch { /* 統治メモリへの記録は補助経路 */ }
     });
 
     return { added, updatedMemories: updated, replaced, invalidated };

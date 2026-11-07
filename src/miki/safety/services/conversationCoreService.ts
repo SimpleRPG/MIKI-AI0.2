@@ -185,7 +185,7 @@ export class ConversationCoreService {
     let t = performance.now();
     const interpretation = hybridConversationEngineService.interpret(prompt, state);
     const dialogueAct = interpretation.dialogueAct;
-    const vocabulary = (interpretation.semantic as any)?.vocabulary || conversationUnknownVocabularyService.assess(prompt, { allowResearch: true });
+    const vocabulary = (interpretation as any).vocabulary || (interpretation.semantic as any)?.vocabulary || conversationUnknownVocabularyService.assess(prompt, { allowResearch: true });
     const unknownTerms = Array.isArray(vocabulary?.unknowns)
       ? vocabulary.unknowns.map((item: any) => String(item.term || '')).filter(Boolean).slice(0, 3)
       : [];

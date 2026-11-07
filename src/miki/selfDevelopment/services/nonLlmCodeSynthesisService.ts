@@ -3,12 +3,27 @@ import { capabilityGraphService } from '../../capability/services/capabilityGrap
 import { componentCompositionService, CompositionPlan } from '../../capability/services/componentCompositionService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 
+/*
+ * P462: 合成できない理由コードの人間可読な説明。機械可読コードは
+ * そのまま保持し、表明用に理由文を併記するための対応表。
+ */
+const GAP_REASON_DESCRIPTIONS: Record<string, string> = {
+  CAPABILITY_GRAPH_UNAVAILABLE: '能力グラフが使えません（検証済み部品が不足しているか、目的と部品の対応付けができていません）。まず材料（検証済み部品）を用意する必要があります。',
+  VERIFIED_COMPOSITION_UNAVAILABLE: '検証済み部品の組み合わせでは、この目的を構成できません。新しい部品の作成か、教師への供給依頼が必要です。',
+  EXISTING_AND_CAPABILITY_COMPOSITION_UNAVAILABLE: '既存部品と能力グラフのどちらでも構成できません。部品の追加が必要です。',
+  REGISTRY_COMPONENT_INCOMPLETE: '部品レジストリの登録が不完全で、構成に必要な部品を特定できません。',
+};
+export function describeGapReason(code: string): string {
+  return GAP_REASON_DESCRIPTIONS[code] || `合成を続行できません（理由コード: ${code}）。`;
+}
+
 export interface CodeSynthesisSource {
   existingComponentIds: string[];
   existingComposition?: CompositionPlan;
   existingCompositionUsable: boolean;
   unknownOrGapDetected: boolean;
   gapReason?: string;
+  gapReasonDescription?: string;
 }
 
 export interface CodeSynthesisPlan {
@@ -100,6 +115,8 @@ export class NonLlmCodeSynthesisService {
       existingCompositionUsable: existingUsable,
       unknownOrGapDetected: Boolean(gapReason),
       gapReason,
+      // P462: 機械コードと併せて、人間可読な理由も返す（表明の仕方）。
+      gapReasonDescription: gapReason ? describeGapReason(gapReason) : undefined,
     };
 
     if (
