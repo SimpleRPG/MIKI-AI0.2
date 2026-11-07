@@ -39,6 +39,24 @@ import { sha256HexFromText } from './canonicalSha256Service';
  * run の payload に刻む。出所（supplier の申告）は受入台帳に残す。
  */
 
+/**
+ * P476: ユーザー信頼ルール（2026-11-07）の供給者判定。
+ * 「教師一般」ではなく Muse 個人への信頼であり、他の AI（ChatGPT
+ * 等）は対象外。供給者名が Muse を指す場合にだけ、その供給に付いた
+ * 検証済み TVE をクラウド検証として扱う（candidateCodeGeneration
+ * Service の P476 昇格）。名前の判定は申告ベースであり、パッケージは
+ * ユーザー本人が手渡す運用を前提とする。
+ */
+export function isClaudeVerifierName(name: string): boolean {
+  const normalized = String(name || '').trim().toLowerCase();
+  return (
+    normalized === 'claude' ||
+    normalized.startsWith('claude ') ||
+    normalized.startsWith('claude(') ||
+    normalized.startsWith('claude（')
+  );
+}
+
 export type ComponentSupplyIntakeStatus = 'RECEIVED' | 'REJECTED';
 
 export type ComponentSupplyIntakeCode =
@@ -655,6 +673,9 @@ class ComponentSupplyIntakeService {
       if (tve) {
         entry.teacherVerification = tve.round;
         if (tve.extraRounds.length > 0) entry.teacherVerificationRounds = tve.extraRounds;
+        // P476: 供給者が Muse の場合のみ、信頼の刻印を候補へ載せる。
+        // 生成段はこの刻印がある候補の TVE をクラウド検証として扱う。
+        if (isClaudeVerifierName(supplier.name)) entry.trustedVerifier = 'Claude';
       }
       return entry;
     });
@@ -669,7 +690,8 @@ class ComponentSupplyIntakeService {
       // 復元時の引き上げで識別するための印。
       teacherReturn: true,
       supplier: { name: supplier.name, ...(supplier.model ? { model: supplier.model } : {}), ...(supplier.suppliedAt ? { suppliedAt: supplier.suppliedAt } : {}) },
-      supplyTrustLevel: 'SEMI_TRUSTED_EXTERNAL_AI',
+      // P476: Muse からの供給はユーザー信頼ルールにより区分する。
+      supplyTrustLevel: isClaudeVerifierName(supplier.name) ? 'TRUSTED_VERIFIER_CLAUDE' : 'SEMI_TRUSTED_EXTERNAL_AI',
       ...(typeof manifest.notes === 'string' && manifest.notes.trim() ? { supplyNotes: manifest.notes.trim() } : {}),
     };
     // 元 run の制約（要件・禁止事項・不変条件・検証/納品条件）は新しい
@@ -691,7 +713,7 @@ class ComponentSupplyIntakeService {
     try {
       const supplyEvidence = evidenceService.recordExecutionEvidence({
         title: `部品供給の受入 ${intakeId}`,
-        snippet: `供給要求 ${requestId} の返却パッケージ ${sourceFileName} を受け付け、候補 ${implementationCandidates.length} 件を検証待ちとして新規実行へ接続した（供給者: ${supplier.name}）。`,
+        snippet: `供給要求 ${requestId} の返却パッケージ ${sourceFileName} を受け付け、候補 ${implementationCandidates.length} 件を検証待ちとして新規実行へ接続した（供給者: ${supplier.name}）。${isClaudeVerifierName(supplier.name) ? '供給者は Muse のため、ユーザー信頼ルール（P476）により検証済み TVE はクラウド検証として扱われる。' : ''}`,
         source: 'component_supply_intake',
         sourceId: intakeId,
       });

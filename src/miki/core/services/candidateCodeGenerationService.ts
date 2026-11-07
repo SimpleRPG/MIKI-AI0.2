@@ -2460,6 +2460,7 @@ class CandidateCodeGenerationService {
     tests:string;
     teacherVerification?:unknown;
     teacherVerificationRounds?:unknown;
+    trustedVerifier?:string;
   },
  ):void{
   if(candidate.teacherVerification===undefined&&candidate.teacherVerificationRounds===undefined)return;
@@ -2512,6 +2513,20 @@ class CandidateCodeGenerationService {
       tests_txt:[...synthesized,'',candidate.tests].join('\n'),
       updated_at:Date.now(),
     });
+  }
+  // P476: ユーザー信頼ルール（2026-11-07）: 供給者が Muse の場合に
+  // 限り、検証済み TVE をクラウド検証として認め CLOUD_TESTED まで
+  // 進める。他の供給者の TVE は従来どおり ANALYZED 止まり。
+  // DEVICE_TESTED 以降は実機カナリア（保存済みラウンドの再生）が
+  // 担う。VERIFIED の意味（実機で動き、使われて測れた証拠）は、
+  // 信頼ルールでも変えない。
+  if(candidate.trustedVerifier==='Claude'){
+    const cloud=componentRegistryService.advanceComponentStatus(
+      componentId,
+      'CLOUD_TESTED',
+      '[P476] Trusted verifier (Claude): TVE accepted as cloud verification (user trust rule 2026-11-07)',
+    );
+    systemLogger.info('SELF_IMPROVEMENT',`[P476] trusted verifier advance: ${componentId} -> CLOUD_TESTED success=${cloud.success}${cloud.success?'':' reason='+cloud.message}`);
   }
   systemLogger.info('SELF_IMPROVEMENT',`[P449] TVE applied: ${componentId} cases=${synthesized.length} rounds=${rounds.length} -> ANALYZED`);
  }
@@ -2595,6 +2610,7 @@ class CandidateCodeGenerationService {
       sourceLearningArtifactIds:this.strings(item.sourceLearningArtifactIds),
       teacherVerification:item.teacherVerification,
       teacherVerificationRounds:Array.isArray(item.teacherVerificationRounds)?item.teacherVerificationRounds:undefined,
+      trustedVerifier:typeof item.trustedVerifier==='string'?item.trustedVerifier:undefined,
     }))
     .filter(item=>
       allowed.has(item.path)&&

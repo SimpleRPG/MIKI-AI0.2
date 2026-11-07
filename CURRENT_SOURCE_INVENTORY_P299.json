@@ -12869,9 +12869,9 @@
     },
     {
       "path": "src/miki/core/services/candidateCodeGenerationService.ts",
-      "bytes": 119355,
-      "lines": 2627,
-      "sha256": "5ea031a77b351d39785c5bc3a3bb17974e64ad9ba4263ec4681f797762eb4e37",
+      "bytes": 120400,
+      "lines": 2643,
+      "sha256": "2c3ba9ae8e55eb7136a90c528ad4143784b1a2d5dcec02791d448a017f8fbb23",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -13685,9 +13685,9 @@
     },
     {
       "path": "src/miki/core/services/componentSupplyIntakeService.ts",
-      "bytes": 50865,
-      "lines": 963,
-      "sha256": "4db0484c8d2475653496c41e80bfc813002cf457b5dcf1f3b227a689b59b3338",
+      "bytes": 52282,
+      "lines": 985,
+      "sha256": "1006a763d9efb7ce724ee1ef0f16ead8a3b60257f3233a5630e3db14f131f89f",
       "relativeImportCandidates": [
         {
           "line": 2,
