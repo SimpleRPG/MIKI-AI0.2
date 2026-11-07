@@ -583,7 +583,11 @@ class WorldModelGraphService {
         : all.filter(
             (c: any) =>
               c.status === 'UNVERIFIED' &&
-              ((c.source && c.source !== 'web_search') || hasAdmissible(c.claim_id)),
+              // P480: 世界モデル自身の仮説（source=world_model_graph）は
+              // 仮パスにも載せない。自分の仮説が地図の「かも」に化けて
+              // 自己参照になるのを防ぐ（証拠が付けば通常経路で上がる）。
+              ((c.source && c.source !== 'web_search' && c.source !== 'world_model_graph') ||
+                hasAdmissible(c.claim_id)),
           );
     const provisionalAdded = this.extractFromClaims(provisionalCandidates as any[], true);
 

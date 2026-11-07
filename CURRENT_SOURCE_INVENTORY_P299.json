@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1773,
     "sourceFileCount": 1326,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1237,
-    "relativeImportCandidateCount": 3814,
-    "resolvedRelativeImportCandidateCount": 3798,
+    "relativeImportCandidateCount": 3815,
+    "resolvedRelativeImportCandidateCount": 3799,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -12706,9 +12706,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 84883,
-      "lines": 1655,
-      "sha256": "d5a60d3337e11efb5c32c50e26d8ded4442d8a405374d9f96d30bf339227fb9e",
+      "bytes": 86262,
+      "lines": 1680,
+      "sha256": "ed6618dca61caf55d6c60bb8f95cfa9dee56ee49218e4eb1e5ddd59a5c5fd84c",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12775,10 +12775,16 @@
           "specifier": "../../../types/evidenceSelfImprovementTypes",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types/evidenceSelfImprovementTypes.ts"
+        },
+        {
+          "line": 12,
+          "specifier": "../../selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
         }
       ],
-      "relativeImportCandidateCount": 11,
-      "resolvedRelativeImportCount": 11,
+      "relativeImportCandidateCount": 12,
+      "resolvedRelativeImportCount": 12,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27633,9 +27639,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/worldModelGraphService.ts",
-      "bytes": 31873,
-      "lines": 734,
-      "sha256": "343e41df9d1607bf380de03d9b90d14ac601914b94d2731d18d5f58554df3d23",
+      "bytes": 32213,
+      "lines": 738,
+      "sha256": "002432de2adb273d82fcee703b12f63af8f56a76cfe4ade09518a8008e2405fb",
       "relativeImportCandidates": [
         {
           "line": 1,

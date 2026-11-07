@@ -9,6 +9,7 @@ import { selfImprovementPreflightService } from './selfImprovementPreflightServi
 import { improvementDebtService } from './improvementDebtService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
+import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -176,6 +177,9 @@ class AutonomousSelfImprovementLoopService {
   private sequence = 0;
   // P475: 上限却下のログ・保存の間引き（同一トリガーの連続却下対策）。
   private refusalLogAt = new Map<string, number>();
+  // P480: 世界モデル成長の最終実行時刻（メモリ上。drain のたびに
+  // 判定し、30分に1回だけ回す）。
+  private lastWorldModelGrowthAt = 0;
   private lastDigestSignature = '';
   private lastLoadDroppedInvalid = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -565,6 +569,23 @@ class AutonomousSelfImprovementLoopService {
     await this.drain();
   }
 
+  /**
+   * P480: 世界モデルの成長を30分に1回までで回す。generateHypotheses
+   * は内部で検証済み/未検証 Claim からの関係抽出（確定＋仮）と、
+   * 部品—知識リンクの再同期までを含む。仮説は上限3件（検証キューを
+   * 圧迫しない）。失敗してもループ本体は止めない。
+   */
+  private maybeRunWorldModelGrowth(): void {
+    const now = Date.now();
+    if (now - this.lastWorldModelGrowthAt < 30 * 60_000) return;
+    this.lastWorldModelGrowthAt = now;
+    try {
+      worldModelGraphService.generateHypotheses(3);
+    } catch (error) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[P480] 世界モデルの成長に失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   private async drain(): Promise<void> {
     if (this.writesBlocked || this.disposed || this.running) return;
     const generation = this.lifecycleGeneration;
@@ -579,6 +600,10 @@ class AutonomousSelfImprovementLoopService {
     // P463: 選択の時点でも並べ直す。優先度は投入時に固定され、運転中の
     // expedite（待ち解除・引き上げ）が選択順に反映されなかった。
     this.state.queue.sort(compareQueueRequests);
+    // P480: 世界モデルの成長（関係抽出＋仮説生成。内部で部品リンクの
+    // 同期も回る）を定期運転に相乗りさせる。これまで呼び出し元が
+    // どこにも無く、実機ログでも活動0件だった。
+    this.maybeRunWorldModelGrowth();
     if (this.writesBlocked || this.state.queue.length === 0) return;
     this.running = true;
     let activeRequest: AutonomousImprovementRequest | undefined;
