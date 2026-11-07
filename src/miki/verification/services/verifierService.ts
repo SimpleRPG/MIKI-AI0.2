@@ -26,6 +26,9 @@ export interface VerificationResult {
   stale: boolean;
   reasons: string[];
   promoted: boolean;
+  // P463: 一次・公式情報（PRIMARY / OFFICIAL ロール）が admissible に
+  // 含まれていたか。検証台帳にも残す。
+  hasPrimaryOrOfficialSource: boolean;
 }
 
 /**
@@ -69,6 +72,7 @@ export class VerifierService {
         stale: false,
         reasons: ['対象Claimが存在しません。'],
         promoted: false,
+        hasPrimaryOrOfficialSource: false,
       };
     }
 
@@ -79,6 +83,20 @@ export class VerifierService {
 
     const admissible = evidence.filter((e) => e.status === 'ADMISSIBLE' && e.metadata?.research_source_role !== 'COUNTEREVIDENCE');
     const independentClusters = new Set(admissible.map((e) => e.independence_cluster_id));
+    // P463: 一次資料の判定接続。収集ポリシーでは一次資料が必須でも、
+    // 判定段の昇格条件には入っていなかった。証拠全件に役割が明示されて
+    // いる場合（研究経由）に限り、一次・公式情報なしでは確定しない。
+    // 役割が未記録の証拠が混ざる経路は従来どおり（クラスタ数で判定）。
+    const hasPrimaryOrOfficialSource = admissible.some((e) => {
+      const role = e.metadata?.research_source_role;
+      return role === 'PRIMARY' || role === 'OFFICIAL';
+    });
+    const allEvidenceRolesClassified =
+      admissible.length > 0 &&
+      admissible.every((e) => {
+        const role = e.metadata?.research_source_role;
+        return typeof role === 'string' && role !== 'UNCLASSIFIED';
+      });
     const contradictionCount = (claim.contradicted_by || []).filter((id) => {
       const other = claimDatabaseService.getClaim(id);
       return !!other && other.status !== 'SUPERSEDED' && other.status !== 'FALSE';
@@ -101,6 +119,8 @@ export class VerifierService {
       outcome = 'DEVICE_VERIFIED';
       reasons.push('明示的なEXECUTION証拠が確認されました。');
       claimDatabaseService.setVerificationStatus(claim.claim_id, 'DEVICE_VERIFIED', 'Verifier: admissible execution evidence');
+    } else if (independentClusters.size >= 2 && allEvidenceRolesClassified && !hasPrimaryOrOfficialSource) {
+      reasons.push('独立クラスターは足りていますが、一次・公式情報が含まれていません。二次情報のみでは確定しません。');
     } else if (independentClusters.size >= 2) {
       outcome = 'SUPPORTED';
       reasons.push(`独立証拠クラスター${independentClusters.size}件を確認しました。`);
@@ -128,11 +148,33 @@ export class VerifierService {
                 : { unresolvedClusterShortage: 1 },
     );
 
+    // P463: 判定の根拠を Claim 単位で読み返せる台帳に残す（従来は
+    // ログと集計カウンタしか残らなかった）。台帳の失敗は判定を変えない。
+    try {
+      const ledgerKey = 'miki_claim_verification_ledger_v1';
+      const rawLedger = storageService.getItem(ledgerKey);
+      const parsedLedger: unknown = rawLedger ? JSON.parse(rawLedger) : [];
+      const entries: unknown[] = Array.isArray(parsedLedger) ? parsedLedger : [];
+      entries.push({
+        claimId: claim.claim_id,
+        outcome,
+        reasons: [...reasons],
+        evidenceIds: admissible.map((e) => e.evidence_id),
+        independentClusters: independentClusters.size,
+        hasPrimaryOrOfficialSource,
+        contradictionCount,
+        stale,
+        verifiedAt: Date.now(),
+      });
+      storageService.setItem(ledgerKey, JSON.stringify(entries.slice(-300)));
+    } catch { /* 台帳は補助記録 */ }
+
     claimVerificationEventService.publish({
       claimId: claim.claim_id,
       outcome,
       promoted,
       verifiedAt: Date.now(),
+      reasons: [...reasons],
     });
 
     systemLogger.info(
@@ -151,6 +193,7 @@ export class VerifierService {
       stale,
       reasons,
       promoted,
+      hasPrimaryOrOfficialSource,
     };
   }
 

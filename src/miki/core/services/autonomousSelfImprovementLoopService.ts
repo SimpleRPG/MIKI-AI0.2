@@ -560,6 +560,9 @@ class AutonomousSelfImprovementLoopService {
     // same predicate load() uses, so the queue cannot grow unbounded
     // while the app is running.
     this.purgeStaleDiscoveryRequests(Date.now());
+    // P463: 選択の時点でも並べ直す。優先度は投入時に固定され、運転中の
+    // expedite（待ち解除・引き上げ）が選択順に反映されなかった。
+    this.state.queue.sort(compareQueueRequests);
     if (this.writesBlocked || this.state.queue.length === 0) return;
     this.running = true;
     let activeRequest: AutonomousImprovementRequest | undefined;

@@ -55,7 +55,19 @@ type StoredTermComponent = KnowledgeComponentArtifact & {
   occurrences?: number;
   gloss?: string;
   needsGloss?: boolean;
+  // P463: その語が実際に使われていた文（使い方ごと覚えるための最小保持）。
+  exampleSentence?: string;
 };
+
+// P463: ページテキストから、その語を含む最初の文を1つ抜く。
+function findExampleSentence(text: string, term: string): string | undefined {
+  const sentences = text.split(/(?<=[。！？!?])|\n+/);
+  for (const sentence of sentences) {
+    const clean = sentence.trim();
+    if (clean && clean.includes(term)) return clean.slice(0, 140);
+  }
+  return undefined;
+}
 
 function normalize(value: string): string {
   return value.normalize('NFKC').trim().toLowerCase();
@@ -146,6 +158,7 @@ class WebTermLearningService {
           occurrences: (existing.occurrences ?? 0) + occurrences,
           gloss: existing.gloss ?? hit?.gloss,
           needsGloss: !(existing.gloss ?? hit?.gloss),
+          exampleSentence: existing.exampleSentence ?? findExampleSentence(text, term),
           updatedAt: Date.now(),
         };
         reusableComponentFactoryService.storeCandidates([merged]);
@@ -206,6 +219,7 @@ class WebTermLearningService {
         semanticIds: hit?.semanticIds,
         sourceTitle: input.sourceTitle ?? '',
         needsGloss,
+        exampleSentence: findExampleSentence(text, term),
       };
 
       const canonicalSha256 = canonicalSha256Object(body);

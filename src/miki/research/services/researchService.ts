@@ -6,6 +6,7 @@ import { researchStrategyService, ResearchRoute } from './researchStrategyServic
 import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/services/cognitiveEvidenceIntegrationService';
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { webTermLearningService } from './webTermLearningService';
+import { dictionaryBootstrapService } from './dictionaryBootstrapService';
 import { webContentUnderstandingService } from './webContentUnderstandingService';
 import { wordAssociationGraphService } from '../../memory/services/wordAssociationGraphService';
 import { systemLogger } from '../../../services/systemLogger';
@@ -836,6 +837,13 @@ export class ResearchService {
               claimIds: [pageClaimId],
               sourceTitle: page.result.title,
             });
+
+            // P463: gloss が無い語（needsGloss）は、深掘り辞書引きの
+            // 消費者に渡す。従来は印と集計だけで、補完する後段がなかった。
+            // lookupDeep は同一語の再試行を内部で抑止する。
+            for (const learnedTerm of termLearning.terms.filter((t) => t.needsGloss).slice(0, 5)) {
+              dictionaryBootstrapService.lookupDeep(learnedTerm.term);
+            }
 
             for (const componentId of termLearning.componentIds) {
               if (!learnedTermComponentIds.includes(componentId)) {
