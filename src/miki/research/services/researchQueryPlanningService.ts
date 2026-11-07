@@ -41,12 +41,47 @@ const DEVICE:EnvironmentFingerprint={os:'Android',device:'Galaxy S25',architectu
 const clamp=(value:number,min:number,max:number)=>Math.min(max,Math.max(min,Math.trunc(Number.isFinite(value)?value:min)));
 const normalize=(text:string)=>text.normalize('NFKC').replace(/\s+/g,' ').trim();
 const extractSiteConstraints=(text:string):string[]=>[...text.matchAll(/(?:^|\s)site:([^\s]+)/gi)].map(m=>m[1].trim()).filter(Boolean);
+/*
+ * P460: 研究クエリの組み立て段。長い説明文・診断文をそのまま検索文に
+ * しないため、対象（gapFocus）・引用・識別子・内容語から短いクエリを
+ * 組み立てる。考え方はコード調査側 githubCodeMaterialService.shapeQueries
+ * と P439 の gapFocus クエリと同じで、切り詰め（slice）ではなく抽出。
+ * 抽出元が何も無い場合だけ、最後の手段として先頭を切り取る。
+ */
+export const RESEARCH_QUERY_MAX_CHARS=180;
+const SHORT_QUERY_MAX_TERMS=10;
+const LONG_INTENT_CHARS=200;
+const LONG_INTENT_WORDS=24;
+const QUERY_TERM_STOPWORDS=new Set(['the','and','for','with','from','that','this','are','was','were','will','would','can','could','should','into','about','over','under','between','through','find','needed','objective','current','context','structured','latent','deliverables','determine','required']);
+const JP_TERM_STOP_SEGMENTS=new Set(['について','として','により','ため','こと','もの','これ','それ','場合','以上','以下','今回','前回','自分','相手','検索意図','不足文字列','意味化']);
+export function isLongResearchIntent(text:string):boolean{const n=normalize(text);return n.length>LONG_INTENT_CHARS||n.split(/\s+/).filter(Boolean).length>LONG_INTENT_WORDS;}
+export function buildShortResearchQuery(text:string,focus?:GapFocusMaterialInput):string{
+ const normalized=normalize(text);
+ if(!normalized)return '';
+ if(!isLongResearchIntent(normalized))return normalized;
+ const terms:string[]=[];
+ const push=(value:string)=>{const term=normalize(value);if(term&&!terms.includes(term))terms.push(term);};
+ for(const slot of (focus?.slotNames??[]).slice(0,3))push(slot);
+ for(const path of (focus?.targetPaths??[]).slice(0,3))push(String(path||'').split('/').pop()||'');
+ for(const m of normalized.matchAll(/「([^」]{2,40})」|『([^』]{2,40})』|"([^"]{2,40})"/g))push(m[1]||m[2]||m[3]||'');
+ for(const m of normalized.matchAll(/[A-Za-z][A-Za-z0-9_$.-]{2,}/g)){if(!QUERY_TERM_STOPWORDS.has(m[0].toLowerCase()))push(m[0]);if(terms.length>=14)break;}
+ for(const m of normalized.matchAll(/[ァ-ヶー]{2,}|[一-龠々]{2,}/g)){if(!JP_TERM_STOP_SEGMENTS.has(m[0]))push(m[0]);if(terms.length>=22)break;}
+ const chosen:string[]=[];
+ for(const term of terms){
+   if(chosen.length>=SHORT_QUERY_MAX_TERMS)break;
+   chosen.push(term);
+   while(chosen.join(' ').length>RESEARCH_QUERY_MAX_CHARS&&chosen.length>1)chosen.pop();
+   if(chosen.join(' ').length>RESEARCH_QUERY_MAX_CHARS)break;
+ }
+ const query=chosen.join(' ').trim();
+ return query||normalized.slice(0,RESEARCH_QUERY_MAX_CHARS);
+}
 class ResearchQueryPlanningService {
  getPolicy():QueryPlanningPolicy {const value=(()=>{const raw=storageService.getItem(POLICY_KEY);try{return raw?JSON.parse(raw) as QueryPlanningPolicy:DEFAULT_POLICY;}catch{return DEFAULT_POLICY;}})();return this.normalizePolicy(value||DEFAULT_POLICY);}
  savePolicy(input:QueryPlanningPolicy):{policy:QueryPlanningPolicy;receiptId:string;policySha256:string}{const policy=this.normalizePolicy({...input,updatedAt:Date.now()});storageService.setItem(POLICY_KEY,JSON.stringify(policy));const policySha256=canonicalSha256Object(policy);return {policy,receiptId:`RQPR-${policySha256.slice(0,20)}`,policySha256};}
  listPlans():ResearchQueryPlan[]{return (()=>{const raw=storageService.getItem(PLAN_KEY);try{return raw?JSON.parse(raw) as ResearchQueryPlan[]:[];}catch{return [];}})();}
  listRevisionPairs():QueryRevisionPair[]{return (()=>{const raw=storageService.getItem(REVISION_KEY);try{return raw?JSON.parse(raw) as QueryRevisionPair[]:[];}catch{return [];}})();}
- buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput,exclusion?:ResearchQueryExclusion,independentFocus?:IndependentEvidenceFocus):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus?{intent,environment:DEVICE,policy,gapFocus}:{intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',intent,'全体条件を保持した基準検索']);
+ buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput,exclusion?:ResearchQueryExclusion,independentFocus?:IndependentEvidenceFocus):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const effectiveIntent=isLongResearchIntent(intent)?(buildShortResearchQuery(intent,gapFocus)||intent):intent;const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus?{intent,environment:DEVICE,policy,gapFocus}:{intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',effectiveIntent,'全体条件を保持した基準検索']);
 /*
  * P439: 不足スロット向けの材料探索クエリを1本足す（gapFocus がある場合）。
  * 戦略ごとに探索先を変える（GitHub コード検索／Stack Exchange／Web 文書）。
@@ -69,20 +104,20 @@ if(gapFocus&&Array.isArray(gapFocus.slotNames)&&gapFocus.slotNames.length>0){
  * ない。除外条件を変えた再試行も同一の計画として改訂履歴に残る。
  */
 if(independentFocus&&Array.isArray(independentFocus.claimIds)&&independentFocus.claimIds.length>0){
-  const independentQuery=`${intent} independent source evidence official documentation counterevidence`;
+  const independentQuery=`${effectiveIntent} independent source evidence official documentation counterevidence`;
   specs.push(['PRIMARY_SOURCE',independentQuery,'独立出典の追加証拠']);
 }
 
-const implementationRequired=/(?:実装|実装方法|実装例|部品|component|pattern|algorithm|implementation|implement|code|コード|修正|追加|作成|生成)/i.test(intent);
+const implementationRequired=/(?:実装|実装方法|実装例|部品|component|pattern|algorithm|implementation|implement|code|コード|修正|追加|作成|生成)/i.test(effectiveIntent);
 if(implementationRequired){
   specs.push([
     'IMPLEMENTATION_EXAMPLE',
-    `${intent} implementation example source code algorithm`,
+    `${effectiveIntent} implementation example source code algorithm`,
     '実装方式・明示的コード例・アルゴリズム'
   ]);
 }
 
-if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${intent} official specification documentation`,'一次・公式情報']);if(policy.requireCurrentEnvironmentCheck)specs.push(['CURRENT_ENVIRONMENT',`${intent} Android arm64 Termux compatibility`,'Galaxy S25環境適合']);if(policy.requireCounterEvidenceSearch)specs.push(['COUNTEREVIDENCE',`${intent} limitation unsupported known issue`,'反証・制限']);const webPolicy=webResearchPolicyService.get();if(webPolicy.requirePrimarySource&&!specs.some(x=>x[0]==='PRIMARY_SOURCE'||x[0]==='OFFICIAL_SPECIFICATION'))specs.push(['PRIMARY_SOURCE',`${intent} primary source`,'一次情報']);const unique=new Map<string,[QueryIntentType,string,string]>();for(const item of specs){const key=normalize(item[1]).toLowerCase();if(!unique.has(key))unique.set(key,item);}const chosen=[...unique.values()].slice(0,policy.maxQueriesPerPlan);const queries=chosen.map((item,index)=>this.makeQuery(queryPlanId,researchQuestionId,intent,item[0],item[1],item[2],index,targetClaimIds,exclusion));const patternSelection=queryPatternSelectionService.select(intent,chosen.map(item=>item[0]),DEVICE,Math.min(3,policy.maxQueriesPerPlan));const status=policy.enabled&&queries.every(q=>q.readiness==='READY')?'READY':'BLOCKED';const base= {queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries,usedQueryPatternIds:patternSelection.selectedPatternIds,excludedQueryPatternIds:patternSelection.excludedPatternIds,queryPatternSelectionId:patternSelection.selectionId,queryPatternSelectionSha256:patternSelection.selectionSha256,status:status as ResearchQueryPlan['status'],createdAt:Date.now(),updatedAt:Date.now()};const plan:{planSha256:string}&typeof base={...base,planSha256:canonicalSha256Object(base)};const plans=[plan,...this.listPlans().filter(x=>x.queryPlanId!==plan.queryPlanId)].slice(0,100);storageService.setItem(PLAN_KEY,JSON.stringify(plans));return plan;}
+if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${effectiveIntent} official specification documentation`,'一次・公式情報']);if(policy.requireCurrentEnvironmentCheck)specs.push(['CURRENT_ENVIRONMENT',`${effectiveIntent} Android arm64 Termux compatibility`,'Galaxy S25環境適合']);if(policy.requireCounterEvidenceSearch)specs.push(['COUNTEREVIDENCE',`${effectiveIntent} limitation unsupported known issue`,'反証・制限']);const webPolicy=webResearchPolicyService.get();if(webPolicy.requirePrimarySource&&!specs.some(x=>x[0]==='PRIMARY_SOURCE'||x[0]==='OFFICIAL_SPECIFICATION'))specs.push(['PRIMARY_SOURCE',`${effectiveIntent} primary source`,'一次情報']);const unique=new Map<string,[QueryIntentType,string,string]>();for(const item of specs){const key=normalize(item[1]).toLowerCase();if(!unique.has(key))unique.set(key,item);}const chosen=[...unique.values()].slice(0,policy.maxQueriesPerPlan);const queries=chosen.map((item,index)=>this.makeQuery(queryPlanId,researchQuestionId,effectiveIntent,item[0],item[1],item[2],index,targetClaimIds,exclusion));const patternSelection=queryPatternSelectionService.select(effectiveIntent,chosen.map(item=>item[0]),DEVICE,Math.min(3,policy.maxQueriesPerPlan));const status=policy.enabled&&queries.every(q=>q.readiness==='READY')?'READY':'BLOCKED';const base= {queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries,usedQueryPatternIds:patternSelection.selectedPatternIds,excludedQueryPatternIds:patternSelection.excludedPatternIds,queryPatternSelectionId:patternSelection.selectionId,queryPatternSelectionSha256:patternSelection.selectionSha256,status:status as ResearchQueryPlan['status'],createdAt:Date.now(),updatedAt:Date.now()};const plan:{planSha256:string}&typeof base={...base,planSha256:canonicalSha256Object(base)};const plans=[plan,...this.listPlans().filter(x=>x.queryPlanId!==plan.queryPlanId)].slice(0,100);storageService.setItem(PLAN_KEY,JSON.stringify(plans));return plan;}
  reviseQuery(planId:string,queryId:string,revisedText:string,reason:string,beforeOutcome:Record<string,unknown>):QueryRevisionPair {const plan=this.listPlans().find(x=>x.queryPlanId===planId);const query=plan?.queries.find(x=>x.queryId===queryId);if(!plan||!query)throw new Error('QUERY_NOT_FOUND');const revised=normalize(revisedText);if(!revised||revised===query.queryText)throw new Error('QUERY_REVISION_REQUIRED');const before=new Set(query.queryText.split(/\s+/));const after=new Set(revised.split(/\s+/));const base={queryId,originalQuery:query.queryText,revisedQuery:revised,revisionReason:normalize(reason)||'UNSPECIFIED',termsAdded:[...after].filter(x=>!before.has(x)),termsRemoved:[...before].filter(x=>!after.has(x)),beforeOutcome,resultingEvidenceIds:[],acceptedByCore:false,createdAt:Date.now()};const pair:{revisionPairId:string;pairSha256:string}&typeof base={...base,pairSha256:canonicalSha256Object(base),revisionPairId:''};pair.revisionPairId=`QRP-${pair.pairSha256.slice(0,20)}`;storageService.setItem(REVISION_KEY,JSON.stringify([pair,...this.listRevisionPairs()].slice(0,500)));return pair;}
  private makeQuery(planId:string,rqid:string,canonical:string,intentType:QueryIntentType,text:string,expected:string,index:number,targetClaimIds:string[]=[],exclusion?:ResearchQueryExclusion):ResearchQueryIntent {const queryText=normalize(text);
  /*

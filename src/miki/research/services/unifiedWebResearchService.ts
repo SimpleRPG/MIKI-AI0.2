@@ -1,6 +1,6 @@
 import { autonomousSearchService } from './autonomousSearchService';
 import type { AutonomousSearchConfig } from './autonomousSearchService';
-import { researchQueryPlanningService } from './researchQueryPlanningService';
+import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIntent } from './researchQueryPlanningService';
 
 export * from './autonomousSearchService';
 
@@ -27,7 +27,10 @@ export class UnifiedWebResearchService {
         ? plan.queries.find(q => q.intentType === 'BASELINE')?.queryText ||
           plan.queries[0]?.queryText ||
           normalized
-        : normalized;
+        : // P460: 計画が BLOCKED でも生の長文は飛ばさず、組み立て直す。
+          isLongResearchIntent(normalized)
+          ? buildShortResearchQuery(normalized) || normalized
+          : normalized;
 
     return autonomousSearchService.executeSearch(plannedQuery, options);
   }

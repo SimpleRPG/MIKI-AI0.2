@@ -12,7 +12,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { sourcePageGraphService } from './sourcePageGraphService';
 import { contentTermsFromTokens } from './japaneseAnalysisService';
 import { japaneseAnalysisCompositionService } from '../../conversation/services/japaneseAnalysisCompositionService';
-import { researchQueryPlanningService } from './researchQueryPlanningService';
+import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIntent } from './researchQueryPlanningService';
 import type { GapFocusMaterialInput, ResearchQueryExclusion, IndependentEvidenceFocus } from './researchQueryPlanningService';
 import { storageService } from '../../../services/storageService';
 import { collectionSourceRegistryService } from '../../core/services/collectionSourceRegistryService';
@@ -333,12 +333,21 @@ export class ResearchService {
 
     const materials: WebImplementationMaterial[] = [];
 
-    const raw = await unifiedWebResearchService.executePlannedSearch(text);
+    // P460: Web チャンネルにも、コード専用チャンネルと同じ文脈から
+    // 組み立てた短いクエリを渡す（従来は長い問いがそのまま検索文に
+    // なっていた）。材料の出所表記（sourceQuery）は元の問いのまま。
+    const webQuery = isLongResearchIntent(text)
+      ? buildShortResearchQuery(text, {
+          slotNames: (options?.codeMaterialContext?.gapContract?.missingSlots ?? []).map((slot) => slot.slotName),
+          targetPaths: options?.codeMaterialContext?.targetPaths,
+        }) || text
+      : text;
+    const raw = await unifiedWebResearchService.executePlannedSearch(webQuery);
     const results = this.normalizeSearchResults(raw).slice(0, maxResults);
 
     if (results.length > 0) {
       const pages = await unifiedWebResearchService.readSearchResultPages(
-        text,
+        webQuery,
         results,
         { maxPages },
       );
@@ -606,8 +615,13 @@ export class ResearchService {
       let recommendedRevisionQuery: string | undefined;
       let latestWebResearchProgress: WebResearchProgress | undefined;
 
+      // P460: 計画が BLOCKED のときのフォールバックでも、生の長い
+      // baseQuery は飛ばさない。組み立て段で短いクエリに直してから使う。
+      const adaptiveBase = isLongResearchIntent(baseQuery)
+        ? buildShortResearchQuery(baseQuery, options?.gapFocus) || baseQuery
+        : baseQuery;
       const buildAdaptiveQuery = (round: number, results: VerificationResult[]): string => {
-        if (round === 0) return baseQuery;
+        if (round === 0) return adaptiveBase;
         if (recommendedRevisionQuery) return recommendedRevisionQuery;
         const reasons = results.flatMap(result => Array.isArray(result.reasons) ? result.reasons : [])
           .map(String)
@@ -615,7 +629,7 @@ export class ResearchService {
         const focus = reasons.length > 0
           ? [...new Set(reasons)].slice(0, 4).join(' / ')
           : 'independent evidence / official documentation / counterevidence / compatibility';
-        const adaptiveQuery = `${baseQuery} / adaptive research round ${continuationRound + round + 1} / ${focus}`;
+        const adaptiveQuery = `${adaptiveBase} / adaptive research round ${continuationRound + round + 1} / ${focus}`;
         // P440 D6: 適応クエリにも既存クラスタのホスト除外を載せる
         // （単語数24の上限を超えない場合のみ）。
         const siteExclusions = sourceExclusion.excludedHosts.slice(0, 2).map(host => `-site:${host}`).join(' ');
