@@ -174,6 +174,8 @@ class AutonomousSelfImprovementLoopService {
   private state: AutonomousLoopState = { status: 'IDLE', queue: [], updatedAt: 0 };
   private running = false;
   private sequence = 0;
+  // P475: 上限却下のログ・保存の間引き（同一トリガーの連続却下対策）。
+  private refusalLogAt = new Map<string, number>();
   private lastDigestSignature = '';
   private lastLoadDroppedInvalid = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -281,12 +283,26 @@ class AutonomousSelfImprovementLoopService {
       const lowest = this.state.queue.reduce((best, item) =>
         !best || (item.priority ?? 0) < (best.priority ?? 0) ? item : best,
         undefined as AutonomousImprovementRequest | undefined);
-      systemLogger.info(
-        'SELF_IMPROVEMENT',
-        `[RUNTIME] AutonomousLoop enqueue refused at cap: trigger=${truncateForLog(trigger, 80)} source=${source} runType=${meta.runType ?? '-'} queue=${this.state.queue.length}`,
-      );
-      this.save();
-      void this.drain();
+      // P475: 同一トリガーの却下が短時間に連続する場合、ログ・保存・
+      // drain 起動を間引く（実測では20分に200件超の却下ログが出て
+      // いた）。却下そのものの意味（既存項目を返す）は変えない。
+      const refusalKey = `${source}|${meta.runType ?? '-'}|${trigger.slice(0, 80)}`;
+      const refusalNow = Date.now();
+      const lastRefusalAt = this.refusalLogAt.get(refusalKey) ?? 0;
+      if (refusalNow - lastRefusalAt >= 60_000) {
+        this.refusalLogAt.set(refusalKey, refusalNow);
+        if (this.refusalLogAt.size > 200) {
+          for (const [key, at] of this.refusalLogAt) {
+            if (refusalNow - at >= 60_000) this.refusalLogAt.delete(key);
+          }
+        }
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[RUNTIME] AutonomousLoop enqueue refused at cap: trigger=${truncateForLog(trigger, 80)} source=${source} runType=${meta.runType ?? '-'} queue=${this.state.queue.length}`,
+        );
+        this.save();
+        void this.drain();
+      }
       return { ...(lowest ?? this.state.queue[0]) };
     }
     const now = Date.now();

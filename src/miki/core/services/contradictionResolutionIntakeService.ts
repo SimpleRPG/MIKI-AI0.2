@@ -83,6 +83,9 @@ export interface ContradictionIntakeItemResult {
   evidenceIds: string[];
   revisionStatus?: string;
   mergedClaimId?: string;
+  // P475: 教師側の制約（ポリシー・運用上の理由）による評価不能の申告。
+  // 制約は知識の正誤ではないため、材料不足の保留と区別して記録する。
+  teacherConstraint?: boolean;
 }
 
 export interface ContradictionResolutionIntakeRecord {
@@ -285,6 +288,14 @@ class ContradictionResolutionIntakeService {
       reason: '',
       evidenceIds: [],
     };
+    // P475: 教師制約の申告検出。rationale の冒頭付近に「教師制約」の
+    // 明記がある HOLD は、教師が制約で評価を断ったものであり、正誤の
+    // 判断でも材料不足の保留でもない。区別して記録し、証言の重み付け
+    // （将来の検証経路）が制約を知識の評価と取り違えないようにする。
+    const isTeacherConstraint =
+      verdict === 'HOLD' && params.rationale.trimStart().slice(0, 24).includes('教師制約');
+    if (isTeacherConstraint) base.teacherConstraint = true;
+
     try {
       // 教師の理由は常に CLOUD_AI 証拠として記録する（学習素材）。
       // クラスタは教師ごとの1件（recordCloudAiEvidence の既定）。
@@ -297,13 +308,16 @@ class ContradictionResolutionIntakeService {
           trust_boundary: 'UNTRUSTED_EXTERNAL_AI',
           external_bundle_id: intakeId,
           ...(verdict === 'BOTH_WRONG' ? { research_source_role: 'COUNTEREVIDENCE' as const } : {}),
+          ...(isTeacherConstraint ? { teacher_constraint: true } : {}),
         },
       });
       base.evidenceIds.push(evidence.evidence_id);
 
       if (verdict === 'HOLD') {
         base.outcome = 'HELD';
-        base.reason = '教師が判断保留としたため、証拠の記録のみ行い、ペアとキューには触れませんでした。';
+        base.reason = isTeacherConstraint
+          ? '教師側の制約により評価不能と申告されたため、証拠の記録のみ行い、正誤の判断としては扱いませんでした。'
+          : '教師が判断保留としたため、証拠の記録のみ行い、ペアとキューには触れませんでした。';
         return base;
       }
 
@@ -640,6 +654,7 @@ class ContradictionResolutionIntakeService {
     const settledCount = itemResults.filter((item) => item.outcome === 'SETTLED').length;
     const attachedCount = itemResults.filter((item) => item.outcome === 'EVIDENCE_ATTACHED' || item.outcome === 'MERGED_CANDIDATE_REGISTERED').length;
     const heldCount = itemResults.filter((item) => item.outcome === 'HELD').length;
+    const constraintCount = itemResults.filter((item) => item.teacherConstraint).length;
     const unansweredCount = request.items.length - itemResults.length;
 
     const record: ContradictionResolutionIntakeRecord = {
@@ -664,7 +679,7 @@ class ContradictionResolutionIntakeService {
     contradictionResolutionRequestService.recordStatus(
       requestId,
       'RECEIVED',
-      `受入 ${intakeId}（回答者: ${teacherName}）決着 ${settledCount} 件／証拠付加 ${attachedCount} 件／保留 ${heldCount} 件${unansweredCount > 0 ? `／未回答 ${unansweredCount} 件は次回パッケージで再送` : ''}`,
+      `受入 ${intakeId}（回答者: ${teacherName}）決着 ${settledCount} 件／証拠付加 ${attachedCount} 件／保留 ${heldCount} 件${constraintCount > 0 ? `（うち教師制約による評価不能 ${constraintCount} 件）` : ''}${unansweredCount > 0 ? `／未回答 ${unansweredCount} 件は次回パッケージで再送` : ''}`,
     );
     systemLogger.info('SELF_IMPROVEMENT', `[矛盾解決 受入] ${intakeId} request=${requestId} teacher=${teacherName} settled=${settledCount} attached=${attachedCount} held=${heldCount} expedited=${expeditedCount}`);
     return {

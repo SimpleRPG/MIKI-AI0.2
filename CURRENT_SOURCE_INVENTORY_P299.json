@@ -12700,9 +12700,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 83938,
-      "lines": 1639,
-      "sha256": "705b1ebc59df62988d282035e0e545f2c0ac4ed5afa230247b0189ef1028f39f",
+      "bytes": 84883,
+      "lines": 1655,
+      "sha256": "d5a60d3337e11efb5c32c50e26d8ded4442d8a405374d9f96d30bf339227fb9e",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -13908,9 +13908,9 @@
     },
     {
       "path": "src/miki/core/services/contradictionResolutionIntakeService.ts",
-      "bytes": 32999,
-      "lines": 680,
-      "sha256": "047e42ff6a65553f7fa38125e9a22e28abb25d43640991c300bdaaf5ea13e2d8",
+      "bytes": 34274,
+      "lines": 695,
+      "sha256": "0f6ebf8e16e2167b899d63c367a87e33f53b45bbc9e011aaa80a9866ffd338ca",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -13967,9 +13967,9 @@
     },
     {
       "path": "src/miki/core/services/contradictionResolutionRequestService.ts",
-      "bytes": 31510,
-      "lines": 636,
-      "sha256": "bc92ccde808d42daa4b1728c4a65176a0c4b5ace81fddf53eb64ea3ac780a7cd",
+      "bytes": 32311,
+      "lines": 638,
+      "sha256": "b9a3b1a0b99c63cce1fc0551b53eed98b5301e59c17383fcd845203976898f11",
       "relativeImportCandidates": [
         {
           "line": 2,
