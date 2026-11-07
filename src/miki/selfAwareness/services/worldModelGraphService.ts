@@ -4,6 +4,7 @@ import { canonicalSha256Object } from '../../core/services/canonicalSha256Servic
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
+import { evidenceService } from '../../memory/services/evidenceService';
 
 /*
  * P465: 世界モデル（実体と型つき関係のグラフ）。
@@ -48,6 +49,12 @@ export interface WorldRelation {
   sourceClaimIds: string[];
   confidence: number;
   createdAt: number;
+  /**
+   * P479: 未検証 Claim から抽出した「仮の関係」。事実としては扱わず
+   * （仮説生成には使わない）、調査・検証の当たりを付ける地図として
+   * 保持する。検証済み Claim が同じ関係を支持したら確定へ昇格する。
+   */
+  provisional?: boolean;
 }
 
 export interface WorldHypothesisRecord {
@@ -78,6 +85,13 @@ export interface WorldComponentLink {
   basis: 'KNOWLEDGE_REF' | 'TEXT_MATCH';
   matchedText: string;
   componentStatus: string;
+  /**
+   * P479: リンクの強さ。CONFIRMED は「実体が確定した関係に属し、部品
+   * も CLOUD_TESTED 以上」の両端とも裏付けがある場合のみ。それ以外
+   * （名前一致だけ、知識が未検証、部品が未検証）は PROVISIONAL＝
+   * 「かも」のリンクとして区別し、検証・調査の手がかりに使う。
+   */
+  strength: 'CONFIRMED' | 'PROVISIONAL';
   updatedAt: number;
 }
 
@@ -87,6 +101,7 @@ export interface WorldComponentHit {
   componentStatus: string;
   entityName: string;
   basis: 'KNOWLEDGE_REF' | 'TEXT_MATCH';
+  strength: 'CONFIRMED' | 'PROVISIONAL';
   /** 関係経由で見つかった場合、起点になった実体名。直接リンクでは無し。 */
   viaEntity?: string;
 }
@@ -173,6 +188,7 @@ class WorldModelGraphService {
     type: WorldRelationType;
     sourceClaimId?: string;
     confidence?: number;
+    provisional?: boolean;
   }): WorldRelation | null {
     const from = this.registerEntity(params.fromName);
     const to = this.registerEntity(params.toName);
@@ -184,6 +200,11 @@ class WorldModelGraphService {
       if (params.sourceClaimId && !existing.sourceClaimIds.includes(params.sourceClaimId)) {
         existing.sourceClaimIds.push(params.sourceClaimId);
       }
+      // P479: 仮の関係が検証済みの裏付けを得たら確定へ昇格させる。
+      if (existing.provisional && params.provisional !== true) {
+        existing.provisional = false;
+        existing.confidence = Math.max(existing.confidence, params.confidence ?? 0.8);
+      }
       this.save();
       return existing;
     }
@@ -193,8 +214,9 @@ class WorldModelGraphService {
       to: to.name,
       type: params.type,
       sourceClaimIds: params.sourceClaimId ? [params.sourceClaimId] : [],
-      confidence: params.confidence ?? 0.8,
+      confidence: params.confidence ?? (params.provisional ? 0.3 : 0.8),
       createdAt: Date.now(),
+      ...(params.provisional ? { provisional: true } : {}),
     };
     state.relations.push(relation);
     if (state.relations.length > MAX_RELATIONS) {
@@ -240,6 +262,15 @@ class WorldModelGraphService {
       .map((e) => e.name)
       .filter((n) => n.length >= 2)
       .sort((a, b) => b.length - a.length);
+    // P479: 確定した関係に属する実体（＝知識側が裏付け済みの実体）。
+    const confirmedEntities = new Set<string>();
+    for (const r of state.relations) {
+      if (r.provisional) continue;
+      confirmedEntities.add(r.from);
+      confirmedEntities.add(r.to);
+    }
+    const componentVerifiedish = (status: string): boolean =>
+      status === 'VERIFIED' || status === 'DEVICE_TESTED' || status === 'CLOUD_TESTED';
     const next: WorldComponentLink[] = [];
     const now = Date.now();
     for (const comp of components) {
@@ -265,6 +296,11 @@ class WorldModelGraphService {
           basis,
           matchedText,
           componentStatus: String(comp.status || ''),
+          // P479: 両端（知識・部品）とも裏付けがある場合だけ CONFIRMED。
+          strength:
+            confirmedEntities.has(entityName) && componentVerifiedish(String(comp.status || ''))
+              ? 'CONFIRMED'
+              : 'PROVISIONAL',
           updatedAt: now,
         });
       };
@@ -308,6 +344,7 @@ class WorldModelGraphService {
           componentStatus: link.componentStatus,
           entityName: name,
           basis: link.basis,
+          strength: link.strength || 'PROVISIONAL',
           ...(via ? { viaEntity: via } : {}),
         };
         const prev = hits.get(link.componentId);
@@ -326,6 +363,7 @@ class WorldModelGraphService {
     return [...hits.values()].sort(
       (a, b) =>
         (a.viaEntity ? 1 : 0) - (b.viaEntity ? 1 : 0) ||
+        (a.strength === 'CONFIRMED' ? 0 : 1) - (b.strength === 'CONFIRMED' ? 0 : 1) ||
         rank(a.componentStatus) - rank(b.componentStatus) ||
         a.componentId.localeCompare(b.componentId),
     );
@@ -387,8 +425,11 @@ class WorldModelGraphService {
 
   /**
    * 能力計画のスコア付け用: 目標に現れる実体へリンクされた部品への
-   * 加点表。直接リンク 25、関係経由 12（既存の知識ブーストと同程度の
-   * 「候補に割り込む」強さに留め、支配はしない）。
+   * 加点表。CONFIRMED の直接リンク 25、関係経由 12（既存の知識
+   * ブーストと同程度の「候補に割り込む」強さに留め、支配はしない）。
+   * P479: PROVISIONAL（仮）リンクは弱く効かせる（直接 10、経由 5）。
+   * 計画が拾うのは VERIFIED 部品だけなので、仮リンクの加点は
+   * 「検証済み部品同士の並び替え」にしか作用しない。
    */
   public rankComponentsForGoal(goalText: string): Map<string, number> {
     const state = this.load();
@@ -396,7 +437,8 @@ class WorldModelGraphService {
     for (const e of state.entities) {
       if (e.name.length < 2 || !goalText.includes(e.name)) continue;
       for (const hit of this.componentsForEntity(e.name)) {
-        const value = hit.viaEntity ? 12 : 25;
+        const value =
+          hit.strength === 'CONFIRMED' ? (hit.viaEntity ? 12 : 25) : hit.viaEntity ? 5 : 10;
         boost.set(hit.componentId, Math.max(boost.get(hit.componentId) || 0, value));
       }
     }
@@ -404,27 +446,88 @@ class WorldModelGraphService {
   }
 
   /**
-   * 検証済み Claim の文面から、型つき関係を決定論的に抽出する。
-   * 未検証の主張は世界の事実として取り込まない。
+   * P479: 検証・調査のリード（当たり）。仮リンクは「ここを確かめれば
+   * 橋が確定する」場所を示す:
+   * - claimsNearComponents: 部品に繋がっているのに未検証の知識。
+   *   これを裏付ければ、知識と部品の両方が確定側に寄る。
+   * - componentsNearKnowledge: 知識は確定しているのに部品が未検証。
+   *   カナリア（実機確認）の優先候補。
    */
-  public extractRelationsFromClaims(): { added: number; scanned: number } {
-    const claims = claimDatabaseService
-      .getAllClaims()
-      .filter((c: any) => c && (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED'));
+  public verificationLeads(limit = 20): {
+    claimsNearComponents: Array<{ claimId: string; statement: string; componentIds: string[] }>;
+    componentsNearKnowledge: Array<{ componentId: string; componentName: string; componentStatus: string; entityNames: string[] }>;
+  } {
+    const state = this.load();
+    const links = state.componentLinks || [];
+    const confirmedEntities = new Set<string>();
+    for (const r of state.relations) {
+      if (r.provisional) continue;
+      confirmedEntities.add(r.from);
+      confirmedEntities.add(r.to);
+    }
+
+    const componentLeads = new Map<string, { componentName: string; componentStatus: string; entityNames: Set<string> }>();
+    for (const link of links) {
+      if (link.strength !== 'PROVISIONAL') continue;
+      if (!confirmedEntities.has(link.entityName)) continue;
+      if (link.componentStatus === 'VERIFIED') continue;
+      const entry =
+        componentLeads.get(link.componentId) ||
+        { componentName: link.componentName, componentStatus: link.componentStatus, entityNames: new Set<string>() };
+      entry.entityNames.add(link.entityName);
+      componentLeads.set(link.componentId, entry);
+    }
+
+    const claimLeads = new Map<string, Set<string>>();
+    for (const r of state.relations) {
+      if (!r.provisional) continue;
+      const componentIds = new Set<string>();
+      for (const hit of this.componentsForEntity(r.from)) componentIds.add(hit.componentId);
+      for (const hit of this.componentsForEntity(r.to)) componentIds.add(hit.componentId);
+      if (componentIds.size === 0) continue;
+      for (const claimId of r.sourceClaimIds) {
+        const claim: any = claimDatabaseService.getClaim(claimId);
+        if (!claim || claim.status !== 'UNVERIFIED') continue;
+        const entry = claimLeads.get(claimId) || new Set<string>();
+        for (const id of componentIds) entry.add(id);
+        claimLeads.set(claimId, entry);
+      }
+    }
+
+    return {
+      claimsNearComponents: [...claimLeads.entries()].slice(0, limit).map(([claimId, componentIds]) => {
+        const claim: any = claimDatabaseService.getClaim(claimId);
+        return {
+          claimId,
+          statement: claim ? String(claim.statement || '') : '',
+          componentIds: [...componentIds],
+        };
+      }),
+      componentsNearKnowledge: [...componentLeads.entries()].slice(0, limit).map(([componentId, entry]) => ({
+        componentId,
+        componentName: entry.componentName,
+        componentStatus: entry.componentStatus,
+        entityNames: [...entry.entityNames],
+      })),
+    };
+  }
+
+  private static readonly RELATION_PATTERNS: Array<{ type: WorldRelationType; regex: RegExp }> = [
+    { type: 'IS_A', regex: /^(.{1,30}?)は(.{1,30}?)の一種/ },
+    { type: 'IS_A', regex: /^(.{1,30}?)は(.{1,30}?)の仲間/ },
+    { type: 'USED_FOR', regex: /^(.{1,30}?)は(.{1,30}?)に使われ/ },
+    { type: 'USED_FOR', regex: /^(.{1,30}?)は(.{1,30}?)用(?:の|だ|で)/ },
+    { type: 'CAUSES', regex: /^(.{1,30}?)が原因で(.{1,30}?)が/ },
+    { type: 'CAUSES', regex: /^(.{1,30}?)すると(.{1,30}?)になる/ },
+    { type: 'PART_OF', regex: /^(.{1,30}?)は(.{1,30}?)の一部/ },
+    { type: 'ENABLES', regex: /^(.{1,30}?)は(.{1,30}?)を可能に/ },
+  ];
+
+  private extractFromClaims(claims: any[], provisional: boolean): number {
     let added = 0;
-    const patterns: Array<{ type: WorldRelationType; regex: RegExp }> = [
-      { type: 'IS_A', regex: /^(.{1,30}?)は(.{1,30}?)の一種/ },
-      { type: 'IS_A', regex: /^(.{1,30}?)は(.{1,30}?)の仲間/ },
-      { type: 'USED_FOR', regex: /^(.{1,30}?)は(.{1,30}?)に使われ/ },
-      { type: 'USED_FOR', regex: /^(.{1,30}?)は(.{1,30}?)用(?:の|だ|で)/ },
-      { type: 'CAUSES', regex: /^(.{1,30}?)が原因で(.{1,30}?)が/ },
-      { type: 'CAUSES', regex: /^(.{1,30}?)すると(.{1,30}?)になる/ },
-      { type: 'PART_OF', regex: /^(.{1,30}?)は(.{1,30}?)の一部/ },
-      { type: 'ENABLES', regex: /^(.{1,30}?)は(.{1,30}?)を可能に/ },
-    ];
-    for (const claim of claims as any[]) {
+    for (const claim of claims) {
       const statement = String(claim.statement || '').replace(/。$/, '');
-      for (const { type, regex } of patterns) {
+      for (const { type, regex } of WorldModelGraphService.RELATION_PATTERNS) {
         const match = statement.match(regex);
         if (!match) continue;
         const before = this.load().relations.length;
@@ -433,19 +536,68 @@ class WorldModelGraphService {
           toName: match[2],
           type,
           sourceClaimId: claim.claim_id,
+          provisional,
         });
         if (relation && this.load().relations.length > before) added++;
         break;
       }
     }
+    return added;
+  }
+
+  /**
+   * Claim の文面から、型つき関係を決定論的に抽出する。
+   *
+   * 確定パス（従来どおり）: 検証済み Claim だけを世界の事実として
+   * 取り込む。
+   *
+   * P479 仮パス: 未検証 Claim からも「仮の関係」を抽出して地図に
+   * 載せる。ただし無差別には載せない（未検証の在庫にはノイズが
+   * 多い）: 出所が web_search 以外（会話・教師・運用由来）か、
+   * ADMISSIBLE な証拠が付いている Claim に限る。仮の関係は仮説
+   * 生成には使わず、予測では「仮」と明示して確信度を半分にする。
+   * 役割は、調査・検証の当たりを付けることと、部品との仮リンクで
+   * 「どこを確かめれば橋が確定するか」を見えるようにすること。
+   * 仮の関係の総数は上限（800）で抑える。
+   */
+  public extractRelationsFromClaims(): { added: number; scanned: number; provisionalAdded: number; provisionalScanned: number } {
+    const all = claimDatabaseService.getAllClaims().filter((c: any) => c);
+    const verified = all.filter((c: any) => c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED');
+    const added = this.extractFromClaims(verified as any[], false);
+
+    const admissibleCache = new Map<string, boolean>();
+    const hasAdmissible = (claimId: string): boolean => {
+      const cached = admissibleCache.get(claimId);
+      if (cached !== undefined) return cached;
+      let result = false;
+      try {
+        result = evidenceService.list({ claimId }).some((e) => e.status === 'ADMISSIBLE');
+      } catch { /* 証拠が読めなければ仮パスには載せない */ }
+      admissibleCache.set(claimId, result);
+      return result;
+    };
+    const provisionalCount = this.load().relations.filter((r) => r.provisional).length;
+    const provisionalCandidates =
+      provisionalCount >= 800
+        ? []
+        : all.filter(
+            (c: any) =>
+              c.status === 'UNVERIFIED' &&
+              ((c.source && c.source !== 'web_search') || hasAdmissible(c.claim_id)),
+          );
+    const provisionalAdded = this.extractFromClaims(provisionalCandidates as any[], true);
+
     if (added > 0) {
       systemLogger.info('SELF_IMPROVEMENT', `🌐 [WorldModel] 検証済みClaimから関係を${added}件抽出（実体${this.load().entities.length}件・関係${this.load().relations.length}件）`);
+    }
+    if (provisionalAdded > 0) {
+      systemLogger.info('SELF_IMPROVEMENT', `🌐 [WorldModel] 未検証Claimから仮の関係を${provisionalAdded}件抽出（調査・検証の当たり付け用）`);
     }
     // P478: 世界が育つたびに部品との橋も張り直す（定期経路に相乗り）。
     try {
       this.syncComponentLinks();
     } catch { /* 橋の同期失敗は抽出を止めない */ }
-    return { added, scanned: claims.length };
+    return { added, scanned: verified.length, provisionalAdded, provisionalScanned: provisionalCandidates.length };
   }
 
   /**
@@ -461,8 +613,9 @@ class WorldModelGraphService {
       state.relations.some((r) => r.from === from && r.to === to && r.type === type);
     const candidates: Array<{ from: string; to: string; type: WorldRelationType; basis: 'INHERITANCE' | 'SIBLING_ANALOGY' }> = [];
 
-    const isA = state.relations.filter((r) => r.type === 'IS_A');
-    const others = state.relations.filter((r) => r.type !== 'IS_A');
+    // P479: 仮説は確定した関係からのみ生成する（仮×仮の増殖を防ぐ）。
+    const isA = state.relations.filter((r) => r.type === 'IS_A' && !r.provisional);
+    const others = state.relations.filter((r) => r.type !== 'IS_A' && !r.provisional);
 
     // 継承: A IS_A B かつ B -R-> C なら A -R-> C を仮説にする
     for (const isa of isA) {
@@ -530,11 +683,11 @@ class WorldModelGraphService {
    * 「これはどうなるか」の予測。CAUSES / ENABLES の連鎖をたどる。
    * 返るのはモデルの予測であり、事実ではない。
    */
-  public predict(entityName: string, maxDepth = 2): Array<{ entity: string; path: string[]; type: WorldRelationType; confidence: number }> {
+  public predict(entityName: string, maxDepth = 2): Array<{ entity: string; path: string[]; type: WorldRelationType; confidence: number; provisional: boolean }> {
     const state = this.load();
-    const results: Array<{ entity: string; path: string[]; type: WorldRelationType; confidence: number }> = [];
-    const queue: Array<{ name: string; path: string[]; confidence: number; depth: number }> = [
-      { name: entityName, path: [entityName], confidence: 1, depth: 0 },
+    const results: Array<{ entity: string; path: string[]; type: WorldRelationType; confidence: number; provisional: boolean }> = [];
+    const queue: Array<{ name: string; path: string[]; confidence: number; depth: number; provisional: boolean }> = [
+      { name: entityName, path: [entityName], confidence: 1, depth: 0, provisional: false },
     ];
     const seen = new Set<string>([entityName]);
     while (queue.length > 0) {
@@ -545,10 +698,12 @@ class WorldModelGraphService {
         if (relation.type !== 'CAUSES' && relation.type !== 'ENABLES') continue;
         if (seen.has(relation.to)) continue;
         seen.add(relation.to);
-        const confidence = current.confidence * relation.confidence;
+        // P479: 仮の関係を通る予測は「仮」と明示し、確信度を半分にする。
+        const provisional = current.provisional || relation.provisional === true;
+        const confidence = current.confidence * relation.confidence * (relation.provisional ? 0.5 : 1);
         const path = [...current.path, relation.to];
-        results.push({ entity: relation.to, path, type: relation.type, confidence });
-        queue.push({ name: relation.to, path, confidence, depth: current.depth + 1 });
+        results.push({ entity: relation.to, path, type: relation.type, confidence, provisional });
+        queue.push({ name: relation.to, path, confidence, depth: current.depth + 1, provisional });
       }
     }
     return results;
@@ -565,7 +720,7 @@ class WorldModelGraphService {
   ): {
     entity: string;
     components: WorldComponentHit[];
-    predictions: Array<{ entity: string; path: string[]; type: WorldRelationType; confidence: number; components: WorldComponentHit[] }>;
+    predictions: Array<{ entity: string; path: string[]; type: WorldRelationType; confidence: number; provisional: boolean; components: WorldComponentHit[] }>;
   } {
     const predictions = this.predict(entityName, maxDepth);
     return {

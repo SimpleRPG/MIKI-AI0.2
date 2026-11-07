@@ -174,7 +174,7 @@ export class ComponentCompositionService {
    *
    * `initialInputTypes` は外部入力(例: 会話テキストString)を明示する契約であり、
    * Component同士の出力だけで無理に直列化しない。CANDIDATEはランタイム実行対象にせず、
-   * ANALYZED / DEVICE_TESTED / VERIFIED のみを実行計画へ載せる。
+   * ANALYZED / CLOUD_TESTED（P479）/ DEVICE_TESTED / VERIFIED のみを実行計画へ載せる。
    */
   public composeRuntimeComponentIds(
     goal: string,
@@ -193,6 +193,11 @@ export class ComponentCompositionService {
 
     const allowedStatuses = new Set<ComponentTxtPackage['status']>([
       'ANALYZED',
+      // P479: CLOUD_TESTED（クラウド側で検証済み。P476 の Muse 信頼
+      // 特急の到達点を含む）も、この制限パス（決定論的・READ_ONLY・
+      // 事前承認された基盤部品のみ）では実行計画に載せられるように
+      // する。一般の能力計画（VERIFIED のみ）は従来どおり変えない。
+      'CLOUD_TESTED',
       'DEVICE_TESTED',
       'VERIFIED',
     ]);

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1773,
     "sourceFileCount": 1326,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1237,
-    "relativeImportCandidateCount": 3813,
-    "resolvedRelativeImportCandidateCount": 3797,
+    "relativeImportCandidateCount": 3814,
+    "resolvedRelativeImportCandidateCount": 3798,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -9351,9 +9351,9 @@
     },
     {
       "path": "src/miki/capability/services/componentCompositionService.ts",
-      "bytes": 18307,
-      "lines": 438,
-      "sha256": "6d87d40f811617cec6bbc59d75bdd4208e9b071d28fba9ee3b73b16436739a8d",
+      "bytes": 18722,
+      "lines": 443,
+      "sha256": "543324b0fab8269da994f7468bcf1f0bd98df2cf79f0b5193f6988f3cb31a992",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27633,9 +27633,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/worldModelGraphService.ts",
-      "bytes": 23628,
-      "lines": 579,
-      "sha256": "e3c1cc00b6f0677d5ea83f68acb70f4852fb9f6754fd3e9ad1e4e9809a27c1ed",
+      "bytes": 31873,
+      "lines": 734,
+      "sha256": "343e41df9d1607bf380de03d9b90d14ac601914b94d2731d18d5f58554df3d23",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27672,10 +27672,16 @@
           "specifier": "../../capability/services/componentRegistryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/capability/services/componentRegistryService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "../../memory/services/evidenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/evidenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {
