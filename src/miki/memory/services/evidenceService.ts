@@ -48,6 +48,14 @@ export interface EvidenceRecord {
     operation_class?: 'BUSINESS' | 'DIAGNOSTIC';
     fetch_method?: WebFetchMethod;
     trust_boundary?: 'UNTRUSTED_EXTERNAL_WEB' | 'UNTRUSTED_EXTERNAL_AI' | 'LOCAL_EXECUTION';
+    /** P475: 教師が制約で評価を断った申告（正誤の判断ではない）。 */
+    teacher_constraint?: boolean;
+    /**
+     * P477: ユーザー信頼ルール（2026-11-07）の刻印。検証者が Muse の
+     * 場合にだけ 'Claude' が入る。検証器はこの刻印のある CLOUD_AI 証拠
+     * （制約保留・反証を除く）を検証証言として扱う。他の AI には付けない。
+     */
+    trusted_verifier?: string;
     external_bundle_id?: string;
     prompt_sha256?: string;
     response_sha256?: string;

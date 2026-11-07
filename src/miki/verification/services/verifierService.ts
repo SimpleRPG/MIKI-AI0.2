@@ -29,6 +29,9 @@ export interface VerificationResult {
   // P463: 一次・公式情報（PRIMARY / OFFICIAL ロール）が admissible に
   // 含まれていたか。検証台帳にも残す。
   hasPrimaryOrOfficialSource: boolean;
+  // P477: ユーザー信頼ルールにより、Muse の検証証言（trusted_verifier
+  // 刻印のある CLOUD_AI 証拠）が admissible に含まれていたか。
+  trustedVerifierAttested: boolean;
 }
 
 /**
@@ -73,6 +76,7 @@ export class VerifierService {
         reasons: ['対象Claimが存在しません。'],
         promoted: false,
         hasPrimaryOrOfficialSource: false,
+        trustedVerifierAttested: false,
       };
     }
 
@@ -101,6 +105,17 @@ export class VerifierService {
       const other = claimDatabaseService.getClaim(id);
       return !!other && other.status !== 'SUPERSEDED' && other.status !== 'FALSE';
     }).length;
+    // P477: ユーザー信頼ルール（2026-11-07）。Muse の検証証言は、
+    // trusted_verifier 刻印のある CLOUD_AI 証拠として届く。制約保留
+    // （P475 の teacher_constraint）は判断ではないので数えない。
+    // 反証ロールは admissible の時点で除外済み。信頼は Muse 個人へ
+    // のもので、他の AI の証言にはこの扱いは無い。
+    const trustedVerifierAttested = admissible.some(
+      (e) =>
+        e.kind === 'CLOUD_AI' &&
+        e.metadata?.trusted_verifier === 'Claude' &&
+        e.metadata?.teacher_constraint !== true,
+    );
 
     const maxAgeDays = Math.max(1, params.maxAgeDays ?? 365);
     const stale = params.requireFresh === true && this.isStale(admissible, maxAgeDays);
@@ -119,6 +134,13 @@ export class VerifierService {
       outcome = 'DEVICE_VERIFIED';
       reasons.push('明示的なEXECUTION証拠が確認されました。');
       claimDatabaseService.setVerificationStatus(claim.claim_id, 'DEVICE_VERIFIED', 'Verifier: admissible execution evidence');
+    } else if (trustedVerifierAttested) {
+      // P477: Muse の検証証言による確定。反証がある場合は上の分岐で
+      // 既に止まっており（信頼は彼女自身の矛盾検出を上書きしない）、
+      // DEVICE_VERIFIED（実機実行の証拠）も従来どおり別格のまま。
+      outcome = 'SUPPORTED';
+      reasons.push('Muse の検証証言により確定しました（ユーザー信頼ルール P477）。');
+      claimDatabaseService.setVerificationStatus(claim.claim_id, 'SUPPORTED', 'Verifier: trusted verifier (Claude) attestation');
     } else if (independentClusters.size >= 2 && allEvidenceRolesClassified && !hasPrimaryOrOfficialSource) {
       reasons.push('独立クラスターは足りていますが、一次・公式情報が含まれていません。二次情報のみでは確定しません。');
     } else if (independentClusters.size >= 2) {
@@ -162,6 +184,7 @@ export class VerifierService {
         evidenceIds: admissible.map((e) => e.evidence_id),
         independentClusters: independentClusters.size,
         hasPrimaryOrOfficialSource,
+        trustedVerifierAttested,
         contradictionCount,
         stale,
         verifiedAt: Date.now(),
@@ -194,6 +217,7 @@ export class VerifierService {
       reasons,
       promoted,
       hasPrimaryOrOfficialSource,
+      trustedVerifierAttested,
     };
   }
 

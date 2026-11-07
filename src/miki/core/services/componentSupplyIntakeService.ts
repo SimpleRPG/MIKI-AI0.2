@@ -9,6 +9,8 @@ import { autonomousSelfImprovementLoopService, TEACHER_RETURN_PRIORITY } from '.
 import { taskBlackboardService } from './taskBlackboardService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
+import { isClaudeVerifierName } from './trustedVerifier';
+export { isClaudeVerifierName };
 import { sha256HexFromText } from './canonicalSha256Service';
 
 /*
@@ -40,23 +42,10 @@ import { sha256HexFromText } from './canonicalSha256Service';
  */
 
 /**
- * P476: ユーザー信頼ルール（2026-11-07）の供給者判定。
- * 「教師一般」ではなく Muse 個人への信頼であり、他の AI（ChatGPT
- * 等）は対象外。供給者名が Muse を指す場合にだけ、その供給に付いた
- * 検証済み TVE をクラウド検証として扱う（candidateCodeGeneration
- * Service の P476 昇格）。名前の判定は申告ベースであり、パッケージは
- * ユーザー本人が手渡す運用を前提とする。
+ * P476/P477: ユーザー信頼ルール（2026-11-07）の供給者判定は
+ * trustedVerifier.ts に一元化した（知識側の検証でも同じ判定を使う）。
+ * ここでは互換のため再エクスポートする（import 行を参照）。
  */
-export function isClaudeVerifierName(name: string): boolean {
-  const normalized = String(name || '').trim().toLowerCase();
-  return (
-    normalized === 'claude' ||
-    normalized.startsWith('claude ') ||
-    normalized.startsWith('claude(') ||
-    normalized.startsWith('claude（')
-  );
-}
-
 export type ComponentSupplyIntakeStatus = 'RECEIVED' | 'REJECTED';
 
 export type ComponentSupplyIntakeCode =

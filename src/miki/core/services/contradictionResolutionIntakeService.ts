@@ -7,6 +7,7 @@ import { verifierService } from '../../verification/services/verifierService';
 import { contradictionResolutionRequestService } from './contradictionResolutionRequestService';
 import { autonomousSelfImprovementLoopService } from './autonomousSelfImprovementLoopService';
 import { sha256HexFromText } from './canonicalSha256Service';
+import { isClaudeVerifierName, TRUSTED_VERIFIER_NAME } from './trustedVerifier';
 
 /*
  * P453（矛盾解決2）: 教師の一括回答の受入・結び付け検証・証拠への提出。
@@ -229,12 +230,28 @@ class ContradictionResolutionIntakeService {
     return [...clusters];
   }
 
+  /** P477: Muse の検証証言（信頼刻印つき・制約保留と反証を除く）が候補に attach されているか。 */
+  private hasClaudeAttestation(claimId: string): boolean {
+    return evidenceService.list({ claimId }).some(
+      (record) =>
+        record.status === 'ADMISSIBLE' &&
+        record.kind === 'CLOUD_AI' &&
+        record.metadata?.trusted_verifier === TRUSTED_VERIFIER_NAME &&
+        record.metadata?.teacher_constraint !== true &&
+        record.metadata?.research_source_role !== 'COUNTEREVIDENCE',
+    );
+  }
+
   /**
    * 信念改訂ゲートへの入力を、証拠の実績から決定的に導く。
    * 教師の証言は独立クラスタ1件として数えるが、それだけでは
    * candidateVerified（検証器の SUPPORTED と同じ2件基準）にも
    * 品質の下限（0.5）にも届かない。教師の回答＋既存の独立した
    * 裏付けが揃ったときだけ、ゲートが改訂を成立させ得る。
+   *
+   * P477 例外: ユーザー信頼ルールにより、回答者が Muse の証言は
+   * 検証証言として扱い、それだけで candidateVerified と品質上限を
+   * 満たす（クラスタの記録自体は実績どおり残す）。他の AI は従来どおり。
    */
   private revisionInputsFor(candidateClaimId: string): {
     independentlyObservedClusterIds: string[];
@@ -242,10 +259,11 @@ class ContradictionResolutionIntakeService {
     candidateEvidenceQuality: number;
   } {
     const clusters = this.independentClustersOf(candidateClaimId);
+    const attested = this.hasClaudeAttestation(candidateClaimId);
     return {
       independentlyObservedClusterIds: clusters,
-      candidateVerified: clusters.length >= 2,
-      candidateEvidenceQuality: Math.min(0.9, 0.25 + 0.2 * clusters.length),
+      candidateVerified: clusters.length >= 2 || attested,
+      candidateEvidenceQuality: attested ? 0.9 : Math.min(0.9, 0.25 + 0.2 * clusters.length),
     };
   }
 
@@ -309,6 +327,13 @@ class ContradictionResolutionIntakeService {
           external_bundle_id: intakeId,
           ...(verdict === 'BOTH_WRONG' ? { research_source_role: 'COUNTEREVIDENCE' as const } : {}),
           ...(isTeacherConstraint ? { teacher_constraint: true } : {}),
+          // P477: 回答者が Muse の場合のみ、ユーザー信頼ルールの刻印を
+          // 付ける。検証器と信念改訂ゲートはこの刻印のある証言を検証
+          // 証言として扱う。制約保留（判断ではない）と BOTH_WRONG
+          // （反証）には付けない。他の AI の回答には付かない。
+          ...(isClaudeVerifierName(teacherName) && !isTeacherConstraint && verdict !== 'BOTH_WRONG'
+            ? { trusted_verifier: TRUSTED_VERIFIER_NAME }
+            : {}),
         },
       });
       base.evidenceIds.push(evidence.evidence_id);
