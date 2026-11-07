@@ -398,7 +398,7 @@ class ContradictionResolutionRequestService {
           verdicts: [
             {
               itemId: '要求の items[].itemId のいずれか',
-              verdict: 'A_STANDS | B_STANDS | BOTH_WRONG | MERGE | HOLD のいずれか',
+              verdict: 'A_STANDS | B_STANDS | BOTH_WRONG | MERGE | HOLD | NO_CONTRADICTION のいずれか',
               rationale: '必須・空不可。判断の理由。具体的に書いてください（この文章が MIKI 側で証拠・学習素材として保存されます）。',
               mergedStatement: 'verdict が MERGE のとき必須。両者を統合した新しい主張文。',
               supportingSources: [{ title: '出典のタイトル', url: 'URL（任意）', excerpt: '根拠となる抜粋（任意）' }],
@@ -412,6 +412,7 @@ class ContradictionResolutionRequestService {
           BOTH_WRONG: '両方とも誤り。理由を rationale に書いてください。',
           MERGE: '両者は統合できる（条件や範囲を分ければ両立する等）。mergedStatement に統合後の主張文を書いてください。',
           HOLD: '提示された材料だけでは判断できません。何が足りないかを rationale に書いてください。保留は正しい回答として扱われます。教師側の制約で判断できない場合は、rationale の冒頭に「教師制約：」と明記してください。',
+          NO_CONTRADICTION: 'そもそも対立する命題が存在しません（主題が無関係、または両立する内容）。この回答でペアは解消され、再送されなくなります。両方の主張の真偽そのものは未確定のまま残ります。誤検出だと思う場合は HOLD ではなくこちらを選んでください。',
         },
         rules: [
           'contradiction_reply.json の requestId は要求のものをそのまま返してください。',
@@ -627,7 +628,7 @@ class ContradictionResolutionRequestService {
       `- requestId は要求のもの（${String(request.requestId)}）をそのまま返すこと`,
       '- requestSha256 には、受け取った要求 ZIP（Base64 復号後バイナリ）の SHA-256（16進小文字）を入れること',
       '- verdicts には全 item についての回答を入れること。各 verdict には itemId、verdict、rationale（必須）が要ります',
-      '- verdict の意味: A_STANDS＝主張Aが正しい／B_STANDS＝主張Bが正しい／BOTH_WRONG＝両方とも誤り／MERGE＝統合できる（mergedStatement に統合後の主張文を書くこと）／HOLD＝判断保留（何が足りないかを rationale に書くこと）',
+      '- verdict の意味: A_STANDS＝主張Aが正しい／B_STANDS＝主張Bが正しい／BOTH_WRONG＝両方とも誤り／MERGE＝統合できる（mergedStatement に統合後の主張文を書くこと）／HOLD＝判断保留（何が足りないかを rationale に書くこと）／NO_CONTRADICTION＝そもそも対立する命題が無い（主題が無関係・両立する）。ペアは解消され再送されなくなる。誤検出なら HOLD ではなくこちら',
       '- 出典を挙げる場合は supportingSources に書くこと。存在しない出典を作らないこと',
       '- teacher.name（回答者名。例: Claude）と、できれば answeredAt（ISO 8601）を入れること',
       '',

@@ -21,7 +21,7 @@ import { storageService } from '../../../services/storageService';
 import { conversationCompositionResearchSchedulerService } from '../../conversation/services/conversationCompositionResearchSchedulerService';
 import { systemLogger } from '../../../services/systemLogger';
 import { executionEventBusService } from '../../execution/services/executionEventBusService';
-import { claimVerificationEventService } from '../../verification/services/claimVerificationEventService';
+import { claimVerificationEventService, type ClaimVerificationEvent } from '../../verification/services/claimVerificationEventService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { selfImprovementRequestEventService } from '../../improvement/services/selfImprovementRequestEventService';
 import { crossDomainCirculationService, type MikiDomain } from './crossDomainCirculationService';
@@ -86,6 +86,9 @@ function incrementStudyMeasurement(patch: Record<string, number>): void {
 class DomainIntegrationBootstrapService{
  private initialized=false;
  private unsubscribers:Array<()=>void>=[];
+ // P481: Claim 検証イベントの伝播ブレーキの記録（claimId → 最後に
+ // 伝播した結果と時刻）。メモリ上のみで、再起動で一度だけ再伝播する。
+ private claimEventPropagationAt = new Map<string, { outcome: string; at: number }>();
 
  async initialize():Promise<void>{
   if(this.initialized)return;
@@ -112,7 +115,7 @@ class DomainIntegrationBootstrapService{
   this.unsubscribers.push(
    executionEventBusService.subscribe('execution.completed',e=>{crossDomainCirculationService.record('execution','learning','EXECUTION_COMPLETED',e.event_id);crossDomainCirculationService.record('execution','experience','EXECUTION_EXPERIENCE',e.event_id);void this.handleExecutionEvent(e);}),
    executionEventBusService.subscribe('execution.failed',e=>{crossDomainCirculationService.record('execution','safety','EXECUTION_FAILED',e.event_id);crossDomainCirculationService.record('safety','improvement','FAILURE_REQUIRES_IMPROVEMENT',e.event_id);void this.handleExecutionEvent(e);selfImprovementIngressService.submit({trigger:`execution.failed:${e.event_id}:${e.component_id}`,source:'EXECUTION'});}),
-   claimVerificationEventService.subscribe(e=>{crossDomainCirculationService.record('verification',(e.outcome==='SUPPORTED'||e.outcome==='DEVICE_VERIFIED')?'promotion':'unknown',`CLAIM_${e.outcome}`,e.claimId);if(e.outcome==='CONTRADICTED'||e.outcome==='UNRESOLVED'){const claimContext=claimDatabaseService.buildClaimContext(e.claimId);autonomousIssueDiscoveryService.recordContradiction(e.claimId,claimContext?`${e.outcome}: ${claimContext.statement}`:e.outcome);selfImprovementIngressService.submit({trigger:`claim.${e.outcome}:${e.claimId}`,source:'SYSTEM',payload:claimContext?{claimContext}:undefined});}}),
+   claimVerificationEventService.subscribe(e=>{crossDomainCirculationService.record('verification',(e.outcome==='SUPPORTED'||e.outcome==='DEVICE_VERIFIED')?'promotion':'unknown',`CLAIM_${e.outcome}`,e.claimId);this.propagateClaimVerificationEvent(e);}),
    selfImprovementRequestEventService.subscribe(e=>{const requestId=e.requestId||undefined;crossDomainCirculationService.record(e.source==='AUTOPILOT'?'autonomy':'conversation','improvement','SELF_IMPROVEMENT_REQUESTED',requestId||e.trigger);selfImprovementIngressService.submit({trigger:e.trigger,source:e.source,runId:requestId,sourceId:requestId,payload:requestId?{autopilotRequestId:requestId}:undefined});}),
   );
    systemLogger.info('SELF_IMPROVEMENT',`[DomainIntegration] ${MIKI_DOMAINS.length} domains registered`);
@@ -120,6 +123,35 @@ class DomainIntegrationBootstrapService{
    this.dispose();
    throw error;
   }
+ }
+
+ /**
+  * P481: Claim 検証イベント（CONTRADICTED / UNRESOLVED）の、矛盾 issue
+  * 記録と自律ループへの直接投入への伝播にブレーキをかける。
+  * verifyClaim は調査のたびに発火するため、従来は解けない Claim が
+  * 検証のたびに全量でキューへ戻っていた（キューの滞留の一因）。
+  * 同一 Claim・同一結果は6時間、結果が変わった場合でも1時間は
+  * 再伝播しない。新しい材料が来れば結果自体が変わる経路（裏付けの
+  * 追加・教師回答）で届くため、実質的な変化を取りこぼさない。
+  */
+ propagateClaimVerificationEvent(e: ClaimVerificationEvent): void {
+  const outcome = typeof e.outcome === 'string' ? e.outcome : '';
+  if (outcome !== 'CONTRADICTED' && outcome !== 'UNRESOLVED') return;
+  const now = Date.now();
+  const prev = this.claimEventPropagationAt.get(e.claimId);
+  if (prev) {
+   const cooldown = prev.outcome === outcome ? 6 * 60 * 60_000 : 60 * 60_000;
+   if (now - prev.at < cooldown) return;
+  }
+  this.claimEventPropagationAt.set(e.claimId, { outcome, at: now });
+  if (this.claimEventPropagationAt.size > 1000) {
+   for (const [key, value] of this.claimEventPropagationAt) {
+    if (now - value.at >= 6 * 60 * 60_000) this.claimEventPropagationAt.delete(key);
+   }
+  }
+  const claimContext = claimDatabaseService.buildClaimContext(e.claimId);
+  autonomousIssueDiscoveryService.recordContradiction(e.claimId, claimContext ? `${outcome}: ${claimContext.statement}` : outcome);
+  selfImprovementIngressService.submit({ trigger: `claim.${outcome}:${e.claimId}`, source: 'SYSTEM', payload: claimContext ? { claimContext } : undefined });
  }
 
  dispose():void{

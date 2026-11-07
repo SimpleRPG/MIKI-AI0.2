@@ -56,6 +56,9 @@ export interface EvidenceRecord {
      * （制約保留・反証を除く）を検証証言として扱う。他の AI には付けない。
      */
     trusted_verifier?: string;
+    // P481: ペア解消の判断証拠である印。「矛盾ではない」という判断は
+    // Claim の真偽の証拠ではないため、検証器の数えから外す。
+    pair_dissolution?: boolean;
     external_bundle_id?: string;
     prompt_sha256?: string;
     response_sha256?: string;

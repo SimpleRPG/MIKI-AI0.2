@@ -78,6 +78,12 @@ class AutonomousIssueDiscoveryService{
  getPersistenceState():DiscoveryPersistenceState{return {status:this.persistenceStatus,...(this.persistenceReason?{reason:this.persistenceReason}:{})};}
  list(limit=100):DiscoveredIssue[]{return [...this.issues.values()].sort((a,b)=>b.priority-a.priority||b.lastSeenAt-a.lastSeenAt||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,limit).map(x=>({...x}));}
  recordContradiction(claimId:string,detail:string):DiscoveredIssue{this.assertWritable();const previous=new Map(this.issues);const issue=this.upsert('CLAIM_CONTRADICTION',claimId,`Claim矛盾: ${claimId}`,detail,95);try{this.save();return issue;}catch(error){this.issues=previous;throw error;}}
+ /**
+  * P481: 指定した (kind, sourceId) の未解決 issue を解決済みに倒す。
+  * 教師がペア解消（NO_CONTRADICTION）を返したときに、解消された
+  * Claim の矛盾 issue を止めるために使う。解決した件数を返す。
+  */
+ resolveBySource(kind:DiscoveredIssueKind,sourceId:string,outcome:string):number{this.assertWritable();let resolved=0;const now=Date.now();for(const issue of this.issues.values()){if(issue.kind===kind&&issue.sourceId===sourceId&&!issue.resolvedAt){issue.resolvedAt=now;issue.queuedAt=undefined;issue.nextRetryAt=undefined;issue.exhausted=false;issue.lastOutcome=outcome;this.issues.set(issue.fingerprint,issue);resolved++;}}if(resolved>0)this.save();return resolved;}
  async scan(mode:DiscoveryScanMode='AUTONOMOUS'):Promise<DiscoveryScanResult>{
   if(this.disposed)throw new Error('AUTONOMOUS_DISCOVERY_SERVICE_DISPOSED');
   this.assertWritable();

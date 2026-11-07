@@ -6,6 +6,7 @@ import { claimDatabaseService, type BeliefRevisionResult } from '../../memory/se
 import { verifierService } from '../../verification/services/verifierService';
 import { contradictionResolutionRequestService } from './contradictionResolutionRequestService';
 import { autonomousSelfImprovementLoopService } from './autonomousSelfImprovementLoopService';
+import { autonomousIssueDiscoveryService } from './autonomousIssueDiscoveryService';
 import { sha256HexFromText } from './canonicalSha256Service';
 import { isClaudeVerifierName, TRUSTED_VERIFIER_NAME } from './trustedVerifier';
 
@@ -59,13 +60,14 @@ export type ContradictionResolutionIntakeCode =
   | 'REQUEST_NOT_ISSUED'
   | 'REQUEST_HASH_MISMATCH';
 
-export type ContradictionVerdict = 'A_STANDS' | 'B_STANDS' | 'BOTH_WRONG' | 'MERGE' | 'HOLD';
+export type ContradictionVerdict = 'A_STANDS' | 'B_STANDS' | 'BOTH_WRONG' | 'MERGE' | 'HOLD' | 'NO_CONTRADICTION';
 
 export type ContradictionItemOutcome =
   | 'SETTLED'
   | 'EVIDENCE_ATTACHED'
   | 'MERGED_CANDIDATE_REGISTERED'
   | 'HELD'
+  | 'DISSOLVED'
   | 'ERROR';
 
 export interface ContradictionIntakeTeacher {
@@ -130,7 +132,7 @@ const MAX_INPUT_BYTES = 3_000_000;
 const MAX_FILES = 100;
 const MAX_TOTAL_CONTENT_BYTES = 10 * 1024 * 1024;
 
-const VERDICTS: ContradictionVerdict[] = ['A_STANDS', 'B_STANDS', 'BOTH_WRONG', 'MERGE', 'HOLD'];
+const VERDICTS: ContradictionVerdict[] = ['A_STANDS', 'B_STANDS', 'BOTH_WRONG', 'MERGE', 'HOLD', 'NO_CONTRADICTION'];
 
 const textEncoder = new TextEncoder();
 const byteLength = (text: string): number => textEncoder.encode(text).length;
@@ -327,11 +329,15 @@ class ContradictionResolutionIntakeService {
           external_bundle_id: intakeId,
           ...(verdict === 'BOTH_WRONG' ? { research_source_role: 'COUNTEREVIDENCE' as const } : {}),
           ...(isTeacherConstraint ? { teacher_constraint: true } : {}),
+          // P481: ペア解消の判断は「ペアについての判断」であって Claim
+          // の真偽の検証ではないため、印を付けて昇格の数えから外す。
+          ...(verdict === 'NO_CONTRADICTION' ? { pair_dissolution: true } : {}),
           // P477: 回答者が Muse の場合のみ、ユーザー信頼ルールの刻印を
           // 付ける。検証器と信念改訂ゲートはこの刻印のある証言を検証
           // 証言として扱う。制約保留（判断ではない）と BOTH_WRONG
-          // （反証）には付けない。他の AI の回答には付かない。
-          ...(isClaudeVerifierName(teacherName) && !isTeacherConstraint && verdict !== 'BOTH_WRONG'
+          // （反証）と NO_CONTRADICTION（ペアの判断）には付けない。
+          // 他の AI の回答には付かない。
+          ...(isClaudeVerifierName(teacherName) && !isTeacherConstraint && verdict !== 'BOTH_WRONG' && verdict !== 'NO_CONTRADICTION'
             ? { trusted_verifier: TRUSTED_VERIFIER_NAME }
             : {}),
         },
@@ -343,6 +349,31 @@ class ContradictionResolutionIntakeService {
         base.reason = isTeacherConstraint
           ? '教師側の制約により評価不能と申告されたため、証拠の記録のみ行い、正誤の判断としては扱いませんでした。'
           : '教師が判断保留としたため、証拠の記録のみ行い、ペアとキューには触れませんでした。';
+        return base;
+      }
+
+      if (verdict === 'NO_CONTRADICTION') {
+        // P481: 誤検出ペアの排出路。「対立する命題が無い」という教師の
+        // 判断でペアを解消する: 判断証拠を双方へ attach（pair_dissolution
+        // 印により真偽の昇格には数えない）、contradicted_by のリンクを
+        // 外し、未解決の矛盾 issue を解決済みに倒す。これでペアは
+        // enumeratePairs から消え、再送・再投入の対象から外れる。
+        // 両 Claim の真偽そのものは未確定のまま残る。
+        evidenceService.attachEvidenceToClaim(evidence.evidence_id, claimAId);
+        evidenceService.attachEvidenceToClaim(evidence.evidence_id, claimBId);
+        const unlinked = claimDatabaseService.removeContradictionLink(claimAId, claimBId);
+        let resolvedIssues = 0;
+        try {
+          resolvedIssues =
+            autonomousIssueDiscoveryService.resolveBySource('CLAIM_CONTRADICTION', claimAId, 'PAIR_DISSOLVED_BY_TEACHER') +
+            autonomousIssueDiscoveryService.resolveBySource('CLAIM_CONTRADICTION', claimBId, 'PAIR_DISSOLVED_BY_TEACHER');
+        } catch {
+          // issue 解決の失敗はペア解消自体を止めない（リンク解除が本体）。
+        }
+        verifierService.verifyClaim({ claimId: claimAId });
+        verifierService.verifyClaim({ claimId: claimBId });
+        base.outcome = 'DISSOLVED';
+        base.reason = `対立する命題が無いという教師の判断によりペアを解消しました（リンク解除: ${unlinked ? '実施' : '対象なし'}／矛盾 issue 解決: ${resolvedIssues}件）。両 Claim の真偽は未確定のままです。`;
         return base;
       }
 
@@ -646,7 +677,9 @@ class ContradictionResolutionIntakeService {
       });
       itemResults.push(result);
       systemLogger.info('SELF_IMPROVEMENT', `[矛盾解決] ${itemId} verdict=${result.verdict} outcome=${result.outcome} ${result.reason}`);
-      if (result.verdict !== 'HOLD') {
+      // P481: ペア解消（NO_CONTRADICTION）は対象 Claim の検証加速を
+      // しない（ペアが消えただけで、真偽は通常経路に委ねる）。
+      if (result.verdict !== 'HOLD' && result.verdict !== 'NO_CONTRADICTION') {
         expediteClaimIds.add(result.claimAId);
         expediteClaimIds.add(result.claimBId);
         if (result.mergedClaimId) expediteClaimIds.add(result.mergedClaimId);
@@ -676,7 +709,7 @@ class ContradictionResolutionIntakeService {
       }
     }
 
-    const settledCount = itemResults.filter((item) => item.outcome === 'SETTLED').length;
+    const settledCount = itemResults.filter((item) => item.outcome === 'SETTLED' || item.outcome === 'DISSOLVED').length;
     const attachedCount = itemResults.filter((item) => item.outcome === 'EVIDENCE_ATTACHED' || item.outcome === 'MERGED_CANDIDATE_REGISTERED').length;
     const heldCount = itemResults.filter((item) => item.outcome === 'HELD').length;
     const constraintCount = itemResults.filter((item) => item.teacherConstraint).length;

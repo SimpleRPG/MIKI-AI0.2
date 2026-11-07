@@ -656,7 +656,73 @@ export class ClaimDatabaseService {
     ) {
       return `出典不一致（${candidate.independence_cluster_id || 'unknown'} vs ${existing.independence_cluster_id || 'unknown'}）`;
     }
+    // P481: 対立語以外の内容語（主題を担う語）を共有しないペアは、
+    // 別の主題の文同士が対立語だけで結ばれた誤検出として弱い矛盾に
+    // 留める（実例: アンテナ審判の文と LISP の文が「できる／できない」
+    // だけで結ばれる）。教師パッケージ10件全件がこの型の誤検出だった。
+    if (!this.sharesContentToken(candidate.statement, existing.statement)) {
+      return '内容語の共有なし（対立語のみの一致）';
+    }
     return undefined;
+  }
+
+  /**
+   * P481: 両文が主題を担う内容語を共有するか。漢字・かな・英数の
+   * 2文字以上の語を拾い、対立語と一般語を除いて一致を見る。形態素
+   * 解析は使わない簡易判定（3文字以上の語は先頭2文字での部分一致も
+   * 共有とみなし、表記の揺れを吸収する）。
+   */
+  private sharesContentToken(a: string, b: string): boolean {
+    const stop = new Set([
+      'できる', 'できない', '発生する', '発生しない', '高速化する', '低速化する',
+      '推奨', '非推奨', 'これ', 'それ', 'あれ', 'ため', 'こと', 'もの', 'よう',
+      '場合', '以上', '以下', '関する', 'ための', 'について', 'において', 'よって',
+    ]);
+    const tokens = (text: string): string[] => {
+      const found: string[] = [];
+      for (const m of String(text || '').matchAll(/[a-zA-Z0-9]{2,}|[一-龯]{2,}|[ぁ-んァ-ヶ]{2,}/g)) {
+        if (!stop.has(m[0])) found.push(m[0]);
+      }
+      return found;
+    };
+    const bText = String(b || '');
+    const bTokens = new Set(tokens(bText));
+    for (const token of tokens(a)) {
+      if (bTokens.has(token)) return true;
+      if (token.length >= 3 && bText.includes(token.slice(0, 2))) return true;
+    }
+    return false;
+  }
+
+  /**
+   * P481: 2つの Claim の間の contradicted_by リンクを双方向に外す。
+   * 教師が「対立する命題が無い（誤検出）」と判断したペアの排出路。
+   * Claim 自体と真偽の状態には触れない。リンクが実在して外れたら true。
+   */
+  public removeContradictionLink(claimAId: string, claimBId: string): boolean {
+    const a = this.claims.get(claimAId);
+    const b = this.claims.get(claimBId);
+    let removed = false;
+    if (a?.contradicted_by?.includes(claimBId)) {
+      a.contradicted_by = a.contradicted_by.filter((id) => id !== claimBId);
+      removed = true;
+    }
+    if (b?.contradicted_by?.includes(claimAId)) {
+      b.contradicted_by = b.contradicted_by.filter((id) => id !== claimAId);
+      removed = true;
+    }
+    if (removed) {
+      this.relations = this.relations.filter(
+        (r) =>
+          !(
+            r.relation === 'CONTRADICTS' &&
+            ((r.source_claim_id === claimAId && r.target_claim_id === claimBId) ||
+              (r.source_claim_id === claimBId && r.target_claim_id === claimAId))
+          ),
+      );
+      this.saveToStorage();
+    }
+    return removed;
   }
 
   /**

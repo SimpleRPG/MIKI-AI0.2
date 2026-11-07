@@ -85,7 +85,9 @@ export class VerifierService {
     const executionEvidence = this.collectEvidence(params.claimId, params.executionEvidenceIds)
       .filter((e) => e.kind === 'EXECUTION');
 
-    const admissible = evidence.filter((e) => e.status === 'ADMISSIBLE' && e.metadata?.research_source_role !== 'COUNTEREVIDENCE');
+    // P481: ペア解消の判断証拠（pair_dissolution）は真偽の証拠ではない
+    // ため、反証と同じく裏付けの数えから外す。
+    const admissible = evidence.filter((e) => e.status === 'ADMISSIBLE' && e.metadata?.research_source_role !== 'COUNTEREVIDENCE' && e.metadata?.pair_dissolution !== true);
     const independentClusters = new Set(admissible.map((e) => e.independence_cluster_id));
     // P463: 一次資料の判定接続。収集ポリシーでは一次資料が必須でも、
     // 判定段の昇格条件には入っていなかった。証拠全件に役割が明示されて
