@@ -177,8 +177,8 @@ class AutonomousSelfImprovementLoopService {
   private sequence = 0;
   // P475: 上限却下のログ・保存の間引き（同一トリガーの連続却下対策）。
   private refusalLogAt = new Map<string, number>();
-  // P480: 世界モデル成長の最終実行時刻（メモリ上。drain のたびに
-  // 判定し、30分に1回だけ回す）。
+  // P480/P482: 世界モデル成長の最終実行時刻（メモリ上。enqueue の
+  // たびに判定し、30分に1回だけ回す）。
   private lastWorldModelGrowthAt = 0;
   private lastDigestSignature = '';
   private lastLoadDroppedInvalid = 0;
@@ -228,6 +228,14 @@ class AutonomousSelfImprovementLoopService {
     meta: Partial<AutonomousImprovementRequest> = {}
   ): AutonomousImprovementRequest {
     this.assertWritable();
+    // P482: 世界モデルの成長チェックは drain の入口ではなくこちらに
+    // 置く。キュー満杯時は drain が「実行中」で早期に戻ることが多く、
+    // P480 の置き場所では成長が回らないことが実機ログで分かった。
+    // enqueue は投入・却下・重複の全経路で呼ばれるため、ここなら
+    // 30分の間引き判定が確実に評価される（実際の成長は間引き内のみ。
+    // 成長が Claim イベント経由で enqueue を再帰させても、時刻記録が
+    // 先行するため二重には回らない）。
+    this.maybeRunWorldModelGrowth();
     const duplicate = this.state.queue.find(item =>
       item.trigger === trigger &&
       item.source === source &&
@@ -600,10 +608,6 @@ class AutonomousSelfImprovementLoopService {
     // P463: 選択の時点でも並べ直す。優先度は投入時に固定され、運転中の
     // expedite（待ち解除・引き上げ）が選択順に反映されなかった。
     this.state.queue.sort(compareQueueRequests);
-    // P480: 世界モデルの成長（関係抽出＋仮説生成。内部で部品リンクの
-    // 同期も回る）を定期運転に相乗りさせる。これまで呼び出し元が
-    // どこにも無く、実機ログでも活動0件だった。
-    this.maybeRunWorldModelGrowth();
     if (this.writesBlocked || this.state.queue.length === 0) return;
     this.running = true;
     let activeRequest: AutonomousImprovementRequest | undefined;
