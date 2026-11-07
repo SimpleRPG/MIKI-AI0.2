@@ -317,7 +317,8 @@ export class EvidenceService {
 
   public registerUnverifiedClaim(
     evidenceId: string,
-    statement?: string
+    statement?: string,
+    options?: { allowDuplicate?: boolean }
   ): string | undefined {
     const evidence = this.records.get(evidenceId);
     if (!evidence || evidence.status === 'REJECTED') return undefined;
@@ -325,6 +326,11 @@ export class EvidenceService {
     const text = (statement || evidence.snippet).trim();
     if (text.length < 15) return undefined;
 
+    // P459: registerClaim 側の重複排除により、同一文面が既にあれば
+    // 既存 Claim が返る。その場合この証拠は「既存 Claim への追加の
+    // attach」として働く（独立クラスタの証拠が既存 Claim に集まる
+    // のが 2 クラスタ原則の観点で望ましい形）。allowDuplicate は
+    // 研究の反証パスのように別 Claim として意図的に分ける場合のみ。
     const claim = claimDatabaseService.registerClaim({
       statement: text,
       world: 'REAL',
@@ -336,9 +342,10 @@ export class EvidenceService {
       independence_cluster_id: evidence.independence_cluster_id,
       maturity: 'DISCOVERED',
       self_provenance: 'INDEPENDENTLY_SUPPORTED',
+      allowDuplicate: options?.allowDuplicate,
     });
 
-    evidence.claim_ids.push(claim.claim_id);
+    if (!evidence.claim_ids.includes(claim.claim_id)) evidence.claim_ids.push(claim.claim_id);
     evidence.status = 'ADMISSIBLE';
     this.save();
 

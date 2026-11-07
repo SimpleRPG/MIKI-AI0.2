@@ -14,6 +14,64 @@ import { knowledgeHalfLifeService, type KnowledgeStability } from './knowledgeHa
 
 const CLAIMS_STORAGE_KEY = 'miki_claim_db_v1';
 
+/*
+ * P459: Claim の重複排除で使う「同一性」。
+ * 文面は研究経路の既存正規化（researchService.normalizeClaimStatement）と
+ * 同系（小文字化・空白圧縮・句読点／引用符の除去）に NFKC を足し、全角／
+ * 半角の揺れも同一視する。小数点や桁区切りは保持する（「1.5倍」と
+ * 「15倍」のような別物を畳まない）。同一性の残りは world・kind・source
+ * の一致と scope の安定文字列化の一致で、出典（origin_source_id）や
+ * クラスタの違いは同一性を妨げない（別出典の同じ文は、既存 Claim へ
+ * 証拠が集まる形になる。検証器はクラスタを Set で数えるため、同一
+ * クラスタの証拠が増えても二重計上にはならない）。
+ */
+export const normalizeClaimStatementForDedup = (text: string): string =>
+  String(text || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[\s　]+/g, ' ')
+    .replace(/[「」『』“”\"'、。！？!?]/g, '')
+    .trim();
+
+const stableStringifyForScope = (value: unknown): string => {
+  if (value === null || value === undefined) return 'null';
+  if (Array.isArray(value)) return `[${value.map(stableStringifyForScope).join(',')}]`;
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringifyForScope(v)}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+};
+
+export const claimDedupIdentityKey = (parts: {
+  statement: string;
+  world: string;
+  kind: string;
+  source: string;
+  scope?: unknown;
+}): string =>
+  [
+    normalizeClaimStatementForDedup(parts.statement),
+    parts.world,
+    parts.kind,
+    parts.source,
+    stableStringifyForScope(parts.scope ?? {}),
+  ].join('\u0001');
+
+/** P459: フォールドで正本を選ぶ際の status の強さ（決定的な順序付け）。 */
+const CLAIM_DEDUP_STATUS_RANK: Record<string, number> = {
+  DEVICE_VERIFIED: 6,
+  SUPPORTED: 5,
+  CANDIDATE: 4,
+  UNVERIFIED: 3,
+  DISPUTED: 3,
+  CONTEXT_ONLY: 2,
+  CONTRADICTED: 1,
+  UNRESOLVED: 1,
+};
+
 /**
  * 主張間の関係リンク
  */
@@ -49,10 +107,13 @@ export class ClaimDatabaseService {
   private claims: Map<string, ClaimRecord> = new Map();
   private relations: ClaimRelation[] = [];
   private counter: number = 1;
+  // P459: 文面は登録後に変わらないため、正規化結果を claim_id で保持する。
+  private normalizedStatementCache: Map<string, string> = new Map();
 
   private constructor() {
     this.loadFromStorage();
     this.migrateLegacySeedVerification();
+    this.foldDuplicateClaims();
     if (this.claims.size === 0) {
       this.initSeedClaims();
     }
@@ -143,6 +204,12 @@ export class ClaimDatabaseService {
   /**
    * 新規主張の登録 (第6.2節・6.3節)
    * 既存主張との矛盾・上書き(SUPERSEDE)関係を自動検出し、整合性を保つ
+   *
+   * P459: 登録時の重複排除。文面の正規化形・world・kind・source・scope
+   * が全て一致し、終端（SUPERSEDED／FALSE）でない既存 Claim があれば、
+   * 新規作成せずその Claim を返す（矛盾検出も行わない）。重複登録の
+   * 試みは [P459] ログに残す。呼び出し側が別 Claim として意図的に
+   * 分けたい場合（研究の反証パス）だけ allowDuplicate を指定する。
    */
   public registerClaim(params: {
     statement: string;
@@ -157,7 +224,19 @@ export class ClaimDatabaseService {
     maturity?: ClaimMaturity;
     self_provenance?: ClaimSelfProvenance;
     open_world_status?: ClaimOpenWorldStatus;
+    allowDuplicate?: boolean;
   }): ClaimRecord {
+    if (!params.allowDuplicate) {
+      const duplicate = this.findDuplicateClaim(params);
+      if (duplicate) {
+        systemLogger.info(
+          'SELF_IMPROVEMENT',
+          `[P459] [主張DB重複排除] 既存の主張 ${duplicate.claim_id} と同一（正規化文面・world・kind・source・scope が一致）のため新規登録せず既存を返します: 「${String(params.statement || '').trim().slice(0, 80)}」`
+        );
+        return duplicate;
+      }
+    }
+
     const claim_id = `CLM-${String(this.counter++).padStart(6, '0')}`;
     const now = Date.now();
 
@@ -237,6 +316,137 @@ export class ClaimDatabaseService {
     );
 
     return newClaim;
+  }
+
+  /**
+   * P459: 同一性の一致する既存 Claim を探す。終端（SUPERSEDED／FALSE）
+   * の Claim は同一視しない（置換済みの文面は改めて登録できる）。
+   * 複数残っている場合（フォールド前の旧データ等）は、正本の選び方
+   * （status の強さ→古い順→ID 順）で決定的に1件を選ぶ。
+   */
+  private findDuplicateClaim(params: {
+    statement: string;
+    world: ClaimWorld;
+    kind: ClaimKind;
+    scope?: ClaimScope;
+    source: string;
+  }): ClaimRecord | undefined {
+    const targetKey = claimDedupIdentityKey({
+      statement: params.statement,
+      world: params.world,
+      kind: params.kind,
+      source: params.source,
+      scope: params.scope ?? {},
+    });
+    const matches: ClaimRecord[] = [];
+    for (const claim of this.claims.values()) {
+      if (claim.status === 'SUPERSEDED' || claim.status === 'FALSE') continue;
+      if (claim.world !== params.world || claim.kind !== params.kind || claim.source !== params.source) continue;
+      if (this.dedupIdentityKeyOfClaim(claim) === targetKey) matches.push(claim);
+    }
+    if (matches.length === 0) return undefined;
+    matches.sort(
+      (a, b) =>
+        (CLAIM_DEDUP_STATUS_RANK[b.status] ?? 0) - (CLAIM_DEDUP_STATUS_RANK[a.status] ?? 0) ||
+        a.created_at - b.created_at ||
+        a.claim_id.localeCompare(b.claim_id)
+    );
+    return matches[0];
+  }
+
+  private dedupIdentityKeyOfClaim(claim: ClaimRecord): string {
+    let normalized = this.normalizedStatementCache.get(claim.claim_id);
+    if (normalized === undefined) {
+      normalized = normalizeClaimStatementForDedup(claim.statement);
+      this.normalizedStatementCache.set(claim.claim_id, normalized);
+    }
+    return [
+      normalized,
+      claim.world,
+      claim.kind,
+      claim.source,
+      stableStringifyForScope(claim.scope ?? {}),
+    ].join('\u0001');
+  }
+
+  /**
+   * P459: 既存データの重複掃除（ロード時に1回、決定的・冪等）。
+   * 同一性が一致する非終端 Claim のグループについて、正本を1件決め、
+   * 他を SUPERSEDED にして superseded_by で正本を指す。Claim 自体は
+   * 削除しない。参照の張り替えは Claim DB の内側に閉じる
+   * （contradicted_by／derived_from／superseded_by／superseded_from を
+   * 正本へ寄せ、重複と自己参照を除く）。証拠レコード側の claim_ids は
+   * supersedeClaim の既存作法と同じく張り替えない（履歴として残り、
+   * SUPERSEDED な Claim は検証・パッケージ作成の対象から外れる）。
+   * relations はセッション内のみの保持でロード時点では空のため対象外。
+   * SUPERSEDED は同一視の対象外なので、再起動で再実行されても何も
+   * 起きない。
+   */
+  private foldDuplicateClaims(): void {
+    const groups = new Map<string, ClaimRecord[]>();
+    for (const claim of this.claims.values()) {
+      if (claim.status === 'SUPERSEDED' || claim.status === 'FALSE') continue;
+      const key = this.dedupIdentityKeyOfClaim(claim);
+      const group = groups.get(key);
+      if (group) group.push(claim);
+      else groups.set(key, [claim]);
+    }
+
+    const dupToCanonical = new Map<string, string>();
+    let foldedGroups = 0;
+    for (const group of groups.values()) {
+      if (group.length < 2) continue;
+      const sorted = [...group].sort(
+        (a, b) =>
+          (CLAIM_DEDUP_STATUS_RANK[b.status] ?? 0) - (CLAIM_DEDUP_STATUS_RANK[a.status] ?? 0) ||
+          a.created_at - b.created_at ||
+          a.claim_id.localeCompare(b.claim_id)
+      );
+      const canonical = sorted[0];
+      foldedGroups += 1;
+      for (const dup of sorted.slice(1)) {
+        dupToCanonical.set(dup.claim_id, canonical.claim_id);
+      }
+    }
+    if (dupToCanonical.size === 0) return;
+
+    const now = Date.now();
+    for (const [dupId, canonicalId] of dupToCanonical) {
+      const dup = this.claims.get(dupId);
+      if (!dup) continue;
+      dup.status = 'SUPERSEDED';
+      (dup as ClaimRecord & { beliefStatus?: BeliefRevisionStatus }).beliefStatus = 'SUPERSEDED';
+      dup.superseded_by = canonicalId;
+      dup.updated_at = now;
+    }
+
+    const remap = (id: string): string => dupToCanonical.get(id) ?? id;
+    for (const claim of this.claims.values()) {
+      if (claim.contradicted_by) {
+        claim.contradicted_by = [...new Set(claim.contradicted_by.map(remap))].filter(
+          (id) => id !== claim.claim_id
+        );
+      }
+      if (claim.derived_from) {
+        claim.derived_from = [...new Set(claim.derived_from.map(remap))].filter(
+          (id) => id !== claim.claim_id
+        );
+      }
+      if (claim.superseded_from && dupToCanonical.has(claim.superseded_from)) {
+        const next = remap(claim.superseded_from);
+        claim.superseded_from = next === claim.claim_id ? undefined : next;
+      }
+      if (claim.superseded_by && dupToCanonical.has(claim.superseded_by)) {
+        const next = remap(claim.superseded_by);
+        if (next !== claim.claim_id) claim.superseded_by = next;
+      }
+    }
+
+    this.saveToStorage();
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[P459] [主張DB重複掃除] 同一主張の重複 ${dupToCanonical.size} 件を ${foldedGroups} 件の正本へ寄せました（SUPERSEDED化し、DB内の参照は正本へ張り替え）`
+    );
   }
 
   /**

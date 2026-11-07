@@ -1146,8 +1146,10 @@ export class ResearchService {
 
     // Counterevidence remains a separately inspectable Claim; it must not
     // silently join an existing positive-support Claim.
+    // P459: そのため反証パスだけは Claim DB の重複排除を明示的に外し、
+    // 従来どおり別 Claim として登録する。
     if (!reuseExisting) {
-      return evidenceService.registerUnverifiedClaim(evidenceId, statement);
+      return evidenceService.registerUnverifiedClaim(evidenceId, statement, { allowDuplicate: true });
     }
 
     const existingClaimId = claimIdByNormalizedStatement.get(normalized);
