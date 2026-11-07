@@ -33,15 +33,15 @@
       "quality": "ILLUSTRATION_2D",
       "width": 512,
       "height": 768,
-      "sha256": "8ab46aa06e07dc38b80f4fd1cc99fd40dc3854920d5e894ecc4ce69707825a30",
-      "bytes": 19320
+      "sha256": "f003b1a1b9d12e0d580def8601a6100c5e4049805033a6df5f2ac7c494addeb5",
+      "bytes": 23910
     },
     {
       "quality": "ILLUSTRATION_25D",
       "width": 768,
       "height": 1152,
-      "sha256": "b5c9511d83e7c36fdadbffa36cbabf89b9e746b19ad2a9ce44896c8b1bd62c57",
-      "bytes": 38287
+      "sha256": "4dd9fe36f3ea3e379775833620cd63b51097886de7d85fc72bb89fff1b25f592",
+      "bytes": 44089
     }
   ]
 }

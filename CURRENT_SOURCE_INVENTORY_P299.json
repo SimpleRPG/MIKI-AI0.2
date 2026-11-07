@@ -17384,9 +17384,9 @@
     },
     {
       "path": "src/miki/core/services/personVisualProductionP138Service.ts",
-      "bytes": 7941,
-      "lines": 30,
-      "sha256": "cfe22067830c2fae0e727b08139575127f3e1a42d948ff2597d7dd7370245694",
+      "bytes": 10384,
+      "lines": 55,
+      "sha256": "b0553335c016f99ff07eea0113b3491864f4513fdbef925a528563013b1ccdf2",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -17597,9 +17597,9 @@
     },
     {
       "path": "src/miki/core/services/rasterCanvasService.ts",
-      "bytes": 8389,
-      "lines": 220,
-      "sha256": "beee494570536173773507632a32dae853b20a04048d2d1d87a586b52d87bf13",
+      "bytes": 16409,
+      "lines": 403,
+      "sha256": "8daf22f2921a9bccc5e58dcffce0a96eed2f8dffa276941d633a467e778dad90",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,

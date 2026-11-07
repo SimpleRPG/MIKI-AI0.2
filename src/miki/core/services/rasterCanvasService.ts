@@ -183,27 +183,134 @@ export class RasterCanvas {
     }
   }
 
+  /** 内部解像度で円をスタンプする（線とストロークの共通部品）。 */
+  private stampCircle(x: number, y: number, r: number, rgb: Rgb, sa: number): void {
+    if (r <= 0) return;
+    const ss = this.supersample;
+    const cyPx = y * ss;
+    const rPx = r * ss;
+    const yy0 = Math.max(0, Math.floor(cyPx - rPx));
+    const yy1 = Math.min(this.pixelHeight - 1, Math.ceil(cyPx + rPx));
+    for (let iy = yy0; iy <= yy1; iy++) {
+      const ly = (iy + 0.5) / ss;
+      const t = (ly - y) / r;
+      if (Math.abs(t) > 1) continue;
+      const half = r * Math.sqrt(1 - t * t);
+      this.blendSpan(iy, Math.floor((x - half) * ss), Math.ceil((x + half) * ss), rgb, sa);
+    }
+  }
+
   public line(x0: number, y0: number, x1: number, y1: number, color: string, alpha = 1, width = 1): void {
     const rgb = parseHexColor(color);
     const sa = Math.max(0, Math.min(1, alpha));
     const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1) * this.supersample;
-    const r = width / 2;
     for (let i = 0; i <= n; i++) {
       const x = x0 + ((x1 - x0) * i) / n;
       const y = y0 + ((y1 - y0) * i) / n;
-      // 円のスタンプもスパンで塗る
-      const ss = this.supersample;
-      const cyPx = y * ss;
-      const rPx = r * ss;
-      const yy0 = Math.max(0, Math.floor(cyPx - rPx));
-      const yy1 = Math.min(this.pixelHeight - 1, Math.ceil(cyPx + rPx));
-      for (let iy = yy0; iy <= yy1; iy++) {
-        const ly = (iy + 0.5) / ss;
-        const t = (ly - y) / r;
-        if (Math.abs(t) > 1) continue;
-        const half = r * Math.sqrt(1 - t * t);
-        this.blendSpan(iy, Math.floor((x - half) * ss), Math.ceil((x + half) * ss), rgb, sa);
+      this.stampCircle(x, y, width / 2, rgb, sa);
+    }
+  }
+
+  /** 上下グラデーションの楕円（虹彩や頬の色づきなど、色が流れる面用）。 */
+  public gradientEllipse(cx: number, cy: number, rx: number, ry: number, colorTop: string, colorBottom: string, alpha = 1): void {
+    if (rx <= 0 || ry <= 0) return;
+    const top = parseHexColor(colorTop);
+    const bottom = parseHexColor(colorBottom);
+    const sa = Math.max(0, Math.min(1, alpha));
+    const ss = this.supersample;
+    const cyPx = cy * ss;
+    const ryPx = ry * ss;
+    const y0 = Math.max(0, Math.floor(cyPx - ryPx));
+    const y1 = Math.min(this.pixelHeight - 1, Math.ceil(cyPx + ryPx));
+    for (let iy = y0; iy <= y1; iy++) {
+      const ly = (iy + 0.5) / ss;
+      const t = (ly - cy) / ry;
+      const half = rx * Math.sqrt(Math.max(0, 1 - t * t));
+      const mix = Math.max(0, Math.min(1, (t + 1) / 2));
+      const rgb: Rgb = [
+        Math.round(top[0] + (bottom[0] - top[0]) * mix),
+        Math.round(top[1] + (bottom[1] - top[1]) * mix),
+        Math.round(top[2] + (bottom[2] - top[2]) * mix),
+      ];
+      this.blendSpan(iy, Math.floor((cx - half) * ss), Math.ceil((cx + half) * ss), rgb, sa);
+    }
+  }
+
+  /*
+   * P468: ストローク描画（図形ではなく絵として描くための筆）。
+   * 軌跡に沿って円形の筆を運び、重なった所は自然に濃くなる。
+   * taperIn / taperOut は線の入りと抜け（0〜1、全体長に対する割合）。
+   * soft の筆は周辺がぼけるので、陰や空気感のある塗りに使う。
+   */
+  public strokePath(
+    points: number[][],
+    options: { color: string; width: number; alpha?: number; taperIn?: number; taperOut?: number; soft?: boolean },
+  ): void {
+    if (points.length < 2) return;
+    const rgb = parseHexColor(options.color);
+    const sa = Math.max(0, Math.min(1, options.alpha ?? 1));
+    const width = Math.max(0.2, options.width);
+    // 累積長
+    const cum: number[] = [0];
+    for (let i = 1; i < points.length; i++) {
+      cum.push(cum[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
+    }
+    const total = cum[cum.length - 1];
+    if (total <= 0) return;
+    const taperInLen = total * Math.max(0, Math.min(0.9, options.taperIn ?? 0));
+    const taperOutLen = total * Math.max(0, Math.min(0.9, options.taperOut ?? 0));
+    const step = Math.max(0.35, (width / 2) * 0.45);
+    const steps = Math.max(2, Math.ceil(total / step));
+    let seg = 1;
+    for (let i = 0; i <= steps; i++) {
+      const d = (total * i) / steps;
+      while (seg < cum.length - 1 && cum[seg] < d) seg++;
+      const segLen = Math.max(1e-6, cum[seg] - cum[seg - 1]);
+      const f = (d - cum[seg - 1]) / segLen;
+      const x = points[seg - 1][0] + (points[seg][0] - points[seg - 1][0]) * f;
+      const y = points[seg - 1][1] + (points[seg][1] - points[seg - 1][1]) * f;
+      let factor = 1;
+      if (taperInLen > 0) factor = Math.min(factor, Math.sqrt(Math.min(1, d / taperInLen)));
+      if (taperOutLen > 0) factor = Math.min(factor, Math.sqrt(Math.min(1, (total - d) / taperOutLen)));
+      const r = Math.max(0.15, (width / 2) * factor);
+      if (options.soft) this.softEllipse(x, y, r, r, options.color, sa * 0.5);
+      else this.stampCircle(x, y, r, rgb, sa);
+    }
+  }
+
+  /** 2次/3次ベジェ曲線をストロークで描く（髪の流れやまつ毛の弧など）。 */
+  public bezierStroke(
+    p0: number[],
+    p1: number[],
+    p2: number[],
+    p3: number[] | null,
+    options: { color: string; width: number; alpha?: number; taperIn?: number; taperOut?: number; soft?: boolean },
+  ): void {
+    const pts: number[][] = [];
+    const n = 24;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const u = 1 - t;
+      if (p3) {
+        pts.push([
+          u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+          u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+        ]);
+      } else {
+        pts.push([u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0], u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1]]);
       }
+    }
+    this.strokePath(pts, options);
+  }
+
+  /** 柔らかい筆で面を塗る（陰・空気・水彩的な重ね塗り）。低透明度で重ねるほど濃くなる。 */
+  public paintStroke(
+    points: number[][],
+    options: { color: string; width: number; alpha?: number; passes?: number },
+  ): void {
+    const passes = Math.max(1, options.passes ?? 1);
+    for (let i = 0; i < passes; i++) {
+      this.strokePath(points, { color: options.color, width: options.width, alpha: options.alpha ?? 0.16, soft: true });
     }
   }
 

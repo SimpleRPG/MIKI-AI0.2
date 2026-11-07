@@ -15,8 +15,33 @@ class PersonVisualProductionP138Service{
  confirmationQuestion(profile:P138VisualProfile):string|null{return profile.garments.some(g=>g.presence==='GARMENT_CONFIRMATION_REQUIRED')?'対象領域では外観と衣服候補の差を確定できません。衣服あり、衣服なし、不明のまま、のどれとして扱いますか？':null;}
  async render(profile:P138VisualProfile,quality:PersonRenderQuality):Promise<P138PngArtifact>{this.verify(profile);const policy=profile.garments[0].boundaryRenderingPolicy;const dims:Record<PersonRenderQuality,[number,number]>={PIXEL_NATIVE:[64,96],PIXEL_ILLUSTRATION:[256,384],ILLUSTRATION_2D:[512,768],ILLUSTRATION_25D:[768,1152]};const [w,h]=dims[quality],ss=quality==='ILLUSTRATION_2D'?3:quality==='ILLUSTRATION_25D'?2:1,c=new RasterCanvas(w,h,ss),s=w/256;const skin='#f2c6a8',hair='#302333',cloth='#ececec',shadow='#b8bdc8',deep='#777f91',light='#ffffff',shoe='#34333a';
   if(quality==='ILLUSTRATION_25D'){c.softEllipse(w*.52,h*.915,w*.185,h*.03,'#000000',.38);c.softEllipse(w*.545,h*.52,w*.20,h*.38,'#000000',.13);}
-  c.ellipse(w*.5,h*.15,w*.105,h*.105,hair);c.ellipse(w*.482,h*.136,w*.096,h*.099,'#453550',.85);c.ellipse(w*.5,h*.165,w*.088,h*.092,skin);c.ellipse(w*.468,h*.158,w*.008,h*.006,'#332f36');c.ellipse(w*.532,h*.158,w*.008,h*.006,'#332f36');c.line(w*.49,h*.19,w*.51,h*.19,'#9c5d60',1,Math.max(1,s));
-  if(quality==='ILLUSTRATION_2D'||quality==='ILLUSTRATION_25D'){c.line(w*.452,h*.147,w*.484,h*.145,'#4a3a3a',.7,Math.max(1,s));c.line(w*.516,h*.145,w*.548,h*.147,'#4a3a3a',.7,Math.max(1,s));c.line(w*.5,h*.166,w*.496,h*.179,'#d9a37e',.85,Math.max(1,s));c.softEllipse(w*.45,h*.186,w*.021,h*.012,'#e8977a',.32);c.softEllipse(w*.55,h*.186,w*.021,h*.012,'#e8977a',.32);}
+  c.ellipse(w*.5,h*.15,w*.105,h*.105,hair);c.ellipse(w*.482,h*.136,w*.096,h*.099,'#453550',.85);c.ellipse(w*.5,h*.165,w*.088,h*.092,skin);if(quality==='PIXEL_NATIVE'||quality==='PIXEL_ILLUSTRATION'){c.ellipse(w*.468,h*.158,w*.008,h*.006,'#332f36');c.ellipse(w*.532,h*.158,w*.008,h*.006,'#332f36');}c.line(w*.49,h*.19,w*.51,h*.19,'#9c5d60',1,Math.max(1,s));
+  if(quality==='ILLUSTRATION_2D'||quality==='ILLUSTRATION_25D'){
+    // P468: 図形の貼り合わせではなく、筆（ストローク）で描く。目・眉・髪の流れ。
+    c.softEllipse(w*.5,h*.242,w*.034,h*.013,'#d9a37e',.35); // 首の陰
+    for(const ex of [w*.468,w*.532]){const ey=h*.16;
+      c.ellipse(ex,ey,w*.0155,h*.0085,'#fdfdfd',.96);
+      c.gradientEllipse(ex,ey+h*.0005,w*.0085,h*.0075,'#2e2018','#7c4b26');
+      c.ellipse(ex,ey+h*.0005,w*.0038,h*.0038,'#14100c');
+      c.ellipse(ex-w*.0035,ey-h*.003,w*.0028,h*.0028,'#ffffff');c.ellipse(ex+w*.003,ey+h*.0035,w*.0016,h*.0016,'#ffffff',.9);
+      c.bezierStroke([ex-w*.016,ey-h*.002],[ex,ey-h*.013],[ex+w*.016,ey-h*.002],null,{color:'#2b2126',width:Math.max(1.2,s*1.15),taperIn:.35,taperOut:.35});
+      c.strokePath([[ex-w*.011,ey+h*.0075],[ex+w*.011,ey+h*.0075]],{color:'#a9806a',width:Math.max(.8,s*.6),alpha:.4,taperIn:.3,taperOut:.3});
+    }
+    c.bezierStroke([w*.45,h*.146],[w*.467,h*.1395],[w*.486,h*.1445],null,{color:'#4a3a3a',width:Math.max(1,s*1.1),alpha:.8,taperIn:.3,taperOut:.3});
+    c.bezierStroke([w*.514,h*.1445],[w*.533,h*.1395],[w*.55,h*.146],null,{color:'#4a3a3a',width:Math.max(1,s*1.1),alpha:.8,taperIn:.3,taperOut:.3});
+    c.line(w*.5,h*.166,w*.496,h*.179,'#d9a37e',.85,Math.max(1,s));
+    c.softEllipse(w*.45,h*.186,w*.021,h*.012,'#e8977a',.32);c.softEllipse(w*.55,h*.186,w*.021,h*.012,'#e8977a',.32);
+    // 髪: ベースの楕円の上に、流れのある毛束とハイライトを筆で足す
+    c.bezierStroke([w*.408,h*.088],[w*.394,h*.16],[w*.402,h*.215],[w*.418,h*.268],{color:'#241a2e',width:w*.011,taperIn:.15,taperOut:.55});
+    c.bezierStroke([w*.592,h*.088],[w*.606,h*.16],[w*.598,h*.215],[w*.582,h*.268],{color:'#241a2e',width:w*.011,taperIn:.15,taperOut:.55});
+    c.bezierStroke([w*.415,h*.095],[w*.405,h*.17],[w*.415,h*.24],null,{color:'#55436a',width:w*.006,alpha:.75,taperIn:.2,taperOut:.5});
+    c.bezierStroke([w*.585,h*.095],[w*.595,h*.17],[w*.585,h*.24],null,{color:'#55436a',width:w*.006,alpha:.75,taperIn:.2,taperOut:.5});
+    c.bezierStroke([w*.455,h*.055],[w*.44,h*.085],[w*.436,h*.106],null,{color:'#2e2138',width:w*.007,alpha:.9,taperIn:.2,taperOut:.45});
+    c.bezierStroke([w*.478,h*.052],[w*.47,h*.075],[w*.472,h*.088],null,{color:'#2e2138',width:w*.007,alpha:.9,taperIn:.2,taperOut:.45});
+    c.bezierStroke([w*.522,h*.052],[w*.53,h*.075],[w*.528,h*.088],null,{color:'#2e2138',width:w*.007,alpha:.9,taperIn:.2,taperOut:.45});
+    c.bezierStroke([w*.545,h*.055],[w*.56,h*.085],[w*.564,h*.106],null,{color:'#2e2138',width:w*.007,alpha:.9,taperIn:.2,taperOut:.45});
+    c.bezierStroke([w*.44,h*.078],[w*.472,h*.058],[w*.532,h*.066],null,{color:'#6d557f',width:w*.007,alpha:.45,taperIn:.3,taperOut:.3});
+  }
   c.poly([[w*.42,h*.25],[w*.58,h*.25],[w*.64,h*.58],[w*.36,h*.58]],cloth);c.poly([[w*.42,h*.25],[w*.50,h*.25],[w*.47,h*.58],[w*.36,h*.58]],shadow);c.poly([[w*.50,h*.25],[w*.58,h*.25],[w*.64,h*.58],[w*.47,h*.58]],light);
   c.poly([[w*.42,h*.27],[w*.33,h*.31],[w*.28,h*.55],[w*.34,h*.57],[w*.43,h*.39]],cloth);c.poly([[w*.58,h*.27],[w*.67,h*.31],[w*.72,h*.55],[w*.66,h*.57],[w*.57,h*.39]],cloth);c.ellipse(w*.30,h*.58,w*.028,h*.04,skin);c.ellipse(w*.70,h*.58,w*.028,h*.04,skin);
   c.poly([[w*.40,h*.58],[w*.49,h*.58],[w*.47,h*.88],[w*.37,h*.88]],deep);c.poly([[w*.51,h*.58],[w*.60,h*.58],[w*.63,h*.88],[w*.53,h*.88]],'#687185');c.ellipse(w*.40,h*.90,w*.07,h*.025,shoe);c.ellipse(w*.60,h*.90,w*.07,h*.025,shoe);
