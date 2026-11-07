@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1770,
-    "sourceFileCount": 1323,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1234,
-    "relativeImportCandidateCount": 3798,
-    "resolvedRelativeImportCandidateCount": 3782,
+    "trackedPathCountExcludingControlPaths": 1771,
+    "sourceFileCount": 1324,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1235,
+    "relativeImportCandidateCount": 3803,
+    "resolvedRelativeImportCandidateCount": 3787,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -7162,103 +7162,109 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 121890,
-      "lines": 2335,
-      "sha256": "c35af1aef6f64e0e0662977f1fd6c38e79810fe28d922e367f4113303aac7604",
+      "bytes": 127863,
+      "lines": 2436,
+      "sha256": "5b383b4e9b52e238cc7419d1b4e36f559307573bb862e915a92cb29ea3db66f3",
       "relativeImportCandidates": [
         {
-          "line": 49,
+          "line": 50,
           "specifier": "../miki/core/ui/typedImprovementUiGatewayService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/ui/typedImprovementUiGatewayService.ts"
         },
         {
-          "line": 53,
+          "line": 54,
           "specifier": "../miki/core/mikiInteractionBus",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/mikiInteractionBus.ts"
         },
         {
-          "line": 54,
+          "line": 55,
           "specifier": "./ReviewPackageLibrary",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/ReviewPackageLibrary.tsx"
         },
         {
-          "line": 55,
+          "line": 56,
           "specifier": "./SelfCodeSpaceScreen",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/SelfCodeSpaceScreen.tsx"
         },
         {
-          "line": 56,
+          "line": 57,
           "specifier": "./LearningArchivePanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/LearningArchivePanel.tsx"
         },
         {
-          "line": 57,
+          "line": 58,
           "specifier": "./LearningInspectorPanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/LearningInspectorPanel.tsx"
         },
         {
-          "line": 58,
+          "line": 59,
           "specifier": "./self_improvement/DevelopmentReviewLifecyclePanel",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/self_improvement/DevelopmentReviewLifecyclePanel.tsx"
         },
         {
-          "line": 59,
+          "line": 60,
           "specifier": "../miki/core/ui/typedCoreUiGatewayService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/ui/typedCoreUiGatewayService.ts"
         },
         {
-          "line": 60,
+          "line": 61,
           "specifier": "../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         },
         {
-          "line": 61,
+          "line": 62,
           "specifier": "../miki/core/services/componentSupplyRequestService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/componentSupplyRequestService.ts"
         },
         {
-          "line": 62,
+          "line": 63,
           "specifier": "../miki/core/services/componentSupplyIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/componentSupplyIntakeService.ts"
         },
         {
-          "line": 63,
+          "line": 64,
           "specifier": "../miki/core/services/contradictionResolutionRequestService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/contradictionResolutionRequestService.ts"
         },
         {
-          "line": 64,
+          "line": 65,
           "specifier": "../miki/core/services/contradictionResolutionIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/contradictionResolutionIntakeService.ts"
         },
         {
-          "line": 65,
+          "line": 66,
+          "specifier": "../miki/core/services/teacherMaterialIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/teacherMaterialIntakeService.ts"
+        },
+        {
+          "line": 67,
           "specifier": "../miki/execution/services/backgroundWorkerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/execution/services/backgroundWorkerService.ts"
         },
         {
-          "line": 66,
+          "line": 68,
           "specifier": "../utils/isEditableInputActive",
           "resolution": "RESOLVED",
           "resolvedPath": "src/utils/isEditableInputActive.ts"
         }
       ],
-      "relativeImportCandidateCount": 15,
-      "resolvedRelativeImportCount": 15,
+      "relativeImportCandidateCount": 16,
+      "resolvedRelativeImportCount": 16,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -18862,6 +18868,41 @@
       ],
       "relativeImportCandidateCount": 2,
       "resolvedRelativeImportCount": 2,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/services/teacherMaterialIntakeService.ts",
+      "bytes": 17829,
+      "lines": 413,
+      "sha256": "4d4f1bcb1a0e9c64fd9d155be597e24bec64ebd890ad0574528e6dd922027ee5",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "./canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        },
+        {
+          "line": 8,
+          "specifier": "./reusableComponentFactoryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/reusableComponentFactoryService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
       "unresolvedRelativeImportCount": 0
     },
     {

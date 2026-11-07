@@ -34,6 +34,7 @@ import {
   Send,
   Boxes,
   Scale,
+  BookOpen,
 } from 'lucide-react';
 
 import {
@@ -62,6 +63,7 @@ import { componentSupplyRequestService } from '../miki/core/services/componentSu
 import { componentSupplyIntakeService } from '../miki/core/services/componentSupplyIntakeService';
 import { contradictionResolutionRequestService } from '../miki/core/services/contradictionResolutionRequestService';
 import { contradictionResolutionIntakeService } from '../miki/core/services/contradictionResolutionIntakeService';
+import { teacherMaterialIntakeService } from '../miki/core/services/teacherMaterialIntakeService';
 import { backgroundWorkerService } from '../miki/execution/services/backgroundWorkerService';
 import { isEditableInputActive } from '../utils/isEditableInputActive';
 
@@ -273,6 +275,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   // 未決着ペアの件数）。
   const [contradictionRequests, setContradictionRequests] = useState(() => contradictionResolutionRequestService.list());
   const [contradictionIntakes, setContradictionIntakes] = useState(() => contradictionResolutionIntakeService.list());
+  const [teacherIntakes, setTeacherIntakes] = useState(() => teacherMaterialIntakeService.list());
   const [unresolvedPairCount, setUnresolvedPairCount] = useState(() => contradictionResolutionRequestService.countUnresolvedPairs());
 
   // P450: バックグラウンド実行のオンオフ (既定ON、サービス側で永続化)
@@ -288,6 +291,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
   const directiveFileInputRef = useRef<HTMLInputElement | null>(null);
   const supplyReplyFileInputRef = useRef<HTMLInputElement | null>(null);
   const contradictionReplyFileInputRef = useRef<HTMLInputElement | null>(null);
+  const teacherMaterialFileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedDirectiveId, setSelectedDirectiveId] = useState<string | null>(null);
 
   // Execution triggers state
@@ -325,6 +329,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
       setSupplyIntakes(componentSupplyIntakeService.list());
       setContradictionRequests(contradictionResolutionRequestService.list());
       setContradictionIntakes(contradictionResolutionIntakeService.list());
+      setTeacherIntakes(teacherMaterialIntakeService.list());
       setUnresolvedPairCount(contradictionResolutionRequestService.countUnresolvedPairs());
     }, 2000);
 
@@ -347,6 +352,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     setSupplyIntakes(componentSupplyIntakeService.list());
     setContradictionRequests(contradictionResolutionRequestService.list());
     setContradictionIntakes(contradictionResolutionIntakeService.list());
+    setTeacherIntakes(teacherMaterialIntakeService.list());
     setUnresolvedPairCount(contradictionResolutionRequestService.countUnresolvedPairs());
     setRefreshTick((prev) => prev + 1);
   };
@@ -839,6 +845,38 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
     } catch (error) {
       setActionMessage({
         text: `矛盾への一括回答を受け付けられません: ${error instanceof Error ? error.message : String(error)}`,
+        type: 'error',
+      });
+    }
+    triggerRefresh();
+  };
+
+  // P472: 教師教材パッケージ（.zip / .zip.txt）を取り込む手動導線。
+  // 教材は要求に結び付かない代わりに、出所を台帳へ記録し、レッスンを
+  // 候補・未検証の知識部品として登録する。教材だけで主張は確定しない。
+  const handleTeacherMaterialFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setActionMessage({ text: '教師教材を照合しています…', type: 'info' });
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const result = await teacherMaterialIntakeService.receivePackage({ fileName: file.name, bytes });
+      if (result.ok) {
+        setActionMessage({
+          text: `教師教材を受け付けました（レッスン ${result.record.lessonCount} 件／参照画像 ${result.record.references.length} 件）。レッスンは候補・未検証の知識部品として登録されました。`,
+          type: 'success',
+        });
+      } else {
+        const reasons = result.reasons?.length ? `（${result.reasons.join(' / ')}）` : '';
+        setActionMessage({
+          text: `教師教材を受け付けられません: ${result.message}${reasons}`,
+          type: 'error',
+        });
+      }
+    } catch (error) {
+      setActionMessage({
+        text: `教師教材を受け付けられません: ${error instanceof Error ? error.message : String(error)}`,
         type: 'error',
       });
     }
@@ -1486,6 +1524,69 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-violet-400" />
+                  教師教材の取り込み
+                </h3>
+                <span className="text-[11px] text-slate-400">受入 {teacherIntakes.filter((i) => i.status === 'RECEIVED').length} 件</span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                外部AI（教師）からの教材パッケージ（レッスン集）を取り込めます。要求への回答とは別枠で、レッスンは候補・未検証の知識部品として登録されます。教材だけで主張が確定することはありません。同梱の参照画像は観察の材料として保管されます。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => teacherMaterialFileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold flex items-center gap-1.5 border border-slate-700"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  教師教材を取り込む
+                </button>
+                <input
+                  ref={teacherMaterialFileInputRef}
+                  type="file"
+                  accept=".zip,.txt,application/zip,text/plain"
+                  className="hidden"
+                  onChange={handleTeacherMaterialFileChange}
+                />
+              </div>
+
+              {teacherIntakes.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[11px] font-semibold text-slate-300">受入結果（直近）</div>
+                  <div className="divide-y divide-slate-800/60 border border-slate-800/60 rounded-lg overflow-hidden">
+                    {teacherIntakes.slice(0, 5).map((intake) => (
+                      <div key={intake.intakeId} className="p-3 bg-slate-900/40 text-xs space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-violet-300 text-[11px] truncate">{intake.subject || intake.sourceFileName}</span>
+                          <span
+                            className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${
+                              intake.status === 'RECEIVED'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            }`}
+                          >
+                            {intake.status === 'RECEIVED' ? '受入' : '却下'}（{intake.code}）
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                          <span>教師: {intake.teacherName || '不明'}</span>
+                          <span>受入: {fmtTime(intake.receivedAt)}</span>
+                          {intake.status === 'RECEIVED' && (
+                            <span>レッスン {intake.lessonCount} 件／参照画像 {intake.references.length} 件</span>
+                          )}
+                        </div>
+                        {intake.status === 'REJECTED' && intake.reasons.length > 0 && (
+                          <div className="text-[10px] text-rose-300/80 truncate">理由: {intake.reasons[0]}</div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
