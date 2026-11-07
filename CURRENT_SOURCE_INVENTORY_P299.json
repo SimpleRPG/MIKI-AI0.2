@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1769,
-    "sourceFileCount": 1322,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1233,
-    "relativeImportCandidateCount": 3797,
-    "resolvedRelativeImportCandidateCount": 3781,
+    "trackedPathCountExcludingControlPaths": 1770,
+    "sourceFileCount": 1323,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1234,
+    "relativeImportCandidateCount": 3798,
+    "resolvedRelativeImportCandidateCount": 3782,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -16930,6 +16930,23 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/core/services/localImageGenerationService.ts",
+      "bytes": 6980,
+      "lines": 161,
+      "sha256": "b489583662f18a6a5d8b7e5936138b5e04df4b9fad20adc23e384574067c9645",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/core/services/missingAssetSynthesisService.ts",
       "bytes": 3408,
       "lines": 27,
@@ -17384,9 +17401,9 @@
     },
     {
       "path": "src/miki/core/services/personVisualProductionP138Service.ts",
-      "bytes": 10384,
-      "lines": 55,
-      "sha256": "b0553335c016f99ff07eea0113b3491864f4513fdbef925a528563013b1ccdf2",
+      "bytes": 11259,
+      "lines": 61,
+      "sha256": "3580b9fc0c42d4252c3c35cabb707f7144c80864bd8a59cfc1228f53117df20e",
       "relativeImportCandidates": [
         {
           "line": 1,
