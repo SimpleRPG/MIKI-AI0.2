@@ -34,6 +34,30 @@ import { stackExchangeMaterialService } from '../../core/services/stackExchangeM
 // P439: 不足スロット向け研究で試した戦略の記録。ギャップごとに3戦略まで。
 const GAP_FOCUS_STRATEGY_LEDGER_KEY='miki_gap_focus_strategy_attempts_v1';
 
+// P473: 主張適格性（知識在庫の監査 2026-11-07 の対策）。
+// ページの文を Claim 化する前に「知識として持つに値する文か」を見る。
+// 出典に実在することと検索語に一致することだけでは、宣伝文・見出し
+// 断片・書き手の一人称の体験談まで事実の主張として在庫化してしまう
+// （実例: 製品ページの宣伝文が FACT_CLAIM になった）。ここで落とす
+// のは Claim 化だけで、Evidence 自体は従来どおり記録される。
+const P473_PROMO_TERMS = ['応援し', '激減', '瞬時', 'ゼロで', '徹底的', '叩き出', 'かみ砕', 'あるある', '詰まったら', 'ここへ', '爆速', '禁断', '裏技', 'じゃじゃ馬', 'お任せ'];
+export function assessClaimWorthiness(statement: string): { ok: boolean; reason?: string } {
+  const text = String(statement || '').trim();
+  if (!text) return { ok: false, reason: 'EMPTY' };
+  if (/[？?]\s*$/.test(text)) return { ok: false, reason: 'QUESTION_FORM' };
+  if (/(私自身|私の経験|僕自身|働き始めた当初)/.test(text)) return { ok: false, reason: 'FIRST_PERSON_ANECDOTE' };
+  const promoHits = P473_PROMO_TERMS.filter((term) => text.includes(term)).length;
+  if (promoHits >= 2) return { ok: false, reason: 'PROMOTIONAL' };
+  if (promoHits >= 1 && /[！!]/.test(text)) return { ok: false, reason: 'PROMOTIONAL' };
+  if (/(だよ|だね|じゃん|なんだ|んだよ)[。！!]?\s*$/.test(text)) return { ok: false, reason: 'CASUAL_BLOG_VOICE' };
+  if (!/[。！？!?」』.]$/.test(text) && text.length < 30) return { ok: false, reason: 'HEADING_FRAGMENT' };
+  return { ok: true };
+}
+
+// P473: 錨語の抽出で落とす一般語（研究の meta な言葉）。
+const P473_ANCHOR_STOP_SEGMENTS = new Set(['研究', '調査', '不足', '必要', '方法', '対象', '情報', '知識', '理解', '説明', '確認', '内容', '場合', '使用', '利用', 'について', 'ため', 'こと', 'もの', 'よう', 'これ', 'それ', '現在', '可能', '関連', '実現', '構築', '重要', '具体', '詳細', '基本', '一般', '全体', '部分', '状態', '形式', '種類', '特徴', '性質', '効果', '影響', '変化']);
+const P473_ANCHOR_STOP_LATIN = new Set(['the', 'and', 'for', 'with', 'from', 'into', 'that', 'this', 'research', 'gap', 'unknown', 'missing']);
+
 // P440 D5: 勉強の測定値の置き場所（verifierService・
 // reusableComponentFactoryService・domainIntegrationBootstrapService と
 // 同じキー・同じ形）。ここでは読むだけ（書くのは各測定点）。
@@ -452,6 +476,16 @@ export class ResearchService {
     const continuationRound = Number.isFinite(options?.continuationRound)
       ? Math.max(0, Math.floor(options!.continuationRound!))
       : 0;
+    // P473: この研究の錨語。質問・gap の対象・不足内容・焦点スロット
+    // から抽出する。派生クエリの語や、取得したページの語彙は含めない
+    // （含めると「読んだページの言葉」が錨になって漂流が止まらない）。
+    const anchorTerms = this.extractAnchorTerms(
+      baseQuery,
+      gap.identity?.target || '',
+      gap.identity?.missingContent || '',
+      (options?.gapFocus?.slotNames || []).join(' '),
+      (options?.gapFocus?.targetPaths || []).join(' '),
+    );
     /*
      * P0: 固定3回を最終仕様にしない。
      * 1回の呼び出しには安全な実行上限を置くが、adaptive=trueなら
@@ -758,7 +792,7 @@ export class ResearchService {
               if (graphClaims >= 4) break;
               const normalizedStatement = this.normalizeClaimStatement(relevant.text);
               if (normalizedStatement.length < 15 || !normalizedFullText.includes(normalizedStatement)) continue;
-              const graphClaimId = this.linkResearchEvidenceToClaim(pageEvidence.evidence_id, relevant.text, claimIdByNormalizedStatement, !isCounterEvidencePass);
+              const graphClaimId = this.linkResearchEvidenceToClaim(pageEvidence.evidence_id, relevant.text, claimIdByNormalizedStatement, !isCounterEvidencePass, { anchorTerms });
               if (graphClaimId) {
                 if (!claimIds.includes(graphClaimId)) claimIds.push(graphClaimId);
                 graphClaims += 1;
@@ -790,6 +824,7 @@ export class ResearchService {
                   statement,
                   claimIdByNormalizedStatement,
                   !isCounterEvidencePass,
+                  { anchorTerms },
                 );
               },
             });
@@ -821,6 +856,7 @@ export class ResearchService {
               pageClaimStatement,
               claimIdByNormalizedStatement,
               !isCounterEvidencePass,
+              { anchorTerms },
             );
             if (pageClaimId && !claimIds.includes(pageClaimId)) {
               claimIds.push(pageClaimId);
@@ -841,7 +877,14 @@ export class ResearchService {
             // P463: gloss が無い語（needsGloss）は、深掘り辞書引きの
             // 消費者に渡す。従来は印と集計だけで、補完する後段がなかった。
             // lookupDeep は同一語の再試行を内部で抑止する。
-            for (const learnedTerm of termLearning.terms.filter((t) => t.needsGloss).slice(0, 5)) {
+            // P473: 深掘りは「この研究の錨に触れる語」だけに限る。ページ
+            // 由来だけの語彙は needsGloss の記録に留め、ここでは掘らない
+            // （読んだページの言葉がそのまま次の調査語彙になる循環を断つ）。
+            const deepDiveTerms = termLearning.terms
+              .filter((t) => t.needsGloss)
+              .filter((t) => anchorTerms.length === 0 || baseQuery.includes(t.term) || anchorTerms.some((a) => a.includes(t.term) || t.term.includes(a)))
+              .slice(0, 5);
+            for (const learnedTerm of deepDiveTerms) {
               dictionaryBootstrapService.lookupDeep(learnedTerm.term);
             }
 
@@ -913,6 +956,7 @@ export class ResearchService {
           statement,
           claimIdByNormalizedStatement,
           !isCounterEvidencePass,
+          { anchorTerms },
         );
 
         if (claimId && !claimIds.includes(claimId)) claimIds.push(claimId);
@@ -1171,14 +1215,55 @@ export class ResearchService {
     return evidenceService.registerUnverifiedClaim(anchor.evidence_id, statement);
   }
 
+  // P473: 元の研究質問から錨語（内容語）を抽出する。派生クエリの語では
+  // なく「何を調べているか」の核の語を錨にすることで、読んだページの
+  // 語彙に引っ張られてテーマが漂流するのを止める。
+  private extractAnchorTerms(...sources: string[]): string[] {
+    const terms: string[] = [];
+    const push = (value: string) => {
+      const term = value.trim();
+      if (term.length >= 2 && !terms.includes(term)) terms.push(term);
+    };
+    for (const source of sources) {
+      const text = String(source || '');
+      for (const m of text.matchAll(/[A-Za-z][A-Za-z0-9_$.-]{2,}/g)) {
+        if (!P473_ANCHOR_STOP_LATIN.has(m[0].toLowerCase())) push(m[0]);
+      }
+      for (const m of text.matchAll(/[ァ-ヶー]{2,}|[一-龠々]{2,}/g)) {
+        if (!P473_ANCHOR_STOP_SEGMENTS.has(m[0])) push(m[0]);
+      }
+    }
+    return terms.slice(0, 10);
+  }
+
+  // P473: 文が錨語を十分に含むか。錨が2語以下しか取れない研究（辞書
+  // 引き等）では1語の一致で通す。既に在庫にある Claim への証拠付加は
+  // この関門の対象外（呼び出し側の重複排除マップで先に処理される）。
+  private passesAnchorGate(statement: string, anchorTerms: string[]): boolean {
+    if (anchorTerms.length === 0) return true;
+    const normalized = this.normalizeClaimStatement(statement);
+    const hits = anchorTerms.filter((term) => normalized.includes(this.normalizeClaimStatement(term))).length;
+    return anchorTerms.length <= 2 ? hits >= 1 : hits >= 2;
+  }
+
   private linkResearchEvidenceToClaim(
     evidenceId: string,
     statement: string,
     claimIdByNormalizedStatement: Map<string, string>,
     reuseExisting = true,
+    gate?: { anchorTerms?: string[] },
   ): string | undefined {
     const normalized = this.normalizeClaimStatement(statement);
     if (normalized.length < 15) return undefined;
+
+    // P473: 主張適格性。知識として持つに値しない文（疑問文・見出し
+    // 断片・宣伝・一人称の体験談・ブログ調の語りかけ）は Claim 化
+    // しない。Evidence 自体は記録済みなので、出所の追跡は失われない。
+    const worthiness = assessClaimWorthiness(statement);
+    if (!worthiness.ok) {
+      systemLogger.info('SELF_IMPROVEMENT', `[P473] 主張化を見送り (${worthiness.reason}): ${statement.slice(0, 60)}`);
+      return undefined;
+    }
 
     // Counterevidence remains a separately inspectable Claim; it must not
     // silently join an existing positive-support Claim.
@@ -1193,6 +1278,14 @@ export class ResearchService {
       return evidenceService.attachEvidenceToClaim(evidenceId, existingClaimId)
         ? existingClaimId
         : undefined;
+    }
+
+    // P473: 錨チェック。新規 Claim 化は、元の研究質問の核の語を含む
+    // 文だけに限る。検索語との1語一致で流れ着いたページの文は、ここ
+    // で止まる（証拠付加は上の重複排除経路で従来どおり可能）。
+    if (gate?.anchorTerms && gate.anchorTerms.length > 0 && !this.passesAnchorGate(statement, gate.anchorTerms)) {
+      systemLogger.info('SELF_IMPROVEMENT', `[P473] 錨語不足で主張化を見送り: ${statement.slice(0, 60)}`);
+      return undefined;
     }
 
     const createdClaimId = evidenceService.registerUnverifiedClaim(evidenceId, statement);
