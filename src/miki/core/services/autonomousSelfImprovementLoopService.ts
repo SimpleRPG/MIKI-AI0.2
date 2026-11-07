@@ -1344,6 +1344,14 @@ class AutonomousSelfImprovementLoopService {
         'SELF_IMPROVEMENT',
         `[RUNTIME] AutonomousLoop drop: ${request.id} task=${request.taskId || '-'} reason=${truncateForLog(`${reason}:MAX_ATTEMPTS`, 120)}`,
       );
+      // P458: 教師返却の材料が試行上限で落ちた場合は、行き先
+      // （受入台帳の保全と再投入）が分かる行を別に残す。
+      if (isTeacherReturnRequest(request)) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `[P458] 教師返却の材料がキューから落ちました: request=${request.id} run=${request.runId || '-'} intake=${typeof request.payload?.supplyIntakeId === 'string' ? request.payload.supplyIntakeId : '-'} reason=${truncateForLog(`${reason}:MAX_ATTEMPTS`, 120)} — 供給材料は受入台帳に保全されており、次回起動時の照合で再投入されます`,
+        );
+      }
       this.logQueueDigest('exhausted', true);
       return;
     }
@@ -1396,6 +1404,15 @@ class AutonomousSelfImprovementLoopService {
         'SELF_IMPROVEMENT',
         `[RUNTIME] AutonomousLoop drop: ${request.id} task=${request.taskId || '-'} reason=${truncateForLog(reason, 120)}`,
       );
+      // P458: 教師返却の材料が落ちた場合は、行き先（受入台帳の保全と
+      // 再投入）が分かる行を別に残す（LOG_6 の 001 はこの経路で、
+      // 理由だけでは材料の喪失に気づけなかった）。
+      if (isTeacherReturnRequest(request)) {
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `[P458] 教師返却の材料がキューから落ちました: request=${request.id} run=${request.runId || '-'} intake=${typeof request.payload?.supplyIntakeId === 'string' ? request.payload.supplyIntakeId : '-'} reason=${truncateForLog(reason, 120)} — 供給材料は受入台帳に保全されており、次回起動時の照合で再投入されます`,
+        );
+      }
     }
     this.logQueueDigest('drop', true);
   }
@@ -1563,9 +1580,12 @@ class AutonomousSelfImprovementLoopService {
     }catch{persistedTaskIds=null;}
     const loadNow=Date.now();
     let purgedCount=0;let orphanedPurgedCount=0;let staleDiscoveryPurgedCount=0;
+    // P458: 起動時 purge で外れる教師返却項目は、件数の集計とは別に
+    // 個別の行で残すため集めておく。
+    const purgedTeacherReturns:AutonomousImprovementRequest[]=[];
     const activeQueue=parsed.queue.filter(item=>{
-      if(item.attempts>=MAX_ATTEMPTS){purgedCount+=1;return false;}
-      if(persistedTaskIds&&item.attempts===0&&typeof item.taskId==='string'&&item.taskId&&!persistedTaskIds.has(item.taskId)){orphanedPurgedCount+=1;return false;}
+      if(item.attempts>=MAX_ATTEMPTS){purgedCount+=1;if(isTeacherReturnRequest(item))purgedTeacherReturns.push(item);return false;}
+      if(persistedTaskIds&&item.attempts===0&&typeof item.taskId==='string'&&item.taskId&&!persistedTaskIds.has(item.taskId)){orphanedPurgedCount+=1;if(isTeacherReturnRequest(item))purgedTeacherReturns.push(item);return false;}
       // P429 (B1): unstarted discovery requests older than
       // DISCOVERY_UNSTARTED_TTL_MS. Never dropped: attempted requests,
       // the active request and its task, claim-context carriers, and
@@ -1605,6 +1625,11 @@ class AutonomousSelfImprovementLoopService {
     activeQueue.sort(compareQueueRequests);
     this.state={...parsed,queue:activeQueue};
     if(purgedCount>0||droppedInvalid>0||orphanedPurgedCount>0||staleDiscoveryPurgedCount>0||capTrimmedCount>0||teacherReturnLiftedCount>0){this.state.status='IDLE';this.state.activeRequestId=undefined;this.state.retryAt=undefined;const parts:string[]=[];if(droppedInvalid>0)parts.push(`INVALID_REQUESTS_DROPPED:${droppedInvalid}`);if(purgedCount>0)parts.push(`EXHAUSTED_REQUESTS_PURGED:${purgedCount}`);if(orphanedPurgedCount>0)parts.push(`ORPHANED_REQUESTS_PURGED:${orphanedPurgedCount}`);if(staleDiscoveryPurgedCount>0)parts.push(`STALE_DISCOVERY_REQUESTS_PURGED:${staleDiscoveryPurgedCount}`);if(capTrimmedCount>0)parts.push(`CAP_TRIMMED:${capTrimmedCount}`);if(teacherReturnLiftedCount>0)parts.push(`TEACHER_RETURN_PRIORITY_LIFTED:${teacherReturnLiftedCount}`);this.state.lastReason=parts.join(':');if(orphanedPurgedCount>0||staleDiscoveryPurgedCount>0||capTrimmedCount>0){systemLogger.info('SELF_IMPROVEMENT',`[RUNTIME] AutonomousLoop purge: orphaned=${orphanedPurgedCount} staleDiscovery=${staleDiscoveryPurgedCount} capTrimmed=${capTrimmedCount} queue=${activeQueue.length}`);}if(teacherReturnLiftedCount>0){systemLogger.info('SELF_IMPROVEMENT',`[RUNTIME] AutonomousLoop teacher-return priority lifted: ${teacherReturnLiftedCount} 件 queue=${activeQueue.length}`);}try{this.save();}catch{/* WRITE_BLOCKED is exposed and further execution is stopped. */}}
+    // P458: 起動時 purge で教師返却項目が外れた場合は、材料の行き先
+    // （受入台帳の保全と、この後の保全照合での再投入）が分かる行を残す。
+    for(const item of purgedTeacherReturns){
+      systemLogger.warn('SELF_IMPROVEMENT',`[P458] 教師返却の材料が起動時の整理でキューから外れました: request=${item.id} run=${item.runId||'-'} intake=${typeof item.payload?.supplyIntakeId==='string'?item.payload.supplyIntakeId:'-'} — 供給材料は受入台帳に保全されており、この後の保全照合で再投入されます`);
+    }
   }
 }
 

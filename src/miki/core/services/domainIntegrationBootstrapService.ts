@@ -28,6 +28,7 @@ import { crossDomainCirculationService, type MikiDomain } from './crossDomainCir
 import { domainRouterService, type DomainCommand, type DomainEnvelope, type DomainReply } from './domainRouterService';
 import { blackboardRecoveryService } from './blackboardRecoveryService';
 import { autonomousSelfImprovementLoopService } from './autonomousSelfImprovementLoopService';
+import { componentSupplyIntakeService } from './componentSupplyIntakeService';
 import { selfImprovementIngressService } from './selfImprovementIngressService';
 import { autonomousIssueDiscoveryService } from './autonomousIssueDiscoveryService';
 import { autonomousCapabilityInnovationService } from '../../selfDevelopment/services/autonomousCapabilityInnovationService';
@@ -98,6 +99,12 @@ class DomainIntegrationBootstrapService{
   const connectivityAudit=await domainParticipationService.auditAll();
   if(!connectivityAudit.passed)throw new Error('DOMAIN_CONNECTIVITY_AUDIT_FAILED');
   autonomousSelfImprovementLoopService.initialize();
+  // P458: drop でキューから落ちた供給 run の材料を、受入台帳の保全から
+  // 照合・再投入する。失敗しても起動は止めない（保全は台帳に残り、
+  // 次回起動で再試行される）。
+  void componentSupplyIntakeService.reconcilePreservedSupplyRuns().catch(error=>{
+   systemLogger.warn('SELF_IMPROVEMENT',`[P458] 供給材料の保全照合に失敗: ${String(error instanceof Error?error.message:error)}`);
+  });
   autonomousIssueDiscoveryService.initialize();autonomousCapabilityInnovationService.initialize();templateInventionService.initialize();
   conversationCompositionResearchSchedulerService.initialize();
   const recovery=blackboardRecoveryService.recoverInterrupted();

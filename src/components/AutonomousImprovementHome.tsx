@@ -1349,6 +1349,16 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                           <span>受入: {fmtTime(intake.receivedAt)}</span>
                           {intake.newRunId && <span>新しい実行: {intake.newRunId}</span>}
                         </div>
+                        {intake.preservation && (
+                          <div className="text-[10px] text-teal-300/80">
+                            材料保全: {intake.preservation.status === 'CONSUMED'
+                              ? '消費済み（検証の梯子へ引き渡し済み）'
+                              : intake.preservation.status === 'EXHAUSTED'
+                                ? '自動再投入は上限到達（材料は保全中）'
+                                : '保全中（実行が落ちても再投入されます）'}
+                            {intake.preservation.requeueCount > 0 && <span> / 再投入 {intake.preservation.requeueCount} 回</span>}
+                          </div>
+                        )}
                         {intake.status === 'REJECTED' && intake.reasons.length > 0 && (
                           <div className="text-[10px] text-rose-300/80 truncate">理由: {intake.reasons[0]}</div>
                         )}

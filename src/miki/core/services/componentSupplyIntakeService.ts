@@ -5,7 +5,9 @@ import { evidenceService } from '../../memory/services/evidenceService';
 import { componentSupplyRequestService } from './componentSupplyRequestService';
 import { teacherVerificationEvidenceService, type TeacherVerificationRound } from '../../verification/services/teacherVerificationEvidenceService';
 import { improvementIntakeRouterService, type ImprovementIntakeRun } from './improvementIntakeRouterService';
-import { TEACHER_RETURN_PRIORITY } from './autonomousSelfImprovementLoopService';
+import { autonomousSelfImprovementLoopService, TEACHER_RETURN_PRIORITY } from './autonomousSelfImprovementLoopService';
+import { taskBlackboardService } from './taskBlackboardService';
+import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
 import { sha256HexFromText } from './canonicalSha256Service';
 
@@ -66,6 +68,23 @@ export interface ComponentSupplySupplier {
   suppliedAt?: string;
 }
 
+/*
+ * P458: 材料保全の状態。受入れた候補は run の payload にしか存在せず、
+ * run がキューから drop されると材料ごと消えた（LOG_6: 001 が
+ * BLACKBOARD_TASK_NOT_RESUMABLE、002 が MAX_ATTEMPTS_REACHED で喪失）。
+ * 受入時点で候補実体と payload を台帳へ複製し（PRESERVED）、run が
+ * 孤児になったら台帳から再投入する。候補が検証の梯子側へ渡り切ったら
+ * CONSUMED、再投入の上限に達したら EXHAUSTED（材料自体は台帳に残る）。
+ */
+export interface ComponentSupplyPreservation {
+  status: 'PRESERVED' | 'CONSUMED' | 'EXHAUSTED';
+  requeueCount: number;
+  lastRequeuedAt?: number;
+  lastRequeueRunId?: string;
+  orphanDetectedAt?: number;
+  consumedBy?: string;
+}
+
 export interface ComponentSupplyIntakeRecord {
   intakeId: string;
   requestId: string;
@@ -95,6 +114,20 @@ export interface ComponentSupplyIntakeRecord {
   }>;
   /** P449: TVE が無効だったため候補単位で落とした理由。 */
   teacherVerificationDropped?: string[];
+  /*
+   * P458: drop 保全。候補実体（TVE ラウンド込み）の複製。run の payload
+   * とは独立に台帳へ残すため、キュー項目が drop されても材料は消えない。
+   */
+  preservedCandidates?: Array<Record<string, unknown>>;
+  /*
+   * P458: drop 保全。再投入に使う run payload の複製。
+   * sourceSnapshotSha256 は receive() が現在値で付け直すため含めない。
+   */
+  preservedPayload?: Record<string, unknown>;
+  /** P458: drop 保全。再投入時の objective（元 run のものを保持）。 */
+  preservedObjective?: string;
+  /** P458: 保全の状態（再投入回数・消費済み・上限到達）。 */
+  preservation?: ComponentSupplyPreservation;
 }
 
 export interface ComponentSupplyIntakeResult {
@@ -137,6 +170,11 @@ const MAX_INPUT_BYTES = 3_000_000;
 // 解凍後の安全上限（priority12 の先例と調査報告 §4.1 の目安）。
 const MAX_FILES = 100;
 const MAX_TOTAL_CONTENT_BYTES = 10 * 1024 * 1024;
+
+// P458: 1受入あたりの自動再投入の上限。起動のたびに無条件で戻すと
+// 「失敗→drop→再投入→失敗」が起動回数分だけ繰り返されるため、
+// 回数で止める。材料自体は台帳に残り、手動再投入は上限の対象外。
+export const MAX_SUPPLY_PRESERVATION_REQUEUES = 5;
 
 const textEncoder = new TextEncoder();
 const byteLength = (text: string): number => textEncoder.encode(text).length;
@@ -196,6 +234,10 @@ class ComponentSupplyIntakeService {
       supplier: record.supplier ? { ...record.supplier } : undefined,
       teacherVerification: record.teacherVerification ? record.teacherVerification.map((item) => ({ ...item })) : undefined,
       teacherVerificationDropped: record.teacherVerificationDropped ? [...record.teacherVerificationDropped] : undefined,
+      // P458: 保全物は run やキューの側と参照を共有しない（JSON 複製）。
+      preservedCandidates: record.preservedCandidates ? JSON.parse(JSON.stringify(record.preservedCandidates)) as Array<Record<string, unknown>> : undefined,
+      preservedPayload: record.preservedPayload ? JSON.parse(JSON.stringify(record.preservedPayload)) as Record<string, unknown> : undefined,
+      preservation: record.preservation ? { ...record.preservation } : undefined,
     };
   }
 
@@ -705,6 +747,16 @@ class ComponentSupplyIntakeService {
           }
         : {}),
       ...(tveReasons.length > 0 ? { teacherVerificationDropped: tveReasons } : {}),
+      /*
+       * P458: 材料の保全。候補実体（TVE ラウンド込み）と payload を
+       * 台帳へ複製する。run の payload とは参照を共有しない JSON 複製で、
+       * キュー項目の drop や router の run レコードの窓溢れ（500件）でも
+       * 材料が残るようにする。再投入は reconcilePreservedSupplyRuns が担う。
+       */
+      preservedCandidates: JSON.parse(JSON.stringify(implementationCandidates)) as Array<Record<string, unknown>>,
+      preservedPayload: JSON.parse(JSON.stringify(payload)) as Record<string, unknown>,
+      preservedObjective: run.objective,
+      preservation: { status: 'PRESERVED', requeueCount: 0 },
     };
     this.ledger.set(intakeId, record);
     this.save();
@@ -717,6 +769,8 @@ class ComponentSupplyIntakeService {
       systemLogger.info('SELF_IMPROVEMENT', `[P449] TVE verified: ${[...verifiedTve.entries()].map(([path, tve]) => `${path} rounds=${1 + tve.extraRounds.length} checks=${tve.round.checks.length}`).join(', ')}`, { intakeId });
     }
     systemLogger.info('SELF_IMPROVEMENT', `[部品供給 受入] ${intakeId} request=${requestId} supplier=${supplier.name} → 新規Run ${run.runId}（候補は検証待ちの部品候補として生成段へ接続）`, { candidatePaths });
+    // P458: 保全が台帳に残ったことをログでも確認できるようにする。
+    systemLogger.info('SELF_IMPROVEMENT', `[P458] 供給材料を保全: intake=${intakeId} candidates=${implementationCandidates.length} tve=${verifiedTve.size > 0 ? 'あり' : 'なし'} — run が drop されても受入台帳から再投入できます`);
     return {
       ok: true,
       code: 'SUCCESS',
@@ -725,6 +779,184 @@ class ComponentSupplyIntakeService {
       record: this.clone(record),
       runId: run.runId,
     };
+  }
+
+  // ------------------------------------------------------------------
+  // P458: 材料保全の照合と再投入
+  //
+  // 供給 run は USER_REQUEST で、AUTONOMOUS_DISCOVERY のような定期
+  // リコンサイラが無い。キュー項目が drop されると run レコードは
+  // QUEUED のまま残り、誰にも拾われない（LOG_6 の喪失の正体）。
+  // ここでは「run が終端でないのにキューに対応項目が無い」孤児を
+  // 検出し、台帳の保全物から既存の receive() 経路で再投入する。
+  // 検証の梯子・ゲートには一切触らない（材料を入口へ戻すだけ）。
+  // ------------------------------------------------------------------
+
+  /** 保全対象の run に対応するキュー項目がまだ生きているか。 */
+  private isPreservedRunQueued(record: ComponentSupplyIntakeRecord): boolean {
+    const queue = autonomousSelfImprovementLoopService.getState().queue;
+    return queue.some((item) =>
+      (record.newRunId !== undefined && item.runId === record.newRunId) ||
+      item.payload?.supplyIntakeId === record.intakeId,
+    );
+  }
+
+  /*
+   * 材料が検証の梯子側へ渡り切っているかの判定。渡り切っていれば
+   * 再投入は不要（CONSUMED）。判定は既存の記録だけで行う:
+   * - run 自体が COMPLETED
+   * - run のブラックボードタスクが COMPLETED
+   * - 保全候補の全件が、供給エピソード（intakeId）を刻んだ部品として
+   *   レジストリに登録済み（生成段が createCodeComponentCandidate で
+   *   CANDIDATE 登録した状態。entry_point が候補と一致するもの）
+   */
+  private preservedMaterialConsumedBy(record: ComponentSupplyIntakeRecord): string | undefined {
+    const run = record.newRunId ? improvementIntakeRouterService.get(record.newRunId) : undefined;
+    if (run?.status === 'COMPLETED') return 'RUN_COMPLETED';
+    if (run?.taskId) {
+      const task = taskBlackboardService.get(run.taskId);
+      if (task?.status === 'COMPLETED') return 'TASK_COMPLETED';
+    }
+    const candidates = record.preservedCandidates ?? [];
+    if (candidates.length > 0) {
+      const components = componentRegistryService.getAllComponents();
+      const allRegistered = candidates.every((candidate) => {
+        const entryPoint = typeof candidate.entryPoint === 'string' && candidate.entryPoint
+          ? candidate.entryPoint
+          : typeof candidate.path === 'string' ? candidate.path : '';
+        if (!entryPoint) return false;
+        return components.some((component) => {
+          const carrier = component as { entry_point?: unknown; source_episode_ids?: unknown };
+          return carrier.entry_point === entryPoint
+            && Array.isArray(carrier.source_episode_ids)
+            && carrier.source_episode_ids.includes(record.intakeId);
+        });
+      });
+      if (allRegistered) return 'REGISTERED_AS_COMPONENT';
+    }
+    return undefined;
+  }
+
+  /*
+   * P458 以前の受入（保全物が無い）でも、router の run レコードが
+   * まだ残っていれば、その payload から保全へ複製する（バックフィル）。
+   * run レコード自体が窓溢れで消えている場合は複製元が無く、対象外。
+   */
+  private ensurePreservedMaterial(record: ComponentSupplyIntakeRecord): boolean {
+    if (record.preservedPayload && (record.preservedCandidates?.length ?? 0) > 0) return true;
+    const run = record.newRunId ? improvementIntakeRouterService.get(record.newRunId) : undefined;
+    const candidates = run?.payload?.implementationCandidates;
+    if (!run || !Array.isArray(candidates) || candidates.length === 0) return false;
+    const rest: Record<string, unknown> = { ...(run.payload ?? {}) };
+    delete rest.sourceSnapshotSha256;
+    record.preservedPayload = JSON.parse(JSON.stringify(rest)) as Record<string, unknown>;
+    record.preservedCandidates = JSON.parse(JSON.stringify(candidates)) as Array<Record<string, unknown>>;
+    record.preservedObjective = run.objective;
+    record.preservation = record.preservation ?? { status: 'PRESERVED', requeueCount: 0 };
+    this.save();
+    systemLogger.info('SELF_IMPROVEMENT', `[P458] 旧受入の材料を run の payload から保全へ複製: intake=${record.intakeId} run=${run.runId} candidates=${candidates.length}`);
+    return true;
+  }
+
+  /**
+   * 保全した材料を、新しい run としてキューへ再投入する。
+   * 既にキューに居る／消費済みの場合は何もしない。旧 run は先に
+   * REJECTED へ閉じる（receive() の sourceHash 重複判定は REJECTED を
+   * 除外するため、閉じないと同一 payload の再投入が重複として
+   * 弾かれ、孤児 run が返ってきてしまう）。
+   */
+  public async requeuePreservedRun(
+    intakeId: string,
+    reason: string,
+    options?: { manual?: boolean },
+  ): Promise<{ requeued: boolean; runId?: string; detail: string }> {
+    const record = this.ledger.get(intakeId);
+    if (!record || record.status !== 'RECEIVED') return { requeued: false, detail: 'INTAKE_NOT_RECEIVED' };
+    if (!this.ensurePreservedMaterial(record)) return { requeued: false, detail: 'NO_PRESERVED_MATERIAL' };
+    const preservation = record.preservation ?? (record.preservation = { status: 'PRESERVED', requeueCount: 0 });
+    if (preservation.status === 'CONSUMED') return { requeued: false, detail: 'ALREADY_CONSUMED' };
+    if (this.isPreservedRunQueued(record)) return { requeued: false, detail: 'STILL_QUEUED' };
+    const consumedBy = this.preservedMaterialConsumedBy(record);
+    if (consumedBy) {
+      preservation.status = 'CONSUMED';
+      preservation.consumedBy = consumedBy;
+      this.save();
+      systemLogger.info('SELF_IMPROVEMENT', `[P458] 供給材料は消費済みのため再投入しません: intake=${intakeId} consumedBy=${consumedBy}`);
+      return { requeued: false, detail: consumedBy };
+    }
+    // ここまで来たら孤児（run が終端でなく、キューにも居ない）。
+    preservation.orphanDetectedAt = Date.now();
+    if (!options?.manual && preservation.requeueCount >= MAX_SUPPLY_PRESERVATION_REQUEUES) {
+      if (preservation.status !== 'EXHAUSTED') {
+        preservation.status = 'EXHAUSTED';
+        this.save();
+      }
+      systemLogger.error('SELF_IMPROVEMENT', `[P458] 供給材料の自動再投入が上限（${MAX_SUPPLY_PRESERVATION_REQUEUES}回）に達しました: intake=${intakeId} run=${record.newRunId ?? '-'} — 材料は受入台帳に保全されたままです。手動再投入は requeuePreservedRun の manual 指定で可能です`);
+      return { requeued: false, detail: 'REQUEUE_LIMIT_REACHED' };
+    }
+    const previousRunId = record.newRunId;
+    const previousRun = previousRunId ? improvementIntakeRouterService.get(previousRunId) : undefined;
+    if (previousRun && previousRun.status !== 'REJECTED' && previousRun.status !== 'COMPLETED') {
+      improvementIntakeRouterService.reject(previousRunId as string);
+    }
+    let run: ImprovementIntakeRun;
+    try {
+      run = await improvementIntakeRouterService.receive({
+        runType: 'USER_REQUEST',
+        sourceId: record.requestId,
+        objective: record.preservedObjective ?? `部品供給の受入（要求 ${record.requestId}）`,
+        // 再投入も教師返却の優先帯で戻す（初回受入と同じ扱い）。
+        priority: TEACHER_RETURN_PRIORITY,
+        relatedRunIds: [...new Set([record.originRunId, previousRunId].filter((x): x is string => typeof x === 'string' && x.length > 0))],
+        payload: JSON.parse(JSON.stringify(record.preservedPayload)) as Record<string, unknown>,
+      });
+    } catch (error) {
+      // 自己コード空間の未同期など MIKI 側の一時要因。保全は残るため
+      // 次回の照合で再試行できる。回数は消費しない。
+      this.save();
+      systemLogger.warn('SELF_IMPROVEMENT', `[P458] 供給材料の再投入に失敗（次回照合で再試行）: intake=${intakeId} reason=${reason}: ${error instanceof Error ? error.message : String(error)}`);
+      return { requeued: false, detail: 'RUN_CREATE_FAILED' };
+    }
+    if (previousRunId && run.runId === previousRunId) {
+      this.save();
+      return { requeued: false, detail: 'RECEIVE_DEDUPED_TO_ORPHAN' };
+    }
+    record.newRunId = run.runId;
+    preservation.status = 'PRESERVED';
+    preservation.requeueCount += 1;
+    preservation.lastRequeuedAt = Date.now();
+    preservation.lastRequeueRunId = run.runId;
+    this.save();
+    systemLogger.info('SELF_IMPROVEMENT', `[P458] 供給材料を再投入: intake=${intakeId} oldRun=${previousRunId ?? '-'} newRun=${run.runId} reason=${reason} requeue=${preservation.requeueCount} candidates=${record.preservedCandidates?.length ?? 0}`);
+    return { requeued: true, runId: run.runId, detail: 'REQUEUED' };
+  }
+
+  /**
+   * 保全済みの全受入を照合し、孤児になった供給 run を再投入する。
+   * 起動時（bootstrap）に呼ばれる。再投入・消費済み・上限到達の
+   * 内訳を返し、ログにも残す。1件の失敗で全体は止めない。
+   */
+  public async reconcilePreservedSupplyRuns(): Promise<{ checked: number; requeued: number; consumed: number; exhausted: number }> {
+    let checked = 0;
+    let requeued = 0;
+    let consumed = 0;
+    let exhausted = 0;
+    for (const record of [...this.ledger.values()]) {
+      if (record.status !== 'RECEIVED') continue;
+      checked += 1;
+      try {
+        const result = await this.requeuePreservedRun(record.intakeId, 'STARTUP_RECONCILE');
+        if (result.requeued) requeued += 1;
+        else if (result.detail === 'RUN_COMPLETED' || result.detail === 'TASK_COMPLETED' || result.detail === 'REGISTERED_AS_COMPONENT' || result.detail === 'ALREADY_CONSUMED') consumed += 1;
+        else if (result.detail === 'REQUEUE_LIMIT_REACHED') exhausted += 1;
+      } catch (error) {
+        systemLogger.warn('SELF_IMPROVEMENT', `[P458] 保全材料の照合に失敗: intake=${record.intakeId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    if (checked > 0) {
+      systemLogger.info('SELF_IMPROVEMENT', `[P458] 供給材料の保全照合: checked=${checked} requeued=${requeued} consumed=${consumed} exhausted=${exhausted}`);
+    }
+    return { checked, requeued, consumed, exhausted };
   }
 }
 
