@@ -465,7 +465,14 @@ export class ResearchService {
     // の対象を計画に渡す。除外はホスト・URL ともに件数を限定する。
     const sourceExclusion = this.buildSourceExclusion(gap.researchClaimIds || []);
     const independentFocus = this.buildIndependentEvidenceFocus(gap.researchClaimIds || [], baseQuery);
-    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery, gap.researchClaimIds || [], this.resolveGapFocusStrategy(options?.gapFocus), sourceExclusion, independentFocus);
+    const queryPlan = researchQueryPlanningService.buildPlan(baseQuery, gap.researchClaimIds || [], this.resolveGapFocusStrategy(options?.gapFocus), sourceExclusion, independentFocus, {
+      // P461: 計画に gap の構造（type・対象・不足内容・条件）を渡し、
+      // 必要に応じた分解が起きるようにする。
+      gapType: gap.type,
+      target: gap.identity?.target,
+      missingContent: gap.identity?.missingContent,
+      conditions: gap.identity?.conditions,
+    });
     const invocationPassLimit = Math.min(
       queryPlan.policy.maxTotalSearchRequests,
       queryPlan.policy.maxQueriesPerPlan,
@@ -643,7 +650,14 @@ export class ResearchService {
         const plannedQuery = queryPlan.status === 'READY'
           ? queryPlan.queries[pass]?.queryText
           : undefined;
-        const passQuery = plannedQuery || buildAdaptiveQuery(pass, verification);
+        // P461: 前パスの結果から勧められた改訂クエリは、計画が READY の
+        // 通常パスでも次の1パスに使う（従来は BLOCKED 時のフォールバック
+        // でしか使われず、結果の質が残りの計画に影響しなかった）。
+        const useRevision = pass > 0 && !!recommendedRevisionQuery;
+        const passQuery = useRevision
+          ? (recommendedRevisionQuery as string)
+          : plannedQuery || buildAdaptiveQuery(pass, verification);
+        if (useRevision) recommendedRevisionQuery = undefined;
         nextQuery = passQuery;
         const queryStartedAt = Date.now();
         const raw = await unifiedWebResearchService.executePlannedSearch(passQuery, {
@@ -904,7 +918,7 @@ export class ResearchService {
         verification = [];
         resolved = false;
 
-        if (queryPlan.status === "READY" && queryPlan.queries[pass]) { const passEvidenceIds = [...new Set(evidence.filter(item => item.status !== "REJECTED").map(item => item.evidence_id))]; const passClusters = new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)); researchQueryOutcomeLearningService.record({ queryPlanId: queryPlan.queryPlanId, queryId: queryPlan.queries[pass].queryId, queryText: queryPlan.queries[pass].queryText, status: passEvidenceIds.length ? "EVIDENCE_GAINED" : results.length ? "LOW_QUALITY_RESULTS" : "NO_RESULTS", candidateUrlCount: results.filter(result => !!result.url).length, renderedPageCount: readResults.filter(page => page.success && !!page.text.trim()).length, admissibleIndependentSourceCount: passClusters.size, primarySourceCount: passEvidenceIds.filter(id => { const item = evidence.find(e => e.evidence_id === id); return item?.status !== "REJECTED" && (item?.metadata?.research_source_role === "PRIMARY" || item?.metadata?.research_source_role === "OFFICIAL"); }).length, sourceTierTarget: queryPlan.queries[pass].sourceTierTarget, counterevidenceChecked: queryPlan.queries[pass].intentType === "COUNTEREVIDENCE", evidenceIds: passEvidenceIds, failureReasons: verification.filter(result => result.outcome === "UNRESOLVED").flatMap(result => result.reasons), environmentApplicability: "CURRENT_ENVIRONMENT", executionTimeMs: Date.now() - queryStartedAt, attempt: pass + 1 }); }
+        if (queryPlan.status === "READY" && queryPlan.queries[pass]) { const passEvidenceIds = [...new Set(evidence.filter(item => item.status !== "REJECTED").map(item => item.evidence_id))]; const passClusters = new Set(evidence.filter(item => item.status !== "REJECTED" && item.independence_cluster_id).map(item => item.independence_cluster_id)); researchQueryOutcomeLearningService.record({ queryPlanId: queryPlan.queryPlanId, queryId: queryPlan.queries[pass].queryId, queryText: queryPlan.queries[pass].queryText, status: passEvidenceIds.length ? "EVIDENCE_GAINED" : results.length ? "LOW_QUALITY_RESULTS" : "NO_RESULTS", candidateUrlCount: results.filter(result => !!result.url).length, renderedPageCount: readResults.filter(page => page.success && !!page.text.trim()).length, admissibleIndependentSourceCount: passClusters.size, primarySourceCount: passEvidenceIds.filter(id => { const item = evidence.find(e => e.evidence_id === id); return item?.status !== "REJECTED" && (item?.metadata?.research_source_role === "PRIMARY" || item?.metadata?.research_source_role === "OFFICIAL"); }).length, sourceTierTarget: queryPlan.queries[pass].sourceTierTarget, counterevidenceChecked: queryPlan.queries[pass].intentType === "COUNTEREVIDENCE", evidenceIds: passEvidenceIds, failureReasons: [...verification.filter(result => result.outcome === "UNRESOLVED").flatMap(result => result.reasons), ...(results.length >= 8 && passEvidenceIds.length > 0 && passEvidenceIds.length / results.length < 0.25 ? ["LOW_EVIDENCE_RATE"] : [])], environmentApplicability: "CURRENT_ENVIRONMENT", executionTimeMs: Date.now() - queryStartedAt, attempt: pass + 1 }); }
 
         if (queryPlan.status === "READY" && queryPlan.queries[pass]) {
           const revision = researchQueryOutcomeLearningService.recommendRevision(queryPlan.queryPlanId, queryPlan.queries[pass].queryId);

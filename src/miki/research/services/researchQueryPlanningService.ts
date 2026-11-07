@@ -29,6 +29,17 @@ export interface IndependentEvidenceFocus {
   claimIds:string[];
   neededClusters:number;
 }
+/*
+ * P461: 計画の入力として gap の構造を受け取るための形。
+ * knowledgeGapService を import すると循環になるため、必要な項目だけの
+ * 構造的な型で受ける（呼び出し側が KnowledgeGap から組み立てて渡す）。
+ */
+export interface GapStructureInput {
+  gapType?: string;
+  target?: string;
+  missingContent?: string;
+  conditions?: string[];
+}
 export interface ResearchQueryIntent {queryId:string;queryPlanId:string;parentQueryId?:string;researchQuestionId:string;intentType:QueryIntentType;targetClaimIds:string[];missingEvidenceType:string;environmentConstraints:EnvironmentFingerprint;sourceTierTarget:string;language:string;termsIncluded:string[];termsExcluded:string[];exactPhrases:string[];siteOrDomainConstraints:string[];timeConstraint?:string;expectedEvidence:string;stopCondition:string;createdBy:'CORE_18_DOMAINS';createdAt:number;queryText:string;readiness:QueryReadiness;applicability:EnvironmentApplicability;validationReasons:string[];}
 export interface QueryPlanningPolicy {enabled:boolean;maxQueriesPerPlan:number;maxRevisionPerQuery:number;maxParallelQueries:number;maxTotalSearchRequests:number;maxQueryExecutionTimeMs:number;maxCandidateUrlsPerQuery:number;stopWhenEvidenceSatisfied:boolean;preferOfficialSources:boolean;requireCurrentEnvironmentCheck:boolean;requireCounterEvidenceSearch:boolean;linkAutoIndependentSourcePolicy:boolean;updatedAt:number;}
 export interface ResearchQueryPlan {queryPlanId:string;researchQuestionId:string;canonicalResearchIntent:string;environment:EnvironmentFingerprint;policy:QueryPlanningPolicy;queries:ResearchQueryIntent[];usedQueryPatternIds:string[];excludedQueryPatternIds:string[];queryPatternSelectionId:string;queryPatternSelectionSha256:string;status:'DRAFT'|'READY'|'BLOCKED'|'RUNNING'|'COMPLETED'|'STOPPED';planSha256:string;createdAt:number;updatedAt:number;}
@@ -81,7 +92,7 @@ class ResearchQueryPlanningService {
  savePolicy(input:QueryPlanningPolicy):{policy:QueryPlanningPolicy;receiptId:string;policySha256:string}{const policy=this.normalizePolicy({...input,updatedAt:Date.now()});storageService.setItem(POLICY_KEY,JSON.stringify(policy));const policySha256=canonicalSha256Object(policy);return {policy,receiptId:`RQPR-${policySha256.slice(0,20)}`,policySha256};}
  listPlans():ResearchQueryPlan[]{return (()=>{const raw=storageService.getItem(PLAN_KEY);try{return raw?JSON.parse(raw) as ResearchQueryPlan[]:[];}catch{return [];}})();}
  listRevisionPairs():QueryRevisionPair[]{return (()=>{const raw=storageService.getItem(REVISION_KEY);try{return raw?JSON.parse(raw) as QueryRevisionPair[]:[];}catch{return [];}})();}
- buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput,exclusion?:ResearchQueryExclusion,independentFocus?:IndependentEvidenceFocus):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const effectiveIntent=isLongResearchIntent(intent)?(buildShortResearchQuery(intent,gapFocus)||intent):intent;const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus?{intent,environment:DEVICE,policy,gapFocus}:{intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',effectiveIntent,'全体条件を保持した基準検索']);
+ buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput,exclusion?:ResearchQueryExclusion,independentFocus?:IndependentEvidenceFocus,gapStructure?:GapStructureInput):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const effectiveIntent=isLongResearchIntent(intent)?(buildShortResearchQuery(intent,gapFocus)||intent):intent;const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus||gapStructure?{intent,environment:DEVICE,policy,gapFocus,gapStructure}:{intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',effectiveIntent,'全体条件を保持した基準検索']);
 /*
  * P439: 不足スロット向けの材料探索クエリを1本足す（gapFocus がある場合）。
  * 戦略ごとに探索先を変える（GitHub コード検索／Stack Exchange／Web 文書）。
@@ -94,6 +105,30 @@ if(gapFocus&&Array.isArray(gapFocus.slotNames)&&gapFocus.slotNames.length>0){
   const siteHint=gapFocus.strategy==='GITHUB_CODE'?'site:github.com':gapFocus.strategy==='STACK_EXCHANGE'?'site:stackoverflow.com':'';
   const materialQuery=[slotText,'TypeScript implementation example',targetText,siteHint].map(value=>value.trim()).filter(Boolean).join(' ');
   if(materialQuery)specs.push(['IMPLEMENTATION_EXAMPLE',materialQuery,'不足スロット向け実装材料']);
+}
+
+/*
+ * P461: gap の type に応じた小さい問いを1本足す。これまでは計画の入力が
+ * 文字列だけだったため、「版が不明なら版を特定する問い」「矛盾なら条件を
+ * 切り分ける問い」のような、必要に応じた分解が起きなかった。
+ * 対象（target）が分かっている場合は、その語を先頭に置いて固有性を上げる。
+ */
+if(gapStructure&&gapStructure.gapType){
+  const targetTerm=gapStructure.target?normalize(gapStructure.target).split(/\s+/)[0]:'';
+  const base=targetTerm&&!effectiveIntent.includes(targetTerm)?`${targetTerm} ${effectiveIntent}`:effectiveIntent;
+  const byType:Record<string,[QueryIntentType,string,string]> = {
+    UNKNOWN_VERSION:['VERSION_SPECIFIC',`${base} version release notes changelog`,'版の特定'],
+    UNKNOWN_TERM:['PRIMARY_SOURCE',`${base} definition glossary official`,'用語の定義（一次資料）'],
+    CONTRADICTION:['LIMITATION',`${base} conditions exceptions specification`,'矛盾する条件の切り分け'],
+    UNKNOWN_COUNTEREXAMPLE:['LIMITATION',`${base} conditions exceptions specification`,'反例が成り立つ条件の切り分け'],
+    UNKNOWN_CAUSE:['ERROR_DIAGNOSIS',`${base} cause diagnosis troubleshooting`,'原因の診断'],
+    UNKNOWN_EFFECT:['ERROR_DIAGNOSIS',`${base} effects impact documentation`,'効果・影響の確認'],
+    UNKNOWN_COMPATIBILITY:['COMPATIBILITY',`${base} compatibility supported versions requirements`,'互換性・対応条件'],
+    UNKNOWN_EXCEPTION:['LIMITATION',`${base} limitations exceptions edge cases`,'例外・境界条件'],
+    UNKNOWN_SOURCE:['PRIMARY_SOURCE',`${base} primary source original publication`,'出典の特定'],
+  };
+  const spec=byType[gapStructure.gapType];
+  if(spec)specs.push(spec);
 }
 
 /*

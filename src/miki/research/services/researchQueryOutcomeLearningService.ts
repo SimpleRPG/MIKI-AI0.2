@@ -1,6 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
-import { researchQueryPlanningService, QueryReadiness } from './researchQueryPlanningService';
+import { researchQueryPlanningService, QueryReadiness, buildShortResearchQuery } from './researchQueryPlanningService';
 import { queryPatternRepositoryService } from './queryPatternRepositoryService';
 
 export type QueryOutcomeStatus =
@@ -121,11 +121,28 @@ class ResearchQueryOutcomeLearningService {
         reason = 'PRIVACY_BLOCKED';
       } else if (exhausted || latest.status === 'BUDGET_EXHAUSTED') {
         reason = 'REVISION_BUDGET_EXHAUSTED';
-      } else if (latest.status === 'NO_RESULTS' || latest.status === 'LOW_QUALITY_RESULTS') {
+      } else if (latest.status === 'NO_RESULTS') {
         shouldRevise = true;
         readiness = 'READY';
         reason = latest.status;
-        revisedQuery = normalize(`${query.queryText} official documentation ${plan.environment.os} ${plan.environment.architecture}`);
+        // P461: 0件のときは「足す」のではなく「引く」。語を落として
+        // 広げる（材料チャンネルの RELAXED と同じ発想）。既に短い場合は
+        // 意図文から組み立て直す。
+        const terms = query.queryText.split(/\s+/).filter(Boolean);
+        revisedQuery = terms.length > 4
+          ? terms.slice(0, 4).join(' ')
+          : normalize(buildShortResearchQuery(plan.canonicalResearchIntent) || `${query.queryText} official documentation`);
+      } else if (latest.status === 'LOW_QUALITY_RESULTS') {
+        shouldRevise = true;
+        readiness = 'READY';
+        reason = latest.status;
+        // P461: 結果はあるが証拠にならない（ノイズ過多）ときは「絞る」。
+        // 識別子・内容語への抽出で固有性を上げ、同じ文になる場合だけ
+        // 公式文書の方向へ寄せる。
+        const narrowed = buildShortResearchQuery(query.queryText);
+        revisedQuery = normalize(narrowed && narrowed !== query.queryText
+          ? narrowed
+          : `${query.queryText} official documentation ${plan.environment.os} ${plan.environment.architecture}`);
       } else if (latest.status === 'ENVIRONMENT_MISMATCH') {
         shouldRevise = true;
         readiness = 'ENVIRONMENT_MISMATCH';
