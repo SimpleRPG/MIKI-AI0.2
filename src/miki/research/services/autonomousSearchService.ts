@@ -579,6 +579,27 @@ export function isSourceBackedSearchResult(result: WebSearchResultItem): boolean
   }
 }
 
+// P485: her own classified diagnosis of why search is (or was)
+// failing -- the record form of the investigation process (notice a
+// pattern in outcomes, classify the cause as hers vs upstream vs
+// budget, act on it, keep the conclusion). Persisted so a restart
+// does not erase what she concluded, and readable via
+// getSearchSelfDiagnosis().
+export type SearchSelfDiagnosisCause = 'NONE' | 'UPSTREAM_SUSPENDED' | 'BUDGET_EXHAUSTED' | 'RECOVERED';
+export interface SearchSelfDiagnosis {
+  cause: SearchSelfDiagnosisCause;
+  detail: string;
+  at: number;
+  until?: number;
+}
+const SEARCH_SELF_DIAGNOSIS_KEY = 'miki_search_self_diagnosis_v1';
+const OPENALEX_BUDGET_BLOCK_KEY = 'miki_openalex_budget_block_v1';
+// P485: empty outcomes are cached for a shorter window than hits --
+// long enough to stop the exact-duplicate re-fires the device logs
+// showed (same query up to 4x in one window), short enough that a
+// recovered upstream is retried reasonably soon.
+const NEGATIVE_CACHE_TTL_MS = 30 * 60 * 1000;
+
 const SEARCH_CONFIG_KEY='miki_autonomous_search_config_v1';
 const SEARCH_STATS_KEY='miki_autonomous_search_stats_v1';
 const SEARCH_RECORDS_KEY='miki_autonomous_search_records_v1';
@@ -598,7 +619,11 @@ const DEFAULT_STATS:AutonomousSearchStats={
 export class AutonomousSearchService {
   private config: AutonomousSearchConfig;
   private stats: AutonomousSearchStats;
-  private cache: Map<string, { data: AutonomousSearchExecutionResult; timestamp: number }> = new Map();
+  private cache: Map<string, { data: AutonomousSearchExecutionResult; timestamp: number; negative?: boolean }> = new Map();
+  // P485: self-diagnosis of the search infrastructure (see the type
+  // above) and the OpenAlex daily-budget block. Both persisted.
+  private selfDiagnosis: SearchSelfDiagnosis = { cause: 'NONE', detail: '', at: 0 };
+  private openAlexBudgetBlockedUntil = 0;
   // P432: failed page reads, in-memory only (URL -> failedAt). No
   // persistence, no timer; stale entries are dropped when re-checked.
   private failedPageUrls = new Map<string, number>();
@@ -606,6 +631,79 @@ export class AutonomousSearchService {
   constructor() {
     this.config = this.loadConfig();
     this.stats = this.loadStats();
+    // P485: restore the self-diagnosis and any live OpenAlex budget
+    // block, so a restart does not make her re-spend a budget she
+    // already concluded is exhausted.
+    try {
+      const savedDiagnosis = storageService.getItem(SEARCH_SELF_DIAGNOSIS_KEY);
+      if (savedDiagnosis) {
+        const parsed = JSON.parse(savedDiagnosis);
+        if (parsed && typeof parsed.cause === 'string') this.selfDiagnosis = parsed;
+      }
+      const savedBlock = storageService.getItem(OPENALEX_BUDGET_BLOCK_KEY);
+      if (savedBlock) {
+        const parsed = JSON.parse(savedBlock);
+        if (typeof parsed?.blockedUntil === 'number') this.openAlexBudgetBlockedUntil = parsed.blockedUntil;
+      }
+    } catch {
+      // Diagnosis/block are auxiliary state; defaults stand.
+    }
+  }
+
+  // P485: record a classified cause for the search layer's state.
+  // The log line states the conclusion in her terms (what is wrong,
+  // whose side it is on, what she will do meanwhile) -- the same
+  // shape as an investigator's report, kept where later turns and
+  // the operational snapshot can find it.
+  private recordSelfDiagnosis(cause: SearchSelfDiagnosisCause, detail: string, until?: number): void {
+    const previous = this.selfDiagnosis;
+    this.selfDiagnosis = {
+      cause,
+      detail: detail.slice(0, 300),
+      at: Date.now(),
+      ...(until ? { until } : {}),
+    };
+    try {
+      storageService.setItem(SEARCH_SELF_DIAGNOSIS_KEY, JSON.stringify(this.selfDiagnosis));
+    } catch {
+      // Auxiliary record; losing it must not break the search.
+    }
+    if (previous.cause !== cause || cause === 'UPSTREAM_SUSPENDED' || cause === 'BUDGET_EXHAUSTED') {
+      const sentence =
+        cause === 'UPSTREAM_SUSPENDED'
+          ? '検索が振るわない原因は、クエリではなく上流エンジンの停止と判断しました。冷却が明けるまで検索を控えます'
+          : cause === 'BUDGET_EXHAUSTED'
+            ? 'OpenAlex の無料予算が枯渇したと判断しました。UTC 深夜のリセットまで OpenAlex を止めます'
+            : '検索基盤の回復を確認しました';
+      systemLogger.info('SELF_IMPROVEMENT', `🩺 [自己診断] ${sentence}（詳細: ${this.selfDiagnosis.detail}）`);
+    }
+  }
+
+  private noteSearchRecovered(): void {
+    if (this.selfDiagnosis.cause === 'UPSTREAM_SUSPENDED') {
+      this.recordSelfDiagnosis('RECOVERED', 'SearXNG が結果を返しました');
+    }
+  }
+
+  // P485: a budget-exhaustion 429 from OpenAlex means the shared
+  // daily budget is gone until the UTC-midnight reset. Remembering
+  // that conclusion stops the rescue path from re-spending calls
+  // that cannot succeed (device-observed: 34 calls in one window
+  // after the budget was already known to be $0).
+  private blockOpenAlexForBudget(detail: string): void {
+    const reset = new Date();
+    reset.setUTCHours(24, 0, 0, 0);
+    this.openAlexBudgetBlockedUntil = reset.getTime();
+    try {
+      storageService.setItem(OPENALEX_BUDGET_BLOCK_KEY, JSON.stringify({ blockedUntil: this.openAlexBudgetBlockedUntil }));
+    } catch {
+      // Auxiliary record; the in-memory block still holds.
+    }
+    this.recordSelfDiagnosis('BUDGET_EXHAUSTED', detail, this.openAlexBudgetBlockedUntil);
+  }
+
+  public getSearchSelfDiagnosis(): SearchSelfDiagnosis {
+    return { ...this.selfDiagnosis };
   }
 
   private loadConfig(): AutonomousSearchConfig {
@@ -835,7 +933,12 @@ export class AutonomousSearchService {
 
     if (!options?.bypassCache && this.cache.has(cacheKey)) {
       const cached = this.cache.get(cacheKey)!;
-      if (Date.now() - cached.timestamp < 3600000) {
+      // P485: negative (empty) entries live for the shorter TTL.
+      const ttl = cached.negative ? NEGATIVE_CACHE_TTL_MS : 3600000;
+      if (Date.now() - cached.timestamp < ttl) {
+        if (cached.negative) {
+          systemLogger.info('SELF_IMPROVEMENT', 'ℹ️ [検索キャッシュ] 直近に同じ検索が空だったため、再送せず記録を返します');
+        }
         return cached.data;
       }
     }
@@ -1085,6 +1188,12 @@ export class AutonomousSearchService {
     };
 
     const attemptOpenAlex = async (): Promise<ProviderSearchOutput | null> => {
+      // P485: she already concluded the daily budget is exhausted;
+      // do not spend another call re-learning it.
+      if (this.openAlexBudgetBlockedUntil > Date.now()) {
+        markProvider('openalex', 'SKIPPED', 'OpenAlexは予算枯渇のため停止中（UTC深夜にリセット）');
+        return null;
+      }
       try {
         const apiUrl = readSupplementalApiUrl('miki_openalex_api_url', 'https://api.openalex.org/works');
         const url = new URL(apiUrl);
@@ -1122,6 +1231,13 @@ export class AutonomousSearchService {
           const reason = detail ? `HTTP ${res.status}: ${detail}` : `HTTP ${res.status}`;
           markProvider('openalex', 'FAILED', reason);
           systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [OpenAlex] 応答失敗: ${reason}`);
+          // P485: a 429 whose body says the budget is gone is a
+          // conclusion, not a transient failure -- remember it
+          // until the UTC-midnight reset instead of re-asking on
+          // every rescue.
+          if (res.status === 429 && /budget|insufficient/i.test(detail)) {
+            this.blockOpenAlexForBudget(reason);
+          }
           return null;
         }
         const data = await res.json();
@@ -1214,11 +1330,25 @@ export class AutonomousSearchService {
       // matching cooldown, an HTTP 429 counts as rate pressure.
       if (searxngRun.output) {
         searchPacerNoteSuccess();
+        // P485: a success after a suspended diagnosis closes the
+        // investigation -- the recorded cause flips to RECOVERED.
+        this.noteSearchRecovered();
       } else if (searxngRun.suspensionTier) {
         searchPacerNotePressure('エンジン停止');
         searchPacerStartCooldown(searxngRun.suspensionTier, searxngRun.emptyReason || '');
+        // P485: keep the classified cause, not just the cooldown.
+        this.recordSelfDiagnosis(
+          'UPSTREAM_SUSPENDED',
+          searxngRun.emptyReason || '全エンジン停止中',
+          Date.now() + searchPacerCooldownRemainingMs(),
+        );
       } else if (searxngRun.httpStatus === 429) {
         searchPacerNotePressure('HTTP 429');
+      } else if (searxngRun.httpStatus !== undefined && searxngRun.httpStatus >= 500) {
+        // P485: instance-side 5xx is also rate/load pressure; until
+        // now only suspensions and 429 fed the pacer, so a
+        // struggling instance never slowed her down.
+        searchPacerNotePressure('HTTP 5xx');
       }
     }
 
@@ -1282,7 +1412,7 @@ export class AutonomousSearchService {
       return result;
     }
 
-    return {
+    const emptyResult: AutonomousSearchExecutionResult = {
       ...result,
       // P415: when the pass ended empty and SearXNG said why, the
       // summary carries the classified reasons. This summary is what
@@ -1293,6 +1423,13 @@ export class AutonomousSearchService {
         ? `「${safeQuery}」の検索に失敗しました。空の理由: ${emptyReason}（${providerSummary}）。`
         : `「${safeQuery}」の検索に失敗しました（${providerSummary}）。`,
     };
+    // P485: cache the empty outcome too. Until now only successes
+    // were cached, so the same query re-fired every provider on
+    // every pass and every re-queued gap -- the device logs showed
+    // one query sent 4 times inside a single window, all returning
+    // the same empty answer from a suspended upstream.
+    this.cache.set(cacheKey, { data: emptyResult, timestamp: Date.now(), negative: true });
+    return emptyResult;
   }
 
   /**
