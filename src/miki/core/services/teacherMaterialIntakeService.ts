@@ -7,6 +7,7 @@ import {
   type KnowledgeComponentArtifact,
 } from './reusableComponentFactoryService';
 import { definitionPatternService } from '../../research/services/definitionPatternService';
+import { lexicalRelationService, type LexicalRelationType } from '../../memory/services/lexicalRelationService';
 
 /*
  * P472: 教師教材パッケージの受け口。
@@ -29,10 +30,13 @@ import { definitionPatternService } from '../../research/services/definitionPatt
  * 形式: ZIP（または .zip.txt = Base64）のルートに teacher_material.json。
  * { formatVersion: 1, packageType: 'TEACHER_MATERIAL', teacher: { name },
  *   subject?, lessons: [{ id, title, rule, reason?, howToJudge?, example?, antiPattern? }],
- *   definitionPatterns?: [{ id?, name?, regex }] }
+ *   definitionPatterns?: [{ id?, name?, regex }],
+ *   lexicalRelations?: [{ a, b, type }] }
  * 定義形（P494）は任意の追加分。regex は (?<term>) と (?<gloss>) の
  * 名前付きグループ必須で、レジストリ側の検証を通ったものだけ登録
  * される。レッスンが空でも、有効な定義形があれば受け付ける。
+ * 語彙ルール（P495）も任意の追加分。type は PARAPHRASE と SYNONYM
+ * のみ受け付ける（言い換え・同義の供給用）。
  * 参照画像は references/ 以下に .png / .jpg / .jpeg / .webp で同梱できる。
  */
 
@@ -72,6 +76,8 @@ export interface TeacherMaterialIntakeRecord {
   lessonCount: number;
   // P494: このパッケージで登録された定義形の件数。
   definitionPatternCount?: number;
+  // P495: このパッケージで登録された語彙ルールの件数。
+  lexicalRelationCount?: number;
   componentIds: string[];
   references: TeacherMaterialReferenceRecord[];
   receivedAt: number;
@@ -320,9 +326,29 @@ class TeacherMaterialIntakeService {
       if (result.ok) definitionPatternCount++;
       else patternNotes.push(`定義形 ${typeof p.id === 'string' ? p.id : '(id無し)'}: ${result.reason}`);
     }
+    // P495: 語彙ルールの供給（任意）。言い換え対と同義対だけを
+    // 受け付ける（反対・上位などの判断系は教師教材からは入れない）。
+    const rawRelations = Array.isArray((manifest as any).lexicalRelations)
+      ? (manifest as any).lexicalRelations as unknown[]
+      : [];
+    let lexicalRelationCount = 0;
+    const relationNotes: string[] = [];
+    for (const item of rawRelations.slice(0, 50)) {
+      const r = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : {};
+      const a = typeof r.a === 'string' ? r.a.trim() : '';
+      const b = typeof r.b === 'string' ? r.b.trim() : '';
+      const type = typeof r.type === 'string' ? r.type.trim().toUpperCase() : '';
+      if (!a || !b || a.length > 60 || b.length > 60 || (type !== 'PARAPHRASE' && type !== 'SYNONYM')) {
+        relationNotes.push(`語彙ルール ${a || '(a無し)'}: 形式が不正か、type が対象外です`);
+        continue;
+      }
+      if (lexicalRelationService.addRelation(a, b, type as LexicalRelationType, 'teacher')) {
+        lexicalRelationCount++;
+      }
+    }
     const rawLessons = manifest.lessons;
-    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0) {
-      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形）を入れてください。', ['lessons が空配列または未設定で、有効な定義形もありません', ...patternNotes], identifiedCtx);
+    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0 && lexicalRelationCount === 0) {
+      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形・語彙ルール）を入れてください。', ['lessons が空配列または未設定で、有効な定義形・語彙ルールもありません', ...patternNotes, ...relationNotes], identifiedCtx);
     }
     const lessons: TeacherLesson[] = [];
     for (const item of Array.isArray(rawLessons) ? rawLessons : []) {
@@ -425,14 +451,15 @@ class TeacherMaterialIntakeService {
       subject,
       lessonCount: lessons.length,
       definitionPatternCount,
+      lexicalRelationCount,
       componentIds,
       references,
       receivedAt,
     };
     this.ledger.set(intakeId, record);
     this.save();
-    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount}`, { subject });
-    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件）。`, reasons: [...patternNotes], record: { ...record } };
+    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount} relations=${lexicalRelationCount}`, { subject });
+    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件、語彙ルール ${lexicalRelationCount} 件）。`, reasons: [...patternNotes, ...relationNotes], record: { ...record } };
   }
 }
 

@@ -4,6 +4,7 @@ import { semanticDictionaryGraphP209Service } from '../../core/services/semantic
 import { conversationComponentPipelineService } from './conversationComponentPipelineService';
 import { contentTermsFromTokens, type JapaneseToken } from '../../research/services/japaneseAnalysisService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
+import { paraphraseService } from '../../memory/services/paraphraseService';
 import { dictionaryBootstrapService } from '../../research/services/dictionaryBootstrapService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
@@ -167,7 +168,11 @@ class ConversationGraphRuntimeP212Service {
  }
  private selfInquiryDictionaryAnswer(term:string):string {
   const hits=japaneseDictionaryService.lookup(term);
-  if(hits.length){const entry=hits[0];const gloss=entry.gloss?entry.gloss.slice(0,80):'';return `『${term}』は辞書に載っています。${entry.reading?`読みは「${entry.reading}」です。`:''}${gloss?`意味は「${gloss}」です。`:''}`.trim()}
+  if(hits.length){const entry=hits[0];const gloss=entry.gloss?entry.gloss.slice(0,80):'';let answer=`『${term}』は辞書に載っています。${entry.reading?`読みは「${entry.reading}」です。`:''}${gloss?`意味は「${gloss}」です。`:''}`.trim();
+  // P495: 辞書の丸写しで終わらせず、意味保存チェックを通った
+  // 言い換えを「つまり」で添える（自分の言葉で言い直す）。
+  if(gloss){const restated=paraphraseService.restate(gloss,{style:'casual'});if(restated.changed)answer+=` つまり、${restated.text}ってことです。`;}
+  return answer;}
   return `『${term}』は手元の辞書には載っていません。サーバー側の全量辞書に問い合わせておきます。`;
  }
  private selfInquirySurfaceCountAnswer():string {

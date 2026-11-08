@@ -21,7 +21,7 @@ import { canonicalSha256Object } from '../../core/services/canonicalSha256Servic
  * - teacher / manual: 将来の受け口（型だけ用意）。
  */
 
-export type LexicalRelationType = 'SYNONYM' | 'ANTONYM' | 'HYPERNYM' | 'TRANSLATION' | 'ABBREVIATION' | 'FIELD' | 'VARIANT';
+export type LexicalRelationType = 'SYNONYM' | 'ANTONYM' | 'HYPERNYM' | 'TRANSLATION' | 'ABBREVIATION' | 'FIELD' | 'VARIANT' | 'PARAPHRASE';
 export type LexicalRelationSource = 'seed' | 'wikidata' | 'teacher' | 'manual' | 'learned';
 
 export interface LexicalRelation {
@@ -112,6 +112,19 @@ const SEED_VARIANTS: Array<[string, string]> = [
   ['すごい', '凄い'], ['わかる', '分かる'],
 ];
 
+// P495: 言い換え（硬い表現・長い表現 → 口語・短い表現）。方向を
+// 持つ（a を b に言い換える）。種は安全なサ変動詞→和語動詞と、
+// 定型の圧縮だけに絞る。文脈依存の圧縮（例: 療法→癒し）は種に
+// 入れず、教師・学習・手動の供給に委ねる。
+const SEED_PARAPHRASES: Array<[string, string]> = [
+  ['利用する', '使う'], ['使用する', '使う'], ['購入する', '買う'],
+  ['質問する', '聞く'], ['回答する', '答える'], ['開始する', '始める'],
+  ['終了する', '終わる'], ['選択する', '選ぶ'], ['決定する', '決める'],
+  ['変更する', '変える'], ['作成する', '作る'], ['削除する', '消す'],
+  ['修理する', '直す'], ['確認する', '確かめる'], ['行う', 'する'],
+  ['することができる', 'できる'], ['することができない', 'できない'],
+];
+
 function normalizeTerm(term: string): string {
   return String(term || '').toLowerCase().trim();
 }
@@ -160,16 +173,37 @@ class LexicalRelationService {
         );
       }
     } catch { /* 読めなければ種から始める */ }
-    if (this.relations.length === 0) {
+    // P495: 種は「台帳が空のときだけ」ではなく、不足分を補う形で
+    // 入れる。新しい型の種を後から足しても既存の台帳に届くように
+    // するため（この形でないと、端末で育った台帳には P491 の種も
+    // 届かなかった）。
+    {
       const now = Date.now();
-      for (const [a, b] of SEED_ANTONYMS) this.relations.push({ a, b, type: 'ANTONYM', source: 'seed', updatedAt: now });
-      for (const [a, b] of SEED_SYNONYMS) this.relations.push({ a, b, type: 'SYNONYM', source: 'seed', updatedAt: now });
-      for (const [a, b] of SEED_HYPERNYMS) this.relations.push({ a, b, type: 'HYPERNYM', source: 'seed', updatedAt: now });
-      for (const [a, b] of SEED_TRANSLATIONS) this.relations.push({ a, b, type: 'TRANSLATION', source: 'seed', updatedAt: now });
-      for (const [a, b] of SEED_ABBREVIATIONS) this.relations.push({ a, b, type: 'ABBREVIATION', source: 'seed', updatedAt: now });
-      for (const [a, b] of SEED_FIELDS) this.relations.push({ a, b, type: 'FIELD', source: 'seed', updatedAt: now });
-      for (const [a, b] of SEED_VARIANTS) this.relations.push({ a, b, type: 'VARIANT', source: 'seed', updatedAt: now });
-      this.save();
+      const seedPairs: Array<[string, string, LexicalRelationType]> = [
+        ...SEED_ANTONYMS.map(([a, b]): [string, string, LexicalRelationType] => [a, b, 'ANTONYM']),
+        ...SEED_SYNONYMS.map(([a, b]): [string, string, LexicalRelationType] => [a, b, 'SYNONYM']),
+        ...SEED_HYPERNYMS.map(([a, b]): [string, string, LexicalRelationType] => [a, b, 'HYPERNYM']),
+        ...SEED_TRANSLATIONS.map(([a, b]): [string, string, LexicalRelationType] => [a, b, 'TRANSLATION']),
+        ...SEED_ABBREVIATIONS.map(([a, b]): [string, string, LexicalRelationType] => [a, b, 'ABBREVIATION']),
+        ...SEED_FIELDS.map(([a, b]): [string, string, LexicalRelationType] => [a, b, 'FIELD']),
+        ...SEED_VARIANTS.map(([a, b]): [string, string, LexicalRelationType] => [a, b, 'VARIANT']),
+        ...SEED_PARAPHRASES.map(([a, b]): [string, string, LexicalRelationType] => [a, b, 'PARAPHRASE']),
+      ];
+      let supplemented = 0;
+      for (const [a, b, type] of seedPairs) {
+        const directional = type === 'HYPERNYM' || type === 'FIELD';
+        const exists = this.relations.some((r) =>
+          r.type === type &&
+          (directional
+            ? r.a === a && r.b === b
+            : (r.a === a && r.b === b) || (r.a === b && r.b === a)),
+        );
+        if (!exists) {
+          this.relations.push({ a, b, type, source: 'seed', updatedAt: now });
+          supplemented++;
+        }
+      }
+      if (supplemented > 0) this.save();
     }
     try {
       const sensesRaw = storageService.getItem(SENSES_KEY);
@@ -305,6 +339,17 @@ class LexicalRelationService {
   public antonymPairs(): Array<[string, string]> {
     this.load();
     return this.relations.filter((r) => r.type === 'ANTONYM').map((r) => [r.a, r.b] as [string, string]);
+  }
+
+  /** P495: 言い換え対（a を b に言い換える、方向あり）。 */
+  public paraphrasePairs(): Array<[string, string]> {
+    this.load();
+    return this.relations.filter((r) => r.type === 'PARAPHRASE').map((r) => [r.a, r.b] as [string, string]);
+  }
+
+  public paraphrasesOf(phraseRaw: string): string[] {
+    const phrase = normalizeTerm(phraseRaw);
+    return this.paraphrasePairs().filter(([a]) => a === phrase).map(([, b]) => b);
   }
 
   public hypernymPairs(): Array<[string, string]> {

@@ -1,0 +1,218 @@
+import { lexicalRelationService } from './lexicalRelationService';
+import { subjectUnderstandingService, extractSubjectTerms } from './subjectUnderstandingService';
+import { systemLogger } from '../../../services/systemLogger';
+
+/**
+ * P495: 言い換え（生成＋意味保存チェック）。
+ *
+ * 目的は2つ: (1) 覚えた意味を辞書の丸写しではなく自分の言葉で
+ * 言えること（自然な会話）、(2) 言い直して意味が保たれるかを
+ * 自分で確かめること（理解の検証＝ハルシネーション対策）。
+ * そのため生成とチェックは必ずセットで、チェックを通らない
+ * 言い換えは採用せず元の文を返す。
+ *
+ * 生成 v1 の範囲（保守的に絞る）:
+ * - PARAPHRASE 関係（方向あり: 硬い/長い → 口語/短い）の置換。
+ *   動詞対は活用を合わせて置換する（利用して→使って）。
+ * - 文末の口語化（である→だよ、ではない→じゃないよ 等）。
+ * 同義語は方向（どちらが口語か）が型に無いため、生成には使わず
+ * チェック側の「意味が保たれている」判定にだけ使う。
+ */
+
+export interface ParaphraseCheck {
+  ok: boolean;
+  reasons: string[];
+}
+
+export interface ParaphraseResult {
+  text: string;
+  changed: boolean;
+  check: ParaphraseCheck;
+}
+
+interface VerbForms {
+  dict: string;
+  te: string;
+  ta: string;
+  nai: string;
+  masu: string;
+}
+
+// るで終わるが五段活用する主な動詞（形だけでは一段と区別できない）。
+const GODAN_RU_EXCEPTIONS = new Set([
+  '帰る', '入る', '知る', '切る', '走る', '要る', '減る', '焦る', '蹴る',
+  '滑る', '喋る', '限る', '握る', '練る', '散る', '参る', '罵る', '遮る',
+]);
+const EI_ROW_KANA = 'えけげせぜてでねへべぺめれいきぎしじちぢにひびぴみり';
+
+function verbForms(dictForm: string): VerbForms | undefined {
+  const d = (dictForm || '').trim();
+  if (d.length < 2) return undefined;
+  if (d === '来る') return { dict: d, te: '来て', ta: '来た', nai: '来ない', masu: '来ます' };
+  if (d === 'くる') return { dict: d, te: 'きて', ta: 'きた', nai: 'こない', masu: 'きます' };
+  if (d === 'する') return { dict: d, te: 'して', ta: 'した', nai: 'しない', masu: 'します' };
+  if (d.endsWith('する')) {
+    const stem = d.slice(0, -2);
+    if (!stem) return undefined;
+    return { dict: d, te: `${stem}して`, ta: `${stem}した`, nai: `${stem}しない`, masu: `${stem}します` };
+  }
+  if (d.endsWith('る') && d.length >= 3) {
+    const before = d[d.length - 2];
+    const stem = d.slice(0, -1);
+    if (EI_ROW_KANA.includes(before) && !GODAN_RU_EXCEPTIONS.has(d)) {
+      // 一段活用
+      return { dict: d, te: `${stem}て`, ta: `${stem}た`, nai: `${stem}ない`, masu: `${stem}ます` };
+    }
+    // 五段（る）
+    return { dict: d, te: `${stem}って`, ta: `${stem}った`, nai: `${stem}らない`, masu: `${stem}ります` };
+  }
+  const last = d[d.length - 1];
+  const stem = d.slice(0, -1);
+  const godan: Record<string, [string, string, string, string]> = {
+    'う': ['って', 'った', 'わない', 'います'],
+    'く': ['いて', 'いた', 'かない', 'きます'],
+    'ぐ': ['いで', 'いだ', 'がない', 'ぎます'],
+    'す': ['して', 'した', 'さない', 'します'],
+    'つ': ['って', 'った', 'たない', 'ちます'],
+    'ぬ': ['んで', 'んだ', 'なない', 'にます'],
+    'ぶ': ['んで', 'んだ', 'ばない', 'びます'],
+    'む': ['んで', 'んだ', 'まない', 'みます'],
+  };
+  const row = godan[last];
+  if (!row) return undefined;
+  return { dict: d, te: stem + row[0], ta: stem + row[1], nai: stem + row[2], masu: stem + row[3] };
+}
+
+function applyPair(text: string, a: string, b: string): string {
+  const fa = verbForms(a);
+  const fb = verbForms(b);
+  if (fa && fb) {
+    let out = text;
+    const keys: Array<keyof VerbForms> = ['te', 'ta', 'nai', 'masu', 'dict'];
+    const ordered = keys
+      .map((k) => [fa[k], fb[k]] as [string, string])
+      .filter(([x, y]) => x !== y && x.length >= 2)
+      .sort((x, y) => y[0].length - x[0].length);
+    for (const [from, to] of ordered) {
+      if (out.includes(from)) out = out.split(from).join(to);
+    }
+    return out;
+  }
+  if (a.length >= 2 && text.includes(a)) return text.split(a).join(b);
+  return text;
+}
+
+function casualizeEndings(text: string): string {
+  let out = text;
+  out = out.split('ではありません。').join('じゃないよ。');
+  out = out.split('ではない。').join('じゃないよ。');
+  out = out.split('かもしれない。').join('かも。');
+  out = out.split('である。').join('だよ。');
+  out = out.split('です。').join('だよ。');
+  out = out.split('だろう。').join('だろうね。');
+  if (out.endsWith('である')) out = `${out.slice(0, -3)}だよ`;
+  else if (out.endsWith('です')) out = `${out.slice(0, -2)}だよ`;
+  return out;
+}
+
+function negationCount(text: string): number {
+  return (text.match(/ない|ません|ありません|ずに/g) || []).length;
+}
+
+function numbersOf(text: string): string[] {
+  const half = text.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  return (half.match(/\d+(?:\.\d+)?/g) || []).sort();
+}
+
+class ParaphraseService {
+  /** 意味保存チェック。生成とは独立に、任意の2文の検査にも使う。 */
+  public check(originalRaw: string, candidateRaw: string): ParaphraseCheck {
+    const original = (originalRaw || '').trim();
+    const candidate = (candidateRaw || '').trim();
+    const reasons: string[] = [];
+    if (!candidate) reasons.push('言い換え結果が空');
+    if (negationCount(original) !== negationCount(candidate)) {
+      reasons.push('否定の数が変わっている');
+    }
+    if (JSON.stringify(numbersOf(original)) !== JSON.stringify(numbersOf(candidate))) {
+      reasons.push('数値が変わっている');
+    }
+    const originalTerms = extractSubjectTerms(original);
+    // 反対語の混入は、語の抽出単位に頼らず対そのものを文面で走査
+    // する（「上がる」のような漢字1字＋送り仮名の動詞は、主題語の
+    // 抽出では拾えないため）。
+    for (const [a, b] of lexicalRelationService.antonymPairs()) {
+      if (original.includes(a) && candidate.includes(b) && !original.includes(b)) {
+        reasons.push(`反対の語「${b}」が混入している`);
+      }
+      if (original.includes(b) && candidate.includes(a) && !original.includes(a)) {
+        reasons.push(`反対の語「${a}」が混入している`);
+      }
+    }
+    if (originalTerms.length > 0) {
+      // フレーズ圧縮（言い換え対 a→b）で a の中に含まれて消えた語は、
+      // b が候補にあれば「置き換えられた」として覆われた扱いにする。
+      const pairs = lexicalRelationService.paraphrasePairs();
+      // 言い換え先 b は活用した形で現れる（終わる→終わった）ため、
+      // 辞書形だけでなく活用形でも候補に含まれているかを見る。
+      const pairTargetPresent = (b: string): boolean => {
+        if (candidate.includes(b)) return true;
+        const forms = verbForms(b);
+        if (!forms) return false;
+        return [forms.te, forms.ta, forms.nai, forms.masu].some((f) => candidate.includes(f));
+      };
+      const covered = originalTerms.filter(
+        (term) =>
+          candidate.includes(term) ||
+          lexicalRelationService.synonymsOf(term).some((s) => candidate.includes(s)) ||
+          lexicalRelationService.paraphrasesOf(term).some((p) => candidate.includes(p)) ||
+          lexicalRelationService.hypernymsOf(term).some((h) => candidate.includes(h)) ||
+          pairs.some(([a, b]) => (a.includes(term) || term.includes(a)) && pairTargetPresent(b)),
+      );
+      if (covered.length / originalTerms.length < 0.75) {
+        reasons.push('主題の語が落ちている');
+      }
+    }
+    const originalField = subjectUnderstandingService.assess(original).field;
+    const candidateField = subjectUnderstandingService.assess(candidate).field;
+    if (originalField && candidateField && originalField !== candidateField) {
+      reasons.push('分野が変わっている');
+    }
+    return { ok: reasons.length === 0, reasons };
+  }
+
+  /**
+   * 言い換えを生成し、意味保存チェックを通った場合だけ採用する。
+   * 通らなければ元の文をそのまま返す（changed=false）。
+   */
+  public restate(textRaw: string, options?: { style?: 'casual' | 'plain' }): ParaphraseResult {
+    const original = (textRaw || '').trim();
+    if (!original) return { text: original, changed: false, check: { ok: true, reasons: [] } };
+    let out = original;
+    let substitutions = 0;
+    const pairs = [...lexicalRelationService.paraphrasePairs()].sort((x, y) => y[0].length - x[0].length);
+    for (const [a, b] of pairs) {
+      if (substitutions >= 8) break;
+      const next = applyPair(out, a, b);
+      if (next !== out) {
+        out = next;
+        substitutions++;
+      }
+    }
+    if ((options?.style ?? 'casual') === 'casual') {
+      out = casualizeEndings(out);
+    }
+    if (out === original) {
+      return { text: original, changed: false, check: { ok: true, reasons: [] } };
+    }
+    const check = this.check(original, out);
+    if (!check.ok) {
+      systemLogger.info('SELF_IMPROVEMENT', `📖 [言い換え却下] 意味保存チェックで不採用: ${check.reasons.join(' / ')}`);
+      return { text: original, changed: false, check };
+    }
+    systemLogger.info('SELF_IMPROVEMENT', `📖 [言い換え] 「${original.slice(0, 40)}」→「${out.slice(0, 40)}」`);
+    return { text: out, changed: true, check };
+  }
+}
+
+export const paraphraseService = new ParaphraseService();
