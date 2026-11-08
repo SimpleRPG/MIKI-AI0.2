@@ -17758,9 +17758,9 @@
     },
     {
       "path": "src/miki/core/services/requiredAssetAcquisitionService.ts",
-      "bytes": 44784,
-      "lines": 1058,
-      "sha256": "f7069ce8df448e855e648e5123f8964b10d9a26c3953a8ea8611821e98cc4c0d",
+      "bytes": 46932,
+      "lines": 1101,
+      "sha256": "b3192e3a6e8352b33de8cf3c9afa584c268bcf9fd00af3b9e96a84ea56c4ab81",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -34257,9 +34257,9 @@
     },
     {
       "path": "src/miki/unknown/services/knowledgeGapService.ts",
-      "bytes": 25992,
-      "lines": 412,
-      "sha256": "826f78120bc07f20885b1b2832d7f5169cce310d763a7464981e20d953b023aa",
+      "bytes": 26781,
+      "lines": 421,
+      "sha256": "46f9875e01bce29fbf04996cbe6d87a8390d8f3f199b9ae66f074c7282a1a551",
       "relativeImportCandidates": [
         {
           "line": 1,

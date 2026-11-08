@@ -82,7 +82,13 @@ export class KnowledgeGapService {
   public detect(params: {query:string;reason?:string;type?:KnowledgeGapType;priority?:number;requiredEvidence?:string[];sourceRequestId?:string;target?:string;missingContent?:string;conditions?:string[];environment?:string;taskId?:string;capabilityIds?:string[];claimIds?:string[]}): KnowledgeGap {
     const query=params.query.trim(); const identity=this.buildIdentity(params); const existing=this.findOpen(query,params);
     if(existing)return this.mergeInto(existing,params,identity);
-    const now=Date.now(); const gap:KnowledgeGap={id:this.makeId(query),query,type:params.type||this.inferType(query,params.reason||''),identity,sourceRequestIds:params.sourceRequestId?[params.sourceRequestId]:[],mergedCount:0,priority:Math.max(1,Math.min(100,params.priority??50)),requiredEvidence:params.requiredEvidence?.filter(Boolean)||['信頼できる一次資料または再現可能な検証結果'],status:'OPEN',reason:params.reason||'端末内の既知知識だけでは結論を確定できない',sourceRequestId:params.sourceRequestId,createdAt:now,updatedAt:now,attempts:0};
+    const now=Date.now(); const gap:KnowledgeGap={id:this.makeId(query),query,type:params.type||this.inferType(query,params.reason||''),identity,sourceRequestIds:params.sourceRequestId?[params.sourceRequestId]:[],mergedCount:0,priority:Math.max(1,Math.min(100,params.priority??50)),requiredEvidence:params.requiredEvidence?.filter(Boolean)||['信頼できる一次資料または再現可能な検証結果'],status:'OPEN',reason:params.reason||'端末内の既知知識だけでは結論を確定できない',sourceRequestId:params.sourceRequestId,createdAt:now,updatedAt:now,attempts:0,
+    // P483: 対象 Claim を gap 本体にも持つ。identity 側は照合用に
+    // 正規化（小文字化）されるため、researchService が読む
+    // researchClaimIds には原形の ID を入れる。これが無いと初回の
+    // 調査で出典除外（同じ出典の再取得＝独立性の喪失）も独立裏付け
+    // の焦点も効かなかった。
+    ...(params.claimIds?.filter(Boolean).length?{researchClaimIds:[...new Set(params.claimIds.filter(Boolean))]}:{})};
     this.gaps.unshift(gap); this.save(); systemLogger.info('SELF_IMPROVEMENT',`🔎 [Knowledge Gap] ${gap.id}: ${gap.type} / ${gap.query}`); return gap;
   }
 
@@ -250,8 +256,11 @@ export class KnowledgeGapService {
   private buildIdentity(params:{query:string;target?:string;missingContent?:string;conditions?:string[];environment?:string;taskId?:string;capabilityIds?:string[];claimIds?:string[]}):KnowledgeGapIdentity{
     const target=this.semanticNormalize(params.target||''); const missingContent=this.semanticNormalize(params.missingContent||params.query); const conditions=[...new Set((params.conditions||[]).map(x=>this.semanticNormalize(x)).filter(Boolean))].sort(); const environment=this.semanticNormalize(params.environment||''); const taskId=this.semanticNormalize(params.taskId||''); const capabilityIds=[...new Set((params.capabilityIds||[]).map(x=>this.semanticNormalize(x)).filter(Boolean))].sort(); const claimIds=[...new Set((params.claimIds||[]).map(x=>this.semanticNormalize(x)).filter(Boolean))].sort(); const canonical={target,missingContent,conditions,environment,taskId,capabilityIds,claimIds}; return {...canonical,semanticKey:canonicalSha256Object(canonical)};
   }
-  private mergeInto(existing:KnowledgeGap,params:{priority?:number;requiredEvidence?:string[];sourceRequestId?:string;reason?:string},identity:KnowledgeGapIdentity):KnowledgeGap{
-    const evidence=new Set([...(existing.requiredEvidence||[]),...(params.requiredEvidence||[])].filter(Boolean)); const sources=new Set([...(existing.sourceRequestIds||[]),...(existing.sourceRequestId?[existing.sourceRequestId]:[]),params.sourceRequestId||''].filter(Boolean)); existing.identity=existing.identity||identity; existing.priority=Math.max(existing.priority,Math.max(1,Math.min(100,params.priority??existing.priority))); existing.requiredEvidence=[...evidence]; existing.sourceRequestIds=[...sources]; existing.mergedCount=(existing.mergedCount||0)+1; if(params.reason&&!existing.reason.includes(params.reason))existing.reason=`${existing.reason} / ${params.reason}`.slice(0,2000); existing.updatedAt=Date.now(); this.save(); return existing;
+  private mergeInto(existing:KnowledgeGap,params:{priority?:number;requiredEvidence?:string[];sourceRequestId?:string;reason?:string;claimIds?:string[]},identity:KnowledgeGapIdentity):KnowledgeGap{
+    const evidence=new Set([...(existing.requiredEvidence||[]),...(params.requiredEvidence||[])].filter(Boolean)); const sources=new Set([...(existing.sourceRequestIds||[]),...(existing.sourceRequestId?[existing.sourceRequestId]:[]),params.sourceRequestId||''].filter(Boolean)); existing.identity=existing.identity||identity; existing.priority=Math.max(existing.priority,Math.max(1,Math.min(100,params.priority??existing.priority))); existing.requiredEvidence=[...evidence]; existing.sourceRequestIds=[...sources]; existing.mergedCount=(existing.mergedCount||0)+1; if(params.reason&&!existing.reason.includes(params.reason))existing.reason=`${existing.reason} / ${params.reason}`.slice(0,2000);
+    // P483: 既存 gap への再検出でも対象 Claim を補う（detect 側の修正と対）。
+    if(params.claimIds?.filter(Boolean).length)existing.researchClaimIds=[...new Set([...(existing.researchClaimIds||[]),...params.claimIds.filter(Boolean)])];
+    existing.updatedAt=Date.now(); this.save(); return existing;
   }
   private semanticNormalize(text:string):string{
     let value=this.normalize(text).replace(/[「」『』【】()[\]{}<>]/g,' ').replace(/[？?！!。、，,：:;；]/g,' ').replace(/\b(what|which|how|why|when|where|is|are|the|a|an|to|of|for|with)\b/gi,' ').replace(/(とは|について|を|が|は|の|に|へ|で|と|から|まで|です|ます|ください|知りたい|教えて|どう|どのように|方法|仕組み|やり方)/g,' ').replace(/\s+/g,' ').trim();

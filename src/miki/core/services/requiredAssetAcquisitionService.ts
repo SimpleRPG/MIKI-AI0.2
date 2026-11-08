@@ -308,9 +308,19 @@ class RequiredAssetAcquisitionService {
      * から組み立てられて載るので、その存在自体が直接の信号であ
      * る。直接経路の挙動は不変（従来どおり文脈ありで Claim 経路）。
      */
-    const claimRoute = claimContext && claimContext.statement.trim()
-      ? claimContext
-      : undefined;
+    // P483: Claim 文脈が届かなかった経路（UI 由来の run 等）では、
+    // objective が「Claim矛盾: CLM-…」型の診断タイトルでも、中に
+    // 含まれる Claim ID から文脈を復元して Claim 経路に乗せる。
+    // タイトル文字列は検索不能で、復元できないまま汎用経路に落と
+    // すと項目名そのものを検索する空転になる（実機 LOG_16:
+    // CLM-000104 の証拠取得が項目名を検索し続けていた）。
+    const recoveredClaimContext =
+      !claimContext?.statement?.trim()
+        ? this.recoverClaimContextFromObjective(objective)
+        : undefined;
+    const effectiveClaimContext =
+      claimContext?.statement?.trim() ? claimContext : recoveredClaimContext;
+    const claimRoute = effectiveClaimContext;
     // 調査側の Claim 照合（findBestMatchingClaim）は空白・句読点で
     // 区切った語と主張文の部分一致でスコアを付けるため、文をその
     // まま並べただけでは（特に DISPUTED 主張の減点で）一致に届か
@@ -364,6 +374,10 @@ class RequiredAssetAcquisitionService {
           workspaceId: request.workspaceId,
           objectiveLength: objective.length,
           requirement: request.requirement,
+          // P483: Claim 経路に乗ったか／文脈を復元したかを残す
+          // （objectiveLength だけでは経路が見えなかった）。
+          claimRoute: Boolean(claimRoute),
+          claimContextRecovered: Boolean(recoveredClaimContext),
         }),
       );
 
@@ -761,6 +775,35 @@ class RequiredAssetAcquisitionService {
       if (lines.join('\n').length >= 800) break;
     }
     return lines.join('\n').slice(0, 800) || objective;
+  }
+
+  /**
+   * P483: objective に含まれる Claim ID から Claim 文脈を復元する。
+   * 診断タイトル（Claim矛盾: CLM-… 等）経由のタスクでは、ingress の
+   * payload に文脈が載らない経路が残っており、そのままだと証拠取得
+   * がタイトル文字列を検索する空転になっていた。文脈の正本は
+   * claimDatabaseService.buildClaimContext。
+   */
+  private recoverClaimContextFromObjective(objective: string): ClaimEvidenceContext | undefined {
+    const match = String(objective || '').match(/CLM-\d{3,}/);
+    if (!match) return undefined;
+    try {
+      const context = claimDatabaseService.buildClaimContext(match[0]);
+      if (!context?.statement?.trim()) return undefined;
+      return {
+        claimId: context.claimId,
+        statement: context.statement,
+        scope: context.scope,
+        source: context.source,
+        originSourceId: context.originSourceId,
+        contradictedBy: (context.contradictedBy || []).map(item => ({
+          claimId: item.claimId,
+          statement: item.statement,
+        })),
+      };
+    } catch {
+      return undefined;
+    }
   }
 
   private researchSubjectLine(raw: string): string {
