@@ -114,6 +114,7 @@ export interface ClaimRelation {
 export class ClaimDatabaseService {
   private static instance: ClaimDatabaseService;
   private claims: Map<string, ClaimRecord> = new Map();
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private relations: ClaimRelation[] = [];
   private counter: number = 1;
   // P459: 文面は登録後に変わらないため、正規化結果を claim_id で保持する。
@@ -1418,11 +1419,19 @@ export class ClaimDatabaseService {
   }
 
   private saveToStorage(): void {
-    try {
-      storageService.setItem(CLAIMS_STORAGE_KEY, JSON.stringify(Array.from(this.claims.values())));
-    } catch {
-      // Ignore
-    }
+    // P499: 保存を短い窓でまとめる。調査は Claim を連続で登録
+    // するため、従来は1件ごとに全件を JSON 化して保存しており、
+    // 台帳が育つほど学習ループの書き込みが重くなっていた。
+    // メモリ上の Map が正で、永続化だけをバッチ化する。
+    if (this.saveTimer) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      try {
+        storageService.setItem(CLAIMS_STORAGE_KEY, JSON.stringify(Array.from(this.claims.values())));
+      } catch {
+        // Ignore
+      }
+    }, 150);
   }
 }
 

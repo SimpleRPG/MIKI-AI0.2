@@ -74,7 +74,12 @@ export class KnowledgeGapService {
 
   private save(): void {
     try {
-      storageService.setItem(STORAGE_KEY, JSON.stringify(this.gaps.slice(0, 500)));
+      // P499: 保存上限を超えるときは未解決の gap を優先して残す。
+      // 従来は新しい順の単純切りで、古い未解決 gap（学習の
+      // 待ち行列）が再起動で静かに消えることがあった。
+      const open = this.gaps.filter((g) => g.status === 'OPEN' || g.status === 'RESEARCHING');
+      const rest = this.gaps.filter((g) => g.status !== 'OPEN' && g.status !== 'RESEARCHING');
+      storageService.setItem(STORAGE_KEY, JSON.stringify([...open, ...rest].slice(0, 500)));
     } catch (error) {
       systemLogger.warn('SELF_IMPROVEMENT', `KnowledgeGapの保存に失敗しました: ${String(error)}`);
     }

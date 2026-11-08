@@ -67,6 +67,7 @@ function makeEntry(row: string[]): JapaneseDictionaryEntry {
 class JapaneseDictionaryService {
   private static instance: JapaneseDictionaryService;
   private personal = new Map<string, JapaneseDictionaryEntry>();
+  private savePersonalTimer: ReturnType<typeof setTimeout> | null = null;
   private imported = new Map<JapaneseDictionarySource, JapaneseDictionaryEntry[]>();
   private packageInfo = new Map<JapaneseDictionarySource, JapaneseDictionaryPackageInfo>();
   private builtinEntries: JapaneseDictionaryEntry[] = BUILTIN.map(makeEntry);
@@ -251,7 +252,15 @@ class JapaneseDictionaryService {
 
   private importedEntries(key: string): JapaneseDictionaryEntry[] { return [...this.imported.values()].flat().filter(e => e.normalized === key); }
   private loadPersonal() { try { const arr = storageService.getJson<JapaneseDictionaryEntry[]>(PERSONAL_KEY, []); if (Array.isArray(arr)) for (const e of arr) if (e?.normalized) this.personal.set(e.normalized, e); } catch { /* conservative empty dictionary */ } }
-  private savePersonal() { try { storageService.setItem(PERSONAL_KEY, JSON.stringify([...this.personal.values()].slice(-5000))); } catch { systemLogger.warn('CHAT', '[JapaneseDictionary] personal dictionary persistence unavailable'); } }
+  private savePersonal() {
+    // P499: 保存を短い窓でまとめる（意味学習は1ページで複数語を
+    // 連続登録するため、その都度の全件 JSON 化を避ける）。
+    if (this.savePersonalTimer) return;
+    this.savePersonalTimer = setTimeout(() => {
+      this.savePersonalTimer = null;
+      try { storageService.setItem(PERSONAL_KEY, JSON.stringify([...this.personal.values()].slice(-5000))); } catch { systemLogger.warn('CHAT', '[JapaneseDictionary] personal dictionary persistence unavailable'); }
+    }, 150);
+  }
   private loadPackages() {
     try {
       const raw = storageService.getItem(PACKAGES_KEY);

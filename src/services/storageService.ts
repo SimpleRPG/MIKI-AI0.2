@@ -57,6 +57,21 @@ class StorageService {
       console.warn('storageService: init failed, continuing with in-memory storage only', e);
       this.backend = 'memory';
     });
+    // P499: 書き込みは 400ms 遅延で永続化されるため、アプリが
+    // その間に落とされると直近の学習が消える。背景化・終了の
+    // タイミングで即時フラッシュして窓を閉じる。
+    try {
+      if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') void this.flush();
+        });
+      }
+      if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        window.addEventListener('pagehide', () => {
+          void this.flush();
+        });
+      }
+    } catch { /* ライフサイクル連動はベストエフォート */ }
   }
 
   private withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
