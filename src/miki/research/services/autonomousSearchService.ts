@@ -7,6 +7,7 @@ import {
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { getSearxngSearchSettings, buildSearxngSearchUrl } from './searxngSettingsService';
+import { sourceTrustBonus } from './sourceTrustService';
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
 import { selfImprovementService } from '../../improvement/services/selfImprovementService';
@@ -519,7 +520,12 @@ export function mergeSearchResults(
   );
 
   candidates.sort((a, b) => {
-    const relevanceDelta = (b.item.relevanceScore ?? 0) - (a.item.relevanceScore ?? 0);
+    // P490: 出典の信頼度ルールを並びにだけ効かせる（一次情報に
+    // 近い出典をわずかに前へ、まとめ側をわずかに後ろへ）。保存
+    // される関連度そのものは変えない。
+    const relevanceDelta =
+      (b.item.relevanceScore ?? 0) + sourceTrustBonus(b.item.url) -
+      ((a.item.relevanceScore ?? 0) + sourceTrustBonus(a.item.url));
     if (relevanceDelta !== 0) return relevanceDelta;
 
     const providerDelta = (rank.get(a.provider) ?? 99) - (rank.get(b.provider) ?? 99);

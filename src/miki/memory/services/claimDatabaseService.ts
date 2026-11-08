@@ -11,6 +11,7 @@ import type {
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { knowledgeHalfLifeService, type KnowledgeStability } from './knowledgeHalfLifeService';
+import { lexicalRelationService } from './lexicalRelationService';
 
 const CLAIMS_STORAGE_KEY = 'miki_claim_db_v1';
 
@@ -601,7 +602,7 @@ export class ClaimDatabaseService {
         if (scopeOverlap) {
           // P438: 出典・クラスタ／種別による話題の区別。出典が違う
           // ペアは「矛盾」と断定せず弱い矛盾として残す。
-          const suppressedReason = this.topicMismatchReason(candidate, existing);
+          const suppressedReason = this.topicMismatchReason(candidate, existing, matchedPair);
           contradictoryList.push(
             suppressedReason
               ? { claim: existing, matchedPair, suppressedReason }
@@ -626,6 +627,14 @@ export class ClaimDatabaseService {
       ['推奨', '非推奨', '推奨／非推奨'],
       ['真', '偽', '真／偽'],
     ];
+    // P490: 語彙ルールに登録された反対語も対立ペアに使う。固定の
+    // 5組だけでは「増加する／減少する」「成功／失敗」のような
+    // 典型的な対立をそもそも検出できなかった。ルールは種＋
+    // Wikidata 学習で増えるため、検出範囲が語彙の成長と一緒に
+    // 広がる。
+    for (const [a, b] of lexicalRelationService.antonymPairs()) {
+      pairs.push([a, b, `${a}／${b}`]);
+    }
     for (const [a, b, label] of pairs) {
       if (
         (this.hasBoundaryTerm(candStmt, a) && this.hasBoundaryTerm(existingStmt, b)) ||
@@ -646,7 +655,7 @@ export class ClaimDatabaseService {
    * しない」という扱いであり、未検証のものを検証済みとして扱う変更
    * ではない。
    */
-  private topicMismatchReason(candidate: ClaimRecord, existing: ClaimRecord): string | undefined {
+  private topicMismatchReason(candidate: ClaimRecord, existing: ClaimRecord, matchedPair?: string): string | undefined {
     if (candidate.kind !== existing.kind) {
       return `種別不一致（${candidate.kind} vs ${existing.kind}）`;
     }
@@ -660,10 +669,45 @@ export class ClaimDatabaseService {
     // 別の主題の文同士が対立語だけで結ばれた誤検出として弱い矛盾に
     // 留める（実例: アンテナ審判の文と LISP の文が「できる／できない」
     // だけで結ばれる）。教師パッケージ10件全件がこの型の誤検出だった。
-    if (!this.sharesContentToken(candidate.statement, existing.statement)) {
+    // P490 改善: 内容語の共有判定の前に、一致した対立語そのものを
+    // 両文から取り除く。対立語の語尾や語幹（下がる／上がる の
+    // 「がる」、発生する／発生しない の「発生」）が「共有する内容語」
+    // に化けて、P481 の抑制が効かなくなるため。本来の意図は
+    // 「対立語以外の内容語」の共有を見ること。
+    const stripPair = (text: string): string => {
+      let out = String(text || '');
+      if (matchedPair) {
+        for (const term of matchedPair.split('／')) {
+          if (term) out = out.split(term).join('');
+        }
+      }
+      return out;
+    };
+    if (
+      !this.sharesContentToken(stripPair(candidate.statement), stripPair(existing.statement)) &&
+      !this.hasSynonymBridge(candidate.statement, existing.statement)
+    ) {
       return '内容語の共有なし（対立語のみの一致）';
     }
     return undefined;
+  }
+
+  /**
+   * P490: 片方の文の語が、もう片方では同義語に置き換わっている
+   * 場合に「主題は同じ」とみなす橋。表記が違うだけで同じ主題の
+   * 文を、内容語の不一致として弱い矛盾に落とさないために使う。
+   * 汎用動詞（調べる／使う／作る等）の対は橋に使わない（どの文
+   * にも現れるため、主題の根拠にならない）。
+   */
+  private hasSynonymBridge(aRaw: string, bRaw: string): boolean {
+    const generic = new Set(['調べる', '検索する', '使う', '使用する', '用いる', '作る', '作成する', '教える', '伝える']);
+    const a = String(aRaw || '');
+    const b = String(bRaw || '');
+    for (const [x, y] of lexicalRelationService.synonymPairs()) {
+      if (generic.has(x) || generic.has(y)) continue;
+      if ((a.includes(x) && b.includes(y)) || (a.includes(y) && b.includes(x))) return true;
+    }
+    return false;
   }
 
   /**

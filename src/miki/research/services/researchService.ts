@@ -10,6 +10,7 @@ import { webTermLearningService } from './webTermLearningService';
 import { dictionaryBootstrapService } from './dictionaryBootstrapService';
 import { webContentUnderstandingService } from './webContentUnderstandingService';
 import { wordAssociationGraphService } from '../../memory/services/wordAssociationGraphService';
+import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 import { systemLogger } from '../../../services/systemLogger';
 import { sourcePageGraphService } from './sourcePageGraphService';
 import { contentTermsFromTokens } from './japaneseAnalysisService';
@@ -985,6 +986,13 @@ export class ResearchService {
               .map((item) => item.term);
             if (glossedTerms.length > 1) {
               wordAssociationGraphService.recordCooccurrences(glossedTerms);
+            }
+            // P490: gloss 付きで学べた語は、辞書的な語関係（同義・
+            // 反対・上位）も Wikidata から引いて語彙ルールへ足す。
+            // fire-and-forget（内部で7日間引き・例外は投げない）。
+            // 1ページあたり最大2語まで（共有基盤への配慮）。
+            for (const term of glossedTerms.slice(0, 2)) {
+              void lexicalRelationService.learnFromWikidata(term);
             }
             // P440 D5: 学習進捗の集計。
             termLearningTotals.terms += termLearning.terms.length;

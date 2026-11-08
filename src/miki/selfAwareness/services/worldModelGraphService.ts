@@ -5,6 +5,7 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { evidenceService } from '../../memory/services/evidenceService';
+import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 
 /*
  * P465: 世界モデル（実体と型つき関係のグラフ）。
@@ -590,6 +591,27 @@ class WorldModelGraphService {
                 hasAdmissible(c.claim_id)),
           );
     const provisionalAdded = this.extractFromClaims(provisionalCandidates as any[], true);
+
+    // P490: 語彙ルールの上位語を、実体として既に地図に載っている
+    // 語についてだけ IS_A の仮の関係として足す。語彙ルールは
+    // 「使い勝手」の知識であり検証済みの事実ではないため、確定
+    // 関係にはしない（仮説生成には使われず、予測では仮として
+    // 扱われる）。地図に無い語の実体は作らない（孤立した実体で
+    // 地図を汚さない）。
+    let lexicalAdded = 0;
+    try {
+      const entityNames = new Set(this.load().entities.map((e) => e.name.toLowerCase()));
+      for (const [hyponym, hypernym] of lexicalRelationService.hypernymPairs()) {
+        if (lexicalAdded >= 50) break;
+        if (!entityNames.has(hyponym.toLowerCase())) continue;
+        const before = this.load().relations.length;
+        this.addRelation({ fromName: hyponym, toName: hypernym, type: 'IS_A', provisional: true, confidence: 0.3 });
+        if (this.load().relations.length > before) lexicalAdded++;
+      }
+      if (lexicalAdded > 0) {
+        systemLogger.info('SELF_IMPROVEMENT', `🌐📚 [WorldModel] 語彙ルールからIS_Aの仮の関係を${lexicalAdded}件追加`);
+      }
+    } catch { /* 語彙ルールの接続失敗は抽出を止めない */ }
 
     if (added > 0) {
       systemLogger.info('SELF_IMPROVEMENT', `🌐 [WorldModel] 検証済みClaimから関係を${added}件抽出（実体${this.load().entities.length}件・関係${this.load().relations.length}件）`);
