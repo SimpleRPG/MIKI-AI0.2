@@ -25419,9 +25419,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 70386,
-      "lines": 1343,
-      "sha256": "beaf74409654c1f35e6a4fbedf48699e4b4f17661bd636dad33ad77ae8a719d4",
+      "bytes": 70872,
+      "lines": 1348,
+      "sha256": "4a14f21f4fcce7ac821415c729dffc30b6a85af1378b69e6ce074b3021b97e36",
       "relativeImportCandidates": [
         {
           "line": 1,

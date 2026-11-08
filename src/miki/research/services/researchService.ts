@@ -263,7 +263,12 @@ export class ResearchService {
     let needed = 0;
     for (const claimId of claimIds) {
       const claim = claimDatabaseService.getClaim(claimId);
-      if (!claim || claim.status !== 'UNRESOLVED') continue;
+      // P484: 対象は「未確定で裏付け不足」の主張。検証器は UNRESOLVED
+      // という結果を status に書き戻さない（未確定の主張は UNVERIFIED
+      // のまま留まる）ため、status==='UNRESOLVED' だけでは会話改訂を
+      // 経た主張しか拾えず、独立裏付け探索の本流が外れていた。
+      // 矛盾経路にいる DISPUTED / CONTRADICTED は従来どおり対象外。
+      if (!claim || (claim.status !== 'UNRESOLVED' && claim.status !== 'UNVERIFIED')) continue;
       const evidenceIds = evidenceService.list({ claimId })
         .filter(record => record.status !== 'REJECTED')
         .map(record => record.evidence_id);
