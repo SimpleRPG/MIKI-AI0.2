@@ -221,7 +221,18 @@ class WorldModelGraphService {
     };
     state.relations.push(relation);
     if (state.relations.length > MAX_RELATIONS) {
-      state.relations = state.relations.slice(-MAX_RELATIONS);
+      // P498: 単純な末尾切りだと、新しい仮の関係が古い確定済みの
+      // 関係を押し出してしまう。仮のもの→確信度の低いもの→
+      // 古いものの順に落とし、確定した知識を残す。
+      const excess = state.relations.length - MAX_RELATIONS;
+      const dropOrder = [...state.relations].sort((a, b) => {
+        const provDiff = Number(b.provisional ?? false) - Number(a.provisional ?? false);
+        if (provDiff !== 0) return provDiff;
+        if (a.confidence !== b.confidence) return a.confidence - b.confidence;
+        return a.createdAt - b.createdAt;
+      });
+      const dropIds = new Set(dropOrder.slice(0, excess).map((r) => r.id));
+      state.relations = state.relations.filter((r) => !dropIds.has(r.id));
     }
     this.save();
     return relation;

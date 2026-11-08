@@ -223,6 +223,25 @@ export class ConversationCoreService {
       ? vocabulary.unknowns.map((item: any) => String(item.term || '')).filter(Boolean).slice(0, 3)
       : [];
     const explicitUnknownInquiry = unknownTerms.length > 0 && /意味|定義|とは|何|調べ|検索|教えて|使い方/.test(prompt);
+    // P498: 雑談の中で出た未知語は、その場で聞き返さなくても
+    // 意味学習の gap として残す。従来はターンの解釈に使われる
+    // だけで、明示的に意味を聞かれない限り学習の入口に入らず、
+    // 会話由来の未知語は背景で学ばれることがなかった。背景の
+    // 再検証ループが UNKNOWN_TERM gap を拾って意味を学び、
+    // 辞書に入れる（解けない語は試行上限で休止する）。
+    if (unknownTerms.length > 0) {
+      try {
+        for (const term of unknownTerms) {
+          knowledgeGapService.detect({
+            query: `用語の意味を学ぶ: ${term}`,
+            reason: '雑談の中で意味が分からない語が出たため、背景で意味を学ぶ。',
+            type: 'UNKNOWN_TERM',
+            target: term,
+            priority: 45,
+          });
+        }
+      } catch { /* 意味学習への接続は補助経路。失敗しても会話は止めない。 */ }
+    }
     // P456 (A): 本人が伝えた事実への聞き返しは、未知語の調査橋より先に
     // 保持済みの本人発言由来の事実で照合する。一致したときだけ想起経路へ進み、
     // 一致しなければ従来経路（調査橋・Claim 照合・分からない）に委ねる。

@@ -26571,9 +26571,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 59256,
-      "lines": 1020,
-      "sha256": "fb1ef7d1dbada989b4851280658176074e5ce1a731ccbd0bc8c1054a7bcae8eb",
+      "bytes": 60286,
+      "lines": 1039,
+      "sha256": "ef019521502fb9e30880442d17b24a920ffa6a32ef3627d5cd322eb967bf9a44",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27936,9 +27936,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/worldModelGraphService.ts",
-      "bytes": 33597,
-      "lines": 760,
-      "sha256": "a4e8c8b4560efa0d49b5fe4296593005a84bcfaf1860aec9e68182171cb1de1b",
+      "bytes": 34326,
+      "lines": 771,
+      "sha256": "6569e4b819c8e6e3de31c4f3b5ef32d3d4da35057003d44d345be61d31ba64c8",
       "relativeImportCandidates": [
         {
           "line": 1,
