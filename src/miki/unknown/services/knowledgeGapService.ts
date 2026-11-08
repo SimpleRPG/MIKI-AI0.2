@@ -4,6 +4,7 @@ import type { PotentialUnknownBasis, PotentialUnknownCandidate } from '../../../
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 
 const STORAGE_KEY = 'miki_knowledge_gaps_v1';
+export const GAP_RETRY_PARK_ATTEMPTS = 10;
 
 export type KnowledgeGapType =
   | 'UNKNOWN_TERM' | 'INSUFFICIENT_EVIDENCE' | 'CONTRADICTION' | 'STALE_INFORMATION' | 'UNKNOWN_CAPABILITY' | 'WEAK_COMPONENT'
@@ -348,6 +349,16 @@ export class KnowledgeGapService {
 
   public markResolved(id: string): KnowledgeGap | undefined {
     return this.update(id, { status: 'RESOLVED' });
+  }
+
+  /**
+   * P497: 再調査の試行上限に達し、それ以降に再検出（merge）も
+   * されていない gap は「休止」とみなす。解けない問いを永遠に
+   * 再調査し続けて自律ループの枠を占有しないため。再検出で
+   * updatedAt が進めば自動で休止が解ける（必要になった証拠）。
+   */
+  public isRetryParked(gap: KnowledgeGap): boolean {
+    return gap.attempts >= GAP_RETRY_PARK_ATTEMPTS && (gap.updatedAt || 0) <= (gap.lastResearchAt || 0);
   }
 
   public markBlocked(id: string, reason?: string): KnowledgeGap | undefined {

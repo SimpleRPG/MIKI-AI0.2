@@ -8572,9 +8572,9 @@
     },
     {
       "path": "src/miki/autonomy/services/autonomousRevalidationLoopService.ts",
-      "bytes": 12930,
-      "lines": 318,
-      "sha256": "b413d44fc4f9ae5010941233898284ed9fc3f9af5fbea4eda0d239a585093187",
+      "bytes": 13433,
+      "lines": 325,
+      "sha256": "f9faccf16305c2319e35c4473020fcbfa86cbd86642936849335d28a4b6463eb",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -25382,9 +25382,9 @@
     },
     {
       "path": "src/miki/research/services/japaneseDictionaryService.ts",
-      "bytes": 18943,
-      "lines": 277,
-      "sha256": "12edfa72cd5975ff4728cf831fb19dde6ebdaf40312be18d35e410ce6c5280fe",
+      "bytes": 19246,
+      "lines": 281,
+      "sha256": "703d8e80b78619ad18d9d15dec39d29e5c0d3b69b328416897eee9ef3a637d2d",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -26265,9 +26265,9 @@
     },
     {
       "path": "src/miki/research/services/webTermLearningService.ts",
-      "bytes": 14351,
-      "lines": 354,
-      "sha256": "0150768ba27f7609ee84dd730029879c40cef23ce71c1f013553a0d9635c599d",
+      "bytes": 17202,
+      "lines": 403,
+      "sha256": "f7533e6f1d116a0e308346836158ddf9222b2fffc012c157ecf889bb4ef5e0e0",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -34554,9 +34554,9 @@
     },
     {
       "path": "src/miki/unknown/services/knowledgeGapService.ts",
-      "bytes": 26781,
-      "lines": 421,
-      "sha256": "46f9875e01bce29fbf04996cbe6d87a8390d8f3f199b9ae66f074c7282a1a551",
+      "bytes": 27349,
+      "lines": 432,
+      "sha256": "f10b07be50eca8bf4549ebec4a7d035f3de84eed97b796f28413338e2ecb04e2",
       "relativeImportCandidates": [
         {
           "line": 1,

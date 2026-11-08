@@ -86,7 +86,14 @@ export class AutonomousRevalidationLoopService {
       const now = Date.now();
       const maxGapTasksPerRun = limit >= 6 ? 3 : 1;
 
-      const eligibleGaps = knowledgeGapService.listOpen(500)
+      const openGaps = knowledgeGapService.listOpen(500);
+      // P497: 試行上限に達した gap は休止し、枠を占有させない。
+      const parkedGaps = openGaps.filter(gap => knowledgeGapService.isRetryParked(gap));
+      if (parkedGaps.length > 0) {
+        systemLogger.info('SELF_IMPROVEMENT', `🧊 [ギャップ休止] 試行上限に達した未解決 gap ${parkedGaps.length} 件を休止中（再び検出されれば再開）`);
+      }
+      const eligibleGaps = openGaps
+        .filter(gap => !knowledgeGapService.isRetryParked(gap))
         .filter(gap => {
           const exponent = Math.min(7, Math.max(0, gap.attempts - 1));
           const retryDelayMs = Math.min(

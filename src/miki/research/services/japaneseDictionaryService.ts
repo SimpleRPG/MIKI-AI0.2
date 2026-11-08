@@ -125,6 +125,10 @@ class JapaneseDictionaryService {
     const clean = surface.trim();
     if (!clean) return undefined;
     const entry: JapaneseDictionaryEntry = { surface: clean, normalized: normalize(clean), lemma: options.lemma || clean, reading: options.reading, pos: options.pos || 'UNKNOWN', semanticIds: options.semanticIds, gloss: options.gloss, aliases: options.aliases, source: 'PERSONAL', priority: 100 };
+    // P497: 再登録は「最近使った」として末尾へ移す。保存は末尾
+    // 5000件の切り出しのため、初回登録順のままだと、よく使う語が
+    // 古い一回きりの語に押し出されて再起動で消える。
+    this.personal.delete(entry.normalized);
     this.personal.set(entry.normalized, entry); this.savePersonal();
     return entry;
   }

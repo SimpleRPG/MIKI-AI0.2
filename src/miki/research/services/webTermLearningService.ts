@@ -63,6 +63,9 @@ type StoredTermComponent = KnowledgeComponentArtifact & {
   term?: string;
   occurrences?: number;
   gloss?: string;
+  // P497: gloss の出所（'dictionary' または定義形のパターン ID）。
+  // 弱い定義形由来の gloss を強い定義で上書きする判定に使う。
+  glossPatternId?: string;
   needsGloss?: boolean;
   // P463: その語が実際に使われていた文（使い方ごと覚えるための最小保持）。
   exampleSentence?: string;
@@ -166,10 +169,13 @@ class WebTermLearningService {
         }
         // P494: 辞書に gloss が無い語は、このページの定義文から
         // 意味を得る（推測ではなく、定義の明示がある場合だけ）。
-        if (!hit?.gloss) {
-          const extraction = extractions.get(normalize(term));
-          if (extraction) {
-            learnedByTerm.set(normalize(term), extraction);
+        // P497: 定義文の記録は辞書ヒットの有無にかかわらず行う
+        // （辞書に弱い gloss で入っている語へ、強い定義で
+        // 上書きする判定が統合側で必要になるため）。
+        const extraction = extractions.get(normalize(term));
+        if (extraction) {
+          learnedByTerm.set(normalize(term), extraction);
+          if (!hit?.gloss) {
             return {
               term,
               occurrences,
@@ -194,14 +200,40 @@ class WebTermLearningService {
       if (!hit && occurrences < 2) continue;
       const learnedDef = learnedByTerm.get(normalize(term));
 
-      const needsGloss = !hit?.gloss;
+      // P497: gloss の有無は辞書ヒットだけでなく、定義文から
+      // 抽出した意味でも判定する（従来は定義で学んだ語も
+      // needsGloss のまま部品化され、意味があるのに「意味なし」
+      // として扱われ続けていた）。
+      const effectiveGloss = hit?.gloss ?? learnedDef?.gloss;
+      const needsGloss = !effectiveGloss;
       if (needsGloss) needsGlossCount++;
       else glossedCount++;
 
       const existing = existingByTerm.get(term);
       if (existing) {
         // 同じ語の証拠を束ねるだけ。意味の推測はしない。gloss は辞書
-        // ヒットがある場合だけ補う（無ければ gloss 無しのまま）。
+        // ヒットか、本文の定義文から抽出したもの（P494）で補う。
+        // P497: 統合側で定義 gloss を落とすと、先に gloss 無しで
+        // 部品化された語は、後から定義を学んでも部品側だけ
+        // 永久に gloss 無しのまま残っていた。
+        let mergedGloss = existing.gloss ?? hit?.gloss ?? learnedDef?.gloss;
+        let mergedGlossPatternId = existing.gloss
+          ? existing.glossPatternId
+          : learnedDef
+            ? learnedDef.patternId
+            : hit?.gloss
+              ? 'dictionary'
+              : undefined;
+        // P497: 「Xとは〜」の明示定義は、「Xは〜である」由来の
+        // 弱い gloss より優先する（辞書由来は最優先のまま）。
+        if (
+          learnedDef?.gloss &&
+          learnedDef.patternId === 'seed-jp-towa' &&
+          mergedGlossPatternId === 'seed-jp-ha-dearu'
+        ) {
+          mergedGloss = learnedDef.gloss;
+          mergedGlossPatternId = learnedDef.patternId;
+        }
         const merged: StoredTermComponent = {
           ...existing,
           claimIds: [...new Set([...existing.claimIds, ...(input.claimIds ?? [])])],
@@ -209,8 +241,9 @@ class WebTermLearningService {
           sourceUrls: [...new Set([...existing.sourceUrls, input.url])],
           sourceArtifactIds: [...new Set([...existing.sourceArtifactIds, input.evidenceId])],
           occurrences: (existing.occurrences ?? 0) + occurrences,
-          gloss: existing.gloss ?? hit?.gloss,
-          needsGloss: !(existing.gloss ?? hit?.gloss),
+          gloss: mergedGloss,
+          glossPatternId: mergedGlossPatternId,
+          needsGloss: !mergedGloss,
           exampleSentence: existing.exampleSentence ?? findExampleSentence(text, term),
           updatedAt: Date.now(),
         };
@@ -268,7 +301,8 @@ class WebTermLearningService {
         lemma: hit?.lemma,
         reading: hit?.reading,
         pos: hit?.pos,
-        gloss: hit?.gloss,
+        gloss: effectiveGloss,
+        glossPatternId: learnedDef ? learnedDef.patternId : hit?.gloss ? 'dictionary' : undefined,
         semanticIds: hit?.semanticIds,
         sourceTitle: input.sourceTitle ?? '',
         needsGloss,
@@ -294,7 +328,7 @@ class WebTermLearningService {
         lemma: hit?.lemma,
         reading: hit?.reading,
         pos: hit?.pos,
-        gloss: hit?.gloss,
+        gloss: effectiveGloss,
         semanticIds: hit?.semanticIds,
         componentId: component.componentId,
         needsGloss,
@@ -326,8 +360,23 @@ class WebTermLearningService {
         japaneseDictionaryService.addPersonal(def.term, {
           gloss: def.gloss,
           reading: def.reading,
-          semanticIds: ['learned:definition'],
+          semanticIds: ['learned:definition', `pattern:${def.patternId}`],
         });
+      } else if (def.patternId === 'seed-jp-towa') {
+        // P497: 弱い定義形（Xは〜である）で先に個人辞書へ入った語に、
+        // 明示定義（Xとは〜）が後から来たら gloss を強い方へ差し
+        // 替える。本物の辞書由来の語は対象外（個人辞書の学習
+        // エントリだけが差し替え対象）。
+        const existingLearned = japaneseDictionaryService
+          .lookup(def.term)
+          .find((e) => e.source === 'PERSONAL' && (e.semanticIds || []).includes('learned:definition'));
+        if (existingLearned && !(existingLearned.semanticIds || []).includes('pattern:seed-jp-towa')) {
+          japaneseDictionaryService.addPersonal(def.term, {
+            gloss: def.gloss,
+            reading: def.reading ?? existingLearned.reading,
+            semanticIds: ['learned:definition', `pattern:${def.patternId}`],
+          });
+        }
       }
       learnedDefinitions.push({ term: def.term, gloss: def.gloss, sense });
       systemLogger.info(
