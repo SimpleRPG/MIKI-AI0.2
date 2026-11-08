@@ -124,8 +124,15 @@ class RuntimeLogReviewService {
     } catch {
       // レビュー記録は補助。書けなくても集計結果は返す。
     }
+    // P493: 所見ゼロでも実行したこと自体を1行残す。所見がある時だけ
+    // ログに出る形だと、外部からは「レビューが回っていない」のか
+    // 「回って所見が無かった」のか区別できない（2026-11-08 実機で
+    // 判別できなかった）。件数サマリは次のレビューの集計対象になる
+    // が、テンプレート化で1パターンに畳まれるため増殖はしない。
     if (findings.length > 0) {
       systemLogger.info('SELF_IMPROVEMENT', `🔎 [自己レビュー] 直近${windowMinutes}分: ${findings.join(' ／ ')}`);
+    } else {
+      systemLogger.info('SELF_IMPROVEMENT', `🔎 [自己レビュー] 直近${windowMinutes}分: 所見なし（対象${summary.total}件／検索成功${summary.searchSuccess}・0件${summary.searchEmpty}／警告${summary.warnings}）`);
     }
     return record;
   }

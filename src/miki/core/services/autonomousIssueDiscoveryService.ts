@@ -84,6 +84,15 @@ class AutonomousIssueDiscoveryService{
   * Claim の矛盾 issue を止めるために使う。解決した件数を返す。
   */
  resolveBySource(kind:DiscoveredIssueKind,sourceId:string,outcome:string):number{this.assertWritable();let resolved=0;const now=Date.now();for(const issue of this.issues.values()){if(issue.kind===kind&&issue.sourceId===sourceId&&!issue.resolvedAt){issue.resolvedAt=now;issue.queuedAt=undefined;issue.nextRetryAt=undefined;issue.exhausted=false;issue.lastOutcome=outcome;this.issues.set(issue.fingerprint,issue);resolved++;}}if(resolved>0)this.save();return resolved;}
+ /**
+  * P493: 矛盾パッケージ生成（enumeratePairs）と同一基準で「生きている
+  * 矛盾」が無い Claim の CLAIM_CONTRADICTION issue を、陳腐化として
+  * 解決する。リンクが消えた（ID 衝突による上書き等）後もタスクだけが
+  * 空転し、パッケージ側は「矛盾なし」と数える食い違い（CLM-000104）
+  * を、両者が同じ物差し（liveContradictionPartners）を見ることで
+  * 構造的に無くす。スキャンのたびに評価する。
+  */
+ reconcileStaleContradictionIssues():number{this.assertWritable();const targets=[...this.issues.values()].filter(issue=>issue.kind==='CLAIM_CONTRADICTION'&&!issue.resolvedAt&&claimDatabaseService.liveContradictionPartners(issue.sourceId).length===0);let resolved=0;for(const issue of targets){resolved+=this.resolveBySource('CLAIM_CONTRADICTION',issue.sourceId,'STALE_NO_LIVE_LINK');}if(resolved>0)systemLogger.info('SELF_IMPROVEMENT',`🧹 [矛盾タスク整合] 生きている矛盾リンクが無い Claim の contradiction issue を ${resolved} 件解決しました（STALE_NO_LIVE_LINK）`);return resolved;}
  async scan(mode:DiscoveryScanMode='AUTONOMOUS'):Promise<DiscoveryScanResult>{
   if(this.disposed)throw new Error('AUTONOMOUS_DISCOVERY_SERVICE_DISPOSED');
   this.assertWritable();
@@ -91,6 +100,9 @@ class AutonomousIssueDiscoveryService{
   if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;this.activeScanGeneration=generation;
   try{
    await this.reconcileQueuedIssues(generation);
+   // P493: 生きている矛盾リンクが無い Claim の contradiction issue を
+   // 陳腐化として片付ける（タスク側とパッケージ側の物差しを揃える）。
+   try{this.reconcileStaleContradictionIssues();}catch{/* 整合は補助。スキャン本体は止めない */}
    if(!this.isCurrentGeneration(generation))return this.emptyScanResult(mode);
    const before=this.issues.size;
    for(const event of executionEventBusService.list('execution.failed').slice(0,50))this.upsert('EXECUTION_FAILURE',event.event_id,`実行失敗: ${event.component_id}`,`${event.test_case_id} / ${event.error_message||event.output_summary||event.type}`,90);

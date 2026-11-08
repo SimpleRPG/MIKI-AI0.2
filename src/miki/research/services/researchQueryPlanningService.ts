@@ -2,6 +2,8 @@ import { storageService } from '../../../services/storageService';
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { webResearchPolicyService } from './webResearchPolicyService';
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
+import { subjectUnderstandingService, looksLikeFieldSalad } from '../../memory/services/subjectUnderstandingService';
+import { japaneseDictionaryService } from './japaneseDictionaryService';
 import { queryPatternSelectionService } from './queryPatternSelectionService';
 
 export type QueryIntentType='BASELINE'|'OFFICIAL_SPECIFICATION'|'CURRENT_ENVIRONMENT'|'COMPATIBILITY'|'VERSION_SPECIFIC'|'LIMITATION'|'COUNTEREVIDENCE'|'ALTERNATIVE'|'ERROR_DIAGNOSIS'|'IMPLEMENTATION_EXAMPLE'|'SECURITY'|'PRIMARY_SOURCE'|'UPDATE_OR_RETRACTION'|'SYNONYM_EXPANSION'|'TRANSLATION_EXPANSION'|'ABBREVIATION_EXPANSION';
@@ -43,7 +45,7 @@ export interface GapStructureInput {
 }
 export interface ResearchQueryIntent {queryId:string;queryPlanId:string;parentQueryId?:string;researchQuestionId:string;intentType:QueryIntentType;targetClaimIds:string[];missingEvidenceType:string;environmentConstraints:EnvironmentFingerprint;sourceTierTarget:string;language:string;termsIncluded:string[];termsExcluded:string[];exactPhrases:string[];siteOrDomainConstraints:string[];timeConstraint?:string;expectedEvidence:string;stopCondition:string;createdBy:'CORE_18_DOMAINS';createdAt:number;queryText:string;readiness:QueryReadiness;applicability:EnvironmentApplicability;validationReasons:string[];}
 export interface QueryPlanningPolicy {enabled:boolean;maxQueriesPerPlan:number;maxRevisionPerQuery:number;maxParallelQueries:number;maxTotalSearchRequests:number;maxQueryExecutionTimeMs:number;maxCandidateUrlsPerQuery:number;stopWhenEvidenceSatisfied:boolean;preferOfficialSources:boolean;requireCurrentEnvironmentCheck:boolean;requireCounterEvidenceSearch:boolean;linkAutoIndependentSourcePolicy:boolean;updatedAt:number;}
-export interface ResearchQueryPlan {queryPlanId:string;researchQuestionId:string;canonicalResearchIntent:string;environment:EnvironmentFingerprint;policy:QueryPlanningPolicy;queries:ResearchQueryIntent[];usedQueryPatternIds:string[];excludedQueryPatternIds:string[];queryPatternSelectionId:string;queryPatternSelectionSha256:string;status:'DRAFT'|'READY'|'BLOCKED'|'RUNNING'|'COMPLETED'|'STOPPED';planSha256:string;createdAt:number;updatedAt:number;}
+export interface ResearchQueryPlan {queryPlanId:string;researchQuestionId:string;canonicalResearchIntent:string;environment:EnvironmentFingerprint;policy:QueryPlanningPolicy;queries:ResearchQueryIntent[];usedQueryPatternIds:string[];excludedQueryPatternIds:string[];queryPatternSelectionId:string;queryPatternSelectionSha256:string;status:'DRAFT'|'READY'|'BLOCKED'|'RUNNING'|'COMPLETED'|'STOPPED';planSha256:string;createdAt:number;updatedAt:number;/** P493: 主題理解の段の結果（主題文・未知語・分野・意味の伴走語）。 */subject?:{status:string;subjectText:string;unknownTerms:string[];field?:string;senseAnchorTerms:string[]};}
 export interface QueryRevisionPair {revisionPairId:string;queryId:string;originalQuery:string;revisedQuery:string;revisionReason:string;termsAdded:string[];termsRemoved:string[];beforeOutcome:Record<string,unknown>;afterOutcome?:Record<string,unknown>;resultingEvidenceIds:string[];acceptedByCore:boolean;pairSha256:string;createdAt:number;}
 const POLICY_KEY='miki_research_query_planning_policy_v1';
 const PLAN_KEY='miki_research_query_plans_v1';
@@ -75,7 +77,7 @@ export function isLongResearchIntent(text:string):boolean{const n=normalize(text
  * はずの「彼女への指示」と「内部の診断情報」を、長さとは別に分類する。
  */
 const BRIEF_OR_DUMP_MARKERS=['必要な証拠を調査する','対象主張を支持する','整合性を確認できる出典','unresolvedComponentMetadata','registryStatus','background-cycle-review','syntaxTemplate','inputKinds','outputKinds'];
-export function isBriefOrDiagnosticText(text:string):boolean{const n=normalize(text);const lower=n.toLowerCase();return BRIEF_OR_DUMP_MARKERS.some(marker=>lower.includes(marker.toLowerCase()))||/(?:^|\s)componentId\s/i.test(n)||/対象主張[:：]/.test(n);}
+export function isBriefOrDiagnosticText(text:string):boolean{const n=normalize(text);const lower=n.toLowerCase();return BRIEF_OR_DUMP_MARKERS.some(marker=>lower.includes(marker.toLowerCase()))||/(?:^|\s)componentId\s/i.test(n)||/対象主張[:：]/.test(n)||looksLikeFieldSalad(n);}
 const INTERNAL_QUERY_TOKENS=new Set(['componentid','registrystatus','unresolvedcomponentmetadata','syntaxtemplate','inputkinds','outputkinds','kind','slots','call','background-cycle-review','code','component','research','missing','meaning']);
 // P487: 大文字小文字を問わない。gap の identity は正規化で小文字化
 // されるため、大文字前提だと rc-knowledge-… のような小文字IDが
@@ -101,6 +103,10 @@ export function extractHumanSubjectTerms(text:string):string[]{
 export function buildShortResearchQuery(text:string,focus?:GapFocusMaterialInput):string{
  const normalized=normalize(text);
  if(!normalized)return '';
+ // P493: フィールド名サラダ（部品メタデータの列挙）からは主題を抽出
+ // しない。残りの語（result / name / input 等）はフィールド名の残骸で
+ // あって主題ではないため、抽出を試みず空を返す（＝検索しない）。
+ if(looksLikeFieldSalad(normalized))return '';
  const briefOrDump=isBriefOrDiagnosticText(normalized);
  if(!briefOrDump&&!isLongResearchIntent(normalized))return normalized;
  const terms:string[]=[];
@@ -146,6 +152,21 @@ class ResearchQueryPlanningService {
  */
 if(!effectiveIntent){
   const blockedBase={queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries:[] as ResearchQueryIntent[],usedQueryPatternIds:[] as string[],excludedQueryPatternIds:[] as string[],queryPatternSelectionId:'',queryPatternSelectionSha256:'',status:'BLOCKED' as ResearchQueryPlan['status'],createdAt:Date.now(),updatedAt:Date.now()};
+  const blockedPlan:{planSha256:string}&typeof blockedBase={...blockedBase,planSha256:canonicalSha256Object(blockedBase)};
+  storageService.setItem(PLAN_KEY,JSON.stringify([blockedPlan,...this.listPlans().filter(x=>x.queryPlanId!==blockedPlan.queryPlanId)].slice(0,100)));
+  return blockedPlan;
+}
+/*
+ * P493: 主題理解の段（共有層 subjectUnderstandingService）。主題を
+ * 中身から立て直し、要の語の意味が分からない問い（NEEDS_MEANING_
+ * LEARNING）と、構造から主題を立てられない問い（UNFORMABLE）は、
+ * 検索を発射せず BLOCKED で返す。呼び出し側は未知語を意味学習へ
+ * 回す。意味を求める問い自体は assess 側で対象外になっている。
+ */
+const understanding=subjectUnderstandingService.assess(effectiveIntent,{isTermKnown:(term)=>japaneseDictionaryService.has(term)});
+if(understanding.status!=='UNDERSTOOD'){
+  subjectUnderstandingService.logAssessment('計画',understanding);
+  const blockedBase={queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries:[] as ResearchQueryIntent[],usedQueryPatternIds:[] as string[],excludedQueryPatternIds:[] as string[],queryPatternSelectionId:'',queryPatternSelectionSha256:'',status:'BLOCKED' as ResearchQueryPlan['status'],subject:{status:understanding.status,subjectText:understanding.subjectText,unknownTerms:understanding.unknownTerms,field:understanding.field,senseAnchorTerms:understanding.senseAnchorTerms},createdAt:Date.now(),updatedAt:Date.now()};
   const blockedPlan:{planSha256:string}&typeof blockedBase={...blockedBase,planSha256:canonicalSha256Object(blockedBase)};
   storageService.setItem(PLAN_KEY,JSON.stringify([blockedPlan,...this.listPlans().filter(x=>x.queryPlanId!==blockedPlan.queryPlanId)].slice(0,100)));
   return blockedPlan;
@@ -215,8 +236,11 @@ if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${effectiv
 const synVariant=lexicalRelationService.synonymVariantOf(effectiveIntent);if(synVariant&&synVariant!==effectiveIntent)expansionSpecs.push(['SYNONYM_EXPANSION',synVariant,'同義語での言い換え検索']);
 const traVariant=lexicalRelationService.translationVariantOf(effectiveIntent);if(traVariant&&traVariant!==effectiveIntent)expansionSpecs.push(['TRANSLATION_EXPANSION',traVariant,'英語での言い換え検索']);
 const abbVariant=lexicalRelationService.abbreviationVariantOf(effectiveIntent);if(abbVariant&&abbVariant!==effectiveIntent)expansionSpecs.push(['ABBREVIATION_EXPANSION',abbVariant,'略語の展開・圧縮での検索']);
+/* P493: 多義語の意味が確定できた場合、その意味の分野を指す伴走語を
+ * 付けた検索を拡張の先頭に置く。同音異義の別分野へ流れ込むのを防ぐ。 */
+if(understanding.senseAnchorTerms.length>0){const anchorQuery=[effectiveIntent,...understanding.senseAnchorTerms.slice(0,3)].join(' ');if(anchorQuery!==effectiveIntent)expansionSpecs.unshift(['SYNONYM_EXPANSION',anchorQuery,'意味確定の伴走語つき検索']);}
 for(const expansionSpec of expansionSpecs.slice(0,2))specs.push(expansionSpec);
-const unique=new Map<string,[QueryIntentType,string,string]>();for(const item of specs){const key=normalize(item[1]).toLowerCase();if(!unique.has(key))unique.set(key,item);}const chosen=[...unique.values()].slice(0,policy.maxQueriesPerPlan);const queries=chosen.map((item,index)=>this.makeQuery(queryPlanId,researchQuestionId,effectiveIntent,item[0],item[1],item[2],index,targetClaimIds,exclusion));const patternSelection=queryPatternSelectionService.select(effectiveIntent,chosen.map(item=>item[0]),DEVICE,Math.min(3,policy.maxQueriesPerPlan));const status=policy.enabled&&queries.every(q=>q.readiness==='READY')?'READY':'BLOCKED';const base= {queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries,usedQueryPatternIds:patternSelection.selectedPatternIds,excludedQueryPatternIds:patternSelection.excludedPatternIds,queryPatternSelectionId:patternSelection.selectionId,queryPatternSelectionSha256:patternSelection.selectionSha256,status:status as ResearchQueryPlan['status'],createdAt:Date.now(),updatedAt:Date.now()};const plan:{planSha256:string}&typeof base={...base,planSha256:canonicalSha256Object(base)};const plans=[plan,...this.listPlans().filter(x=>x.queryPlanId!==plan.queryPlanId)].slice(0,100);storageService.setItem(PLAN_KEY,JSON.stringify(plans));return plan;}
+const unique=new Map<string,[QueryIntentType,string,string]>();for(const item of specs){const key=normalize(item[1]).toLowerCase();if(!unique.has(key))unique.set(key,item);}const chosen=[...unique.values()].slice(0,policy.maxQueriesPerPlan);const queries=chosen.map((item,index)=>this.makeQuery(queryPlanId,researchQuestionId,effectiveIntent,item[0],item[1],item[2],index,targetClaimIds,exclusion));const patternSelection=queryPatternSelectionService.select(effectiveIntent,chosen.map(item=>item[0]),DEVICE,Math.min(3,policy.maxQueriesPerPlan));const status=policy.enabled&&queries.every(q=>q.readiness==='READY')?'READY':'BLOCKED';const base= {queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries,usedQueryPatternIds:patternSelection.selectedPatternIds,excludedQueryPatternIds:patternSelection.excludedPatternIds,queryPatternSelectionId:patternSelection.selectionId,queryPatternSelectionSha256:patternSelection.selectionSha256,status:status as ResearchQueryPlan['status'],subject:{status:understanding.status,subjectText:understanding.subjectText,unknownTerms:understanding.unknownTerms,field:understanding.field,senseAnchorTerms:understanding.senseAnchorTerms},createdAt:Date.now(),updatedAt:Date.now()};const plan:{planSha256:string}&typeof base={...base,planSha256:canonicalSha256Object(base)};const plans=[plan,...this.listPlans().filter(x=>x.queryPlanId!==plan.queryPlanId)].slice(0,100);storageService.setItem(PLAN_KEY,JSON.stringify(plans));return plan;}
  reviseQuery(planId:string,queryId:string,revisedText:string,reason:string,beforeOutcome:Record<string,unknown>):QueryRevisionPair {const plan=this.listPlans().find(x=>x.queryPlanId===planId);const query=plan?.queries.find(x=>x.queryId===queryId);if(!plan||!query)throw new Error('QUERY_NOT_FOUND');const revised=normalize(revisedText);if(!revised||revised===query.queryText)throw new Error('QUERY_REVISION_REQUIRED');const before=new Set(query.queryText.split(/\s+/));const after=new Set(revised.split(/\s+/));const base={queryId,originalQuery:query.queryText,revisedQuery:revised,revisionReason:normalize(reason)||'UNSPECIFIED',termsAdded:[...after].filter(x=>!before.has(x)),termsRemoved:[...before].filter(x=>!after.has(x)),beforeOutcome,resultingEvidenceIds:[],acceptedByCore:false,createdAt:Date.now()};const pair:{revisionPairId:string;pairSha256:string}&typeof base={...base,pairSha256:canonicalSha256Object(base),revisionPairId:''};pair.revisionPairId=`QRP-${pair.pairSha256.slice(0,20)}`;storageService.setItem(REVISION_KEY,JSON.stringify([pair,...this.listRevisionPairs()].slice(0,500)));return pair;}
  private makeQuery(planId:string,rqid:string,canonical:string,intentType:QueryIntentType,text:string,expected:string,index:number,targetClaimIds:string[]=[],exclusion?:ResearchQueryExclusion):ResearchQueryIntent {const queryText=normalize(text);
  /*

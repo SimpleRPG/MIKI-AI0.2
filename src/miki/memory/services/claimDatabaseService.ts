@@ -14,6 +14,10 @@ import { knowledgeHalfLifeService, type KnowledgeStability } from './knowledgeHa
 import { lexicalRelationService } from './lexicalRelationService';
 
 const CLAIMS_STORAGE_KEY = 'miki_claim_db_v1';
+// P492: 採番の high-water mark と整合性所見の保存キー。Claim 配列本体の
+// 保存が遅延・失敗しても採番が巻き戻らないよう、本体とは別に持つ。
+const CLAIM_ID_HIGH_WATER_KEY = 'miki_claim_id_high_water_v1';
+const CLAIM_ID_INTEGRITY_KEY = 'miki_claim_id_integrity_v1';
 
 /*
  * P459: Claim の重複排除で使う「同一性」。
@@ -114,6 +118,8 @@ export class ClaimDatabaseService {
   private counter: number = 1;
   // P459: 文面は登録後に変わらないため、正規化結果を claim_id で保持する。
   private normalizedStatementCache: Map<string, string> = new Map();
+  // P492: 読み込み時に検出した採番まわりの整合性所見。
+  private integrityFindings: string[] = [];
 
   private constructor() {
     this.loadFromStorage();
@@ -242,7 +248,29 @@ export class ClaimDatabaseService {
       }
     }
 
-    const claim_id = `CLM-${String(this.counter++).padStart(6, '0')}`;
+    // P492: 発行済み ID の再配布を防ぐ。カウンタが既存 ID と衝突して
+    // いたら空きまで進める（既存 Claim を黙って上書きしない）。採番した
+    // 番号は Claim 本体の保存より先に high-water として永続化するので、
+    // 本体の保存が遅れた状態で終了・再起動しても巻き戻らない。
+    let allocatedNum = this.counter;
+    let skipped = 0;
+    while (this.claims.has(`CLM-${String(allocatedNum).padStart(6, '0')}`)) {
+      allocatedNum++;
+      skipped++;
+    }
+    if (skipped > 0) {
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `🔐 [Claim ID採番] カウンタが既存 Claim と衝突したため ${skipped} 件読み飛ばしました (next=${allocatedNum})`
+      );
+    }
+    this.counter = allocatedNum + 1;
+    try {
+      storageService.setItem(CLAIM_ID_HIGH_WATER_KEY, String(allocatedNum + 1));
+    } catch {
+      // high-water が書けなくても、読み込み時に Claim 配列の最大値から回復できる。
+    }
+    const claim_id = `CLM-${String(allocatedNum).padStart(6, '0')}`;
     const now = Date.now();
 
     // 6.7 自己生成情報による自己証明の禁止チェック
@@ -1278,14 +1306,54 @@ export class ClaimDatabaseService {
       if (raw) {
         const data = JSON.parse(raw);
         if (Array.isArray(data)) {
+          // P492: Map に畳む前に、同一 claim_id で異なる文面のレコードが
+          // 保存配列に混ざっていないか検出する。過去の採番巻き戻しで
+          // 上書きされた Claim の痕跡は、ここでしか掴めない。
+          const statementById = new Map<string, string>();
           for (const c of data) {
+            const prev = statementById.get(c.claim_id);
+            if (prev !== undefined && prev !== c.statement) {
+              this.integrityFindings.push(
+                `duplicate claim_id ${c.claim_id} with divergent statements in stored array`
+              );
+            }
+            statementById.set(c.claim_id, c.statement);
             this.claims.set(c.claim_id, c);
           }
           const maxIdNum = data.reduce((max, c) => {
             const match = c.claim_id.match(/CLM-(\d+)/);
             return match ? Math.max(max, parseInt(match[1], 10)) : max;
           }, 0);
-          this.counter = maxIdNum + 1;
+          // P492: 採番は保存済み Claim の最大値だけに依存させない。
+          // 2026-11-05 に CLM-000080〜105 が二重発番された事故は、本体
+          // 配列の保存が間に合わない状態で再起動し、最大値が巻き戻った
+          // ことが原因。high-water mark と最大値の大きい方から進める。
+          let highWater = 0;
+          try {
+            highWater = parseInt(storageService.getItem(CLAIM_ID_HIGH_WATER_KEY) || '0', 10) || 0;
+          } catch {
+            highWater = 0;
+          }
+          if (highWater > maxIdNum + 1) {
+            this.integrityFindings.push(
+              `claim id high-water (${highWater}) exceeds stored max id (${maxIdNum}); a past rollback likely overwrote claims`
+            );
+          }
+          this.counter = Math.max(maxIdNum + 1, highWater);
+          if (this.integrityFindings.length > 0) {
+            try {
+              const prevRaw = storageService.getItem(CLAIM_ID_INTEGRITY_KEY);
+              const prev: string[] = prevRaw ? JSON.parse(prevRaw) : [];
+              const merged = [...new Set([...prev, ...this.integrityFindings])].slice(-50);
+              storageService.setItem(CLAIM_ID_INTEGRITY_KEY, JSON.stringify(merged));
+            } catch {
+              // 整合性記録は補助。書けなくても読み込みは続ける。
+            }
+            systemLogger.warn(
+              'SELF_IMPROVEMENT',
+              `🔐 [Claim ID整合性] ${this.integrityFindings.join(' ／ ')}`
+            );
+          }
         }
       }
     } catch {
@@ -1316,6 +1384,37 @@ export class ClaimDatabaseService {
       changed = true;
     }
     if (changed) this.saveToStorage();
+  }
+
+  /** P492: 採番の整合性所見（重複 ID・巻き戻しの痕跡）と現在のカウンタ。 */
+  public getClaimIdIntegrityReport(): { counter: number; findings: string[] } {
+    return { counter: this.counter, findings: [...this.integrityFindings] };
+  }
+
+  /**
+   * P492: 矛盾パッケージ生成（contradictionResolutionRequestService の
+   * enumeratePairs）と同一基準で「生きている矛盾相手」を返す。タスク側と
+   * パッケージ側が別々の物差しで数えると、実在しないペアを追うタスクが
+   * 空転する（CLM-000104 の事例）。基準は contradicted_by の相互リンクと
+   * 両側が SUPERSEDED／FALSE でないこと。
+   */
+  public liveContradictionPartners(claimId: string): string[] {
+    const self = this.claims.get(claimId);
+    if (!self || self.status === 'SUPERSEDED' || self.status === 'FALSE') return [];
+    const partners = new Set<string>();
+    for (const otherId of self.contradicted_by ?? []) {
+      const other = this.claims.get(otherId);
+      if (other && other.status !== 'SUPERSEDED' && other.status !== 'FALSE') {
+        partners.add(otherId);
+      }
+    }
+    for (const other of this.claims.values()) {
+      if (other.claim_id === claimId) continue;
+      if (other.status === 'SUPERSEDED' || other.status === 'FALSE') continue;
+      if ((other.contradicted_by ?? []).includes(claimId)) partners.add(other.claim_id);
+    }
+    partners.delete(claimId);
+    return [...partners];
   }
 
   private saveToStorage(): void {

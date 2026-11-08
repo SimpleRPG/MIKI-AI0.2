@@ -11,6 +11,7 @@ import { dictionaryBootstrapService } from './dictionaryBootstrapService';
 import { webContentUnderstandingService } from './webContentUnderstandingService';
 import { wordAssociationGraphService } from '../../memory/services/wordAssociationGraphService';
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
+import { subjectUnderstandingService } from '../../memory/services/subjectUnderstandingService';
 import { systemLogger } from '../../../services/systemLogger';
 import { sourcePageGraphService } from './sourcePageGraphService';
 import { contentTermsFromTokens } from './japaneseAnalysisService';
@@ -52,6 +53,11 @@ export function assessClaimWorthiness(statement: string): { ok: boolean; reason?
   if (promoHits >= 2) return { ok: false, reason: 'PROMOTIONAL' };
   if (promoHits >= 1 && /[！!]/.test(text)) return { ok: false, reason: 'PROMOTIONAL' };
   if (/(だよ|だね|じゃん|なんだ|んだよ)[。！!]?\s*$/.test(text)) return { ok: false, reason: 'CASUAL_BLOG_VOICE' };
+  // P493: 動機・規範の修辞は事実の文ではない。実例（2026-11-08 の
+  // TSConfig 調査）:「noEmitOnError を true にするのは、自分に厳しく
+  // あるためだ。」が FACT_CLAIM として登録された。書き手の動機や
+  // 心構えは、設定の事実とは分けて扱う。
+  if (/(ためだ|ためです|べきだ|べきです|ことが大切|のがコツ|心がけ)[。！!]?\s*$/.test(text)) return { ok: false, reason: 'RHETORIC_NOT_FACT' };
   if (!/[。！？!?」』.]$/.test(text) && text.length < 30) return { ok: false, reason: 'HEADING_FRAGMENT' };
   return { ok: true };
 }
@@ -236,7 +242,7 @@ export class ResearchService {
   // 学ぶ gap（UNKNOWN_TERM）を立て、意味が分かった後の再調査で
   // 主題を組み直せるようにする。detect は同一クエリを統合する
   // ので、同じ未理解が繰り返されても gap は溜まらない。
-  private routeUnunderstoodSubjectToMeaningLearning(gap: KnowledgeGap, baseQuery: string): void {
+  private routeUnunderstoodSubjectToMeaningLearning(gap: KnowledgeGap, baseQuery: string, planUnknownTerms?: string[]): void {
     try {
       // 材料は baseQuery だけでなく、gap の対象・不足内容と、ダンプ内
       // の meaning 値からも取る。組み立て段が主題として読めなかった
@@ -246,7 +252,11 @@ export class ResearchService {
         .map(m => m[1])
         .join(' ');
       const source = [baseQuery, gap.identity?.target ?? '', gap.identity?.missingContent ?? '', meaningValues].join(' ');
-      const terms = extractHumanSubjectTerms(source);
+      // P493: 主題理解の段が未知語を特定できている場合は、その語を
+      // そのまま使う（抽出の当て推量より段の判定の方が正確）。
+      const terms = planUnknownTerms && planUnknownTerms.length > 0
+        ? [...new Set(planUnknownTerms)].slice(0, 8)
+        : extractHumanSubjectTerms(source);
       if (terms.length === 0) return;
       knowledgeGapService.detect({
         query: `用語の意味を学ぶ: ${terms.slice(0, 3).join(' ')}`,
@@ -547,6 +557,9 @@ export class ResearchService {
       missingContent: gap.identity?.missingContent,
       conditions: gap.identity?.conditions,
     });
+    // P493: この調査パスの主題の分野（主題理解の段が確定できた場合）。
+    // 取り込み側の分野照合に使う。
+    const subjectField = queryPlan.subject?.field;
     const invocationPassLimit = Math.min(
       queryPlan.policy.maxTotalSearchRequests,
       queryPlan.policy.maxQueriesPerPlan,
@@ -768,7 +781,7 @@ export class ResearchService {
           // P487: 止めて終わりにしない。人間の語が残っているなら、
           // その語の意味を学ぶ gap へ回し、意味が分かった後の
           // 再調査で主題を組めるようにする。
-          this.routeUnunderstoodSubjectToMeaningLearning(gap, baseQuery);
+          this.routeUnunderstoodSubjectToMeaningLearning(gap, baseQuery, queryPlan.subject?.unknownTerms);
           systemLogger.info('SELF_IMPROVEMENT', '🧭 [主題理解] 検索の主題を特定できなかったため、この調査では検索しません');
           break;
         }
@@ -871,7 +884,7 @@ export class ResearchService {
               if (graphClaims >= 4) break;
               const normalizedStatement = this.normalizeClaimStatement(relevant.text);
               if (normalizedStatement.length < 15 || !normalizedFullText.includes(normalizedStatement)) continue;
-              const graphClaimId = this.linkResearchEvidenceToClaim(pageEvidence.evidence_id, relevant.text, claimIdByNormalizedStatement, !isCounterEvidencePass, { anchorTerms });
+              const graphClaimId = this.linkResearchEvidenceToClaim(pageEvidence.evidence_id, relevant.text, claimIdByNormalizedStatement, !isCounterEvidencePass, { anchorTerms, subjectField });
               if (graphClaimId) {
                 if (!claimIds.includes(graphClaimId)) claimIds.push(graphClaimId);
                 graphClaims += 1;
@@ -903,7 +916,7 @@ export class ResearchService {
                   statement,
                   claimIdByNormalizedStatement,
                   !isCounterEvidencePass,
-                  { anchorTerms },
+                  { anchorTerms, subjectField },
                 );
               },
             });
@@ -935,7 +948,7 @@ export class ResearchService {
               pageClaimStatement,
               claimIdByNormalizedStatement,
               !isCounterEvidencePass,
-              { anchorTerms },
+              { anchorTerms, subjectField },
             );
             if (pageClaimId && !claimIds.includes(pageClaimId)) {
               claimIds.push(pageClaimId);
@@ -1042,7 +1055,7 @@ export class ResearchService {
           statement,
           claimIdByNormalizedStatement,
           !isCounterEvidencePass,
-          { anchorTerms },
+          { anchorTerms, subjectField },
         );
 
         if (claimId && !claimIds.includes(claimId)) claimIds.push(claimId);
@@ -1337,7 +1350,7 @@ export class ResearchService {
     statement: string,
     claimIdByNormalizedStatement: Map<string, string>,
     reuseExisting = true,
-    gate?: { anchorTerms?: string[] },
+    gate?: { anchorTerms?: string[]; subjectField?: string },
   ): string | undefined {
     const normalized = this.normalizeClaimStatement(statement);
     if (normalized.length < 15) return undefined;
@@ -1371,6 +1384,15 @@ export class ResearchService {
     // で止まる（証拠付加は上の重複排除経路で従来どおり可能）。
     if (gate?.anchorTerms && gate.anchorTerms.length > 0 && !this.passesAnchorGate(statement, gate.anchorTerms)) {
       systemLogger.info('SELF_IMPROVEMENT', `[P473] 錨語不足で主張化を見送り: ${statement.slice(0, 60)}`);
+      return undefined;
+    }
+
+    // P493: 分野照合。主題の分野と文の分野が両方確定していて交わら
+    // ない文は、この調査の成果として Claim 化しない。同音異義の別
+    // 分野（例：特許のクレーム）から流れ着いた文が、証拠探しの副産
+    // 物として事実化するのを止める。どちらか不定なら判断しない。
+    if (subjectUnderstandingService.fieldMismatch(gate?.subjectField, statement) === true) {
+      systemLogger.info('SELF_IMPROVEMENT', `🧠 [意味照合] 主題の分野（${gate?.subjectField}）と合わないため主張化を見送り: ${statement.slice(0, 60)}`);
       return undefined;
     }
 

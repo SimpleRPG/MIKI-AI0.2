@@ -42,7 +42,12 @@ export class UnifiedWebResearchService {
   public async executePlannedSearch(query:string, options?:Parameters<typeof autonomousSearchService.executeSearch>[1]) {
     const normalized=String(query||"").trim();
     if(!normalized) throw new Error("RESEARCH_QUERY_REQUIRED");
-    return autonomousSearchService.executeSearch(normalized, options);
+    // P493: 「計画済み」と称して分類を素通りする経路を塞ぐ。ブリーフ／
+    // 診断ダンプ／フィールド名サラダ（部品メタデータの列挙）は主題抽出
+    // に回し、抽出できなければ空にして検索層の空ガードで終わらせる
+    // （生の構造文を検索エンジンへ送らない）。
+    const shaped=isBriefOrDiagnosticText(normalized)?buildShortResearchQuery(normalized):normalized;
+    return autonomousSearchService.executeSearch(shaped, options);
   }
 
   public getConfig(): AutonomousSearchConfig {

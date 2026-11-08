@@ -602,6 +602,9 @@ export interface SearchSelfDiagnosis {
 }
 const SEARCH_SELF_DIAGNOSIS_KEY = 'miki_search_self_diagnosis_v1';
 const OPENALEX_BUDGET_BLOCK_KEY = 'miki_openalex_budget_block_v1';
+// P493: Marginalia の共有キーレート制限に対する冷却（下記参照）。
+const MARGINALIA_COOLDOWN_KEY = 'miki_marginalia_cooldown_v1';
+const MARGINALIA_COOLDOWN_MS = 15 * 60 * 1000;
 // P485: empty outcomes are cached for a shorter window than hits --
 // long enough to stop the exact-duplicate re-fires the device logs
 // showed (same query up to 4x in one window), short enough that a
@@ -632,6 +635,7 @@ export class AutonomousSearchService {
   // above) and the OpenAlex daily-budget block. Both persisted.
   private selfDiagnosis: SearchSelfDiagnosis = { cause: 'NONE', detail: '', at: 0 };
   private openAlexBudgetBlockedUntil = 0;
+  private marginaliaCooldownUntil = 0;
   // P432: failed page reads, in-memory only (URL -> failedAt). No
   // persistence, no timer; stale entries are dropped when re-checked.
   private failedPageUrls = new Map<string, number>();
@@ -652,6 +656,11 @@ export class AutonomousSearchService {
       if (savedBlock) {
         const parsed = JSON.parse(savedBlock);
         if (typeof parsed?.blockedUntil === 'number') this.openAlexBudgetBlockedUntil = parsed.blockedUntil;
+      }
+      const savedMarginalia = storageService.getItem(MARGINALIA_COOLDOWN_KEY);
+      if (savedMarginalia) {
+        const parsed = JSON.parse(savedMarginalia);
+        if (typeof parsed?.blockedUntil === 'number') this.marginaliaCooldownUntil = parsed.blockedUntil;
       }
     } catch {
       // Diagnosis/block are auxiliary state; defaults stand.
@@ -708,6 +717,20 @@ export class AutonomousSearchService {
       // Auxiliary record; the in-memory block still holds.
     }
     this.recordSelfDiagnosis('BUDGET_EXHAUSTED', detail, this.openAlexBudgetBlockedUntil);
+  }
+
+  // P493: Marginalia の共有キー制限は、旧 API の 503 だけでなく新 API
+  // では 429 でも返る（2026-11-08 実機で 15 分間に 5 回連続 429）。
+  // 共有キーは他人の利用でも制限がかかるため、自分の再試行で状況が
+  // 良くなることはない。制限を引いたら 15 分は再発射を止める。
+  private noteMarginaliaRateLimited(status: number): void {
+    this.marginaliaCooldownUntil = Date.now() + MARGINALIA_COOLDOWN_MS;
+    try {
+      storageService.setItem(MARGINALIA_COOLDOWN_KEY, JSON.stringify({ blockedUntil: this.marginaliaCooldownUntil }));
+    } catch {
+      // Auxiliary record; the in-memory cooldown still holds.
+    }
+    systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [Marginalia] 共有キーのレート制限（HTTP ${status}）のため ${MARGINALIA_COOLDOWN_MS / 60000} 分間は再発射しません`);
   }
 
   public getSearchSelfDiagnosis(): SearchSelfDiagnosis {
@@ -1306,6 +1329,11 @@ export class AutonomousSearchService {
     // shared limit is a classified failure, not a retry trigger.
     const attemptMarginalia = async (): Promise<ProviderSearchOutput | null> => {
       try {
+        // P493: 共有キーのレート制限で冷却中なら発射しない。
+        if (Date.now() < this.marginaliaCooldownUntil) {
+          markProvider('marginalia', 'SKIPPED', '共有キーのレート制限で冷却中（再発射を抑制）');
+          return null;
+        }
         const apiUrl = readSupplementalApiUrl('miki_marginalia_api_url', 'https://api2.marginalia-search.com/search');
         const url = new URL(apiUrl);
         // P491: Marginalia のインデックスは英語圏中心のため、
@@ -1321,9 +1349,12 @@ export class AutonomousSearchService {
           headers: { 'API-Key': 'public', 'User-Agent': SUPPLEMENTAL_USER_AGENT, Accept: 'application/json' },
         });
         if (!res.ok) {
-          const reason = res.status === 503 ? 'HTTP 503（共有キーのレート制限）' : `HTTP ${res.status}`;
+          // P493: 共有キーのレート制限は 503 と 429 の両方で返る。
+          const rateLimited = res.status === 503 || res.status === 429;
+          const reason = rateLimited ? `HTTP ${res.status}（共有キーのレート制限）` : `HTTP ${res.status}`;
           markProvider('marginalia', 'FAILED', reason);
           systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [Marginalia] 応答失敗: ${reason}`);
+          if (rateLimited) this.noteMarginaliaRateLimited(res.status);
           return null;
         }
         const data = await res.json();

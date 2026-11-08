@@ -161,11 +161,16 @@ function buildCodeComponentGapMeaning(componentIds:string[]):string {
     ].join(' | ');
   });
 
+  // P493: 「意味文」に機械フィールド（unresolvedComponentMetadata=…）を
+  // 混ぜない。この文はそのまま調査クエリや記憶・ルールの本文に流れ、
+  // 構造がテキストの表面に漏れる事故の出発点だった（2026-11-08 実機）。
+  // 部品の内訳は構造化された gap 側に残っているので、意味文は人間の
+  // 文だけにする。descriptions は将来の構造化利用のために組み立ては残す。
+  void descriptions;
   return [
     '自律コード改善で必要なCODE Componentの実装能力を解決する。',
     'Component IDそのものを検索意図として扱わず、既存Componentの目的・入口・I/O・依存・状態から必要能力を意味化する。',
     '既存CODE Componentで再利用または適応できる場合はそれを優先し、存在しない場合のみ実装パターン・契約・依存・テスト方法をResearchで調査する。',
-    `unresolvedComponentMetadata=${descriptions.join(' || ')}`
   ].join(' ');
 }
 
@@ -183,18 +188,17 @@ function buildCompositionGapMeaning(input:{
   gapContractSummary?:string;
   liveTargetSummary?:string;
 }):string {
+  // P493: 同上。goal= / targetPaths= / synthesisGapReason= /
+  // gapDescriptions= 等の機械フィールドは意味文に混ぜない。それらは
+  // 構造化された gap レコード側の情報であり、テキストにすると調査
+  // クエリ・記憶・自律改善ルールの本文へそのまま漏れる（2026-11-08
+  // 実機のスクリーンショットと検索ログで確認）。引数の内訳は呼び出し
+  // 側の構造に残っている。
+  void input;
   return [
     '自律コード改善で必要な実装能力（検証済みCODE Component・実装パターン）が不足している。',
     '不足文字列そのものを検索意図として扱わず、対象ファイルと不足の内訳から必要能力を意味化する。',
     '既存CODE Componentで再利用または適応できる場合はそれを優先し、存在しない場合のみ実装パターン・契約・依存・テスト方法をResearchで調査する。',
-    `goal=${input.goal}`,
-    `targetPaths=${input.targetPaths.join(', ') || 'none'}`,
-    ...(input.gapReason ? [`synthesisGapReason=${input.gapReason}`] : []),
-    ...(input.gapDescriptions.length
-      ? [`gapDescriptions=${input.gapDescriptions.join(' || ')}`]
-      : ['gapDescriptions=none recorded (generation did not leave a gap breakdown)']),
-    ...(input.gapContractSummary ? [`gapContract=${input.gapContractSummary}`] : []),
-    ...(input.liveTargetSummary ? [`liveTargetSurface=${input.liveTargetSummary}`] : []),
   ].join(' ');
 }
 

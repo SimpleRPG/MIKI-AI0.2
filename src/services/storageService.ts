@@ -567,6 +567,28 @@ class StorageService {
       if (!Array.isArray(parsed)) return [];
       let migrated = false;
       const memories = parsed.map((memory: MemoryItem) => {
+        // P493: タスク目的文の機械フィールド（goal= / targetPaths= /
+        // synthesisGapReason= / gapDescriptions=）が本文に混ざったまま
+        // 保存された記憶を、人間の文の部分だけに切り戻す。マーカーが
+        // 2種以上そろった場合だけを対象にし、通常の文章は触らない。
+        // 共有層の stripMachineFields と同じ規則（ここは低レイヤー
+        // のため import せず同等の判定を内蔵する）。
+        if (memory && typeof memory.content === 'string') {
+          const markers = [' goal=', '\ngoal=', ' targetPaths=', '\ntargetPaths=', ' synthesisGapReason=', ' gapDescriptions='];
+          const hits = markers.filter((marker) => memory.content.includes(marker));
+          if (hits.length >= 2) {
+            let cut = memory.content.length;
+            for (const marker of markers) {
+              const idx = memory.content.indexOf(marker);
+              if (idx > 0 && idx < cut) cut = idx;
+            }
+            const head = memory.content.slice(0, cut).trim();
+            if (head.length >= 10) {
+              migrated = true;
+              memory = { ...memory, content: head };
+            }
+          }
+        }
         if (memory?.destination !== 'lora_dataset') return memory;
         migrated = true;
         return {
