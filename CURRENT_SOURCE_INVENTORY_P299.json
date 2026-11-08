@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1780,
     "sourceFileCount": 1333,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1244,
-    "relativeImportCandidateCount": 3853,
-    "resolvedRelativeImportCandidateCount": 3837,
+    "relativeImportCandidateCount": 3855,
+    "resolvedRelativeImportCandidateCount": 3839,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -10380,9 +10380,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphCompletionP214Service.ts",
-      "bytes": 5406,
-      "lines": 30,
-      "sha256": "f50313166cb183e68a900748fa5a8daaa17091c7e0cd7085387ddc6ff289d475",
+      "bytes": 5373,
+      "lines": 31,
+      "sha256": "56a1e10aa2b6294d21449387c8a4e9d80dc00b77531e0fddd61ad1b0dbe50695",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10395,10 +10395,16 @@
           "specifier": "../../core/services/unifiedKnowledgeGraphP151Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/unifiedKnowledgeGraphP151Service.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
         }
       ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -25353,9 +25359,9 @@
     },
     {
       "path": "src/miki/research/services/japaneseAnalysisService.ts",
-      "bytes": 13464,
-      "lines": 265,
-      "sha256": "4a99dc3a6371732dc1d87ba32a364a906d66fe4cdf11462d986a3b97226c8eb8",
+      "bytes": 13781,
+      "lines": 269,
+      "sha256": "c642185e96fd5697f1aaf486302210ce0825adb8a43f050d23735b8e5a82108c",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -25365,19 +25371,25 @@
         },
         {
           "line": 2,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 3,
           "specifier": "./japaneseDictionaryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
         },
         {
-          "line": 3,
+          "line": 4,
           "specifier": "./japaneseMorphologyService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseMorphologyService.ts"
         }
       ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
       "unresolvedRelativeImportCount": 0
     },
     {

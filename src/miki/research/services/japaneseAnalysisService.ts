@@ -1,4 +1,5 @@
 import { systemLogger } from '../../../services/systemLogger';
+import { storageService } from '../../../services/storageService';
 import { japaneseDictionaryService, JapaneseDictionaryEntry } from './japaneseDictionaryService';
 import { japaneseMorphologyService, NativeJapaneseMorpheme } from './japaneseMorphologyService';
 
@@ -147,7 +148,10 @@ class JapaneseAnalysisService {
   private correctionHistory: Array<{ input: string; target: string; at: number }> = [];
   private constructor() {
     try {
-      const raw = localStorage.getItem('miki_japanese_correction_history_v1');
+      // P500: 保存先を storageService に統一（旧 localStorage 直書き
+      // は移行済みバックエンドと二重管理になっていた）。キーは
+      // 従来と同じで、移行コピーがそのまま読める。
+      const raw = storageService.getItem('miki_japanese_correction_history_v1');
       if (raw) this.correctionHistory = JSON.parse(raw);
     } catch { /* storage unavailable: keep in-memory fallback */ }
   }
@@ -237,7 +241,7 @@ class JapaneseAnalysisService {
     if (!input.trim() || !target.trim()) return;
     this.correctionHistory.push({ input: normalize(input), target: normalize(target), at: Date.now() });
     if (this.correctionHistory.length > 100) this.correctionHistory.shift();
-    try { localStorage.setItem('miki_japanese_correction_history_v1', JSON.stringify(this.correctionHistory)); } catch { /* fallback */ }
+    try { storageService.setItem('miki_japanese_correction_history_v1', JSON.stringify(this.correctionHistory)); } catch { /* fallback */ }
     systemLogger.info('CHAT', `🈯 [JapaneseAnalysis] correction candidate recorded: ${target.slice(0, 60)}`);
   }
 
