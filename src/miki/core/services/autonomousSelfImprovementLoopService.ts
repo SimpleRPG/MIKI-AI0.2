@@ -10,6 +10,7 @@ import { improvementDebtService } from './improvementDebtService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
+import { runtimeLogReviewService } from '../../selfAwareness/services/runtimeLogReviewService';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -180,6 +181,7 @@ class AutonomousSelfImprovementLoopService {
   // P480/P482: 世界モデル成長の最終実行時刻（メモリ上。enqueue の
   // たびに判定し、30分に1回だけ回す）。
   private lastWorldModelGrowthAt = 0;
+  private lastLogSelfReviewAt = 0;
   private lastDigestSignature = '';
   private lastLoadDroppedInvalid = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -236,6 +238,8 @@ class AutonomousSelfImprovementLoopService {
     // 成長が Claim イベント経由で enqueue を再帰させても、時刻記録が
     // 先行するため二重には回らない）。
     this.maybeRunWorldModelGrowth();
+    // P488: 自分のログの自己レビューも同じ理由でここに置く。
+    this.maybeRunLogSelfReview();
     const duplicate = this.state.queue.find(item =>
       item.trigger === trigger &&
       item.source === source &&
@@ -591,6 +595,22 @@ class AutonomousSelfImprovementLoopService {
       worldModelGraphService.generateHypotheses(3);
     } catch (error) {
       systemLogger.warn('SELF_IMPROVEMENT', `[P480] 世界モデルの成長に失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * P488: 自分のログの自己レビューを30分に1回までで回す。直近の
+   * ログを集計し、繰り返しパターンと所見を記録する（runtimeLog
+   * ReviewService）。失敗してもループ本体は止めない。
+   */
+  private maybeRunLogSelfReview(): void {
+    const now = Date.now();
+    if (now - this.lastLogSelfReviewAt < 30 * 60_000) return;
+    this.lastLogSelfReviewAt = now;
+    try {
+      runtimeLogReviewService.review(60);
+    } catch (error) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[P488] ログの自己レビューに失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

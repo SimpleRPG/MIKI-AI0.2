@@ -1,4 +1,5 @@
 import { unifiedWebResearchService } from './unifiedWebResearchService';
+import { autonomousSearchService } from './autonomousSearchService';
 import type { SearchLane } from './unifiedWebResearchService';
 import { knowledgeGapService, KnowledgeGap } from '../../unknown/services/knowledgeGapService';
 import { evidenceService, EvidenceRecord } from '../../memory/services/evidenceService';
@@ -723,7 +724,28 @@ export class ResearchService {
           : adaptiveQuery;
       };
 
+      // P488: 自分の自己診断（P485）が「上流停止中／予算枯渇」を
+      // 示している間は、調査を回しても検索層で止まるだけなので、
+      // 計画段で証拠待ちに倒す。診断は彼女自身の結論であり、
+      // それに従って行動を変えることが「活用」である。
+      let liveSearchDiagnosis: string | null = null;
+      try {
+        const diagnosis = autonomousSearchService.getSearchSelfDiagnosis();
+        if (
+          (diagnosis.cause === 'UPSTREAM_SUSPENDED' || diagnosis.cause === 'BUDGET_EXHAUSTED') &&
+          (!diagnosis.until || diagnosis.until > Date.now())
+        ) {
+          liveSearchDiagnosis = `${diagnosis.cause}: ${diagnosis.detail}`;
+        }
+      } catch {
+        // 診断が読めなければ通常運転を続ける。
+      }
+
       for (let pass = 0; pass < invocationPassLimit; pass++) {
+        if (liveSearchDiagnosis) {
+          systemLogger.info('SELF_IMPROVEMENT', `🩺 [自己診断を活用] 検索基盤の自己診断（${liveSearchDiagnosis}）のため、この調査は証拠待ちにします`);
+          break;
+        }
         roundsCompleted = pass + 1;
         const plannedQuery = queryPlan.status === 'READY'
           ? queryPlan.queries[pass]?.queryText
