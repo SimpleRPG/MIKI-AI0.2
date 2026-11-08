@@ -66,17 +66,41 @@ const LONG_INTENT_WORDS=24;
 const QUERY_TERM_STOPWORDS=new Set(['the','and','for','with','from','that','this','are','was','were','will','would','can','could','should','into','about','over','under','between','through','find','needed','objective','current','context','structured','latent','deliverables','determine','required']);
 const JP_TERM_STOP_SEGMENTS=new Set(['について','として','により','ため','こと','もの','これ','それ','場合','以上','以下','今回','前回','自分','相手','検索意図','不足文字列','意味化']);
 export function isLongResearchIntent(text:string):boolean{const n=normalize(text);return n.length>LONG_INTENT_CHARS||n.split(/\s+/).filter(Boolean).length>LONG_INTENT_WORDS;}
+/*
+ * P486: 「長さ」では測れない非クエリ文の認識。実機ログでは、証拠取得の
+ * 指示文（ブリーフ、約110字）は長文判定（200字/24語・英語前提）を
+ * すり抜けて丸ごと検索文になり、部品の診断ダンプや内部フィールド名の
+ * 羅列も同じ穴を通っていた。問いを理解していれば検索文に混ざらない
+ * はずの「彼女への指示」と「内部の診断情報」を、長さとは別に分類する。
+ */
+const BRIEF_OR_DUMP_MARKERS=['必要な証拠を調査する','対象主張を支持する','整合性を確認できる出典','unresolvedComponentMetadata','registryStatus','background-cycle-review','syntaxTemplate','inputKinds','outputKinds'];
+export function isBriefOrDiagnosticText(text:string):boolean{const n=normalize(text);return BRIEF_OR_DUMP_MARKERS.some(marker=>n.includes(marker))||/(?:^|\s)componentId\s/.test(n)||/対象主張[:：]/.test(n);}
+const INTERNAL_QUERY_TOKENS=new Set(['componentid','registrystatus','unresolvedcomponentmetadata','syntaxtemplate','inputkinds','outputkinds','kind','slots','call','background-cycle-review','code','component','research','missing','meaning']);
+const INTERNAL_ID_PATTERN=/^(?:[A-Z]{2,4}-[A-Za-z0-9][A-Za-z0-9-]{3,}|bg_[A-Za-z0-9_]+)$/;
+const JP_BRIEF_STOP_SEGMENTS=new Set(['対象主張','矛盾する主張','調査キーワード','裏付け','解消','支持','整合性','出典','優先','矛盾','証拠','主張','調査','検索','確認','対象','必要']);
+// P486: 形態素境界で止め語が割れる（裏付け→裏付＋け、調査キーワード→
+// 調査＋キーワード）ため、完全一致ではなく相互包含で判定する。
+const isJpBriefStop=(segment:string):boolean=>{for(const stop of JP_BRIEF_STOP_SEGMENTS){if(stop===segment||stop.includes(segment)||segment.includes(stop))return true;}return false;};
 export function buildShortResearchQuery(text:string,focus?:GapFocusMaterialInput):string{
  const normalized=normalize(text);
  if(!normalized)return '';
- if(!isLongResearchIntent(normalized))return normalized;
+ const briefOrDump=isBriefOrDiagnosticText(normalized);
+ if(!briefOrDump&&!isLongResearchIntent(normalized))return normalized;
  const terms:string[]=[];
  const push=(value:string)=>{const term=normalize(value);if(term&&!terms.includes(term))terms.push(term);};
+ // P486: ブリーフでは、ラベル（対象主張:／矛盾する主張:／調査キーワード:）
+ // の値こそが主題。指示文そのものではなく、まずその値を取る。
+ if(briefOrDump){
+   for(const m of normalized.matchAll(/(?:対象主張|矛盾する主張|調査キーワード|主題|意味)[:：]\s*([^。]{2,80}?)(?=(?:対象主張|矛盾する主張|調査キーワード|主題|意味)[:：]|対象主張を支持する|。|$)/g)){
+     const value=(m[1]||'').trim();
+     if(value&&!INTERNAL_ID_PATTERN.test(value))push(value);
+   }
+ }
  for(const slot of (focus?.slotNames??[]).slice(0,3))push(slot);
  for(const path of (focus?.targetPaths??[]).slice(0,3))push(String(path||'').split('/').pop()||'');
  for(const m of normalized.matchAll(/「([^」]{2,40})」|『([^』]{2,40})』|"([^"]{2,40})"/g))push(m[1]||m[2]||m[3]||'');
- for(const m of normalized.matchAll(/[A-Za-z][A-Za-z0-9_$.-]{2,}/g)){if(!QUERY_TERM_STOPWORDS.has(m[0].toLowerCase()))push(m[0]);if(terms.length>=14)break;}
- for(const m of normalized.matchAll(/[ァ-ヶー]{2,}|[一-龠々]{2,}/g)){if(!JP_TERM_STOP_SEGMENTS.has(m[0]))push(m[0]);if(terms.length>=22)break;}
+ for(const m of normalized.matchAll(/[A-Za-z][A-Za-z0-9_$.-]{2,}/g)){const token=m[0];if(!QUERY_TERM_STOPWORDS.has(token.toLowerCase())&&!INTERNAL_QUERY_TOKENS.has(token.toLowerCase())&&!INTERNAL_ID_PATTERN.test(token))push(token);if(terms.length>=14)break;}
+ for(const m of normalized.matchAll(/[ァ-ヶー]{2,}|[一-龠々]{2,}/g)){if(!JP_TERM_STOP_SEGMENTS.has(m[0])&&!(briefOrDump&&isJpBriefStop(m[0])))push(m[0]);if(terms.length>=22)break;}
  const chosen:string[]=[];
  for(const term of terms){
    if(chosen.length>=SHORT_QUERY_MAX_TERMS)break;
@@ -85,6 +109,10 @@ export function buildShortResearchQuery(text:string,focus?:GapFocusMaterialInput
    if(chosen.join(' ').length>RESEARCH_QUERY_MAX_CHARS)break;
  }
  const query=chosen.join(' ').trim();
+ // P486: ブリーフ／ダンプから主題を抽出できなかった場合は、切り取った
+ // 断片を検索文として蘇らせない。空を返し、呼び出し側に「主題を特定
+ // できなかった」ことを伝える（＝理解できていない問いを検索しない）。
+ if(briefOrDump&&!query)return '';
  return query||normalized.slice(0,RESEARCH_QUERY_MAX_CHARS);
 }
 class ResearchQueryPlanningService {
@@ -92,7 +120,20 @@ class ResearchQueryPlanningService {
  savePolicy(input:QueryPlanningPolicy):{policy:QueryPlanningPolicy;receiptId:string;policySha256:string}{const policy=this.normalizePolicy({...input,updatedAt:Date.now()});storageService.setItem(POLICY_KEY,JSON.stringify(policy));const policySha256=canonicalSha256Object(policy);return {policy,receiptId:`RQPR-${policySha256.slice(0,20)}`,policySha256};}
  listPlans():ResearchQueryPlan[]{return (()=>{const raw=storageService.getItem(PLAN_KEY);try{return raw?JSON.parse(raw) as ResearchQueryPlan[]:[];}catch{return [];}})();}
  listRevisionPairs():QueryRevisionPair[]{return (()=>{const raw=storageService.getItem(REVISION_KEY);try{return raw?JSON.parse(raw) as QueryRevisionPair[]:[];}catch{return [];}})();}
- buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput,exclusion?:ResearchQueryExclusion,independentFocus?:IndependentEvidenceFocus,gapStructure?:GapStructureInput):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const effectiveIntent=isLongResearchIntent(intent)?(buildShortResearchQuery(intent,gapFocus)||intent):intent;const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus||gapStructure?{intent,environment:DEVICE,policy,gapFocus,gapStructure}:{intent,environment:DEVICE,policy}).slice(0,20)}`;const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',effectiveIntent,'全体条件を保持した基準検索']);
+ buildPlan(question:string,targetClaimIds:string[]=[],gapFocus?:GapFocusMaterialInput,exclusion?:ResearchQueryExclusion,independentFocus?:IndependentEvidenceFocus,gapStructure?:GapStructureInput):ResearchQueryPlan {const intent=normalize(question);if(!intent)throw new Error('RESEARCH_INTENT_REQUIRED');const effectiveIntent=(isLongResearchIntent(intent)||isBriefOrDiagnosticText(intent))?buildShortResearchQuery(intent,gapFocus):intent;const policy=this.getPolicy();const researchQuestionId=`RQ-${canonicalSha256Object({intent}).slice(0,20)}`;const queryPlanId=`RQP-${canonicalSha256Object(gapFocus||gapStructure?{intent,environment:DEVICE,policy,gapFocus,gapStructure}:{intent,environment:DEVICE,policy}).slice(0,20)}`;
+/*
+ * P486: 主題を特定できなかった計画。ブリーフ／診断ダンプから主題を
+ * 抽出できなかった場合、断片を検索文として蘇らせず、クエリ0件の
+ * BLOCKED 計画を返す。呼び出し側はこれを「問いをまだ理解できて
+ * いない」として扱い、検索を発射しない。
+ */
+if(!effectiveIntent){
+  const blockedBase={queryPlanId,researchQuestionId,canonicalResearchIntent:intent,environment:DEVICE,policy,queries:[] as ResearchQueryIntent[],usedQueryPatternIds:[] as string[],excludedQueryPatternIds:[] as string[],queryPatternSelectionId:'',queryPatternSelectionSha256:'',status:'BLOCKED' as ResearchQueryPlan['status'],createdAt:Date.now(),updatedAt:Date.now()};
+  const blockedPlan:{planSha256:string}&typeof blockedBase={...blockedBase,planSha256:canonicalSha256Object(blockedBase)};
+  storageService.setItem(PLAN_KEY,JSON.stringify([blockedPlan,...this.listPlans().filter(x=>x.queryPlanId!==blockedPlan.queryPlanId)].slice(0,100)));
+  return blockedPlan;
+}
+const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',effectiveIntent,'全体条件を保持した基準検索']);
 /*
  * P439: 不足スロット向けの材料探索クエリを1本足す（gapFocus がある場合）。
  * 戦略ごとに探索先を変える（GitHub コード検索／Stack Exchange／Web 文書）。

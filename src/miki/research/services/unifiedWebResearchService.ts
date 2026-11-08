@@ -1,6 +1,6 @@
 import { autonomousSearchService } from './autonomousSearchService';
 import type { AutonomousSearchConfig } from './autonomousSearchService';
-import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIntent } from './researchQueryPlanningService';
+import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIntent, isBriefOrDiagnosticText } from './researchQueryPlanningService';
 
 export * from './autonomousSearchService';
 
@@ -28,9 +28,13 @@ export class UnifiedWebResearchService {
           plan.queries[0]?.queryText ||
           normalized
         : // P460: 計画が BLOCKED でも生の長文は飛ばさず、組み立て直す。
-          isLongResearchIntent(normalized)
-          ? buildShortResearchQuery(normalized) || normalized
-          : normalized;
+          // P486: ブリーフ／診断ダンプは主題抽出に失敗したら空を返し、
+          // 検索層の空ガードで結果0件として終わる（生文を送らない）。
+          isBriefOrDiagnosticText(normalized)
+          ? buildShortResearchQuery(normalized)
+          : isLongResearchIntent(normalized)
+            ? buildShortResearchQuery(normalized) || normalized
+            : normalized;
 
     return autonomousSearchService.executeSearch(plannedQuery, options);
   }

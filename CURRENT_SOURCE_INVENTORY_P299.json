@@ -25374,9 +25374,9 @@
     },
     {
       "path": "src/miki/research/services/researchQueryPlanningService.ts",
-      "bytes": 20944,
-      "lines": 174,
-      "sha256": "df9fa41618b6af8d6292fa10783739572c1d76eea0e74674d38709f1ab55b8eb",
+      "bytes": 25055,
+      "lines": 215,
+      "sha256": "93961a46fbae1f0c2116d9f9677fa953ad32bf523910373e1ed419cf033d8221",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -25419,9 +25419,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 70872,
-      "lines": 1348,
-      "sha256": "4a14f21f4fcce7ac821415c729dffc30b6a85af1378b69e6ce074b3021b97e36",
+      "bytes": 71932,
+      "lines": 1363,
+      "sha256": "427aff855811b91a415cbf2de7785fb3374705d020ae2f596914e4cc741f1d51",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -25832,9 +25832,9 @@
     },
     {
       "path": "src/miki/research/services/unifiedWebResearchService.ts",
-      "bytes": 3201,
-      "lines": 94,
-      "sha256": "bbb35768d38d39597ab690f14a8f63d61647b0be944f04a1968000d0527467fd",
+      "bytes": 3523,
+      "lines": 98,
+      "sha256": "934d58d8d63bb9a4be9711d5e13f56fba00c22dba1269a5440783f137ad754f4",
       "relativeImportCandidates": [
         {
           "line": 1,

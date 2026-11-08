@@ -13,7 +13,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { sourcePageGraphService } from './sourcePageGraphService';
 import { contentTermsFromTokens } from './japaneseAnalysisService';
 import { japaneseAnalysisCompositionService } from '../../conversation/services/japaneseAnalysisCompositionService';
-import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIntent } from './researchQueryPlanningService';
+import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIntent, isBriefOrDiagnosticText } from './researchQueryPlanningService';
 import type { GapFocusMaterialInput, ResearchQueryExclusion, IndependentEvidenceFocus } from './researchQueryPlanningService';
 import { storageService } from '../../../services/storageService';
 import { collectionSourceRegistryService } from '../../core/services/collectionSourceRegistryService';
@@ -664,9 +664,15 @@ export class ResearchService {
 
       // P460: 計画が BLOCKED のときのフォールバックでも、生の長い
       // baseQuery は飛ばさない。組み立て段で短いクエリに直してから使う。
-      const adaptiveBase = isLongResearchIntent(baseQuery)
-        ? buildShortResearchQuery(baseQuery, options?.gapFocus) || baseQuery
-        : baseQuery;
+      // P486: ブリーフ／診断ダンプでは主題を抽出できなければ空のままに
+      // する（生文を蘇らせない）。通常の長文では従来どおり切り取り
+      // フォールバックが効くため、|| baseQuery は分類済み文に限って外す。
+      const adaptiveBase = isBriefOrDiagnosticText(baseQuery)
+        ? buildShortResearchQuery(baseQuery, options?.gapFocus)
+        : isLongResearchIntent(baseQuery)
+          ? buildShortResearchQuery(baseQuery, options?.gapFocus) || baseQuery
+          : baseQuery;
+      let subjectUnresolved = false;
       const buildAdaptiveQuery = (round: number, results: VerificationResult[]): string => {
         if (round === 0) return adaptiveBase;
         if (recommendedRevisionQuery) return recommendedRevisionQuery;
@@ -698,6 +704,15 @@ export class ResearchService {
           ? (recommendedRevisionQuery as string)
           : plannedQuery || buildAdaptiveQuery(pass, verification);
         if (useRevision) recommendedRevisionQuery = undefined;
+        // P486: 主題を特定できなかったパスは検索を発射しない。理解
+        // できていない問いへの検索は、枠の消費と「調べたつもり」だけ
+        // を生む。gap は証拠待ちとして残り、主題が分かる材料が来た
+        // ときに再び調べられる。
+        if (!passQuery.trim()) {
+          subjectUnresolved = true;
+          systemLogger.info('SELF_IMPROVEMENT', '🧭 [主題理解] 検索の主題を特定できなかったため、この調査では検索しません');
+          break;
+        }
         nextQuery = passQuery;
         const queryStartedAt = Date.now();
         const raw = await unifiedWebResearchService.executePlannedSearch(passQuery, {
