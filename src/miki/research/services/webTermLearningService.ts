@@ -1,6 +1,9 @@
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { japaneseDictionaryService } from './japaneseDictionaryService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
+import { definitionPatternService, type ExtractedDefinition } from './definitionPatternService';
+import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
+import { systemLogger } from '../../../services/systemLogger';
 import {
   reusableComponentFactoryService,
   type KnowledgeComponentArtifact,
@@ -12,6 +15,9 @@ export interface WebTermLearningInput {
   evidenceId: string;
   claimIds?: string[];
   sourceTitle?: string;
+  // P494: いま意味を必要としている語（調査を止めている未知語）。
+  // 候補抽出の単位から漏れても定義抽出と登録の対象にする。
+  priorityTerms?: string[];
 }
 
 export interface LearnedWebTerm {
@@ -37,6 +43,8 @@ export interface WebTermLearningResult {
   glossedCount: number;
   duplicateCount: number;
   needsGlossCount: number;
+  // P494: このページの定義文から新しく覚えた意味。
+  learnedDefinitions: Array<{ term: string; gloss: string; sense: string }>;
 }
 
 const STOP_WORDS = new Set([
@@ -102,8 +110,16 @@ class WebTermLearningService {
   learnPage(input: WebTermLearningInput): WebTermLearningResult {
     const text = input.text.trim();
     if (!text || !input.url || !input.evidenceId) {
-      return { terms: [], componentIds: [], glossedCount: 0, duplicateCount: 0, needsGlossCount: 0 };
+      return { terms: [], componentIds: [], glossedCount: 0, duplicateCount: 0, needsGlossCount: 0, learnedDefinitions: [] };
     }
+
+    // P494: 定義文の抽出は候補ランキングと独立に先に行う。辞書に
+    // gloss が無い語は、ページ内の定義の明示から意味を得る。
+    const extractions = new Map<string, ExtractedDefinition>();
+    for (const def of definitionPatternService.extractDefinitions(text)) {
+      extractions.set(normalize(def.term), def);
+    }
+    const learnedByTerm = new Map<string, ExtractedDefinition>();
 
     const terms: LearnedWebTerm[] = [];
     const componentIds: string[] = [];
@@ -127,7 +143,16 @@ class WebTermLearningService {
     // 辞書引きは1回だけ行い、gloss 付きを先に・出現回数の多い順に並べて
     // ページ内上限で切る。gloss の軸は「辞書ヒット」ではなく「gloss 有無」
     // （辞書にあっても gloss 無しが多数あるため。P440 D7）。
-    const ranked = [...extractCandidates(text)]
+    const candidatesMap = extractCandidates(text);
+    // P494: 優先語（意味が必要な語）は候補の単位から漏れても対象に
+    // 入れる。本文に実在することだけは確認する。
+    for (const priority of input.priorityTerms ?? []) {
+      const key = normalize(priority);
+      if (key && !candidatesMap.has(key) && text.includes(priority)) {
+        candidatesMap.set(key, 2);
+      }
+    }
+    const ranked = [...candidatesMap]
       .map(([term, occurrences]) => {
         const hits = japaneseDictionaryService.lookup(term);
         const hit = hits[0];
@@ -137,6 +162,23 @@ class WebTermLearningService {
           const unitGloss = unitConversionService.glossForTerm(term);
           if (unitGloss) {
             return { term, occurrences, hit: { ...(hit || {}), gloss: unitGloss } as typeof hit };
+          }
+        }
+        // P494: 辞書に gloss が無い語は、このページの定義文から
+        // 意味を得る（推測ではなく、定義の明示がある場合だけ）。
+        if (!hit?.gloss) {
+          const extraction = extractions.get(normalize(term));
+          if (extraction) {
+            learnedByTerm.set(normalize(term), extraction);
+            return {
+              term,
+              occurrences,
+              hit: {
+                ...(hit || {}),
+                gloss: extraction.gloss,
+                reading: hit?.reading ?? extraction.reading,
+              } as typeof hit,
+            };
           }
         }
         return { term, occurrences, hit };
@@ -150,6 +192,7 @@ class WebTermLearningService {
 
     for (const { term, occurrences, hit } of ranked) {
       if (!hit && occurrences < 2) continue;
+      const learnedDef = learnedByTerm.get(normalize(term));
 
       const needsGloss = !hit?.gloss;
       if (needsGloss) needsGlossCount++;
@@ -177,7 +220,7 @@ class WebTermLearningService {
         terms.push({
           term,
           occurrences: merged.occurrences ?? occurrences,
-          dictionaryKnown: Boolean(hit),
+          dictionaryKnown: Boolean(hit) && !learnedDef,
           dictionarySource: hit?.source,
           lemma: hit?.lemma,
           reading: hit?.reading,
@@ -220,7 +263,7 @@ class WebTermLearningService {
         freshnessPolicy: 'REVALIDATE_ON_ENVIRONMENT_CHANGE',
         term,
         occurrences,
-        dictionaryKnown: Boolean(hit),
+        dictionaryKnown: Boolean(hit) && !learnedDef,
         dictionarySource: hit?.source,
         lemma: hit?.lemma,
         reading: hit?.reading,
@@ -246,7 +289,7 @@ class WebTermLearningService {
       terms.push({
         term,
         occurrences,
-        dictionaryKnown: Boolean(hit),
+        dictionaryKnown: Boolean(hit) && !learnedDef,
         dictionarySource: hit?.source,
         lemma: hit?.lemma,
         reading: hit?.reading,
@@ -258,7 +301,53 @@ class WebTermLearningService {
       });
     }
 
-    return { terms, componentIds, glossedCount, duplicateCount, needsGlossCount };
+    // P494: 定義文から学んだ意味を、意味ストア（多義は分岐として）
+    // と個人辞書へ登録し、意味学習のループを閉じる。辞書に既にある
+    // 語は個人辞書で上書きしない（意味の分岐だけが増える）。
+    const learnedDefinitions: Array<{ term: string; gloss: string; sense: string }> = [];
+    const registeredKeys = new Set<string>();
+    const registerDefinition = (def: ExtractedDefinition) => {
+      const key = normalize(def.term);
+      if (registeredKeys.has(key)) return;
+      registeredKeys.add(key);
+      const sense = lexicalRelationService.addLearnedSense(def.term, {
+        description: def.gloss,
+        hypernyms: def.hypernym ? [def.hypernym] : [],
+        enLabel: def.enLabel,
+        sourceUrl: input.url,
+      });
+      if (def.hypernym) {
+        lexicalRelationService.addRelation(def.term, def.hypernym, 'HYPERNYM', 'learned');
+      }
+      if (def.enLabel) {
+        lexicalRelationService.addRelation(def.term, def.enLabel, 'TRANSLATION', 'learned');
+      }
+      if (!japaneseDictionaryService.has(def.term)) {
+        japaneseDictionaryService.addPersonal(def.term, {
+          gloss: def.gloss,
+          reading: def.reading,
+          semanticIds: ['learned:definition'],
+        });
+      }
+      learnedDefinitions.push({ term: def.term, gloss: def.gloss, sense });
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `📖 [意味学習] 「${def.term}」: ${def.gloss.slice(0, 60)} (意味=${sense}, 出所=${input.url})`,
+      );
+    };
+    const rankedTermKeys = new Set(terms.map((t) => normalize(t.term)));
+    for (const def of learnedByTerm.values()) {
+      if (rankedTermKeys.has(normalize(def.term))) registerDefinition(def);
+    }
+    let overflow = 0;
+    for (const def of extractions.values()) {
+      if (overflow >= 3) break;
+      if (registeredKeys.has(normalize(def.term))) continue;
+      registerDefinition(def);
+      overflow++;
+    }
+
+    return { terms, componentIds, glossedCount, duplicateCount, needsGlossCount, learnedDefinitions };
   }
 }
 

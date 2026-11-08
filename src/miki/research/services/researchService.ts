@@ -7,6 +7,7 @@ import { researchStrategyService, ResearchRoute } from './researchStrategyServic
 import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/services/cognitiveEvidenceIntegrationService';
 import { mikiUnifiedLearningContinuumService } from '../../learning/services/mikiUnifiedLearningContinuumService';
 import { webTermLearningService } from './webTermLearningService';
+import { japaneseDictionaryService } from './japaneseDictionaryService';
 import { dictionaryBootstrapService } from './dictionaryBootstrapService';
 import { webContentUnderstandingService } from './webContentUnderstandingService';
 import { wordAssociationGraphService } from '../../memory/services/wordAssociationGraphService';
@@ -560,6 +561,12 @@ export class ResearchService {
     // P493: この調査パスの主題の分野（主題理解の段が確定できた場合）。
     // 取り込み側の分野照合に使う。
     const subjectField = queryPlan.subject?.field;
+    // P494: 意味学習の優先語（この調査の主題で意味が要る語）。
+    const priorityTermsForLearning = [...new Set(
+      [gap.identity?.target, ...(queryPlan.subject?.unknownTerms ?? [])]
+        .map((t) => (t || '').trim())
+        .filter(Boolean),
+    )];
     const invocationPassLimit = Math.min(
       queryPlan.policy.maxTotalSearchRequests,
       queryPlan.policy.maxQueriesPerPlan,
@@ -802,6 +809,24 @@ export class ResearchService {
         // （同じ出典の繰り返しを避ける）。除外しすぎて0件になっても
         // フォールバックはしない（ログで様子を見る）。件数だけログに出す。
         const results = rawResults.filter(result => !this.isExcludedSearchResult(result, sourceExclusion));
+        // P494: 未知語の意味を学ぶ調査では、検索エンジンの調子に
+        // 左右されないよう、辞書サイトのその語のページを直接の
+        // 読み対象として先頭に足す（通常の読み経路で証拠化される）。
+        if (pass === 0 && gap.type === 'UNKNOWN_TERM') {
+          const directTarget = (gap.identity?.target || '').trim()
+            || (gap.query.split(':')[1] || '').trim().split(/\s+/)[0];
+          if (directTarget && !japaneseDictionaryService.has(directTarget)) {
+            const encoded = encodeURIComponent(directTarget);
+            const directResults = [
+              { title: `${directTarget} - Wikipedia`, snippet: '', source: 'wikipedia-direct', url: `https://ja.wikipedia.org/wiki/${encoded}` },
+              { title: `${directTarget} - Wiktionary`, snippet: '', source: 'wiktionary-direct', url: `https://ja.wiktionary.org/wiki/${encoded}` },
+            ].filter((d) => !results.some((r) => r.url === d.url));
+            if (directResults.length > 0) {
+              results.unshift(...directResults);
+              systemLogger.info('SELF_IMPROVEMENT', `📖 [意味学習] 「${directTarget}」を辞書サイトから直接引く (読み対象に ${directResults.length} 件追加)`);
+            }
+          }
+        }
         const excludedResultCount = rawResults.length - results.length;
         if (excludedResultCount > 0) {
           systemLogger.info('SELF_IMPROVEMENT', `[Research] excluded ${excludedResultCount} known-source results (hosts=${sourceExclusion.excludedHosts.length}, urls=${sourceExclusion.excludedUrls.length})`);
@@ -964,7 +989,18 @@ export class ResearchService {
               evidenceId: pageEvidence.evidence_id,
               claimIds: [pageClaimId],
               sourceTitle: page.result.title,
+              priorityTerms: priorityTermsForLearning.length ? priorityTermsForLearning : undefined,
             });
+
+            // P494: 意味が辞書に載ったら、この UNKNOWN_TERM gap は
+            // 役目を終える。再調査のたびに同じ語を調べ直さない。
+            if (gap.type === 'UNKNOWN_TERM' && termLearning.learnedDefinitions.length > 0) {
+              const learnedTarget = (gap.identity?.target || '').trim();
+              if (learnedTarget && japaneseDictionaryService.has(learnedTarget)) {
+                knowledgeGapService.markResolved(gap.id);
+                systemLogger.info('SELF_IMPROVEMENT', `📖 [意味学習] 「${learnedTarget}」を覚えたため、意味学習 gap を解決しました`);
+              }
+            }
 
             // P463: gloss が無い語（needsGloss）は、深掘り辞書引きの
             // 消費者に渡す。従来は印と集計だけで、補完する後段がなかった。

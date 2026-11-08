@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 
 /*
  * P490: 語彙ルール（型つき語関係）の置き場。
@@ -21,7 +22,7 @@ import { systemLogger } from '../../../services/systemLogger';
  */
 
 export type LexicalRelationType = 'SYNONYM' | 'ANTONYM' | 'HYPERNYM' | 'TRANSLATION' | 'ABBREVIATION' | 'FIELD' | 'VARIANT';
-export type LexicalRelationSource = 'seed' | 'wikidata' | 'teacher' | 'manual';
+export type LexicalRelationSource = 'seed' | 'wikidata' | 'teacher' | 'manual' | 'learned';
 
 export interface LexicalRelation {
   a: string;
@@ -130,6 +131,9 @@ export interface LexicalSense {
   description: string;
   enLabel?: string;
   hypernyms: string[];
+  // P494: ページの定義文から学んだ意味の出所と学習時刻。
+  sourceUrl?: string;
+  learnedAt?: number;
 }
 
 class LexicalRelationService {
@@ -472,7 +476,16 @@ class LexicalRelationService {
       const clueText = [sense.description, ...(sense.hypernyms || []), sense.enLabel || ''].join(' ');
       let score = 0;
       for (const token of new Set(tokensOf(clueText))) {
-        if (contextTokens.has(token) || context.includes(token)) score++;
+        // P494: 文脈の語が手がかりの語の一部である場合（熱帯 ⊂
+        // 熱帯地域）も一致と数える。語の切り方の粒度差で、意味の
+        // 選択が常時失敗するのを防ぐ。
+        if (
+          contextTokens.has(token) ||
+          context.includes(token) ||
+          [...contextTokens].some((ct) => ct.length >= 2 && token.includes(ct))
+        ) {
+          score++;
+        }
       }
       if (score > bestScore) {
         best = sense;
@@ -483,6 +496,59 @@ class LexicalRelationService {
       }
     }
     return bestScore > 0 && !tied ? best : undefined;
+  }
+
+  /**
+   * P494: ページの定義文から学んだ意味を、意味の分岐として記録
+   * する。多義語は「最初の定義で上書き」せず、別の定義が来たら
+   * 別の意味として並べる（日本語は同音・同表記の別義が多いため）。
+   * 既存の学習済み意味と説明文の重なりが大きければ同じ意味と
+   * みなして reinforced を返す。Wikidata 由来の意味とは別枠
+   * （entityId が 'learned:' 始まり）で持ち、disambiguate の
+   * 候補には両方とも載る。
+   */
+  public addLearnedSense(
+    termRaw: string,
+    input: { description: string; hypernyms?: string[]; enLabel?: string; sourceUrl?: string },
+  ): 'added' | 'reinforced' | 'skipped' {
+    this.load();
+    const term = normalizeTerm(termRaw);
+    const description = (input.description || '').trim();
+    if (!term || description.length < 4) return 'skipped';
+    const tokensOf = (text: string): Set<string> =>
+      new Set(
+        (String(text || '').toLowerCase().match(/[a-z0-9]{2,}|[一-龯]{2,}|[ぁ-んァ-ヶ]{2,}/g) ?? []),
+      );
+    const newTokens = tokensOf(description);
+    for (const sense of this.senses) {
+      if (sense.term !== term || !sense.entityId.startsWith('learned:')) continue;
+      const oldTokens = tokensOf(sense.description);
+      let inter = 0;
+      for (const t of newTokens) if (oldTokens.has(t)) inter++;
+      const union = new Set([...newTokens, ...oldTokens]).size || 1;
+      if (inter / union >= 0.5) {
+        if (!sense.sourceUrl && input.sourceUrl) sense.sourceUrl = input.sourceUrl;
+        this.saveSenses();
+        return 'reinforced';
+      }
+    }
+    const learnedCount = this.senses.filter(
+      (s) => s.term === term && s.entityId.startsWith('learned:'),
+    ).length;
+    if (learnedCount >= 6) return 'skipped';
+    const entityId = `learned:${canonicalSha256Object({ term, description }).slice(0, 16)}`;
+    if (this.senses.some((s) => s.entityId === entityId)) return 'reinforced';
+    this.senses.push({
+      term,
+      entityId,
+      description,
+      enLabel: input.enLabel,
+      hypernyms: input.hypernyms ?? [],
+      sourceUrl: input.sourceUrl,
+      learnedAt: Date.now(),
+    });
+    this.saveSenses();
+    return 'added';
   }
 
   /**

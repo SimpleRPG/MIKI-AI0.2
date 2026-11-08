@@ -6,6 +6,7 @@ import {
   reusableComponentFactoryService,
   type KnowledgeComponentArtifact,
 } from './reusableComponentFactoryService';
+import { definitionPatternService } from '../../research/services/definitionPatternService';
 
 /*
  * P472: 教師教材パッケージの受け口。
@@ -27,7 +28,11 @@ import {
  *
  * 形式: ZIP（または .zip.txt = Base64）のルートに teacher_material.json。
  * { formatVersion: 1, packageType: 'TEACHER_MATERIAL', teacher: { name },
- *   subject?, lessons: [{ id, title, rule, reason?, howToJudge?, example?, antiPattern? }] }
+ *   subject?, lessons: [{ id, title, rule, reason?, howToJudge?, example?, antiPattern? }],
+ *   definitionPatterns?: [{ id?, name?, regex }] }
+ * 定義形（P494）は任意の追加分。regex は (?<term>) と (?<gloss>) の
+ * 名前付きグループ必須で、レジストリ側の検証を通ったものだけ登録
+ * される。レッスンが空でも、有効な定義形があれば受け付ける。
  * 参照画像は references/ 以下に .png / .jpg / .jpeg / .webp で同梱できる。
  */
 
@@ -65,6 +70,8 @@ export interface TeacherMaterialIntakeRecord {
   teacherName: string;
   subject: string;
   lessonCount: number;
+  // P494: このパッケージで登録された定義形の件数。
+  definitionPatternCount?: number;
   componentIds: string[];
   references: TeacherMaterialReferenceRecord[];
   receivedAt: number;
@@ -295,12 +302,30 @@ class TeacherMaterialIntakeService {
     }
     const subject = typeof manifest.subject === 'string' ? manifest.subject : '';
     const identifiedCtx: Partial<TeacherMaterialIntakeRecord> = { ...manifestCtx, teacherName, subject };
+    // P494: 定義形の供給（任意）。レッスンとは独立に受け付け、
+    // レジストリ側の検証を通ったものだけが登録される。
+    const rawPatterns = Array.isArray((manifest as any).definitionPatterns)
+      ? (manifest as any).definitionPatterns as unknown[]
+      : [];
+    let definitionPatternCount = 0;
+    const patternNotes: string[] = [];
+    for (const item of rawPatterns) {
+      const p = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : {};
+      const result = definitionPatternService.addPattern({
+        id: typeof p.id === 'string' ? p.id : undefined,
+        name: typeof p.name === 'string' ? p.name : undefined,
+        regex: typeof p.regex === 'string' ? p.regex : '',
+        source: 'teacher',
+      });
+      if (result.ok) definitionPatternCount++;
+      else patternNotes.push(`定義形 ${typeof p.id === 'string' ? p.id : '(id無し)'}: ${result.reason}`);
+    }
     const rawLessons = manifest.lessons;
-    if (!Array.isArray(rawLessons) || rawLessons.length === 0) {
-      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスンを入れてください。', ['lessons が空配列または未設定です'], identifiedCtx);
+    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0) {
+      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形）を入れてください。', ['lessons が空配列または未設定で、有効な定義形もありません', ...patternNotes], identifiedCtx);
     }
     const lessons: TeacherLesson[] = [];
-    for (const item of rawLessons) {
+    for (const item of Array.isArray(rawLessons) ? rawLessons : []) {
       const lesson = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : {};
       const id = typeof lesson.id === 'string' ? lesson.id.trim() : '';
       const title = typeof lesson.title === 'string' ? lesson.title.trim() : '';
@@ -399,14 +424,15 @@ class TeacherMaterialIntakeService {
       teacherName,
       subject,
       lessonCount: lessons.length,
+      definitionPatternCount,
       componentIds,
       references,
       receivedAt,
     };
     this.ledger.set(intakeId, record);
     this.save();
-    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length}`, { subject });
-    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件）。`, reasons: [], record: { ...record } };
+    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount}`, { subject });
+    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件）。`, reasons: [...patternNotes], record: { ...record } };
   }
 }
 
