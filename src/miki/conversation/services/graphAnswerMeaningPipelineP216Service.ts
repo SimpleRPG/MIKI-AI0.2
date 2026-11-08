@@ -1,6 +1,7 @@
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
+import { paraphraseService } from '../../memory/services/paraphraseService';
 
 export interface P216AnswerRequirements { inputSurface:string; intentIds:string[]; constraintIds:string[]; grammarIds:string[]; meaningComponentIds:string[]; contentTerms?:string[]; executionResult?:unknown }
 export interface P216MeaningPart { partId:string; kind:'CONCLUSION'|'ACTION'|'CONSTRAINT'|'CONTENT'|'EVIDENCE'|'LIMITATION'|'NEXT_STEP'; meaningId:string; required:boolean; text:string }
@@ -87,6 +88,12 @@ class GraphAnswerMeaningPipelineP216Service {
   const grammarInspection=surfaceGrammarAndStyleService.validateGrammarAndParticles(text);
   const grammarIssues=[...grammarInspection.conjugationIssues,...grammarInspection.particleIssues];
   text=grammarInspection.repairedText;
+  // P496: 言い換え（置換のみ・文末は変えない）を文ごとに適用する。
+  // この後の文法再検査と意味保存の判定は、言い換え後の文で
+  // 行われる（言い換えが意味を壊せば、このパイプライン自身の
+  // 検査で semanticPreservation が落ちて見える）。
+  const paraphrased=paraphraseService.restateProse(text);
+  if(paraphrased.changed)text=paraphrased.text;
   const grammarRecheck=surfaceGrammarAndStyleService.validateGrammarAndParticles(text);
   const remainingGrammarIssues=[...grammarRecheck.conjugationIssues,...grammarRecheck.particleIssues];
   missing=requiredIds.filter(id=>requiredTokens[id]&&!requiredTokens[id].test(text));

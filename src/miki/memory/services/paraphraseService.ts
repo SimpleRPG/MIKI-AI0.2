@@ -213,6 +213,33 @@ class ParaphraseService {
     systemLogger.info('SELF_IMPROVEMENT', `📖 [言い換え] 「${original.slice(0, 40)}」→「${out.slice(0, 40)}」`);
     return { text: out, changed: true, check };
   }
+
+  /**
+   * P496: 文章全体（回答文）への言い換え適用。文ごとに置換のみを
+   * 行い、文末の文体には触らない（口調は人格・文体サービスの領分）。
+   * コード・URL・記号を含む文は対象外。チェックを通らない文は
+   * 元のまま残るため、文章全体としては「安全な文だけ言い換わった」
+   * 状態になる。
+   */
+  public restateProse(textRaw: string): ParaphraseResult {
+    const original = textRaw || '';
+    if (!original.trim()) return { text: original, changed: false, check: { ok: true, reasons: [] } };
+    const sentences = original.split(/(?<=[。！？!?])\s*/u).filter((s) => s.length > 0);
+    let changed = false;
+    const out = sentences
+      .map((sentence) => {
+        if (sentence.trim().length < 8) return sentence;
+        if (/https?:\/\/|`|\{|\}|\[|\]/.test(sentence)) return sentence;
+        const r = this.restate(sentence, { style: 'plain' });
+        if (r.changed) {
+          changed = true;
+          return r.text;
+        }
+        return sentence;
+      })
+      .join('');
+    return { text: out, changed, check: { ok: true, reasons: [] } };
+  }
 }
 
 export const paraphraseService = new ParaphraseService();
