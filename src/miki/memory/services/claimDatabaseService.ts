@@ -27,12 +27,16 @@ const CLAIMS_STORAGE_KEY = 'miki_claim_db_v1';
  * クラスタの証拠が増えても二重計上にはならない）。
  */
 export const normalizeClaimStatementForDedup = (text: string): string =>
-  String(text || '')
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[\s　]+/g, ' ')
-    .replace(/[「」『』“”\"'、。！？!?]/g, '')
-    .trim();
+  // P491: NFKC で吸収できない表記ゆれ（サーバ／サーバー等）は
+  // 語彙ルールの VARIANT で正形に寄せてから同一性を判定する。
+  lexicalRelationService.foldVariants(
+    String(text || '')
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[\s　]+/g, ' ')
+      .replace(/[「」『』“”\"'、。！？!?]/g, '')
+      .trim(),
+  );
 
 const stableStringifyForScope = (value: unknown): string => {
   if (value === null || value === undefined) return 'null';

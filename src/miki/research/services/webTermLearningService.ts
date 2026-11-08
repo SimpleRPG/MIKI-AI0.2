@@ -1,5 +1,6 @@
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { japaneseDictionaryService } from './japaneseDictionaryService';
+import { unitConversionService } from '../../memory/services/unitConversionService';
 import {
   reusableComponentFactoryService,
   type KnowledgeComponentArtifact,
@@ -129,7 +130,16 @@ class WebTermLearningService {
     const ranked = [...extractCandidates(text)]
       .map(([term, occurrences]) => {
         const hits = japaneseDictionaryService.lookup(term);
-        return { term, occurrences, hit: hits[0] };
+        const hit = hits[0];
+        // P491: 単位の語は辞書に gloss が無くても、換算ルールから
+        // 意味（代表的な換算）を付けられる。
+        if (!hit?.gloss) {
+          const unitGloss = unitConversionService.glossForTerm(term);
+          if (unitGloss) {
+            return { term, occurrences, hit: { ...(hit || {}), gloss: unitGloss } as typeof hit };
+          }
+        }
+        return { term, occurrences, hit };
       })
       .sort((a, b) => {
         const glossDiff = Number(Boolean(b.hit?.gloss)) - Number(Boolean(a.hit?.gloss));

@@ -20,7 +20,7 @@ import { systemLogger } from '../../../services/systemLogger';
  * - teacher / manual: 将来の受け口（型だけ用意）。
  */
 
-export type LexicalRelationType = 'SYNONYM' | 'ANTONYM' | 'HYPERNYM';
+export type LexicalRelationType = 'SYNONYM' | 'ANTONYM' | 'HYPERNYM' | 'TRANSLATION' | 'ABBREVIATION' | 'FIELD' | 'VARIANT';
 export type LexicalRelationSource = 'seed' | 'wikidata' | 'teacher' | 'manual';
 
 export interface LexicalRelation {
@@ -33,6 +33,7 @@ export interface LexicalRelation {
 
 const RELATIONS_KEY = 'miki_lexical_relations_v1';
 const ATTEMPTS_KEY = 'miki_lexical_wikidata_attempts_v1';
+const SENSES_KEY = 'miki_lexical_senses_v1';
 const MAX_RELATIONS = 2000;
 const WIKIDATA_RETRY_MS = 7 * 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 3000;
@@ -69,8 +70,66 @@ const SEED_HYPERNYMS: Array<[string, string]> = [
   ['りんご', '果物'], ['ギター', '楽器'], ['ピアノ', '楽器'],
 ];
 
+// P491 日英対応の種: [日本語, 英語]。英語圏の出典と Marginalia に効く。
+const SEED_TRANSLATIONS: Array<[string, string]> = [
+  ['検索エンジン', 'search engine'], ['関数', 'function'], ['変数', 'variable'],
+  ['配列', 'array'], ['例外', 'exception'], ['非同期', 'asynchronous'],
+  ['型', 'type'], ['戻り値', 'return value'], ['認証', 'authentication'],
+  ['認可', 'authorization'], ['暗号化', 'encryption'], ['圧縮', 'compression'],
+  ['並行処理', 'concurrency'], ['期限', 'deadline'], ['在庫', 'inventory'],
+];
+
+// P491 略語の種: [略語, 正式名称]。
+const SEED_ABBREVIATIONS: Array<[string, string]> = [
+  ['api', 'application programming interface'], ['cpu', 'central processing unit'],
+  ['gpu', 'graphics processing unit'], ['ram', 'random access memory'],
+  ['url', 'uniform resource locator'], ['html', 'hypertext markup language'],
+  ['css', 'cascading style sheets'], ['json', 'javascript object notation'],
+  ['sql', 'structured query language'], ['sdk', 'software development kit'],
+  ['ui', 'user interface'], ['os', 'operating system'],
+  ['llm', 'large language model'], ['rag', 'retrieval augmented generation'],
+  ['ocr', 'optical character recognition'], ['vpn', 'virtual private network'],
+];
+
+// P491 分野の種: [語, 分野]。調査の組み立ての判断材料。
+const SEED_FIELDS: Array<[string, string]> = [
+  ['typescript', 'プログラミング'], ['javascript', 'プログラミング'],
+  ['python', 'プログラミング'], ['プログラミング言語', 'プログラミング'],
+  ['sqlite', 'プログラミング'], ['データベース', 'プログラミング'],
+  ['searxng', '情報検索'], ['検索エンジン', '情報検索'],
+  ['android', 'モバイル'], ['ギター', '音楽'], ['ピアノ', '音楽'],
+  ['楽器', '音楽'], ['犬', '動物'], ['猫', '動物'], ['哺乳類', '動物'],
+  ['りんご', '食'], ['果物', '食'],
+];
+
+// P491 表記ゆれの種: [正形, ゆれ]。foldVariants で ゆれ→正形 に寄せる。
+const SEED_VARIANTS: Array<[string, string]> = [
+  ['サーバー', 'サーバ'], ['ユーザー', 'ユーザ'], ['ブラウザー', 'ブラウザ'],
+  ['コンピューター', 'コンピュータ'], ['プリンター', 'プリンタ'],
+  ['モニター', 'モニタ'], ['フィルター', 'フィルタ'],
+  ['できる', '出来る'], ['ください', '下さい'], ['ありがとう', '有難う'],
+  ['すごい', '凄い'], ['わかる', '分かる'],
+];
+
 function normalizeTerm(term: string): string {
   return String(term || '').toLowerCase().trim();
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * P491: 意味の分岐（多義語）。同じ語に対する Wikidata の別項目が
+ * 別の意味に対応する。description と上位語が、文脈から意味を
+ * 選ぶための手がかり。
+ */
+export interface LexicalSense {
+  term: string;
+  entityId: string;
+  description: string;
+  enLabel?: string;
+  hypernyms: string[];
 }
 
 class LexicalRelationService {
@@ -79,6 +138,10 @@ class LexicalRelationService {
   private antonymMap = new Map<string, Set<string>>();
   private hypernymMap = new Map<string, Set<string>>(); // 下位 -> 上位
   private hyponymMap = new Map<string, Set<string>>(); // 上位 -> 下位
+  private translationMap = new Map<string, Set<string>>(); // 双方向
+  private abbreviationMap = new Map<string, Set<string>>(); // 双方向
+  private fieldMap = new Map<string, Set<string>>(); // 語 -> 分野
+  private senses: LexicalSense[] = [];
   private loaded = false;
 
   private load(): void {
@@ -98,9 +161,30 @@ class LexicalRelationService {
       for (const [a, b] of SEED_ANTONYMS) this.relations.push({ a, b, type: 'ANTONYM', source: 'seed', updatedAt: now });
       for (const [a, b] of SEED_SYNONYMS) this.relations.push({ a, b, type: 'SYNONYM', source: 'seed', updatedAt: now });
       for (const [a, b] of SEED_HYPERNYMS) this.relations.push({ a, b, type: 'HYPERNYM', source: 'seed', updatedAt: now });
+      for (const [a, b] of SEED_TRANSLATIONS) this.relations.push({ a, b, type: 'TRANSLATION', source: 'seed', updatedAt: now });
+      for (const [a, b] of SEED_ABBREVIATIONS) this.relations.push({ a, b, type: 'ABBREVIATION', source: 'seed', updatedAt: now });
+      for (const [a, b] of SEED_FIELDS) this.relations.push({ a, b, type: 'FIELD', source: 'seed', updatedAt: now });
+      for (const [a, b] of SEED_VARIANTS) this.relations.push({ a, b, type: 'VARIANT', source: 'seed', updatedAt: now });
       this.save();
     }
+    try {
+      const sensesRaw = storageService.getItem(SENSES_KEY);
+      const parsedSenses = sensesRaw ? JSON.parse(sensesRaw) : null;
+      if (Array.isArray(parsedSenses)) {
+        this.senses = parsedSenses.filter(
+          (s: any) => s && typeof s.term === 'string' && typeof s.entityId === 'string',
+        );
+      }
+    } catch { /* 意味分岐が読めなくても関係ストアは動く */ }
     this.rebuildIndex();
+  }
+
+  private saveSenses(): void {
+    try {
+      storageService.setItem(SENSES_KEY, JSON.stringify(this.senses.slice(-500)));
+    } catch (e) {
+      systemLogger.warn('PERSISTENCE', 'Failed to save lexical senses', e);
+    }
   }
 
   private save(): void {
@@ -116,6 +200,9 @@ class LexicalRelationService {
     this.antonymMap.clear();
     this.hypernymMap.clear();
     this.hyponymMap.clear();
+    this.translationMap.clear();
+    this.abbreviationMap.clear();
+    this.fieldMap.clear();
     const link = (map: Map<string, Set<string>>, from: string, to: string) => {
       if (!map.has(from)) map.set(from, new Set());
       map.get(from)!.add(to);
@@ -127,10 +214,19 @@ class LexicalRelationService {
       } else if (rel.type === 'ANTONYM') {
         link(this.antonymMap, rel.a, rel.b);
         link(this.antonymMap, rel.b, rel.a);
-      } else {
+      } else if (rel.type === 'TRANSLATION') {
+        link(this.translationMap, rel.a, rel.b);
+        link(this.translationMap, rel.b, rel.a);
+      } else if (rel.type === 'ABBREVIATION') {
+        link(this.abbreviationMap, rel.a, rel.b);
+        link(this.abbreviationMap, rel.b, rel.a);
+      } else if (rel.type === 'FIELD') {
+        link(this.fieldMap, rel.a, rel.b);
+      } else if (rel.type === 'HYPERNYM') {
         link(this.hypernymMap, rel.a, rel.b);
         link(this.hyponymMap, rel.b, rel.a);
       }
+      // VARIANT は foldVariants が関係リストから直接読む。
     }
   }
 
@@ -139,9 +235,10 @@ class LexicalRelationService {
     const a = normalizeTerm(aRaw);
     const b = normalizeTerm(bRaw);
     if (!a || !b || a === b) return false;
+    const directional = type === 'HYPERNYM' || type === 'FIELD';
     const exists = this.relations.some((r) =>
       r.type === type &&
-      (type === 'HYPERNYM'
+      (directional
         ? r.a === a && r.b === b
         : (r.a === a && r.b === b) || (r.a === b && r.b === a)),
     );
@@ -211,6 +308,183 @@ class LexicalRelationService {
     return this.relations.filter((r) => r.type === 'HYPERNYM').map((r) => [r.a, r.b] as [string, string]);
   }
 
+  // ----------------------------------------------------------------
+  // P491: 日英対応・略語・分野・表記ゆれ・意味分岐
+  // ----------------------------------------------------------------
+
+  public translationsOf(termRaw: string): string[] {
+    this.load();
+    return [...(this.translationMap.get(normalizeTerm(termRaw)) || [])];
+  }
+
+  /** 略語⇔正式名称のもう一方を返す。 */
+  public expansionsOf(termRaw: string): string[] {
+    this.load();
+    return [...(this.abbreviationMap.get(normalizeTerm(termRaw)) || [])];
+  }
+
+  /** 語の分野。上位語に付いた分野も継承する。 */
+  public fieldsOf(termRaw: string): string[] {
+    this.load();
+    const term = normalizeTerm(termRaw);
+    const found = new Set<string>(this.fieldMap.get(term) || []);
+    for (const hyper of this.hypernymsOf(term)) {
+      for (const field of this.fieldMap.get(hyper) || []) found.add(field);
+    }
+    return [...found];
+  }
+
+  /** テキスト中に現れる語の分野を集める。 */
+  public fieldsOfText(textRaw: string): string[] {
+    this.load();
+    const text = String(textRaw || '').toLowerCase();
+    const found = new Set<string>();
+    for (const term of this.fieldMap.keys()) {
+      if (term && text.includes(term)) {
+        for (const field of this.fieldsOf(term)) found.add(field);
+      }
+    }
+    return [...found];
+  }
+
+  private variantOfPairs(
+    pairs: Array<[string, string]>,
+    textRaw: string,
+    caseInsensitive = false,
+  ): string | undefined {
+    const text = String(textRaw || '');
+    if (!text) return undefined;
+    const sorted = [...pairs].sort((x, y) => Math.max(y[0].length, y[1].length) - Math.max(x[0].length, x[1].length));
+    for (const [a, b] of sorted) {
+      for (const [from, to] of [[a, b], [b, a]] as Array<[string, string]>) {
+        if (caseInsensitive) {
+          const idx = text.toLowerCase().indexOf(from.toLowerCase());
+          if (idx >= 0) {
+            const variant = text.slice(0, idx) + to + text.slice(idx + from.length);
+            if (variant !== text) return variant;
+          }
+        } else if (text.includes(from)) {
+          const variant = text.replace(from, to);
+          if (variant !== text) return variant;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * テキスト中の語を1つだけ英語（または日本語）対応語に置き換えた
+   * 文を返す。多義語は文脈で意味を選んで、その意味の英語ラベルを
+   * 優先する。
+   */
+  public translationVariantOf(textRaw: string): string | undefined {
+    this.load();
+    const text = String(textRaw || '');
+    const pairs = this.relations
+      .filter((r) => r.type === 'TRANSLATION')
+      .map((r) => [r.a, r.b] as [string, string])
+      .sort((x, y) => Math.max(y[0].length, y[1].length) - Math.max(x[0].length, x[1].length));
+    for (const [a, b] of pairs) {
+      // a は日本語側の想定。多義語なら意味に合った enLabel を使う。
+      if (text.includes(a)) {
+        const senses = this.sensesOf(a);
+        if (senses.length > 1) {
+          const sense = this.disambiguate(a, text);
+          if (sense?.enLabel) {
+            const variant = text.replace(a, sense.enLabel);
+            if (variant !== text) return variant;
+          }
+        }
+        const variant = text.replace(a, b);
+        if (variant !== text) return variant;
+      }
+      if (text.includes(b)) {
+        const variant = text.replace(b, a);
+        if (variant !== text) return variant;
+      }
+    }
+    return undefined;
+  }
+
+  /** テキスト中の略語（または正式名称）をもう一方に置き換えた文。 */
+  public abbreviationVariantOf(textRaw: string): string | undefined {
+    this.load();
+    const pairs = this.relations
+      .filter((r) => r.type === 'ABBREVIATION')
+      .map((r) => [r.a, r.b] as [string, string]);
+    return this.variantOfPairs(pairs, textRaw, true);
+  }
+
+  /**
+   * 表記ゆれを正形に寄せる（サーバ→サーバー 等）。正形が ゆれ+
+   * 残り、という形の場合は、既に正形の箇所を二重化しないよう
+   * 後読みで守る。
+   */
+  public foldVariants(textRaw: string): string {
+    this.load();
+    let text = String(textRaw || '');
+    const pairs = this.relations
+      .filter((r) => r.type === 'VARIANT')
+      .sort((x, y) => y.b.length - x.b.length);
+    for (const rel of pairs) {
+      const canonical = rel.a;
+      const variant = rel.b;
+      if (!variant || canonical === variant) continue;
+      if (canonical.startsWith(variant)) {
+        const rest = canonical.slice(variant.length);
+        const re = new RegExp(escapeRegExp(variant) + '(?!' + escapeRegExp(rest) + ')', 'g');
+        text = text.replace(re, canonical);
+      } else {
+        text = text.split(variant).join(canonical);
+      }
+    }
+    return text;
+  }
+
+  public sensesOf(termRaw: string): LexicalSense[] {
+    this.load();
+    const term = normalizeTerm(termRaw);
+    return this.senses.filter((s) => s.term === term);
+  }
+
+  /**
+   * 文脈に最も合う意味を選ぶ。意味の手がかり（説明文・上位語・
+   * 英語ラベル）の語が文脈にどれだけ現れるかで決める。同点や
+   * 手がかり無しでは選ばない（undefined）。
+   */
+  public disambiguate(termRaw: string, contextRaw: string): LexicalSense | undefined {
+    const senses = this.sensesOf(termRaw);
+    if (senses.length === 0) return undefined;
+    if (senses.length === 1) return senses[0];
+    const context = String(contextRaw || '').toLowerCase();
+    const tokensOf = (text: string): string[] => {
+      const found: string[] = [];
+      for (const m of String(text || '').toLowerCase().matchAll(/[a-z0-9]{2,}|[一-龯]{2,}|[ぁ-んァ-ヶ]{2,}/g)) {
+        found.push(m[0]);
+      }
+      return found;
+    };
+    const contextTokens = new Set(tokensOf(context));
+    let best: LexicalSense | undefined;
+    let bestScore = 0;
+    let tied = false;
+    for (const sense of senses) {
+      const clueText = [sense.description, ...(sense.hypernyms || []), sense.enLabel || ''].join(' ');
+      let score = 0;
+      for (const token of new Set(tokensOf(clueText))) {
+        if (contextTokens.has(token) || context.includes(token)) score++;
+      }
+      if (score > bestScore) {
+        best = sense;
+        bestScore = score;
+        tied = false;
+      } else if (score === bestScore && score > 0) {
+        tied = true;
+      }
+    }
+    return bestScore > 0 && !tied ? best : undefined;
+  }
+
   /**
    * テキスト中に現れる同義語を1つだけ counterpart に置き換えた
    * 文を返す（クエリの言い換え用）。長い語を優先し、置き換えが
@@ -234,14 +508,24 @@ class LexicalRelationService {
     return undefined;
   }
 
-  public counts(): { total: number; synonym: number; antonym: number; hypernym: number; wikidata: number } {
+  public counts(): {
+    total: number; synonym: number; antonym: number; hypernym: number; wikidata: number;
+    translation: number; abbreviation: number; field: number; variant: number; polysemousTerms: number;
+  } {
     this.load();
+    const senseCounts = new Map<string, number>();
+    for (const sense of this.senses) senseCounts.set(sense.term, (senseCounts.get(sense.term) || 0) + 1);
     return {
       total: this.relations.length,
       synonym: this.relations.filter((r) => r.type === 'SYNONYM').length,
       antonym: this.relations.filter((r) => r.type === 'ANTONYM').length,
       hypernym: this.relations.filter((r) => r.type === 'HYPERNYM').length,
       wikidata: this.relations.filter((r) => r.source === 'wikidata').length,
+      translation: this.relations.filter((r) => r.type === 'TRANSLATION').length,
+      abbreviation: this.relations.filter((r) => r.type === 'ABBREVIATION').length,
+      field: this.relations.filter((r) => r.type === 'FIELD').length,
+      variant: this.relations.filter((r) => r.type === 'VARIANT').length,
+      polysemousTerms: [...senseCounts.values()].filter((n) => n > 1).length,
     };
   }
 
@@ -257,9 +541,11 @@ class LexicalRelationService {
 
   /**
    * Wikidata の公開 API から、1語分の辞書的な語関係を引いて
-   * ストアに足す。別名=同義、P461=反対、P279/P31=上位。
-   * 失敗しても例外は投げない。同じ語は7日間引き直さない
-   * （共有基盤への配慮と無駄撃ち防止）。
+   * ストアに足す。別名=同義、P461=反対、P279/P31=上位、
+   * 英語ラベル=日英対応、P1813（短い名前）=略語。
+   * P491: 検索は上位3件まで取り、別項目は「意味の分岐」として
+   * 記録する（多義語）。失敗しても例外は投げない。同じ語は
+   * 7日間引き直さない（共有基盤への配慮と無駄撃ち防止）。
    */
   public async learnFromWikidata(termRaw: string): Promise<number> {
     const term = normalizeTerm(termRaw);
@@ -288,14 +574,21 @@ class LexicalRelationService {
         if (!res.ok) return null;
         return res.json();
       };
+      const claimTargetIds = (claims: any, prop: string): string[] =>
+        (claims?.[prop] || [])
+          .map((c: any) => c?.mainsnak?.datavalue?.value?.id)
+          .filter(Boolean)
+          .map(String);
 
       const search = await callApi({
-        action: 'wbsearchentities', search: term, language: 'ja', uselang: 'ja', type: 'item', limit: '1',
+        action: 'wbsearchentities', search: term, language: 'ja', uselang: 'ja', type: 'item', limit: '3',
       });
-      const hit = Array.isArray(search?.search) ? search.search[0] : null;
-      if (!hit?.id) return 0;
+      const hits = (Array.isArray(search?.search) ? search.search : []).filter((h: any) => h?.id);
+      if (hits.length === 0) return 0;
+      const main = hits[0];
+      const hitIds = hits.map((h: any) => String(h.id));
 
-      const aliases = Array.isArray(hit.aliases) ? hit.aliases : [];
+      const aliases = Array.isArray(main.aliases) ? main.aliases : [];
       for (const alias of aliases.slice(0, 8)) {
         const aliasText = String(alias || '').trim();
         if (aliasText.length >= 2 && aliasText.length <= 20 && normalizeTerm(aliasText) !== term) {
@@ -303,28 +596,84 @@ class LexicalRelationService {
         }
       }
 
-      const entityData = await callApi({ action: 'wbgetentities', ids: hit.id, props: 'claims' });
-      const claims = entityData?.entities?.[hit.id]?.claims || {};
-      const targetIds = new Map<string, LexicalRelationType>();
-      for (const id of (claims.P461 || []).map((c: any) => c?.mainsnak?.datavalue?.value?.id).filter(Boolean)) {
-        targetIds.set(String(id), 'ANTONYM');
+      // 全ヒットのラベル（日英）: 主項目の英語ラベルは日英対応に、
+      // 各ヒットの英語ラベルは意味分岐の手がかりになる。
+      const entityLabels = await callApi({
+        action: 'wbgetentities', ids: hitIds.join('|'), props: 'labels', languages: 'ja|en',
+      });
+      const enLabelOf = (id: string): string | undefined => {
+        const value = entityLabels?.entities?.[id]?.labels?.en?.value;
+        return typeof value === 'string' && value.trim().length >= 2 ? value.trim() : undefined;
+      };
+      const mainEn = enLabelOf(String(main.id));
+      if (mainEn && normalizeTerm(mainEn) !== term) {
+        if (this.addRelation(term, mainEn, 'TRANSLATION', 'wikidata')) added++;
       }
-      for (const prop of ['P279', 'P31']) {
-        for (const id of (claims[prop] || []).map((c: any) => c?.mainsnak?.datavalue?.value?.id).filter(Boolean)) {
-          if (!targetIds.has(String(id))) targetIds.set(String(id), 'HYPERNYM');
+
+      // 全ヒットの claims を一括で取る。
+      const claimsData = await callApi({ action: 'wbgetentities', ids: hitIds.join('|'), props: 'claims' });
+      const claimsOf = (id: string): any => claimsData?.entities?.[id]?.claims || {};
+      const mainClaims = claimsOf(String(main.id));
+
+      // 略語（P1813 短い名前）は主項目から。
+      for (const entry of (mainClaims.P1813 || [])) {
+        const value = entry?.mainsnak?.datavalue?.value;
+        if (value && typeof value.text === 'string' && value.text.trim().length >= 2) {
+          if (this.addRelation(value.text, term, 'ABBREVIATION', 'wikidata')) added++;
         }
       }
+
+      // 関係の行き先（反対・上位）の日本語ラベルを一括で引く。
+      const targetIds = new Set<string>();
+      for (const id of hitIds) {
+        const claims = claimsOf(id);
+        for (const id2 of claimTargetIds(claims, 'P461')) targetIds.add(id2);
+        for (const id2 of claimTargetIds(claims, 'P279')) targetIds.add(id2);
+        for (const id2 of claimTargetIds(claims, 'P31')) targetIds.add(id2);
+      }
+      const labelOf = new Map<string, string>();
       if (targetIds.size > 0) {
         const labels = await callApi({
-          action: 'wbgetentities', ids: [...targetIds.keys()].join('|'), props: 'labels', languages: 'ja',
+          action: 'wbgetentities', ids: [...targetIds].join('|'), props: 'labels', languages: 'ja',
         });
-        for (const [id, type] of targetIds) {
+        for (const id of targetIds) {
           const label = labels?.entities?.[id]?.labels?.ja?.value;
-          if (typeof label === 'string' && label.trim().length >= 2) {
-            if (this.addRelation(term, label, type, 'wikidata')) added++;
-          }
+          if (typeof label === 'string' && label.trim().length >= 2) labelOf.set(id, label.trim());
         }
       }
+
+      // 主項目の反対・上位は語レベルのルールとして登録する。
+      for (const id of claimTargetIds(mainClaims, 'P461')) {
+        const label = labelOf.get(id);
+        if (label && this.addRelation(term, label, 'ANTONYM', 'wikidata')) added++;
+      }
+      for (const prop of ['P279', 'P31']) {
+        for (const id of claimTargetIds(mainClaims, prop)) {
+          const label = labelOf.get(id);
+          if (label && this.addRelation(term, label, 'HYPERNYM', 'wikidata')) added++;
+        }
+      }
+
+      // 意味の分岐: ヒット全件を意味として記録する（既存は飛ばす）。
+      let sensesChanged = false;
+      for (const hit of hits) {
+        const entityId = String(hit.id);
+        if (this.senses.some((s) => s.term === term && s.entityId === entityId)) continue;
+        const claims = claimsOf(entityId);
+        const hypernymLabels = [...claimTargetIds(claims, 'P279'), ...claimTargetIds(claims, 'P31')]
+          .map((id) => labelOf.get(id))
+          .filter((v): v is string => Boolean(v));
+        this.senses.push({
+          term,
+          entityId,
+          description: String(hit.description || ''),
+          enLabel: enLabelOf(entityId),
+          hypernyms: hypernymLabels,
+        });
+        sensesChanged = true;
+      }
+      if (sensesChanged) this.saveSenses();
+
       if (added > 0) {
         systemLogger.info('SELF_IMPROVEMENT', `📚 [語彙ルール] Wikidataから「${term}」の語関係を${added}件学習（累計${this.relations.length}件）`);
       }

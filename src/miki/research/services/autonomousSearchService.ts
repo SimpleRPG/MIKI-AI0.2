@@ -8,6 +8,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { getSearxngSearchSettings, buildSearxngSearchUrl } from './searxngSettingsService';
 import { sourceTrustBonus } from './sourceTrustService';
+import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
 import { workingAgendaService } from '../../strategy/services/workingAgendaService';
 import { selfImprovementService } from '../../improvement/services/selfImprovementService';
@@ -1307,7 +1308,13 @@ export class AutonomousSearchService {
       try {
         const apiUrl = readSupplementalApiUrl('miki_marginalia_api_url', 'https://api2.marginalia-search.com/search');
         const url = new URL(apiUrl);
-        url.searchParams.set('query', safeQuery);
+        // P491: Marginalia のインデックスは英語圏中心のため、
+        // 日英対応が分かる語は英語に置き換えたクエリで投げる。
+        const marginaliaQuery = lexicalRelationService.translationVariantOf(safeQuery) ?? safeQuery;
+        if (marginaliaQuery !== safeQuery) {
+          systemLogger.info('SELF_IMPROVEMENT', `🌐 [Marginalia] 英語クエリで発射: ${marginaliaQuery}`);
+        }
+        url.searchParams.set('query', marginaliaQuery);
         url.searchParams.set('count', String(maxResults));
         const res = await fetch(url.toString(), {
           signal: AbortSignal.timeout(SUPPLEMENTAL_PROVIDER_TIMEOUT_MS),
