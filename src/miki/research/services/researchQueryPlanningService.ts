@@ -74,13 +74,29 @@ export function isLongResearchIntent(text:string):boolean{const n=normalize(text
  * はずの「彼女への指示」と「内部の診断情報」を、長さとは別に分類する。
  */
 const BRIEF_OR_DUMP_MARKERS=['必要な証拠を調査する','対象主張を支持する','整合性を確認できる出典','unresolvedComponentMetadata','registryStatus','background-cycle-review','syntaxTemplate','inputKinds','outputKinds'];
-export function isBriefOrDiagnosticText(text:string):boolean{const n=normalize(text);return BRIEF_OR_DUMP_MARKERS.some(marker=>n.includes(marker))||/(?:^|\s)componentId\s/.test(n)||/対象主張[:：]/.test(n);}
+export function isBriefOrDiagnosticText(text:string):boolean{const n=normalize(text);const lower=n.toLowerCase();return BRIEF_OR_DUMP_MARKERS.some(marker=>lower.includes(marker.toLowerCase()))||/(?:^|\s)componentId\s/i.test(n)||/対象主張[:：]/.test(n);}
 const INTERNAL_QUERY_TOKENS=new Set(['componentid','registrystatus','unresolvedcomponentmetadata','syntaxtemplate','inputkinds','outputkinds','kind','slots','call','background-cycle-review','code','component','research','missing','meaning']);
-const INTERNAL_ID_PATTERN=/^(?:[A-Z]{2,4}-[A-Za-z0-9][A-Za-z0-9-]{3,}|bg_[A-Za-z0-9_]+)$/;
+// P487: 大文字小文字を問わない。gap の identity は正規化で小文字化
+// されるため、大文字前提だと rc-knowledge-… のような小文字IDが
+// 「人間の語」に化けて意味学習へ流れてしまう（検証で発見）。
+const INTERNAL_ID_PATTERN=/^(?:[A-Z]{2,4}-[A-Za-z0-9][A-Za-z0-9-]{3,}|bg_[A-Za-z0-9_]+)$/i;
 const JP_BRIEF_STOP_SEGMENTS=new Set(['対象主張','矛盾する主張','調査キーワード','裏付け','解消','支持','整合性','出典','優先','矛盾','証拠','主張','調査','検索','確認','対象','必要']);
 // P486: 形態素境界で止め語が割れる（裏付け→裏付＋け、調査キーワード→
 // 調査＋キーワード）ため、完全一致ではなく相互包含で判定する。
 const isJpBriefStop=(segment:string):boolean=>{for(const stop of JP_BRIEF_STOP_SEGMENTS){if(stop===segment||stop.includes(segment)||segment.includes(stop))return true;}return false;};
+/*
+ * P487: 文から「人間の主題の語」だけを抜く。内部トークン・内部ID・
+ * 指示語彙を除いた残りが、意味を学ぶ価値のある語。主題を理解
+ * できなかった調査を意味学習へ回すときの材料取りに使う。
+ */
+export function extractHumanSubjectTerms(text:string):string[]{
+ const normalized=normalize(text);
+ const terms:string[]=[];
+ const push=(value:string)=>{const term=normalize(value);if(term&&!terms.includes(term))terms.push(term);};
+ for(const m of normalized.matchAll(/[A-Za-z][A-Za-z0-9_$.-]{2,}/g)){const token=m[0];if(!QUERY_TERM_STOPWORDS.has(token.toLowerCase())&&!INTERNAL_QUERY_TOKENS.has(token.toLowerCase())&&!INTERNAL_ID_PATTERN.test(token))push(token);if(terms.length>=14)break;}
+ for(const m of normalized.matchAll(/[ァ-ヶー]{2,}|[一-龠々]{2,}/g)){if(!JP_TERM_STOP_SEGMENTS.has(m[0])&&!isJpBriefStop(m[0]))push(m[0]);if(terms.length>=22)break;}
+ return terms.slice(0,8);
+}
 export function buildShortResearchQuery(text:string,focus?:GapFocusMaterialInput):string{
  const normalized=normalize(text);
  if(!normalized)return '';

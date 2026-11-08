@@ -13,7 +13,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { sourcePageGraphService } from './sourcePageGraphService';
 import { contentTermsFromTokens } from './japaneseAnalysisService';
 import { japaneseAnalysisCompositionService } from '../../conversation/services/japaneseAnalysisCompositionService';
-import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIntent, isBriefOrDiagnosticText } from './researchQueryPlanningService';
+import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIntent, isBriefOrDiagnosticText, extractHumanSubjectTerms } from './researchQueryPlanningService';
 import type { GapFocusMaterialInput, ResearchQueryExclusion, IndependentEvidenceFocus } from './researchQueryPlanningService';
 import { storageService } from '../../../services/storageService';
 import { collectionSourceRegistryService } from '../../core/services/collectionSourceRegistryService';
@@ -228,6 +228,38 @@ export class ResearchService {
    * URL は最大10件に限定する。除外後に0件なら除外を緩める
    * フォールバックは入れず、ログで様子を見る。
    */
+  // P487: 主題を理解できなかった調査を、意味の学習へつなぐ。内部
+  // 情報だけの文（診断ダンプ・内部ID）には学ぶべき人間の主題が
+  // 無いので回さない。人間の語が残っている場合は、その語の意味を
+  // 学ぶ gap（UNKNOWN_TERM）を立て、意味が分かった後の再調査で
+  // 主題を組み直せるようにする。detect は同一クエリを統合する
+  // ので、同じ未理解が繰り返されても gap は溜まらない。
+  private routeUnunderstoodSubjectToMeaningLearning(gap: KnowledgeGap, baseQuery: string): void {
+    try {
+      // 材料は baseQuery だけでなく、gap の対象・不足内容と、ダンプ内
+      // の meaning 値からも取る。組み立て段が主題として読めなかった
+      // 場所にこそ、人間の語が残っていることがある（逆に内部IDは
+      // 抽出側で落ちるため、内部情報だけの文はここでも空になる）。
+      const meaningValues = [...baseQuery.matchAll(/(?:meaning|意味)[:：]?\s+([^\s。]{2,60})/g)]
+        .map(m => m[1])
+        .join(' ');
+      const source = [baseQuery, gap.identity?.target ?? '', gap.identity?.missingContent ?? '', meaningValues].join(' ');
+      const terms = extractHumanSubjectTerms(source);
+      if (terms.length === 0) return;
+      knowledgeGapService.detect({
+        query: `用語の意味を学ぶ: ${terms.slice(0, 3).join(' ')}`,
+        reason: `調査の主題を理解できなかったため、検索の前に主題の語の意味を学ぶ。元の問い: ${baseQuery.slice(0, 120)}`,
+        type: 'UNKNOWN_TERM',
+        target: terms[0],
+        priority: Math.max(40, Math.min(90, (gap.priority ?? 50) - 5)),
+        sourceRequestId: gap.sourceRequestId,
+      });
+      systemLogger.info('SELF_IMPROVEMENT', `🧭 [主題理解] 主題の語（${terms.slice(0, 3).join('／')}）の意味を学ぶ gap を立てました`);
+    } catch {
+      // 意味学習への接続は補助経路。失敗しても調査自体は止めない。
+    }
+  }
+
   private buildSourceExclusion(claimIds: string[]): ResearchQueryExclusion {
     const hosts = new Set<string>();
     const urls = new Set<string>();
@@ -710,6 +742,10 @@ export class ResearchService {
         // ときに再び調べられる。
         if (!passQuery.trim()) {
           subjectUnresolved = true;
+          // P487: 止めて終わりにしない。人間の語が残っているなら、
+          // その語の意味を学ぶ gap へ回し、意味が分かった後の
+          // 再調査で主題を組めるようにする。
+          this.routeUnunderstoodSubjectToMeaningLearning(gap, baseQuery);
           systemLogger.info('SELF_IMPROVEMENT', '🧭 [主題理解] 検索の主題を特定できなかったため、この調査では検索しません');
           break;
         }
