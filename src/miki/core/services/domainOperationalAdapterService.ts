@@ -14,6 +14,7 @@ import { resourceGovernanceService } from '../../safety/services/resourceGoverna
 import { mikiCognitiveVitalsService } from '../../selfAwareness/services/mikiCognitiveVitalsService';
 import { autonomousSearchService } from '../../research/services/autonomousSearchService';
 import { runtimeLogReviewService } from '../../selfAwareness/services/runtimeLogReviewService';
+import { knowledgeSelfInspectionService } from '../../selfAwareness/services/knowledgeSelfInspectionService';
 import { codebaseReflectionService } from '../../selfDevelopment/services/codebaseReflectionService';
 import { planOrchestratorService } from '../../strategy/services/planOrchestratorService';
 import { unknownResolutionService } from '../../unknown/services/unknownResolutionService';
@@ -75,7 +76,7 @@ class DomainOperationalAdapterService {
           // P488: 検索の自己診断（P485）と、自分のログの自己レビュー
           // （P488）も同じスナップショットに載せる。記録した結論を
           // 運用の読み手（自己モデル・画面）が実際に読めるように。
-          return snapshot(domain,'autonomousSearchService',{config:unifiedWebResearchService.getConfig(),stats:unifiedWebResearchService.getStats(),recent:unifiedWebResearchService.getRecentRecords(20),selfDiagnosis:autonomousSearchService.getSearchSelfDiagnosis(),lastSelfReview:runtimeLogReviewService.latestReview(),lexicalRelations:lexicalRelationService.counts()});
+          return snapshot(domain,'autonomousSearchService',{config:unifiedWebResearchService.getConfig(),stats:unifiedWebResearchService.getStats(),recent:unifiedWebResearchService.getRecentRecords(20),selfDiagnosis:autonomousSearchService.getSearchSelfDiagnosis(),lastSelfReview:runtimeLogReviewService.latestReview(),lastSelfInspection:knowledgeSelfInspectionService.latest(),lexicalRelations:lexicalRelationService.counts()});
         case 'safety':
           return snapshot(domain,'resourceGovernanceService',{resources:resourceGovernanceService.getSnapshot()});
         case 'selfAwareness':

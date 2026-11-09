@@ -11,6 +11,7 @@ import { coreCycleSettingsService } from './coreCycleSettingsService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { runtimeLogReviewService } from '../../selfAwareness/services/runtimeLogReviewService';
+import { knowledgeSelfInspectionService } from '../../selfAwareness/services/knowledgeSelfInspectionService';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -182,6 +183,7 @@ class AutonomousSelfImprovementLoopService {
   // たびに判定し、30分に1回だけ回す）。
   private lastWorldModelGrowthAt = 0;
   private lastLogSelfReviewAt = 0;
+  private lastKnowledgeSelfInspectionAt = 0;
   private lastDigestSignature = '';
   private lastLoadDroppedInvalid = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -240,6 +242,8 @@ class AutonomousSelfImprovementLoopService {
     this.maybeRunWorldModelGrowth();
     // P488: 自分のログの自己レビューも同じ理由でここに置く。
     this.maybeRunLogSelfReview();
+    // P501: 知識・語彙の自己点検も同じ場所で、間引きして回す。
+    this.maybeRunKnowledgeSelfInspection();
     const duplicate = this.state.queue.find(item =>
       item.trigger === trigger &&
       item.source === source &&
@@ -611,6 +615,22 @@ class AutonomousSelfImprovementLoopService {
       runtimeLogReviewService.review(60);
     } catch (error) {
       systemLogger.warn('SELF_IMPROVEMENT', `[P488] ログの自己レビューに失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * P501: 知識と語彙の自己点検を12時間に1回までで回す。台帳の
+   * 変化は遅いため、ログレビューより間隔を広く取る。失敗して
+   * もループ本体は止めない。
+   */
+  private maybeRunKnowledgeSelfInspection(): void {
+    const now = Date.now();
+    if (now - this.lastKnowledgeSelfInspectionAt < 12 * 60 * 60_000) return;
+    this.lastKnowledgeSelfInspectionAt = now;
+    try {
+      knowledgeSelfInspectionService.inspect();
+    } catch (error) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[P501] 知識・語彙の自己点検に失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
