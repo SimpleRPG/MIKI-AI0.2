@@ -216,6 +216,18 @@ class ConversationGraphRuntimeP212Service {
  }
  // P511: プロジェクトの決め事の想起。プロジェクト名がノートに無い
  // 質問（「政府の方針は？」等）では undefined を返して通常経路に委ねる。
+ // P555: 作業状態（今の作業・次の手）の想起。相方として「今何を
+ // 作ってるの？」に答えるための入口。
+ private selfInquiryWorkStateAnswer(value:string):string|undefined {
+  const project=projectNotebookService.findProjectInText(value);
+  if(!project)return undefined;
+  const state=projectNotebookService.getWorkState(project);
+  if(!state||(!state.current&&!state.next))return `${project}の作業状態は、まだ聞いていません。`;
+  const parts:string[]=[];
+  if(state.current)parts.push(`今は「${state.current}」に取り組んでいます`);
+  if(state.next)parts.push(`次は「${state.next}」の予定です`);
+  return `${project}の作業状態：${parts.join('。')}。`;
+ }
  private selfInquiryProjectAnswer(rawProject:string):string|undefined {
   const name=rawProject.replace(/^(この|その|あの)/u,'').trim();
   const project=projectNotebookService.findProject(name);
@@ -307,6 +319,10 @@ class ConversationGraphRuntimeP212Service {
   }
   if(/(?:知らない|分からない)(?:言葉|単語)|知らない(?:言葉|単語)/u.test(value)){
    return this.selfInquiryUserKnowledgeAnswer();
+  }
+  if(/(?:今|現在)(?:何|なに)を(?:作って|して)|(?:今|現在)の作業|次の作業|次は(?:何|なに)|進捗/u.test(value)){
+   const workAnswer=this.selfInquiryWorkStateAnswer(value);
+   if(workAnswer)return workAnswer;
   }
   const projectAspectAnswer=this.selfInquiryProjectAspectAnswer(value,semantic?.terms??[]);
   if(projectAspectAnswer)return projectAspectAnswer;

@@ -40,6 +40,8 @@ export interface RoleplaySession {
   notedTerms?: string[];
   // P536: 場面進行の歩数（何ターン会話したかの数え）。
   sceneBeats?: number;
+  // P554: 弱い終了信号を検出した歩数。3歩以内にもう一度来たら終了が確定する。
+  pendingEndBeat?: number;
 }
 
 const ROLES_KEY = 'miki_roleplay_roles_v1';
@@ -255,11 +257,29 @@ export class RoleplaySessionService {
   public handleUserText(text: string, personaId: string): 'started' | 'ended' | undefined {
     const source = String(text || '');
     if (!source.trim()) return undefined;
-    if (/なりチャ(?:終わり|おわり|終了|おしまい)|役を(?:終わり|おわり|終了|やめ)|なりきり(?:終わり|終了)|(?:普通|元)に(?:戻って|もどって)/.test(source)) {
+    // P554: 終了の誤爆対策。強い信号（なりチャそのものへの明示の終了
+    // 指示）は即終了。弱い信号（「元に戻って」「役をやめる」）は役の
+    // 中の台詞にも出うるので、1回では終わらせず、3歩以内にもう一度
+    // 来たときだけ確定する。
+    if (/なりチャ(?:終わり|おわり|終了|おしまい)|役を(?:終わり|おわり|終了|やめて)|なりきり(?:終わり|終了)/.test(source)) {
       if (this.isActive()) {
         this.endSession();
         return 'ended';
       }
+      return undefined;
+    }
+    if (/役を(?:やめる|やめたい|やめよう|やめます)|(?:普通|元)に(?:戻って|もどって)/.test(source)) {
+      const session = this.loadSession();
+      if (!session) return undefined;
+      const beats = session.sceneBeats || 0;
+      if (session.pendingEndBeat !== undefined && beats - session.pendingEndBeat <= 3) {
+        this.endSession();
+        return 'ended';
+      }
+      session.pendingEndBeat = beats;
+      this.session = session;
+      this.persistSession();
+      systemLogger.info('CHAT', '🎭 [なりチャ] 弱い終了信号を検出しました。もう一度で終了します。');
       return undefined;
     }
     const startMatch =

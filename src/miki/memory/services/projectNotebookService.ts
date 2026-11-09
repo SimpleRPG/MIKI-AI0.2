@@ -23,7 +23,16 @@ export interface ProjectDecision {
   createdAt: number;
 }
 
+/** P555: プロジェクトごとの作業状態（今取り組んでいるもの・次の手）。 */
+export interface ProjectWorkState {
+  project: string;
+  current?: string;
+  next?: string;
+  updatedAt: number;
+}
+
 const STORAGE_KEY = 'miki_project_notebook_v1';
+const WORK_STATE_KEY = 'miki_project_work_state_v1';
 
 const SEED_DECISIONS: ReadonlyArray<{ project: string; text: string }> = [
   { project: 'EFR', text: 'マップは表示しない（難易度が下がるため）。' },
@@ -46,6 +55,7 @@ const normalizeText = (value: string): string => value.replace(/\s+/g, ' ').trim
 export class ProjectNotebookService {
   private static instance: ProjectNotebookService;
   private decisions: ProjectDecision[] | null = null;
+  private workStates: ProjectWorkState[] | null = null;
 
   private constructor() {}
 
@@ -135,6 +145,8 @@ export class ProjectNotebookService {
   public intakeFromUserText(text: string): ProjectDecision | undefined {
     const source = String(text || '');
     if (!source.trim()) return undefined;
+    // P555: 作業状態の発言（「今〜を作ってる」「次は〜を作る」）も拾う。
+    try { this.intakeWorkStateFromUserText(source); } catch { /* best-effort */ }
     if (/[？?]\s*$/.test(source.trim()) || /教えて|聞かせて/.test(source)) return undefined;
     if (!/決め(た|る|ました|よう)|ことにし(た|ます|よう|よ)|決定(した|する|しました)/.test(source)) return undefined;
     const project = this.findProjectInText(source);
@@ -149,6 +161,84 @@ export class ProjectNotebookService {
       return undefined;
     }
     return this.addDecision(project, sentence, 'user');
+  }
+
+  // ---- P555: 作業状態（今の作業・次の手） ----
+
+  private loadWorkStates(): ProjectWorkState[] {
+    if (this.workStates) return this.workStates;
+    let loaded: ProjectWorkState[] = [];
+    try {
+      const raw = storageService.getItem(WORK_STATE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ProjectWorkState[];
+        if (Array.isArray(parsed)) loaded = parsed.filter((s) => s && typeof s.project === 'string');
+      }
+    } catch {
+      loaded = [];
+    }
+    this.workStates = loaded;
+    return this.workStates;
+  }
+
+  private persistWorkStates(): void {
+    try {
+      storageService.setItem(WORK_STATE_KEY, JSON.stringify(this.workStates ?? []));
+    } catch { /* 保存は補助経路 */ }
+  }
+
+  public getWorkState(project: string): ProjectWorkState | undefined {
+    const canonical = this.findProject(project) ?? project;
+    return this.loadWorkStates().find((s) => s.project === canonical);
+  }
+
+  public listWorkStates(): ProjectWorkState[] {
+    return [...this.loadWorkStates()];
+  }
+
+  public setWorkState(project: string, patch: { current?: string; next?: string }): ProjectWorkState | undefined {
+    const canonical = this.findProject(project);
+    if (!canonical) return undefined;
+    const states = this.loadWorkStates();
+    let state = states.find((s) => s.project === canonical);
+    if (!state) {
+      state = { project: canonical, updatedAt: Date.now() };
+      states.push(state);
+    }
+    if (patch.current) state.current = patch.current;
+    if (patch.next) state.next = patch.next;
+    state.updatedAt = Date.now();
+    this.persistWorkStates();
+    systemLogger.info('SYSTEM', `📓 [作業状態] ${canonical}： 今「${state.current ?? '—'}」／次「${state.next ?? '—'}」`);
+    return state;
+  }
+
+  /**
+   * P555: 作業の進み具合の発言を取り込む。プロジェクト名があり、
+   * 「今〜を作ってる／実装中」「次は〜を作る」の形で、意味チェック
+   * （P546）を通った文だけを作業状態として残す。
+   */
+  private intakeWorkStateFromUserText(text: string): void {
+    const project = this.findProjectInText(text);
+    if (!project) return;
+    const sentences = String(text || '').split(/(?<=。)/).map((s) => s.trim()).filter(Boolean);
+    for (const sentence of sentences.length > 0 ? sentences : [String(text || '').trim()]) {
+      if (!sentence) continue;
+      const currentMatch = sentence.match(/今(?:は|、)?(.{2,24}?)(?:を作って(?:い)?る|を実装して(?:い)?る|を作成中|を実装中|の実装中|の作成中)/);
+      const nextMatch = sentence.match(/次(?:は|に)(.{2,24}?)(?:を作る|を実装する|をやる|に取り組む)/);
+      if (!currentMatch && !nextMatch) continue;
+      if (!intakeMeaningGuardService.check(sentence).ok) continue;
+      const patch: { current?: string; next?: string } = {};
+      if (currentMatch) patch.current = this.cleanWorkItem(currentMatch[1], project);
+      if (nextMatch) patch.next = this.cleanWorkItem(nextMatch[1], project);
+      if (patch.current || patch.next) this.setWorkState(project, patch);
+    }
+  }
+
+  private cleanWorkItem(raw: string, project: string): string {
+    let v = String(raw || '').trim().replace(/^[はの、,]+/, '');
+    if (v.startsWith(project)) v = v.slice(project.length).replace(/^の/, '');
+    return v.replace(/の$/, '').trim();
   }
 
   public listDecisions(project?: string): ProjectDecision[] {
