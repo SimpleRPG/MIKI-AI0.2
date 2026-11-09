@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 37636,
-      "lines": 374,
-      "sha256": "c157b5be0d46dcf638dc735917acfc089a587e90bbb5a67827467ffabd8d72a4",
+      "bytes": 38435,
+      "lines": 383,
+      "sha256": "8d061e46cdf2c1e0d616e9f562e45f02854b2d44101393ac978c7296d3983b7b",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -28638,9 +28638,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/stateSnapshotExportService.ts",
-      "bytes": 6326,
-      "lines": 132,
-      "sha256": "6e1e31a35487f1a327e0e79f05df557a82ba705dc808129b763e6875bf8a8110",
+      "bytes": 6628,
+      "lines": 136,
+      "sha256": "8ab28ae7d700837318774f2f47b0f9cfec7e5d28553a2c381163fe4773e149a3",
       "relativeImportCandidates": [
         {
           "line": 1,

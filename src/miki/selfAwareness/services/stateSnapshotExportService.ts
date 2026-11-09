@@ -61,6 +61,8 @@ class StateSnapshotExportService {
     const projects = projectNotebookService.listProjects().map((project) => ({
       project,
       decisions: projectNotebookService.listDecisions(project).map((d) => d.text),
+      // P560: 作業状態（今の作業・次の手）も監査対象に含める。
+      workState: projectNotebookService.getWorkState(project) ?? null,
     }));
     let selfInspection: unknown = null;
     try {
@@ -87,6 +89,8 @@ class StateSnapshotExportService {
       roles: roleplaySessionService.listRoles().map((r) => ({ name: r.name, stance: r.stance, world: r.world, lastSummary: r.lastSummary || '' })),
       reflections: reviewReflectionService.list().map((r) => ({ question: r.question, answer: r.answer })),
       openTopic: conversationOpenTopicService.current(),
+      // P560: P553 でリスト化された開いた話題を全部含める。
+      openTopics: conversationOpenTopicService.listPending(),
       userKnowledge: {
         known: userKnowledgeProfileService.listKnown(),
         unknown: userKnowledgeProfileService.listUnknown(),

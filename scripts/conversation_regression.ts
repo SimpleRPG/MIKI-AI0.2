@@ -358,6 +358,15 @@ const bibiApology = await conversationCoreService.execute({ prompt: 'ごめん�
 check('P559 ビービーの受け止めはタメ口になる', String((bibiApology as any).replyText || '').includes('大丈夫') && !String((bibiApology as any).replyText || '').includes('くださいね') && !String((bibiApology as any).replyText || '').includes('ですよ'), String((bibiApology as any).replyText || '').slice(0, 140));
 personaProfileService.switchProfile('persona-default');
 
+// ---- スナップショットの拡充（P560） ----
+conversationOpenTopicService.record('残したい話題', 3);
+conversationGraphRuntimeP212Service.ingestInput('regression-p560', '状態を書き出して');
+conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p560');
+const snapshotRaw2 = storageService.getItem('miki_state_snapshot_v1');
+let snapshotJson2 = '';
+try { snapshotJson2 = String((JSON.parse(String(snapshotRaw2)) as any).json || ''); } catch { /* 検証側で失敗させる */ }
+check('P560 スナップショットに作業状態と話題リストが入る', snapshotJson2.includes('workState') && snapshotJson2.includes('当たり判定') && snapshotJson2.includes('openTopics') && snapshotJson2.includes('残したい話題'), snapshotJson2.slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
