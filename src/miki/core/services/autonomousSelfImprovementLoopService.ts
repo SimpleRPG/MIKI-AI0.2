@@ -13,6 +13,8 @@ import { worldModelGraphService } from '../../selfAwareness/services/worldModelG
 import { runtimeLogReviewService } from '../../selfAwareness/services/runtimeLogReviewService';
 import { knowledgeSelfInspectionService } from '../../selfAwareness/services/knowledgeSelfInspectionService';
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { associationGraphService } from '../../memory/services/associationGraphService';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -639,6 +641,23 @@ class AutonomousSelfImprovementLoopService {
       reviewReflectionService.runIfDue();
     } catch (error) {
       systemLogger.warn('SELF_IMPROVEMENT', `[P537] 振り返りの問いに失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    // P540: 台帳のアーカイブ整理。世界モデルの関係から参照されて
+    // いる Claim は保護して、棚へは移さない。
+    try {
+      const referenced = new Set<string>();
+      for (const rel of worldModelGraphService.relations()) {
+        for (const id of (rel as { sourceClaimIds?: string[] }).sourceClaimIds || []) referenced.add(id);
+      }
+      claimDatabaseService.archiveStaleClaims({ referencedClaimIds: referenced });
+    } catch (error) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[P540] 台帳のアーカイブ整理に失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    // P541: 連想グラフの作り直し（24時間に1回まではサービス側）。
+    try {
+      associationGraphService.rebuildIfDue();
+    } catch (error) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[P541] 連想グラフの作り直しに失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

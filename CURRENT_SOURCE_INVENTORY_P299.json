@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1789,
-    "sourceFileCount": 1342,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1253,
-    "relativeImportCandidateCount": 3922,
-    "resolvedRelativeImportCandidateCount": 3906,
+    "trackedPathCountExcludingControlPaths": 1790,
+    "sourceFileCount": 1343,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1254,
+    "relativeImportCandidateCount": 3930,
+    "resolvedRelativeImportCandidateCount": 3914,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 12406,
-      "lines": 158,
-      "sha256": "e3175fb5274a2c1e4cdf8d65910b2ca1d86de7a8d94566ebf279668843ff2051",
+      "bytes": 14694,
+      "lines": 178,
+      "sha256": "50144f2351171b5aa88d28d192264084d76be05f232a217a4db08c6a5ac97328",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -1713,10 +1713,16 @@
           "specifier": "../src/miki/selfAwareness/services/worldModelCanvasExportService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/worldModelCanvasExportService.ts"
+        },
+        {
+          "line": 32,
+          "specifier": "../src/miki/memory/services/associationGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/associationGraphService.ts"
         }
       ],
-      "relativeImportCandidateCount": 13,
-      "resolvedRelativeImportCount": 13,
+      "relativeImportCandidateCount": 14,
+      "resolvedRelativeImportCount": 14,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -11307,9 +11313,9 @@
     },
     {
       "path": "src/miki/conversation/services/paragraphCompositionService.ts",
-      "bytes": 17503,
-      "lines": 369,
-      "sha256": "18666d173159af1dbd0d585f386f9d64c185c9e50c2cf4e957c90c3de86e5208",
+      "bytes": 18905,
+      "lines": 398,
+      "sha256": "2f26b2e98503c10ac65350ae4179084aaa1ffe31d7269c9ff5135631c1574afe",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -11325,25 +11331,31 @@
         },
         {
           "line": 3,
+          "specifier": "../../memory/services/associationGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/associationGraphService.ts"
+        },
+        {
+          "line": 4,
           "specifier": "./roleplaySessionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/roleplaySessionService.ts"
         },
         {
-          "line": 4,
+          "line": 5,
           "specifier": "../../../services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
         },
         {
-          "line": 5,
+          "line": 6,
           "specifier": "../../../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         }
       ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
+      "relativeImportCandidateCount": 6,
+      "resolvedRelativeImportCount": 6,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -13007,9 +13019,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousSelfImprovementLoopService.ts",
-      "bytes": 89056,
-      "lines": 1732,
-      "sha256": "302967aa0589a72b1bb88bdeae6e48c4458dd01b617961df90609c3c524619fa",
+      "bytes": 90256,
+      "lines": 1751,
+      "sha256": "64b4cab4e6aecff925b16233fe920f0ee7cf7cb412ff3aa507522a00316f2753",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -13100,10 +13112,22 @@
           "specifier": "../../selfAwareness/services/reviewReflectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/reviewReflectionService.ts"
+        },
+        {
+          "line": 16,
+          "specifier": "../../memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 17,
+          "specifier": "../../memory/services/associationGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/associationGraphService.ts"
         }
       ],
-      "relativeImportCandidateCount": 15,
-      "resolvedRelativeImportCount": 15,
+      "relativeImportCandidateCount": 17,
+      "resolvedRelativeImportCount": 17,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -23932,6 +23956,41 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/memory/services/associationGraphService.ts",
+      "bytes": 5274,
+      "lines": 131,
+      "sha256": "3802eb3aea5526d91f960e453f3d41aaeac3f9486e917505579eba545b47a107",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "./claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "../../selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/memory/services/causalMemoryLedgerService.ts",
       "bytes": 2868,
       "lines": 21,
@@ -23956,9 +24015,9 @@
     },
     {
       "path": "src/miki/memory/services/claimDatabaseService.ts",
-      "bytes": 66399,
-      "lines": 1493,
-      "sha256": "afdaccf36c3d7ed773a9ad60b0805850659a267d5face57254400d470b73533e",
+      "bytes": 69914,
+      "lines": 1566,
+      "sha256": "8d0b1466db6c1941008d06f6ac26ef91207397f38addaad16bbfe06794d4433d",
       "relativeImportCandidates": [
         {
           "line": 10,

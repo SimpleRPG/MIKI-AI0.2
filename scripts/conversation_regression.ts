@@ -29,6 +29,7 @@ const { roleplaySessionService} = await import('../src/miki/conversation/service
 const { classifyDialogueAct } = await import('../src/miki/conversation/services/conversationStateService');
 const { reviewReflectionService } = await import('../src/miki/selfAwareness/services/reviewReflectionService');
 const { worldModelCanvasExportService } = await import('../src/miki/selfAwareness/services/worldModelCanvasExportService');
+const { associationGraphService } = await import('../src/miki/memory/services/associationGraphService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -141,6 +142,25 @@ conversationFactIntakeService.intakeFromUserText('生徒と九九の練習もし
 roleplaySessionService.endSession();
 const saved = roleplaySessionService.listRoles().find((r) => r.roleId === role.roleId);
 check('P523 あらすじが自動で残る', Boolean(saved?.lastSummary && saved.lastSummary.includes('練習')), String(saved?.lastSummary));
+
+// ---- 台帳アーカイブ（P540） ----
+const staleClaim = claimDatabaseService.registerClaim({ statement: 'アーカイブ棚照合キーXYZの記録です', world: 'REAL', kind: 'FACT', status: 'UNVERIFIED', source: 'regression' } as any);
+(staleClaim as any).updated_at = Date.now() - 100 * 24 * 60 * 60_000;
+const freshClaim = claimDatabaseService.registerClaim({ statement: 'アーカイブされない新しい知識です', world: 'REAL', kind: 'FACT', status: 'UNVERIFIED', source: 'regression' } as any);
+const arch1 = claimDatabaseService.archiveStaleClaims({});
+check('P540 古い未検証Claimが棚へ移る', arch1.archived >= 1 && claimDatabaseService.listArchivedClaims().some((c) => c.claim_id === staleClaim.claim_id), JSON.stringify(arch1));
+check('P540 新しいClaimは棚へ移らない', !claimDatabaseService.listArchivedClaims().some((c) => c.claim_id === freshClaim.claim_id), '');
+const shelfMatch = claimDatabaseService.findBestMatchingClaim('アーカイブ棚照合キーXYZについて教えて');
+check('P540 棚からも二段で照合できる', Boolean(shelfMatch.hasMatch && shelfMatch.bestClaim?.claim_id === staleClaim.claim_id && shelfMatch.scopeNotes.some((n) => n.includes('アーカイブ棚'))), JSON.stringify(shelfMatch.scopeNotes));
+
+// ---- 連想グラフ（P541） ----
+worldModelGraphService.addRelation({ fromName: '連想鳥', toName: '連想虫', type: 'USED_FOR', provisional: true } as any);
+claimDatabaseService.registerClaim({ statement: '連想鳥は連想虫と一緒に暮らしています', world: 'REAL', kind: 'FACT', status: 'UNVERIFIED', source: 'regression' } as any);
+associationGraphService.rebuild();
+const assocList = associationGraphService.associations('連想鳥', 3);
+check('P541 共起から連想ができる', assocList.some((a) => a.name === '連想虫'), JSON.stringify(assocList));
+const assocSupp = paragraphCompositionService.buildSupplements({ subjectTerms: ['連想鳥'], supportingClaims: [], excludeText: 'テスト' });
+check('P541 連想は思い出します形式でのみ出る', assocSupp.some((s) => s.includes('連想虫のことも思い出します')), JSON.stringify(assocSupp));
 
 // ---- 結果 ----
 let fail = 0;

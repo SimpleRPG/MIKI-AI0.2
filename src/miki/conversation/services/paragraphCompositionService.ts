@@ -1,5 +1,6 @@
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { associationGraphService } from '../../memory/services/associationGraphService';
 import { roleplaySessionService } from './roleplaySessionService';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
@@ -30,7 +31,7 @@ import { systemLogger } from '../../../services/systemLogger';
  * 中で育つほど、段落の顔ぶれは変わっていく。
  */
 
-type MaterialType = 'RELATION' | 'CLAIM' | 'ANALOGY';
+type MaterialType = 'RELATION' | 'CLAIM' | 'ANALOGY' | 'ASSOCIATION';
 
 interface MaterialCandidate {
   type: MaterialType;
@@ -128,11 +129,39 @@ class ParagraphCompositionService {
       }
     }
 
+    // ASSOCIATION (P541): 連想グラフからの緩い連想。事実では
+    // なく「思い出す」こととしてだけ出す。適合は最低に置き、
+    // 確かな材料があるときはそちらが優先される。
+    if (terms.length > 0) {
+      try {
+        associationGraphService.ensureBuilt();
+        for (const term of terms) {
+          for (const assoc of associationGraphService.associations(term, 2)) {
+            if (terms.includes(assoc.name)) continue;
+            addCandidate({
+              type: 'ASSOCIATION',
+              key: `assoc:${term}|${assoc.name}`,
+              text: `${term}の話をすると、${assoc.name}のことも思い出します。`,
+              fit: 1.2,
+            });
+          }
+        }
+      } catch {
+        /* 連想が読めなければ他の材料だけにする */
+      }
+    }
+
     if (candidates.length === 0) return [];
+
+    // P541: 連想は「確かな材料が届かない場所」のための広さ。
+    // 事実の材料（関係・Claim・類推）が1つでもあるときは連想を
+    // 候補から外す。新しさボーナスで事実を押しのけないように。
+    const hasFactual = candidates.some((c) => c.type !== 'ASSOCIATION');
+    const pool = hasFactual ? candidates.filter((c) => c.type !== 'ASSOCIATION') : candidates;
 
     // P529: 適合＋新しさで採点し、種類の多様さを少し優遇して2文まで選ぶ
     const usage = this.loadUsage();
-    const scored = candidates
+    const scored = pool
       .map((c) => ({ c, score: c.fit + this.noveltyScore(c.key, usage) }))
       .sort((a, b) => b.score - a.score);
     const picked: MaterialCandidate[] = [];

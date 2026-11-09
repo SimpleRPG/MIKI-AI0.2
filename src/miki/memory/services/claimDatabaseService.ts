@@ -608,12 +608,66 @@ export class ClaimDatabaseService {
    * せず、「弱い矛盾」として suppressedReason 付きで返す。信号は捨てず、
    * 呼び出し側がログに残す。kind が異なる場合も同様に弱い矛盾扱いにする。
    */
+  /**
+   * P540: 台帳のアーカイブ棚（適応的忘却）。消さずに archived
+   * フラグで別棚へ移す。対象は (1) 信念状態または検証状態が
+   * SUPERSEDED のものと QUARANTINED、(2) UNVERIFIED のまま
+   * 90 日更新がなく、世界モデルの関係から参照されていないもの。
+   * 照合（findBestMatchingClaim）は現役を先に見て、見つから
+   * なければ棚まで探す二段構え。矛盾検出は棚を対象にしない。
+   */
+  public archiveStaleClaims(opts?: { referencedClaimIds?: Set<string>; now?: number }): { archived: number; active: number; shelf: number } {
+    const now = opts?.now ?? Date.now();
+    const STALE_MS = 90 * 24 * 60 * 60_000;
+    let archived = 0;
+    for (const claim of this.claims.values()) {
+      const rec = claim as ClaimRecord & { archived?: boolean; archived_at?: number; updated_at?: number; beliefStatus?: string };
+      if (rec.archived) continue;
+      const terminal = claim.status === 'SUPERSEDED' || rec.beliefStatus === 'SUPERSEDED' || rec.beliefStatus === 'QUARANTINED';
+      const stale = claim.status === 'UNVERIFIED'
+        && typeof rec.updated_at === 'number'
+        && now - rec.updated_at > STALE_MS
+        && !(opts?.referencedClaimIds?.has(claim.claim_id));
+      if (terminal || stale) {
+        rec.archived = true;
+        rec.archived_at = now;
+        archived++;
+      }
+    }
+    if (archived > 0) {
+      this.saveToStorage();
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🗄️ [台帳整理] ${archived} 件をアーカイブ棚へ移しました（現役 ${this.activeClaimCount()} 件・棚 ${this.archivedClaimCount()} 件）`
+      );
+    }
+    return { archived, active: this.activeClaimCount(), shelf: this.archivedClaimCount() };
+  }
+
+  public activeClaimCount(): number {
+    let n = 0;
+    for (const c of this.claims.values()) if (!(c as ClaimRecord & { archived?: boolean }).archived) n++;
+    return n;
+  }
+
+  public archivedClaimCount(): number {
+    let n = 0;
+    for (const c of this.claims.values()) if ((c as ClaimRecord & { archived?: boolean }).archived) n++;
+    return n;
+  }
+
+  public listArchivedClaims(): ClaimRecord[] {
+    return Array.from(this.claims.values()).filter((c) => (c as ClaimRecord & { archived?: boolean }).archived);
+  }
+
   public detectContradictions(candidate: ClaimRecord): Array<{ claim: ClaimRecord; matchedPair: string; suppressedReason?: string }> {
     const contradictoryList: Array<{ claim: ClaimRecord; matchedPair: string; suppressedReason?: string }> = [];
     const candStmt = candidate.statement.toLowerCase();
 
     for (const [, existing] of this.claims) {
       if (existing.status === 'SUPERSEDED' || existing.status === 'FALSE') continue;
+      // P540: アーカイブ棚の主張は矛盾検出の対象にしない。
+      if ((existing as ClaimRecord & { archived?: boolean }).archived) continue;
 
       // 創作世界と現実世界は矛盾とみなさず共存可能 (世界区分チェック)
       if (candidate.world !== existing.world) {
@@ -1011,8 +1065,23 @@ export class ClaimDatabaseService {
   /**
    * 自然言語の問いかけから主張DB内の最適な主張を照合・抽出
    * 設計思想指示書 第3章 ルートB / 第6章 / 第7章
+   * P540: 現役の棚で見つからなければアーカイブ棚まで探す。
    */
-  public findBestMatchingClaim(query: string): {
+  public findBestMatchingClaim(query: string): ReturnType<ClaimDatabaseService['findBestMatchingClaimInPool']> {
+    const primary = this.findBestMatchingClaimInPool(query, false);
+    if (primary.hasMatch) return primary;
+    let hasShelf = false;
+    for (const c of this.claims.values()) if ((c as ClaimRecord & { archived?: boolean }).archived) { hasShelf = true; break; }
+    if (hasShelf) {
+      const shelf = this.findBestMatchingClaimInPool(query, true);
+      if (shelf.hasMatch) {
+        return { ...shelf, scopeNotes: [...shelf.scopeNotes, 'アーカイブ棚の主張から回答しています'] };
+      }
+    }
+    return primary;
+  }
+
+  private findBestMatchingClaimInPool(query: string, includeArchived: boolean): {
     hasMatch: boolean;
     bestClaim?: ClaimRecord;
     supportingClaims: ClaimRecord[];
@@ -1028,6 +1097,10 @@ export class ClaimDatabaseService {
     const activeClaims = Array.from(this.claims.values()).filter(
       (c) => c.status !== 'SUPERSEDED' && c.status !== 'FALSE'
         && (c as ClaimRecord & {beliefStatus?:BeliefRevisionStatus}).beliefStatus !== 'QUARANTINED'
+        // P540: 照合プールは現役のみ／棚のみを切り替える。
+        && (includeArchived
+          ? (c as ClaimRecord & {archived?: boolean}).archived === true
+          : !(c as ClaimRecord & {archived?: boolean}).archived)
     );
 
     // P527: 照合語の用意。従来はクエリを句読点・空白で割るだけで、
