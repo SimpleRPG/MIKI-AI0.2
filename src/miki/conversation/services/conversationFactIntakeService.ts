@@ -2,6 +2,8 @@ import type { MemoryItem } from '../../../types';
 import { enrichMemoryMetadata } from '../../../utils/memoryRetrieval';
 import { scopedVersionedMemoryService } from '../../memory/services/scopedVersionedMemoryService';
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
+import { roleplaySessionService } from './roleplaySessionService';
+import { personaProfileService } from './personaProfileService';
 
 /**
  * P452: 会話の理解の土台 ― ユーザー発言からの事実取り込み。
@@ -448,6 +450,15 @@ export class ConversationFactIntakeService {
    * 保存自体は呼び出し側（App の setMemories / storage）が担う。
    */
   public intakeFromUserText(text: string, existingMemories: MemoryItem[]): FactIntakeResult {
+    // P514: なりチャの開始・終了と、セッション中の創作分離。
+    // 演じている間の発言は創作であり、本人の現実の事実として
+    // 取り込まない。開始・終了の指示文自体も事実にしない。
+    try {
+      const signal = roleplaySessionService.handleUserText(text, personaProfileService.get().profileId);
+      if (signal || roleplaySessionService.isActive()) {
+        return { added: [], updatedMemories: existingMemories, replaced: 0, invalidated: 0 };
+      }
+    } catch { /* ゲートの失敗で通常の取り込みは止めない */ }
     // P513: プロジェクトの決め事らしい発言はプロジェクトノートにも
     // 取り込む。失敗しても事実取り込み自体は止めない。
     try {
