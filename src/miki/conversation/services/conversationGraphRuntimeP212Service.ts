@@ -256,7 +256,7 @@ class ConversationGraphRuntimeP212Service {
  }
  private selfInquiryCanvasExportAnswer():string {
   const result=worldModelCanvasExportService.exportNow();
-  return `世界モデルを JSON Canvas 形式で書き出しました（実体 ${result.nodes} 件・関係 ${result.edges} 件）。Obsidian などで開ける .canvas の中身として、自分の保存領域に置いてあります。`;
+  return `世界モデルを JSON Canvas 形式で書き出しました（実体 ${result.nodes} 件・関係 ${result.edges} 件）。ダウンロードフォルダの MIKI_RUNTIME_LOG.txt の末尾にも、区切り印つきで同じ内容を書き出してあります。`;
  }
  private selfInquiryRoleAnswer():string|undefined {
   const session=roleplaySessionService.getSession();

@@ -66,6 +66,16 @@ class WorldModelCanvasExportService {
       storageService.setItem(STORAGE_KEY, JSON.stringify(record));
     } catch { /* 保存は補助経路 */ }
     systemLogger.info('SELF_IMPROVEMENT', `📤 [世界モデル書き出し] 実体${built.nodes}・関係${built.edges} を JSON Canvas 形式で書き出しました`);
+    // P539: 保存領域の中だけでは人の目に触れない。ランタイムログ
+    // （ダウンロードフォルダの MIKI_RUNTIME_LOG.txt）にも、区切り
+    // 印つきの完全な形で書き出す。ログが上がってくれば、こちらで
+    // .canvas ファイルとして取り出せる。
+    try {
+      const iso = new Date(record.exportedAt).toISOString();
+      systemLogger.appendRawBlockToRuntimeLog(
+        `\n===== MIKI WORLD MODEL CANVAS (JSON Canvas 1.0) exportedAt=${iso} =====\n${built.json}\n===== END MIKI WORLD MODEL CANVAS =====\n`,
+      );
+    } catch { /* ログへの書き出しは補助経路 */ }
     return record;
   }
 

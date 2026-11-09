@@ -374,6 +374,33 @@ class SystemLogger {
     }
   }
 
+  /**
+   * P539: 整形済みのテキストブロックを、そのままの形でランタイム
+   * ログファイルへ追記する（世界モデルの JSON Canvas 書き出し等、
+   * 「ファイルとして人の目に触れる」必要がある成果物用）。ログの
+   * 1行形式に整形されると壊れる内容のための経路で、呼び出し側が
+   * 区切り印まで含めた完全なブロックを渡す。失敗しても本処理は
+   * 止めない。
+   */
+  public appendRawBlockToRuntimeLog(block: string): void {
+    if (typeof window === 'undefined' || !block) return;
+    const text = block.endsWith('\n') ? block : `${block}\n`;
+    this.runtimeLogFileQueue = this.runtimeLogFileQueue
+      .catch(() => undefined)
+      .then(async () => {
+        const ready = await this.initializeRuntimeLogFile();
+        if (!ready || !this.runtimeLogFileInitialized || !this.runtimeLogFilePlugin) return;
+        try {
+          await this.runtimeLogFilePlugin.appendRuntimeLog({
+            filename: RUNTIME_LOG_FILE_NAME,
+            line: text,
+          });
+        } catch (error) {
+          console.warn('[SystemLogger] raw block append failed', error);
+        }
+      });
+  }
+
   private queueRuntimeLogFile(entry: SystemLogEntry): void {
     if (typeof window === 'undefined') {
       return;

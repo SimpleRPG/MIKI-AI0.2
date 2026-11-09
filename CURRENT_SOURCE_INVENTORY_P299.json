@@ -10551,9 +10551,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 33093,
+      "bytes": 33127,
       "lines": 382,
-      "sha256": "c769bc2a4fb76bc3218e805743aa863d9949d4ad5fb87ccc05a39a7c3286ee29",
+      "sha256": "7b5345b5c86dbf3e31454a719db24e31f7d4202b1df2dd4b9e0ecf60338c858a",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -28420,9 +28420,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/worldModelCanvasExportService.ts",
-      "bytes": 3158,
-      "lines": 84,
-      "sha256": "c6b6558cf9dc8b8f0cf8b425204393c314ff0f1f45a1fd73da3480d16e10e202",
+      "bytes": 3818,
+      "lines": 94,
+      "sha256": "61e6dad8a1eea3c248197692a7a0c73085bb8660ccaa257109e07baf1c9f15cc",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -37622,9 +37622,9 @@
     },
     {
       "path": "src/services/systemLogger.ts",
-      "bytes": 43021,
-      "lines": 1060,
-      "sha256": "a4424eba6438eb283a6dcdcd1844be30fd630a848e6dee29b5ab436e35269f2d",
+      "bytes": 44247,
+      "lines": 1087,
+      "sha256": "66d04a151189f7b481874dc37e26a4aa8439f91f327293b8aff8af5913a5e140",
       "relativeImportCandidates": [
         {
           "line": 1,
