@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1794,
     "sourceFileCount": 1347,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1258,
-    "relativeImportCandidateCount": 3969,
-    "resolvedRelativeImportCandidateCount": 3953,
+    "relativeImportCandidateCount": 3970,
+    "resolvedRelativeImportCandidateCount": 3954,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 38435,
-      "lines": 383,
-      "sha256": "8d061e46cdf2c1e0d616e9f562e45f02854b2d44101393ac978c7296d3983b7b",
+      "bytes": 40057,
+      "lines": 401,
+      "sha256": "04522a42b8ea50ea0d1e5d170e033898c114826f37bdaf12acb1c10a8e3bc817",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -10623,9 +10623,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 36037,
-      "lines": 417,
-      "sha256": "f534ffb1e612c4d60c149fc66e6809798f14ab575d4854ad98a75afa2a67da6e",
+      "bytes": 36942,
+      "lines": 429,
+      "sha256": "e761cb8304ca945153e69f37ea98356a95366b733f3fb347fbf87373e72fbff2",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10725,85 +10725,91 @@
         },
         {
           "line": 17,
+          "specifier": "../../selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 18,
           "specifier": "./conversationLanguageComponentGraphP213Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationLanguageComponentGraphP213Service.ts"
         },
         {
-          "line": 18,
+          "line": 19,
           "specifier": "./conversationGraphCompletionP214Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationGraphCompletionP214Service.ts"
         },
         {
-          "line": 19,
+          "line": 20,
           "specifier": "./conversationGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationGraphConnectorP211Service.ts"
         },
         {
-          "line": 20,
+          "line": 21,
           "specifier": "../../research/services/researchGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchGraphConnectorP211Service.ts"
         },
         {
-          "line": 21,
+          "line": 22,
           "specifier": "../../unknown/services/unknownGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/unknown/services/unknownGraphConnectorP211Service.ts"
         },
         {
-          "line": 22,
+          "line": 23,
           "specifier": "../../experience/services/experienceGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/experience/services/experienceGraphConnectorP211Service.ts"
         },
         {
-          "line": 23,
+          "line": 24,
           "specifier": "../../verification/services/verificationGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verificationGraphConnectorP211Service.ts"
         },
         {
-          "line": 24,
+          "line": 25,
           "specifier": "../../core/services/crossDomainGraphConnectionP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/crossDomainGraphConnectionP211Service.ts"
         },
         {
-          "line": 25,
+          "line": 26,
           "specifier": "./userCommunicationPreferenceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/userCommunicationPreferenceService.ts"
         },
         {
-          "line": 26,
+          "line": 27,
           "specifier": "./surfaceVariationGrowthService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/surfaceVariationGrowthService.ts"
         },
         {
-          "line": 27,
+          "line": 28,
           "specifier": "../../research/services/webMaterialPatternExtractor",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webMaterialPatternExtractor.ts"
         },
         {
-          "line": 28,
+          "line": 29,
           "specifier": "./surfaceVariationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/surfaceVariationService.ts"
         },
         {
-          "line": 29,
+          "line": 30,
           "specifier": "../../memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         }
       ],
-      "relativeImportCandidateCount": 29,
-      "resolvedRelativeImportCount": 29,
+      "relativeImportCandidateCount": 30,
+      "resolvedRelativeImportCount": 30,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -24818,9 +24824,9 @@
     },
     {
       "path": "src/miki/memory/services/projectNotebookService.ts",
-      "bytes": 11976,
-      "lines": 273,
-      "sha256": "8f550b06de5aed8686142a71b75c281eaf765d09ab1cc015c6408d6dd995d70e",
+      "bytes": 13146,
+      "lines": 295,
+      "sha256": "a958b6f747b674c93c1eb8fc60348ff8eefce97372d89f5cfe4824b88125ae6b",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27095,9 +27101,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 74232,
-      "lines": 1282,
-      "sha256": "2454fe3d27b05a69c636e4c4144c5d7d2f9094fb46d55b788a6ffdee8ad0507f",
+      "bytes": 75290,
+      "lines": 1305,
+      "sha256": "889f831325cca1b7512136f42096fa0fb719b6376cc6a2c52e3d7fa3ea2b3137",
       "relativeImportCandidates": [
         {
           "line": 1,

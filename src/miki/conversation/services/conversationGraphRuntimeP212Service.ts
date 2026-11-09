@@ -14,6 +14,7 @@ import { reviewReflectionService } from '../../selfAwareness/services/reviewRefl
 import { userKnowledgeProfileService } from './userKnowledgeProfileService';
 import { worldModelCanvasExportService } from '../../selfAwareness/services/worldModelCanvasExportService';
 import { stateSnapshotExportService } from '../../selfAwareness/services/stateSnapshotExportService';
+import { knowledgeSelfInspectionService } from '../../selfAwareness/services/knowledgeSelfInspectionService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -216,6 +217,14 @@ class ConversationGraphRuntimeP212Service {
  }
  // P511: プロジェクトの決め事の想起。プロジェクト名がノートに無い
  // 質問（「政府の方針は？」等）では undefined を返して通常経路に委ねる。
+ // P562: 自分の知識・語彙の自己点検を、その場で実行して結果を答える。
+ // 点検は自律ループでも回るが、会話で頼まれたら今の状態で答える。
+ private selfInquirySelfInspectionAnswer():string {
+  const record=knowledgeSelfInspectionService.inspect();
+  const findings=record.findings??[];
+  if(findings.length===0)return '自分の知識と語彙を点検しました。今のところ、大きな穴は見つかりませんでした。';
+  return `自分の知識と語彙を点検しました。気になるところが${findings.length}件あります。\n`+findings.slice(0,5).map((f,i)=>`${i+1}. ${f}`).join('\n');
+ }
  // P555: 作業状態（今の作業・次の手）の想起。相方として「今何を
  // 作ってるの？」に答えるための入口。
  private selfInquiryWorkStateAnswer(value:string):string|undefined {
@@ -319,6 +328,9 @@ class ConversationGraphRuntimeP212Service {
   }
   if(/(?:知らない|分からない)(?:言葉|単語)|知らない(?:言葉|単語)/u.test(value)){
    return this.selfInquiryUserKnowledgeAnswer();
+  }
+  if(/点検|自分の弱点|弱点はある/u.test(value)){
+   return this.selfInquirySelfInspectionAnswer();
   }
   if(/(?:今|現在)(?:何|なに)を(?:作って|して)|(?:今|現在)の作業|次の作業|次は(?:何|なに)|進捗/u.test(value)){
    const workAnswer=this.selfInquiryWorkStateAnswer(value);

@@ -367,6 +367,24 @@ let snapshotJson2 = '';
 try { snapshotJson2 = String((JSON.parse(String(snapshotRaw2)) as any).json || ''); } catch { /* 検証側で失敗させる */ }
 check('P560 スナップショットに作業状態と話題リストが入る', snapshotJson2.includes('workState') && snapshotJson2.includes('当たり判定') && snapshotJson2.includes('openTopics') && snapshotJson2.includes('残したい話題'), snapshotJson2.slice(0, 160));
 
+// ---- ビービーの雑談反応プール（P561） ----
+personaProfileService.switchProfile('persona-bibi');
+const bibiCasual = await conversationCoreService.execute({ prompt: 'カピバラかわいい' } as any);
+const bibiCasualHead = String((bibiCasual as any).replyText || '').split(/[！。]/)[0];
+check('P561 ビービーの雑談反応はビービーの形になる', bibiCasualHead.includes('カピバラ') && !bibiCasualHead.includes('ですね'), bibiCasualHead);
+personaProfileService.switchProfile('persona-default');
+
+// ---- 自己点検を会話で聞ける（P562） ----
+conversationGraphRuntimeP212Service.ingestInput('regression-p562', '自分の知識を点検して');
+const inspectionAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p562');
+check('P562 点検して、に結果を答える', Boolean(inspectionAnswer && inspectionAnswer.includes('点検しました')), String(inspectionAnswer).slice(0, 140));
+
+// ---- 作業状態の完了（P563） ----
+projectNotebookService.intakeFromUserText('EFRのペットができた');
+check('P563 完了で次の手が今の作業になる', projectNotebookService.getWorkState('EFR')?.current === '当たり判定' && projectNotebookService.getWorkState('EFR')?.next === undefined, JSON.stringify(projectNotebookService.getWorkState('EFR')));
+projectNotebookService.intakeFromUserText('EFRの当たり判定ができたらいいな');
+check('P563 仮定の完了では進まない', projectNotebookService.getWorkState('EFR')?.current === '当たり判定', JSON.stringify(projectNotebookService.getWorkState('EFR')));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

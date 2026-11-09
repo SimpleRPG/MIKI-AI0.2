@@ -1220,8 +1220,18 @@ export class ConversationCoreService {
       try { storageService.setItem('miki_casual_reaction_usage_v1', JSON.stringify(ledger)); } catch { /* 回転は補助経路 */ }
       return pool[idx];
     };
+    // P561: 反応の形そのものにも人格の声を持たせる。ビービーのときは
+    // ビービーのプールから選ぶ（丁寧な形を後から口調変換するのでは、
+    // 「いいですね！」のような形が彼女の声にならなかった）。
+    let bibi = false;
+    try { bibi = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibi = false; }
     if (/嬉しい|うれしい|楽しい|よかった|すごい|やった|最高|面白い|かわいい|可愛い|美味しい|おいしい|気持ちいい/.test(prompt)) {
-      return pick([
+      return pick(bibi ? [
+        `${term}、いいね！`,
+        `わーい、${term}だ！`,
+        `${term}、よかったね！`,
+        `${term}、すてき！`,
+      ] : [
         `${term}、いいですね！`,
         `お、${term}ですか。なんだか楽しそうですね。`,
         `${term}、それはよかったですね！`,
@@ -1229,7 +1239,11 @@ export class ConversationCoreService {
       ], 'positive');
     }
     if (/大変|つらい|しんどい|悲しい|残念|ひどい|困った/.test(prompt)) {
-      return pick([
+      return pick(bibi ? [
+        `${term}、たいへんだったね…`,
+        `${term}、しんどかったね。無理しないでね。`,
+        `${term}の話、聞かせて？`,
+      ] : [
         `${term}の件、大変でしたね。`,
         `${term}、それはしんどかったですね。`,
         `${term}の話、無理のない範囲で聞かせてくださいね。`,
@@ -1237,7 +1251,12 @@ export class ConversationCoreService {
       ], 'hard');
     }
     if (prompt.length >= 10) {
-      return pick([
+      return pick(bibi ? [
+        `${term}の話だね。`,
+        `ふーん、${term}かぁ。`,
+        `${term}、なるほどね。`,
+        `${term}、もっと聞かせて！`,
+      ] : [
         `${term}の話ですね。`,
         `ふむ、${term}ですか。`,
         `${term}、なるほどですね。`,
@@ -1246,7 +1265,11 @@ export class ConversationCoreService {
     }
     // P531: 短い発話でも主題語があれば受け止める（従来は null で
     // 定型文に落ちていた）。
-    return pick([
+    return pick(bibi ? [
+      `${term}、そうなんだ。`,
+      `${term}の話だね。`,
+      `${term}、うんうん。`,
+    ] : [
       `${term}、そうなんですね。`,
       `${term}の話ですね。`,
       `${term}、なるほど。`,

@@ -213,10 +213,27 @@ export class ProjectNotebookService {
     return state;
   }
 
+  /** P563: 今の作業が完了したら、次の手を今の作業に進める。 */
+  public advanceWorkState(project: string): ProjectWorkState | undefined {
+    const canonical = this.findProject(project);
+    if (!canonical) return undefined;
+    const state = this.loadWorkStates().find((s) => s.project === canonical);
+    if (!state || !state.current) return undefined;
+    const done = state.current;
+    state.current = state.next;
+    state.next = undefined;
+    state.updatedAt = Date.now();
+    this.persistWorkStates();
+    systemLogger.info('SYSTEM', `📓 [作業状態] ${canonical}：「${done}」が完了。${state.current ? `次は「${state.current}」へ。` : ''}`);
+    return state;
+  }
+
   /**
    * P555: 作業の進み具合の発言を取り込む。プロジェクト名があり、
    * 「今〜を作ってる／実装中」「次は〜を作る」の形で、意味チェック
    * （P546）を通った文だけを作業状態として残す。
+   * P563: 今の作業の名前を含んだ完了の発言（「〜ができた」）は、
+   * 次の手へ進める合図として扱う。
    */
   private intakeWorkStateFromUserText(text: string): void {
     const project = this.findProjectInText(text);
@@ -224,6 +241,11 @@ export class ProjectNotebookService {
     const sentences = String(text || '').split(/(?<=。)/).map((s) => s.trim()).filter(Boolean);
     for (const sentence of sentences.length > 0 ? sentences : [String(text || '').trim()]) {
       if (!sentence) continue;
+      const stateNow = this.getWorkState(project);
+      if (stateNow?.current && sentence.includes(stateNow.current) && /(?:できた|完成した|終わった|完了した)/.test(sentence)) {
+        if (intakeMeaningGuardService.check(sentence).ok) this.advanceWorkState(project);
+        continue;
+      }
       const currentMatch = sentence.match(/今(?:は|、)?(.{2,24}?)(?:を作って(?:い)?る|を実装して(?:い)?る|を作成中|を実装中|の実装中|の作成中)/);
       const nextMatch = sentence.match(/次(?:は|に)(.{2,24}?)(?:を作る|を実装する|をやる|に取り組む)/);
       if (!currentMatch && !nextMatch) continue;
