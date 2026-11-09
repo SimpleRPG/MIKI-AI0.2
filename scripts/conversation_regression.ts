@@ -26,6 +26,7 @@ const { surfaceVariationGrowthService} = await import('../src/miki/conversation/
 const { conversationFactIntakeService} = await import('../src/miki/conversation/services/conversationFactIntakeService');
 const { conversationGraphRuntimeP212Service} = await import('../src/miki/conversation/services/conversationGraphRuntimeP212Service');
 const { roleplaySessionService} = await import('../src/miki/conversation/services/roleplaySessionService');
+const { classifyDialogueAct } = await import('../src/miki/conversation/services/conversationStateService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -73,6 +74,12 @@ const goodVariant = surfaceVariationGrowthService.verifyCandidate(
 );
 check('P533 丁寧な変種は通す', goodVariant.passed, goodVariant.rejectionReason);
 
+check('P535 陳述文はSTATEMENT', classifyDialogueAct('今日はモコロンを捕まえてすごく嬉しい') === 'STATEMENT', classifyDialogueAct('今日はモコロンを捕まえてすごく嬉しい'));
+check('P535 過去形の報告は依頼でない', classifyDialogueAct('散歩してきた') === 'STATEMENT', classifyDialogueAct('散歩してきた'));
+check('P535 質問はQUESTIONのまま', classifyDialogueAct('モコロンって何？') === 'QUESTION', classifyDialogueAct('モコロンって何？'));
+check('P535 依頼の形はREQUEST', classifyDialogueAct('モコロンについて調べてください') === 'REQUEST', classifyDialogueAct('モコロンについて調べてください'));
+check('P535 挨拶はCASUAL_CHATのまま', classifyDialogueAct('おはよう') === 'CASUAL_CHAT', classifyDialogueAct('おはよう'));
+
 // ---- 会話の流れ（コア経由） ----
 const greet = await conversationCoreService.execute({ prompt: 'おはよう'} as any);
 const gText = String((greet as any).replyText || '');
@@ -104,6 +111,10 @@ const role = roleplaySessionService.saveRole({ name: '先生', stance: '教師',
 roleplaySessionService.startSession(role, 'persona-default');
 const texture = paragraphCompositionService.sceneTextureSuffix('今日は生徒がよく頑張っていた');
 check('P530 学んだ描写が地の文になる', Boolean(texture && texture.includes('光が差し込む')), String(texture));
+const beat1 = paragraphCompositionService.sceneProgressionSuffix();
+const beat2 = paragraphCompositionService.sceneProgressionSuffix();
+const beat3 = paragraphCompositionService.sceneProgressionSuffix();
+check('P536 場面は3歩に1回進む', beat1 === undefined && beat2 === undefined && Boolean(beat3 && beat3.includes('チャイム')), JSON.stringify([beat1, beat2, beat3]));
 conversationFactIntakeService.intakeFromUserText('今日は掛け算の練習をした', []);
 conversationFactIntakeService.intakeFromUserText('生徒と九九の練習もした', []);
 roleplaySessionService.endSession();

@@ -661,7 +661,12 @@ export class ConversationCoreService {
         ?? 'そうなんですね。話してくれてありがとう。';
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
       // （創作の層の中だけ。場面が無ければ何も付かない）。
-      const reaction = reactionBase + (paragraphCompositionService.sceneTextureSuffix(prompt) ?? '');
+      // P536: 3ターンに1回は、地の文の代わりに場面の進行を添えて
+      // 彼女の側から場面を一歩進める。
+      const reaction = reactionBase
+        + (paragraphCompositionService.sceneProgressionSuffix()
+          ?? paragraphCompositionService.sceneTextureSuffix(prompt)
+          ?? '');
       ir = answerContentIrService.buildAnswerIR({
         conclusion: reaction,
         target: '日常対話',

@@ -335,6 +335,35 @@ class ParagraphCompositionService {
     ];
     return generic[seed % generic.length];
   }
+
+  /**
+   * P536: 場面の進行（接尾辞として本文に足す1文）。地の文が
+   * 「空気」を足すのに対して、こちらは「出来事」で場面を一歩
+   * 進める。歩数はセッションに数え、3ターンに1回だけ進める
+   * （進む回は地の文の代わりになる）。場面プールは出来事の型、
+   * 歩数で順に回す。
+   */
+  public sceneProgressionSuffix(): string | undefined {
+    const session = roleplaySessionService.getSession();
+    if (!session) return undefined;
+    const scene = String(session.scene || '').trim();
+    if (!scene) return undefined;
+    const beat = roleplaySessionService.advanceSceneBeat();
+    if (beat % 3 !== 0) return undefined;
+    const stepIndex = Math.floor(beat / 3) - 1;
+    const pools: Array<[RegExp, string[]]> = [
+      [/教室|学校|授業/, ['チャイムが鳴って、休み時間になりました。', '窓の外で、運動場の声が大きくなってきました。']],
+      [/海|浜|港|船/, ['波の音が、少しずつ強くなってきました。', '遠くの海で、船の汽笛が聞こえました。']],
+      [/森|林|山/, ['木の間を、風が通り抜けていきました。', 'どこかで、小鳥が鳴き始めました。']],
+      [/街|町|店/, ['通りの向こうで、店の明かりが灯り始めました。', '人通りが、少しずつ増えてきました。']],
+      [/城|宮殿/, ['遠くで、鐘が鳴りました。', '廊下を、衛兵の足音が過ぎていきました。']],
+      [/部屋|家|自宅/, ['窓の外が、少し暗くなってきました。', '時計の針が、カチリと進みました。']],
+    ];
+    for (const [pattern, pool] of pools) {
+      if (pattern.test(scene)) return ` ${pool[stepIndex % pool.length]}`;
+    }
+    return ` ${scene}の時間が、少し進みました。`;
+  }
 }
 
 export const paragraphCompositionService = new ParagraphCompositionService();

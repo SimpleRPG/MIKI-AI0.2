@@ -321,9 +321,33 @@ export function classifyDialogueAct(userPrompt: string): DialogueAct {
     return 'FEEDBACK';
   }
 
-  // 11. 一般作業依頼
-  if (/して|やって|お願い|実行/i.test(text)) {
+  /*
+   * P535: 陳述文の判定を源流に入れる。従来は既定が QUESTION で、
+   * 「して」を含むだけで REQUEST になり、日常の発話（報告・感想・
+   * 状態の共有）が軒並み質問／依頼扱いされていた。消費側が文の形
+   * で回避していたのをやめ、ここで形を見る:
+   * - 依頼は命令・依頼の形（〜てください／〜てほしい／文末の
+   *   やって・して等）のときだけ REQUEST にする。過去形の報告
+   *   （「散歩してきた」）は依頼ではない。
+   * - 疑問の形（疑問符・疑問詞・文末のか等）でない文は STATEMENT。
+   */
+  const looksInterrogative =
+    /[？?]/.test(text) ||
+    /(?:ですか|ますか|でしょうか|かな|かしら)$/.test(text.replace(/[。！!]+$/, '')) ||
+    /(?:何|なぜ|どうして|どう|いつ|どこ|だれ|誰|どれ|どちら|いくら|いくつ)/.test(text);
+  const looksImperative =
+    /(?:て|して|せて)(?:ください|くれ|ほしい|もらえ|いただけ)/.test(text) ||
+    /(?:してください|お願いします|頼む|してくれ|やってくれ|やって|して|しろ|やれ)[。！!]?$/.test(text) ||
+    /(?:てほしい|してほしい|お願い)[。！!]?$/.test(text);
+
+  // 11. 一般作業依頼（命令・依頼の形のときだけ）
+  if (looksImperative || /お願い|実行して/.test(text)) {
     return 'REQUEST';
+  }
+
+  // 12. 陳述文（疑問の形でないもの）
+  if (!looksInterrogative) {
+    return 'STATEMENT';
   }
 
   return 'QUESTION';

@@ -38,6 +38,8 @@ export interface RoleplaySession {
   summary: string;
   // P523: あらすじ自動生成の材料（セッション中の発話の内容語）。
   notedTerms?: string[];
+  // P536: 場面進行の歩数（何ターン会話したかの数え）。
+  sceneBeats?: number;
 }
 
 const ROLES_KEY = 'miki_roleplay_roles_v1';
@@ -219,6 +221,15 @@ export class RoleplaySessionService {
     this.persistSession();
     systemLogger.info('CHAT', `🎭 [なりチャ] ${session.roleName} の役を終了しました。`);
     return session;
+  }
+
+  /** P536: 場面進行の歩数を1つ進めて返す（セッションに永続化）。 */
+  public advanceSceneBeat(): number {
+    const session = this.loadSession();
+    if (!session) return 0;
+    session.sceneBeats = (session.sceneBeats || 0) + 1;
+    this.persistSession();
+    return session.sceneBeats;
   }
 
   public setScene(scene: string): void {
