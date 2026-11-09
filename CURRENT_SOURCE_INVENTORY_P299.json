@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1781,
     "sourceFileCount": 1334,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1245,
-    "relativeImportCandidateCount": 3869,
-    "resolvedRelativeImportCandidateCount": 3853,
+    "relativeImportCandidateCount": 3871,
+    "resolvedRelativeImportCandidateCount": 3855,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -10432,9 +10432,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationGraphRuntimeP212Service.ts",
-      "bytes": 27394,
-      "lines": 299,
-      "sha256": "2f9d387462bf6490a5ac3af494ee24cb3abb9108b68460d5a24a7e30c97cb412",
+      "bytes": 27831,
+      "lines": 304,
+      "sha256": "227775396bf62aa8d8faaf9ecb110e9cb646caf851db2e7f14bf9213d539d6ec",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10492,85 +10492,91 @@
         },
         {
           "line": 10,
+          "specifier": "../../memory/services/lexicalRelationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
+        },
+        {
+          "line": 11,
           "specifier": "./conversationLanguageComponentGraphP213Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationLanguageComponentGraphP213Service.ts"
         },
         {
-          "line": 11,
+          "line": 12,
           "specifier": "./conversationGraphCompletionP214Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationGraphCompletionP214Service.ts"
         },
         {
-          "line": 12,
+          "line": 13,
           "specifier": "./conversationGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationGraphConnectorP211Service.ts"
         },
         {
-          "line": 13,
+          "line": 14,
           "specifier": "../../research/services/researchGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchGraphConnectorP211Service.ts"
         },
         {
-          "line": 14,
+          "line": 15,
           "specifier": "../../unknown/services/unknownGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/unknown/services/unknownGraphConnectorP211Service.ts"
         },
         {
-          "line": 15,
+          "line": 16,
           "specifier": "../../experience/services/experienceGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/experience/services/experienceGraphConnectorP211Service.ts"
         },
         {
-          "line": 16,
+          "line": 17,
           "specifier": "../../verification/services/verificationGraphConnectorP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verificationGraphConnectorP211Service.ts"
         },
         {
-          "line": 17,
+          "line": 18,
           "specifier": "../../core/services/crossDomainGraphConnectionP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/crossDomainGraphConnectionP211Service.ts"
         },
         {
-          "line": 18,
+          "line": 19,
           "specifier": "./userCommunicationPreferenceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/userCommunicationPreferenceService.ts"
         },
         {
-          "line": 19,
+          "line": 20,
           "specifier": "./surfaceVariationGrowthService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/surfaceVariationGrowthService.ts"
         },
         {
-          "line": 20,
+          "line": 21,
           "specifier": "../../research/services/webMaterialPatternExtractor",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webMaterialPatternExtractor.ts"
         },
         {
-          "line": 21,
+          "line": 22,
           "specifier": "./surfaceVariationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/surfaceVariationService.ts"
         },
         {
-          "line": 22,
+          "line": 23,
           "specifier": "../../memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         }
       ],
-      "relativeImportCandidateCount": 22,
-      "resolvedRelativeImportCount": 22,
+      "relativeImportCandidateCount": 23,
+      "resolvedRelativeImportCount": 23,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -10965,9 +10971,9 @@
     },
     {
       "path": "src/miki/conversation/services/graphAnswerMeaningPipelineP216Service.ts",
-      "bytes": 10859,
-      "lines": 129,
-      "sha256": "de08689cf789490f1b6914db2c47b3d87c72f5593425a77c9788c35ae3f553ad",
+      "bytes": 11440,
+      "lines": 138,
+      "sha256": "74574ea5a91a9350c5e17b7064c446cf0bfeb7efb5b15250f2174a11db575e30",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10998,10 +11004,16 @@
           "specifier": "../../memory/services/unitConversionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/unitConversionService.ts"
+        },
+        {
+          "line": 6,
+          "specifier": "./personaProfileService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/personaProfileService.ts"
         }
       ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
+      "relativeImportCandidateCount": 6,
+      "resolvedRelativeImportCount": 6,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -24336,9 +24348,9 @@
     },
     {
       "path": "src/miki/memory/services/paraphraseService.ts",
-      "bytes": 11112,
-      "lines": 245,
-      "sha256": "8295e433e0317e5168f49f7ecff3ef221053e2baaff9873fe72462524dea877a",
+      "bytes": 12614,
+      "lines": 274,
+      "sha256": "623c632196e5a121704d03e694a4370989319d38b46ca65297d44ec696a71423",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -3,6 +3,7 @@ import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
+import { personaProfileService, BIBI_PROFILE_ID } from './personaProfileService';
 
 export interface P216AnswerRequirements { inputSurface:string; intentIds:string[]; constraintIds:string[]; grammarIds:string[]; meaningComponentIds:string[]; contentTerms?:string[]; executionResult?:unknown }
 export interface P216MeaningPart { partId:string; kind:'CONCLUSION'|'ACTION'|'CONSTRAINT'|'CONTENT'|'EVIDENCE'|'LIMITATION'|'NEXT_STEP'; meaningId:string; required:boolean; text:string }
@@ -95,6 +96,14 @@ class GraphAnswerMeaningPipelineP216Service {
   // 検査で semanticPreservation が落ちて見える）。
   const paraphrased=paraphraseService.restateProse(text);
   if(paraphrased.changed)text=paraphrased.text;
+  // P506: ビービーが話すときは、文末を彼女の口調（幼いタメ口）に
+  // 合わせる。みき（既定の人格）では何もしない。文ごとの意味保存
+  // チェックを通った文だけが変わり、この後の文法再検査と意味保存
+  // の判定も変換後の文で効く。
+  if(personaProfileService.getActiveProfileId()===BIBI_PROFILE_ID){
+   const voiced=paraphraseService.applyCasualVoice(text);
+   if(voiced.changed)text=voiced.text;
+  }
   // P503: 帝国単位（マイル等）を含む文には、メートル法への換算を
   // 注記として文末に添える（本文は書き換えず、読み手の換算負担を
   // 無くす）。華氏だけは換算先が本文に無いと唐突なので対象外。

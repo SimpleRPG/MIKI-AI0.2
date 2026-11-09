@@ -102,11 +102,14 @@ function applyPair(text: string, a: string, b: string): string {
   return text;
 }
 
-function casualizeEndings(text: string): string {
+function casualizeEndings(text: string, forVoice = false): string {
   let out = text;
   out = out.split('ではありません。').join('じゃないよ。');
   out = out.split('ではない。').join('じゃないよ。');
-  out = out.split('かもしれない。').join('かも。');
+  // P506: 人格の口調として使う場合は「かもしれない→かも」を
+  // 使わない。可能性の表現を落とすと意味保存チェックの
+  // 否定カウントにも触れてしまうため、安全側に倒す。
+  if (!forVoice) out = out.split('かもしれない。').join('かも。');
   out = out.split('である。').join('だよ。');
   out = out.split('です。').join('だよ。');
   out = out.split('だろう。').join('だろうね。');
@@ -221,6 +224,32 @@ class ParaphraseService {
    * 元のまま残るため、文章全体としては「安全な文だけ言い換わった」
    * 状態になる。
    */
+  /**
+   * P506: 人格の口調（幼いタメ口）を文末にだけ適用する。文ごとに
+   * 変換し、意味保存チェックを通った文だけを採用する（通らない
+   * 文は元の文体のまま）。コード・URL・記号を含む文は対象外。
+   * 動詞の「ます」形は活用の誤りが入りやすいため触らない。
+   */
+  public applyCasualVoice(textRaw: string): ParaphraseResult {
+    const original = textRaw || '';
+    if (!original.trim()) return { text: original, changed: false, check: { ok: true, reasons: [] } };
+    const sentences = original.split(/(?<=[。！？!?])\s*/u).filter((s) => s.length > 0);
+    let changed = false;
+    const out = sentences
+      .map((sentence) => {
+        if (sentence.trim().length < 8) return sentence;
+        if (/https?:\/\/|`|\{|\}|\[|\]/.test(sentence)) return sentence;
+        const voiced = casualizeEndings(sentence, true);
+        if (voiced === sentence) return sentence;
+        const check = this.check(sentence, voiced);
+        if (!check.ok) return sentence;
+        changed = true;
+        return voiced;
+      })
+      .join('');
+    return { text: out, changed, check: { ok: true, reasons: [] } };
+  }
+
   public restateProse(textRaw: string): ParaphraseResult {
     const original = textRaw || '';
     if (!original.trim()) return { text: original, changed: false, check: { ok: true, reasons: [] } };

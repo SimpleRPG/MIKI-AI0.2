@@ -7,6 +7,7 @@ import { japaneseDictionaryService } from '../../research/services/japaneseDicti
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { dictionaryBootstrapService } from '../../research/services/dictionaryBootstrapService';
 import { webTermLearningService } from '../../research/services/webTermLearningService';
+import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -177,6 +178,10 @@ class ConversationGraphRuntimeP212Service {
   // 使い方の例として添える（意味だけでなく使い方も話せるように）。
   const example=webTermLearningService.exampleSentenceFor(term);
   if(example)answer+=` 例えば「${example.slice(0,80)}${example.length>80?'…':''}」のように使われます。`;
+  // P507: 同義語が登録されていれば、似た言葉として添える
+  // （語と語のつながりも一緒に話せるように）。
+  const synonyms=lexicalRelationService.synonymsOf(term).filter(s=>s!==term).slice(0,3);
+  if(synonyms.length)answer+=` 似た言葉には${synonyms.map(s=>`「${s}」`).join('')}があります。`;
   return answer;}
   return `『${term}』は手元の辞書には載っていません。サーバー側の全量辞書に問い合わせておきます。`;
  }
