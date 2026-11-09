@@ -35,6 +35,10 @@ export interface PersonaCommunicationStyle {
   formality: number;
   verbosity: number;
   technicalExplanation: boolean;
+  // P510: ユーモア軸。合成側の MultiAxisPersonaConfig.humor に渡す。
+  // これが無いと humor は既定 OFF のまま固定され、言い回しプールの
+  // ユーモア行が誰にも出なかった。
+  humor: 'OFF' | 'LIGHT' | 'MODERATE';
 }
 
 export interface PersonaProfileReceipt {
@@ -142,6 +146,7 @@ class PersonaProfileService {
       formality: clamp(has(text, ['格式', 'フォーマル', 'formal']) ? 80 : has(text, ['気軽', 'カジュアル']) ? 35 : 55),
       verbosity: clamp(has(text, ['詳し', '丁寧に説明']) ? 75 : has(text, ['簡潔', '短く']) ? 30 : 50),
       technicalExplanation: has(text, ['分かりやす', '専門語', '解説', '説明']),
+      humor: has(text, ['幼', '元気', '明る', 'おっちょこちょい', 'ユーモア', '面白', 'あほ']) ? 'MODERATE' : 'OFF',
     };
   }
 

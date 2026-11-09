@@ -185,6 +185,7 @@ export class RuntimeConversationCompositionService {
       formality: communicationStyle.formality >= 80 ? 'HIGH' : communicationStyle.formality <= 35 ? 'LOW' : 'MEDIUM_LOW',
       verbosity: communicationStyle.verbosity <= 35 ? 'CONCISE' : communicationStyle.verbosity >= 80 ? 'DETAILED' : 'ADAPTIVE',
       technicalTerminology: communicationStyle.technicalExplanation ? 'BALANCED' : 'PLAIN_LANGUAGE',
+      humor: communicationStyle.humor,
     } as Partial<MultiAxisPersonaConfig>;
     const cacheKey = stableSignature(ir, primarySkeleton, options.assembledCode, personaProfile.profileId, personaProfile.revision);
     const cached = this.cache.get(cacheKey);
