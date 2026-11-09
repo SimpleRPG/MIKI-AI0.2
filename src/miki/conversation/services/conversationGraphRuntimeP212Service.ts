@@ -6,6 +6,7 @@ import { contentTermsFromTokens, type JapaneseToken } from '../../research/servi
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { dictionaryBootstrapService } from '../../research/services/dictionaryBootstrapService';
+import { webTermLearningService } from '../../research/services/webTermLearningService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -172,6 +173,10 @@ class ConversationGraphRuntimeP212Service {
   // P495: 辞書の丸写しで終わらせず、意味保存チェックを通った
   // 言い換えを「つまり」で添える（自分の言葉で言い直す）。
   if(gloss){const restated=paraphraseService.restate(gloss,{style:'casual'});if(restated.changed)answer+=` つまり、${restated.text}ってことです。`;}
+  // P502: 学習時に保持した「実際に使われていた文」があれば、
+  // 使い方の例として添える（意味だけでなく使い方も話せるように）。
+  const example=webTermLearningService.exampleSentenceFor(term);
+  if(example)answer+=` 例えば「${example.slice(0,80)}${example.length>80?'…':''}」のように使われます。`;
   return answer;}
   return `『${term}』は手元の辞書には載っていません。サーバー側の全量辞書に問い合わせておきます。`;
  }

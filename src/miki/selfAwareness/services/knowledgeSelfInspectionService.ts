@@ -26,6 +26,7 @@ export interface KnowledgeSelfInspectionRecord {
   personalDictionary: number;
   learnedDictionaryEntries: number;
   lexicalRelations: number;
+  paraphrasePairs: number;
   termComponents: number;
   glosslessCount: number;
   glosslessSample: string[];
@@ -89,6 +90,12 @@ class KnowledgeSelfInspectionService {
       findings.push(`意味が付いていない用語が${glosslessTerms.length}件残っている${gapsRaised > 0 ? `（${gapsRaised}件を意味学習へ流した）` : ''}`);
     }
 
+    // 言い換えの対（自分の言葉で言い直して意味を確かめる力の在庫）。
+    const paraphrasePairs = lexicalRelationService.paraphrasePairs().length;
+    if (paraphrasePairs === 0) {
+      findings.push('言い換えの対が1件も無く、自分の言葉で言い直す検証ができない');
+    }
+
     // 世界の関係。
     const relations = worldModelGraphService.relations();
     const provisional = relations.filter((r) => r.provisional).length;
@@ -114,6 +121,7 @@ class KnowledgeSelfInspectionService {
       personalDictionary: personal.length,
       learnedDictionaryEntries: learned,
       lexicalRelations: lexicalRelationService.counts().total,
+      paraphrasePairs,
       termComponents: termComponents.length,
       glosslessCount: glosslessTerms.length,
       glosslessSample: glosslessTerms.slice(0, 10),
@@ -136,7 +144,7 @@ class KnowledgeSelfInspectionService {
     this.saveRecord(record);
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🩺 [自己点検] 辞書${record.personalDictionary}件（学習${learned}）／意味待ち${record.glosslessCount}件／関係${record.worldRelations}件（仮${provisional}）／知識${claims}件（孤立${connectivity.orphaned}）／学習待ち${record.openGaps}件（休止${parked}）`,
+      `🩺 [自己点検] 辞書${record.personalDictionary}件（学習${learned}）／言い換え対${record.paraphrasePairs}件／意味待ち${record.glosslessCount}件／関係${record.worldRelations}件（仮${provisional}）／知識${claims}件（孤立${connectivity.orphaned}）／学習待ち${record.openGaps}件（休止${parked}）`,
     );
     for (const finding of findings) {
       systemLogger.info('SELF_IMPROVEMENT', `🩺 [自己点検] 所見: ${finding}`);

@@ -2,6 +2,7 @@ import { canonicalSha256Object } from '../../core/services/canonicalSha256Servic
 import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
+import { unitConversionService } from '../../memory/services/unitConversionService';
 
 export interface P216AnswerRequirements { inputSurface:string; intentIds:string[]; constraintIds:string[]; grammarIds:string[]; meaningComponentIds:string[]; contentTerms?:string[]; executionResult?:unknown }
 export interface P216MeaningPart { partId:string; kind:'CONCLUSION'|'ACTION'|'CONSTRAINT'|'CONTENT'|'EVIDENCE'|'LIMITATION'|'NEXT_STEP'; meaningId:string; required:boolean; text:string }
@@ -94,6 +95,16 @@ class GraphAnswerMeaningPipelineP216Service {
   // 検査で semanticPreservation が落ちて見える）。
   const paraphrased=paraphraseService.restateProse(text);
   if(paraphrased.changed)text=paraphrased.text;
+  // P503: 帝国単位（マイル等）を含む文には、メートル法への換算を
+  // 注記として文末に添える（本文は書き換えず、読み手の換算負担を
+  // 無くす）。華氏だけは換算先が本文に無いと唐突なので対象外。
+  text=text.split(/(?<=[。！？!?])/u).map(sentence=>{
+   if(!sentence.trim())return sentence;
+   const notes=unitConversionService.parseAndConvert(sentence).filter(note=>!/華氏|°F/u.test(note.original));
+   if(!notes.length)return sentence;
+   const noteText=notes.map(note=>`${note.original}は${note.converted}`).join('、');
+   return sentence.replace(/([。！？!?])$/u,`（${noteText}）$1`);
+  }).join('');
   const grammarRecheck=surfaceGrammarAndStyleService.validateGrammarAndParticles(text);
   const remainingGrammarIssues=[...grammarRecheck.conjugationIssues,...grammarRecheck.particleIssues];
   missing=requiredIds.filter(id=>requiredTokens[id]&&!requiredTokens[id].test(text));

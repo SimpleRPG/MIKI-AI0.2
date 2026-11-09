@@ -110,6 +110,24 @@ function extractCandidates(text: string): Map<string, number> {
 }
 
 class WebTermLearningService {
+  /**
+   * P502: その語が実際に使われていた文（P463 で部品に保持した
+   * 例文）を返す。会話の用語説明で「使い方」も添えるために使う。
+   * 部品が無い・例文が無い場合は undefined。
+   */
+  public exampleSentenceFor(term: string): string | undefined {
+    const key = normalize(term);
+    if (!key) return undefined;
+    const components = reusableComponentFactoryService.list() as unknown as StoredTermComponent[];
+    for (const component of components) {
+      if (component.componentType !== 'TERM_KNOWLEDGE') continue;
+      if (!component.term || normalize(component.term) !== key) continue;
+      const example = component.exampleSentence?.trim();
+      if (example) return example;
+    }
+    return undefined;
+  }
+
   learnPage(input: WebTermLearningInput): WebTermLearningResult {
     const text = input.text.trim();
     if (!text || !input.url || !input.evidenceId) {

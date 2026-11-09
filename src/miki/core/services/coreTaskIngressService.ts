@@ -1,5 +1,6 @@
 import { graphAnswerMeaningPipelineP216Service, type P216FinalAnswer } from '../../conversation/services/graphAnswerMeaningPipelineP216Service';
 import { conversationGraphRuntimeP212Service } from '../../conversation/services/conversationGraphRuntimeP212Service';
+import { personaProfileService } from '../../conversation/services/personaProfileService';
 import { coreOrchestratorService, type CoreOrchestrationResult } from './coreOrchestratorService';
 import type { MikiDomain } from './crossDomainCirculationService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
@@ -221,6 +222,14 @@ class CoreTaskIngressService {
     if(clusters.size===1)finalResponse+=`\n\n※この回答の情報は、1つの情報源${hosts.length===1?`（${hosts[0]}）`:''}だけに基づいています。他の情報源では確認できていません。`;
     else finalResponse+=`\n\n出典：${(hosts.length?hosts:used.map(record=>record.source)).slice(0,3).join('、')}`;
    }
+  }
+  // P504: 誰が話しているかを回答の冒頭で明ける。みきとビービーは
+  // 知識も記憶も共有のため、名乗りが無いと切り替えたことが相手に
+  // 伝わらない。検証と Claim 抽出が終わった後の表示だけの加工で、
+  // 既に名前で始まる回答には重ねない。
+  {
+   const activePersonaName=(personaProfileService.get().name||'').trim();
+   if(activePersonaName&&finalResponse.trim()&&!finalResponse.startsWith(`【${activePersonaName}】`))finalResponse=`【${activePersonaName}】${finalResponse}`;
   }
   const result=coreOrchestratorService.finalizeConversationResponse(taskId,finalResponse,{passed:answerValidationPassed,failedReasons:[...new Set(failedReasons)]});
   if(!result)failedReasons.push('CORE_FINALIZATION_RESULT_MISSING');
