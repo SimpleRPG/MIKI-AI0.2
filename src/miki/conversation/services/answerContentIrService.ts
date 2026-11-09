@@ -302,6 +302,13 @@ export class AnswerContentIrService {
       );
       if (unknownTerm) {
         surfaceText += `\n\nそういえば、「${unknownTerm}」という言葉はまだ覚えていません。どういう意味か教えてもらえますか？`;
+      } else {
+        // P532: 未知語の質問が無いターンでは、話題についての質問
+        // （core が世界モデルの関係から用意したもの）で続きを聞く。
+        const topicQuestion = (ir as any).topic_question as string | undefined;
+        if (topicQuestion && !surfaceText.includes(topicQuestion.slice(0, 10))) {
+          surfaceText += `\n\n${topicQuestion}`;
+        }
       }
     }
 

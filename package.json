@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "check:imports": "node scripts/check_imports.mjs",
+    "test:conversation": "tsx scripts/conversation_regression.ts",
     "android:add": "npx cap add android",
     "android:sync": "npx cap sync android",
     "android:native-runner": "bash scripts/install_android_native_runner.sh",

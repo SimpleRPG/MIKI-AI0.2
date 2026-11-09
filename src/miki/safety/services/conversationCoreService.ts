@@ -981,6 +981,20 @@ export class ConversationCoreService {
       } catch { /* 段落合成は補助経路 */ }
     }
 
+    // P532: 戦略が質問を求めるターンでは、話題についての質問も
+    // 用意しておく（未知語の質問が付かない場合に表層側が使う）。
+    if (
+      (ir.strategy === 'ASK_QUESTION' || ir.strategy === 'DEEPEN' || ir.strategy === 'EXPAND_TOPIC') &&
+      !(ir as any).topic_question
+    ) {
+      try {
+        const topicQuestion = paragraphCompositionService.buildTopicQuestion(
+          [nextState.currentTopic, ...(japaneseAnalysis?.contentTokens || [])].filter(Boolean) as string[],
+        );
+        if (topicQuestion) (ir as any).topic_question = topicQuestion;
+      } catch { /* 質問の用意は補助経路 */ }
+    }
+
     const runtimeComposition = runtimeConversationCompositionService.compose(ir, skeleton, { maxCandidates: 4, timeBudgetMs: 12, assembledCode });
     let surface = { surfaceText: runtimeComposition.surfaceText };
 

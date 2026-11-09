@@ -278,6 +278,25 @@ export class SurfaceVariationGrowthService {
       missingOrDistorted.push('【確実性誇張】根拠なく絶対・100%断定を付与しています');
     }
 
+    /*
+     * P533: 文体（レジスタ）混在の検知。意味保持と文法が通っても、
+     * 丁寧・尊敬表現の文にカジュアルな終助詞が混ざる変種（実例:
+     * 「ご検討くださいだよ！」）は、口調を静かに壊したまま正式採用
+     * されていた。シードが丁寧側の文のときだけ、候補の文末と文中
+     * の混在を検査する。シード自体がカジュアルな文（人格の声）の
+     * 変種は対象外。
+     */
+    const seedIsFormal = /です|ます|ください|ございます|いたします|頂きます|申し/.test(seedText);
+    if (seedIsFormal) {
+      const trimmed = candidateText.trim();
+      if (/(?:だよ|だね|じゃん|だぜ|だなあ)[。！!？?]?$/.test(trimmed) || /(?:だよ|だね|じゃん)(?:！|!)/.test(trimmed)) {
+        missingOrDistorted.push('【文体混在】丁寧な文の文末にカジュアルな終助詞が混ざっています');
+      }
+      if (/(?:ください|ございます|いたします)[^。]*?(?:だよ|だね|じゃん)/.test(candidateText)) {
+        missingOrDistorted.push('【文体混在】丁寧表現とカジュアル表現が同一文に混在しています');
+      }
+    }
+
     const semanticPreserved = irCheck.isPreserved && missingOrDistorted.length === 0;
 
     // 3.2 文法・助詞破綻検査 (surfaceGrammarAndStyleService)

@@ -203,6 +203,59 @@ class ParagraphCompositionService {
     }
   }
 
+  /**
+   * P532: 話題についての質問を組み立てる。主題の世界モデルの関係
+   * から「続きを聞く」質問を作る。関係が無ければ作らない（知らな
+   * いことを知ったかぶりで聞かない）。
+   */
+  public buildTopicQuestion(subjectTerms: string[]): string | undefined {
+    try {
+      const terms = [...new Set(subjectTerms)].filter((t) => t && t.length >= 2);
+      if (terms.length === 0) return undefined;
+      const entities = worldModelGraphService.entities();
+      const relations = worldModelGraphService.relations().filter((r) => !r.provisional);
+      let subject: string | undefined;
+      for (const t of terms) {
+        const hit = entities.find((e) => t === e.name || t.includes(e.name));
+        if (hit) { subject = hit.name; break; }
+      }
+      if (!subject) return undefined;
+      const mine = relations
+        .filter((r) => r.from === subject || r.to === subject)
+        .sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+      for (const r of mine) {
+        const q = this.questionForRelation(r.type, subject, r.from === subject ? r.to : r.from, r.from === subject);
+        if (q) return q;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private questionForRelation(type: string, subject: string, other: string, subjectIsFrom: boolean): string | undefined {
+    switch (type) {
+      case 'USED_FOR':
+        return subjectIsFrom
+          ? `${subject}は、${other}以外にも何かに使えますか？`
+          : `${subject}に使われるものは、他にもありますか？`;
+      case 'IS_A':
+        return subjectIsFrom
+          ? `${subject}のような${other}は、他にもいますか？`
+          : `${other}の他に、${subject}にはどんなものがいますか？`;
+      case 'CAUSES':
+        return subjectIsFrom
+          ? `${subject}が${other}を引き起こすのは、どんなときですか？`
+          : `${subject}を引き起こすものは、他にもありますか？`;
+      case 'ENABLES':
+        return subjectIsFrom ? `${subject}があると、他にはどんなことができますか？` : undefined;
+      case 'PART_OF':
+        return subjectIsFrom ? `${other}には、${subject}の他に何がありますか？` : undefined;
+      default:
+        return undefined;
+    }
+  }
+
   private verbalizeRelation(type: string, from?: string, to?: string): string | undefined {
     if (!from || !to) return undefined;
     switch (type) {
