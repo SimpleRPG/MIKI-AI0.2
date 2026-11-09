@@ -898,6 +898,21 @@ export class ConversationCoreService {
     nextState.explanationAdaptation = explanationAdaptation;
 
     t = performance.now();
+    // P519: 全分岐の合流点で、未知語と（未設定なら）会話戦略を IR に
+    // 揃える。分岐ごとに渡す方式だと付いたり付かなかったりする。
+    if (unknownTerms.length > 0 && !(ir as any).unknown_terms?.length) {
+      (ir as any).unknown_terms = unknownTerms;
+    }
+    if (!ir.strategy) {
+      try {
+        ir.strategy = conversationStrategyService.selectConversationStrategy({
+          prompt,
+          stage: nextState.stage,
+          persona: answerContentIrService.getDefaultPersona(),
+        }).strategy;
+      } catch { /* 戦略の補完は補助経路 */ }
+    }
+
     const runtimeComposition = runtimeConversationCompositionService.compose(ir, skeleton, { maxCandidates: 4, timeBudgetMs: 12, assembledCode });
     let surface = { surfaceText: runtimeComposition.surfaceText };
     const temporalGuard = verifyConversationEntityTimeStateConsistency(prompt, surface.surfaceText, nextState);

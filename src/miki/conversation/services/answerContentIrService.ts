@@ -116,6 +116,9 @@ export class AnswerContentIrService {
     strategy?: ConversationStrategy;
     prompt?: string;
     stage?: ConversationStage;
+    // P519: このターンの発話に出た未知語。戦略が「質問する」のとき、
+    // 表層生成がその語の意味を聞き返すために使う。
+    unknownTerms?: string[];
   }): AnswerContentIR {
     let resolvedStrategy = params.strategy;
     if (!resolvedStrategy && (params.prompt || params.stage)) {
@@ -140,6 +143,7 @@ export class AnswerContentIrService {
       interaction_mode: params.interactionMode || 'NORMAL',
       world_scope: params.worldScope || 'REAL',
       strategy: resolvedStrategy,
+      unknown_terms: params.unknownTerms || [],
     };
 
     systemLogger.info(
@@ -269,6 +273,28 @@ export class AnswerContentIrService {
     }
 
     // 温かみ (warmth) とユーモア (humor) の適用
+    // P519: 会話戦略の「質問する」を実際の質問に接続する。戦略は
+    // 選択され、成果まで学習されていたのに、表層生成のどこにも
+    // 質問を作る段が無く、ASK_QUESTION は空転していた。材料は
+    // このターンの未知語（P498 で学習 gap にも登録済み）で、
+    // 「分からない言葉は、その場で聞く」を会話の動きにする。
+    // 一般回答の骨格だけ・末尾が既に質問でない場合だけ・1語だけ。
+    const strategyWantsQuestion =
+      ir.strategy === 'ASK_QUESTION' || ir.strategy === 'DEEPEN' || ir.strategy === 'EXPAND_TOPIC';
+    if (
+      strategyWantsQuestion &&
+      skeletonType === 'GENERAL_ANSWER' &&
+      !isEmpathyOnly &&
+      !/[？?]\s*$/.test(surfaceText)
+    ) {
+      const unknownTerm = (ir.unknown_terms || []).find(
+        (t: string) => t && !surfaceText.includes(`「${t}」`)
+      );
+      if (unknownTerm) {
+        surfaceText += `\n\nそういえば、「${unknownTerm}」という言葉はまだ覚えていません。どういう意味か教えてもらえますか？`;
+      }
+    }
+
     surfaceText = surfaceGrammarAndStyleService.applyWarmthAndHumor(surfaceText, persona);
 
     // 活用規則・助詞選択規則の破綻検査と修復
