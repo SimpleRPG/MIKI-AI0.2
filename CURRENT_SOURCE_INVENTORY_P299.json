@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1794,
     "sourceFileCount": 1347,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1258,
-    "relativeImportCandidateCount": 3965,
-    "resolvedRelativeImportCandidateCount": 3949,
+    "relativeImportCandidateCount": 3966,
+    "resolvedRelativeImportCandidateCount": 3950,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 35686,
-      "lines": 359,
-      "sha256": "17f33344dea41fb5c4fe1d7fca30d2b5b16f930885e83102ed18315320303845",
+      "bytes": 36552,
+      "lines": 365,
+      "sha256": "eac0341ccdc8bc8ddf3356cc2d0b2924cc3864d69dd9db08153ffdb2168dcaa5",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -1761,10 +1761,16 @@
           "specifier": "../src/miki/research/services/autonomousSearchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/autonomousSearchService.ts"
+        },
+        {
+          "line": 40,
+          "specifier": "../src/miki/research/services/japaneseAnalysisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
         }
       ],
-      "relativeImportCandidateCount": 21,
-      "resolvedRelativeImportCount": 21,
+      "relativeImportCandidateCount": 22,
+      "resolvedRelativeImportCount": 22,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -25859,9 +25865,9 @@
     },
     {
       "path": "src/miki/research/services/japaneseAnalysisService.ts",
-      "bytes": 13781,
-      "lines": 269,
-      "sha256": "c642185e96fd5697f1aaf486302210ce0825adb8a43f050d23735b8e5a82108c",
+      "bytes": 14871,
+      "lines": 296,
+      "sha256": "65a2c6dbdcb6f0005270ab5423aec5481d7d3609d9e6eb52f2c56e5845fa315e",
       "relativeImportCandidates": [
         {
           "line": 1,

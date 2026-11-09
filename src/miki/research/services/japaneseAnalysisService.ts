@@ -75,6 +75,32 @@ export function contentTermsFromTokens(tokens: JapaneseToken[]): string[] {
     .filter(term => term.length >= 2 && !CONTENT_TERM_STOPWORDS.has(term) && !functionSurfaces.some(surface => surface !== term && surface.includes(term))))].slice(0, 12);
 }
 
+/**
+ * P557: Intl.Segmenter は辞書に無いカタカナ複合語（リスザル、
+ * ワラビー等）を断片に割ってしまう。隣り合うカタカナの内容語は
+ * 1つの複合語として扱う。内容語は話題・連想・要約など多くの段の
+ * 材料になるので、ここで揃える。
+ */
+export function mergeKatakanaCompoundTokens(tokens: JapaneseToken[]): JapaneseToken[] {
+  const isKatakanaWord = (t: JapaneseToken): boolean => t.kind === 'WORD' && /^[ァ-ヶー・]+$/.test(t.surface);
+  const merged: JapaneseToken[] = [];
+  for (const token of tokens) {
+    const prev = merged[merged.length - 1];
+    if (prev && isKatakanaWord(prev) && isKatakanaWord(token) && prev.end === token.start) {
+      merged[merged.length - 1] = {
+        surface: prev.surface + token.surface,
+        normalized: prev.normalized + token.normalized,
+        kind: 'WORD',
+        start: prev.start,
+        end: token.end,
+      };
+    } else {
+      merged.push(token);
+    }
+  }
+  return merged;
+}
+
 function enrichToken(token: JapaneseToken): JapaneseToken {
   const hit: JapaneseDictionaryEntry | undefined = japaneseDictionaryService.lookup(token.surface)[0];
   if (!hit) return token;
@@ -193,7 +219,8 @@ class JapaneseAnalysisService {
     return this.buildResult(text || '', normalizedText, tokens, 'DETERMINISTIC_FALLBACK');
   }
 
-  private buildResult(text: string, normalizedText: string, tokens: JapaneseToken[], analyzer: JapaneseAnalysisResult['analyzer']): JapaneseAnalysisResult {
+  private buildResult(text: string, normalizedText: string, rawTokens: JapaneseToken[], analyzer: JapaneseAnalysisResult['analyzer']): JapaneseAnalysisResult {
+    const tokens = mergeKatakanaCompoundTokens(rawTokens);
     const contentTokens = tokens.filter(t => t.kind === 'WORD' && t.normalized.length > 0)
       .map(t => t.normalized).filter((v, i, a) => a.indexOf(v) === i);
     const compact = normalizedText.replace(/\s+/g, '');

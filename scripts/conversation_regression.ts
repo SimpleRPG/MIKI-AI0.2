@@ -37,6 +37,7 @@ const { userKnowledgeProfileService } = await import('../src/miki/conversation/s
 const { intakeMeaningGuardService } = await import('../src/miki/memory/services/intakeMeaningGuardService');
 const { projectNotebookService } = await import('../src/miki/memory/services/projectNotebookService');
 const { autonomousSearchService } = await import('../src/miki/research/services/autonomousSearchService');
+const { japaneseAnalysisService } = await import('../src/miki/research/services/japaneseAnalysisService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -342,6 +343,11 @@ const r = await conversationCoreService.execute({ prompt: p } as any);
 casualHeads.push(String((r as any).replyText || '').split(/[！。]/)[0]);
 }
 check('P556 雑談の反応形が回転する', new Set(casualHeads).size === 3 && casualHeads[0].includes('カピバラ') && casualHeads[1].includes('リス') && casualHeads[2].includes('ラビー'), casualHeads.join(' / '));
+
+// ---- カタカナ複合語の結合（P557） ----
+check('P557 リスザルが1語になる', japaneseAnalysisService.analyze('リスザルかわいい').contentTokens.includes('リスザル'), JSON.stringify(japaneseAnalysisService.analyze('リスザルかわいい').contentTokens));
+check('P557 ワラビーが1語になる', japaneseAnalysisService.analyze('ワラビーが好き').contentTokens.includes('ワラビー'), JSON.stringify(japaneseAnalysisService.analyze('ワラビーが好き').contentTokens));
+check('P557 既存の語はそのまま', japaneseAnalysisService.analyze('モコロンはパルです').contentTokens.includes('モコロン'), JSON.stringify(japaneseAnalysisService.analyze('モコロンはパルです').contentTokens));
 
 // ---- 結果 ----
 let fail = 0;
