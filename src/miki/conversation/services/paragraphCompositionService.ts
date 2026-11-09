@@ -248,7 +248,10 @@ class ParagraphCompositionService {
         const hit = entities.find((e) => t === e.name || t.includes(e.name));
         if (hit) { subject = hit.name; break; }
       }
-      if (!subject) return undefined;
+      if (!subject) {
+        // P552: 世界モデルの実体でない話題でも、相手の経験に聞く形なら出せる。
+        return this.experienceQuestion(terms[0]);
+      }
       const mine = relations
         .filter((r) => r.from === subject || r.to === subject)
         .sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
@@ -256,10 +259,30 @@ class ParagraphCompositionService {
         const q = this.questionForRelation(r.type, subject, r.from === subject ? r.to : r.from, r.from === subject);
         if (q) return q;
       }
-      return undefined;
+      // P552: 確定した関係が無い主題では、連想があれば連想として聞き、
+      // それも無ければ相手の経験に聞く。知らない事実そのものは聞かない
+      // （P532 の規律は保つ）。
+      associationGraphService.ensureBuilt();
+      const assoc = associationGraphService.associations(subject, 1)[0];
+      if (assoc && assoc.name !== subject) {
+        return `${subject}の話になると、${assoc.name}のことも思い出します。${assoc.name}とは、どんなつながりがあるのですか？`;
+      }
+      return this.experienceQuestion(subject);
     } catch {
       return undefined;
     }
+  }
+
+  /** P552: 主題について、相手の経験・印象に聞く質問。形は主題から決定的に選ぶ。 */
+  private experienceQuestion(subject: string): string {
+    const forms = [
+      `${subject}は、いつごろから知っていますか？`,
+      `${subject}は、どんなときに思い出すことが多いですか？`,
+      `${subject}のことで、印象に残っていることはありますか？`,
+    ];
+    let h = 0;
+    for (const ch of subject) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return forms[h % forms.length];
   }
 
   private questionForRelation(type: string, subject: string, other: string, subjectIsFrom: boolean): string | undefined {

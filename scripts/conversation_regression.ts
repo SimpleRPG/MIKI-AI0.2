@@ -292,6 +292,15 @@ const nextYear = new Date().getFullYear() + 1;
 const yearNeed = autonomousSearchService.detectNeedForSearch(`${nextYear}年の新機能は何？`);
 check('P551 来年の年号でも最新情報として拾う', yearNeed.needsSearch === true, JSON.stringify(yearNeed));
 
+// ---- 話題質問のフォールバック（P552） ----
+const relationQuestion = paragraphCompositionService.buildTopicQuestion(['モコロン']);
+check('P552 関係がある主題では従来の質問が優先', Boolean(relationQuestion && relationQuestion.includes('モコロン') && !relationQuestion.includes('いつごろから')), String(relationQuestion));
+const freshQuestion = paragraphCompositionService.buildTopicQuestion(['カピバラ']);
+check('P552 関係が無い主題でも経験への質問が出る', Boolean(freshQuestion && freshQuestion.includes('カピバラ') && /いつごろから|思い出すことが多い|印象に残って/.test(freshQuestion)), String(freshQuestion));
+worldModelGraphService.addRelation({ fromName: 'レッサーパンダモドキ', toName: 'モコロン', type: 'IS_A', provisional: true } as any);
+const provisionalQuestion = paragraphCompositionService.buildTopicQuestion(['レッサーパンダモドキ']);
+check('P552 仮関係だけの主題でも質問が出る', Boolean(provisionalQuestion && provisionalQuestion.includes('レッサーパンダモドキ') && provisionalQuestion.includes('？')), String(provisionalQuestion));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
