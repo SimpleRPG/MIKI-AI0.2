@@ -12,6 +12,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { knowledgeHalfLifeService, type KnowledgeStability } from './knowledgeHalfLifeService';
 import { lexicalRelationService } from './lexicalRelationService';
+import { japaneseAnalysisService, contentTermsFromTokens } from '../../research/services/japaneseAnalysisService';
 
 const CLAIMS_STORAGE_KEY = 'miki_claim_db_v1';
 // P492: 採番の high-water mark と整合性所見の保存キー。Claim 配列本体の
@@ -1029,6 +1030,19 @@ export class ClaimDatabaseService {
         && (c as ClaimRecord & {beliefStatus?:BeliefRevisionStatus}).beliefStatus !== 'QUARANTINED'
     );
 
+    // P527: 照合語の用意。従来はクエリを句読点・空白で割るだけで、
+    // 「モコロンについて教えて」のような区切りの無い日本語文では
+    // 文全体が1語になり、知っている Claim にも一致しなかった。
+    // 形態素ベースの内容語も候補に加え、主題語で照合できるように
+    // する（解析が使えない環境では従来の分割のみで動く）。
+    const queryWords = qLower.split(/[\s,、。？！?!\-_/]+/i).filter((w) => w.length >= 2);
+    try {
+      const terms = contentTermsFromTokens(japaneseAnalysisService.analyze(query).tokens)
+        .map((t) => t.toLowerCase())
+        .filter((t) => t.length >= 2 && !/^(について|において|として|こと|もの|ため|よう|とき|ところ|これ|それ)$/.test(t));
+      for (const t of terms) if (!queryWords.includes(t)) queryWords.push(t);
+    } catch { /* 解析なしでも従来どおり照合する */ }
+
     // 1. スコアリング (キーワード一致、重要語、成熟度、検証状態)
     const scored = activeClaims.map((claim) => {
       let score = 0;
@@ -1036,7 +1050,7 @@ export class ClaimDatabaseService {
       const stmtLower = claim.statement.toLowerCase();
 
       // トークン分割マッチング
-      const words = qLower.split(/[\s,、。？！?!\-_/]+/i).filter((w) => w.length >= 2);
+      const words = queryWords;
       for (const w of words) {
         if (stmtLower.includes(w)) {
           score += 15;

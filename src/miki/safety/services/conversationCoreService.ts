@@ -1134,7 +1134,7 @@ export class ConversationCoreService {
     );
     if (!term) return null;
     const pick = (pool: string[]): string => pool[(prompt.length + term.length) % pool.length];
-    if (/嬉しい|うれしい|楽しい|よかった|すごい|やった|最高|面白い|かわいい|美味しい|気持ちいい/.test(prompt)) {
+    if (/嬉しい|うれしい|楽しい|よかった|すごい|やった|最高|面白い|かわいい|可愛い|美味しい|おいしい|気持ちいい/.test(prompt)) {
       return pick([
         `${term}、いいですね！`,
         `お、${term}ですか。なんだか楽しそうですね。`,
@@ -1155,7 +1155,12 @@ export class ConversationCoreService {
         `${term}、なるほどですね。`,
       ]);
     }
-    return null;
+    // P531: 短い発話でも主題語があれば受け止める（従来は null で
+    // 定型文に落ちていた）。
+    return pick([
+      `${term}、そうなんですね。`,
+      `${term}の話ですね。`,
+    ]);
   }
 
   private buildResult(

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1786,
     "sourceFileCount": 1339,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1250,
-    "relativeImportCandidateCount": 3894,
-    "resolvedRelativeImportCandidateCount": 3878,
+    "relativeImportCandidateCount": 3896,
+    "resolvedRelativeImportCandidateCount": 3880,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -11206,9 +11206,9 @@
     },
     {
       "path": "src/miki/conversation/services/paragraphCompositionService.ts",
-      "bytes": 6765,
-      "lines": 143,
-      "sha256": "5870a2a1e543357914f99c102a2543967f5bf13bbad0e51354cbc2f5e5ccef4e",
+      "bytes": 13232,
+      "lines": 287,
+      "sha256": "f6105e18737d9735b38b2c8ca62bb0a2ce91950fd9f0b32772bba149bc82a4aa",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -11230,13 +11230,19 @@
         },
         {
           "line": 4,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 5,
           "specifier": "../../../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         }
       ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
+      "relativeImportCandidateCount": 5,
+      "resolvedRelativeImportCount": 5,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -23843,9 +23849,9 @@
     },
     {
       "path": "src/miki/memory/services/claimDatabaseService.ts",
-      "bytes": 65354,
-      "lines": 1479,
-      "sha256": "9bd971adff7a934822fca436c47f0d65b2753601b6e69d56321fc574fa2a37cb",
+      "bytes": 66399,
+      "lines": 1493,
+      "sha256": "afdaccf36c3d7ed773a9ad60b0805850659a267d5face57254400d470b73533e",
       "relativeImportCandidates": [
         {
           "line": 10,
@@ -23876,10 +23882,16 @@
           "specifier": "./lexicalRelationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
+        },
+        {
+          "line": 15,
+          "specifier": "../../research/services/japaneseAnalysisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
         }
       ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
+      "relativeImportCandidateCount": 6,
+      "resolvedRelativeImportCount": 6,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -26800,9 +26812,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 68423,
-      "lines": 1187,
-      "sha256": "8acb135566b9fba57e81cda4448be756aaeb4f505efd5ae8ff7efc2dff627d1a",
+      "bytes": 68664,
+      "lines": 1192,
+      "sha256": "a96e5ce49b184342f18e791ff769d490a990536ca40dc208f1d754b11f176f97",
       "relativeImportCandidates": [
         {
           "line": 1,

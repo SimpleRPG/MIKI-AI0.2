@@ -1,101 +1,206 @@
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { roleplaySessionService } from './roleplaySessionService';
+import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 
 /**
- * P525/P526: 段落合成（決定論）。
+ * P525/P526/P528-P530: 段落合成（決定論）。
  *
  * 彼女の回答は「結論1文＋付属品」で終わりがちで、文章を段落として
  * 編む段が無かった。ここでは、彼女が既に検証済みで持っている材料
- * だけを使って、2文目・3文目を組み立てる。
+ * だけを使って、2文目・3文目を組み立てる。新しい事実は作らない。
+ * 材料が無ければ段落は付かない。
  *
- * P525 の材料:
- *   1. 世界モデルの確定した関係（仮の関係 provisional は使わない）
- *      を、関係タイプごとの言い換え型で文にする。
- *   2. 質問にマッチした補助 Claim の statement（検証済みの文その
- *      もの）を、重複しない範囲で1文添える。
- * 新しい事実は作らない。材料が無ければ段落は付かない。
+ * 材料の種類:
+ *   RELATION (P525): 世界モデルの確定した関係を、関係タイプごとの
+ *     言い換え型で文にする（仮の関係 provisional は使わない）。
+ *   CLAIM (P525): 同じ主題の検証済み Claim の statement そのもの。
+ *     findBestMatchingClaim の supportingClaims は主 Claim 自身しか
+ *     返さないため、台帳から直接拾う。
+ *   ANALOGY (P528): 類推の表現化。主題と同じ「関係の形」を持つ別の
+ *     実体（彼女がよく知っているもの）を引き、似ていることを言葉に
+ *     する。比喩は世界モデルの構造写像として作る。
+ *   SCENE (P526/P530): なりチャの地の文。場面に合う描写を、彼女が
+ *     学んだ Claim の描写文から優先して選び、無ければ場面の型から。
  *
- * P526 の材料（なりチャの地の文）:
- *   セッションの「場面」から、場面の質感を表す1文を選ぶ。創作の
- *   層の中だけの話で、事実の材料とは混ぜない。毎ターン付けると
- *   型が目立つので、種に応じて間引く。
+ * P529: 候補を作って選ぶ。材料は候補として集め、「適合」と「新し
+ * さ（最近使っていないか）」で採点して最大2文を選ぶ。使用した材
+ * 料は台帳に残し、同じ材料が続けて出ないようにする。材料が彼女の
+ * 中で育つほど、段落の顔ぶれは変わっていく。
  */
+
+type MaterialType = 'RELATION' | 'CLAIM' | 'ANALOGY';
+
+interface MaterialCandidate {
+  type: MaterialType;
+  key: string;
+  text: string;
+  fit: number;
+}
+
+interface UsageEntry {
+  key: string;
+  at: number;
+}
+
+const USAGE_KEY = 'miki_paragraph_material_usage_v1';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 class ParagraphCompositionService {
+  // ---- 使用台帳（新しさの物差し） ----
+
+  private loadUsage(): UsageEntry[] {
+    try {
+      const raw = storageService.getItem(USAGE_KEY);
+      const parsed = raw ? (JSON.parse(raw) as UsageEntry[]) : [];
+      const cutoff = Date.now() - 14 * DAY_MS;
+      return (Array.isArray(parsed) ? parsed : []).filter((e) => e && e.key && e.at >= cutoff).slice(-120);
+    } catch {
+      return [];
+    }
+  }
+
+  private recordUsage(keys: string[]): void {
+    try {
+      const usage = this.loadUsage();
+      const now = Date.now();
+      for (const key of keys) usage.push({ key, at: now });
+      storageService.setItem(USAGE_KEY, JSON.stringify(usage.slice(-120)));
+    } catch { /* 台帳は補助 */ }
+  }
+
+  private noveltyScore(key: string, usage: UsageEntry[]): number {
+    let last = 0;
+    for (const e of usage) if (e.key === key && e.at > last) last = e.at;
+    if (!last) return 1.5;
+    const age = Date.now() - last;
+    if (age < 60 * 60 * 1000) return -5;
+    if (age < DAY_MS) return -3;
+    return 1;
+  }
+
+  // ---- 段落の材料集めと選択 ----
+
   public buildSupplements(params: {
     subjectTerms: string[];
     supportingClaims: Array<{ claim_id: string; statement: string }>;
     excludeClaimId?: string;
     excludeText: string;
   }): string[] {
-    const out: string[] = [];
     const terms = [...new Set(params.subjectTerms)].filter((t) => t && t.length >= 2);
-    const usable = (statement: string): boolean =>
-      statement.length >= 8 &&
-      statement.length <= 140 &&
-      !params.excludeText.includes(statement.slice(0, 12)) &&
-      !out.some((s) => s.includes(statement.slice(0, 12)));
+    const candidates: MaterialCandidate[] = [];
+    const seenTexts: string[] = [params.excludeText];
+    const addCandidate = (c: MaterialCandidate) => {
+      if (!c.text) return;
+      if (seenTexts.some((s) => s.includes(c.text.slice(0, 12)))) return;
+      if (candidates.some((x) => x.text.includes(c.text.slice(0, 12)) || c.text.includes(x.text.slice(0, 12)))) return;
+      seenTexts.push(c.text);
+      candidates.push(c);
+    };
 
-    // 1. 世界モデルの関係を文にする
     try {
-      const entities = worldModelGraphService.entities();
-      // WorldRelation の from/to は実体の「名前」で保持されている。
-      const matchedNames = new Set(
-        entities
-          .filter((e) => terms.some((t) => t === e.name || t.includes(e.name)))
-          .map((e) => e.name),
-      );
-      if (matchedNames.size > 0) {
-        const relations = worldModelGraphService
-          .relations()
-          .filter((r) => !r.provisional && (matchedNames.has(r.from) || matchedNames.has(r.to)))
-          .sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
-        for (const relation of relations) {
-          const sentence = this.verbalizeRelation(relation.type, relation.from, relation.to);
-          if (sentence && !params.excludeText.includes(sentence.slice(0, 10))) {
-            out.push(sentence);
-            break;
+      this.collectRelationAndAnalogy(terms, addCandidate);
+    } catch {
+      /* 世界モデルが読めなければ Claim の材料だけにする */
+    }
+
+    // CLAIM: 台帳から同じ主題の検証済み Claim を拾う
+    if (terms.length > 0) {
+      try {
+        for (const claim of params.supportingClaims || []) {
+          if (params.excludeClaimId && claim.claim_id === params.excludeClaimId) continue;
+          const st = String(claim.statement || '').trim();
+          if (st.length >= 8 && st.length <= 140 && terms.some((t) => st.includes(t))) {
+            addCandidate({ type: 'CLAIM', key: `claim:${claim.claim_id}`, text: /[。．.]$/.test(st) ? st : `${st}。`, fit: 2 });
           }
         }
-      }
-    } catch {
-      /* 世界モデルが読めなければ Claim の段落だけにする */
-    }
-
-    // 2. 補助 Claim の文を添える。findBestMatchingClaim の
-    // supportingClaims は主 Claim 自身しか返さないため、同じ主題の
-    // 検証済み Claim を台帳から直接拾うのが本命の経路。
-    const pushClaim = (statement: string) => {
-      const st = String(statement || '').trim();
-      if (usable(st)) out.push(/[。．.]$/.test(st) ? st : `${st}。`);
-    };
-    for (const claim of params.supportingClaims || []) {
-      if (out.length >= 2) break;
-      if (params.excludeClaimId && claim.claim_id === params.excludeClaimId) continue;
-      pushClaim(claim.statement);
-    }
-    if (out.length < 2 && terms.length > 0) {
-      try {
         for (const claim of claimDatabaseService.listClaims()) {
-          if (out.length >= 2) break;
           if (params.excludeClaimId && claim.claim_id === params.excludeClaimId) continue;
           if (claim.status !== 'SUPPORTED' && claim.status !== 'DEVICE_VERIFIED') continue;
           const st = String(claim.statement || '').trim();
+          if (st.length < 8 || st.length > 140) continue;
           if (!terms.some((t) => st.includes(t))) continue;
-          pushClaim(st);
+          addCandidate({ type: 'CLAIM', key: `claim:${claim.claim_id}`, text: /[。．.]$/.test(st) ? st : `${st}。`, fit: 2 });
         }
       } catch {
-        /* 台帳が読めなければ関係の段落だけにする */
+        /* 台帳が読めなければ他の材料だけにする */
       }
     }
 
-    if (out.length > 0) {
-      try {
-        systemLogger.info('CHAT', `🧩 [段落合成] 検証済みの材料から ${out.length} 文の段落を編みました`);
-      } catch { /* ログは補助 */ }
+    if (candidates.length === 0) return [];
+
+    // P529: 適合＋新しさで採点し、種類の多様さを少し優遇して2文まで選ぶ
+    const usage = this.loadUsage();
+    const scored = candidates
+      .map((c) => ({ c, score: c.fit + this.noveltyScore(c.key, usage) }))
+      .sort((a, b) => b.score - a.score);
+    const picked: MaterialCandidate[] = [];
+    for (const { c, score } of scored) {
+      if (picked.length >= 2) break;
+      if (picked.length === 1 && picked[0].type === c.type) {
+        const diverse = scored.find((x) => x.c.type !== c.type && !picked.includes(x.c) && x.score >= score - 1);
+        if (diverse) {
+          picked.push(diverse.c);
+          continue;
+        }
+      }
+      picked.push(c);
     }
-    return out.slice(0, 2);
+
+    this.recordUsage(picked.map((c) => c.key));
+    try {
+      systemLogger.info('CHAT', `🧩 [段落合成] 候補 ${candidates.length} 件から ${picked.map((c) => c.type).join('+')} を選んで段落を編みました`);
+    } catch { /* ログは補助 */ }
+    return picked.map((c) => c.text);
+  }
+
+  private collectRelationAndAnalogy(
+    terms: string[],
+    addCandidate: (c: MaterialCandidate) => void,
+  ): void {
+    const entities = worldModelGraphService.entities();
+    const relations = worldModelGraphService.relations().filter((r) => !r.provisional);
+    // WorldRelation の from/to は実体の「名前」で保持されている。
+    const matchedNames: string[] = [];
+    for (const t of terms) {
+      for (const e of entities) {
+        if ((t === e.name || t.includes(e.name)) && !matchedNames.includes(e.name)) matchedNames.push(e.name);
+      }
+    }
+    if (matchedNames.length === 0) return;
+
+    const byConfidence = (a: { confidence?: number }, b: { confidence?: number }) => (b.confidence || 0) - (a.confidence || 0);
+    for (const r of relations.filter((r) => matchedNames.includes(r.from) || matchedNames.includes(r.to)).sort(byConfidence)) {
+      const sentence = this.verbalizeRelation(r.type, r.from, r.to);
+      if (sentence) {
+        addCandidate({ type: 'RELATION', key: `rel:${r.from}:${r.type}:${r.to}`, text: sentence, fit: 3 });
+      }
+    }
+
+    // P528: 類推。主題の関係と同じ形を持つ、よく知っている別の実体を引く。
+    const subject = matchedNames[0];
+    const familiarity = new Map<string, number>();
+    for (const r of relations) {
+      familiarity.set(r.from, (familiarity.get(r.from) || 0) + 1);
+      familiarity.set(r.to, (familiarity.get(r.to) || 0) + 1);
+    }
+    const subjectRelations = relations.filter((r) => r.from === subject && ['USED_FOR', 'CAUSES', 'ENABLES'].includes(r.type));
+    const analogyTypesUsed = new Set<string>();
+    for (const r of subjectRelations) {
+      if (analogyTypesUsed.size >= 2) break;
+      if (analogyTypesUsed.has(r.type)) continue;
+      const parallels = relations
+        .filter((x) => x.type === r.type && x.from !== subject && x.from !== r.to)
+        .sort((a, b) => (familiarity.get(b.from) || 0) - (familiarity.get(a.from) || 0));
+      const parallel = parallels[0];
+      if (!parallel) continue;
+      const text = this.verbalizeAnalogy(r.type, subject, r.to, parallel.from, parallel.to);
+      if (text) {
+        analogyTypesUsed.add(r.type);
+        addCandidate({ type: 'ANALOGY', key: `ana:${subject}:${r.type}:${parallel.from}`, text, fit: 2.5 });
+      }
+    }
   }
 
   private verbalizeRelation(type: string, from?: string, to?: string): string | undefined {
@@ -110,9 +215,27 @@ class ParagraphCompositionService {
     }
   }
 
+  private verbalizeAnalogy(type: string, subject: string, subjectTo: string, other: string, otherTo: string): string | undefined {
+    // 関係そのものの文と重ならないよう、対比の形で1文にまとめる。
+    switch (type) {
+      case 'USED_FOR':
+        return `${subject}が${subjectTo}に使われるのは、${other}が${otherTo}に使われるのに似ています。`;
+      case 'CAUSES':
+        return `${subject}が${subjectTo}を引き起こすのは、${other}が${otherTo}を引き起こすのに似ています。`;
+      case 'ENABLES':
+        return `${subject}があると${subjectTo}ができるのは、${other}があると${otherTo}ができるのに似ています。`;
+      default:
+        return undefined;
+    }
+  }
+
+  // ---- なりチャの地の文 ----
+
   /**
-   * P526: なりチャの場面の地の文（接尾辞として本文に足す1文）。
+   * P526/P530: 場面の地の文（接尾辞として本文に足す1文）。
    * セッションが無ければ undefined。約3回に1回は間引く。
+   * P530: 彼女が学んだ Claim の描写文（場面を含み、感覚の言葉を
+   * 持つもの）を優先し、最近使ったものは避ける。無ければ型から。
    */
   public sceneTextureSuffix(seedText: string): string | undefined {
     const session = roleplaySessionService.getSession();
@@ -121,6 +244,27 @@ class ParagraphCompositionService {
     if (!scene) return undefined;
     const seed = seedText.length + scene.length + (session.notedTerms?.length || 0);
     if (seed % 3 === 0) return undefined;
+
+    // P530: 学んだ描写文から選ぶ
+    try {
+      const usage = this.loadUsage();
+      const sensory = /景色|眺め|音|香|匂い|光|風|静か|ざわめき|輝|染ま|揺れ|温か|冷た|夕暮れ|朝日/;
+      const learned = claimDatabaseService
+        .listClaims()
+        .filter((c) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED'))
+        .map((c) => ({ claim: c, st: String(c.statement || '').trim() }))
+        .filter(({ st }) => st.length >= 8 && st.length <= 140 && st.includes(scene) && sensory.test(st))
+        .map(({ claim, st }) => ({ key: `scene:${claim.claim_id}`, text: /[。．.]$/.test(st) ? st : `${st}。`, novelty: this.noveltyScore(`scene:${claim.claim_id}`, usage) }))
+        .filter((x) => x.novelty > -3)
+        .sort((a, b) => b.novelty - a.novelty);
+      if (learned.length > 0) {
+        this.recordUsage([learned[0].key]);
+        return learned[0].text;
+      }
+    } catch {
+      /* 学んだ描写が無ければ型から選ぶ */
+    }
+
     const pools: Array<[RegExp, string[]]> = [
       [/教室|学校|授業/, ['黒板には、今日の予定が書かれています。', '窓の外からは、校庭のざわめきが聞こえてきます。']],
       [/海|浜|港|船/, ['波の音が、静かに繰り返し聞こえています。', '潮風が、頬を撫でていきます。']],
