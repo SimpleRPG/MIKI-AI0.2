@@ -947,7 +947,7 @@ export class ConversationCoreService {
     t = performance.now();
     // P522/P524: 開いた話題と、相手の状態の兆候を残す
     // （日をまたいだ会話の継続と、状態の流れの読みの土台）。
-    try { conversationOpenTopicService.record(nextState.currentTopic); } catch { /* 補助経路 */ }
+    try { conversationOpenTopicService.record(nextState.currentTopic, conversationOpenTopicService.salienceOf(prompt)); } catch { /* 補助経路 */ }
     try { userStateTrailService.recordFromText(prompt); } catch { /* 補助経路 */ }
 
     // P519: 全分岐の合流点で、未知語と（未設定なら）会話戦略を IR に

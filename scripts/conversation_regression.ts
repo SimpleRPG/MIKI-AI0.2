@@ -30,6 +30,9 @@ const { classifyDialogueAct } = await import('../src/miki/conversation/services/
 const { reviewReflectionService } = await import('../src/miki/selfAwareness/services/reviewReflectionService');
 const { worldModelCanvasExportService } = await import('../src/miki/selfAwareness/services/worldModelCanvasExportService');
 const { associationGraphService } = await import('../src/miki/memory/services/associationGraphService');
+const { knowledgeConsolidationService } = await import('../src/miki/selfAwareness/services/knowledgeConsolidationService');
+const { conversationOpenTopicService } = await import('../src/miki/conversation/services/conversationOpenTopicService');
+const { storageService } = await import('../src/services/storageService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -161,6 +164,26 @@ const assocList = associationGraphService.associations('連想鳥', 3);
 check('P541 共起から連想ができる', assocList.some((a) => a.name === '連想虫'), JSON.stringify(assocList));
 const assocSupp = paragraphCompositionService.buildSupplements({ subjectTerms: ['連想鳥'], supportingClaims: [], excludeText: 'テスト' });
 check('P541 連想は思い出します形式でのみ出る', assocSupp.some((s) => s.includes('連想虫のことも思い出します')), JSON.stringify(assocSupp));
+
+// ---- 統合パス（P542） ----
+worldModelGraphService.addRelation({ fromName: 'テスト獣A', toName: 'パル', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+worldModelGraphService.addRelation({ fromName: 'テスト獣B', toName: 'パル', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+worldModelGraphService.addRelation({ fromName: 'テスト獣A', toName: '綿毛', type: 'USED_FOR', provisional: false, confidence: 0.9 } as any);
+worldModelGraphService.addRelation({ fromName: 'テスト獣B', toName: '綿毛', type: 'USED_FOR', provisional: false, confidence: 0.9 } as any);
+const cons1 = knowledgeConsolidationService.runIfDue();
+const schemaClaims = claimDatabaseService.listClaims().filter((c) => (c as any).kind === 'SCHEMA');
+check('P542 共通の型が図式になる', Boolean(cons1 && cons1.schemas >= 1 && schemaClaims.some((c) => String(c.statement).includes('パル') && String(c.statement).includes('綿毛'))), JSON.stringify(schemaClaims.map((c) => c.statement)));
+const cons2 = knowledgeConsolidationService.runIfDue(Date.now() + 25 * 60 * 60_000);
+const schemaClaims2 = claimDatabaseService.listClaims().filter((c) => (c as any).kind === 'SCHEMA');
+check('P542 図式は重複して増えない', schemaClaims2.length === schemaClaims.length, `${schemaClaims.length} -> ${schemaClaims2.length}`);
+
+// ---- 重要度タギング（P543） ----
+check('P543 重要度は材料の合算で決まる', conversationOpenTopicService.salienceOf('これは大事だから覚えておいて') >= 3 && conversationOpenTopicService.salienceOf('今日はいい天気だね') === 1, '');
+storageService.setItem('miki_open_topics_v1', '');
+conversationOpenTopicService.record('軽い話題', 1);
+conversationOpenTopicService.record('大事な話題', 4);
+conversationOpenTopicService.record('別の軽い話題', 1);
+check('P543 大事な話題は軽い話題に消されない', conversationOpenTopicService.current()?.topic === '大事な話題', JSON.stringify(conversationOpenTopicService.current()));
 
 // ---- 結果 ----
 let fail = 0;

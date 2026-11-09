@@ -15,6 +15,7 @@ import { knowledgeSelfInspectionService } from '../../selfAwareness/services/kno
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { associationGraphService } from '../../memory/services/associationGraphService';
+import { knowledgeConsolidationService } from '../../selfAwareness/services/knowledgeConsolidationService';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -658,6 +659,12 @@ class AutonomousSelfImprovementLoopService {
       associationGraphService.rebuildIfDue();
     } catch (error) {
       systemLogger.warn('SELF_IMPROVEMENT', `[P541] 連想グラフの作り直しに失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    // P542: 統合パス（関係の再抽出と図式。24時間に1回まではサービス側）。
+    try {
+      knowledgeConsolidationService.runIfDue();
+    } catch (error) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[P542] 統合パスに失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
