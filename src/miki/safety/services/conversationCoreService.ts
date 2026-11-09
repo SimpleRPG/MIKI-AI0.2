@@ -43,6 +43,7 @@ import { conversationComponentPipelineService } from '../../conversation/service
 import { japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
 import { runtimeConversationCompositionService } from '../../conversation/services/runtimeConversationCompositionService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
+import { paragraphCompositionService } from '../../conversation/services/paragraphCompositionService';
 import { userStateTrailService } from '../../conversation/services/userStateTrailService';
 import { hybridConversationEngineService } from '../../conversation/services/hybridConversationEngineService';
 import { implementationSelectionService } from '../../strategy/services/implementationSelectionService';
@@ -656,8 +657,11 @@ export class ConversationCoreService {
       // 日常の発話（「いい天気だね」「散歩してきた」）が、知識の
       // 不足として「答えられない」に落ちていた。雑談は知識問題で
       // はないので、内容に反応して会話として受ける。
-      const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
+      const reactionBase = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
         ?? 'そうなんですね。話してくれてありがとう。';
+      // P526: なりチャ中は、場面の地の文を1文添えて段落にする
+      // （創作の層の中だけ。場面が無ければ何も付かない）。
+      const reaction = reactionBase + (paragraphCompositionService.sceneTextureSuffix(prompt) ?? '');
       ir = answerContentIrService.buildAnswerIR({
         conclusion: reaction,
         target: '日常対話',
@@ -956,8 +960,38 @@ export class ConversationCoreService {
       } catch { /* 戦略の補完は補助経路 */ }
     }
 
+    // P525: 段落合成の材料を IR に揃える。検証済みの世界モデルの
+    // 関係と補助 Claim を、結論とは別の段落として編む（描画は
+    // 表層生成側）。挨拶・受領・共感だけのターンには付けない。
+    if (
+      status === 'RESOLVED' &&
+      reason !== 'casual_chat_resolved' &&
+      reason !== 'empathy_fatigue_resolved' &&
+      reason !== 'user_fact_acknowledged' &&
+      !(ir as any).supplement_sentences?.length
+    ) {
+      try {
+        const supplements = paragraphCompositionService.buildSupplements({
+          subjectTerms: [nextState.currentTopic, ...(japaneseAnalysis?.contentTokens || [])].filter(Boolean) as string[],
+          supportingClaims: claimMatch.supportingClaims || [],
+          excludeClaimId: claimMatch.bestClaim?.claim_id,
+          excludeText: String((ir as any).conclusion || ''),
+        });
+        if (supplements.length > 0) (ir as any).supplement_sentences = supplements;
+      } catch { /* 段落合成は補助経路 */ }
+    }
+
     const runtimeComposition = runtimeConversationCompositionService.compose(ir, skeleton, { maxCandidates: 4, timeBudgetMs: 12, assembledCode });
     let surface = { surfaceText: runtimeComposition.surfaceText };
+
+    // P525: 合成の候補選択によっては段落が表層に乗らない経路が
+    // あるため、合流点で未収載の補足文だけを段落として足す
+    // （重複は文頭で判定して防ぐ）。
+    const supplementSentences = ((ir as any).supplement_sentences as string[] | undefined) || [];
+    if (supplementSentences.length > 0) {
+      const missing = supplementSentences.filter((s) => s && !surface.surfaceText.includes(s.slice(0, 12)));
+      if (missing.length > 0) surface.surfaceText += `\n\n${missing.join('')}`;
+    }
     const temporalGuard = verifyConversationEntityTimeStateConsistency(prompt, surface.surfaceText, nextState);
     usedComponents.push(`conversation.temporal_state_consistency:${temporalGuard.passed ? 'PASS' : 'BLOCK'}`);
     if (!temporalGuard.passed) {

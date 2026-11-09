@@ -265,6 +265,16 @@ export class AnswerContentIrService {
     let surfaceText = lines.join('\n').trim();
     if (!surfaceText) surfaceText = (formattedConclusion || '現時点では回答を確定できません。').trim();
 
+    // P525: 段落合成。結論1文で終わらせず、彼女が検証済みで持って
+    // いる材料（世界モデルの関係・補助 Claim）を、独立した段落と
+    // して編む。材料の用意は core 側（IR の supplement_sentences）。
+    // 新しい事実はここでも作らない。
+    const supplementSentences = ((ir as any).supplement_sentences as string[] | undefined) || [];
+    if (skeletonType === 'GENERAL_ANSWER' && !skipNextActionsAndQuestions && supplementSentences.length > 0) {
+      const fresh = supplementSentences.filter((s) => s && !surfaceText.includes(s.slice(0, 12)));
+      if (fresh.length > 0) surfaceText += `\n\n${fresh.join('')}`;
+    }
+
     // 指示書 1.3: EMPATHY_ONLY の場合、文末の質問表現（〜ですか？、〜いかがですか？等）を徹底排除
     if (isEmpathyOnly) {
       surfaceText = surfaceText
