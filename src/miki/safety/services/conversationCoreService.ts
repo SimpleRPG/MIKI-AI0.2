@@ -42,6 +42,8 @@ import { failureMemoryService } from '../../memory/services/failureMemoryService
 import { conversationComponentPipelineService } from '../../conversation/services/conversationComponentPipelineService';
 import { japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
 import { runtimeConversationCompositionService } from '../../conversation/services/runtimeConversationCompositionService';
+import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
+import { userStateTrailService } from '../../conversation/services/userStateTrailService';
 import { hybridConversationEngineService } from '../../conversation/services/hybridConversationEngineService';
 import { implementationSelectionService } from '../../strategy/services/implementationSelectionService';
 import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
@@ -597,6 +599,26 @@ export class ConversationCoreService {
         casualConclusion = 'こんにちは！本日もよろしくお願いいたします。準備万全です。';
       }
 
+      // P524: 疲労が直近72時間に前回分もあるなら、単発の共感では
+      // なく「続いている」ことを見た受け止めにする。
+      if (isFatigue && userStateTrailService.recentCount('fatigue', 72) >= 1) {
+        casualConclusion = 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。';
+      }
+      // P521: 定型の挨拶で終わらせず、内容のある雑談には内容へ
+      // 反応する（主題語＋感情の手がかり）。挨拶・感謝・疲労など
+      // の決まった受け止めが要る言い方では従来の文を優先する。
+      const isPhatic = isFatigue || /お疲れ|おつかれ|ありがとう|感謝|おはよう|元気/.test(prompt);
+      if (!isPhatic) {
+        const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
+        if (reaction) casualConclusion = reaction;
+      }
+      // P522: 前の日以前に開いた話題が残っていれば、挨拶のときに
+      // 一度だけ拾う。
+      if (/おはよう|こんにちは|ただいま|こんばんは|やあ/.test(prompt)) {
+        const openTopic = conversationOpenTopicService.takeCallbackTopic();
+        if (openTopic) casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
+      }
+
       const strategyResult = conversationStrategyService.selectConversationStrategy({
         prompt,
         stage: nextState.stage,
@@ -629,6 +651,22 @@ export class ConversationCoreService {
       skeleton = 'GENERAL_ANSWER';
       status = 'RESOLVED';
       reason = 'user_fact_acknowledged';
+    } else if (this.isConversationalFallthrough(prompt, dialogueAct)) {
+      // P521: 雑談の受け皿。質問でも依頼でもなく、調べる必要もない
+      // 日常の発話（「いい天気だね」「散歩してきた」）が、知識の
+      // 不足として「答えられない」に落ちていた。雑談は知識問題で
+      // はないので、内容に反応して会話として受ける。
+      const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
+        ?? 'そうなんですね。話してくれてありがとう。';
+      ir = answerContentIrService.buildAnswerIR({
+        conclusion: reaction,
+        target: '日常対話',
+        certainty: 'CERTAIN',
+        detailLevel: 'BRIEF',
+      });
+      skeleton = 'GENERAL_ANSWER';
+      status = 'RESOLVED';
+      reason = 'casual_chat_fallthrough';
     } else {
       status = 'UNRESOLVED';
       reason = claimMatch.unmetReason || 'knowledge_gap';
@@ -898,6 +936,11 @@ export class ConversationCoreService {
     nextState.explanationAdaptation = explanationAdaptation;
 
     t = performance.now();
+    // P522/P524: 開いた話題と、相手の状態の兆候を残す
+    // （日をまたいだ会話の継続と、状態の流れの読みの土台）。
+    try { conversationOpenTopicService.record(nextState.currentTopic); } catch { /* 補助経路 */ }
+    try { userStateTrailService.recordFromText(prompt); } catch { /* 補助経路 */ }
+
     // P519: 全分岐の合流点で、未知語と（未設定なら）会話戦略を IR に
     // 揃える。分岐ごとに渡す方式だと付いたり付かなかったりする。
     if (unknownTerms.length > 0 && !(ir as any).unknown_terms?.length) {
@@ -1023,6 +1066,62 @@ export class ConversationCoreService {
 
   private extractTopic(prompt: string): string {
     return prompt.replace(/^(ねえ|ちょっと|みき[、,]?)\s*/i, '').slice(0, 80);
+  }
+
+  /**
+   * P521: その発話が「雑談として受けるべき日常の発話」かどうか。
+   * 質問・依頼・調査が要る発話は雑談に倒さない（そちらは従来の
+   * 経路で扱う）。
+   */
+  private isConversationalFallthrough(prompt: string, dialogueAct: string): boolean {
+    // 注: dialogueAct の分類は粗く、日常の発言も QUESTION / REQUEST
+    // に倒れる（「いい天気だね」が QUESTION になる）。そのため行為
+    // 分類では絞らず、文の形そのもので判定する。
+    if (String(dialogueAct || '') === 'REQUEST_RECOMMENDATION') return false;
+    if (looksInterrogative(prompt)) return false;
+    if (/教えて|調べて|検索|何|なぜ|どうして|ですか|でしょうか/.test(prompt)) return false;
+    if (/(?:して|やって|作って|書いて|送って)(?:ください|くれ|ほしい|もらえる)|お願い/.test(prompt)) return false;
+    try {
+      if (unifiedWebResearchService.detectNeedForSearch(prompt).needsSearch) return false;
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * P521: 雑談への反応を、発話の内容から組み立てる。主題語を拾い、
+   * 感情の手がかり（上向き／大変）で受け止め方を変える。定型の
+   * 挨拶文と違い、そのターンの内容に触れた一文になる。
+   */
+  private buildCasualReaction(prompt: string, contentTokens: string[]): string | null {
+    const term = (contentTokens || []).find(
+      (t) => t.length >= 2 && !/^(今日|明日|昨日|今|これ|それ|あれ|ここ|そこ)$/.test(t)
+    );
+    if (!term) return null;
+    const pick = (pool: string[]): string => pool[(prompt.length + term.length) % pool.length];
+    if (/嬉しい|うれしい|楽しい|よかった|すごい|やった|最高|面白い|かわいい|美味しい|気持ちいい/.test(prompt)) {
+      return pick([
+        `${term}、いいですね！`,
+        `お、${term}ですか。なんだか楽しそうですね。`,
+        `${term}、それはよかったですね！`,
+      ]);
+    }
+    if (/大変|つらい|しんどい|悲しい|残念|ひどい|困った/.test(prompt)) {
+      return pick([
+        `${term}の件、大変でしたね。`,
+        `${term}、それはしんどかったですね。`,
+        `${term}の話、無理のない範囲で聞かせてくださいね。`,
+      ]);
+    }
+    if (prompt.length >= 10) {
+      return pick([
+        `${term}の話ですね。`,
+        `ふむ、${term}ですか。`,
+        `${term}、なるほどですね。`,
+      ]);
+    }
+    return null;
   }
 
   private buildResult(
