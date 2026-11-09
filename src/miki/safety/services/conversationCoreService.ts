@@ -591,8 +591,10 @@ export class ConversationCoreService {
         casualConclusion = '本当にお疲れ様でした。今日は大変でしたね。無理をなさらず、ゆっくり休んでくださいね。';
       } else if (/お疲れ|おつかれ/i.test(prompt)) {
         casualConclusion = 'お疲れ様です！本日も順調に進んでいます。';
-      } else if (/ありがとう|感謝/i.test(prompt)) {
+      } else if (/ありがと(?:う|ー)?|感謝/i.test(prompt)) {
         casualConclusion = 'どういたしまして！お役に立てて何よりです。';
+      } else if (/ごめん|すみません|申し訳/.test(prompt)) {
+        casualConclusion = '大丈夫ですよ。気にしないでくださいね。';
       } else if (/おはよ(?:う|ー)?/i.test(prompt)) {
         casualConclusion = 'おはようございます！今日も一日頑張りましょう。';
       } else if (/元気/.test(prompt)) {
@@ -609,7 +611,7 @@ export class ConversationCoreService {
       // P521: 定型の挨拶で終わらせず、内容のある雑談には内容へ
       // 反応する（主題語＋感情の手がかり）。挨拶・感謝・疲労など
       // の決まった受け止めが要る言い方では従来の文を優先する。
-      const isPhatic = isFatigue || /お疲れ|おつかれ|ありがとう|感謝|おはよ(?:う|ー)?|元気/.test(prompt);
+      const isPhatic = isFatigue || /お疲れ|おつかれ|ありがと(?:う|ー)?|感謝|ごめん|すみません|申し訳|おはよ(?:う|ー)?|元気/.test(prompt);
       if (!isPhatic) {
         const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
         if (reaction) casualConclusion = reaction;
@@ -660,19 +662,27 @@ export class ConversationCoreService {
       // はないので、内容に反応して会話として受ける。
       // P547: 宣言文として来た疲れの発話（「今日はへとへとだよ」）も、
       // 話題の反響ではなく共感で受ける。判定の語彙は userStateTrailService に集約。
+      // P548: 感謝・謝罪も同じで、分類が宣言文でも社交の受け止めを優先する。
       const fallthroughFatigue = userStateTrailService.isFatigueText(prompt);
+      const fallthroughThanks = /ありがと(?:う|ー)?|感謝/.test(prompt);
+      const fallthroughApology = /ごめん|すみません|申し訳/.test(prompt);
+      const fallthroughPhatic = fallthroughFatigue || fallthroughThanks || fallthroughApology;
       const reactionBase = fallthroughFatigue
         ? (userStateTrailService.recentCount('fatigue', 72) >= 1
           ? 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。'
           : '本当にお疲れ様でした。無理をなさらず、ゆっくり休んでくださいね。')
-        : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
-          ?? 'そうなんですね。話してくれてありがとう。');
+        : fallthroughThanks
+          ? 'どういたしまして！お役に立てて何よりです。'
+          : fallthroughApology
+            ? '大丈夫ですよ。気にしないでくださいね。'
+            : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
+              ?? 'そうなんですね。話してくれてありがとう。');
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
       // （創作の層の中だけ。場面が無ければ何も付かない）。
       // P536: 3ターンに1回は、地の文の代わりに場面の進行を添えて
       // 彼女の側から場面を一歩進める。
       const reaction = reactionBase
-        + (fallthroughFatigue
+        + (fallthroughPhatic
           ? ''
           : (paragraphCompositionService.sceneProgressionSuffix()
             ?? paragraphCompositionService.sceneTextureSuffix(prompt)

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1794,
     "sourceFileCount": 1347,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1258,
-    "relativeImportCandidateCount": 3963,
-    "resolvedRelativeImportCandidateCount": 3947,
+    "relativeImportCandidateCount": 3964,
+    "resolvedRelativeImportCandidateCount": 3948,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 25498,
-      "lines": 268,
-      "sha256": "dc1fc6ad3fd9e3b8066c518c97f12db56cf6df8830c5f9e96cd54fdfce7b043b",
+      "bytes": 27093,
+      "lines": 279,
+      "sha256": "105f6b6608f8377ac5e9a7de2e9bd6bfe5e2fba0dc3f33ce01542ad3f69fc8d8",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -1755,10 +1755,16 @@
           "specifier": "../src/miki/memory/services/projectNotebookService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/projectNotebookService.ts"
+        },
+        {
+          "line": 39,
+          "specifier": "../src/miki/research/services/autonomousSearchService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/autonomousSearchService.ts"
         }
       ],
-      "relativeImportCandidateCount": 20,
-      "resolvedRelativeImportCount": 20,
+      "relativeImportCandidateCount": 21,
+      "resolvedRelativeImportCount": 21,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -11455,9 +11461,9 @@
     },
     {
       "path": "src/miki/conversation/services/roleplaySessionService.ts",
-      "bytes": 10749,
+      "bytes": 10806,
       "lines": 283,
-      "sha256": "a8347b6363807850644e1eceb3f8623fddd1ce568f0afcf25f95d05c80a5df3b",
+      "sha256": "0d89bf018d96ecfa9405056c9cb187ea415d63fbbcef85e82fa465434ec137d4",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -25502,9 +25508,9 @@
     },
     {
       "path": "src/miki/research/services/autonomousSearchService.ts",
-      "bytes": 96623,
+      "bytes": 96637,
       "lines": 2168,
-      "sha256": "d85130ce4b1f6828f03526f955b1fb0f5c1780f9964c1f94b25ce2df899e01d7",
+      "sha256": "90f58c4ef14cf56ff649ad98ffa3c7dd91efd0c6afe1e6a8262da1e05a5856df",
       "relativeImportCandidates": [
         {
           "line": 6,
@@ -27077,9 +27083,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 71348,
-      "lines": 1236,
-      "sha256": "a350592ddb867b400aed7fe72d13345a6009c825d5b10518d85c15dac8b81ee0",
+      "bytes": 72148,
+      "lines": 1246,
+      "sha256": "803e1e08fcdf1ecf1c016cad7992eff3b70654b63cd97ef6f26f974367b3ce87",
       "relativeImportCandidates": [
         {
           "line": 1,

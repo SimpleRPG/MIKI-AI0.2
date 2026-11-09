@@ -255,7 +255,7 @@ export class RoleplaySessionService {
   public handleUserText(text: string, personaId: string): 'started' | 'ended' | undefined {
     const source = String(text || '');
     if (!source.trim()) return undefined;
-    if (/なりチャ(?:終わり|おわり|終了)|役を(?:終わり|おわり|終了|やめ)|なりきり(?:終わり|終了)/.test(source)) {
+    if (/なりチャ(?:終わり|おわり|終了|おしまい)|役を(?:終わり|おわり|終了|やめ)|なりきり(?:終わり|終了)|(?:普通|元)に(?:戻って|もどって)/.test(source)) {
       if (this.isActive()) {
         this.endSession();
         return 'ended';

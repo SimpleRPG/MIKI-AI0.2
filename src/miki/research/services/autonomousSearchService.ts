@@ -857,10 +857,10 @@ export class AutonomousSearchService {
     if (!t || t.length < 2) return { needsSearch: false };
 
     // 1. 明示的な検索指示
-    const explicitPattern = /(?:調べ|検索|ググっ|ネットで|リサーチ|情報集め|グーグル|google)(?:て|ろ|てみて|てほしい|た|る|ます)/i;
+    const explicitPattern = /(?:調べ|検索|ググっ|ネットで|リサーチ|情報集め|グーグル|google)(?:て|ろ|てみて|てほしい|た|る|ます|して)/i;
     if (explicitPattern.test(t)) {
       const cleaned = t
-        .replace(/(?:について|の事|のこと)?(?:調べ|検索|ググっ|ネットで|リサーチ)(?:て|ろ|てみて|てほしい|た|る|ます|くれ)?/gi, '')
+        .replace(/(?:について|の事|のこと)?(?:調べ|検索|ググっ|ネットで|リサーチ)(?:て|ろ|てみて|てほしい|た|る|ます|くれ|して)?/gi, '')
         .replace(/^[、。\s]+|[、。\s]+$/g, '')
         .trim();
       return {

@@ -36,6 +36,7 @@ const { storageService } = await import('../src/services/storageService');
 const { userKnowledgeProfileService } = await import('../src/miki/conversation/services/userKnowledgeProfileService');
 const { intakeMeaningGuardService } = await import('../src/miki/memory/services/intakeMeaningGuardService');
 const { projectNotebookService } = await import('../src/miki/memory/services/projectNotebookService');
+const { autonomousSearchService } = await import('../src/miki/research/services/autonomousSearchService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -251,6 +252,16 @@ check('P547 へとへと、でも疲れとして受ける', String((fatigueReply
 check('P547 〜になってから、では役は始まらない', roleplaySessionService.handleUserText('大人になってから決める', 'persona-default') === undefined && !roleplaySessionService.isActive(), '');
 check('P547 〜になって、で役が始まる', roleplaySessionService.handleUserText('先生になって', 'persona-default') === 'started' && roleplaySessionService.isActive(), '');
 check('P547 役を終われる', roleplaySessionService.handleUserText('なりチャ終わり', 'persona-default') === 'ended' && !roleplaySessionService.isActive(), '');
+
+// ---- 言い回しの変種その2（P548） ----
+const thanksReply = await conversationCoreService.execute({ prompt: 'ありがとー' } as any);
+check('P548 ありがとー、でも感謝として受ける', String((thanksReply as any).replyText || '').includes('どういたしまして'), String((thanksReply as any).replyText || '').slice(0, 120));
+const apologyReply = await conversationCoreService.execute({ prompt: 'ごめんね' } as any);
+check('P548 ごめんね、を受け止める', String((apologyReply as any).replyText || '').includes('大丈夫'), String((apologyReply as any).replyText || '').slice(0, 120));
+check('P548 なりチャおしまい、で役が終わる', roleplaySessionService.handleUserText('先生になって', 'persona-default') === 'started' && roleplaySessionService.handleUserText('なりチャおしまい', 'persona-default') === 'ended' && !roleplaySessionService.isActive(), '');
+check('P548 元に戻って、で役が終わる', roleplaySessionService.handleUserText('先生として話して', 'persona-default') === 'started' && roleplaySessionService.handleUserText('元に戻って', 'persona-default') === 'ended' && !roleplaySessionService.isActive(), '');
+const searchNeed = autonomousSearchService.detectNeedForSearch('モコロンの生息地を検索して');
+check('P548 検索して、を検索指示として拾う', searchNeed.needsSearch === true && searchNeed.category === 'explicit_request', JSON.stringify(searchNeed));
 
 // ---- 結果 ----
 let fail = 0;
