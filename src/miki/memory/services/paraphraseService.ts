@@ -111,9 +111,17 @@ function casualizeEndings(text: string, forVoice = false): string {
   // 否定カウントにも触れてしまうため、安全側に倒す。
   if (!forVoice) out = out.split('かもしれない。').join('かも。');
   out = out.split('である。').join('だよ。');
+  // P559: 依頼・共感の丁寧な文末も口調に寄せる（意味保存チェックが
+  // 通るものだけが採用される）。
+  out = out.split('ないでくださいね。').join('ないでね。');
+  out = out.split('てくださいね。').join('てね。');
+  out = out.split('ですよ。').join('だよ。');
+  out = out.split('ですね。').join('だね。');
   out = out.split('です。').join('だよ。');
   out = out.split('だろう。').join('だろうね。');
   if (out.endsWith('である')) out = `${out.slice(0, -3)}だよ`;
+  else if (out.endsWith('ですよ')) out = `${out.slice(0, -3)}だよ`;
+  else if (out.endsWith('ですね')) out = `${out.slice(0, -3)}だね`;
   else if (out.endsWith('です')) out = `${out.slice(0, -2)}だよ`;
   return out;
 }
@@ -237,7 +245,8 @@ class ParaphraseService {
     let changed = false;
     const out = sentences
       .map((sentence) => {
-        if (sentence.trim().length < 8) return sentence;
+        // P559: 短い文（「大丈夫ですよ。」等）こそ口調が出るので、下限は4文字に。
+        if (sentence.trim().length < 4) return sentence;
         if (/https?:\/\/|`|\{|\}|\[|\]/.test(sentence)) return sentence;
         const voiced = casualizeEndings(sentence, true);
         if (voiced === sentence) return sentence;

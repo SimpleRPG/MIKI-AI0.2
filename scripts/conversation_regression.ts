@@ -38,6 +38,7 @@ const { intakeMeaningGuardService } = await import('../src/miki/memory/services/
 const { projectNotebookService } = await import('../src/miki/memory/services/projectNotebookService');
 const { autonomousSearchService } = await import('../src/miki/research/services/autonomousSearchService');
 const { japaneseAnalysisService } = await import('../src/miki/research/services/japaneseAnalysisService');
+const { personaProfileService } = await import('../src/miki/conversation/services/personaProfileService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -348,6 +349,14 @@ check('P556 雑談の反応形が回転する', new Set(casualHeads).size === 3 
 check('P557 リスザルが1語になる', japaneseAnalysisService.analyze('リスザルかわいい').contentTokens.includes('リスザル'), JSON.stringify(japaneseAnalysisService.analyze('リスザルかわいい').contentTokens));
 check('P557 ワラビーが1語になる', japaneseAnalysisService.analyze('ワラビーが好き').contentTokens.includes('ワラビー'), JSON.stringify(japaneseAnalysisService.analyze('ワラビーが好き').contentTokens));
 check('P557 既存の語はそのまま', japaneseAnalysisService.analyze('モコロンはパルです').contentTokens.includes('モコロン'), JSON.stringify(japaneseAnalysisService.analyze('モコロンはパルです').contentTokens));
+
+// ---- 雑談の前置き除去（P558）とビービーの口調（P559） ----
+check('P558 雑談の返答に定型の前置きが付かない', !String((thanksReply as any).replyText || '').includes('前提として'), String((thanksReply as any).replyText || '').slice(0, 120));
+(globalThis as any).window = (globalThis as any).window ?? { dispatchEvent: () => true, addEventListener: () => {}, removeEventListener: () => {} };
+personaProfileService.switchProfile('persona-bibi');
+const bibiApology = await conversationCoreService.execute({ prompt: 'ごめんね' } as any);
+check('P559 ビービーの受け止めはタメ口になる', String((bibiApology as any).replyText || '').includes('大丈夫') && !String((bibiApology as any).replyText || '').includes('くださいね') && !String((bibiApology as any).replyText || '').includes('ですよ'), String((bibiApology as any).replyText || '').slice(0, 140));
+personaProfileService.switchProfile('persona-default');
 
 // ---- 結果 ----
 let fail = 0;

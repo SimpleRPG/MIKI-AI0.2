@@ -27,6 +27,8 @@ import { conversationUserFactRecallService, looksInterrogative, UserFactIntakeSu
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { storageService } from '../../../services/storageService';
+import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
+import { paraphraseService } from '../../memory/services/paraphraseService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { capabilityGraphService } from '../../capability/services/capabilityGraphService';
 import { componentCompositionService } from '../../capability/services/componentCompositionService';
@@ -623,6 +625,7 @@ export class ConversationCoreService {
         const openTopic = conversationOpenTopicService.takeCallbackTopic();
         if (openTopic) casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
       }
+      casualConclusion = this.applyPersonaVoice(casualConclusion);
 
       const strategyResult = conversationStrategyService.selectConversationStrategy({
         prompt,
@@ -634,7 +637,10 @@ export class ConversationCoreService {
         conclusion: casualConclusion,
         target: '日常対話・挨拶・共感',
         reasons: ['日常対話・挨拶・感情の受け止めとして認識しました。'],
-        conditions: isFatigue ? [] : ['前提として、いつでも作業指示やご相談を受け付けています。'],
+        // P558: 以前は定型の「前提」が付き、表面生成で「前提として、
+        // …受け付けています場合、」という壊れた前置きが雑談の返答に
+        // 混入していた。日常対話に前提条件は要らない。
+        conditions: [],
         certainty: 'CERTAIN',
         detailLevel: 'BRIEF',
         strategy: strategyResult.strategy,
@@ -689,7 +695,7 @@ export class ConversationCoreService {
             ?? paragraphCompositionService.sceneTextureSuffix(prompt)
             ?? ''));
       ir = answerContentIrService.buildAnswerIR({
-        conclusion: reaction,
+        conclusion: this.applyPersonaVoice(reaction),
         target: '日常対話',
         certainty: 'CERTAIN',
         detailLevel: 'BRIEF',
@@ -1176,6 +1182,18 @@ export class ConversationCoreService {
       return false;
     }
     return true;
+  }
+
+  /**
+   * P559: ビービーが有効なときだけ、雑談の受け止めに幼いタメ口を
+   * 適用する。P506 の口調寄せは P212 の回答経路にしか無く、日常の
+   * 雑談ではビービーも丁寧語のままだった。
+   */
+  private applyPersonaVoice(text: string): string {
+    try {
+      if (personaProfileService.get().profileId !== BIBI_PROFILE_ID) return text;
+      return paraphraseService.applyCasualVoice(text).text;
+    } catch { return text; }
   }
 
   /**
