@@ -28,6 +28,7 @@ import { conversationStrategyService } from '../../strategy/services/conversatio
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { storageService } from '../../../services/storageService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
+import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { capabilityGraphService } from '../../capability/services/capabilityGraphService';
@@ -514,6 +515,8 @@ export class ConversationCoreService {
     let skeleton: AnswerSkeletonType = 'GENERAL_ANSWER';
     let status: ConversationCoreResult['status'] = 'RESOLVED';
     let reason = implementationSelection.reason;
+    // P565: 知らない語への聞き返し（候補）。合成の後段で足す。
+    let pendingUnknownQuestion: { topic: string; question: string } | undefined;
     if (potentialUnknowns.length > 0) reason += `; potential_unknowns=${potentialUnknowns.length}${potentialUnknownGapId ? `; promoted_gap=${potentialUnknownGapId}` : ''}`;
     let verifiedResearchClaimId: string | undefined;
     let verifiedResearchOutcome: 'SUPPORTED' | 'DEVICE_VERIFIED' | undefined;
@@ -588,28 +591,36 @@ export class ConversationCoreService {
       });
     } else if (dialogueAct === 'CASUAL_CHAT') {
       const isFatigue = userStateTrailService.isFatigueText(prompt);
+      // P564: 定型の受け止め文も人格で出し分ける（ビービーは定型でも
+      // 丁寧語のままだった）。
+      let bibiCasual = false;
+      try { bibiCasual = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibiCasual = false; }
 
       let casualConclusion: string;
       if (isFatigue) {
-        casualConclusion = '本当にお疲れ様でした。今日は大変でしたね。無理をなさらず、ゆっくり休んでくださいね。';
+        casualConclusion = bibiCasual
+          ? 'おつかれさま！今日はたいへんだったね。無理しないで、ゆっくり休んでね。'
+          : '本当にお疲れ様でした。今日は大変でしたね。無理をなさらず、ゆっくり休んでくださいね。';
       } else if (/お疲れ|おつかれ/i.test(prompt)) {
-        casualConclusion = 'お疲れ様です！本日も順調に進んでいます。';
+        casualConclusion = bibiCasual ? 'おつかれさま！今日も順調だよ。' : 'お疲れ様です！本日も順調に進んでいます。';
       } else if (/ありがと(?:う|ー)?|感謝/i.test(prompt)) {
-        casualConclusion = 'どういたしまして！お役に立てて何よりです。';
+        casualConclusion = bibiCasual ? 'どういたしまして！役に立ててよかった！' : 'どういたしまして！お役に立てて何よりです。';
       } else if (/ごめん|すみません|申し訳/.test(prompt)) {
-        casualConclusion = '大丈夫ですよ。気にしないでくださいね。';
+        casualConclusion = bibiCasual ? '大丈夫だよ。気にしないでね。' : '大丈夫ですよ。気にしないでくださいね。';
       } else if (/おはよ(?:う|ー)?/i.test(prompt)) {
-        casualConclusion = 'おはようございます！今日も一日頑張りましょう。';
+        casualConclusion = bibiCasual ? 'おはよう！今日も一日がんばろうね。' : 'おはようございます！今日も一日頑張りましょう。';
       } else if (/元気/.test(prompt)) {
-        casualConclusion = '元気ですよ！声をかけてくれてありがとうございます。';
+        casualConclusion = bibiCasual ? '元気だよ！声をかけてくれてありがとう！' : '元気ですよ！声をかけてくれてありがとうございます。';
       } else {
-        casualConclusion = 'こんにちは！本日もよろしくお願いいたします。準備万全です。';
+        casualConclusion = bibiCasual ? 'こんにちは！今日もよろしくね。準備はばっちりだよ。' : 'こんにちは！本日もよろしくお願いいたします。準備万全です。';
       }
 
       // P524: 疲労が直近72時間に前回分もあるなら、単発の共感では
       // なく「続いている」ことを見た受け止めにする。
       if (isFatigue && userStateTrailService.recentCount('fatigue', 72) >= 1) {
-        casualConclusion = 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。';
+        casualConclusion = bibiCasual
+          ? 'ここ数日、おつかれが続いてるみたいだね。無理しないで、今日はゆっくり休んでね。'
+          : 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。';
       }
       // P521: 定型の挨拶で終わらせず、内容のある雑談には内容へ
       // 反応する（主題語＋感情の手がかり）。挨拶・感謝・疲労など
@@ -625,6 +636,7 @@ export class ConversationCoreService {
         const openTopic = conversationOpenTopicService.takeCallbackTopic();
         if (openTopic) casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
       }
+      if (!isPhatic) pendingUnknownQuestion = this.probeUnknownWord(prompt, unknownTerms);
       casualConclusion = this.applyPersonaVoice(casualConclusion);
 
       const strategyResult = conversationStrategyService.selectConversationStrategy({
@@ -694,6 +706,10 @@ export class ConversationCoreService {
           : (paragraphCompositionService.sceneProgressionSuffix()
             ?? paragraphCompositionService.sceneTextureSuffix(prompt)
             ?? ''));
+      // P565: 雑談の宣言文に出た知らない語は、その場でも一度だけ
+      // 聞き返す（P498 の背景学習とは別に、会話の中でも学ぶ入口）。
+      // 候補だけ用意し、実際に足すのは合成の後段（P525 と同じ場所）。
+      if (!fallthroughPhatic) pendingUnknownQuestion = this.probeUnknownWord(prompt, unknownTerms);
       ir = answerContentIrService.buildAnswerIR({
         conclusion: this.applyPersonaVoice(reaction),
         target: '日常対話',
@@ -1038,6 +1054,11 @@ export class ConversationCoreService {
       const missing = supplementSentences.filter((s) => s && !surface.surfaceText.includes(s.slice(0, 12)));
       if (missing.length > 0) surface.surfaceText += `\n\n${missing.join('')}`;
     }
+    // P565: 知らない語への聞き返しを足し、聞いたことを台帳に残す。
+    if (pendingUnknownQuestion && !surface.surfaceText.includes(pendingUnknownQuestion.question.slice(0, 12))) {
+      surface.surfaceText += `\n\n${pendingUnknownQuestion.question}`;
+      this.markUnknownAsked(pendingUnknownQuestion.topic);
+    }
     // P544: 相手が「知らない」と言っていた語が答えに出てきたら、
     // 辞書の短い説明を括弧で添える（1回の答えに1語まで）。
     try {
@@ -1182,6 +1203,30 @@ export class ConversationCoreService {
       return false;
     }
     return true;
+  }
+
+  /**
+   * P565: 知らない語への聞き返し候補を作る。同じ語は7日間は繰り返し
+   * 聞かない（台帳で管理）。なりチャ中は役を壊すので聞かない。
+   * 実際に足したときだけ markUnknownAsked で台帳に残す。
+   */
+  private probeUnknownWord(prompt: string, unknownTerms: string[]): { topic: string; question: string } | undefined {
+    try {
+      if (roleplaySessionService.isActive()) return undefined;
+      const topic = (unknownTerms || []).find((t) => t.length >= 2 && prompt.includes(t));
+      if (!topic) return undefined;
+      const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
+      if (Date.now() - (asked[topic] || 0) <= 7 * 24 * 3600_000) return undefined;
+      return { topic, question: `そういえば、「${topic}」って、どんなものですか？` };
+    } catch { return undefined; }
+  }
+
+  private markUnknownAsked(topic: string): void {
+    try {
+      const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
+      asked[topic] = Date.now();
+      storageService.setItem('miki_unknown_asked_v1', JSON.stringify(asked));
+    } catch { /* 台帳は補助 */ }
   }
 
   /**

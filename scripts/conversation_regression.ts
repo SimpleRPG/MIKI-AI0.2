@@ -385,6 +385,19 @@ check('P563 完了で次の手が今の作業になる', projectNotebookService.
 projectNotebookService.intakeFromUserText('EFRの当たり判定ができたらいいな');
 check('P563 仮定の完了では進まない', projectNotebookService.getWorkState('EFR')?.current === '当たり判定', JSON.stringify(projectNotebookService.getWorkState('EFR')));
 
+// ---- ビービーの定型の受け止め（P564） ----
+personaProfileService.switchProfile('persona-bibi');
+const bibiGreeting = await conversationCoreService.execute({ prompt: 'おはよー' } as any);
+check('P564 ビービーの挨拶はビービーの形になる', String((bibiGreeting as any).replyText || '').includes('おはよう！') && !String((bibiGreeting as any).replyText || '').includes('ございます'), String((bibiGreeting as any).replyText || '').slice(0, 120));
+personaProfileService.switchProfile('persona-default');
+
+// ---- 雑談で知らない語を聞き返す（P565） ----
+roleplaySessionService.endSession();
+const unknownAsk1 = await conversationCoreService.execute({ prompt: '今日クオッカ見たよ' } as any);
+check('P565 知らない語はその場で聞き返す', String((unknownAsk1 as any).replyText || '').includes('クオッカ') && String((unknownAsk1 as any).replyText || '').includes('どんなもの'), String((unknownAsk1 as any).replyText || '').slice(0, 160));
+const unknownAsk2 = await conversationCoreService.execute({ prompt: 'またクオッカ見たよ' } as any);
+check('P565 同じ語は繰り返し聞かない', !String((unknownAsk2 as any).replyText || '').includes('どんなもの'), String((unknownAsk2 as any).replyText || '').slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
