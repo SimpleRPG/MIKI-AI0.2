@@ -4,6 +4,7 @@ import { scopedVersionedMemoryService } from '../../memory/services/scopedVersio
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { roleplaySessionService } from './roleplaySessionService';
 import { personaProfileService } from './personaProfileService';
+import { userKnowledgeProfileService } from './userKnowledgeProfileService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { systemLogger } from '../../../services/systemLogger';
 
@@ -477,7 +478,33 @@ export class ConversationFactIntakeService {
       if (anyGloss && !userTaught) continue;
       if (userTaught && userTaught.gloss === gloss) continue;
       japaneseDictionaryService.addPersonal(term, { gloss, semanticIds: ['learned:user-taught'] });
+      // P544: 教えた語は「相手が知っている言葉」として記録する。
+      try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
       systemLogger.info('CHAT', `📖 [意味学習] ユーザーから「${term}」の意味を教わりました: ${gloss}`);
+    }
+  }
+
+  /**
+   * P544: 相手の知識モデルの材料集め。観測できる信号だけを見る:
+   * 「Xって何？」は知らない側、知らない側だった語を普通の文で
+   * 使ったら知っている側へ移す。
+   */
+  private observeUserKnowledgeSignals(text: string): void {
+    const value = String(text || '');
+    let questionedTerm: string | undefined;
+    for (const sentence of value.split(/(?<=。)/)) {
+      const m = sentence.trim().match(/^(.{1,12}?)(?:って|とは)(?:何|なに|どういう意味)/);
+      if (!m) continue;
+      const term = m[1].trim();
+      if (!term) continue;
+      if (/^(これ|それ|あれ|どれ|何|なに|ここ|そこ|あそこ)$/.test(term)) continue;
+      if (/[はがをにへともや、。！？!?「」『』（）()\s]/.test(term)) continue;
+      questionedTerm = term;
+      userKnowledgeProfileService.markUnknown(term);
+    }
+    for (const term of userKnowledgeProfileService.listUnknown()) {
+      if (term === questionedTerm) continue;
+      if (value.includes(term)) userKnowledgeProfileService.markKnown(term);
     }
   }
 
@@ -505,6 +532,11 @@ export class ConversationFactIntakeService {
     // 個人辞書に登録する。失敗しても事実取り込み自体は止めない。
     try {
       this.learnTermFromUserExplanation(text);
+    } catch { /* best-effort */ }
+    // P544: 相手の知識モデル（知っている言葉／知らない言葉）の
+    // 材料集め。失敗しても取り込み自体は止めない。
+    try {
+      this.observeUserKnowledgeSignals(text);
     } catch { /* best-effort */ }
     const { facts, invalidations } = this.extractUserFacts(text);
     const now = Date.now();

@@ -33,6 +33,7 @@ const { associationGraphService } = await import('../src/miki/memory/services/as
 const { knowledgeConsolidationService } = await import('../src/miki/selfAwareness/services/knowledgeConsolidationService');
 const { conversationOpenTopicService } = await import('../src/miki/conversation/services/conversationOpenTopicService');
 const { storageService } = await import('../src/services/storageService');
+const { userKnowledgeProfileService } = await import('../src/miki/conversation/services/userKnowledgeProfileService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -184,6 +185,24 @@ conversationOpenTopicService.record('軽い話題', 1);
 conversationOpenTopicService.record('大事な話題', 4);
 conversationOpenTopicService.record('別の軽い話題', 1);
 check('P543 大事な話題は軽い話題に消されない', conversationOpenTopicService.current()?.topic === '大事な話題', JSON.stringify(conversationOpenTopicService.current()));
+
+// ---- 相手の知識モデル（P544） ----
+conversationFactIntakeService.intakeFromUserText('ゾウガメって何？', []);
+check('P544 聞いた語は知らない側に入る', userKnowledgeProfileService.isUnknown('ゾウガメ'), JSON.stringify(userKnowledgeProfileService.listUnknown()));
+conversationFactIntakeService.intakeFromUserText('ゾウガメは大きいよ', []);
+check('P544 普通に使ったら知っている側へ移る', userKnowledgeProfileService.isKnown('ゾウガメ') && !userKnowledgeProfileService.isUnknown('ゾウガメ'), '');
+conversationFactIntakeService.intakeFromUserText('ホタルイカって、発光するイカのことだよ', []);
+check('P544 教えた語は知っている側に入る', userKnowledgeProfileService.isKnown('ホタルイカ'), '');
+conversationFactIntakeService.intakeFromUserText('ペンギンモドキって何？', []);
+conversationGraphRuntimeP212Service.ingestInput('regression-p544', '僕が知らない言葉はある？');
+const userKnowledgeAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p544');
+check('P544 知らない言葉を聞かれて答えられる', Boolean(userKnowledgeAnswer && userKnowledgeAnswer.includes('ペンギンモドキ')), String(userKnowledgeAnswer));
+japaneseDictionaryService.addPersonal('ミズクラゲ', { gloss: '傘を広げて漂うクラゲ', semanticIds: ['regression'] } as any);
+conversationFactIntakeService.intakeFromUserText('ミズクラゲって何？', []);
+claimDatabaseService.registerClaim({ statement: 'ミズクラゲは傘を広げて漂います。', world: 'REAL', kind: 'FACT', status: 'SUPPORTED', source: 'regression' } as any);
+const glossReply = await conversationCoreService.execute({ prompt: 'ミズクラゲについて教えて' } as any);
+const glossText = String((glossReply as any).replyText || '');
+check('P544 知らない語には説明が添えられる', glossText.includes('ミズクラゲ（傘を広げて漂うクラゲ）'), glossText.slice(0, 200));
 
 // ---- 結果 ----
 let fail = 0;

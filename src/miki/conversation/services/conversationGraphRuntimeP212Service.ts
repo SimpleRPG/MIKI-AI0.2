@@ -11,6 +11,7 @@ import { lexicalRelationService } from '../../memory/services/lexicalRelationSer
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { roleplaySessionService } from './roleplaySessionService';
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
+import { userKnowledgeProfileService } from './userKnowledgeProfileService';
 import { worldModelCanvasExportService } from '../../selfAwareness/services/worldModelCanvasExportService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
@@ -254,6 +255,12 @@ class ConversationGraphRuntimeP212Service {
   }
   return lines.join('\n');
  }
+ // P544: 相手の知識モデル（知らないと言っていた言葉）の想起。
+ private selfInquiryUserKnowledgeAnswer():string {
+  const unknown=userKnowledgeProfileService.listUnknown();
+  if(unknown.length===0)return 'あなたが「知らない」と言っていた言葉は、今のところ記録にありません。言葉の意味を聞かれたときに記録しています。';
+  return `あなたが前に「知らない」と言っていた言葉は、${unknown.slice(0,8).join('、')}です。その言葉を使うときは、短い説明を添えるようにしています。`;
+ }
  private selfInquiryCanvasExportAnswer():string {
   const result=worldModelCanvasExportService.exportNow();
   return `世界モデルを JSON Canvas 形式で書き出しました（実体 ${result.nodes} 件・関係 ${result.edges} 件）。ダウンロードフォルダの MIKI_RUNTIME_LOG.txt の末尾にも、区切り印つきで同じ内容を書き出してあります。`;
@@ -288,6 +295,9 @@ class ConversationGraphRuntimeP212Service {
   if(/振り返り/u.test(value)){
    const reflectionAnswer=this.selfInquiryReflectionAnswer();
    if(reflectionAnswer)return reflectionAnswer;
+  }
+  if(/(?:知らない|分からない)(?:言葉|単語)|知らない(?:言葉|単語)/u.test(value)){
+   return this.selfInquiryUserKnowledgeAnswer();
   }
   const projectAspectAnswer=this.selfInquiryProjectAspectAnswer(value,semantic?.terms??[]);
   if(projectAspectAnswer)return projectAspectAnswer;

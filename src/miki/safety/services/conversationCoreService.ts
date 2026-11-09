@@ -41,6 +41,8 @@ import { capabilityReuseService } from '../../capability/services/capabilityReus
 import { failureMemoryService } from '../../memory/services/failureMemoryService';
 import { conversationComponentPipelineService } from '../../conversation/services/conversationComponentPipelineService';
 import { japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
+import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
+import { userKnowledgeProfileService } from '../../conversation/services/userKnowledgeProfileService';
 import { runtimeConversationCompositionService } from '../../conversation/services/runtimeConversationCompositionService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
 import { paragraphCompositionService } from '../../conversation/services/paragraphCompositionService';
@@ -1011,6 +1013,21 @@ export class ConversationCoreService {
       const missing = supplementSentences.filter((s) => s && !surface.surfaceText.includes(s.slice(0, 12)));
       if (missing.length > 0) surface.surfaceText += `\n\n${missing.join('')}`;
     }
+    // P544: 相手が「知らない」と言っていた語が答えに出てきたら、
+    // 辞書の短い説明を括弧で添える（1回の答えに1語まで）。
+    try {
+      for (const term of userKnowledgeProfileService.listUnknown()) {
+        const idx = surface.surfaceText.indexOf(term);
+        if (idx < 0) continue;
+        if (surface.surfaceText[idx + term.length] === '（') continue;
+        const gloss = japaneseDictionaryService.lookup(term).find((e) => e.gloss)?.gloss;
+        if (!gloss) continue;
+        const short = String(gloss).replace(/[。．]$/, '').slice(0, 40);
+        if (!short || surface.surfaceText.includes(short)) continue;
+        surface.surfaceText = `${surface.surfaceText.slice(0, idx + term.length)}（${short}）${surface.surfaceText.slice(idx + term.length)}`;
+        break;
+      }
+    } catch { /* 説明添えは補助経路 */ }
     const temporalGuard = verifyConversationEntityTimeStateConsistency(prompt, surface.surfaceText, nextState);
     usedComponents.push(`conversation.temporal_state_consistency:${temporalGuard.passed ? 'PASS' : 'BLOCK'}`);
     if (!temporalGuard.passed) {
