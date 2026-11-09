@@ -645,6 +645,21 @@ export class ClaimDatabaseService {
       }
     }
 
+    // P512: ハブ抑制。1件の Claim が多数の既存 Claim と硬い矛盾を
+    // 作るのは、文の中に複数の主題が混ざった identity 破損
+    // （CLM-000104 型）の兆候であることが多い。上限を超えた分は
+    // 弱い矛盾として残し、リンクと DISPUTED 化から外す（信号自体
+    // は捨てない）。世界区分の混同は性質が違うため数えない。
+    const HARD_PAIR_CAP = 5;
+    let hardSeen = 0;
+    for (const entry of contradictoryList) {
+      if (entry.suppressedReason || entry.matchedPair === '世界区分の混同') continue;
+      hardSeen++;
+      if (hardSeen > HARD_PAIR_CAP) {
+        entry.suppressedReason = `ペア集中（ハブ疑い・上限${HARD_PAIR_CAP}件超過）`;
+      }
+    }
+
     return contradictoryList;
   }
 
@@ -716,11 +731,18 @@ export class ClaimDatabaseService {
       }
       return out;
     };
+    // P512: 共有の強さで段を付ける。3文字以上の内容語の完全一致が
+    // 1つ、または弱い共有（2文字の一致・語頭の部分一致）が2つ
+    // 無ければ主題が同じとはみなさない。2文字の汎用語が1つだけ
+    // 重なった別主題の文同士（例: どちらも「情報」を含むだけ）が
+    // 対立語で結ばれる誤検出を、弱い矛盾に留めるため。
+    const share = this.contentShareScore(stripPair(candidate.statement), stripPair(existing.statement));
     if (
-      !this.sharesContentToken(stripPair(candidate.statement), stripPair(existing.statement)) &&
+      share.strong < 1 &&
+      share.weak < 2 &&
       !this.hasSynonymBridge(candidate.statement, existing.statement)
     ) {
-      return '内容語の共有なし（対立語のみの一致）';
+      return '内容語の共有が弱い（対立語のみ／汎用語1つの一致）';
     }
     return undefined;
   }
@@ -744,12 +766,21 @@ export class ClaimDatabaseService {
   }
 
   /**
-   * P481: 両文が主題を担う内容語を共有するか。漢字・かな・英数の
-   * 2文字以上の語を拾い、対立語と一般語を除いて一致を見る。形態素
-   * 解析は使わない簡易判定（3文字以上の語は先頭2文字での部分一致も
-   * 共有とみなし、表記の揺れを吸収する）。
+   * P481: 両文が主題を担う内容語を共有するか（P512 で contentShareScore
+   * に実体を移した薄いラッパ）。
    */
   private sharesContentToken(a: string, b: string): boolean {
+    const score = this.contentShareScore(a, b);
+    return score.strong + score.weak >= 1;
+  }
+
+  /**
+   * P512: 内容語の共有を強弱で数える。完全一致した3文字以上の語を
+   * strong、2文字の完全一致と語頭2文字の部分一致を weak とする。
+   * sharesContentToken の素朴な「1つでも重なれば共有」では、汎用的な
+   * 2文字語1つの重なりで別主題のペアが素通りしていた。
+   */
+  private contentShareScore(a: string, b: string): { strong: number; weak: number } {
     const stop = new Set([
       'できる', 'できない', '発生する', '発生しない', '高速化する', '低速化する',
       '推奨', '非推奨', 'これ', 'それ', 'あれ', 'ため', 'こと', 'もの', 'よう',
@@ -764,11 +795,21 @@ export class ClaimDatabaseService {
     };
     const bText = String(b || '');
     const bTokens = new Set(tokens(bText));
+    let strong = 0;
+    let weak = 0;
+    const counted = new Set<string>();
     for (const token of tokens(a)) {
-      if (bTokens.has(token)) return true;
-      if (token.length >= 3 && bText.includes(token.slice(0, 2))) return true;
+      if (counted.has(token)) continue;
+      if (bTokens.has(token)) {
+        counted.add(token);
+        if (token.length >= 3) strong++;
+        else weak++;
+      } else if (token.length >= 3 && bText.includes(token.slice(0, 2))) {
+        counted.add(token);
+        weak++;
+      }
     }
-    return false;
+    return { strong, weak };
   }
 
   /**
