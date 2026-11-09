@@ -27,6 +27,8 @@ const { conversationFactIntakeService} = await import('../src/miki/conversation/
 const { conversationGraphRuntimeP212Service} = await import('../src/miki/conversation/services/conversationGraphRuntimeP212Service');
 const { roleplaySessionService} = await import('../src/miki/conversation/services/roleplaySessionService');
 const { classifyDialogueAct } = await import('../src/miki/conversation/services/conversationStateService');
+const { reviewReflectionService } = await import('../src/miki/selfAwareness/services/reviewReflectionService');
+const { worldModelCanvasExportService } = await import('../src/miki/selfAwareness/services/worldModelCanvasExportService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -80,6 +82,17 @@ check('P535 質問はQUESTIONのまま', classifyDialogueAct('モコロンって
 check('P535 依頼の形はREQUEST', classifyDialogueAct('モコロンについて調べてください') === 'REQUEST', classifyDialogueAct('モコロンについて調べてください'));
 check('P535 挨拶はCASUAL_CHATのまま', classifyDialogueAct('おはよう') === 'CASUAL_CHAT', classifyDialogueAct('おはよう'));
 
+const refl1 = reviewReflectionService.runNow();
+const refl2 = reviewReflectionService.runNow();
+check('P537 振り返りの問いが材料から答える', refl1.questionId === 'learned' && refl1.answer.includes('モコロン'), JSON.stringify(refl1));
+check('P537 問いがローテーションする', refl2.questionId === 'failure' && reviewReflectionService.runIfDue() === undefined, JSON.stringify(refl2));
+
+const canvas = worldModelCanvasExportService.buildCanvas();
+const canvasParsed = JSON.parse(canvas.json);
+check('P538 世界モデルがCanvas形式になる', canvas.nodes >= 5 && canvas.edges >= 5 && canvasParsed.nodes[0].type === 'text' && canvasParsed.edges.some((e: any) => e.label === 'IS_A'), JSON.stringify({ nodes: canvas.nodes, edges: canvas.edges }));
+worldModelCanvasExportService.exportNow();
+check('P538 書き出しが保存される', worldModelCanvasExportService.latestExport()?.nodes === canvas.nodes);
+
 // ---- 会話の流れ（コア経由） ----
 const greet = await conversationCoreService.execute({ prompt: 'おはよう'} as any);
 const gText = String((greet as any).replyText || '');
@@ -105,6 +118,14 @@ check('P518 教わった意味を覚える', japaneseDictionaryService.has('ホ�
 conversationGraphRuntimeP212Service.ingestInput('regression-p520', 'EFRの鍵はどうする？');
 const aspect = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p520');
 check('P520 決め事の側面質問に答える', Boolean(aspect && aspect.includes('鍵')), String(aspect).slice(0, 160));
+
+conversationGraphRuntimeP212Service.ingestInput('regression-p537', 'この前の振り返りは？');
+const reflectionAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p537');
+check('P537 振り返りを聞くと答える', Boolean(reflectionAnswer && reflectionAnswer.includes('振り返り')), String(reflectionAnswer).slice(0, 160));
+
+conversationGraphRuntimeP212Service.ingestInput('regression-p538', '世界モデルを書き出して');
+const exportAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p538');
+check('P538 書き出しを頼むと書き出す', Boolean(exportAnswer && exportAnswer.includes('JSON Canvas')), String(exportAnswer).slice(0, 160));
 
 // ---- なりチャ ----
 const role = roleplaySessionService.saveRole({ name: '先生', stance: '教師', world: '教室', toneHint: '', userRole: ''} as any);

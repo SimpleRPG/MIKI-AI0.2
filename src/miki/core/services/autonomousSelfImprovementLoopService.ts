@@ -12,6 +12,7 @@ import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { runtimeLogReviewService } from '../../selfAwareness/services/runtimeLogReviewService';
 import { knowledgeSelfInspectionService } from '../../selfAwareness/services/knowledgeSelfInspectionService';
+import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -631,6 +632,13 @@ class AutonomousSelfImprovementLoopService {
       knowledgeSelfInspectionService.inspect();
     } catch (error) {
       systemLogger.warn('SELF_IMPROVEMENT', `[P501] 知識・語彙の自己点検に失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    // P537: 振り返りの問いも同じ周期の集まりで回す（24時間に
+    // 1回までの判定はサービス側が持つ）。
+    try {
+      reviewReflectionService.runIfDue();
+    } catch (error) {
+      systemLogger.warn('SELF_IMPROVEMENT', `[P537] 振り返りの問いに失敗（ループは継続）: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

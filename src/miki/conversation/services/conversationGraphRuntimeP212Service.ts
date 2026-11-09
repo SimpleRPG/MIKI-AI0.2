@@ -10,6 +10,8 @@ import { webTermLearningService } from '../../research/services/webTermLearningS
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { roleplaySessionService } from './roleplaySessionService';
+import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
+import { worldModelCanvasExportService } from '../../selfAwareness/services/worldModelCanvasExportService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -241,6 +243,21 @@ class ConversationGraphRuntimeP212Service {
  }
  // P515: なりチャ中の役・場面・あらすじの想起。セッションが
  // 無いときは undefined を返して通常経路に委ねる。
+ private selfInquiryReflectionAnswer():string|undefined {
+  const records=reviewReflectionService.list();
+  if(records.length===0)return 'まだ振り返りをしたことがありません。振り返りは、自分の記録から決まった問いに答える営みで、定期的に行っています。';
+  const latest=records[records.length-1];
+  const lines=[`この前の振り返りでは、問い「${latest.question}」に、こう答えました。`,`${latest.answer}`];
+  if(records.length>=3){
+   const prev=records.slice(-3,-1).map(r=>`「${r.question}」→ ${r.answer}`).join('\n');
+   lines.push(`その前の振り返り:\n${prev}`);
+  }
+  return lines.join('\n');
+ }
+ private selfInquiryCanvasExportAnswer():string {
+  const result=worldModelCanvasExportService.exportNow();
+  return `世界モデルを JSON Canvas 形式で書き出しました（実体 ${result.nodes} 件・関係 ${result.edges} 件）。Obsidian などで開ける .canvas の中身として、自分の保存領域に置いてあります。`;
+ }
  private selfInquiryRoleAnswer():string|undefined {
   const session=roleplaySessionService.getSession();
   if(!session)return undefined;
@@ -264,6 +281,13 @@ class ConversationGraphRuntimeP212Service {
   if(/(?:今の|現在の)役|なりチャの(?:場面|あらすじ|続き)|あらすじ(?:は|って)/u.test(value)){
    const roleAnswer=this.selfInquiryRoleAnswer();
    if(roleAnswer)return roleAnswer;
+  }
+  if(/世界モデル.*(?:書き出|エクスポート|キャンバス)|(?:書き出|エクスポート).*世界モデル/u.test(value)){
+   return this.selfInquiryCanvasExportAnswer();
+  }
+  if(/振り返り/u.test(value)){
+   const reflectionAnswer=this.selfInquiryReflectionAnswer();
+   if(reflectionAnswer)return reflectionAnswer;
   }
   const projectAspectAnswer=this.selfInquiryProjectAspectAnswer(value,semantic?.terms??[]);
   if(projectAspectAnswer)return projectAspectAnswer;
