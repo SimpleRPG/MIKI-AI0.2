@@ -10,7 +10,7 @@ import { storageService } from '../../../services/storageService';
  * だけで、発話そのものは残さない。
  */
 
-export type UserStateSignal = 'fatigue' | 'positive';
+export type UserStateSignal = 'fatigue' | 'positive' | 'anxiety' | 'hunger';
 
 interface UserStateTrailEntry {
   signal: UserStateSignal;
@@ -23,6 +23,9 @@ const RETENTION_MS = 7 * 24 * 3600_000;
 
 const FATIGUE_PATTERN = /(?:疲れた|しんどい|もう無理|だるい|つらい|嫌になった|最悪|やってられない|勘弁して|眠い|眠たい|ねむたい|限界|へろへろ|へとへと|クタクタ)/;
 const POSITIVE_PATTERN = /(?:嬉しい|うれしい|楽しい|よかった|やった|最高|面白い|気持ちいい)/;
+// P573: 不安と空腹も「状態」として流れに残す（受け止めの継続判定に使う）。
+const ANXIETY_PATTERN = /(?:不安|心配|緊張|ドキドキ|気がかり|怖い|こわい)/;
+const HUNGER_PATTERN = /(?:お腹すいた|おなかすいた|お腹空いた|お腹が空いた|腹減った|はらへった|腹ペコ|はらぺこ)/;
 
 export class UserStateTrailService {
   private static instance: UserStateTrailService;
@@ -60,14 +63,28 @@ export class UserStateTrailService {
     return FATIGUE_PATTERN.test(String(text || ''));
   }
 
+  /** P573: 不安の言い回しかどうかだけを見る（記録はしない）。 */
+  public isAnxietyText(text: string): boolean {
+    return ANXIETY_PATTERN.test(String(text || ''));
+  }
+
+  /** P573: 空腹の言い回しかどうかだけを見る（記録はしない）。 */
+  public isHungerText(text: string): boolean {
+    return HUNGER_PATTERN.test(String(text || ''));
+  }
+
   /** 発話から兆候を読み、あれば記録して返す。 */
   public recordFromText(text: string): UserStateSignal | undefined {
     const source = String(text || '');
     const signal: UserStateSignal | undefined = FATIGUE_PATTERN.test(source)
       ? 'fatigue'
-      : POSITIVE_PATTERN.test(source)
-        ? 'positive'
-        : undefined;
+      : ANXIETY_PATTERN.test(source)
+        ? 'anxiety'
+        : HUNGER_PATTERN.test(source)
+          ? 'hunger'
+          : POSITIVE_PATTERN.test(source)
+            ? 'positive'
+            : undefined;
     if (!signal) return undefined;
     const entries = this.load();
     entries.push({ signal, at: Date.now() });

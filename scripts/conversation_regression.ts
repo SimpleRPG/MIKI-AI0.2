@@ -433,6 +433,20 @@ check('P571 背景で覚えた語が挨拶で報告される', String((learnGree
 const learnGreet2 = await conversationCoreService.execute({ prompt: 'こんにちは' } as any);
 check('P571 報告は一度だけ', !String((learnGreet2 as any).replyText || '').includes('調べて覚えました'), String((learnGreet2 as any).replyText || '').slice(0, 200));
 
+// ---- 別れ・出発・帰宅の挨拶と状態の受け止め（P572/P573） ----
+const departure = await conversationCoreService.execute({ prompt: '行ってきます' } as any);
+check('P572 行ってきます、には行ってらっしゃい', String((departure as any).replyText || '').includes('行ってらっしゃい'), String((departure as any).replyText || '').slice(0, 120));
+const homecoming = await conversationCoreService.execute({ prompt: 'ただいま' } as any);
+check('P572 ただいま、にはおかえり', String((homecoming as any).replyText || '').includes('おかえり'), String((homecoming as any).replyText || '').slice(0, 120));
+const goodbye = await conversationCoreService.execute({ prompt: 'じゃあね、また明日' } as any);
+check('P572 別れの挨拶を話題にしない', !String((goodbye as any).replyText || '').includes('じゃあの話') && (String((goodbye as any).replyText || '').includes('さようなら') || String((goodbye as any).replyText || '').includes('じゃあ、また')), String((goodbye as any).replyText || '').slice(0, 120));
+const hungry = await conversationCoreService.execute({ prompt: 'お腹すいた' } as any);
+check('P573 空腹は状態として受ける', String((hungry as any).replyText || '').includes('食べ'), String((hungry as any).replyText || '').slice(0, 120));
+const anxious = await conversationCoreService.execute({ prompt: '明日の発表、不安だ' } as any);
+check('P573 不安は状態として受け、知らない語は聞き返さない', (String((anxious as any).replyText || '').includes('大丈夫') || String((anxious as any).replyText || '').includes('心配') || String((anxious as any).replyText || '').includes('不安なのですね')) && !String((anxious as any).replyText || '').includes('どんなもの'), String((anxious as any).replyText || '').slice(0, 160));
+const agree = await conversationCoreService.execute({ prompt: 'そうだね' } as any);
+check('P573 短い同意は相槌で受ける', !String((agree as any).replyText || '').includes('そうだの話'), String((agree as any).replyText || '').slice(0, 120));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

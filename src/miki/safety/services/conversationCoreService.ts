@@ -612,8 +612,27 @@ export class ConversationCoreService {
       // これは挨拶のような純粋な定型への当て布。
       const fx = (category: string, mikiForms: string[], bibiForms: string[]) =>
         this.pickFixedReply(bibiCasual ? `${category}_bibi` : category, bibiCasual ? bibiForms : mikiForms);
+      // P572: 別れ・出発・帰宅の挨拶は、会話の締めとして最優先で受ける
+      // （「行ってきます」に「こんにちは」と返していた等）。
+      const closingFamily = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|バイバイ|さようなら|さよなら/.test(prompt);
       let casualConclusion: string;
-      if (isFatigue) {
+      if (/おやすみ/.test(prompt)) {
+        casualConclusion = fx('fx_goodnight',
+          ['おやすみなさい。今日も一日お疲れ様でした。', 'おやすみなさい。ゆっくり休んでくださいね。', 'おやすみなさい。いい夢を。'],
+          ['おやすみ！ゆっくり寝てね。', 'おやすみー！いい夢みてね。', 'おやすみ！今日もがんばったね。']);
+      } else if (/行ってきます|いってきます/.test(prompt)) {
+        casualConclusion = fx('fx_departure',
+          ['行ってらっしゃい！気をつけてくださいね。', '行ってらっしゃい。いい日になりますように。', '行ってらっしゃい。帰りを待っていますね。'],
+          ['いってらっしゃい！気をつけてね。', 'いってらっしゃい！がんばってね。', 'いってらっしゃーい！待ってるね。']);
+      } else if (/ただいま/.test(prompt)) {
+        casualConclusion = fx('fx_homecoming',
+          ['おかえりなさい！お疲れ様でした。', 'おかえりなさい。ゆっくりしてくださいね。', 'おかえりなさいませ！待っていましたよ。'],
+          ['おかえり！おつかれさま。', 'おかえりー！ゆっくりしてね。', 'おかえり！待ってたよ。']);
+      } else if (/じゃあね|じゃね|またね|バイバイ|さようなら|さよなら/.test(prompt)) {
+        casualConclusion = fx('fx_goodbye',
+          ['さようなら。またいつでも声をかけてくださいね。', 'じゃあ、また！今日もありがとうございました。', 'さようなら。またお話ししましょうね。'],
+          ['じゃあね！また話そうね。', 'ばいばーい！またね。', 'じゃあ、また！待ってるね。']);
+      } else if (isFatigue) {
         casualConclusion = fx('fx_fatigue',
           ['本当にお疲れ様でした。今日は大変でしたね。無理をなさらず、ゆっくり休んでくださいね。', 'お疲れ様でした。今日は大変でしたね。今日はゆっくり休んでくださいね。', '本当にお疲れ様でした。無理をなさらず、体を休めてくださいね。'],
           ['おつかれさま！今日はたいへんだったね。無理しないで、ゆっくり休んでね。', 'おつかれさま！今日はがんばったね。ゆっくり休んでね。', 'おつかれさま。無理しないで、今日は休んでね。']);
@@ -649,7 +668,7 @@ export class ConversationCoreService {
 
       // P524: 疲労が直近72時間に前回分もあるなら、単発の共感では
       // なく「続いている」ことを見た受け止めにする。
-      if (isFatigue && userStateTrailService.recentCount('fatigue', 72) >= 1) {
+      if (isFatigue && !closingFamily && userStateTrailService.recentCount('fatigue', 72) >= 1) {
         casualConclusion = fx('fx_fatigue_continued',
           ['ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。', 'お疲れが続いているみたいですね。今日は無理をせず、ゆっくり休んでくださいね。'],
           ['ここ数日、おつかれが続いてるみたいだね。無理しないで、今日はゆっくり休んでね。', 'おつかれ、続いてるね。今日は無理しないで休んでね。']);
@@ -657,7 +676,7 @@ export class ConversationCoreService {
       // P521: 定型の挨拶で終わらせず、内容のある雑談には内容へ
       // 反応する（主題語＋感情の手がかり）。挨拶・感謝・疲労など
       // の決まった受け止めが要る言い方では従来の文を優先する。
-      const isPhatic = isFatigue || /お疲れ|おつかれ|ありがと(?:う|ー)?|感謝|ごめん|すみません|申し訳|おはよ(?:う|ー)?|元気|起きた|目覚めた/.test(prompt);
+      const isPhatic = isFatigue || closingFamily || /お疲れ|おつかれ|ありがと(?:う|ー)?|感謝|ごめん|すみません|申し訳|おはよ(?:う|ー)?|元気|起きた|目覚めた/.test(prompt);
       if (!isPhatic) {
         const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
         if (reaction) casualConclusion = reaction;
@@ -733,21 +752,49 @@ export class ConversationCoreService {
       const fallthroughThanks = /ありがと(?:う|ー)?|感謝/.test(prompt);
       const fallthroughApology = /ごめん|すみません|申し訳/.test(prompt);
       const fallthroughWakeup = /起きた|目覚めた|起床/.test(prompt);
-      const fallthroughPhatic = fallthroughFatigue || fallthroughThanks || fallthroughApology || fallthroughWakeup;
+      // P573: 不安・空腹の状態も、話題の反響ではなく状態として受ける。
+      const fallthroughAnxiety = userStateTrailService.isAnxietyText(prompt);
+      const fallthroughHunger = userStateTrailService.isHungerText(prompt);
+      // P572: 別れ・出発・帰宅の挨拶（宣言文で来た場合）。
+      const fallthroughClosing = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|バイバイ|さようなら|さよなら/.test(prompt);
+      const fallthroughClosingText = !fallthroughClosing
+        ? undefined
+        : /おやすみ/.test(prompt)
+          ? this.pickFixedReply('fx_goodnight', ['おやすみなさい。今日も一日お疲れ様でした。', 'おやすみなさい。ゆっくり休んでくださいね。', 'おやすみなさい。いい夢を。'])
+          : /行ってきます|いってきます/.test(prompt)
+            ? this.pickFixedReply('fx_departure', ['行ってらっしゃい！気をつけてくださいね。', '行ってらっしゃい。いい日になりますように。', '行ってらっしゃい。帰りを待っていますね。'])
+            : /ただいま/.test(prompt)
+              ? this.pickFixedReply('fx_homecoming', ['おかえりなさい！お疲れ様でした。', 'おかえりなさい。ゆっくりしてくださいね。', 'おかえりなさいませ！待っていましたよ。'])
+              : this.pickFixedReply('fx_goodbye', ['さようなら。またいつでも声をかけてくださいね。', 'じゃあ、また！今日もありがとうございました。', 'さようなら。またお話ししましょうね。']);
+      // P573: 短い同意は話題ではなく相槌として受ける。
+      const trimmedPrompt = prompt.trim();
+      const fallthroughAgreement = trimmedPrompt.length <= 10 && /^(?:そうだね|そうそう|だよね|わかる|うん|はい|なるほど)/.test(trimmedPrompt);
+      const fallthroughPhatic = fallthroughFatigue || fallthroughThanks || fallthroughApology || fallthroughWakeup
+        || fallthroughAnxiety || fallthroughHunger || fallthroughClosing || fallthroughAgreement;
       // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
       const taughtAck = this.taughtTermAcknowledgement(prompt);
       const reactionBase = taughtAck ?? (fallthroughFatigue
         ? (userStateTrailService.recentCount('fatigue', 72) >= 1
           ? 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。'
           : '本当にお疲れ様でした。無理をなさらず、ゆっくり休んでくださいね。')
-        : fallthroughThanks
-          ? 'どういたしまして！お役に立てて何よりです。'
-          : fallthroughApology
-            ? '大丈夫ですよ。気にしないでくださいね。'
-            : fallthroughWakeup
-              ? this.pickFixedReply('fx_wakeup', ['おはようございます！よく眠れましたか？', 'おはようございます。目覚めはいかがですか？', 'おはようございます！今日もいい日になりますように。'])
-              : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
-                ?? 'そうなんですね。話してくれてありがとう。'));
+        : fallthroughAnxiety
+          ? (userStateTrailService.recentCount('anxiety', 72) >= 1
+            ? 'このところ、心配事が続いているみたいですね。無理をしないでくださいね。'
+            : this.pickFixedReply('fx_anxiety', ['大丈夫ですか？無理をしないでくださいね。', '心配なのですね。話せる範囲で聞かせてくださいね。', '不安なのですね。そばにいますよ。']))
+          : fallthroughHunger
+            ? this.pickFixedReply('fx_hunger', ['お腹が空いたのですね。何か食べられるといいですね。', 'お腹が空きましたか。何か食べましょう。', '空腹なのですね。まずは一息ついて、何か口にしてくださいね。'])
+            : fallthroughClosingText
+              ? fallthroughClosingText
+              : fallthroughThanks
+                ? 'どういたしまして！お役に立てて何よりです。'
+                : fallthroughApology
+                  ? '大丈夫ですよ。気にしないでくださいね。'
+                  : fallthroughWakeup
+                    ? this.pickFixedReply('fx_wakeup', ['おはようございます！よく眠れましたか？', 'おはようございます。目覚めはいかがですか？', 'おはようございます！今日もいい日になりますように。'])
+                    : fallthroughAgreement
+                      ? this.pickFixedReply('fx_agree', ['そうですよね。', 'うんうん、分かります。', 'そうですね。同感です。'])
+                      : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
+                        ?? 'そうなんですね。話してくれてありがとう。'));
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
       // （創作の層の中だけ。場面が無ければ何も付かない）。
       // P536: 3ターンに1回は、地の文の代わりに場面の進行を添えて
