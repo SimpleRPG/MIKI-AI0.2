@@ -184,13 +184,14 @@ export class RuntimeConversationCompositionService {
     // 自体は書き換えない。
     const activeRole = roleplaySessionService.getActiveRole();
     const roleFlavorText = activeRole ? [activeRole.toneHint, activeRole.stance].filter(Boolean).join(' ') : '';
-    const communicationStyle = roleFlavorText
-      ? personaProfileService.deriveCommunicationStyle({
+    const effectiveProfile = roleFlavorText
+      ? {
           ...personaProfile,
           personalityText: `${personaProfile.personalityText} ${roleFlavorText}`,
-          speakingStyle: `${personaProfile.speakingStyle} ${roleFlavorText}`,
-        })
-      : personaProfileService.deriveCommunicationStyle(personaProfile);
+          speakingStyle: `${personaProfile.speakingStyle ?? ''} ${roleFlavorText}`,
+        }
+      : personaProfile;
+    const communicationStyle = personaProfileService.deriveCommunicationStyle(effectiveProfile);
     const surfacePersona = {
       politeness: communicationStyle.politeness >= 80 ? 'VERY_POLITE' : communicationStyle.politeness <= 35 ? 'CASUAL' : 'CASUAL_POLITE',
       warmth: communicationStyle.warmth >= 80 ? 'HIGH' : communicationStyle.warmth <= 35 ? 'LOW' : 'MEDIUM_HIGH',
@@ -198,6 +199,13 @@ export class RuntimeConversationCompositionService {
       verbosity: communicationStyle.verbosity <= 35 ? 'CONCISE' : communicationStyle.verbosity >= 80 ? 'DETAILED' : 'ADAPTIVE',
       technicalTerminology: communicationStyle.technicalExplanation ? 'BALANCED' : 'PLAIN_LANGUAGE',
       humor: communicationStyle.humor,
+      // P517: 導出できるようになった3軸も合成に渡す（今までは
+      // 既定値で固定されていた）。
+      directness: communicationStyle.directness >= 75 ? 'HIGH' : communicationStyle.directness <= 35 ? 'LOW' : 'MEDIUM',
+      proactiveSuggestion: communicationStyle.proactiveness >= 75 ? 'ACTIVE' : communicationStyle.proactiveness >= 45 ? 'MODERATE' : 'OFF',
+      prudence: communicationStyle.prudence >= 85 ? 'VERY_HIGH' : communicationStyle.prudence >= 55 ? 'HIGH' : 'MEDIUM',
+      // P516: その人格自身の言い回し（性格文の具体例から抽出）。
+      interjections: personaProfileService.exampleInterjections(effectiveProfile),
     } as Partial<MultiAxisPersonaConfig>;
     const cacheKey = stableSignature(ir, primarySkeleton, options.assembledCode, personaProfile.profileId, personaProfile.revision, activeRole ? `${activeRole.roleId}:${roleFlavorText}` : '');
     const cached = this.cache.get(cacheKey);

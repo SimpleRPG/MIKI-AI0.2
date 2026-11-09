@@ -39,6 +39,12 @@ export interface PersonaCommunicationStyle {
   // これが無いと humor は既定 OFF のまま固定され、言い回しプールの
   // ユーモア行が誰にも出なかった。
   humor: 'OFF' | 'LIGHT' | 'MODERATE';
+  // P517: 直接さ・積極性・慎重さ。MultiAxisPersonaConfig 側には
+  // 項目があったのに、性格文からの導出が無く既定値で固定されて
+  // いた軸。
+  directness: number;
+  proactiveness: number;
+  prudence: number;
 }
 
 export interface PersonaProfileReceipt {
@@ -139,15 +145,43 @@ class PersonaProfileService {
   }
 
   deriveCommunicationStyle(profile: PersonaProfile): PersonaCommunicationStyle {
-    const text = profile.personalityText.toLowerCase();
+    // P517: 性格文だけでなく話し方スタイルも読む（話し方も性格の
+    // 一部）。キーワード辞書を拡張し、直接さ・積極性・慎重さの
+    // 導出と、ユーモアの LIGHT 段を足した。
+    const text = `${profile.personalityText} ${profile.speakingStyle ?? ''}`.toLowerCase();
     return {
-      politeness: clamp(has(text, ['丁寧', '礼儀', 'polite']) ? 85 : 65),
-      warmth: clamp(has(text, ['温か', '親し', '優し', 'warm', 'friendly']) ? 85 : 60),
-      formality: clamp(has(text, ['格式', 'フォーマル', 'formal']) ? 80 : has(text, ['気軽', 'カジュアル']) ? 35 : 55),
-      verbosity: clamp(has(text, ['詳し', '丁寧に説明']) ? 75 : has(text, ['簡潔', '短く']) ? 30 : 50),
+      politeness: clamp(has(text, ['丁寧', '礼儀', '敬語', 'polite']) ? 85 : has(text, ['タメ口', '率直', 'カジュアル', '気軽']) ? 45 : 65),
+      warmth: clamp(has(text, ['温か', '親し', '優し', '穏やか', 'ほんわか', 'warm', 'friendly']) ? 85 : has(text, ['厳し', '冷静', 'クール', '淡々']) ? 45 : 60),
+      formality: clamp(has(text, ['格式', 'フォーマル', 'きっちり', '真面目', 'formal']) ? 80 : has(text, ['気軽', 'カジュアル', 'くだけた', 'フランク', 'ラフ']) ? 35 : 55),
+      verbosity: clamp(has(text, ['詳し', '丁寧に説明', 'じっくり']) ? 75 : has(text, ['簡潔', '短く', '手短', '端的に']) ? 30 : 50),
       technicalExplanation: has(text, ['分かりやす', '専門語', '解説', '説明']),
-      humor: has(text, ['幼', '元気', '明る', 'おっちょこちょい', 'ユーモア', '面白', 'あほ']) ? 'MODERATE' : 'OFF',
+      humor: has(text, ['幼', '元気', '明る', 'おっちょこちょい', 'ユーモア', '面白', 'あほ', '陽気', '天真爛漫']) ? 'MODERATE' : has(text, ['親しみやす', '茶目っ気', 'フレンドリー']) ? 'LIGHT' : 'OFF',
+      directness: clamp(has(text, ['直接', '率直', 'はっきり', 'ストレート', '単刀直入']) ? 85 : has(text, ['遠回し', '婉曲', 'やんわり', '控えめ']) ? 35 : 55),
+      proactiveness: clamp(has(text, ['積極', '提案', '先回り', 'リード']) ? 80 : has(text, ['受け身', '聞き役', 'サポート役']) ? 35 : 55),
+      prudence: clamp(has(text, ['慎重', '注意深', '確実', '用心']) ? 85 : has(text, ['大胆', '思い切', '勢い']) ? 35 : 60),
     };
+  }
+
+  /**
+   * P516: 性格文・話し方に書かれた本人の言い回しの具体例（「」や
+   * （）の中の感嘆の言葉）を抽出する。〜形の語尾パターン、疑問形、
+   * 文の断片（「わかんない」のような否定形）は除き、短い感嘆だけを
+   * その人格専用の言い回しとして返す。汎用の言い回しプールと違い、
+   * ここで拾った言葉は他の人格には漏れない。
+   */
+  public exampleInterjections(profile: PersonaProfile): string[] {
+    const text = `${profile.personalityText} ${profile.speakingStyle ?? ''}`;
+    const found: string[] = [];
+    for (const group of text.matchAll(/[「（(]([^」）)]{1,40})[」）)]/g)) {
+      for (const raw of group[1].split(/[、,・]/)) {
+        const item = raw.trim();
+        if (item.length < 2 || item.length > 6) continue;
+        if (!/^[ぁ-んァ-ヶー]+$/.test(item)) continue;
+        if (item.endsWith('ない')) continue;
+        if (!found.includes(item)) found.push(item);
+      }
+    }
+    return found.slice(0, 6);
   }
 
   preview(profile: PersonaProfile): Record<'short' | 'technical' | 'correction' | 'unknown', string> {

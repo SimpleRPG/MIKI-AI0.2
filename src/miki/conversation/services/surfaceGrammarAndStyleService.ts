@@ -141,7 +141,14 @@ export class SurfaceGrammarAndStyleService {
     if (!isCriticalScene && persona.humor !== 'OFF') {
       const humorItem = surfaceVariationService.getHumorLine(persona.humor);
       if (humorItem) {
-        result += `\n\n${humorItem.text}`;
+        // P516: その人格自身の言い回し（性格文の具体例から抽出）が
+        // あれば、ユーモア行の頭に本人の感嘆を添える。汎用プールと
+        // 違い、抽出元の人格にだけ効くので他の人格には漏れない。
+        const interjections = (persona as { interjections?: string[] }).interjections;
+        const own = interjections && interjections.length > 0
+          ? interjections[(baseText.length + humorItem.text.length) % interjections.length]
+          : '';
+        result += `\n\n${own ? `${own}！ ` : ''}${humorItem.text}`;
       }
     }
 
