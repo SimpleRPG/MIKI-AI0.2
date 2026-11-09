@@ -419,6 +419,20 @@ check('P566 挨拶が毎回同じ文にならない', String((greet1 as any).rep
 const wakeup = await conversationCoreService.execute({ prompt: '今起きたよ' } as any);
 check('P566 起きた、にも朝の挨拶で返す', String((wakeup as any).replyText || '').includes('おはよう'), String((wakeup as any).replyText || '').slice(0, 120));
 
+// ---- 振り返りと学習報告が挨拶に出る（P570/P571） ----
+storageService.setItem('miki_review_reflections_v1', JSON.stringify({ records: [{ questionId: 'test', question: '今日のテストの問い', answer: 'テストの答えです', at: Date.now() }], lastRunAt: Date.now() }));
+storageService.setItem('miki_reflection_surfaced_v1', '0');
+const reflectGreet = await conversationCoreService.execute({ prompt: 'こんにちは' } as any);
+check('P570 今日の振り返りが挨拶に出る', String((reflectGreet as any).replyText || '').includes('今日のテストの問い'), String((reflectGreet as any).replyText || '').slice(0, 200));
+const askedLedger = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}');
+askedLedger['ワラビー'] = Date.now() - 2 * 3600_000;
+storageService.setItem('miki_unknown_asked_v1', JSON.stringify(askedLedger));
+japaneseDictionaryService.addPersonal('ワラビー', { gloss: '小型のカンガルーの仲間', semanticIds: ['learned:web'] } as any);
+const learnGreet = await conversationCoreService.execute({ prompt: 'おはよう' } as any);
+check('P571 背景で覚えた語が挨拶で報告される', String((learnGreet as any).replyText || '').includes('ワラビー') && String((learnGreet as any).replyText || '').includes('調べて覚えました'), String((learnGreet as any).replyText || '').slice(0, 200));
+const learnGreet2 = await conversationCoreService.execute({ prompt: 'こんにちは' } as any);
+check('P571 報告は一度だけ', !String((learnGreet2 as any).replyText || '').includes('調べて覚えました'), String((learnGreet2 as any).replyText || '').slice(0, 200));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

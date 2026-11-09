@@ -29,6 +29,7 @@ import { adaptExplanationDetailLevel } from '../../conversation/services/convers
 import { storageService } from '../../../services/storageService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
+import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { capabilityGraphService } from '../../capability/services/capabilityGraphService';
@@ -668,7 +669,19 @@ export class ConversationCoreService {
       // 一度だけ拾う。
       if (/おはよ(?:う|ー)?|こんにちは|ただいま|こんばんは|やあ/.test(prompt)) {
         const openTopic = conversationOpenTopicService.takeCallbackTopic();
-        if (openTopic) casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
+        if (openTopic) {
+          casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
+        } else {
+          // P571/P570: 挨拶の場で、彼女の側の近況も1件だけ出す。
+          // 優先順位は、背景で学べた語の報告 → 今日の振り返り。
+          const report = this.learnedTermReport();
+          if (report) {
+            casualConclusion += `\n${report}`;
+          } else {
+            const mention = this.reflectionMention();
+            if (mention) casualConclusion += `\n${mention}`;
+          }
+        }
       }
       if (!isPhatic) pendingUnknownQuestion = this.probeUnknownWord(prompt, unknownTerms);
       casualConclusion = this.applyPersonaVoice(casualConclusion);
@@ -1261,6 +1274,52 @@ export class ConversationCoreService {
       storageService.setItem(key, JSON.stringify(usage));
       return forms[index];
     } catch { return forms[0]; }
+  }
+
+  /**
+   * P571: 以前聞き返した語を背景学習で覚えていたら、挨拶のときに
+   * 一度だけ報告する。ユーザーに教わった語（P567）は既にその場で
+   * 「覚えました」と伝えているので対象外。
+   */
+  private learnedTermReport(): string | undefined {
+    try {
+      if (roleplaySessionService.isActive()) return undefined;
+      const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
+      const reported = JSON.parse(storageService.getItem('miki_learned_report_v1') || '{}') as Record<string, number>;
+      for (const [term, at] of Object.entries(asked)) {
+        if (reported[term]) continue;
+        if (Date.now() - Number(at || 0) < 3600_000) continue;
+        const entries = japaneseDictionaryService.lookup(term);
+        if (entries.length === 0) continue;
+        if (entries.some((e: any) => (e.semanticIds || []).includes('learned:user-taught'))) continue;
+        const gloss = entries.find((e: any) => e.gloss)?.gloss;
+        reported[term] = Date.now();
+        storageService.setItem('miki_learned_report_v1', JSON.stringify(reported));
+        return gloss
+          ? `そういえば、この前聞いた「${term}」、調べて覚えました。${String(gloss).slice(0, 60)}という意味だそうです。`
+          : `そういえば、この前聞いた「${term}」、調べて覚えました。`;
+      }
+    } catch { /* 報告は補助 */ }
+    return undefined;
+  }
+
+  /**
+   * P570: 今日の振り返りがまだ表に出ていなければ、挨拶のときに
+   * 一度だけ口に出す。古い振り返りは聞かれたときだけ答える。
+   */
+  private reflectionMention(): string | undefined {
+    try {
+      if (roleplaySessionService.isActive()) return undefined;
+      const latest = reviewReflectionService.list().slice(-1)[0] as any;
+      if (!latest?.at || !latest.question || !latest.answer) return undefined;
+      const surfaced = Number(storageService.getItem('miki_reflection_surfaced_v1') || 0);
+      if (Number(latest.at) <= surfaced) return undefined;
+      const d = new Date(Number(latest.at));
+      const now = new Date();
+      if (d.getFullYear() !== now.getFullYear() || d.getMonth() !== now.getMonth() || d.getDate() !== now.getDate()) return undefined;
+      storageService.setItem('miki_reflection_surfaced_v1', String(latest.at));
+      return `そういえば、今日の振り返りで「${latest.question}」と考えて、${latest.answer}と答えました。`;
+    } catch { return undefined; }
   }
 
   /**
