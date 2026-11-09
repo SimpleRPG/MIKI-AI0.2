@@ -165,7 +165,7 @@ class ConversationGraphRuntimeP212Service {
  // shares no WordNet synset with 言い回し in the bundled assets,
  // so it is not aliased to the phrasing store here.
  private computeSelfInquiry(text:string,semantic?:{terms:string[];tokens:JapaneseToken[];hasQuestion:boolean}):string|undefined {
-  const byPattern=this.computeSelfInquiryByPattern(text);
+  const byPattern=this.computeSelfInquiryByPattern(text,semantic);
   if(byPattern!==undefined)return byPattern;
   if(!semantic)return undefined;
   return this.computeSelfInquiryByMeaning(semantic);
@@ -220,6 +220,25 @@ class ConversationGraphRuntimeP212Service {
   if(decisions.length===0)return `${project}の決め事は、プロジェクトノートにまだ登録されていません。`;
   return `${project}の決め事はプロジェクトノートに${decisions.length}件あります。\n`+decisions.map((decision,index)=>`${index+1}. ${decision.text}`).join('\n');
  }
+ // P520: プロジェクト名＋決め事に含まれる言葉で聞かれたら、その
+ // 決め事で答える（例：「EFRのマップはどうするの？」）。一覧の
+ // 想起とは別に、相方として普通に話すときの材料にする。
+ private selfInquiryProjectAspectAnswer(value:string,terms:string[]):string|undefined {
+  const project=projectNotebookService.findProjectInText(value);
+  if(!project)return undefined;
+  const decisions=projectNotebookService.listDecisions(project);
+  if(decisions.length===0)return undefined;
+  const aspectTerms=terms.filter((term)=>(term.length>=2||/^[一-龥]$/.test(term))&&term!==project&&!['する','どう','ある','いる','なる','こと','もの','ため','よう'].includes(term));
+  let hits=decisions.filter((decision)=>aspectTerms.some((term)=>decision.text.includes(term)));
+  if(hits.length===0){
+   // 内容語化で落ちた短い漢字（例：「鍵」）は、決め事の主題語
+   // （文頭から助詞までの語）が本文に含まれるかでも照合する。
+   const body=value.replace(project,'');
+   hits=decisions.filter((decision)=>{const head=decision.text.split(/[はがをにへとで、。・（）]/)[0];return head.length>=1&&body.includes(head);});
+  }
+  if(hits.length===0)return undefined;
+  return `${project}については、こう決まっています。\n`+hits.map((decision)=>`・${decision.text}`).join('\n');
+ }
  // P515: なりチャ中の役・場面・あらすじの想起。セッションが
  // 無いときは undefined を返して通常経路に委ねる。
  private selfInquiryRoleAnswer():string|undefined {
@@ -232,7 +251,7 @@ class ConversationGraphRuntimeP212Service {
   if(session.summary)lines.push(`あらすじ：${session.summary}`);
   return lines.join('\n');
  }
- private computeSelfInquiryByPattern(text:string):string|undefined {
+ private computeSelfInquiryByPattern(text:string,semantic?:{terms:string[]}):string|undefined {
   const value=text.trim();
   const dictMatch=value.match(/(.{1,24}?)(?:は|って)(?:辞書|じしょ)に(?:ある|載って|入って)/u);
   if(dictMatch){
@@ -246,6 +265,8 @@ class ConversationGraphRuntimeP212Service {
    const roleAnswer=this.selfInquiryRoleAnswer();
    if(roleAnswer)return roleAnswer;
   }
+  const projectAspectAnswer=this.selfInquiryProjectAspectAnswer(value,semantic?.terms??[]);
+  if(projectAspectAnswer)return projectAspectAnswer;
   const projectMatch=value.match(/(.{1,24}?)(?:の)?(?:決め事|決定事項|方針|ルール)/u);
   if(projectMatch){
    const projectAnswer=this.selfInquiryProjectAnswer(projectMatch[1]);
