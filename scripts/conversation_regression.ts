@@ -204,6 +204,15 @@ const glossReply = await conversationCoreService.execute({ prompt: 'ミズクラ
 const glossText = String((glossReply as any).replyText || '');
 check('P544 知らない語には説明が添えられる', glossText.includes('ミズクラゲ（傘を広げて漂うクラゲ）'), glossText.slice(0, 200));
 
+// ---- 状態スナップショット（P545） ----
+conversationGraphRuntimeP212Service.ingestInput('regression-p545', '状態を書き出して');
+const snapshotAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p545');
+check('P545 状態の書き出しに答える', Boolean(snapshotAnswer && snapshotAnswer.includes('状態スナップショットを書き出しました')), String(snapshotAnswer));
+const snapshotRaw = storageService.getItem('miki_state_snapshot_v1');
+let snapshotJson = '';
+try { snapshotJson = String((JSON.parse(String(snapshotRaw)) as any).json || ''); } catch { /* 検証側で失敗させる */ }
+check('P545 スナップショットに中身が入っている', snapshotJson.includes('モコロン') && snapshotJson.includes('miki-state-snapshot/1'), snapshotJson.slice(0, 120));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

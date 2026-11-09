@@ -13,6 +13,7 @@ import { roleplaySessionService } from './roleplaySessionService';
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 import { userKnowledgeProfileService } from './userKnowledgeProfileService';
 import { worldModelCanvasExportService } from '../../selfAwareness/services/worldModelCanvasExportService';
+import { stateSnapshotExportService } from '../../selfAwareness/services/stateSnapshotExportService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -261,6 +262,11 @@ class ConversationGraphRuntimeP212Service {
   if(unknown.length===0)return 'あなたが「知らない」と言っていた言葉は、今のところ記録にありません。言葉の意味を聞かれたときに記録しています。';
   return `あなたが前に「知らない」と言っていた言葉は、${unknown.slice(0,8).join('、')}です。その言葉を使うときは、短い説明を添えるようにしています。`;
  }
+ // P545: 状態スナップショット（知識・部品の中身）の書き出し。
+ private selfInquiryStateSnapshotAnswer():string {
+  const result=stateSnapshotExportService.exportNow();
+  return `状態スナップショットを書き出しました（Claim ${result.claims} 件・辞書 ${result.dictionary} 件・世界モデル 実体 ${result.entities}・関係 ${result.relations}・部品 ${result.components} 件${result.truncated?'・抜粋':''}）。ダウンロードフォルダの MIKI_RUNTIME_LOG.txt の末尾に、区切り印つきで入れてあります。ログを渡してもらえれば、中身まで確認できます。`;
+ }
  private selfInquiryCanvasExportAnswer():string {
   const result=worldModelCanvasExportService.exportNow();
   return `世界モデルを JSON Canvas 形式で書き出しました（実体 ${result.nodes} 件・関係 ${result.edges} 件）。ダウンロードフォルダの MIKI_RUNTIME_LOG.txt の末尾にも、区切り印つきで同じ内容を書き出してあります。`;
@@ -288,6 +294,9 @@ class ConversationGraphRuntimeP212Service {
   if(/(?:今の|現在の)役|なりチャの(?:場面|あらすじ|続き)|あらすじ(?:は|って)/u.test(value)){
    const roleAnswer=this.selfInquiryRoleAnswer();
    if(roleAnswer)return roleAnswer;
+  }
+  if(/状態.*(?:書き出|エクスポート)|(?:書き出|エクスポート).*状態/u.test(value)){
+   return this.selfInquiryStateSnapshotAnswer();
   }
   if(/世界モデル.*(?:書き出|エクスポート|キャンバス)|(?:書き出|エクスポート).*世界モデル/u.test(value)){
    return this.selfInquiryCanvasExportAnswer();
