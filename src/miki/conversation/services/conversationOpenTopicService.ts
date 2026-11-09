@@ -8,6 +8,11 @@ import { storageService } from '../../../services/storageService';
  * かった。ここでは最後に開いた話題と、その日付だけを小さく保持し、
  * 別の日の挨拶のときに一度だけ「その後どうなりました？」と
  * 拾えるようにする。
+ *
+ * P553: 保持を1件から最大3件のリストにした。話題は1つとは限らず、
+ * 1件だけだと新しい話題が前の話題を常に消してしまった。拾うときは
+ * 重要度の高い順。14日より古い話題は静かに捨てる。保存形式は配列に
+ * なるが、旧形式（単一オブジェクト）もそのまま読める。
  */
 
 interface OpenTopicRecord {
@@ -39,20 +44,22 @@ export class ConversationOpenTopicService {
     return ConversationOpenTopicService.instance;
   }
 
-  private load(): OpenTopicRecord | null {
+  private load(): OpenTopicRecord[] {
     try {
       const raw = storageService.getItem(STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as OpenTopicRecord;
-      return parsed && typeof parsed.topic === 'string' ? parsed : null;
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as unknown;
+      const list = (Array.isArray(parsed) ? parsed : [parsed]) as OpenTopicRecord[];
+      const cutoff = dayKey(Date.now() - 14 * 24 * 3600_000);
+      return list.filter((r) => r && typeof r.topic === 'string' && typeof r.openedDay === 'string' && r.openedDay >= cutoff);
     } catch {
-      return null;
+      return [];
     }
   }
 
-  private save(record: OpenTopicRecord): void {
+  private save(records: OpenTopicRecord[]): void {
     try {
-      storageService.setItem(STORAGE_KEY, JSON.stringify(record));
+      storageService.setItem(STORAGE_KEY, JSON.stringify(records.slice(-3)));
     } catch { /* 保持は補助経路 */ }
   }
 
@@ -71,41 +78,51 @@ export class ConversationOpenTopicService {
 
   /**
    * 今の話題を開いた話題として記録する。同じ話題は開いた日を保ち、
-   * 重要度は高い方を残す。別の話題が来たら、未消費で重要度が高い
-   * 既存の話題は軽い話題に上書きされない（P543）。
+   * 重要度は高い方を残す（P543）。保持は最大3件で、溢れるときは
+   * 重要度が低く古いものから外す（P553）。
    */
   public record(topic?: string, salience = 1): void {
     const clean = String(topic || '').trim();
     if (!clean || clean.length > 24) return;
     const weight = Math.max(1, Math.min(5, Math.round(salience) || 1));
-    const current = this.load();
-    if (current && current.topic === clean) {
-      const merged = Math.max(current.weight || 1, weight);
-      if (merged !== (current.weight || 1)) this.save({ ...current, weight: merged });
+    const records = this.load();
+    const existing = records.find((r) => r.topic === clean);
+    if (existing) {
+      existing.weight = Math.max(existing.weight || 1, weight);
+      this.save(records);
       return;
     }
-    if (current && !current.consumedDay && weight < (current.weight || 1)) return;
-    this.save({ topic: clean, openedDay: dayKey(Date.now()), weight });
+    records.push({ topic: clean, openedDay: dayKey(Date.now()), weight });
+    records.sort((a, b) => (a.weight || 1) - (b.weight || 1) || a.openedDay.localeCompare(b.openedDay));
+    this.save(records.slice(-3));
   }
 
-  /** 現在保持している話題（テスト・自己照会用）。 */
-  public current(): OpenTopicRecord | null {
+  /** 保持している話題の一覧（テスト・状態書き出し用）。 */
+  public listPending(): OpenTopicRecord[] {
     return this.load();
   }
 
+  /** 代表の話題（重要度が最も高く、同点なら新しいもの）。 */
+  public current(): OpenTopicRecord | null {
+    const records = this.load();
+    if (records.length === 0) return null;
+    return [...records].sort((a, b) => (b.weight || 1) - (a.weight || 1) || b.openedDay.localeCompare(a.openedDay))[0];
+  }
+
   /**
-   * 前の日以前に開いた話題を、今日まだ拾っていなければ返す
-   * （返した時点で今日分は消費済みにする）。
+   * 前の日以前に開いた話題を、重要度の高い順に1つ返す
+   * （返した話題は保持から外す）。
    */
   public takeCallbackTopic(): string | undefined {
-    const record = this.load();
-    if (!record) return undefined;
+    const records = this.load();
     const today = dayKey(Date.now());
-    if (record.openedDay >= today) return undefined;
-    if (record.consumedDay === today) return undefined;
-    record.consumedDay = today;
-    this.save(record);
-    return record.topic;
+    const eligible = records
+      .filter((r) => r.openedDay < today && r.consumedDay !== today)
+      .sort((a, b) => (b.weight || 1) - (a.weight || 1) || a.openedDay.localeCompare(b.openedDay));
+    const picked = eligible[0];
+    if (!picked) return undefined;
+    this.save(records.filter((r) => r !== picked));
+    return picked.topic;
   }
 }
 
