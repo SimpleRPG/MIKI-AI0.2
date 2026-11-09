@@ -229,7 +229,8 @@ class CoreTaskIngressService {
   // 既に名前で始まる回答には重ねない。
   {
    const activePersonaName=(personaProfileService.get().name||'').trim();
-   if(activePersonaName&&finalResponse.trim()&&!finalResponse.startsWith(`【${activePersonaName}】`))finalResponse=`【${activePersonaName}】${finalResponse}`;
+   const marker=activePersonaName?`【${personaProfileService.avatarText()} ${activePersonaName}】`:'';
+   if(marker&&finalResponse.trim()&&!finalResponse.startsWith(marker))finalResponse=`${marker}${finalResponse}`;
   }
   const result=coreOrchestratorService.finalizeConversationResponse(taskId,finalResponse,{passed:answerValidationPassed,failedReasons:[...new Set(failedReasons)]});
   if(!result)failedReasons.push('CORE_FINALIZATION_RESULT_MISSING');

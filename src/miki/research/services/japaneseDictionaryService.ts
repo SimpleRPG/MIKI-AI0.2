@@ -258,7 +258,7 @@ class JapaneseDictionaryService {
     if (this.savePersonalTimer) return;
     this.savePersonalTimer = setTimeout(() => {
       this.savePersonalTimer = null;
-      try { storageService.setItem(PERSONAL_KEY, JSON.stringify([...this.personal.values()].slice(-5000))); } catch { systemLogger.warn('CHAT', '[JapaneseDictionary] personal dictionary persistence unavailable'); }
+      try { const all=[...this.personal.values()]; if (all.length>5000) systemLogger.warn('CHAT', `[JapaneseDictionary] 個人辞書が保存上限5000件を超えたため、古い${all.length-5000}件は保存されません（メモリ内には保持）`); storageService.setItem(PERSONAL_KEY, JSON.stringify(all.slice(-5000))); } catch { systemLogger.warn('CHAT', '[JapaneseDictionary] personal dictionary persistence unavailable'); }
     }, 150);
   }
   private loadPackages() {

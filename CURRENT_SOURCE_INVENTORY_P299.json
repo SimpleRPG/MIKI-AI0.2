@@ -11147,9 +11147,9 @@
     },
     {
       "path": "src/miki/conversation/services/personaProfileService.ts",
-      "bytes": 19202,
-      "lines": 437,
-      "sha256": "7f9165547d4c82b430fdb2b667c533f23dd8232b3f5eaa2247faa3cba4e74b5f",
+      "bytes": 19367,
+      "lines": 442,
+      "sha256": "23219a4ae9425949f24b1628c4169f9dfb1068fbcab4ab46dcaacb9b24195972",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14704,9 +14704,9 @@
     },
     {
       "path": "src/miki/core/services/coreTaskIngressService.ts",
-      "bytes": 28026,
-      "lines": 254,
-      "sha256": "ad45b4316a0f05a0a2cfd1508b5cb1006b59befe3f29380810d141f422fc62a5",
+      "bytes": 28081,
+      "lines": 255,
+      "sha256": "17f1ce52d65827cf9e6fe259e79548d00e980aaeb17cf1d23ac1cd1586f17cc9",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -25436,9 +25436,9 @@
     },
     {
       "path": "src/miki/research/services/japaneseDictionaryService.ts",
-      "bytes": 19639,
+      "bytes": 19863,
       "lines": 290,
-      "sha256": "2b87bba32e7fc1178c60818d6fdc84e1397e9e96896fba918406edfc3e8bfba5",
+      "sha256": "ac0f88a8de7d611ed95ef1401c018bb0180b4fceab391e317d79ee2a4d470272",
       "relativeImportCandidates": [
         {
           "line": 1,

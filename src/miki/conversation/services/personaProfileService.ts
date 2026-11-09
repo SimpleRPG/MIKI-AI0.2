@@ -129,6 +129,11 @@ class PersonaProfileService {
     return this.ensureRoster().activeProfileId;
   }
 
+  /** P508: 現在の人格のアバター表示（絵文字）。名乗り用。 */
+  public avatarText(): string {
+    return this.avatarTextFor(this.get());
+  }
+
   deriveCommunicationStyle(profile: PersonaProfile): PersonaCommunicationStyle {
     const text = profile.personalityText.toLowerCase();
     return {
