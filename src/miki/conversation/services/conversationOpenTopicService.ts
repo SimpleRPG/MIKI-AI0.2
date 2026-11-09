@@ -63,7 +63,7 @@ export class ConversationOpenTopicService {
   public salienceOf(text: string): number {
     const t = String(text || '');
     let score = 1;
-    if (/覚えて|忘れないで|大事|重要/.test(t)) score += 2;
+    if (/覚えて|覚えといて|メモして|忘れないで|大事|重要/.test(t)) score += 2;
     if (/大好き|嬉しい|最高|つらい|悲しい|大変|ショック|びっくり|心配|不安/.test(t)) score += 1;
     if (/じゃなくて|ではなく|正しくは|訂正/.test(t)) score += 1;
     return Math.min(5, score);

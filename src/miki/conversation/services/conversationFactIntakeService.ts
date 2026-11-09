@@ -499,7 +499,7 @@ export class ConversationFactIntakeService {
     for (const sentence of value.split(/(?<=。)/)) {
       const trimmed = sentence.trim();
       // P547: 言い回しの変種（なんだっけ／どういうもの／〜の意味は）も拾う。
-      const m = trimmed.match(/^(.{1,12}?)(?:っていうのは|ってのは|って|とは)(?:何|なに|なん|どういう意味|どういうもの|どんな)/)
+      const m = trimmed.match(/^(.{1,12}?)(?:っていうのは|ってのは|って|とは)(?:何|なに|なん|どういう意味|どういうもの|どういうこと|どんな)/)
         ?? trimmed.match(/^(.{1,12}?)の意味は/);
       if (!m) continue;
       const term = m[1].trim();

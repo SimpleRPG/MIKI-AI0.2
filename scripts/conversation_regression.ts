@@ -282,6 +282,11 @@ conversationGraphRuntimeP212Service.ingestInput('regression-p549e', 'さっき�
 const recallAnswer2 = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p549e');
 check('P549 さっきの話、でも思い出しに答える', Boolean(recallAnswer2), String(recallAnswer2));
 
+// ---- 言い回しの変種その3（P550） ----
+conversationFactIntakeService.intakeFromUserText('ドードーモドキってどういうこと？', []);
+check('P550 どういうこと、でも知らない語として拾う', userKnowledgeProfileService.isUnknown('ドードーモドキ'), JSON.stringify(userKnowledgeProfileService.listUnknown()));
+check('P550 覚えといて、でも話題の重みが上がる', conversationOpenTopicService.salienceOf('これ覚えといてほしい') >= 3, String(conversationOpenTopicService.salienceOf('これ覚えといてほしい')));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
