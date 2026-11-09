@@ -1,6 +1,7 @@
 import { AnswerContentIR, AnswerSkeletonType, MultiAxisPersonaConfig } from '../../../types';
 import { answerContentIrService } from './answerContentIrService';
 import { personaProfileService } from './personaProfileService';
+import { roleplaySessionService } from './roleplaySessionService';
 import { autonomousAnswerCompositionPlanService, AutonomousAnswerCompositionPlan } from './autonomousAnswerCompositionPlanService';
 import { conversationSurfaceDiversityService } from './conversationSurfaceDiversityService';
 import type { CoreResult } from '../../core/services/coreResultService';
@@ -48,8 +49,8 @@ const DEFAULT_TIME_BUDGET_MS = 12;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 100;
 
-function stableSignature(ir: AnswerContentIR, skeleton: AnswerSkeletonType, assembledCode: string | undefined, personaProfileId: string, personaRevision: number): string {
-  const payload = JSON.stringify({ conclusion: ir.conclusion, target: ir.target, reasons: ir.reasons, conditions: ir.conditions, exceptions: ir.exceptions, next_actions: ir.next_actions, certainty: ir.certainty, detail_level: ir.detail_level, interaction_mode: ir.interaction_mode, skeleton, assembledCode, personaProfileId, personaRevision });
+function stableSignature(ir: AnswerContentIR, skeleton: AnswerSkeletonType, assembledCode: string | undefined, personaProfileId: string, personaRevision: number, roleFlavorKey = ''): string {
+  const payload = JSON.stringify({ conclusion: ir.conclusion, target: ir.target, reasons: ir.reasons, conditions: ir.conditions, exceptions: ir.exceptions, next_actions: ir.next_actions, certainty: ir.certainty, detail_level: ir.detail_level, interaction_mode: ir.interaction_mode, skeleton, assembledCode, personaProfileId, personaRevision, roleFlavorKey });
   let hash = 2166136261;
   for (let index = 0; index < payload.length; index += 1) { hash ^= payload.charCodeAt(index); hash = Math.imul(hash, 16777619); }
   return (hash >>> 0).toString(16).padStart(8, '0');
@@ -178,7 +179,18 @@ export class RuntimeConversationCompositionService {
     const compositionPlan = autonomousAnswerCompositionPlanService.create(ir);
     const sceneScopes: ConversationFeedbackScope[] = ['WORDING', 'TONE', 'ANSWER_STRUCTURE', ...(ir.detail_level === 'BRIEF' || ir.detail_level === 'DETAILED' ? ['DETAIL_LEVEL' as const] : [])];
     const reusedConversationEpisodes = conversationLearningEpisodeService.findReusableForSimilarScene(sceneScopes);
-    const communicationStyle = personaProfileService.deriveCommunicationStyle(personaProfile);
+    // P515: なりチャ中は、役の口調の寄せと立場を性格文に足してから
+    // 軸を導出する（土台は元の性格、役は味付け）。人格プロフィール
+    // 自体は書き換えない。
+    const activeRole = roleplaySessionService.getActiveRole();
+    const roleFlavorText = activeRole ? [activeRole.toneHint, activeRole.stance].filter(Boolean).join(' ') : '';
+    const communicationStyle = roleFlavorText
+      ? personaProfileService.deriveCommunicationStyle({
+          ...personaProfile,
+          personalityText: `${personaProfile.personalityText} ${roleFlavorText}`,
+          speakingStyle: `${personaProfile.speakingStyle} ${roleFlavorText}`,
+        })
+      : personaProfileService.deriveCommunicationStyle(personaProfile);
     const surfacePersona = {
       politeness: communicationStyle.politeness >= 80 ? 'VERY_POLITE' : communicationStyle.politeness <= 35 ? 'CASUAL' : 'CASUAL_POLITE',
       warmth: communicationStyle.warmth >= 80 ? 'HIGH' : communicationStyle.warmth <= 35 ? 'LOW' : 'MEDIUM_HIGH',
@@ -187,7 +199,7 @@ export class RuntimeConversationCompositionService {
       technicalTerminology: communicationStyle.technicalExplanation ? 'BALANCED' : 'PLAIN_LANGUAGE',
       humor: communicationStyle.humor,
     } as Partial<MultiAxisPersonaConfig>;
-    const cacheKey = stableSignature(ir, primarySkeleton, options.assembledCode, personaProfile.profileId, personaProfile.revision);
+    const cacheKey = stableSignature(ir, primarySkeleton, options.assembledCode, personaProfile.profileId, personaProfile.revision, activeRole ? `${activeRole.roleId}:${roleFlavorText}` : '');
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.createdAt <= CACHE_TTL_MS) return { ...cached.result, cacheHit: true, elapsedMs: performance.now() - startedAt };
     const active = this.inFlight.get(cacheKey);

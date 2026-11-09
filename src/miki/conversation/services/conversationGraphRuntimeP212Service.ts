@@ -9,6 +9,7 @@ import { dictionaryBootstrapService } from '../../research/services/dictionaryBo
 import { webTermLearningService } from '../../research/services/webTermLearningService';
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
+import { roleplaySessionService } from './roleplaySessionService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -219,6 +220,18 @@ class ConversationGraphRuntimeP212Service {
   if(decisions.length===0)return `${project}の決め事は、プロジェクトノートにまだ登録されていません。`;
   return `${project}の決め事はプロジェクトノートに${decisions.length}件あります。\n`+decisions.map((decision,index)=>`${index+1}. ${decision.text}`).join('\n');
  }
+ // P515: なりチャ中の役・場面・あらすじの想起。セッションが
+ // 無いときは undefined を返して通常経路に委ねる。
+ private selfInquiryRoleAnswer():string|undefined {
+  const session=roleplaySessionService.getSession();
+  if(!session)return undefined;
+  const role=roleplaySessionService.getActiveRole();
+  const lines=[`今は「${session.roleName}」の役を被っています。`];
+  if(role?.stance)lines.push(`立場：${role.stance}`);
+  if(session.scene)lines.push(`場面：${session.scene}`);
+  if(session.summary)lines.push(`あらすじ：${session.summary}`);
+  return lines.join('\n');
+ }
  private computeSelfInquiryByPattern(text:string):string|undefined {
   const value=text.trim();
   const dictMatch=value.match(/(.{1,24}?)(?:は|って)(?:辞書|じしょ)に(?:ある|載って|入って)/u);
@@ -229,6 +242,10 @@ class ConversationGraphRuntimeP212Service {
   if(/(言い回し|表現)は(?:何件|いくつ)/u.test(value))return this.selfInquirySurfaceCountAnswer();
   if(/(?:辞書|単語)に?は(?:何件|何語|いくつ)/u.test(value))return this.selfInquiryDictionaryCountAnswer();
   if(/(?:主張|知識)は(?:何件|いくつ)/u.test(value))return this.selfInquiryClaimCountAnswer();
+  if(/(?:今の|現在の)役|なりチャの(?:場面|あらすじ|続き)|あらすじ(?:は|って)/u.test(value)){
+   const roleAnswer=this.selfInquiryRoleAnswer();
+   if(roleAnswer)return roleAnswer;
+  }
   const projectMatch=value.match(/(.{1,24}?)(?:の)?(?:決め事|決定事項|方針|ルール)/u);
   if(projectMatch){
    const projectAnswer=this.selfInquiryProjectAnswer(projectMatch[1]);

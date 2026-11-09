@@ -1,6 +1,7 @@
 import { graphAnswerMeaningPipelineP216Service, type P216FinalAnswer } from '../../conversation/services/graphAnswerMeaningPipelineP216Service';
 import { conversationGraphRuntimeP212Service } from '../../conversation/services/conversationGraphRuntimeP212Service';
 import { personaProfileService } from '../../conversation/services/personaProfileService';
+import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { coreOrchestratorService, type CoreOrchestrationResult } from './coreOrchestratorService';
 import type { MikiDomain } from './crossDomainCirculationService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
@@ -229,7 +230,10 @@ class CoreTaskIngressService {
   // 既に名前で始まる回答には重ねない。
   {
    const activePersonaName=(personaProfileService.get().name||'').trim();
-   const marker=activePersonaName?`【${personaProfileService.avatarText()} ${activePersonaName}】`:'';
+   // P515: なりチャ中は名乗りに役名を添える（例: 【🌸 MIKI-AI・EFRの住人】）。
+   const activeRoleSession=roleplaySessionService.getSession();
+   const displayPersonaName=activePersonaName?(activeRoleSession?`${activePersonaName}・${activeRoleSession.roleName}`:activePersonaName):'';
+   const marker=displayPersonaName?`【${personaProfileService.avatarText()} ${displayPersonaName}】`:'';
    if(marker&&finalResponse.trim()&&!finalResponse.startsWith(marker))finalResponse=`${marker}${finalResponse}`;
   }
   const result=coreOrchestratorService.finalizeConversationResponse(taskId,finalResponse,{passed:answerValidationPassed,failedReasons:[...new Set(failedReasons)]});
