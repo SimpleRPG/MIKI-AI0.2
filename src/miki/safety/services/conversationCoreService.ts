@@ -589,11 +589,15 @@ export class ConversationCoreService {
       ir = answerContentIrService.buildAnswerIR({
         conclusion: claim.statement,
         target: compiled.target,
-        reasons: [`主張DB照合: ${claim.status}`, ...memoryReasons, ...(capabilityPlanApplied ? answerPlan.stepsToExecute || [] : [])],
+        // P569: 知識の回答に工程の内部文（照合ステータス、計画の
+        // 実行ステップ、潜在意図の既定アクション）を混ぜない。
+        // それらは「次のステップ」や理由として表層に出て、知識の
+        // 質問への答えを報告文書にしていた。
+        reasons: [...memoryReasons],
         conditions: claimMatch.scopeNotes,
         certainty: claimMatch.confidence === 'CERTAIN' ? 'CERTAIN' : 'CONDITIONAL',
         worldScope: claim.world,
-        nextActions: latent.suggestedProactiveAction ? [latent.suggestedProactiveAction] : [],
+        nextActions: [],
       });
     } else if (dialogueAct === 'CASUAL_CHAT') {
       const isFatigue = userStateTrailService.isFatigueText(prompt);

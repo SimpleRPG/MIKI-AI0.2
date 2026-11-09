@@ -247,7 +247,10 @@ export class AnswerContentIrService {
     }
 
     // 慎重さ (prudence) の注記付加 (EMPATHY_ONLY / SHORT_ACK ではノイズになるためスキップ)
-    if (!skipNextActionsAndQuestions) {
+    // P569: 注記プールは全て「実行環境の差分・事前テスト」の注意で、
+    // コードや成果物の納品にだけ意味がある。知識の質問など成果物が
+    // 無い回答に付けると無関係な警告になるため、成果物がある時だけ付ける。
+    if (!skipNextActionsAndQuestions && extraArtifactCode) {
       const prudenceNote = surfaceGrammarAndStyleService.applyPrudenceNote(persona.prudence, persona.currentScene);
       if (prudenceNote) {
         lines.push(`\n${prudenceNote}`);

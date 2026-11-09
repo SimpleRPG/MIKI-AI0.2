@@ -410,6 +410,7 @@ check('P568 知っている話題の雑談は報告文にならない', String((
 check('P568 雑談でも知っていることが補足に出る', String((knownCasual as any).replyText || '').includes('パルの一種'), String((knownCasual as any).replyText || '').slice(0, 200));
 const knownQuestion = await conversationCoreService.execute({ prompt: 'モコロンって何？' } as any);
 check('P568 質問は従来どおり知識で答える', String((knownQuestion as any).replyText || '').includes('羊'), String((knownQuestion as any).replyText || '').slice(0, 160));
+check('P569 知識の回答に工程ボイラープレートが混ざらない', !String((knownQuestion as any).replyText || '').includes('【次のステップ】') && !String((knownQuestion as any).replyText || '').includes('※'), String((knownQuestion as any).replyText || '').slice(0, 240));
 
 // ---- 社交の定型も毎回同じにしない（P566） ----
 const greet1 = await conversationCoreService.execute({ prompt: 'おはよう' } as any);
