@@ -2,6 +2,7 @@ import type { MemoryItem } from '../../../types';
 import { enrichMemoryMetadata } from '../../../utils/memoryRetrieval';
 import { scopedVersionedMemoryService } from '../../memory/services/scopedVersionedMemoryService';
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
+import { intakeMeaningGuardService } from '../../memory/services/intakeMeaningGuardService';
 import { roleplaySessionService } from './roleplaySessionService';
 import { personaProfileService } from './personaProfileService';
 import { userKnowledgeProfileService } from './userKnowledgeProfileService';
@@ -418,6 +419,9 @@ export class ConversationFactIntakeService {
       if (facts.length >= MAX_FACTS_PER_UTTERANCE) break;
       const fact = extractFromSentence(sentence, contextEntity);
       if (fact) {
+        // P546: 仮定・引用・伝聞・冗談の文から拾えた形でも、本人の
+        // 確定した事実としては取り込まない（共有層の意味チェック）。
+        if (!intakeMeaningGuardService.check(sentence).ok) continue;
         facts.push(fact);
         // 一人称そのもの（「僕の攻撃力は…」の数値事実など）は対象の文脈にしない。
         if (fact.entity && fact.entity !== '名前' && !FIRST_PERSON.has(fact.entity)) contextEntity = fact.entity;

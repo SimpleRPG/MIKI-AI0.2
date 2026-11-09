@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { intakeMeaningGuardService } from './intakeMeaningGuardService';
 
 /**
  * P511: プロジェクトノート。
@@ -139,6 +140,13 @@ export class ProjectNotebookService {
     if (!project) return undefined;
     const sentences = source.split(/(?<=。)/).map((s) => s.trim()).filter(Boolean);
     const sentence = sentences.find((s) => this.findProjectInText(s) === project) ?? source.trim();
+    // P546: 形は決め事でも、仮定・引用・伝聞なら本人の決定として
+    // 記録しない（共有層の意味チェック）。
+    const verdict = intakeMeaningGuardService.check(sentence);
+    if (!verdict.ok) {
+      systemLogger.info('SYSTEM', `🛡️ [取り込み判定] 決め事として記録しませんでした（${verdict.reason}）: ${sentence.slice(0, 60)}`);
+      return undefined;
+    }
     return this.addDecision(project, sentence, 'user');
   }
 

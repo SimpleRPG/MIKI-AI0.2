@@ -34,6 +34,8 @@ const { knowledgeConsolidationService } = await import('../src/miki/selfAwarenes
 const { conversationOpenTopicService } = await import('../src/miki/conversation/services/conversationOpenTopicService');
 const { storageService } = await import('../src/services/storageService');
 const { userKnowledgeProfileService } = await import('../src/miki/conversation/services/userKnowledgeProfileService');
+const { intakeMeaningGuardService } = await import('../src/miki/memory/services/intakeMeaningGuardService');
+const { projectNotebookService } = await import('../src/miki/memory/services/projectNotebookService');
 
 // ---- 種まき（最小限） ----
 japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['regression']} as any);
@@ -212,6 +214,21 @@ const snapshotRaw = storageService.getItem('miki_state_snapshot_v1');
 let snapshotJson = '';
 try { snapshotJson = String((JSON.parse(String(snapshotRaw)) as any).json || ''); } catch { /* 検証側で失敗させる */ }
 check('P545 スナップショットに中身が入っている', snapshotJson.includes('モコロン') && snapshotJson.includes('miki-state-snapshot/1'), snapshotJson.slice(0, 120));
+
+// ---- 取り込みの意味チェック（P546） ----
+check('P546 仮定は記録系を通らない', intakeMeaningGuardService.check('EFRはマップを出さないことにしたら面白そうだね').reason === 'HYPOTHETICAL', '');
+check('P546 引用は記録系を通らない', intakeMeaningGuardService.check('彼は「EFRはペットを入れないことにした」と言っていた').reason === 'QUOTED_OR_HEARSAY', '');
+check('P546 本人の決定は通る', intakeMeaningGuardService.check('EFRにペットを入れることにした').ok === true, '');
+const efrBefore = projectNotebookService.listDecisions('EFR').length;
+const hypoResult = projectNotebookService.intakeFromUserText('EFRはマップを出さないことにしたら面白そうだね');
+const quoteResult = projectNotebookService.intakeFromUserText('相方は「EFRにペットを入れないことにした」と言っていた');
+check('P546 仮定と引用は決め事にならない', hypoResult === undefined && quoteResult === undefined && projectNotebookService.listDecisions('EFR').length === efrBefore, `${efrBefore} -> ${projectNotebookService.listDecisions('EFR').length}`);
+const realDecision = projectNotebookService.intakeFromUserText('EFRは縦持ち前提にすることにした');
+check('P546 本物の決め事は記録される', Boolean(realDecision) && projectNotebookService.listDecisions('EFR').length === efrBefore + 1, '');
+const factBase = conversationFactIntakeService.intakeFromUserText('僕はカレーが好き', []);
+const factQuoted = conversationFactIntakeService.intakeFromUserText('彼は「僕はカレーが好き」と言っていた', []);
+const factHypo = conversationFactIntakeService.intakeFromUserText('もし僕はカレーが好きだったら毎日食べる', []);
+check('P546 事実取り込みも引用と仮定を落とす', factBase.added.length >= 1 && factQuoted.added.length === 0 && factHypo.added.length === 0, JSON.stringify({ base: factBase.added.length, quoted: factQuoted.added.length, hypo: factHypo.added.length }));
 
 // ---- 結果 ----
 let fail = 0;
