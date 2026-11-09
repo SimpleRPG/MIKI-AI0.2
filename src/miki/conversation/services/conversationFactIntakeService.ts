@@ -488,6 +488,11 @@ export class ConversationFactIntakeService {
     try {
       const signal = roleplaySessionService.handleUserText(text, personaProfileService.get().profileId);
       if (signal || roleplaySessionService.isActive()) {
+        // P523: セッション中の発言は、あらすじ自動生成の材料として
+        // 内容語だけをセッション側に控える（創作として分離したまま）。
+        if (!signal && roleplaySessionService.isActive()) {
+          try { roleplaySessionService.noteTurn(text); } catch { /* 控えは補助経路 */ }
+        }
         return { added: [], updatedMemories: existingMemories, replaced: 0, invalidated: 0 };
       }
     } catch { /* ゲートの失敗で通常の取り込みは止めない */ }

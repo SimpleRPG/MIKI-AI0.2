@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { contentTermsFromTokens, japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
 
 /**
  * P514: なりチャの役レイヤー。
@@ -35,6 +36,8 @@ export interface RoleplaySession {
   startedAt: number;
   scene: string;
   summary: string;
+  // P523: あらすじ自動生成の材料（セッション中の発話の内容語）。
+  notedTerms?: string[];
 }
 
 const ROLES_KEY = 'miki_roleplay_roles_v1';
@@ -171,10 +174,42 @@ export class RoleplaySessionService {
     return session;
   }
 
+  /**
+   * P523: セッション中の発話の内容語を、あらすじの材料として
+   * 控える。創作の分離のため、ここに残るのは内容語だけで、
+   * 現実の事実としては扱わない。
+   */
+  public noteTurn(text: string): void {
+    const session = this.loadSession();
+    if (!session) return;
+    try {
+      const terms = contentTermsFromTokens(japaneseAnalysisService.analyze(String(text || '')).tokens)
+        .filter((t) => t.length >= 2 && !['した', 'する', '今日', '明日', '昨日', 'こと', 'もの', 'ため', 'よう', 'あと', 'それ', 'これ'].includes(t))
+        .slice(0, 6);
+      if (terms.length === 0) return;
+      session.notedTerms = [...(session.notedTerms ?? []), ...terms].slice(-60);
+      this.persistSession();
+    } catch { /* 控えは補助経路 */ }
+  }
+
   /** セッションを終える。あらすじは役に保存して次回の継続に使う。 */
   public endSession(): RoleplaySession | null {
     const session = this.loadSession();
     if (!session) return null;
+    // P523: あらすじが手で付いていなければ、控えた内容語から
+    // 自動で組み立てる（頻出の語＝その回の中心の話題）。
+    if (!session.summary && session.notedTerms && session.notedTerms.length > 0) {
+      const frequency = new Map<string, number>();
+      for (const term of session.notedTerms) frequency.set(term, (frequency.get(term) ?? 0) + 1);
+      const topTerms = [...frequency.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([term]) => term);
+      if (topTerms.length > 0) {
+        session.summary = `${session.roleName}として${session.scene ? `${session.scene}で` : ''}${topTerms.join('と')}の話をした。`;
+        systemLogger.info('CHAT', `🎭 [なりチャ] あらすじを自動生成しました: ${session.summary}`);
+      }
+    }
     const role = this.loadRoles().find((r) => r.roleId === session.roleId);
     if (role && session.summary) {
       role.lastSummary = session.summary;
