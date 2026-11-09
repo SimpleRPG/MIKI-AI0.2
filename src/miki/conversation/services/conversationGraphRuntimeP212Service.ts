@@ -8,6 +8,7 @@ import { paraphraseService } from '../../memory/services/paraphraseService';
 import { dictionaryBootstrapService } from '../../research/services/dictionaryBootstrapService';
 import { webTermLearningService } from '../../research/services/webTermLearningService';
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
+import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -208,6 +209,16 @@ class ConversationGraphRuntimeP212Service {
   if(bestAnswer)return `さっきの話では、直前は『${bestAnswer.slice(0,120)}${bestAnswer.length>120?'…':''}』と答えました。`;
   return 'さっきの話については、まだ答えた記録がありません。';
  }
+ // P511: プロジェクトの決め事の想起。プロジェクト名がノートに無い
+ // 質問（「政府の方針は？」等）では undefined を返して通常経路に委ねる。
+ private selfInquiryProjectAnswer(rawProject:string):string|undefined {
+  const name=rawProject.replace(/^(この|その|あの)/u,'').trim();
+  const project=projectNotebookService.findProject(name);
+  if(!project)return undefined;
+  const decisions=projectNotebookService.listDecisions(project);
+  if(decisions.length===0)return `${project}の決め事は、プロジェクトノートにまだ登録されていません。`;
+  return `${project}の決め事はプロジェクトノートに${decisions.length}件あります。\n`+decisions.map((decision,index)=>`${index+1}. ${decision.text}`).join('\n');
+ }
  private computeSelfInquiryByPattern(text:string):string|undefined {
   const value=text.trim();
   const dictMatch=value.match(/(.{1,24}?)(?:は|って)(?:辞書|じしょ)に(?:ある|載って|入って)/u);
@@ -218,6 +229,11 @@ class ConversationGraphRuntimeP212Service {
   if(/(言い回し|表現)は(?:何件|いくつ)/u.test(value))return this.selfInquirySurfaceCountAnswer();
   if(/(?:辞書|単語)に?は(?:何件|何語|いくつ)/u.test(value))return this.selfInquiryDictionaryCountAnswer();
   if(/(?:主張|知識)は(?:何件|いくつ)/u.test(value))return this.selfInquiryClaimCountAnswer();
+  const projectMatch=value.match(/(.{1,24}?)(?:の)?(?:決め事|決定事項|方針|ルール)/u);
+  if(projectMatch){
+   const projectAnswer=this.selfInquiryProjectAnswer(projectMatch[1]);
+   if(projectAnswer)return projectAnswer;
+  }
   if(/さっき(?:何て|なんて|何を|何の話|なんの話|どんな話)/u.test(value)||/(?:何の話|なんの話)(?:してた|だった)/u.test(value)||/前の答え|直前の答え|さっきの答え/u.test(value))return this.selfInquiryRecallAnswer();
   return undefined;
  }
