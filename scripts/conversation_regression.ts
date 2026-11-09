@@ -388,7 +388,7 @@ check('P563 仮定の完了では進まない', projectNotebookService.getWorkSt
 // ---- ビービーの定型の受け止め（P564） ----
 personaProfileService.switchProfile('persona-bibi');
 const bibiGreeting = await conversationCoreService.execute({ prompt: 'おはよー' } as any);
-check('P564 ビービーの挨拶はビービーの形になる', String((bibiGreeting as any).replyText || '').includes('おはよう！') && !String((bibiGreeting as any).replyText || '').includes('ございます'), String((bibiGreeting as any).replyText || '').slice(0, 120));
+check('P564 ビービーの挨拶はビービーの形になる', (String((bibiGreeting as any).replyText || '').includes('おはよう') || String((bibiGreeting as any).replyText || '').includes('おはよー')) && !String((bibiGreeting as any).replyText || '').includes('ございます'), String((bibiGreeting as any).replyText || '').slice(0, 120));
 personaProfileService.switchProfile('persona-default');
 
 // ---- 雑談で知らない語を聞き返す（P565） ----
@@ -397,6 +397,26 @@ const unknownAsk1 = await conversationCoreService.execute({ prompt: '今日ク�
 check('P565 知らない語はその場で聞き返す', String((unknownAsk1 as any).replyText || '').includes('クオッカ') && String((unknownAsk1 as any).replyText || '').includes('どんなもの'), String((unknownAsk1 as any).replyText || '').slice(0, 160));
 const unknownAsk2 = await conversationCoreService.execute({ prompt: 'またクオッカ見たよ' } as any);
 check('P565 同じ語は繰り返し聞かない', !String((unknownAsk2 as any).replyText || '').includes('どんなもの'), String((unknownAsk2 as any).replyText || '').slice(0, 160));
+
+// ---- 聞き返した語の答えを覚える（P567） ----
+conversationFactIntakeService.intakeFromUserText('クオッカはオーストラリアに住む小さい動物だよ', []);
+check('P567 答えが辞書に取り込まれる', japaneseDictionaryService.lookup('クオッカ').some((e: any) => String(e.gloss || '').includes('オーストラリア')), JSON.stringify(japaneseDictionaryService.lookup('クオッカ')));
+const taughtReply = await conversationCoreService.execute({ prompt: 'クオッカはオーストラリアに住む小さい動物だよ' } as any);
+check('P567 覚えたことが返答に表れる', String((taughtReply as any).replyText || '').includes('覚えました'), String((taughtReply as any).replyText || '').slice(0, 160));
+
+// ---- 知っている話題の雑談は雑談として受ける（P568） ----
+const knownCasual = await conversationCoreService.execute({ prompt: 'モコロンかわいい' } as any);
+check('P568 知っている話題の雑談は報告文にならない', String((knownCasual as any).replyText || '').includes('モコロン') && !String((knownCasual as any).replyText || '').includes('主張DB照合'), String((knownCasual as any).replyText || '').slice(0, 160));
+check('P568 雑談でも知っていることが補足に出る', String((knownCasual as any).replyText || '').includes('パルの一種'), String((knownCasual as any).replyText || '').slice(0, 200));
+const knownQuestion = await conversationCoreService.execute({ prompt: 'モコロンって何？' } as any);
+check('P568 質問は従来どおり知識で答える', String((knownQuestion as any).replyText || '').includes('羊'), String((knownQuestion as any).replyText || '').slice(0, 160));
+
+// ---- 社交の定型も毎回同じにしない（P566） ----
+const greet1 = await conversationCoreService.execute({ prompt: 'おはよう' } as any);
+const greet2 = await conversationCoreService.execute({ prompt: 'おはよう' } as any);
+check('P566 挨拶が毎回同じ文にならない', String((greet1 as any).replyText || '') !== String((greet2 as any).replyText || ''), `${String((greet1 as any).replyText || '').slice(0, 60)} / ${String((greet2 as any).replyText || '').slice(0, 60)}`);
+const wakeup = await conversationCoreService.execute({ prompt: '今起きたよ' } as any);
+check('P566 起きた、にも朝の挨拶で返す', String((wakeup as any).replyText || '').includes('おはよう'), String((wakeup as any).replyText || '').slice(0, 120));
 
 // ---- 結果 ----
 let fail = 0;

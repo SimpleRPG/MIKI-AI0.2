@@ -577,7 +577,13 @@ export class ConversationCoreService {
       skeleton = 'GENERAL_ANSWER';
       status = 'RESOLVED';
       reason = 'user_fact_recall';
-    } else if (claimMatch.hasMatch && claimMatch.bestClaim && claimMatch.confidence !== 'UNVERIFIED') {
+    } else if (claimMatch.hasMatch && claimMatch.bestClaim && claimMatch.confidence !== 'UNVERIFIED'
+      && !(dialogueAct !== 'CORRECTION' && this.isConversationalFallthrough(prompt, dialogueAct))) {
+      // P568: 雑談の宣言文（「モコロンかわいい」「モコロン見たよ」）が
+      // たまたま Claim に一致しただけで、知識照合の報告文で返って
+      // いた。文の形が雑談なら雑談として受け、知っていることは
+      // 合流点の補足（関係の文）で出す。質問・依頼・訂正は従来どおり
+      // Claim 経路で答える。
       const claim = claimMatch.bestClaim;
       const memoryReasons = relevantMemories.slice(0, 2).map((m: any) => memoryReasonLabel(m));
       ir = answerContentIrService.buildAnswerIR({
@@ -596,39 +602,63 @@ export class ConversationCoreService {
       let bibiCasual = false;
       try { bibiCasual = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibiCasual = false; }
 
+      // P566: 社交の定型も毎回同じ文にしない（カテゴリ別に前回と
+      // 違う形を選ぶ）。本筋は学習で返答が変わること（P567/P568）で、
+      // これは挨拶のような純粋な定型への当て布。
+      const fx = (category: string, mikiForms: string[], bibiForms: string[]) =>
+        this.pickFixedReply(bibiCasual ? `${category}_bibi` : category, bibiCasual ? bibiForms : mikiForms);
       let casualConclusion: string;
       if (isFatigue) {
-        casualConclusion = bibiCasual
-          ? 'おつかれさま！今日はたいへんだったね。無理しないで、ゆっくり休んでね。'
-          : '本当にお疲れ様でした。今日は大変でしたね。無理をなさらず、ゆっくり休んでくださいね。';
+        casualConclusion = fx('fx_fatigue',
+          ['本当にお疲れ様でした。今日は大変でしたね。無理をなさらず、ゆっくり休んでくださいね。', 'お疲れ様でした。今日は大変でしたね。今日はゆっくり休んでくださいね。', '本当にお疲れ様でした。無理をなさらず、体を休めてくださいね。'],
+          ['おつかれさま！今日はたいへんだったね。無理しないで、ゆっくり休んでね。', 'おつかれさま！今日はがんばったね。ゆっくり休んでね。', 'おつかれさま。無理しないで、今日は休んでね。']);
       } else if (/お疲れ|おつかれ/i.test(prompt)) {
-        casualConclusion = bibiCasual ? 'おつかれさま！今日も順調だよ。' : 'お疲れ様です！本日も順調に進んでいます。';
+        casualConclusion = fx('fx_otsukare',
+          ['お疲れ様です！本日も順調に進んでいます。', 'お疲れ様です。今日も順調ですよ。', 'お疲れ様です！こちらも元気にやっています。'],
+          ['おつかれさま！今日も順調だよ。', 'おつかれさま！こっちも元気だよ。', 'おつかれさま！今日もばっちりだよ。']);
       } else if (/ありがと(?:う|ー)?|感謝/i.test(prompt)) {
-        casualConclusion = bibiCasual ? 'どういたしまして！役に立ててよかった！' : 'どういたしまして！お役に立てて何よりです。';
+        casualConclusion = fx('fx_thanks',
+          ['どういたしまして！お役に立てて何よりです。', 'どういたしまして。いつでも声をかけてくださいね。', 'いえいえ、こちらこそありがとうございます。'],
+          ['どういたしまして！役に立ててよかった！', 'いえいえ！また声かけてね。', 'どういたしまして！えへへ。']);
       } else if (/ごめん|すみません|申し訳/.test(prompt)) {
-        casualConclusion = bibiCasual ? '大丈夫だよ。気にしないでね。' : '大丈夫ですよ。気にしないでくださいね。';
+        casualConclusion = fx('fx_apology',
+          ['大丈夫ですよ。気にしないでくださいね。', '大丈夫ですよ。いつでも声をかけてください。', '大丈夫です。問題ありませんよ。'],
+          ['大丈夫だよ。気にしないでね。', 'だいじょうぶ！気にしないで。', '大丈夫だよ。えへへ、平気平気。']);
+      } else if (/起きた|目覚めた|起床/.test(prompt)) {
+        casualConclusion = fx('fx_wakeup',
+          ['おはようございます！よく眠れましたか？', 'おはようございます。目覚めはいかがですか？', 'おはようございます！今日もいい日になりますように。'],
+          ['おはよう！よく寝れた？', 'おはよー！目覚めはどう？', 'おはよう！今日もがんばろうね。']);
       } else if (/おはよ(?:う|ー)?/i.test(prompt)) {
-        casualConclusion = bibiCasual ? 'おはよう！今日も一日がんばろうね。' : 'おはようございます！今日も一日頑張りましょう。';
+        casualConclusion = fx('fx_morning',
+          ['おはようございます！今日も一日頑張りましょう。', 'おはようございます。今日もよろしくお願いします。', 'おはようございます！いい朝ですね。'],
+          ['おはよう！今日も一日がんばろうね。', 'おはよー！今日もよろしくね。', 'おはよう！いい朝だね。']);
       } else if (/元気/.test(prompt)) {
-        casualConclusion = bibiCasual ? '元気だよ！声をかけてくれてありがとう！' : '元気ですよ！声をかけてくれてありがとうございます。';
+        casualConclusion = fx('fx_genki',
+          ['元気ですよ！声をかけてくれてありがとうございます。', '元気です！今日も頑張りますね。', 'はい、元気ですよ。ご心配ありがとうございます。'],
+          ['元気だよ！声をかけてくれてありがとう！', 'げんきげんき！今日もがんばるよ。', '元気だよ！心配してくれてありがとう。']);
       } else {
-        casualConclusion = bibiCasual ? 'こんにちは！今日もよろしくね。準備はばっちりだよ。' : 'こんにちは！本日もよろしくお願いいたします。準備万全です。';
+        casualConclusion = fx('fx_greeting',
+          ['こんにちは！本日もよろしくお願いいたします。準備万全です。', 'こんにちは。今日もよろしくお願いします。', 'こんにちは！何かあれば声をかけてくださいね。'],
+          ['こんにちは！今日もよろしくね。準備はばっちりだよ。', 'こんにちは！今日もよろしくね。', 'やっほー！今日もよろしくね。']);
       }
 
       // P524: 疲労が直近72時間に前回分もあるなら、単発の共感では
       // なく「続いている」ことを見た受け止めにする。
       if (isFatigue && userStateTrailService.recentCount('fatigue', 72) >= 1) {
-        casualConclusion = bibiCasual
-          ? 'ここ数日、おつかれが続いてるみたいだね。無理しないで、今日はゆっくり休んでね。'
-          : 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。';
+        casualConclusion = fx('fx_fatigue_continued',
+          ['ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。', 'お疲れが続いているみたいですね。今日は無理をせず、ゆっくり休んでくださいね。'],
+          ['ここ数日、おつかれが続いてるみたいだね。無理しないで、今日はゆっくり休んでね。', 'おつかれ、続いてるね。今日は無理しないで休んでね。']);
       }
       // P521: 定型の挨拶で終わらせず、内容のある雑談には内容へ
       // 反応する（主題語＋感情の手がかり）。挨拶・感謝・疲労など
       // の決まった受け止めが要る言い方では従来の文を優先する。
-      const isPhatic = isFatigue || /お疲れ|おつかれ|ありがと(?:う|ー)?|感謝|ごめん|すみません|申し訳|おはよ(?:う|ー)?|元気/.test(prompt);
+      const isPhatic = isFatigue || /お疲れ|おつかれ|ありがと(?:う|ー)?|感謝|ごめん|すみません|申し訳|おはよ(?:う|ー)?|元気|起きた|目覚めた/.test(prompt);
       if (!isPhatic) {
         const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
         if (reaction) casualConclusion = reaction;
+        // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
+        const taughtAck = this.taughtTermAcknowledgement(prompt);
+        if (taughtAck) casualConclusion = taughtAck;
       }
       // P522: 前の日以前に開いた話題が残っていれば、挨拶のときに
       // 一度だけ拾う。
@@ -685,8 +715,11 @@ export class ConversationCoreService {
       const fallthroughFatigue = userStateTrailService.isFatigueText(prompt);
       const fallthroughThanks = /ありがと(?:う|ー)?|感謝/.test(prompt);
       const fallthroughApology = /ごめん|すみません|申し訳/.test(prompt);
-      const fallthroughPhatic = fallthroughFatigue || fallthroughThanks || fallthroughApology;
-      const reactionBase = fallthroughFatigue
+      const fallthroughWakeup = /起きた|目覚めた|起床/.test(prompt);
+      const fallthroughPhatic = fallthroughFatigue || fallthroughThanks || fallthroughApology || fallthroughWakeup;
+      // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
+      const taughtAck = this.taughtTermAcknowledgement(prompt);
+      const reactionBase = taughtAck ?? (fallthroughFatigue
         ? (userStateTrailService.recentCount('fatigue', 72) >= 1
           ? 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。'
           : '本当にお疲れ様でした。無理をなさらず、ゆっくり休んでくださいね。')
@@ -694,8 +727,10 @@ export class ConversationCoreService {
           ? 'どういたしまして！お役に立てて何よりです。'
           : fallthroughApology
             ? '大丈夫ですよ。気にしないでくださいね。'
-            : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
-              ?? 'そうなんですね。話してくれてありがとう。');
+            : fallthroughWakeup
+              ? this.pickFixedReply('fx_wakeup', ['おはようございます！よく眠れましたか？', 'おはようございます。目覚めはいかがですか？', 'おはようございます！今日もいい日になりますように。'])
+              : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
+                ?? 'そうなんですね。話してくれてありがとう。'));
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
       // （創作の層の中だけ。場面が無ければ何も付かない）。
       // P536: 3ターンに1回は、地の文の代わりに場面の進行を添えて
@@ -1206,6 +1241,25 @@ export class ConversationCoreService {
   }
 
   /**
+   * P566: 社交の定型文をカテゴリ別に回転して選ぶ（前回と違う形）。
+   * 初回はカテゴリ名のハッシュで分散させる。
+   */
+  private pickFixedReply(category: string, forms: string[]): string {
+    if (forms.length <= 1) return forms[0] || '';
+    try {
+      const key = 'miki_fixed_reply_usage_v1';
+      const usage = JSON.parse(storageService.getItem(key) || '{}') as Record<string, number>;
+      const last = usage[category];
+      const index = typeof last === 'number'
+        ? (last + 1) % forms.length
+        : category.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % forms.length;
+      usage[category] = index;
+      storageService.setItem(key, JSON.stringify(usage));
+      return forms[index];
+    } catch { return forms[0]; }
+  }
+
+  /**
    * P565: 知らない語への聞き返し候補を作る。同じ語は7日間は繰り返し
    * 聞かない（台帳で管理）。なりチャ中は役を壊すので聞かない。
    * 実際に足したときだけ markUnknownAsked で台帳に残す。
@@ -1226,7 +1280,25 @@ export class ConversationCoreService {
       const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
       asked[topic] = Date.now();
       storageService.setItem('miki_unknown_asked_v1', JSON.stringify(asked));
+      // P567: 次の発言を「この語への答え」として読むための保留。
+      storageService.setItem('miki_unknown_pending_v1', JSON.stringify({ term: topic, askedAt: Date.now() }));
     } catch { /* 台帳は補助 */ }
+  }
+
+  /**
+   * P567: 直近10分以内に教わった語が発話に出てきたら、「覚えた」
+   * ことを伝える文を作る。学んだことが返答に表れるための接続。
+   */
+  private taughtTermAcknowledgement(prompt: string): string | undefined {
+    try {
+      const raw = storageService.getItem('miki_recently_taught_v1');
+      if (!raw) return undefined;
+      const rec = JSON.parse(raw) as { term?: string; gloss?: string; at?: number };
+      if (!rec.term || !rec.gloss) return undefined;
+      if (Date.now() - Number(rec.at || 0) > 10 * 60_000) return undefined;
+      if (!prompt.includes(rec.term)) return undefined;
+      return `「${rec.term}」、覚えました！${rec.gloss}ということですね。教えてくれてありがとうございます。`;
+    } catch { return undefined; }
   }
 
   /**

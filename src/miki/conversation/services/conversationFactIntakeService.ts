@@ -8,6 +8,7 @@ import { personaProfileService } from './personaProfileService';
 import { userKnowledgeProfileService } from './userKnowledgeProfileService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { systemLogger } from '../../../services/systemLogger';
+import { storageService } from '../../../services/storageService';
 
 /**
  * P452: 会話の理解の土台 ― ユーザー発言からの事実取り込み。
@@ -484,8 +485,49 @@ export class ConversationFactIntakeService {
       japaneseDictionaryService.addPersonal(term, { gloss, semanticIds: ['learned:user-taught'] });
       // P544: 教えた語は「相手が知っている言葉」として記録する。
       try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
+      // P567: 直近に教わった記録（会話側の「覚えました」の材料）。
+      try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
       systemLogger.info('CHAT', `📖 [意味学習] ユーザーから「${term}」の意味を教わりました: ${gloss}`);
     }
+  }
+
+  /**
+   * P567: 聞き返した語への答えを取り込む。彼女が「〜って、どんな
+   * ものですか？」と聞いた直後の発言は、その語の説明として読む
+   * （P518 の定型でなくてもよい）。保留は一回限りで消費する:
+   * 答えでなければ捨て、次の無関係な発言を意味として食わない。
+   */
+  private learnPendingUnknownTerm(text: string): void {
+    const raw = storageService.getItem('miki_unknown_pending_v1');
+    if (!raw) return;
+    storageService.removeItem('miki_unknown_pending_v1');
+    let pending: { term?: string; askedAt?: number } = {};
+    try { pending = JSON.parse(raw); } catch { return; }
+    const term = String(pending.term || '');
+    if (!term || Date.now() - Number(pending.askedAt || 0) > 30 * 60_000) return;
+    const value = String(text || '').trim();
+    if (!value) return;
+    if (/[？?]/.test(value) || /ですか|ますか|でしょうか/.test(value)) return;
+    if (/^(違う|ちがう|いや|じゃなくて|それは違う)/.test(value)) return;
+    if (/知らない|わからない|分からない|知らん/.test(value)) return;
+    if (!intakeMeaningGuardService.check(value).ok) return;
+    const firstSentence = value.split(/(?<=。)/)[0].trim();
+    let gloss = firstSentence;
+    if (gloss.startsWith(term)) {
+      gloss = gloss.slice(term.length).replace(/^(は|って|とは|、|,)/, '');
+    } else if (/^それは/.test(gloss)) {
+      gloss = gloss.replace(/^それは/, '');
+    }
+    gloss = gloss.replace(/(?:ということ)?(?:だよ|ですね|です|だ)?。?$/, '').trim();
+    if (gloss.length < 3 || gloss.length > 80) return;
+    if (!value.includes(term) && !/^それ/.test(value) && value.length > 40) return;
+    const existing = japaneseDictionaryService.lookup(term);
+    // 既に意味がある語（本物の辞書・Web学習・教示済み）は上書きしない。
+    if (existing.find((e) => e.gloss)) return;
+    japaneseDictionaryService.addPersonal(term, { gloss, semanticIds: ['learned:user-taught'] });
+    try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
+    try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
+    systemLogger.info('CHAT', `📖 [意味学習] 聞き返した「${term}」の意味を教わりました: ${gloss}`);
   }
 
   /**
@@ -540,6 +582,11 @@ export class ConversationFactIntakeService {
     // 個人辞書に登録する。失敗しても事実取り込み自体は止めない。
     try {
       this.learnTermFromUserExplanation(text);
+    } catch { /* best-effort */ }
+    // P567: 直前に聞き返した語（P565）への答えは、説明の定型で
+    // なくても意味として取り込む。失敗しても取り込みは止めない。
+    try {
+      this.learnPendingUnknownTerm(text);
     } catch { /* best-effort */ }
     // P544: 相手の知識モデル（知っている言葉／知らない言葉）の
     // 材料集め。失敗しても取り込み自体は止めない。
