@@ -584,8 +584,7 @@ export class ConversationCoreService {
         nextActions: latent.suggestedProactiveAction ? [latent.suggestedProactiveAction] : [],
       });
     } else if (dialogueAct === 'CASUAL_CHAT') {
-      const fatigueRegex = /(?:疲れた|しんどい|もう無理|だるい|つらい|嫌になった|最悪|やってられない|眠い|限界|へろへろ|クタクタ)/;
-      const isFatigue = fatigueRegex.test(prompt);
+      const isFatigue = userStateTrailService.isFatigueText(prompt);
 
       let casualConclusion: string;
       if (isFatigue) {
@@ -594,7 +593,7 @@ export class ConversationCoreService {
         casualConclusion = 'お疲れ様です！本日も順調に進んでいます。';
       } else if (/ありがとう|感謝/i.test(prompt)) {
         casualConclusion = 'どういたしまして！お役に立てて何よりです。';
-      } else if (/おはよう/i.test(prompt)) {
+      } else if (/おはよ(?:う|ー)?/i.test(prompt)) {
         casualConclusion = 'おはようございます！今日も一日頑張りましょう。';
       } else if (/元気/.test(prompt)) {
         casualConclusion = '元気ですよ！声をかけてくれてありがとうございます。';
@@ -610,14 +609,14 @@ export class ConversationCoreService {
       // P521: 定型の挨拶で終わらせず、内容のある雑談には内容へ
       // 反応する（主題語＋感情の手がかり）。挨拶・感謝・疲労など
       // の決まった受け止めが要る言い方では従来の文を優先する。
-      const isPhatic = isFatigue || /お疲れ|おつかれ|ありがとう|感謝|おはよう|元気/.test(prompt);
+      const isPhatic = isFatigue || /お疲れ|おつかれ|ありがとう|感謝|おはよ(?:う|ー)?|元気/.test(prompt);
       if (!isPhatic) {
         const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
         if (reaction) casualConclusion = reaction;
       }
       // P522: 前の日以前に開いた話題が残っていれば、挨拶のときに
       // 一度だけ拾う。
-      if (/おはよう|こんにちは|ただいま|こんばんは|やあ/.test(prompt)) {
+      if (/おはよ(?:う|ー)?|こんにちは|ただいま|こんばんは|やあ/.test(prompt)) {
         const openTopic = conversationOpenTopicService.takeCallbackTopic();
         if (openTopic) casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
       }
@@ -659,16 +658,25 @@ export class ConversationCoreService {
       // 日常の発話（「いい天気だね」「散歩してきた」）が、知識の
       // 不足として「答えられない」に落ちていた。雑談は知識問題で
       // はないので、内容に反応して会話として受ける。
-      const reactionBase = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
-        ?? 'そうなんですね。話してくれてありがとう。';
+      // P547: 宣言文として来た疲れの発話（「今日はへとへとだよ」）も、
+      // 話題の反響ではなく共感で受ける。判定の語彙は userStateTrailService に集約。
+      const fallthroughFatigue = userStateTrailService.isFatigueText(prompt);
+      const reactionBase = fallthroughFatigue
+        ? (userStateTrailService.recentCount('fatigue', 72) >= 1
+          ? 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。'
+          : '本当にお疲れ様でした。無理をなさらず、ゆっくり休んでくださいね。')
+        : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
+          ?? 'そうなんですね。話してくれてありがとう。');
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
       // （創作の層の中だけ。場面が無ければ何も付かない）。
       // P536: 3ターンに1回は、地の文の代わりに場面の進行を添えて
       // 彼女の側から場面を一歩進める。
       const reaction = reactionBase
-        + (paragraphCompositionService.sceneProgressionSuffix()
-          ?? paragraphCompositionService.sceneTextureSuffix(prompt)
-          ?? '');
+        + (fallthroughFatigue
+          ? ''
+          : (paragraphCompositionService.sceneProgressionSuffix()
+            ?? paragraphCompositionService.sceneTextureSuffix(prompt)
+            ?? ''));
       ir = answerContentIrService.buildAnswerIR({
         conclusion: reaction,
         target: '日常対話',
@@ -677,7 +685,7 @@ export class ConversationCoreService {
       });
       skeleton = 'GENERAL_ANSWER';
       status = 'RESOLVED';
-      reason = 'casual_chat_fallthrough';
+      reason = fallthroughFatigue ? 'empathy_fatigue_resolved' : 'casual_chat_fallthrough';
     } else {
       status = 'UNRESOLVED';
       reason = claimMatch.unmetReason || 'knowledge_gap';

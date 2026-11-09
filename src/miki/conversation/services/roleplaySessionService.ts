@@ -265,6 +265,9 @@ export class RoleplaySessionService {
     const startMatch =
       source.match(/(.{1,20}?)(?:として)(?:話して|演じて|なりきって)/) ??
       source.match(/(.{1,20}?)(?:に)(?:なりきって)/) ??
+      // P547: 「<役名>になって」は文末か依頼の形に限る（「〜になってから」
+      // のような通常文を役の開始と誤認しないため）。
+      source.match(/(.{1,20}?)(?:になって)(?:話して|演じて|ほしい|ください|お願い)?[。．!！]?$/) ??
       source.match(/なりチャ[:：]\s*(.{1,20})/);
     if (startMatch) {
       const name = normalizeName(startMatch[1].replace(/^(じゃあ|では|それじゃあ)/, ''));

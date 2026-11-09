@@ -127,7 +127,8 @@ export class ProjectNotebookService {
 
   /**
    * P513: 会話での決定発言を取り込む。プロジェクト名が文中にあり、
-   * 決定を表す言い方（決めた／ことにした／決定した等）が含まれ、
+   * 決定を表す言い方（決めた／ことにした／決定した等、P547で意志形
+   * ことにしよ／ことにしようも追加）が含まれ、
    * 質問文でない場合だけ、そのプロジェクトを含む文を決め事として
    * 登録する。言及しただけ・質問しただけでは登録しない。
    */
@@ -135,7 +136,7 @@ export class ProjectNotebookService {
     const source = String(text || '');
     if (!source.trim()) return undefined;
     if (/[？?]\s*$/.test(source.trim()) || /教えて|聞かせて/.test(source)) return undefined;
-    if (!/決め(た|る|ました)|ことにし(た|ます)|決定(した|する|しました)/.test(source)) return undefined;
+    if (!/決め(た|る|ました|よう)|ことにし(た|ます|よう|よ)|決定(した|する|しました)/.test(source)) return undefined;
     const project = this.findProjectInText(source);
     if (!project) return undefined;
     const sentences = source.split(/(?<=。)/).map((s) => s.trim()).filter(Boolean);

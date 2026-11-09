@@ -13,10 +13,12 @@
  *   HYPOTHETICAL: 仮定・条件（もし、〜たら、〜れば）
  *   QUESTION: 疑問（〜ですか？、だろうか）
  *   JOKE: 冗談の明示（冗談、ネタ、嘘だけど）
+ *   MUSING: 迷い・推量（〜しよっかな、〜かな、〜かも）— 検討中であって
+ *     決め事でも事実でもない。意志形そのもの（〜しよ／〜しよう）は通す
  * 否定そのもの（「〜しないことにした」）は本人の意思として通す。
  */
 
-export type IntakeBlockReason = 'HYPOTHETICAL' | 'QUESTION' | 'QUOTED_OR_HEARSAY' | 'JOKE';
+export type IntakeBlockReason = 'HYPOTHETICAL' | 'QUESTION' | 'QUOTED_OR_HEARSAY' | 'JOKE' | 'MUSING';
 
 export interface IntakeMeaningVerdict {
   ok: boolean;
@@ -38,6 +40,9 @@ class IntakeMeaningGuardService {
     }
     if (/冗談|ネタとして|ウソだけど|嘘だけど/.test(s)) {
       return { ok: false, reason: 'JOKE' };
+    }
+    if (/(?:しよ|しよう)っ?かな/.test(s) || /(?:かな|かもね|かも(?:知れない|しれない))[。．!！]?\s*$/.test(s)) {
+      return { ok: false, reason: 'MUSING' };
     }
     return { ok: true };
   }

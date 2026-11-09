@@ -21,7 +21,7 @@ const STORAGE_KEY = 'miki_user_state_trail_v1';
 const MAX_ENTRIES = 40;
 const RETENTION_MS = 7 * 24 * 3600_000;
 
-const FATIGUE_PATTERN = /(?:疲れた|しんどい|もう無理|だるい|つらい|嫌になった|最悪|やってられない|勘弁して|眠い|限界|へろへろ|クタクタ)/;
+const FATIGUE_PATTERN = /(?:疲れた|しんどい|もう無理|だるい|つらい|嫌になった|最悪|やってられない|勘弁して|眠い|眠たい|ねむたい|限界|へろへろ|へとへと|クタクタ)/;
 const POSITIVE_PATTERN = /(?:嬉しい|うれしい|楽しい|よかった|やった|最高|面白い|気持ちいい)/;
 
 export class UserStateTrailService {
@@ -53,6 +53,11 @@ export class UserStateTrailService {
     try {
       storageService.setItem(STORAGE_KEY, JSON.stringify(entries.slice(-MAX_ENTRIES)));
     } catch { /* 記録は補助経路 */ }
+  }
+
+  /** P547: 疲労の言い回しかどうかだけを見る（記録はしない）。判定の語彙はここに集約する。 */
+  public isFatigueText(text: string): boolean {
+    return FATIGUE_PATTERN.test(String(text || ''));
   }
 
   /** 発話から兆候を読み、あれば記録して返す。 */

@@ -466,7 +466,7 @@ export class ConversationFactIntakeService {
    * - なりチャ中は入口自体が閉じる（intakeFromUserText のゲート）。
    */
   private learnTermFromUserExplanation(text: string): void {
-    const pattern = /^(.{1,12}?)(?:って|とは)、?(.{4,80}?)(?:のこと(?:だ|です|だよ|ですね)?|という意味(?:だ|です|だよ)?|を指す言葉|というもの(?:だ|です)?)[。．]?$/;
+    const pattern = /^(.{1,12}?)(?:っていうのは|ってのは|って|とは)、?(.{4,80}?)(?:のこと(?:だ|です|だよ|ですね)?|という意味(?:だ|です|だよ)?|を指す言葉|というもの(?:だ|です)?)[。．]?$/;
     for (const sentence of String(text || '').split(/(?<=。)/)) {
       const m = sentence.trim().match(pattern);
       if (!m) continue;
@@ -497,10 +497,14 @@ export class ConversationFactIntakeService {
     const value = String(text || '');
     let questionedTerm: string | undefined;
     for (const sentence of value.split(/(?<=。)/)) {
-      const m = sentence.trim().match(/^(.{1,12}?)(?:って|とは)(?:何|なに|どういう意味)/);
+      const trimmed = sentence.trim();
+      // P547: 言い回しの変種（なんだっけ／どういうもの／〜の意味は）も拾う。
+      const m = trimmed.match(/^(.{1,12}?)(?:っていうのは|ってのは|って|とは)(?:何|なに|なん|どういう意味|どういうもの|どんな)/)
+        ?? trimmed.match(/^(.{1,12}?)の意味は/);
       if (!m) continue;
       const term = m[1].trim();
       if (!term) continue;
+      if (/^(その|この|あの)/.test(term) && trimmed.includes('の意味は')) continue;
       if (/^(これ|それ|あれ|どれ|何|なに|ここ|そこ|あそこ)$/.test(term)) continue;
       if (/[はがをにへともや、。！？!?「」『』（）()\s]/.test(term)) continue;
       questionedTerm = term;
