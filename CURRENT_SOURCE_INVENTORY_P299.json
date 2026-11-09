@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1782,
     "sourceFileCount": 1335,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1246,
-    "relativeImportCandidateCount": 3874,
-    "resolvedRelativeImportCandidateCount": 3858,
+    "relativeImportCandidateCount": 3875,
+    "resolvedRelativeImportCandidateCount": 3859,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -10322,9 +10322,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationFactIntakeService.ts",
-      "bytes": 27397,
-      "lines": 558,
-      "sha256": "e58bbebfa5f5edc6a5c4eb12d32e5100e398c0753fb036ac054638aa43ced706",
+      "bytes": 27758,
+      "lines": 564,
+      "sha256": "ecede1b18b5bd2450accacc95e71baa81a7b49ed1d16daa9d0467987b477c459",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -10343,10 +10343,16 @@
           "specifier": "../../memory/services/scopedVersionedMemoryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/scopedVersionedMemoryService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "../../memory/services/projectNotebookService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/projectNotebookService.ts"
         }
       ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -23697,9 +23703,9 @@
     },
     {
       "path": "src/miki/memory/services/claimDatabaseService.ts",
-      "bytes": 63442,
-      "lines": 1438,
-      "sha256": "cb3f5d1fb97e71bca92eb58fdc3b3136278c5ba8c515a8833189188089a102f3",
+      "bytes": 65354,
+      "lines": 1479,
+      "sha256": "9bd971adff7a934822fca436c47f0d65b2753601b6e69d56321fc574fa2a37cb",
       "relativeImportCandidates": [
         {
           "line": 10,
@@ -24383,9 +24389,9 @@
     },
     {
       "path": "src/miki/memory/services/projectNotebookService.ts",
-      "bytes": 5852,
-      "lines": 145,
-      "sha256": "e3c51389cce09b9c0e362ea7038dc5e14fbc9f05bb6be14fb79e388f3f491877",
+      "bytes": 7466,
+      "lines": 174,
+      "sha256": "43aff351c00c6f0c2064d8c5e3d3fd8ea1c806618c977c4f8c1c8b5fed1e1d0a",
       "relativeImportCandidates": [
         {
           "line": 1,

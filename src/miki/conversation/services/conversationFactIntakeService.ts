@@ -1,6 +1,7 @@
 import type { MemoryItem } from '../../../types';
 import { enrichMemoryMetadata } from '../../../utils/memoryRetrieval';
 import { scopedVersionedMemoryService } from '../../memory/services/scopedVersionedMemoryService';
+import { projectNotebookService } from '../../memory/services/projectNotebookService';
 
 /**
  * P452: 会話の理解の土台 ― ユーザー発言からの事実取り込み。
@@ -447,6 +448,11 @@ export class ConversationFactIntakeService {
    * 保存自体は呼び出し側（App の setMemories / storage）が担う。
    */
   public intakeFromUserText(text: string, existingMemories: MemoryItem[]): FactIntakeResult {
+    // P513: プロジェクトの決め事らしい発言はプロジェクトノートにも
+    // 取り込む。失敗しても事実取り込み自体は止めない。
+    try {
+      projectNotebookService.intakeFromUserText(text);
+    } catch { /* best-effort */ }
     const { facts, invalidations } = this.extractUserFacts(text);
     const now = Date.now();
     const updated: MemoryItem[] = existingMemories.map((m) => ({ ...m }));
