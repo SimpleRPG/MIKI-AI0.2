@@ -335,6 +335,14 @@ conversationGraphRuntimeP212Service.ingestInput('regression-p555b', 'EFRの次�
 const workNextAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p555b');
 check('P555 次の作業を聞かれて答えられる', Boolean(workNextAnswer && workNextAnswer.includes('当たり判定')), String(workNextAnswer));
 
+// ---- 雑談反応の回転（P556） ----
+const casualHeads: string[] = [];
+for (const p of ['カピバラかわいい', 'リスザルかわいい', 'ワラビーかわいい']) {
+const r = await conversationCoreService.execute({ prompt: p } as any);
+casualHeads.push(String((r as any).replyText || '').split(/[！。]/)[0]);
+}
+check('P556 雑談の反応形が回転する', new Set(casualHeads).size === 3 && casualHeads[0].includes('カピバラ') && casualHeads[1].includes('リス') && casualHeads[2].includes('ラビー'), casualHeads.join(' / '));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

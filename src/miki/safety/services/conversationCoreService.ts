@@ -26,6 +26,7 @@ import { scopedVersionedMemoryService } from '../../memory/services/scopedVersio
 import { conversationUserFactRecallService, looksInterrogative, UserFactIntakeSummary } from '../../conversation/services/conversationUserFactRecallService';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
+import { storageService } from '../../../services/storageService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { capabilityGraphService } from '../../capability/services/capabilityGraphService';
 import { componentCompositionService } from '../../capability/services/componentCompositionService';
@@ -1187,34 +1188,51 @@ export class ConversationCoreService {
       (t) => t.length >= 2 && !/^(今日|明日|昨日|今|これ|それ|あれ|ここ|そこ)$/.test(t)
     );
     if (!term) return null;
-    const pick = (pool: string[]): string => pool[(prompt.length + term.length) % pool.length];
+    // P556: 形の選択は長さハッシュだけだと、似た長さの発話で毎日
+    // 同じ形が返り続ける。カテゴリごとに前回使った形を覚えておき、
+    // 次は別の形にする（決定的な回転。乱数は使わない）。
+    const pick = (pool: string[], category: string): string => {
+      let ledger: Record<string, number> = {};
+      try {
+        ledger = JSON.parse(storageService.getItem('miki_casual_reaction_usage_v1') || '{}') as Record<string, number>;
+      } catch { ledger = {}; }
+      const last = ledger[category];
+      const idx = typeof last === 'number' ? (last + 1) % pool.length : (prompt.length + term.length) % pool.length;
+      ledger[category] = idx;
+      try { storageService.setItem('miki_casual_reaction_usage_v1', JSON.stringify(ledger)); } catch { /* 回転は補助経路 */ }
+      return pool[idx];
+    };
     if (/嬉しい|うれしい|楽しい|よかった|すごい|やった|最高|面白い|かわいい|可愛い|美味しい|おいしい|気持ちいい/.test(prompt)) {
       return pick([
         `${term}、いいですね！`,
         `お、${term}ですか。なんだか楽しそうですね。`,
         `${term}、それはよかったですね！`,
-      ]);
+        `${term}、素敵ですね。`,
+      ], 'positive');
     }
     if (/大変|つらい|しんどい|悲しい|残念|ひどい|困った/.test(prompt)) {
       return pick([
         `${term}の件、大変でしたね。`,
         `${term}、それはしんどかったですね。`,
         `${term}の話、無理のない範囲で聞かせてくださいね。`,
-      ]);
+        `${term}、聞かせてくれてありがとうございます。`,
+      ], 'hard');
     }
     if (prompt.length >= 10) {
       return pick([
         `${term}の話ですね。`,
         `ふむ、${term}ですか。`,
         `${term}、なるほどですね。`,
-      ]);
+        `${term}、そうなんですね。もっと聞かせてください。`,
+      ], 'neutral');
     }
     // P531: 短い発話でも主題語があれば受け止める（従来は null で
     // 定型文に落ちていた）。
     return pick([
       `${term}、そうなんですね。`,
       `${term}の話ですね。`,
-    ]);
+      `${term}、なるほど。`,
+    ], 'short');
   }
 
   private buildResult(
