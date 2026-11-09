@@ -263,6 +263,25 @@ check('P548 元に戻って、で役が終わる', roleplaySessionService.handle
 const searchNeed = autonomousSearchService.detectNeedForSearch('モコロンの生息地を検索して');
 check('P548 検索して、を検索指示として拾う', searchNeed.needsSearch === true && searchNeed.category === 'explicit_request', JSON.stringify(searchNeed));
 
+// ---- 自己照会の言い回し変種（P549） ----
+conversationGraphRuntimeP212Service.ingestInput('regression-p549a', '知識って何件ある？');
+const claimCountAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p549a');
+check('P549 知識って何件、でも件数に答える', Boolean(claimCountAnswer && claimCountAnswer.includes('件')), String(claimCountAnswer));
+conversationGraphRuntimeP212Service.ingestInput('regression-p549b', 'EFRの決まりを教えて');
+const projectListAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p549b');
+check('P549 決まり、でも決め事一覧に答える', Boolean(projectListAnswer && projectListAnswer.includes('ペット')), String(projectListAnswer));
+conversationGraphRuntimeP212Service.ingestInput('regression-p549c', '世界モデル見せて');
+const canvasAnswer2 = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p549c');
+check('P549 世界モデル見せて、でも書き出しに答える', Boolean(canvasAnswer2 && canvasAnswer2.includes('世界モデル')), String(canvasAnswer2));
+roleplaySessionService.handleUserText('先生になって', 'persona-default');
+conversationGraphRuntimeP212Service.ingestInput('regression-p549d', '今何の役？');
+const roleAnswer2 = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p549d');
+check('P549 今何の役？、でも役に答える', Boolean(roleAnswer2 && roleAnswer2.includes('先生')), String(roleAnswer2));
+roleplaySessionService.handleUserText('なりチャ終わり', 'persona-default');
+conversationGraphRuntimeP212Service.ingestInput('regression-p549e', 'さっきの話は何？');
+const recallAnswer2 = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p549e');
+check('P549 さっきの話、でも思い出しに答える', Boolean(recallAnswer2), String(recallAnswer2));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

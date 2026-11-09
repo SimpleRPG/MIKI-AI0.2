@@ -288,17 +288,17 @@ class ConversationGraphRuntimeP212Service {
    const term=dictMatch[1].replace(/^(この|その|あの)/u,'').trim();
    if(term)return this.selfInquiryDictionaryAnswer(term);
   }
-  if(/(言い回し|表現)は(?:何件|いくつ)/u.test(value))return this.selfInquirySurfaceCountAnswer();
-  if(/(?:辞書|単語)に?は(?:何件|何語|いくつ)/u.test(value))return this.selfInquiryDictionaryCountAnswer();
-  if(/(?:主張|知識)は(?:何件|いくつ)/u.test(value))return this.selfInquiryClaimCountAnswer();
-  if(/(?:今の|現在の)役|なりチャの(?:場面|あらすじ|続き)|あらすじ(?:は|って)/u.test(value)){
+  if(/(言い回し|表現)(?:は|って)(?:何件|いくつ)/u.test(value))return this.selfInquirySurfaceCountAnswer();
+  if(/(?:辞書|単語)(?:に)?(?:は|って)(?:何件|何語|いくつ)/u.test(value))return this.selfInquiryDictionaryCountAnswer();
+  if(/(?:主張|知識)(?:は|って)(?:何件|いくつ)/u.test(value))return this.selfInquiryClaimCountAnswer();
+  if(/(?:今の|現在の)役|何の役(?!に)|役名|なりチャの(?:場面|あらすじ|続き)|あらすじ(?:は|って|を?(?:教えて|見せて))/u.test(value)){
    const roleAnswer=this.selfInquiryRoleAnswer();
    if(roleAnswer)return roleAnswer;
   }
   if(/状態.*(?:書き出|エクスポート)|(?:書き出|エクスポート).*状態/u.test(value)){
    return this.selfInquiryStateSnapshotAnswer();
   }
-  if(/世界モデル.*(?:書き出|エクスポート|キャンバス)|(?:書き出|エクスポート).*世界モデル/u.test(value)){
+  if(/世界モデル.*(?:書き出|エクスポート|キャンバス|見せて|見たい|表示)|(?:書き出|エクスポート).*世界モデル/u.test(value)){
    return this.selfInquiryCanvasExportAnswer();
   }
   if(/振り返り/u.test(value)){
@@ -310,12 +310,12 @@ class ConversationGraphRuntimeP212Service {
   }
   const projectAspectAnswer=this.selfInquiryProjectAspectAnswer(value,semantic?.terms??[]);
   if(projectAspectAnswer)return projectAspectAnswer;
-  const projectMatch=value.match(/(.{1,24}?)(?:の)?(?:決め事|決定事項|方針|ルール)/u);
+  const projectMatch=value.match(/(.{1,24}?)(?:の)?(?:決め事|決まり|決めたこと|決定事項|方針|ルール)/u);
   if(projectMatch){
    const projectAnswer=this.selfInquiryProjectAnswer(projectMatch[1]);
    if(projectAnswer)return projectAnswer;
   }
-  if(/さっき(?:何て|なんて|何を|何の話|なんの話|どんな話)/u.test(value)||/(?:何の話|なんの話)(?:してた|だった)/u.test(value)||/前の答え|直前の答え|さっきの答え/u.test(value))return this.selfInquiryRecallAnswer();
+  if(/さっき(?:何て|なんて|何を|何の話|なんの話|どんな話)/u.test(value)||/(?:何の話|なんの話)(?:してた|だった)/u.test(value)||/前の答え|直前の答え|さっきの答え|さっきの(?:話|こと)/u.test(value))return this.selfInquiryRecallAnswer();
   return undefined;
  }
  // P411 meaning path. Referent: which of MIKI's own stores the
