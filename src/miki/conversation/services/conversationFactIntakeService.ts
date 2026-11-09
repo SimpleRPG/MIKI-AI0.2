@@ -4,6 +4,8 @@ import { scopedVersionedMemoryService } from '../../memory/services/scopedVersio
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { roleplaySessionService } from './roleplaySessionService';
 import { personaProfileService } from './personaProfileService';
+import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
+import { systemLogger } from '../../../services/systemLogger';
 
 /**
  * P452: 会話の理解の土台 ― ユーザー発言からの事実取り込み。
@@ -449,6 +451,36 @@ export class ConversationFactIntakeService {
    * 発言を取り込み、更新後の全記憶リストを返す。
    * 保存自体は呼び出し側（App の setMemories / storage）が担う。
    */
+  /**
+   * P518: 「<語>って／とは、<説明>のこと／という意味」という説明の
+   * 言い方から、語と意味を取り出して個人辞書に登録する。会話の中で
+   * 教わった語が、その場で「知っている語」になるための入口
+   * （意味理解を日常の会話でも育てる）。
+   * - 既に gloss のある語（本物の辞書・Web学習由来）は上書きしない。
+   * - ユーザーから教わった語だけは、教え直しで差し替える。
+   * - なりチャ中は入口自体が閉じる（intakeFromUserText のゲート）。
+   */
+  private learnTermFromUserExplanation(text: string): void {
+    const pattern = /^(.{1,12}?)(?:って|とは)、?(.{4,80}?)(?:のこと(?:だ|です|だよ|ですね)?|という意味(?:だ|です|だよ)?|を指す言葉|というもの(?:だ|です)?)[。．]?$/;
+    for (const sentence of String(text || '').split(/(?<=。)/)) {
+      const m = sentence.trim().match(pattern);
+      if (!m) continue;
+      const term = m[1].trim();
+      const gloss = m[2].trim();
+      if (!term || !gloss) continue;
+      if (/^(これ|それ|あれ|どれ|何|なに|ここ|そこ|あそこ)$/.test(term)) continue;
+      if (/[はがをにへともや、。！？!?「」『』（）()\s]/.test(term)) continue;
+      if (/(です|ます|だった|して)$/.test(term)) continue;
+      const existing = japaneseDictionaryService.lookup(term);
+      const userTaught = existing.find((e) => e.source === 'PERSONAL' && (e.semanticIds || []).includes('learned:user-taught'));
+      const anyGloss = existing.find((e) => e.gloss);
+      if (anyGloss && !userTaught) continue;
+      if (userTaught && userTaught.gloss === gloss) continue;
+      japaneseDictionaryService.addPersonal(term, { gloss, semanticIds: ['learned:user-taught'] });
+      systemLogger.info('CHAT', `📖 [意味学習] ユーザーから「${term}」の意味を教わりました: ${gloss}`);
+    }
+  }
+
   public intakeFromUserText(text: string, existingMemories: MemoryItem[]): FactIntakeResult {
     // P514: なりチャの開始・終了と、セッション中の創作分離。
     // 演じている間の発言は創作であり、本人の現実の事実として
@@ -463,6 +495,11 @@ export class ConversationFactIntakeService {
     // 取り込む。失敗しても事実取り込み自体は止めない。
     try {
       projectNotebookService.intakeFromUserText(text);
+    } catch { /* best-effort */ }
+    // P518: 語の意味を説明してくれた発言は、その語の意味として
+    // 個人辞書に登録する。失敗しても事実取り込み自体は止めない。
+    try {
+      this.learnTermFromUserExplanation(text);
     } catch { /* best-effort */ }
     const { facts, invalidations } = this.extractUserFacts(text);
     const now = Date.now();
