@@ -871,8 +871,10 @@ export class AutonomousSearchService {
       };
     }
 
-    // 2. 時事・最新情報・日付依存トピック (2025年、2026年、最新、最近、トレンド、ニュース)
-    const latestPattern = /(?:最新|最近|トレンド|ニュース|今年|現行|いま|現在|2025年?|2026年?|アップデート|バージョン)/;
+    // 2. 時事・最新情報・日付依存トピック (今年前後の年号、最新、最近、トレンド、ニュース)
+    // P551: 年号を固定で書くと年が替わるたびに黙って陳腐化するので、その時点の年から前後1年を動的に作る。
+    const currentYear = new Date().getFullYear();
+    const latestPattern = new RegExp(`(?:最新|最近|トレンド|ニュース|今年|現行|いま|現在|${currentYear - 1}年?|${currentYear}年?|${currentYear + 1}年?|アップデート|バージョン)`);
     if (latestPattern.test(t) && (t.includes('何') || t.includes('どう') || t.includes('教えて') || t.includes('一覧') || t.includes('状況'))) {
       const cleaned = t
         .replace(/(?:を|について|のこと)?(?:教えて|知りたい|どうなってる|どう|ですか|何|なん)?/g, '')

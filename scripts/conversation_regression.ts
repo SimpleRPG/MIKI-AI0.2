@@ -287,6 +287,11 @@ conversationFactIntakeService.intakeFromUserText('ドードーモドキってど
 check('P550 どういうこと、でも知らない語として拾う', userKnowledgeProfileService.isUnknown('ドードーモドキ'), JSON.stringify(userKnowledgeProfileService.listUnknown()));
 check('P550 覚えといて、でも話題の重みが上がる', conversationOpenTopicService.salienceOf('これ覚えといてほしい') >= 3, String(conversationOpenTopicService.salienceOf('これ覚えといてほしい')));
 
+// ---- 年号の動的化（P551） ----
+const nextYear = new Date().getFullYear() + 1;
+const yearNeed = autonomousSearchService.detectNeedForSearch(`${nextYear}年の新機能は何？`);
+check('P551 来年の年号でも最新情報として拾う', yearNeed.needsSearch === true, JSON.stringify(yearNeed));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
