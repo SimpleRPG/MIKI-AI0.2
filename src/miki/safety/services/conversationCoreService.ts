@@ -924,7 +924,7 @@ export class ConversationCoreService {
               : fallthroughThirst
                 ? this.pickFixedReply('fx_thirst', ['喉が渇いたのですね。何か飲んでくださいね。', '水分を取ってくださいね。', '喉が渇きましたか。一息ついて飲み物をどうぞ。'])
                 : fallthroughPain
-                  ? this.pickFixedReply('fx_pain', ['大丈夫ですか？痛むときは無理しないでくださいね。', '痛いのはつらいですね。休めるときに休んでくださいね。', '大丈夫ですか？温かくして休んでくださいね。'])
+                  ? ffx('fx_pain', ['大丈夫ですか？痛むときは無理しないでくださいね。', '痛いのはつらいですね。休めるときに休んでくださいね。', '大丈夫ですか？温かくして休んでくださいね。'], ['大丈夫？痛いときは無理しないでね。', '痛いのはつらいよね。休めるときに休んでね。', '大丈夫？温かくして休んでね。'])
                   : fallthroughClosingText
               ? fallthroughClosingText
               : fallthroughThanks

@@ -106,6 +106,18 @@ function casualizeEndings(text: string, forVoice = false): string {
   let out = text;
   out = out.split('ではありません。').join('じゃないよ。');
   out = out.split('ではない。').join('じゃないよ。');
+  // P596: い形容詞と「たい」の直後の「です」は「だよ」にしない
+  // （「嬉しいだよ」「増やしていきたいだよ」は不自然なため）。
+  // 汎用の「です。→だよ。」より先に処理する。
+  out = out.split('たいです。').join('たいな。');
+  out = out.split('ほしいです。').join('ほしいな。');
+  out = out.split('嬉しいです。').join('嬉しいよ。');
+  out = out.split('楽しいです。').join('楽しいよ。');
+  out = out.split('難しいです。').join('難しいよ。');
+  out = out.split('ないです。').join('ないよ。');
+  out = out.split('いいです。').join('いいよ。');
+  out = out.split('どうですか？').join('どう？');
+  out = out.split('どうですか。').join('どう。');
   // P506: 人格の口調として使う場合は「かもしれない→かも」を
   // 使わない。可能性の表現を落とすと意味保存チェックの
   // 否定カウントにも触れてしまうため、安全側に倒す。
@@ -120,6 +132,9 @@ function casualizeEndings(text: string, forVoice = false): string {
   out = out.split('です。').join('だよ。');
   out = out.split('だろう。').join('だろうね。');
   if (out.endsWith('である')) out = `${out.slice(0, -3)}だよ`;
+  else if (out.endsWith('たいです')) out = `${out.slice(0, -4)}たいな`;
+  else if (out.endsWith('しいです')) out = `${out.slice(0, -2)}よ`;
+  else if (out.endsWith('ないです')) out = `${out.slice(0, -4)}ないよ`;
   else if (out.endsWith('ですよ')) out = `${out.slice(0, -3)}だよ`;
   else if (out.endsWith('ですね')) out = `${out.slice(0, -3)}だね`;
   else if (out.endsWith('です')) out = `${out.slice(0, -2)}だよ`;
