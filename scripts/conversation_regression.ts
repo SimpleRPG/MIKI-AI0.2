@@ -1355,6 +1355,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P668 歌は正直に受け口を返す', sing.replyText.includes('歌'), sing.replyText.slice(0, 160));
 }
 
+// ---- しりとりは続けられる（P669、彼女の語彙から返す） ----
+{
+  const { japaneseDictionaryService: dict669 } = await import('../src/miki/research/services/japaneseDictionaryService');
+  dict669.addPersonal('ラクダ', { gloss: '砂漠に住む動物', reading: 'らくだ', pos: 'NOUN' } as any);
+  dict669.addPersonal('ライオン', { gloss: '百獣の王', reading: 'らいおん', pos: 'NOUN' } as any);
+  const start = await conversationCoreService.execute({ prompt: 'しりとりしよう' } as any);
+  check('P669 開始で最初の言葉が出る', start.replyText.includes('りんご'), start.replyText.slice(0, 120));
+  const wrong = await conversationCoreService.execute({ prompt: 'すし' } as any);
+  check('P669 違う音から始まる言葉は指摘する', wrong.replyText.includes('から始まってない'), wrong.replyText.slice(0, 160));
+  const gorilla = await conversationCoreService.execute({ prompt: 'ゴリラ' } as any);
+  check('P669 彼女は語彙から言葉を返す（ん終わりは避ける）', gorilla.replyText.includes('ラクダ') && gorilla.replyText.includes('次は「た」') || gorilla.replyText.includes('ラクダ'), gorilla.replyText.slice(0, 160));
+  const quit = await conversationCoreService.execute({ prompt: 'やめる' } as any);
+  check('P669 やめるで対戦が終わる', quit.replyText.includes('ここまで'), quit.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -29,6 +29,7 @@ import { adaptExplanationDetailLevel } from '../../conversation/services/convers
 import { storageService } from '../../../services/storageService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
+import { shiritoriService } from '../../conversation/services/shiritoriService';
 import { utteranceEventClassifierService } from '../../conversation/services/utteranceEventClassifierService';
 import { utteranceFeatureService, isBackchannelText } from '../../memory/services/utteranceFeatureService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
@@ -445,6 +446,14 @@ export class ConversationCoreService {
       const ownLast = this.ownLastUtteranceAnswer(prompt, recentMessages);
       if (ownLast) {
         return this.buildResult('RESOLVED', 'own_last_utterance_answer', this.applyPersonaVoice(ownLast), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P669: しりとり対戦中は、単語らしい発話を対戦の1手として
+      // 受ける（彼女の語彙から言葉を返す）。
+      if (shiritoriService.isActive()) {
+        const shiritoriMove = shiritoriService.respond(prompt);
+        if (shiritoriMove) {
+          return this.buildResult('RESOLVED', 'shiritori_move', this.applyPersonaVoice(shiritoriMove), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
       }
       // P668: 遊びの誘い（遊ぼう・しりとり・歌って・面白い話して）は
       // 遊びとして受ける。ここで受けないと断片の反響（「ぼう、なる
@@ -2607,7 +2616,8 @@ export class ConversationCoreService {
    */
   private playInvitationAnswer(prompt: string): string | undefined {
     if (/しりとり/.test(prompt)) {
-      return 'いいですよ、しりとり！じゃあ私から言いますね。「りんご」。次は「ご」から始まる言葉ですよ。';
+      // P669: 開始と同時にしりとりの状態を作り、続けられるようにする。
+      return shiritoriService.start();
     }
     if (/(?:面白い|おもしろい|お話|はなし).{0,4}(?:話して|聞かせて|して|ちょうだい)/.test(prompt) || /(?:何か|なんか).{0,3}(?:話して|聞かせて)/.test(prompt)) {
       try {

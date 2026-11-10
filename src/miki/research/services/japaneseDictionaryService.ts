@@ -232,6 +232,28 @@ class JapaneseDictionaryService {
     return [...out];
   }
 
+  /**
+   * P669: 遊び（しりとり）に使える語の一覧。名詞系で読みがある語を、
+   * 内蔵・取り込み・個人の全部から返す。彼女の語彙がそのまま
+   * 遊びの材料になる。
+   */
+  public listPlayableWords(): { surface: string; reading: string }[] {
+    const seen = new Set<string>();
+    const out: { surface: string; reading: string }[] = [];
+    const push = (e: JapaneseDictionaryEntry) => {
+      if (!e.reading || e.reading.length < 2) return;
+      if (!(e.pos === 'NOUN' || e.pos === 'PROPER_NOUN' || e.pos === 'TECHNICAL')) return;
+      const key = normalize(e.surface);
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push({ surface: e.surface, reading: e.reading });
+    };
+    this.builtinEntries.forEach(push);
+    for (const list of this.imported.values()) list.forEach(push);
+    for (const e of this.personal.values()) push(e);
+    return out;
+  }
+
   public getStats() {
     return { builtin: this.builtinEntries.length, personal: this.personal.size, imported: [...this.imported.entries()].reduce((n,[,v]) => n + v.length, 0), sources: [...this.imported.keys()], packages: [...this.packageInfo.values()] };
   }
