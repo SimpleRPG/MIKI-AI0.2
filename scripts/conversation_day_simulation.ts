@@ -155,8 +155,10 @@ async function main() {
   storageService.setItem('miki_user_state_trail_v1', JSON.stringify([{ signal: 'fatigue', at: dayAgo }]));
   const d21 = await turn('D2-1 翌朝の挨拶', 'おはよう');
   check('D2-1 前日の話題を彼女から拾う', d21.includes('ツバメの巣'), d21.slice(0, 180));
+  // P641: 学びの報告はエピソードと同じ最初の挨拶に出る（埋もれない）。
+  check('D2-1 背景で学んだ語も同じ挨拶で報告する', d21.includes('クオッカ'), d21.slice(0, 220));
   const d22 = await turn('D2-2 昼の挨拶', 'こんにちは');
-  check('D2-2 背景で学んだ語を報告する', d22.includes('クオッカ'), d22.slice(0, 180));
+  check('D2-2 学びの報告は繰り返さない', !d22.includes('調べて覚えました'), d22.slice(0, 180));
   const d23 = await turn('D2-3 疲れの継続', '疲れた');
   check('D2-3 疲れが続いている形で受ける', d23.includes('続いて') || d23.includes('ここ数日') || d23.includes('このところ'), d23.slice(0, 160));
 

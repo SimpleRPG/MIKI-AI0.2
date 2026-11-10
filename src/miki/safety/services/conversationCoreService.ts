@@ -949,33 +949,38 @@ export class ConversationCoreService {
       if (isGreetingTurn) {
         // P623: 前日のエピソードが組めるなら、話題の単体拾いより
         // 先に「昨日のこと」として出す（話題は消費して二重に出さない）。
+        let appended = 0;
         const episode = (() => { try { return episodeMemoryService.yesterdayEpisode(); } catch { return undefined; } })();
         if (episode) {
           if (episode.topics.length > 0) conversationOpenTopicService.takeCallbackTopic();
           casualConclusion += `\n${episode.summary}その後、どうですか？`;
+          appended += 1;
         }
         const openTopic = episode ? undefined : conversationOpenTopicService.takeCallbackTopic();
         if (openTopic) {
           casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
-        } else {
-          // P571/P570: 挨拶の場で、彼女の側の近況も1件だけ出す。
-          // 優先順位は、背景で学べた語の報告 → 解けた質問の報告 →
-          // 今日の振り返り。
-          const report = this.learnedTermReport();
-          const resolvedReport = report ? undefined : this.resolvedQuestionReport();
-          if (report) {
-            casualConclusion += `\n${report}`;
-          } else if (resolvedReport) {
-            casualConclusion += `\n${resolvedReport}`;
+          appended += 1;
+        }
+        // P571/P621: 彼女の側の近況（学べた語・解けた質問の報告）は、
+        // エピソードや拾い直しがある日にも埋もれさせない。実機では
+        // エピソードが組める日が大半で、報告が何日も先送りになると
+        // 「学んで育つ」実感そのものが消えてしまう。添えは最大2件まで。
+        const report = this.learnedTermReport();
+        const resolvedReport = report ? undefined : this.resolvedQuestionReport();
+        if (report) {
+          casualConclusion += `\n${report}`;
+          appended += 1;
+        } else if (resolvedReport) {
+          casualConclusion += `\n${resolvedReport}`;
+          appended += 1;
+        } else if (appended === 0) {
+          const mention = this.reflectionMention();
+          if (mention) {
+            casualConclusion += `\n${mention}`;
           } else {
-            const mention = this.reflectionMention();
-            if (mention) {
-              casualConclusion += `\n${mention}`;
-            } else {
-              // P580: 時間帯・季節の感覚（1日1回まで、最も弱い添え）。
-              const timeSense = this.timeSenseMention();
-              if (timeSense) casualConclusion += `\n${timeSense}`;
-            }
+            // P580: 時間帯・季節の感覚（1日1回まで、最も弱い添え）。
+            const timeSense = this.timeSenseMention();
+            if (timeSense) casualConclusion += `\n${timeSense}`;
           }
         }
       }
