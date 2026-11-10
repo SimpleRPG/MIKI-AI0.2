@@ -1291,6 +1291,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P659 通常の語は頻度導出される', selfPreferenceService.derivedInterests('persona-p659').includes('星空'), JSON.stringify(selfPreferenceService.derivedInterests('persona-p659')));
 }
 
+// ---- 「さっきの話だけど（続き）」は振り返りに横取りしない（P660） ----
+{
+  const continuation = await conversationCoreService.execute({ prompt: 'さっきの話、続きだけど聞いて' } as any);
+  check('P660 続きの宣言は振り返りにならない', !continuation.replyText.includes('の話をしましたね'), continuation.replyText.slice(0, 160));
+  const recapQ = await conversationCoreService.execute({ prompt: '今日何の話をしたっけ？' } as any);
+  check('P660 今日の振り返りの質問は従来どおり答える', recapQ.replyText.includes('話をしましたね') || recapQ.replyText.includes('今日は'), recapQ.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

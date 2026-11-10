@@ -2975,7 +2975,10 @@ export class ConversationCoreService {
 
   /** P597: 「今日何の話をしたっけ？」に、開いた話題と作業状態から答える（P212 と同じ材料）。 */
   private conversationRecapAnswer(prompt: string, state?: any): string | undefined {
-    if (!/(?:何|なに)の話(?:を)?(?:した|してた|していた)|今日(?:は|に)?(?:何|なに)の話|さっき(?:の)?話/.test(prompt)) return undefined;
+    // P660: 「さっきの話」だけでは振り返りの合図にしない（「さっきの
+    // 話だけど、続きを聞いて」は続きの宣言で、振り返りの質問では
+    // ない）。さっき形は、質問の言葉（何・だっけ）を伴う時だけ拾う。
+    if (!/(?:何|なに)の話(?:を)?(?:した|してた|していた)|今日(?:は|に)?(?:何|なに)の話|さっき(?:の)?話(?:は|って)?(?:何|なに|なんだった|だっけ)/.test(prompt)) return undefined;
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const parts: string[] = [];
