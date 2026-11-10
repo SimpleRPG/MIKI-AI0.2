@@ -297,6 +297,12 @@ export class ConversationCoreService {
       if (choiceAnswer) {
         return this.buildResult('RESOLVED', 'choice_question_answer', this.applyPersonaVoice(choiceAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P594: 「次何作ればいい？」は作業状態から答える（未知語として
+      // 調査キューに倒れていた）。相方としての基本の受け答え。
+      const nextWork = this.nextWorkAnswer(prompt);
+      if (nextWork) {
+        return this.buildResult('RESOLVED', 'next_work_answer', this.applyPersonaVoice(nextWork), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
     }
     if (explicitUnknownInquiry && !userFactRecall) {
       const researched = await unknownResearchConversationBridgeService.resolveAndRespond({
@@ -941,6 +947,15 @@ export class ConversationCoreService {
         } else if (/泣きたい|泣きそう|悲しくて|涙.*出/.test(prompt)) {
           // P593: 泣きたい気持ちは、汎用の相槌で流さない。
           reactionBase = ffx('fx_sad', ['無理しなくて大丈夫ですよ。私はそばにいます。', 'つらいですね。話したくなったら聞きますよ。'], ['無理しなくて大丈夫だよ。そばにいるよ。', 'つらいね。話したくなったら聞くよ。']);
+        } else if (/詰まって|つまずい|うまくいかない|進まない|バグが取れない|エラーが消えない/.test(prompt)) {
+          // P594: 作業の行き詰まりは、相方として一緒に考える形で受ける。
+          reactionBase = ffx('fx_stuck', ['詰まるとしんどいですね。どこで止まっているか、一緒に整理しましょうか。', 'うまくいかないときは、一度切り分けてみましょう。症状を教えてもらえたら、一緒に考えます。'], ['詰まるとしんどいよね。どこで止まってるか、一緒に整理しよ？', 'うまくいかないときは切り分けてみよ。症状を教えてくれたら一緒に考えるよ。']);
+        } else if (/モチベ.*(?:下が|落ち)|やる気.*(?:ない|出ない)|もうやめたい|やめたい|自信(?:が)?ない|向いてない/.test(prompt)) {
+          // P594: 落ち込みは、今の作業に触れながら励ます。
+          reactionBase = this.discouragedAnswer();
+        } else if (/今日は.*休|開発.*休む|休むことに|休みにし/.test(prompt)) {
+          // P594: 休む宣言は労う（主題の反響や語幹の聞き返しにしない）。
+          reactionBase = ffx('fx_rest_day', ['今日はお休みですね。ゆっくり休んでくださいね。', 'お休みの日も大事ですね。しっかり充電してください。'], ['今日はお休みだね。ゆっくり休んでね。', 'お休みも大事だよ。しっかり充電してね。']);
         } else if (/(?:みき|ミキ|ビービー|あなた|君)/.test(prompt) && /(?:かわいい|可愛い|優しい|やさしい|すごい|えらい|好き|大好き)/.test(prompt)) {
           // P593: 彼女への褒め言葉は、主題の反響でなく照れて受ける。
           reactionBase = ffx('fx_compliment', ['えへへ、ありがとう。嬉しいです。', 'ありがとうございます。そう言ってもらえると嬉しいです。', 'わーい、ありがとう。'], ['えへへ、ありがと！うれしい！', 'ありがとー！えへへ。', 'わーい、ありがとう！']);
@@ -1796,7 +1811,9 @@ export class ConversationCoreService {
         const after = prompt.slice(prompt.indexOf(t) + t.length, prompt.indexOf(t) + t.length + 1);
         // P591: 「雨降」+って、「仕事終」+わった のような活用の語幹も
         // 聞き返さない（直後の「わ」「っ」も語幹の続きとみなす）。
-        return !/[るりれろたてますないだわっ]/.test(after);
+        // P594: 動詞の辞書形の尾（む・く・す等）も語幹の続きとみなす
+        // （「開発休」+む を聞き返さない）。
+        return !/[るりれろたてますないだわっむくぐすつぬぶ]/.test(after);
       });
       if (!topic) return undefined;
       const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
@@ -1893,6 +1910,34 @@ export class ConversationCoreService {
     return undefined;
   }
 
+  /** P594: 「次に何を作ればいい？」へ、作業状態（今の作業・次の手）から答える。 */
+  private nextWorkAnswer(prompt: string): string | undefined {
+    if (!/(?:次.*(?:何|なに).*(?:作|や)|次に.*(?:作|やる)|次は.*(?:何|なに))/.test(prompt)) return undefined;
+    try {
+      const states = projectNotebookService.listWorkStates();
+      const withNext = states.find((s) => s.next);
+      if (withNext) {
+        return `${withNext.project}の次の手は「${withNext.next}」でしたよ。${withNext.current ? `今の「${withNext.current}」が終わったら、そちらですね。` : 'そこから進めましょう。'}`;
+      }
+      const withCurrent = states.find((s) => s.current);
+      if (withCurrent) {
+        return `今は${withCurrent.project}の「${withCurrent.current}」を作っているところですね。次はまだ決まっていません。終わったら一緒に考えましょう。`;
+      }
+    } catch { /* 補助経路 */ }
+    return '次の作業は、まだ聞いていません。今作っているものが終わったら、一緒に考えましょう。';
+  }
+
+  /** P594: 落ち込みへの受け止め。今の作業が分かれば、それに触れて励ます。 */
+  private discouragedAnswer(): string {
+    try {
+      const current = projectNotebookService.listWorkStates().find((s) => s.current);
+      if (current) {
+        return `大丈夫、詰まるときは誰でもありますよ。今は${current.project}の「${current.current}」の途中でしたね。今日は少し休んで、また明日考えましょう。作ってきたものは、ちゃんと残っていますよ。`;
+      }
+    } catch { /* 補助経路 */ }
+    return '大丈夫、うまくいかない日は誰でもありますよ。今日は少し休んで、また明日考えましょう。これまで作ってきたものは、ちゃんと残っていますよ。';
+  }
+
   /** P592: 「AとB、どっちがいい？」への答え（材料が無いときの正直な形）。 */
   private choiceQuestionAnswer(prompt: string): string | undefined {
     if (!/(?:どっち|どちら)/.test(prompt) || !/(?:いい|好き|おすすめ|正解)/.test(prompt)) return undefined;
@@ -1930,7 +1975,8 @@ export class ConversationCoreService {
   }
 
   private opinionAnswer(prompt: string, contentTokens: string[]): string | undefined {
-    if (!/(?:どう思う|どう感じる|好きですか|おすすめ)/.test(prompt)) return undefined;
+    // P594: 「〜すべき？」「〜した方がいい？」も意見を求める形として拾う。
+    if (!/(?:どう思う|どう感じる|好きですか|おすすめ|べき|ほうがいい|方がいい|した方が|したほうが)/.test(prompt)) return undefined;
     const topic = this.pickReactionTopic(prompt, contentTokens);
     if (!topic) return undefined;
     try {

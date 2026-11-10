@@ -640,6 +640,20 @@ check('P593 できない依頼は引き受けたふりをしない', cannotReply
 const moodReply = await conversationCoreService.execute({ prompt: '怒ってる？' } as any);
 check('P593 機嫌の質問には自分の状態で答える', moodReply.replyText.includes('怒っていません') || moodReply.replyText.includes('怒ってない'), moodReply.replyText.slice(0, 120));
 
+// ---- 相方としての受け答え（P594） ----
+const stuckReply = await conversationCoreService.execute({ prompt: 'バグが取れない' } as any);
+check('P594 行き詰まりは一緒に考える形で受ける', stuckReply.replyText.includes('一緒') || stuckReply.replyText.includes('切り分け'), stuckReply.replyText.slice(0, 140));
+const discouragedReply = await conversationCoreService.execute({ prompt: 'モチベ下がってきた' } as any);
+check('P594 落ち込みは励ましで受ける', (discouragedReply.replyText.includes('大丈夫') || discouragedReply.replyText.includes('休んで')) && !discouragedReply.replyText.includes('モチベの話'), discouragedReply.replyText.slice(0, 160));
+const shouldReply = await conversationCoreService.execute({ prompt: 'EFRのマップ、やっぱり出すべき？' } as any);
+check('P594 「出すべき？」は決め事を踏まえて意見を言う', shouldReply.replyText.includes('EFR') && shouldReply.replyText.includes('決め事'), shouldReply.replyText.slice(0, 180));
+const restDayReply = await conversationCoreService.execute({ prompt: '今日は開発休む' } as any);
+check('P594 休む宣言は労い、語幹を聞き返さない', (restDayReply.replyText.includes('休んで') || restDayReply.replyText.includes('休み')) && !restDayReply.replyText.includes('どんなもの'), restDayReply.replyText.slice(0, 140));
+projectNotebookService.intakeFromUserText('EFRのペットを作ってる');
+projectNotebookService.intakeFromUserText('次は当たり判定を作る');
+const nextWorkReply = await conversationCoreService.execute({ prompt: '次何作ればいいと思う？' } as any);
+check('P594 次の作業は作業状態から答える', nextWorkReply.replyText.includes('当たり判定'), nextWorkReply.replyText.slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
