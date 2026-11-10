@@ -825,6 +825,16 @@ check('P609 初めての物でも喪失として受ける', passLostReply.replyT
   check('P611 直後の訂正で外れ台帳に移る', review.length === 1 && review[0].category === 'fx_lost', JSON.stringify(review).slice(0, 160));
 }
 
+// ---- 分類の一般化その2・回復の受け止め（P612） ----
+const busStopReply = await conversationCoreService.execute({ prompt: 'バスが止まってる' } as any);
+check('P612 バスの運休も交通として受ける', busStopReply.replyText.includes('大変') || busStopReply.replyText.includes('気をつけて') || busStopReply.replyText.includes('遅れ') || busStopReply.replyText.includes('無理'), busStopReply.replyText.slice(0, 140));
+const ticketReply = await conversationCoreService.execute({ prompt: 'ライブのチケット当たった！' } as any);
+check('P612 当選は達成として一緒に喜ぶ', ticketReply.replyText.includes('おめでとう') || ticketReply.replyText.includes('やりました') || ticketReply.replyText.includes('すごい'), ticketReply.replyText.slice(0, 140));
+const umbrellaReply = await conversationCoreService.execute({ prompt: '傘忘れた' } as any);
+check('P612 置き忘れは喪失寄りに受ける', umbrellaReply.replyText.includes('見つかる') || umbrellaReply.replyText.includes('大変') || umbrellaReply.replyText.includes('困り'), umbrellaReply.replyText.slice(0, 140));
+const recoveredReply = await conversationCoreService.execute({ prompt: '風邪治った' } as any);
+check('P612 回復は喜んで受ける', recoveredReply.replyText.includes('よかった') && !recoveredReply.replyText.includes('良くなりますように'), recoveredReply.replyText.slice(0, 140));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

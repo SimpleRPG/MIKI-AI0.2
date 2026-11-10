@@ -50,7 +50,7 @@ const SEED_VERB_CLASSES: Record<string, UtteranceEventClass> = {
   // 達成
   '倒し': 'ACHIEVEMENT', '倒せ': 'ACHIEVEMENT',
   '勝ち': 'ACHIEVEMENT', '勝て': 'ACHIEVEMENT',
-  '達成': 'ACHIEVEMENT', '合格': 'ACHIEVEMENT', '昇格': 'ACHIEVEMENT',
+  '達成': 'ACHIEVEMENT', '合格': 'ACHIEVEMENT', '昇格': 'ACHIEVEMENT', '当選': 'ACHIEVEMENT',
   '受か': 'ACHIEVEMENT', // 否定形は SETBACK に倒す（classify 内）
   // 対立
   '喧嘩': 'CONFLICT', 'けんか': 'CONFLICT', 'ケンカ': 'CONFLICT',
@@ -66,7 +66,7 @@ const EXAM_CONTEXT = ['試験', '受験', '面接', '入試', 'テスト', '検�
 const SEED_MEASURE_NOUNS = ['レベル', 'スコア', '順位', '段位', 'ランク', '段階', '学年'];
 /** 交通の主体。 */
 const TRANSIT_SUBJECTS = ['電車', 'バス', '飛行機', '新幹線', '列車', '船'];
-const TRANSIT_STEMS = ['遅れ', '止ま', '運休', '遅延', '渋滞', '人身事故'];
+const TRANSIT_STEMS = ['遅れ', '止ま', '止', '運休', '遅延', '渋滞', '人身事故'];
 
 class UtteranceEventClassifierService {
   private static instance: UtteranceEventClassifierService;
@@ -174,6 +174,18 @@ class UtteranceEventClassifierService {
     // 「受かった」形のときだけ達成/後退として扱う（受ける全般は対象外）。
     if (tokenSet.has('受') && (EXAM_CONTEXT.some((s) => tokenSet.has(s)) || negated || /受か(?:っ|り)/.test(text))) {
       return { eventClass: negated ? 'SETBACK' : 'ACHIEVEMENT', negated, aspect, matchedStem: '受（かる）', subject, object };
+    }
+    // 「当たった」は語幹が「当」+「たった」に割れる（抽選・チケットの当選）。
+    if (tokenSet.has('当') && /当た(?:っ|り)/.test(text)) {
+      return { eventClass: 'ACHIEVEMENT', negated, aspect, matchedStem: '当（たる）', subject, object };
+    }
+    // 物を「忘れた」は置き忘れ＝喪失寄り（約束・名前など情報系は除く）。
+    if (has('忘れ') && aspect === 'COMPLETED') {
+      const idx = tokens.indexOf('忘れ');
+      const before = idx > 0 ? tokens[idx - 1] : undefined;
+      if (before && !['約束', 'こと', 'もの', '名前', '宿題', '仕事', '用事'].includes(before)) {
+        return { eventClass: 'LOSS', negated, aspect, matchedStem: '忘れ（置き忘れ）', subject, object };
+      }
     }
     // 「なくした」は語幹が「なく」+「した」に割れる。
     if (tokenSet.has('なく') && /(?:した|しまった)/.test(text)) {
