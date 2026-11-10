@@ -1016,6 +1016,15 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P630 か終わりも QUESTION', classifyDialogueAct('それは本当ですか') === 'QUESTION', classifyDialogueAct('それは本当ですか'));
 }
 
+// ---- 訂正の合図は共有特徴で一元化（P631） ----
+{
+  const { classifyDialogueAct } = await import('../src/miki/conversation/services/conversationStateService');
+  const { utteranceFeatureService } = await import('../src/miki/memory/services/utteranceFeatureService');
+  check('P631 特徴に訂正の合図が載る', utteranceFeatureService.analyze('伝わってないよ').correction && !utteranceFeatureService.analyze('今日はいい天気だね').correction, '');
+  check('P631 伝わってないも CORRECTION に分類される', classifyDialogueAct('伝わってないよ') === 'CORRECTION', classifyDialogueAct('伝わってないよ'));
+  check('P631 それ違うよは従来どおり CORRECTION', classifyDialogueAct('それ違うよ') === 'CORRECTION', classifyDialogueAct('それ違うよ'));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

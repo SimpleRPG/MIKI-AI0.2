@@ -281,8 +281,13 @@ export class ConversationCoreService {
     }
     // P611: 直前の固定形の受け止めが、この発話で訂正されたら
     // 「外れ」として台帳に残す（分類の種表・形の見直し材料）。
+    // P631: 訂正の合図の判定は共有特徴（P615）に一元化した。
     try {
-      if (/(?:違う|そうじゃない|そういうことじゃ|そういう意味じゃ|伝わってない|わかってない|分かってない)/.test(prompt)) {
+      const isCorrection = (() => {
+        try { return utteranceFeatureService.analyze(prompt).correction; }
+        catch { return /(?:違う|そうじゃない|伝わってない)/.test(prompt); }
+      })();
+      if (isCorrection) {
         const last = JSON.parse(storageService.getItem('miki_last_reception_v1') || 'null') as { prompt: string; category: string; eventClass?: string; at: number } | null;
         if (last && Date.now() - last.at < 10 * 60_000) {
           const review = JSON.parse(storageService.getItem('miki_reception_review_v1') || '[]') as unknown[];

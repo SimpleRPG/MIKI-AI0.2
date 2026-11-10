@@ -20,6 +20,8 @@ export interface UtteranceFeatures {
   passive: boolean;
   questionForm: QuestionForm;
   imperative: boolean;
+  /** P631: 訂正の合図（違う・そうじゃない・伝わってない等）。 */
+  correction: boolean;
   /** WORD トークンの surface（語幹を含む）。 */
   tokens: string[];
   contentTokens: string[];
@@ -41,7 +43,7 @@ class UtteranceFeatureService {
     const text = String(prompt || '');
     const fallback: UtteranceFeatures = {
       aspect: 'OTHER', negated: false, passive: false, questionForm: 'NONE',
-      imperative: false, tokens: [], contentTokens: [],
+      imperative: false, correction: false, tokens: [], contentTokens: [],
     };
     if (!text) return fallback;
     let tokens: string[] = [];
@@ -50,6 +52,7 @@ class UtteranceFeatureService {
     let object: string | undefined;
     let topic: string | undefined;
     let hasQuestion = false;
+    let hasCorrection = false;
     try {
       const analysis = japaneseAnalysisService.analyze(text);
       tokens = analysis.tokens.filter((t) => t.kind === 'WORD').map((t) => t.surface);
@@ -58,6 +61,7 @@ class UtteranceFeatureService {
       object = analysis.semanticRoles.find((r) => r.role === 'OBJECT')?.token;
       topic = analysis.semanticRoles.find((r) => r.role === 'TOPIC')?.token;
       hasQuestion = analysis.hasQuestion;
+      hasCorrection = analysis.hasCorrection;
     } catch { /* 解析できない場合は文字列の特徴だけで判定する */ }
 
     const negated = /(?:なかっ|なかった|ません|できない|できなかった|ではない|じゃない)/.test(text) || /(?:^|[がはも、。！!？?\s])ない/.test(text);
@@ -83,7 +87,11 @@ class UtteranceFeatureService {
       || /(?:教えて|見せて|聞かせて|読ませて|開けて|閉めて|歌って|書いて|読んで|作って|買って|持って|取って|連れて|座って|描いて|言って)(?:よ|ね)?[。！!]?$/.test(text.trim())
       || /(?:手伝って|待って|見て|聞いて|止まって)(?:よ|ね)?[。！!]?$/.test(text.trim())
       || /(?:てて|てきて)(?:よ|ね)?[。！!]?$/.test(text.trim());
-    return { aspect, negated, passive, questionForm, imperative, tokens, contentTokens, subject, object, topic };
+    // P631: 訂正の合図も形の知識としてここに集約する（以前は
+    // 対話行為の分類と受け止め誤爆の記録で別々に判定していた）。
+    const correction = hasCorrection
+      || /(?:違う|そうじゃない|そういうことじゃ|そういう意味じゃ|ではなくて|じゃなくて|伝わってない|わかってない|分かってない)/.test(text);
+    return { aspect, negated, passive, questionForm, imperative, correction, tokens, contentTokens, subject, object, topic };
   }
 
   /**

@@ -272,13 +272,18 @@ export function classifyDialogueAct(userPrompt: string): DialogueAct {
   if (!userPrompt || !userPrompt.trim()) return 'QUESTION';
   const text = userPrompt.trim();
 
+  // P630/P631: 文の形の特徴は共有サービスで一度だけ取る。
+  let sharedFeatures: ReturnType<typeof utteranceFeatureService.analyze> | undefined;
+  try { sharedFeatures = utteranceFeatureService.analyze(text); } catch { sharedFeatures = undefined; }
+
   // 1. 雑談・挨拶・相槌
   if (isCasualGreetingOrShortSocial(text)) {
     return 'CASUAL_CHAT';
   }
 
-  // 2. 訂正・指摘
-  if (/違う|そうじゃない|ではなくて|じゃなくて|修正して|訂正|直して|バグ|間違い/i.test(text)) {
+  // 2. 訂正・指摘（訂正の合図そのものは共有特徴、直し依頼の語彙は分類の領分）
+  if ((sharedFeatures?.correction ?? /違う|そうじゃない|ではなくて|じゃなくて/.test(text))
+    || /修正して|訂正|直して|バグ|間違い/i.test(text)) {
     return 'CORRECTION';
   }
 
@@ -340,11 +345,10 @@ export function classifyDialogueAct(userPrompt: string): DialogueAct {
     || /(?:ですか|ますか|でしょうか|かな|かしら)$/.test(text.replace(/[。！!]+$/, ''))
     || /(?:何|なぜ|どうして|どう|いつ|どこ|だれ|誰|どれ|どちら|いくら|いくつ)/.test(text);
   let looksImperative = false;
-  try {
-    const features = utteranceFeatureService.analyze(text);
-    looksInterrogative = features.questionForm !== 'NONE';
-    looksImperative = features.imperative;
-  } catch { /* 特徴が取れなければ従来の局所判定で続ける */ }
+  if (sharedFeatures) {
+    looksInterrogative = sharedFeatures.questionForm !== 'NONE';
+    looksImperative = sharedFeatures.imperative;
+  }
 
   // 11. 一般作業依頼（命令・依頼の形のときだけ）
   if (looksImperative || /お願い|実行して/.test(text)) {
