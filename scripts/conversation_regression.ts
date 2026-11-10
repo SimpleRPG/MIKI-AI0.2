@@ -1121,6 +1121,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P639 スナップショットにエピソードと解消が載る', Boolean(saved.json && saved.json.includes('港の朝市') && saved.json.includes('stateResolved')), (saved.json || '').slice(0, 160));
 }
 
+// ---- 学び済みの欠けは提示前に解消される（P640） ----
+{
+  const { knowledgeGapService } = await import('../src/miki/unknown/services/knowledgeGapService');
+  const { storageService } = await import('../src/services/storageService');
+  knowledgeGapService.detect({ query: '「モコロン」の使い道を調べる', reason: 'regression-p640', type: 'UNKNOWN_RELATION', target: 'モコロン', priority: 50 });
+  knowledgeGapService.detect({ query: '用語の意味を学ぶ: クオッカ', reason: 'regression-p640', type: 'UNKNOWN_TERM', target: 'クオッカ', priority: 45 });
+  const gapReply3 = await conversationCoreService.execute({ prompt: '何が分からないの？' } as any);
+  check('P640 関係が入った欠けは分からないとして出ない', !gapReply3.replyText.includes('モコロンの使い道'), gapReply3.replyText.slice(0, 220));
+  const gapsNow = JSON.parse(storageService.getItem('miki_knowledge_gaps_v1') || '[]') as any[];
+  const moco = gapsNow.find((g) => String(g.query || '').includes('モコロン') && String(g.query || '').includes('使い道'));
+  check('P640 解消された欠けは RESOLVED になる', moco?.status === 'RESOLVED', JSON.stringify(moco || {}).slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

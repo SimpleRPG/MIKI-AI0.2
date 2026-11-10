@@ -2517,6 +2517,36 @@ export class ConversationCoreService {
   private openGapAnswer(prompt: string): string | undefined {
     if (!/(?:何が分から|何がわから|分からないこと|わからないこと|まだ知らないこと|苦手なこと|苦手なもの)/.test(prompt)) return undefined;
     try {
+      // P640: 提示の前に「もう学べている欠け」を解消する。調査以外の
+      // 経路（教師教材・教わった語・関係の追加）で知識が入っても、
+      // 担当した調査が解消しない限り欠けは開いたままになり、
+      // 分かるようになったことを「分からない」と言い続けてしまう。
+      // 提示の窓（上位3件）とは切り離し、開いている欠け全体を対象に
+      // 再検証してから提示を作る。
+      try {
+        for (const gap of knowledgeGapService.listOpen(50)) {
+          if ((gap.priority || 0) < 40) continue;
+          const gapTarget = (gap as any).identity?.target as string | undefined;
+          if (!gapTarget) continue;
+          let resolvedNow = false;
+          if (gap.type === 'UNKNOWN_TERM') {
+            resolvedNow = japaneseDictionaryService.lookup(gapTarget).some((e: any) => e && e.gloss);
+          } else if (gap.type === 'UNKNOWN_RELATION') {
+            const label = String(gap.query || '').match(/」の(.+?)を調べる/)?.[1] || '';
+            const relType = ({ '分類': 'IS_A', '使い道': 'USED_FOR', '一部': 'PART_OF', '中身': 'PART_OF', '引き起こすもの': 'CAUSES', 'できること': 'ENABLES', '作れるもの': 'ENABLES' } as Record<string, string>)[label];
+            if (relType) {
+              resolvedNow = worldModelGraphService.relationsOf(gapTarget, relType as any).length > 0;
+            }
+            if (!resolvedNow && label) {
+              const stem = label.replace(/地$/, '');
+              resolvedNow = claimDatabaseService.getAllClaims().some((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(gapTarget) && String(c.statement || '').includes(stem));
+            }
+          } else {
+            resolvedNow = claimDatabaseService.getAllClaims().some((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(gapTarget));
+          }
+          if (resolvedNow) knowledgeGapService.markResolved(gap.id);
+        }
+      } catch { /* 再検証は補助。失敗したら従来どおり提示する */ }
       const displays: string[] = [];
       for (const gap of knowledgeGapService.listOpen(20)) {
         if ((gap.priority || 0) < 40) continue;
