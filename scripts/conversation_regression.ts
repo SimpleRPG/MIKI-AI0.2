@@ -884,6 +884,16 @@ check('P616 場所は知らない範囲を添えて正直に答える', attrPlac
   check('P616 属性の欠けが調査 gap に積まれる', Boolean(gap), 'gap not found');
 }
 
+// ---- 答えられなかった質問の台帳（P617） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  storageService.setItem('miki_unanswered_questions_v1', '[]');
+  await conversationCoreService.execute({ prompt: 'クオッカの寿命はどのくらい？' } as any);
+  await conversationCoreService.execute({ prompt: 'クオッカの寿命はどのくらい？' } as any);
+  const ledger = JSON.parse(storageService.getItem('miki_unanswered_questions_v1') || '[]') as Array<{ question: string }>;
+  check('P617 答えられなかった質問が台帳に残る（重複なし）', ledger.filter((e) => e.question.includes('クオッカの寿命')).length === 1, JSON.stringify(ledger).slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

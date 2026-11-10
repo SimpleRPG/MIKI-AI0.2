@@ -102,6 +102,8 @@ class StateSnapshotExportService {
       receptionReview: (() => { try { return JSON.parse(storageService.getItem('miki_reception_review_v1') || '[]'); } catch { return []; } })(),
       // P610: 動詞クラス表の拡張分（学習・教師で足された分）。
       verbEventClassExtensions: (() => { try { return JSON.parse(storageService.getItem('miki_verb_event_classes_v1') || '{}'); } catch { return {}; } })(),
+      // P617: 答えられなかった質問の台帳（調査で解けたら消えていく想定の入口）。
+      unansweredQuestions: (() => { try { return JSON.parse(storageService.getItem('miki_unanswered_questions_v1') || '[]'); } catch { return []; } })(),
     };
     return {
       snapshot,

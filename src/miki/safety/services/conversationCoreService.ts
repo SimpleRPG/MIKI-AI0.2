@@ -1523,6 +1523,30 @@ export class ConversationCoreService {
             detailLevel: 'BRIEF',
           });
         } else {
+          // P617: 答えられなかった質問は、その場で流さず台帳に残し、
+          // 調査 gap にも積む（語だけでなく「質問」単位でも
+          // 分からない→分かるの循環を閉じるための入口）。
+          if (!inRoleplay) {
+            try {
+              const qf = utteranceFeatureService.analyze(prompt);
+              if (qf.questionForm !== 'NONE') {
+                const ledger = JSON.parse(storageService.getItem('miki_unanswered_questions_v1') || '[]') as Array<{ question: string; at: number }>;
+                if (!ledger.some((e) => e.question === prompt)) {
+                  ledger.push({ question: prompt, at: Date.now() });
+                  storageService.setItem('miki_unanswered_questions_v1', JSON.stringify(ledger.slice(-50)));
+                }
+                if (qf.contentTokens.length > 0) {
+                  knowledgeGapService.detect({
+                    query: `質問に答える: ${prompt}`,
+                    reason: '会話で聞かれて、今の知識では答えられなかった質問のため、背景で調べる。',
+                    type: 'INSUFFICIENT_EVIDENCE',
+                    target: qf.contentTokens[0],
+                    priority: 40,
+                  });
+                }
+              }
+            } catch { /* 台帳は補助経路 */ }
+          }
           ir = answerContentIrService.buildAnswerIR({
             conclusion: inRoleplay
               ? this.pickFixedReply('fx_roleplay_unknown', ['ごめん、それは分からないや。', 'うーん、それは私も知らなくて…。', 'それは分からないけど、他に聞きたいことはある？'])
