@@ -2305,6 +2305,29 @@ export class ConversationCoreService {
     if (/今日の日付|何月何日/.test(prompt)) {
       return `今日は${now.getMonth() + 1}月${now.getDate()}日です。`;
     }
+    // P674: 月・年・残り日数・素の曜日も、その場で答えられる形。
+    // ここで受けないと「何月」「何日、今年終」が調査キューに落ちて
+    // 的外れな保留文になっていた。
+    if (/(?:今|いま)(?:は|って)?何月|何月(?:です)?か/.test(prompt)) {
+      return `今は${now.getMonth() + 1}月です。`;
+    }
+    if (/(?:今年|ことし)(?:は|って)?何年|今(?:は|って)?何年/.test(prompt)) {
+      return `今年は${now.getFullYear()}年です。`;
+    }
+    if (/何曜日/.test(prompt)) {
+      return `今日は${weekdays[now.getDay()]}曜日です。`;
+    }
+    const remainYear = /(?:あと何日で)?今年(?:は)?(?:あと何日|終わるまで何日|終わる)/.test(prompt) || /今年(?:は)?あと何日/.test(prompt);
+    if (/あと何日/.test(prompt) && /今年/.test(prompt) || remainYear) {
+      const end = new Date(now.getFullYear(), 11, 31);
+      const days = Math.round((end.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+      return days <= 0 ? '今年は今日で終わりです。' : `今年はあと${days}日です。`;
+    }
+    if (/あと何日/.test(prompt) && /今月/.test(prompt)) {
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const days = Math.round((end.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+      return days <= 0 ? '今月は今日で終わりです。' : `今月はあと${days}日です。`;
+    }
     return undefined;
   }
 

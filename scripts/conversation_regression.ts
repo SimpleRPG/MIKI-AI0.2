@@ -1436,6 +1436,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   await conversationCoreService.execute({ prompt: 'やめる' } as any);
 }
 
+// ---- 時計・カレンダーの即答の広がり（P674） ----
+{
+  const now674 = new Date();
+  const month = await conversationCoreService.execute({ prompt: '今って何月？' } as any);
+  check('P674 今の月にその場で答える', month.replyText.includes(`今は${now674.getMonth() + 1}月です`), month.replyText.slice(0, 120));
+  const remain = await conversationCoreService.execute({ prompt: 'あと何日で今年終わる？' } as any);
+  const expectedDays = Math.round((new Date(now674.getFullYear(), 11, 31).getTime() - new Date(now674.getFullYear(), now674.getMonth(), now674.getDate()).getTime()) / 86400000);
+  check('P674 今年の残り日数を計算して答える', expectedDays <= 0 ? remain.replyText.includes('今日で終わり') : remain.replyText.includes(`あと${expectedDays}日`), remain.replyText.slice(0, 120));
+  const dow = await conversationCoreService.execute({ prompt: '何曜日？' } as any);
+  check('P674 素の曜日にも答える', dow.replyText.includes('曜日です'), dow.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
