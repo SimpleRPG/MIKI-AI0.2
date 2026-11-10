@@ -426,6 +426,12 @@ export class ConversationCoreService {
       if (termKnowledge) {
         return this.buildResult('RESOLVED', 'term_knowledge_answer', this.applyPersonaVoice(termKnowledge), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P650: 形容つきの意見質問は、知識照合より先に意見として答える
+      // （Claim がそのまま返ると「どう思う」に答えたことにならない）。
+      const adjOpinion = this.adjectiveOpinionAnswer(prompt);
+      if (adjOpinion) {
+        return this.buildResult('RESOLVED', 'adjective_opinion_answer', this.applyPersonaVoice(adjOpinion), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
       const selfWant = this.selfWantAnswer(prompt);
@@ -2566,6 +2572,20 @@ export class ConversationCoreService {
   }
 
   /**
+   * P650: 形容つきの意見質問（「クオッカってかわいいと思う？」）を
+   * 意見の経路で答えるための入口。判定は opinionAnswer 側の
+   * opinionAdjective と同じ形で、材料が無ければ undefined。
+   */
+  private adjectiveOpinionAnswer(prompt: string): string | undefined {
+    if (!/(?:と思う|と思わない)[？?。\s]*$/.test(prompt.trim())) return undefined;
+    if (!/(かわいい|すごい|面白い|おもしろい|かっこいい|強い|速い|大きい|難しい|珍しい|美味しい|おいしい)/.test(prompt)) return undefined;
+    try {
+      const features = utteranceFeatureService.analyze(prompt);
+      return this.opinionAnswer(prompt, features.contentTokens);
+    } catch { return undefined; }
+  }
+
+  /**
    * P647: 「クオッカ覚えた？」——特定の語について、自分の知識の
    * 状態（覚えた／調べ中／まだ知らない）を答える。P624（最近覚えた
    * こと）と P633（分からないこと）の、語単位の自己点検。
@@ -2970,7 +2990,12 @@ export class ConversationCoreService {
 
   private opinionAnswer(prompt: string, contentTokens: string[]): string | undefined {
     // P594: 「〜すべき？」「〜した方がいい？」も意見を求める形として拾う。
-    if (!/(?:どう思う|どう感じる|好きですか|おすすめ|べき|ほうがいい|方がいい|した方が|したほうが)/.test(prompt)) return undefined;
+    // P650: 「クオッカってかわいいと思う？」——評価の形容詞つきの
+    // 意見質問も意見を求める形。形容詞は締めの文でそのまま返す。
+    const opinionAdjective = /(?:と思う|と思わない)[？?。\s]*$/.test(prompt.trim())
+      ? prompt.match(/(かわいい|すごい|面白い|おもしろい|かっこいい|強い|速い|大きい|難しい|珍しい|美味しい|おいしい)/)?.[1]
+      : undefined;
+    if (!/(?:どう思う|どう感じる|好きですか|おすすめ|べき|ほうがいい|方がいい|した方が|したほうが)/.test(prompt) && !opinionAdjective) return undefined;
     // P601: 相手自身への意見（「僕のことどう思う？」）は、知識の
     // 材料ではなく、関係そのもので答える。
     if (/(?:僕|私|おれ|オレ|自分)のこと/.test(prompt)) {
@@ -3004,6 +3029,7 @@ export class ConversationCoreService {
     try {
       const facts = paragraphCompositionService.buildSupplements({ subjectTerms: [topic], supportingClaims: [], excludeText: prompt });
       if (facts.length > 0) {
+        if (opinionAdjective) return `${facts.slice(0, 2).join('')}私は${topic}、${opinionAdjective}と思います。`;
         const closer = this.pickFixedReply('fx_opinion', [
           `私は${topic}の話、もっと聞いてみたいです。`,
           `私は${topic}、いいなと思います。`,
@@ -3014,6 +3040,7 @@ export class ConversationCoreService {
     } catch { /* 補助経路 */ }
     const dict = this.dictionaryAnswerForQuestion(`${topic}とは`, [topic]);
     if (dict) {
+      if (opinionAdjective) return `${dict}私は${topic}、${opinionAdjective}と思います。`;
       return `${dict}私は${topic}、いいなと思います。`;
     }
     return undefined;

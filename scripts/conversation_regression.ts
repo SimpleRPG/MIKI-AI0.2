@@ -1205,6 +1205,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P648 一昨日に記録が無ければ聞いてないと答える', dayBeforeState.replyText.includes('一昨日は') && dayBeforeState.replyText.includes('聞いてない'), dayBeforeState.replyText.slice(0, 200));
 }
 
+// ---- 形容つきの意見質問にも意見で答える（P650） ----
+{
+  const adjOpinion = await conversationCoreService.execute({ prompt: 'クオッカってかわいいと思う？' } as any);
+  check('P650 形容つきの意見は材料＋その形容で返す', adjOpinion.replyText.includes('かわいいと思います') && !adjOpinion.replyText.includes('答えられない'), adjOpinion.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
