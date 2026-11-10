@@ -1223,6 +1223,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P652 学んだ語と知識の一覧で答える', list.replyText.includes('今まで覚えたのは') && (list.replyText.includes('クオッカ') || list.replyText.includes('モコロン')), list.replyText.slice(0, 240));
 }
 
+// ---- 「〜のこと忘れた？」にも自分の状態で答える（P653） ----
+{
+  const notForgotten = await conversationCoreService.execute({ prompt: 'クオッカのこと忘れた？' } as any);
+  check('P653 知っている語は忘れてないと意味つきで答える', notForgotten.replyText.includes('忘れてない') && notForgotten.replyText.includes('クオッカ'), notForgotten.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

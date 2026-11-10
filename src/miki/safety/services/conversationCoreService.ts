@@ -2623,20 +2623,30 @@ export class ConversationCoreService {
    * 知らない語は、その場で意味学習の欠けに積んで循環を始める。
    */
   private termKnowledgeAnswer(prompt: string): string | undefined {
-    if (!/(?:覚えた|分かった|わかるようになった|分かるようになった|知ってる|知っている)/.test(prompt)) return undefined;
+    if (!/(?:覚えた|分かった|わかるようになった|分かるようになった|知ってる|知っている|覚えてる|覚えている|忘れた|忘れて)/.test(prompt)) return undefined;
     if (!/[？?]/.test(prompt) && !/か[？。]?$/.test(prompt.trim())) return undefined;
+    // P653: 「忘れた？」の聞き方かどうかで、締めの言い方を変える。
+    const forgotFraming = /忘/.test(prompt);
     let term: string | undefined;
     try {
       const features = utteranceFeatureService.analyze(prompt);
-      term = features.contentTokens.find((t) => t.length >= 2 && !/(?:覚え|分か|知って)/.test(t));
+      term = features.contentTokens.find((t) => t.length >= 2 && !/(?:覚え|分か|知って|忘れ)/.test(t));
     } catch { return undefined; }
     if (!term) return undefined;
     try {
       const gloss = japaneseDictionaryService.lookup(term).find((e: any) => e.gloss)?.gloss;
-      if (gloss) return `覚えました。「${term}」は、${String(gloss).slice(0, 60)}という意味です。`;
+      if (gloss) {
+        return forgotFraming
+          ? `忘れてないですよ。「${term}」は、${String(gloss).slice(0, 60)}という意味です。`
+          : `覚えました。「${term}」は、${String(gloss).slice(0, 60)}という意味です。`;
+      }
       const hasKnowledge = worldModelGraphService.relationsOf(term).length > 0
         || claimDatabaseService.getAllClaims().some((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(term));
-      if (hasKnowledge) return `「${term}」については、覚えていることがあります。`;
+      if (hasKnowledge) {
+        return forgotFraming
+          ? `忘れてないですよ。「${term}」については、覚えていることがあります。`
+          : `「${term}」については、覚えていることがあります。`;
+      }
       const open = knowledgeGapService.listOpen(50).some((g) => (g as any).identity?.target === term);
       if (open) return `「${term}」は、まだ調べているところです。分かったら報告しますね。`;
       knowledgeGapService.detect({
@@ -2646,7 +2656,9 @@ export class ConversationCoreService {
         target: term,
         priority: 45,
       });
-      return `「${term}」は、まだ知らないです。今度調べて覚えておきますね。`;
+      return forgotFraming
+        ? `「${term}」は、まだ覚えたことがないんです。今度調べて覚えておきますね。`
+        : `「${term}」は、まだ知らないです。今度調べて覚えておきますね。`;
     } catch { return undefined; }
   }
 
