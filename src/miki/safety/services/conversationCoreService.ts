@@ -373,6 +373,11 @@ export class ConversationCoreService {
       if (unitAnswer) {
         return this.buildResult('RESOLVED', 'unit_conversion_answer', unitAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P677: 数の比較と文字数も、決定的に答えられる。
+      const compareAnswer = this.comparisonAndCountAnswer(prompt);
+      if (compareAnswer) {
+        return this.buildResult('RESOLVED', 'comparison_count_answer', compareAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P604: 食事の迷いは、一緒に考える形で受ける。
       const dinner = this.dinnerMusingAnswer(prompt);
       if (dinner) {
@@ -2414,6 +2419,34 @@ export class ConversationCoreService {
     const rounded = Math.round(converted * 10000) / 10000;
     const shown = Number.isInteger(rounded) ? String(rounded) : String(rounded);
     return `${m[1]}${fromLabel}は${shown}${to}です。`;
+  }
+
+  /**
+   * P677: 数の大小の比較と、語の文字数は決定的に答えられる。
+   * 従来は比較が対象特定の聞き返しに、文字数が調査に化けていた。
+   */
+  private comparisonAndCountAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '').trim();
+    const cmp = p.match(/^(\d+(?:\.\d+)?)\s*と\s*(\d+(?:\.\d+)?)\s*(?:は|って)?\s*どっちが\s*(大きい|多い|小さい|少ない)/);
+    if (cmp) {
+      const a = Number(cmp[1]);
+      const b = Number(cmp[2]);
+      const adjective = cmp[3];
+      if (a === b) return `${cmp[1]}と${cmp[2]}は同じです。`;
+      const bigger = a > b ? cmp[1] : cmp[2];
+      const smaller = a > b ? cmp[2] : cmp[1];
+      return (adjective === '大きい' || adjective === '多い')
+        ? `${bigger}の方が${adjective}です。`
+        : `${smaller}の方が${adjective}です。`;
+    }
+    const countMatch = p.match(/「([^」]{1,30})」\s*(?:って|は)?\s*何文字/) || p.match(/^(.{1,30}?)(?:って|は)何文字/);
+    if (countMatch) {
+      const word = countMatch[1].replace(/\s/g, '');
+      if (word && !/[？?。]/.test(word)) {
+        return `「${word}」は${[...word].length}文字です。`;
+      }
+    }
+    return undefined;
   }
 
   /**

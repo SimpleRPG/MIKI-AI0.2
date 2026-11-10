@@ -1474,6 +1474,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P676 キロの重さ読みでも答える', mass.replyText.includes('1000グラムです'), mass.replyText.slice(0, 120));
 }
 
+// ---- 数の比較と文字数も即答する（P677） ----
+{
+  const cmp = await conversationCoreService.execute({ prompt: '3と5はどっちが大きい？' } as any);
+  check('P677 数の大小に答える', cmp.replyText.includes('5の方が大きいです'), cmp.replyText.slice(0, 120));
+  const cnt = await conversationCoreService.execute({ prompt: '「パルワールド」は何文字？' } as any);
+  check('P677 文字数に答える', cnt.replyText.includes('6文字です'), cnt.replyText.slice(0, 120));
+  const cnt2 = await conversationCoreService.execute({ prompt: 'みかんって何文字？' } as any);
+  check('P677 引用符なしでも文字数に答える', cnt2.replyText.includes('3文字です'), cnt2.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
