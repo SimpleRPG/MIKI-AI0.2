@@ -1,4 +1,4 @@
-import { japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
+import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 import { storageService } from '../../../services/storageService';
 
 /**
@@ -120,16 +120,16 @@ class UtteranceEventClassifierService {
   public classify(prompt: string): UtteranceEventResult | undefined {
     const text = String(prompt || '');
     if (!text) return undefined;
-    let analysis;
-    try { analysis = japaneseAnalysisService.analyze(text); } catch { return undefined; }
-    const tokens = analysis.tokens.filter((t) => t.kind === 'WORD').map((t) => t.surface);
+    // P615: 特徴量は共有サービスで一度だけ計算したものを使う。
+    const features = utteranceFeatureService.analyze(text);
+    const tokens = features.tokens;
     const tokenSet = new Set(tokens);
-    const subject = analysis.semanticRoles.find((r) => r.role === 'SUBJECT')?.token;
-    const object = analysis.semanticRoles.find((r) => r.role === 'OBJECT')?.token;
-    const negated = /(?:なかっ|ない|なかった|ません|できなかった)/.test(text);
+    const subject = features.subject;
+    const object = features.object;
+    const negated = features.negated;
     const aspect: UtteranceEventResult['aspect'] =
-      /(?:てる|ている|てます|てた)/.test(text) ? 'ONGOING'
-      : /(?:た|だ|した|できた|ました)(?:[。！!？?]|よ|ね|$)/.test(text) || /(?:た|だ)$/.test(text.trim()) ? 'COMPLETED'
+      features.aspect === 'COMPLETED' ? 'COMPLETED'
+      : features.aspect === 'ONGOING' ? 'ONGOING'
       : 'OTHER';
     const has = (stem: string) => tokenSet.has(stem) || tokens.some((t) => t.length > stem.length && t.endsWith(stem));
 
@@ -144,7 +144,7 @@ class UtteranceEventClassifierService {
     }
 
     // 受身の叱責は後退。
-    if (PASSIVE_SETBACK_STEMS.some((s) => tokenSet.has(s)) && /(?:られ|られました|られた|れます)/.test(text)) {
+    if (PASSIVE_SETBACK_STEMS.some((s) => tokenSet.has(s)) && features.passive) {
       return { eventClass: 'SETBACK', negated, aspect, matchedStem: '叱責（受身）', subject, object };
     }
 

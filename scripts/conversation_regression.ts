@@ -853,6 +853,25 @@ check('P614 料理名が無ければ聞き返す', recipeReply.replyText.include
 const talkMoreReply = await conversationCoreService.execute({ prompt: 'もっと話したい' } as any);
 check('P614 もっと話したいには温かく応じる', talkMoreReply.replyText.includes('話') && !talkMoreReply.replyText.includes('もっとの話'), talkMoreReply.replyText.slice(0, 140));
 
+// ---- 特徴量の一元化（P615） ----
+{
+  const { utteranceFeatureService } = await import('../src/miki/memory/services/utteranceFeatureService');
+  const f1 = utteranceFeatureService.analyze('昨日は本当に疲れた');
+  check('P615 完了の相を共有特徴で取る', f1.aspect === 'COMPLETED', f1.aspect);
+  const f2 = utteranceFeatureService.analyze('今ごはん食べてる');
+  check('P615 進行の相を取る', f2.aspect === 'ONGOING', f2.aspect);
+  const f3 = utteranceFeatureService.analyze('猫飼いたいな');
+  check('P615 希望の相を取る', f3.aspect === 'DESIDERATIVE', f3.aspect);
+  const f4 = utteranceFeatureService.analyze('上司に怒られた');
+  check('P615 受身と完了を取る', f4.passive && f4.aspect === 'COMPLETED', JSON.stringify({ passive: f4.passive, aspect: f4.aspect }));
+  const f5 = utteranceFeatureService.analyze('何を買ったの？');
+  check('P615 WH疑問を取る', f5.questionForm === 'WH', f5.questionForm);
+  const f6 = utteranceFeatureService.analyze('歌える？');
+  check('P615 YesNo疑問を取る', f6.questionForm === 'YESNO', f6.questionForm);
+  const f7 = utteranceFeatureService.analyze('試験に受からなかった');
+  check('P615 否定を取る', f7.negated, String(f7.negated));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

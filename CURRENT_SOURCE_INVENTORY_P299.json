@@ -39,9 +39,9 @@
     "trackedPathCountExcludingControlPaths": 1797,
     "sourceFileCount": 1350,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1261,
-    "relativeImportCandidateCount": 3998,
-    "resolvedRelativeImportCandidateCount": 3982,
-    "unresolvedRelativeImportCandidateCount": 16
+    "relativeImportCandidateCount": 3999,
+    "resolvedRelativeImportCandidateCount": 3981,
+    "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
     {
@@ -1697,9 +1697,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 95921,
-      "lines": 869,
-      "sha256": "ef609dec8b80c4f8549aa15301de5081d1806c0d43d331969f7b2041a7661581",
+      "bytes": 97198,
+      "lines": 888,
+      "sha256": "5b618cbcbb306bfe77e8848cb1d477647dea28ddafeceeb7aaf2e921c7a8e41e",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -1868,11 +1868,16 @@
           "specifier": "../src/services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 858,
+          "specifier": "../src/miki/memory/services/utteranceFeatureService",
+          "resolution": "UNRESOLVED_CANDIDATE"
         }
       ],
-      "relativeImportCandidateCount": 28,
+      "relativeImportCandidateCount": 29,
       "resolvedRelativeImportCount": 28,
-      "unresolvedRelativeImportCount": 0
+      "unresolvedRelativeImportCount": 1
     },
     {
       "path": "scripts/diagnose_production_build.mjs",
@@ -11981,15 +11986,14 @@
     },
     {
       "path": "src/miki/conversation/services/utteranceEventClassifierService.ts",
-      "bytes": 10867,
+      "bytes": 10551,
       "lines": 206,
-      "sha256": "7fcdc37ffff08725e25e3ea91a94ca95c4fe9f0a0b5b2fef98b039ac422fce43",
+      "sha256": "ac7caa96e654ac4ce015216cd045d874fac721e3067ec61a4d0c7bba9caa6ffa",
       "relativeImportCandidates": [
         {
           "line": 1,
-          "specifier": "../../research/services/japaneseAnalysisService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
+          "specifier": "../../memory/services/utteranceFeatureService",
+          "resolution": "UNRESOLVED_CANDIDATE"
         },
         {
           "line": 2,
@@ -11999,8 +12003,8 @@
         }
       ],
       "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
-      "unresolvedRelativeImportCount": 0
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 1
     },
     {
       "path": "src/miki/core.ts",
