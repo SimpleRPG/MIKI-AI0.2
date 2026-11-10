@@ -22,6 +22,8 @@ export interface UtteranceFeatures {
   imperative: boolean;
   /** P631: 訂正の合図（違う・そうじゃない・伝わってない等）。 */
   correction: boolean;
+  /** P632: 社交行為（挨拶・別れ・感謝・謝罪）。 */
+  socialAct?: 'GREETING' | 'FAREWELL' | 'THANKS' | 'APOLOGY';
   /** WORD トークンの surface（語幹を含む）。 */
   tokens: string[];
   contentTokens: string[];
@@ -91,7 +93,15 @@ class UtteranceFeatureService {
     // 対話行為の分類と受け止め誤爆の記録で別々に判定していた）。
     const correction = hasCorrection
       || /(?:違う|そうじゃない|そういうことじゃ|そういう意味じゃ|ではなくて|じゃなくて|伝わってない|わかってない|分かってない)/.test(text);
-    return { aspect, negated, passive, questionForm, imperative, correction, tokens, contentTokens, subject, object, topic };
+    // P632: 社交行為の言い回しも形の知識としてここに置く（挨拶の
+    // 添え・締めの判定が各所の正規表現に散っていた）。
+    const socialAct: UtteranceFeatures['socialAct'] =
+      /(?:おはよ|こんにちは|こんばんは|ただいま|やあ|おっす|ハロー)/.test(text) ? 'GREETING'
+      : /(?:おやすみ|また明日|またね|バイバイ|行ってきます|お先に|じゃあね|さようなら|失礼します)/.test(text) ? 'FAREWELL'
+      : /(?:ありがとう|ありがと|感謝|サンキュー)/.test(text) ? 'THANKS'
+      : /(?:ごめん|すみません|申し訳)/.test(text) ? 'APOLOGY'
+      : undefined;
+    return { aspect, negated, passive, questionForm, imperative, correction, socialAct, tokens, contentTokens, subject, object, topic };
   }
 
   /**

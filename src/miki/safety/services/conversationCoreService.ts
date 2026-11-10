@@ -935,7 +935,12 @@ export class ConversationCoreService {
       }
       // P522: 前の日以前に開いた話題が残っていれば、挨拶のときに
       // 一度だけ拾う。
-      if (/おはよ(?:う|ー)?|こんにちは|ただいま|こんばんは|やあ/.test(prompt)) {
+      // P632: 挨拶かどうかの判定は共有特徴の socialAct で行う。
+      const isGreetingTurn = (() => {
+        try { return utteranceFeatureService.analyze(prompt).socialAct === 'GREETING'; }
+        catch { return /おはよ|こんにちは|ただいま|こんばんは|やあ/.test(prompt); }
+      })();
+      if (isGreetingTurn) {
         // P623: 前日のエピソードが組めるなら、話題の単体拾いより
         // 先に「昨日のこと」として出す（話題は消費して二重に出さない）。
         const episode = (() => { try { return episodeMemoryService.yesterdayEpisode(); } catch { return undefined; } })();

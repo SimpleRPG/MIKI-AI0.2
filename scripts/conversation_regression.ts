@@ -1025,6 +1025,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P631 それ違うよは従来どおり CORRECTION', classifyDialogueAct('それ違うよ') === 'CORRECTION', classifyDialogueAct('それ違うよ'));
 }
 
+// ---- 社交行為は共有特徴で判定する（P632） ----
+{
+  const { utteranceFeatureService } = await import('../src/miki/memory/services/utteranceFeatureService');
+  check('P632 社交行為の4種が特徴に載る',
+    utteranceFeatureService.analyze('おはよう、よく寝た').socialAct === 'GREETING'
+    && utteranceFeatureService.analyze('じゃあまた明日').socialAct === 'FAREWELL'
+    && utteranceFeatureService.analyze('ありがとう、助かった').socialAct === 'THANKS'
+    && utteranceFeatureService.analyze('ごめん、遅れた').socialAct === 'APOLOGY'
+    && utteranceFeatureService.analyze('今日は暑いね').socialAct === undefined, '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
