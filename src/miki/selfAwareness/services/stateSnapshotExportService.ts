@@ -108,6 +108,17 @@ class StateSnapshotExportService {
       // 点検材料に含める（実機ログで P623〜P635 を数えるため）。
       episodes: (() => { try { return JSON.parse(storageService.getItem('miki_episodes_v1') || '[]'); } catch { return []; } })(),
       stateResolved: (() => { try { return JSON.parse(storageService.getItem('miki_user_state_resolved_v1') || '{}'); } catch { return {}; } })(),
+      // P673: 遊びの状態（しりとり P669・クイズ P670）も点検材料に
+      // 含める。実機で遊ばれたかどうか・詰まり方がログで見える。
+      play: (() => {
+        const read = (key: string) => { try { return JSON.parse(storageService.getItem(key) || 'null'); } catch { return null; } };
+        const shiritori = read('miki_shiritori_v1');
+        const quiz = read('miki_quiz_v1');
+        return {
+          shiritori: shiritori ? { active: !!shiritori.active, usedCount: Array.isArray(shiritori.used) ? shiritori.used.length : 0, requiredKana: shiritori.requiredDisplay || '' } : null,
+          quiz: quiz ? { active: !!quiz.active, asked: quiz.asked || 0, correct: quiz.correct || 0, remaining: Array.isArray(quiz.queue) ? quiz.queue.length : 0 } : null,
+        };
+      })(),
     };
     return {
       snapshot,

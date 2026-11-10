@@ -1424,6 +1424,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P672 「何を飼ってる？」にも想起で答える', petQ2.replyText.includes('猫'), petQ2.replyText.slice(0, 160));
 }
 
+// ---- スナップショットに遊びの状態も入る（P673） ----
+{
+  const { stateSnapshotExportService: snap673 } = await import('../src/miki/selfAwareness/services/stateSnapshotExportService');
+  await conversationCoreService.execute({ prompt: 'しりとりしよう' } as any);
+  snap673.exportNow();
+  const raw673 = storageService.getItem('miki_state_snapshot_v1');
+  let play: any = null;
+  try { play = JSON.parse(String((JSON.parse(String(raw673)) as any).json || '{}')).play; } catch { /* 検証側で失敗させる */ }
+  check('P673 スナップショットにしりとりの状態が入る', Boolean(play && play.shiritori && play.shiritori.active === true && play.shiritori.usedCount >= 1), JSON.stringify(play).slice(0, 160));
+  await conversationCoreService.execute({ prompt: 'やめる' } as any);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
