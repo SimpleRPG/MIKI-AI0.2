@@ -447,6 +447,14 @@ check('P573 不安は状態として受け、知らない語は聞き返さな�
 const agree = await conversationCoreService.execute({ prompt: 'そうだね' } as any);
 check('P573 短い同意は相槌で受ける', !String((agree as any).replyText || '').includes('そうだの話'), String((agree as any).replyText || '').slice(0, 120));
 
+// ---- 話題質問への答えを答えとして受ける（P574） ----
+storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+const topicAnswer = await conversationCoreService.execute({ prompt: '綿毛が取れるんだよ' } as any);
+check('P574 質問への短い答えは答えとして受ける', String((topicAnswer as any).replyText || '').includes('そっか') || String((topicAnswer as any).replyText || '').includes('なるほど'), String((topicAnswer as any).replyText || '').slice(0, 160));
+storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+const notAnswer = await conversationCoreService.execute({ prompt: 'モコロンって何？' } as any);
+check('P574 質問で来たら答えとして扱わない', !String((notAnswer as any).replyText || '').includes('教えてくれてありがとう'), String((notAnswer as any).replyText || '').slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

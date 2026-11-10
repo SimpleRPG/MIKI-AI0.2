@@ -518,6 +518,8 @@ export class ConversationCoreService {
     let reason = implementationSelection.reason;
     // P565: 知らない語への聞き返し（候補）。合成の後段で足す。
     let pendingUnknownQuestion: { topic: string; question: string } | undefined;
+    // P574: 直前の話題質問への答えとして来た発言かどうか。
+    const answeredTopicQuestion = this.consumePendingTopicQuestion(prompt);
     if (potentialUnknowns.length > 0) reason += `; potential_unknowns=${potentialUnknowns.length}${potentialUnknownGapId ? `; promoted_gap=${potentialUnknownGapId}` : ''}`;
     let verifiedResearchClaimId: string | undefined;
     let verifiedResearchOutcome: 'SUPPORTED' | 'DEVICE_VERIFIED' | undefined;
@@ -680,6 +682,10 @@ export class ConversationCoreService {
       if (!isPhatic) {
         const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
         if (reaction) casualConclusion = reaction;
+        // P574: 直前の話題質問への答えなら、答えとして受ける。
+        if (answeredTopicQuestion) {
+          casualConclusion = this.pickFixedReply('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。']);
+        }
         // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
         const taughtAck = this.taughtTermAcknowledgement(prompt);
         if (taughtAck) casualConclusion = taughtAck;
@@ -773,7 +779,7 @@ export class ConversationCoreService {
         || fallthroughAnxiety || fallthroughHunger || fallthroughClosing || fallthroughAgreement;
       // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
       const taughtAck = this.taughtTermAcknowledgement(prompt);
-      const reactionBase = taughtAck ?? (fallthroughFatigue
+      let reactionBase = taughtAck ?? (fallthroughFatigue
         ? (userStateTrailService.recentCount('fatigue', 72) >= 1
           ? 'ここ数日、お疲れが続いているみたいですね。本当に無理をなさらず、今日はゆっくり休んでくださいね。'
           : '本当にお疲れ様でした。無理をなさらず、ゆっくり休んでくださいね。')
@@ -795,12 +801,17 @@ export class ConversationCoreService {
                       ? this.pickFixedReply('fx_agree', ['そうですよね。', 'うんうん、分かります。', 'そうですね。同感です。'])
                       : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
                         ?? 'そうなんですね。話してくれてありがとう。'));
+      // P574: 直前の話題質問への答えなら、答えとして受ける（状態の
+      // 受け止めと、教わった意味の「覚えた」が優先）。
+      if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughClosing) {
+        reactionBase = this.pickFixedReply('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。']);
+      }
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
       // （創作の層の中だけ。場面が無ければ何も付かない）。
       // P536: 3ターンに1回は、地の文の代わりに場面の進行を添えて
       // 彼女の側から場面を一歩進める。
       const reaction = reactionBase
-        + (fallthroughPhatic
+        + ((fallthroughPhatic || answeredTopicQuestion)
           ? ''
           : (paragraphCompositionService.sceneProgressionSuffix()
             ?? paragraphCompositionService.sceneTextureSuffix(prompt)
@@ -1158,6 +1169,18 @@ export class ConversationCoreService {
       surface.surfaceText += `\n\n${pendingUnknownQuestion.question}`;
       this.markUnknownAsked(pendingUnknownQuestion.topic);
     }
+    // P574: 話題の質問が実際に表に出たら、次の発言を「その答え」
+    // として読めるよう保留しておく（多ターンの継続）。
+    const topicQuestion = (ir as any).topic_question as string | undefined;
+    if (topicQuestion && surface.surfaceText.includes(topicQuestion) && !roleplaySessionService.isActive()) {
+      try {
+        storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({
+          terms: [nextState.currentTopic, ...(japaneseAnalysis?.contentTokens || [])].filter(Boolean).slice(0, 6),
+          question: topicQuestion,
+          at: Date.now(),
+        }));
+      } catch { /* 保留は補助 */ }
+    }
     // P544: 相手が「知らない」と言っていた語が答えに出てきたら、
     // 辞書の短い説明を括弧で添える（1回の答えに1語まで）。
     try {
@@ -1367,6 +1390,26 @@ export class ConversationCoreService {
       storageService.setItem('miki_reflection_surfaced_v1', String(latest.at));
       return `そういえば、今日の振り返りで「${latest.question}」と考えて、${latest.answer}と答えました。`;
     } catch { return undefined; }
+  }
+
+  /**
+   * P574: 直前の話題質問への答えかどうかを判定し、保留を消費する。
+   * 保留は見たら必ず消す（宙に浮かせない）。質問形や挨拶で来たら
+   * 答えではない。短い宣言文か、質問の語を含む宣言文を答えとみなす。
+   */
+  private consumePendingTopicQuestion(prompt: string): boolean {
+    try {
+      const raw = storageService.getItem('miki_pending_topic_question_v1');
+      if (!raw) return false;
+      storageService.removeItem('miki_pending_topic_question_v1');
+      const pending = JSON.parse(raw) as { terms?: string[]; at?: number };
+      if (Date.now() - Number(pending.at || 0) > 30 * 60_000) return false;
+      if (looksInterrogative(prompt)) return false;
+      if (/^(?:おはよう|おやすみ|こんにちは|こんばんは|ただいま|行ってきます|いってきます|じゃあね|ありがとう|ごめん)/.test(prompt.trim())) return false;
+      const terms = pending.terms || [];
+      if (terms.some((t) => t && prompt.includes(t))) return true;
+      return prompt.trim().length <= 25;
+    } catch { return false; }
   }
 
   /**
