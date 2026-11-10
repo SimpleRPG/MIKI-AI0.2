@@ -2461,17 +2461,7 @@ export class ConversationCoreService {
         if (episode) return `${episode.summary}覚えてますよ。`;
         return '昨日の話は、まだ記録に残ってないです。';
       }
-      if (/(?:今日|きょう)/.test(prompt)) {
-        const now = new Date();
-        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        const todays = conversationOpenTopicService.listPending()
-          .filter((r) => r.openedDay === todayKey)
-          .map((r) => r.topic)
-          .filter(Boolean)
-          .slice(0, 3);
-        if (todays.length > 0) return `今日は「${todays.join('」や「')}」の話をしましたね。`;
-        return '今日は、まだこれといった話題は無いですね。これからですね。';
-      }
+      // 今日の振り返りは既存の要約経路（P597）の領分なので触らない。
     } catch { return undefined; }
     return undefined;
   }
