@@ -685,9 +685,14 @@ export function verifyConversationEntityTimeStateConsistency(
   }
 
   // Entity guard: explicit anaphora must resolve to the same target before a temporal/state guard can pass.
+  // P575: ただし時間・状態のアンカーが発話にも回答にも無い場合は、
+  // 照応の曖昧さだけで回答全体を差し止めない（「それは笑う」のような
+  // 雑談の照応は、時間・状態の主張とは無関係）。アンカーがある場合に
+  // 限り、参照対象の曖昧さを衝突として扱う。
   const anaphora = resolveAnaphora(userPrompt, state);
   const promptHasAnaphora = /(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(userPrompt);
-  if (promptHasAnaphora && anaphora.confidence === 'ambiguous') {
+  const hasTemporalOrStateAnchors = promptDates.length > 0 || promptStates.length > 0 || answerDates.length > 0 || answerStates.length > 0;
+  if (promptHasAnaphora && anaphora.confidence === 'ambiguous' && hasTemporalOrStateAnchors) {
     conflicts.push('参照対象が複数候補のまま時間/状態整合性を確定できません。');
   }
 

@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 49202,
-      "lines": 471,
-      "sha256": "cc699ca2abefb104ff04ac6ad3238edb95af60dbe9456608024791229fb1adf4",
+      "bytes": 50413,
+      "lines": 479,
+      "sha256": "498220fe9a930cda6d0ad126b2edb06eb1ce541f96bbb18447ce1b8bc9d9c903",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -10947,9 +10947,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationStateService.ts",
-      "bytes": 60136,
-      "lines": 1238,
-      "sha256": "f8807db256185829832321be9f6be1287eacc17030c7cdf204ea634c6d826bf8",
+      "bytes": 60671,
+      "lines": 1243,
+      "sha256": "37bfc64ee06a44044792ee2e597d486c50c5891f31e3780157940166149d2d7c",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -11048,13 +11048,13 @@
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 706,
+          "line": 711,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 706,
+          "line": 711,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
@@ -27107,9 +27107,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 96528,
-      "lines": 1575,
-      "sha256": "ec25ee06ae022a05e8e9dd49287b4dcaef74b5a454b9894e0245ada5952db1a3",
+      "bytes": 99226,
+      "lines": 1613,
+      "sha256": "9f4056ed460da56fe9f2e2e71fa18adfcb40ee5ddbc8315b4c620ba4fe4032f4",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -806,6 +806,18 @@ export class ConversationCoreService {
       if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughClosing) {
         reactionBase = this.pickFixedReply('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。']);
       }
+      // P576: 定型の受け止めに当たらなかった発話のうち、天気の定番と
+      // 笑いは専用の形で受ける（天気は日付から季節感を添える）。
+      const chainMatched = fallthroughFatigue || fallthroughAnxiety || fallthroughHunger || Boolean(fallthroughClosingText)
+        || fallthroughThanks || fallthroughApology || fallthroughWakeup || fallthroughAgreement;
+      if (!taughtAck && !answeredTopicQuestion && !chainMatched) {
+        const weather = this.weatherRemark(prompt);
+        if (weather) {
+          reactionBase = weather;
+        } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
+          reactionBase = this.pickFixedReply('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。']);
+        }
+      }
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
       // （創作の層の中だけ。場面が無ければ何も付かない）。
       // P536: 3ターンに1回は、地の文の代わりに場面の進行を添えて
@@ -1390,6 +1402,32 @@ export class ConversationCoreService {
       storageService.setItem('miki_reflection_surfaced_v1', String(latest.at));
       return `そういえば、今日の振り返りで「${latest.question}」と考えて、${latest.answer}と答えました。`;
     } catch { return undefined; }
+  }
+
+  /**
+   * P576: 天気の定番雑談への受け止め。彼女は日付を知っているので、
+   * 季節外れの暑さ・寒さには「M月にしては珍しいですね」と添えられる。
+   * 天気そのものの実況は持っていないので、断定はしない。
+   */
+  private weatherRemark(prompt: string): string | undefined {
+    const month = new Date().getMonth() + 1;
+    if (/暑い/.test(prompt)) {
+      if (month >= 6 && month <= 9) return this.pickFixedReply('fx_weather_hot', ['暑いですね。水分を取ってくださいね。', '暑いですね。無理をしないでくださいね。']);
+      if (month <= 3 || month >= 11) return `暑いのですね。${month}月にしては珍しいですね。体調に気をつけてくださいね。`;
+      return '暑いのですね。体調に気をつけてくださいね。';
+    }
+    if (/寒い/.test(prompt)) {
+      if (month === 12 || month <= 3) return this.pickFixedReply('fx_weather_cold', ['寒いですね。暖かくしてくださいね。', '寒いですね。温かいものを飲んでくださいね。']);
+      if (month >= 6 && month <= 9) return `寒いのですね。${month}月にしては珍しいですね。暖かくしてくださいね。`;
+      return '寒いのですね。暖かくしてくださいね。';
+    }
+    if (/いい天気|良い天気|晴れてる|晴れたね/.test(prompt)) {
+      return this.pickFixedReply('fx_weather_fine', ['いい天気ですね。気持ちがいいですね。', '晴れてよかったですね。']);
+    }
+    if (/雨/.test(prompt) && prompt.trim().length <= 14) {
+      return this.pickFixedReply('fx_weather_rain', ['雨なのですね。足元に気をつけてくださいね。', '雨ですか。傘は大丈夫ですか？']);
+    }
+    return undefined;
   }
 
   /**

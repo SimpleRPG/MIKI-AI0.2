@@ -455,6 +455,14 @@ storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms:
 const notAnswer = await conversationCoreService.execute({ prompt: 'モコロンって何？' } as any);
 check('P574 質問で来たら答えとして扱わない', !String((notAnswer as any).replyText || '').includes('教えてくれてありがとう'), String((notAnswer as any).replyText || '').slice(0, 160));
 
+// ---- ガードの誤爆修正と天気・笑い（P575/P576） ----
+const laugh = await conversationCoreService.execute({ prompt: 'それは笑う' } as any);
+check('P575/P576 笑いの発話が拒否文にならず笑いで返る', !String((laugh as any).replyText || '').includes('時間・状態条件が混在') && (String((laugh as any).replyText || '').includes('ふふ') || String((laugh as any).replyText || '').includes('あはは')), String((laugh as any).replyText || '').slice(0, 160));
+const guardTrip = await conversationCoreService.execute({ prompt: '昨日は晴れで、明日は雨だ' } as any);
+check('P575 本物の時間の混在は今もガードが止める', String((guardTrip as any).replyText || '').includes('時間・状態条件が混在'), String((guardTrip as any).replyText || '').slice(0, 160));
+const hot = await conversationCoreService.execute({ prompt: '暑いね' } as any);
+check('P576 暑さの雑談に季節感のある受け止め', String((hot as any).replyText || '').includes('水分') || String((hot as any).replyText || '').includes('珍しい') || String((hot as any).replyText || '').includes('体調'), String((hot as any).replyText || '').slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
