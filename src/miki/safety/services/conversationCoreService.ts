@@ -2460,12 +2460,19 @@ export class ConversationCoreService {
     if (!hit) return undefined;
     try {
       const lastAt = userStateTrailService.lastRecordedAt(hit.signal);
+      const resolvedAt = userStateTrailService.resolvedAt(hit.signal);
+      const whenOf = (at: number): string => {
+        const diffMs = Date.now() - at;
+        return diffMs < 3600_000 ? 'さっき'
+          : diffMs < 24 * 3600_000 ? `${Math.max(1, Math.round(diffMs / 3600_000))}時間くらい前`
+            : `${Math.round(diffMs / (24 * 3600_000))}日くらい前`;
+      };
+      // P634: 解消が最後の兆候より新しければ、解消したこととして答える。
+      if (resolvedAt && (!lastAt || resolvedAt >= lastAt)) {
+        return `${hit.label}は、${whenOf(resolvedAt)}に取れたって言ってましたね。`;
+      }
       if (!lastAt) return `${hit.label}の話は、最近は聞いてないですね。今はどうですか？`;
-      const diffMs = Date.now() - lastAt;
-      const when = diffMs < 3600_000 ? 'さっき'
-        : diffMs < 24 * 3600_000 ? `${Math.max(1, Math.round(diffMs / 3600_000))}時間くらい前`
-          : `${Math.round(diffMs / (24 * 3600_000))}日くらい前`;
-      return `${hit.label}は、${when}にそう言ってましたね。その後はどうですか？`;
+      return `${hit.label}は、${whenOf(lastAt)}にそう言ってましたね。その後はどうですか？`;
     } catch { return undefined; }
   }
 

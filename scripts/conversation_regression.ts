@@ -1044,6 +1044,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P633 分からないことは欠けの台帳から答える', gapReply.replyText.includes('まだ分からないのは') && gapReply.replyText.includes('クオッカ'), gapReply.replyText.slice(0, 220));
 }
 
+// ---- 状態の解消は兆候ではなく解消として記録する（P634） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { userStateTrailService } = await import('../src/miki/conversation/services/userStateTrailService');
+  storageService.setItem('miki_user_state_trail_v1', JSON.stringify([{ signal: 'fatigue', at: Date.now() - 2 * 3600_000 }]));
+  storageService.setItem('miki_user_state_resolved_v1', '{}');
+  check('P634 回復の宣言は兆候として積まれない', userStateTrailService.recordFromText('疲れ取れたよ') === undefined && userStateTrailService.recordFromText('疲れた') === 'fatigue', '');
+  check('P634 解消の記録が残り、解消前の記録は継続数から外れる', Boolean(userStateTrailService.resolvedAt('fatigue')) && userStateTrailService.recentCount('fatigue', 72) <= 1, String(userStateTrailService.recentCount('fatigue', 72)));
+  const resolvedRecall = await conversationCoreService.execute({ prompt: '疲れ取れた？' } as any);
+  check('P634 経過の想起は解消として答える', resolvedRecall.replyText.includes('取れたって言ってました'), resolvedRecall.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

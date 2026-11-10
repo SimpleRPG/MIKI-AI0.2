@@ -19,6 +19,7 @@ interface UserStateTrailEntry {
 }
 
 const STORAGE_KEY = 'miki_user_state_trail_v1';
+const RESOLVED_KEY = 'miki_user_state_resolved_v1';
 const MAX_ENTRIES = 40;
 const RETENTION_MS = 7 * 24 * 3600_000;
 
@@ -119,8 +120,43 @@ export class UserStateTrailService {
     return hits[hits.length - 1].at;
   }
 
+  /** P634: その兆候が「解消した」と言われた時刻（無ければ undefined）。 */
+  public resolvedAt(signal: UserStateSignal): number | undefined {
+    try {
+      const map = JSON.parse(storageService.getItem(RESOLVED_KEY) || '{}') as Record<string, number>;
+      return typeof map[signal] === 'number' ? map[signal] : undefined;
+    } catch { return undefined; }
+  }
+
+  private markResolved(signal: UserStateSignal): void {
+    try {
+      const map = JSON.parse(storageService.getItem(RESOLVED_KEY) || '{}') as Record<string, number>;
+      map[signal] = Date.now();
+      storageService.setItem(RESOLVED_KEY, JSON.stringify(map));
+    } catch { /* 補助経路 */ }
+  }
+
   public recordFromText(text: string): UserStateSignal | undefined {
     const source = affirmedText(text);
+    // P634: 回復の宣言（「疲れ取れた」）は兆候の記録ではなく解消
+    // として扱う。移行前は、回復を言っただけで疲れの兆候がもう
+    // 1件積まれ、継続の判定（P524）や経過の想起（P625）が逆転
+    // していた。疑問形（「疲れ取れた？」）は宣言ではないので対象外。
+    try {
+      if (utteranceFeatureService.analyze(source).questionForm === 'NONE'
+        && /(?:取れた|抜けた|治った|良くなった|落ち着いた|回復した)/.test(source)) {
+        // 兆候パターンは「疲れた」のような報告形に寄っているため、
+        // 解消の照合は語幹で行う（「疲れ取れた」の疲れ等）。
+        const resolving: UserStateSignal | undefined = /(?:疲れ|眠気|だる|しんど)/.test(source) ? 'fatigue'
+          : /(?:痛|頭痛|腹痛|歯痛|腰痛)/.test(source) ? 'pain'
+            : /(?:不安|心配|緊張)/.test(source) ? 'anxiety'
+              : undefined;
+        if (resolving) {
+          this.markResolved(resolving);
+          return undefined;
+        }
+      }
+    } catch { /* 解消の判定は補助。失敗したら通常の記録に進む */ }
     const signal: UserStateSignal | undefined = FATIGUE_PATTERN.test(source)
       ? 'fatigue'
       : ANXIETY_PATTERN.test(source)
@@ -143,10 +179,12 @@ export class UserStateTrailService {
     return signal;
   }
 
-  /** 直近 withinHours 時間以内の、その兆候の記録数。 */
+  /** 直近 withinHours 時間以内の、その兆候の記録数。
+   * P634: 解消が記録されている兆候は、解消より前の記録を数えない。 */
   public recentCount(signal: UserStateSignal, withinHours: number): number {
-    const since = Date.now() - withinHours * 3600_000;
-    return this.load().filter((e) => e.signal === signal && e.at >= since).length;
+    const resolved = this.resolvedAt(signal) || 0;
+    const since = Math.max(Date.now() - withinHours * 3600_000, resolved);
+    return this.load().filter((e) => e.signal === signal && e.at >= since && e.at > resolved).length;
   }
 }
 
