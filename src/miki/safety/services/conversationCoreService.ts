@@ -490,6 +490,12 @@ export class ConversationCoreService {
       if (musing) {
         return this.buildResult('RESOLVED', 'time_musing_answer', this.applyPersonaVoice(musing), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P684: 自己紹介と自分の名前の質問には、自分の輪郭で答える。
+      // 汎用の作業了承や「答えられない」に化けていた。
+      const intro = this.selfIntroductionAnswer(prompt);
+      if (intro) {
+        return this.buildResult('RESOLVED', 'self_introduction_answer', this.applyPersonaVoice(intro), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -2813,7 +2819,34 @@ export class ConversationCoreService {
     if (/笑わせて|笑かして/.test(p)) {
       return 'じゃあ一つ。……布団が吹っ飛んだ！すみません、今のところ私の持ちネタはこれだけです。';
     }
+    // P684: 迷い・悩みの宣言は、一緒に整理する形で受ける。
+    if (/決められない|決められなくて|迷ってる|迷っている|悩んでる|悩んでいる/.test(p)) {
+      return '迷いますよね。何で迷っているのか聞かせてくれたら、一緒に整理してみますよ。';
+    }
     return undefined;
+  }
+
+  /**
+   * P684: 自己紹介と自分の名前への質問。プロファイルの名前と、
+   * 彼女の営み（話す・調べる・覚える）で答える。
+   */
+  private selfIntroductionAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '');
+    const asksIntro = /自己紹介/.test(p);
+    const asksName = /(?:あなたの|君の|お前の|あんたの)?名前(?:は|って|を教えて)/.test(p) && !/僕|私|俺|自分の名前/.test(p);
+    const asksWho = /(?:君は|あなたは|あんたは)誰/.test(p);
+    if (!asksIntro && !asksName && !asksWho) return undefined;
+    let name = 'MIKI-AI';
+    let bibi = false;
+    try {
+      const profile = personaProfileService.get();
+      name = profile.name || name;
+      bibi = profile.profileId === BIBI_PROFILE_ID;
+    } catch { /* 既定の形で答える */ }
+    if (asksName && !asksIntro) return `私は${name}です。`;
+    return bibi
+      ? `私は${name}だよ！話したり、知らないことを調べたり覚えたりして、少しずつ育ってるの。よろしくね！`
+      : `私は${name}です。話をしたり、知らないことを調べたり覚えたりしながら、少しずつ育っているAIです。`;
   }
 
   /**

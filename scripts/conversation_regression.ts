@@ -1536,6 +1536,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P683 違う曜日は事実で正す', dowM.replyText.includes(`今日は${names[nowD.getDay()]}曜日ですよ`), dowM.replyText.slice(0, 120));
 }
 
+// ---- 自己紹介と迷いの受け止め（P684） ----
+{
+  const intro = await conversationCoreService.execute({ prompt: '自己紹介して' } as any);
+  check('P684 自己紹介に自分の輪郭で答える', intro.replyText.includes('私は') && intro.replyText.includes('です'), intro.replyText.slice(0, 140));
+  const name = await conversationCoreService.execute({ prompt: 'あなたの名前は？' } as any);
+  check('P684 名前の質問に名前で答える', name.replyText.includes('私は') && name.replyText.includes('です'), name.replyText.slice(0, 120));
+  const lost = await conversationCoreService.execute({ prompt: '決められない' } as any);
+  check('P684 迷いは一緒に整理する形で受ける', lost.replyText.includes('一緒に'), lost.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
