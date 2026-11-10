@@ -1,6 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { conversationOpenTopicService } from './conversationOpenTopicService';
 import { userStateTrailService } from './userStateTrailService';
+import { dayKeyOf, yesterdayKey, daysAgoKey } from '../../memory/services/dayKeyService';
 
 /**
  * P623: 1日の会話を「エピソード」として残す。
@@ -33,15 +34,6 @@ const STATE_LABELS: Record<string, string> = {
   thirst: '喉の渇きの話が多め',
 };
 
-function dayKeyOf(at: number): string {
-  const d = new Date(at);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function yesterdayKey(): string {
-  const now = new Date();
-  return dayKeyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime());
-}
 
 class EpisodeMemoryService {
   private static instance: EpisodeMemoryService;
@@ -69,7 +61,7 @@ class EpisodeMemoryService {
     const out: Episode[] = [];
     const now = new Date();
     for (let i = days; i >= 1; i--) {
-      const key = dayKeyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).getTime());
+      const key = daysAgoKey(i);
       const ep = this.ensureEpisode(key);
       if (ep) out.push(ep);
     }

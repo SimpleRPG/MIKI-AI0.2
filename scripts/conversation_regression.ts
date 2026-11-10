@@ -1073,6 +1073,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P635 解消した日のエピソードは状態を色にしない', Boolean(ep) && ep!.summary.includes('港の朝市') && !ep!.summary.includes('お疲れ気味'), ep ? ep.summary : 'none');
 }
 
+// ---- 日付キーは共有の生成で統一（P636） ----
+{
+  const { dayKeyService } = await import('../src/miki/memory/services/dayKeyService');
+  check('P636 日付キーはゼロ詰めで統一される', dayKeyService.of(new Date(2026, 0, 5, 12, 0).getTime()) === '2026-01-05' && dayKeyService.today() === dayKeyService.of(Date.now()) && dayKeyService.yesterday() === dayKeyService.daysAgo(1), dayKeyService.of(new Date(2026, 0, 5, 12, 0).getTime()));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

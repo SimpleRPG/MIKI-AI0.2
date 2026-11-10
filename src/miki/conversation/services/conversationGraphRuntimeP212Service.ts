@@ -5,6 +5,7 @@ import { conversationComponentPipelineService } from './conversationComponentPip
 import { contentTermsFromTokens, type JapaneseToken } from '../../research/services/japaneseAnalysisService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
+import { dayKeyService } from '../../memory/services/dayKeyService';
 import { dictionaryBootstrapService } from '../../research/services/dictionaryBootstrapService';
 import { webTermLearningService } from '../../research/services/webTermLearningService';
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
@@ -232,7 +233,7 @@ class ConversationGraphRuntimeP212Service {
  // （会話の記録が、その日の要約として返せるように）。
  private selfInquiryDayRecapAnswer():string {
   const now=new Date();
-  const today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const today=dayKeyService.today();
   const topics=conversationOpenTopicService.listPending().filter((r)=>r.openedDay===today).map((r)=>r.topic).filter((t)=>t&&t.length>=2&&!/おはよう|こんにちは|こんばんは|おやすみ|ただいま|起きた|ありがとう|ごめん|疲れた|眠い|お腹|喉/u.test(t));
   const works=projectNotebookService.listWorkStates().filter((w)=>new Date(w.updatedAt).toDateString()===now.toDateString());
   const parts:string[]=[];

@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
+import { dayKeyOf } from '../../memory/services/dayKeyService';
 
 /**
  * P522: 開いた話題の保持。
@@ -26,12 +27,7 @@ interface OpenTopicRecord {
 
 const STORAGE_KEY = 'miki_open_topics_v1';
 
-const dayKey = (ts: number): string => {
-  const d = new Date(ts);
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${month}-${day}`;
-};
+const dayKey = dayKeyOf;
 
 export class ConversationOpenTopicService {
   private static instance: ConversationOpenTopicService;

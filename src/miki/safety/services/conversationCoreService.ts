@@ -33,6 +33,7 @@ import { utteranceEventClassifierService } from '../../conversation/services/utt
 import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
+import { dayKeyService } from '../../memory/services/dayKeyService';
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -1981,7 +1982,7 @@ export class ConversationCoreService {
     try {
       if (roleplaySessionService.isActive()) return undefined;
       const now = new Date();
-      const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+      const dayKey = dayKeyService.today();
       let ledger: Record<string, string> = {};
       try { ledger = JSON.parse(storageService.getItem('miki_time_sense_v1') || '{}'); } catch { ledger = {}; }
       const hour = now.getHours();
