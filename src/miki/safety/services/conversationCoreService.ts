@@ -413,6 +413,13 @@ export class ConversationCoreService {
       if (confirmSim) {
         return this.buildResult('RESOLVED', 'confirmation_similarity_answer', this.applyPersonaVoice(confirmSim), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P644: 対象ラベル外の属性質問（何を食べる？等）も、知っている
+      // 物については正直に扱う。ここで受けないと Claim 照合の合成が
+      // 無関係な知識を変な型で押し付ける崩れがあった。
+      const unknownAttr = this.unknownAttributeAnswer(prompt);
+      if (unknownAttr) {
+        return this.buildResult('RESOLVED', 'unknown_attribute_answer', this.applyPersonaVoice(unknownAttr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
       const selfWant = this.selfWantAnswer(prompt);
@@ -2450,7 +2457,10 @@ export class ConversationCoreService {
     }
     // 確認の質問：Xは Y じゃないの？/なの？ に、関係と照らして答える。
     const confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*(?:じゃないの|なの|ですか|なのですか|の)[？?]?$/);
-    if (confirmMatch && /[？?]/.test(prompt)) {
+    // P644: 疑問詞で始まる中身（「何を食べるの？」等）は確認ではなく
+    // 属性の質問。確認として扱うと、無関係な知識で「じゃなくて」と
+    // 正す崩れになるため、ここでは扱わない。
+    if (confirmMatch && /[？?]/.test(prompt) && !/^(?:何|なに|どの|どう|いつ|どこ|だれ|誰)/.test(confirmMatch[2].trim())) {
       const entity = known.find((t) => prompt.startsWith(t) || prompt.includes(`${t}って`) || prompt.includes(`${t}は`));
       if (!entity) return undefined;
       const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか)/.test(t)).slice(-1)[0];
@@ -2479,14 +2489,74 @@ export class ConversationCoreService {
         if (claims.length > 0) {
           const hit = claims.find((c: any) => String(c.statement || '').includes(candidate));
           if (hit) return `はい、そのとおりです。${String((hit as any).statement).slice(0, 90)}`;
-          const statement = String((claims[0] as any).statement || '');
-          const body = statement.replace(new RegExp(`^${entity}は`), '').replace(/。$/, '');
-          if (body) return `「${entity}」は${candidate}じゃなくて、${body}です。`;
+          // P644: 「じゃなくて」と正せるのは、知識の中に候補とは別の
+          // 「正体」が書かれている場合だけ。無関係な知識（寿命など）を
+          // 正しとして押し付けない。その場合は、正体の手がかりを
+          // 含む知識を選んで提示する。
+          const correcting = claims.find((c: any) => {
+            const st = String(c.statement || '');
+            return features.contentTokens.some((t) => t !== entity && t !== candidate && st.includes(t))
+              || japaneseDictionaryService.lookup(entity).some((e: any) => String(e.gloss || '').length > 0 && st.includes(String(e.gloss || '').slice(0, 4)));
+          });
+          if (correcting) {
+            const statement = String((correcting as any).statement || '');
+            const body = statement.replace(new RegExp(`^${entity}は`), '').replace(/。$/, '');
+            if (body) return `「${entity}」は${candidate}じゃなくて、${body}です。`;
+          }
         }
       } catch { /* Claim 照合は補助 */ }
       return undefined;
     }
     return undefined;
+  }
+
+  /**
+   * P644: 対象ラベル（場所・使い道・材料・やり方・分類・関係種）に
+   * 入らない属性の質問（「何を食べるの？」「どのくらい大きいの？」）
+   * を、知っている物について正直に扱う。知識（Claim）にその属性が
+   * 書かれていれば知識の文で答え、無ければ「まだ知らない」と言って
+   * 欠けに積む。ここで受けずに先へ流すと、Claim 照合の合成が
+   * 無関係な知識を不自然な型で押し付ける崩れがあった。
+   */
+  private unknownAttributeAnswer(prompt: string): string | undefined {
+    if (!/[？?]/.test(prompt) && !/か[？。]?$/.test(prompt.trim())) return undefined;
+    const attrMatch = prompt.match(/(何を|なにを|何で|なにで)(.{1,7}?)(?:の[？?]|ですか|ますか|の$|？|\?)/)
+      || prompt.match(/(どのくらい|どれくらい)(.{1,7}?)(?:の[？?]|？|\?)/)
+      || prompt.match(/(何色|なに色|何匹|何頭|何歳|何キロ|何センチ|何メートル)/);
+    if (!attrMatch) return undefined;
+    const label = `${attrMatch[1]}${attrMatch[2] || ''}`.replace(/[？?]/g, '');
+    let entity: string | undefined;
+    let features: ReturnType<typeof utteranceFeatureService.analyze> | undefined;
+    try {
+      features = utteranceFeatureService.analyze(prompt);
+      entity = features.contentTokens.find((t) => {
+        try {
+          return japaneseDictionaryService.has(t)
+            || worldModelGraphService.relationsOf(t).length > 0
+            || worldModelGraphService.entities().some((e) => e.name === t);
+        } catch { return false; }
+      });
+    } catch { return undefined; }
+    if (!entity || !features) return undefined;
+    // 知識にその属性が書かれていれば、知識の文で答える（P643と同じ流儀）。
+    try {
+      const stem = (attrMatch[2] || '').replace(/(?:る|す|く|つ|う|ぶ|む|ぐ|ぬ)$/, '');
+      const claims = claimDatabaseService.getAllClaims()
+        .filter((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(entity));
+      const hit = claims.find((c: any) => stem.length >= 1 && String(c.statement || '').includes(stem))
+        || claims.find((c: any) => String(c.statement || '').includes(attrMatch[1].replace(/^(?:何を|なにを)/, '')) && attrMatch[1].includes('色'));
+      if (hit) return String((hit as any).statement).slice(0, 120);
+    } catch { /* 補助経路 */ }
+    try {
+      knowledgeGapService.detect({
+        query: `「${entity}」の${label}を調べる`,
+        reason: '知っている物への属性の質問に、知識が無くて答えられなかったため。',
+        type: 'UNKNOWN_RELATION',
+        target: entity,
+        priority: 50,
+      });
+    } catch { /* gap への接続は補助経路 */ }
+    return `「${entity}」が${label}かは、まだ知らないです。調べて覚えておきますね。`;
   }
 
   /**

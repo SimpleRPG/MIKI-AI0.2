@@ -1154,6 +1154,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P643 生息地は知識の文で答える', habitat.replyText.includes('ロットネスト島') && !habitat.replyText.includes('まだ知らない'), habitat.replyText.slice(0, 200));
 }
 
+// ---- 対象外の属性質問も正直に扱う（P644） ----
+{
+  const food = await conversationCoreService.execute({ prompt: 'クオッカって何を食べるの？' } as any);
+  check('P644 食べ物は知らないと正直に言い、変な合成で誤魔化さない', food.replyText.includes('まだ知らない') && !food.replyText.includes('生息していますです'), food.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
