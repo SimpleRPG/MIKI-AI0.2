@@ -1160,6 +1160,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P644 食べ物は知らないと正直に言い、変な合成で誤魔化さない', food.replyText.includes('まだ知らない') && !food.replyText.includes('生息していますです'), food.replyText.slice(0, 200));
 }
 
+// ---- 一昨日の話もエピソードで答える（P645） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { daysAgoKey, yesterdayKey } = await import('../src/miki/memory/services/dayKeyService');
+  storageService.setItem('miki_episodes_v1', JSON.stringify([
+    { day: daysAgoKey(2), topics: ['港の朝市'], summary: '昨日は、「港の朝市」の話をしましたね。' },
+    { day: yesterdayKey(), topics: ['ツバメの巣'], summary: '昨日は、「ツバメの巣」の話をしましたね。' },
+  ]));
+  const dayBefore = await conversationCoreService.execute({ prompt: '一昨日何の話したっけ？' } as any);
+  check('P645 一昨日の話は一昨日のエピソードで答える', dayBefore.replyText.includes('一昨日は') && dayBefore.replyText.includes('港の朝市') && !dayBefore.replyText.includes('ツバメの巣'), dayBefore.replyText.slice(0, 220));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -56,6 +56,12 @@ class EpisodeMemoryService {
     return this.ensureEpisode(yesterdayKey());
   }
 
+  /** P645: N日前のエピソードを（未構築なら今構築して）返す。 */
+  public episodeDaysAgo(daysAgo: number): Episode | undefined {
+    if (daysAgo <= 0) return undefined;
+    return this.ensureEpisode(daysAgoKey(daysAgo));
+  }
+
   /** P627: 過去7日分のエピソードを（組めるものは組んで）日付順に返す。 */
   public recentEpisodes(days = 7): Episode[] {
     const out: Episode[] = [];

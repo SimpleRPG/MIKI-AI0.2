@@ -2602,10 +2602,22 @@ export class ConversationCoreService {
   private episodeRecallAnswer(prompt: string): string | undefined {
     if (!/(?:何の話|どんな話|何話し|話したっけ|話してた)/.test(prompt)) return undefined;
     try {
-      if (/(?:昨日|きのう)/.test(prompt)) {
-        const episode = episodeMemoryService.yesterdayEpisode();
-        if (episode) return `${episode.summary}覚えてますよ。`;
-        return '昨日の話は、まだ記録に残ってないです。';
+      // P645: 一昨日・〜日前もエピソードで答える。一昨日は「昨日」を
+      // 部分文字列として含むため、先に判定しないと昨日の話として
+      // 誤って答えてしまう。日付の言い方も聞かれた日に合わせる。
+      const daysAgo = /(?:一昨日|おととい)/.test(prompt)
+        ? 2
+        : /(?:昨日|きのう)/.test(prompt)
+          ? 1
+          : (() => { const m = prompt.match(/([2-6])日前/); return m ? Number(m[1]) : 0; })();
+      if (daysAgo > 0) {
+        const episode = episodeMemoryService.episodeDaysAgo(daysAgo);
+        const dayLabel = daysAgo === 1 ? '昨日' : daysAgo === 2 ? '一昨日' : `${daysAgo}日前`;
+        if (episode) {
+          const summary = episode.summary.replace(/^昨日は、/, `${dayLabel}は、`);
+          return `${summary}覚えてますよ。`;
+        }
+        return `${dayLabel}の話は、まだ記録に残ってないです。`;
       }
       // 今日の振り返りは既存の要約経路（P597）の領分なので触らない。
     } catch { return undefined; }
