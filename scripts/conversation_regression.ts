@@ -1335,6 +1335,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P666 「作るのが好き」は家事完了で受けない', !like.replyText.includes('お疲れ様でした'), like.replyText.slice(0, 160));
 }
 
+// ---- 聞き返しが複合の断片を語として聞かない（P667） ----
+{
+  const busy = await conversationCoreService.execute({ prompt: '最近忙しくてさ' } as any);
+  check('P667 「最近忙」を聞き返さない', !busy.replyText.includes('「最近忙」って'), busy.replyText.slice(0, 160));
+  const melted = await conversationCoreService.execute({ prompt: '猫の動画見てたら時間溶けた' } as any);
+  check('P667 「時間溶」を聞き返さない', !melted.replyText.includes('「時間溶」って'), melted.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

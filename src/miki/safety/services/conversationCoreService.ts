@@ -2167,13 +2167,15 @@ export class ConversationCoreService {
         if (t.length < 2 || !prompt.includes(t) || projectNotebookService.findProject(t)) return false;
         // P604: 時間の語で始まる複合（「明日早起」等）は予定の断片で、
         // 語の意味を聞く対象ではない。
-        if (/^(?:今日|明日|昨日|朝|昼|夕方|夜|今朝|今夜|週末|今週|来週)/.test(t)) return false;
+        if (/^(?:今日|明日|昨日|朝|昼|夕方|夜|今朝|今夜|週末|今週|来週|最近|今度|この頃)/.test(t)) return false;
         const after = prompt.slice(prompt.indexOf(t) + t.length, prompt.indexOf(t) + t.length + 1);
         // P591: 「雨降」+って、「仕事終」+わった のような活用の語幹も
         // 聞き返さない（直後の「わ」「っ」も語幹の続きとみなす）。
         // P594: 動詞の辞書形の尾（む・く・す等）も語幹の続きとみなす
         // （「開発休」+む を聞き返さない）。
-        return !/[るりれろたてますないだわっむくぐすつぬぶ]/.test(after);
+        // P667: 語幹の続きのかなを広げる（「時間溶」+けた の け、
+        // 「忙」+しい の し 等、五段・形容詞の語幹の続き）。
+        return !/[るりれろたてますないだわっむくぐすつぬぶしけかきげせちびみ]/.test(after);
       });
       if (!topic) return undefined;
       const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
