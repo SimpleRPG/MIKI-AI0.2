@@ -1595,6 +1595,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P689 勝敗を記録から答える', result.replyText.includes('私の勝ちでした'), result.replyText.slice(0, 120));
 }
 
+// ---- スナップショットに遊びの結果と意見の記録（P691） ----
+{
+  const { stateSnapshotExportService: snap691 } = await import('../src/miki/selfAwareness/services/stateSnapshotExportService');
+  snap691.exportNow();
+  const raw691 = storageService.getItem('miki_state_snapshot_v1');
+  let body691: any = {};
+  try { body691 = JSON.parse(String((JSON.parse(String(raw691)) as any).json || '{}')); } catch { /* 検証側で失敗させる */ }
+  check('P691 遊びの結果がスナップショットに入る', !!body691.play && ('quizLastResult' in body691.play) && ('shiritoriLastResult' in body691.play) && body691.play.quizLastResult && body691.play.shiritoriLastResult, JSON.stringify(body691.play || {}).slice(0, 200));
+  check('P691 意見の記録が入る', !!body691.lastOpinion && typeof body691.lastOpinion.topic === 'string', JSON.stringify(body691.lastOpinion || {}).slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

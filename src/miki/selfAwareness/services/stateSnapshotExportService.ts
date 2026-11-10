@@ -117,8 +117,14 @@ class StateSnapshotExportService {
         return {
           shiritori: shiritori ? { active: !!shiritori.active, usedCount: Array.isArray(shiritori.used) ? shiritori.used.length : 0, requiredKana: shiritori.requiredDisplay || '' } : null,
           quiz: quiz ? { active: !!quiz.active, asked: quiz.asked || 0, correct: quiz.correct || 0, remaining: Array.isArray(quiz.queue) ? quiz.queue.length : 0 } : null,
+          // P691: 終わった遊びの結果（P688/P689）と、直近の意見の
+          // 根拠の記録（P687）も、記録→想起が実機で動いたかの
+          // 点検材料に含める。
+          quizLastResult: read('miki_quiz_last_result_v1'),
+          shiritoriLastResult: read('miki_shiritori_last_result_v1'),
         };
       })(),
+      lastOpinion: (() => { try { return JSON.parse(storageService.getItem('miki_last_opinion_v1') || 'null'); } catch { return null; } })(),
     };
     return {
       snapshot,
