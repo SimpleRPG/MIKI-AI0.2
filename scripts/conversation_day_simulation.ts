@@ -162,6 +162,18 @@ async function main() {
   const d23 = await turn('D2-3 疲れの継続', '疲れた');
   check('D2-3 疲れが続いている形で受ける', d23.includes('続いて') || d23.includes('ここ数日') || d23.includes('このところ'), d23.slice(0, 160));
 
+  // ---- 3日目の想起（P649：一昨日・昨日の状態が日をまたいで引けるか） ----
+  const { daysAgoKey } = await import('../src/miki/memory/services/dayKeyService');
+  const existingEpisodes = JSON.parse(storageService.getItem('miki_episodes_v1') || '[]') as unknown[];
+  storageService.setItem('miki_episodes_v1', JSON.stringify([
+    { day: daysAgoKey(2), topics: ['港の朝市'], summary: '昨日は、「港の朝市」の話をしましたね。' },
+    ...existingEpisodes,
+  ]));
+  const d31 = await turn('D3-1 一昨日の想起', '一昨日何の話したっけ？');
+  check('D3-1 一昨日の話は一昨日のエピソードで答える', d31.includes('一昨日は') && d31.includes('港の朝市'), d31.slice(0, 200));
+  const d32 = await turn('D3-2 昨日の状態', '昨日は疲れてた？');
+  check('D3-2 昨日の疲れは記録で答える', d32.includes('昨日は') && d32.includes('疲れ'), d32.slice(0, 200));
+
   // ---- 結果 ----
   const failures = results.filter(([, ok]) => !ok);
   console.log(`\n==== ${results.length - failures.length}/${results.length} checks passed ====`);
