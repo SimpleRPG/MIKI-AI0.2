@@ -791,6 +791,27 @@ check('P608 名前はまだ教わっていないと正直に言う', nameUnknown
 const birthdaySoonReply = await conversationCoreService.execute({ prompt: 'もうすぐ誕生日なんだ' } as any);
 check('P608 近づいた誕生日は楽しみとして受ける', birthdaySoonReply.replyText.includes('誕生日') || birthdaySoonReply.replyText.includes('楽しみ'), birthdaySoonReply.replyText.slice(0, 140));
 
+// ---- 出来事分類は特徴で判定する（P609、旧正規表現に無い言い換えで確認） ----
+const droppedReply = await conversationCoreService.execute({ prompt: '財布を落としてしまった' } as any);
+check('P609 「落としてしまった」も喪失として受ける', droppedReply.replyText.includes('見つかる') || droppedReply.replyText.includes('大変') || droppedReply.replyText.includes('困り'), droppedReply.replyText.slice(0, 140));
+const examFailReply = await conversationCoreService.execute({ prompt: '試験に落ちた' } as any);
+check('P609 試験に落ちたは後退として受ける', (examFailReply.replyText.includes('大変') || examFailReply.replyText.includes('つら')) && !examFailReply.replyText.includes('おめでとう'), examFailReply.replyText.slice(0, 140));
+const examNegReply = await conversationCoreService.execute({ prompt: '試験に受からなかった' } as any);
+check('P609 否定された達成は祝わない', !examNegReply.replyText.includes('おめでとう') && (examNegReply.replyText.includes('大変') || examNegReply.replyText.includes('つら')), examNegReply.replyText.slice(0, 140));
+const passLostReply = await conversationCoreService.execute({ prompt: '定期券を失くしてしまった' } as any);
+check('P609 初めての物でも喪失として受ける', passLostReply.replyText.includes('見つかる') || passLostReply.replyText.includes('大変') || passLostReply.replyText.includes('困り'), passLostReply.replyText.slice(0, 140));
+
+// ---- 動詞クラス表は後から拡張できる（P610） ----
+{
+  const { utteranceEventClassifierService } = await import('../src/miki/conversation/services/utteranceEventClassifierService');
+  utteranceEventClassifierService.registerVerbClass('コケ', 'SETBACK');
+  const extended = utteranceEventClassifierService.classify('試験でコケた');
+  check('P610 拡張した動詞クラスで分類できる', extended?.eventClass === 'SETBACK', JSON.stringify(extended));
+  utteranceEventClassifierService.registerMeasureNoun('段級');
+  const measured = utteranceEventClassifierService.classify('段級が上がった');
+  check('P610 拡張した量の名詞で達成になる', measured?.eventClass === 'ACHIEVEMENT', JSON.stringify(measured));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

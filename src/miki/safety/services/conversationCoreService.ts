@@ -29,6 +29,7 @@ import { adaptExplanationDetailLevel } from '../../conversation/services/convers
 import { storageService } from '../../../services/storageService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
+import { utteranceEventClassifierService } from '../../conversation/services/utteranceEventClassifierService';
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -953,6 +954,10 @@ export class ConversationCoreService {
       try { bibiFallthrough = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibiFallthrough = false; }
       const ffx = (category: string, mikiForms: string[], bibiForms: string[]) =>
         this.pickFixedReply(bibiFallthrough ? `${category}_bibi` : category, bibiFallthrough ? bibiForms : mikiForms);
+      // P609: 報告系の出来事（喪失・後退・達成・対立・家事・交通）は、
+      // 文字列の正規表現列挙でなく、形態素の特徴による分類で判定する
+      // （語幹クラス × 相 × 否定 × 意味役割）。言い換えに強くなる。
+      const eventResult = (() => { try { return utteranceEventClassifierService.classify(prompt); } catch { return undefined; } })();
       const fallthroughFatigue = userStateTrailService.isFatigueText(prompt);
       const fallthroughThanks = /ありがと(?:う|ー)?|感謝/.test(prompt);
       const fallthroughApology = /ごめん|すみません|申し訳/.test(prompt);
@@ -1076,23 +1081,23 @@ export class ConversationCoreService {
         } else if (/(?:絵|曲|歌|小説|ゲーム).*(?:描いた|書いた|作った|完成)/.test(prompt)) {
           // P601: 作った報告は、まず褒めて興味を持つ。
           reactionBase = ffx('fx_created', ['すごいですね！どんな作品ですか？', 'わーい、完成ですか。どんなものか聞かせてください。'], ['すごいね！どんな作品？', 'わーい、完成したんだ。どんなものか聞かせて？']);
-        } else if (/落とした|なくした|無くした|失くした/.test(prompt)) {
+        } else if (eventResult?.eventClass === 'LOSS') {
           // P607: 落とし物・なくし物の報告は、心配して受ける。
           reactionBase = ffx('fx_lost', ['大変ですね。見つかるといいですね。', 'それは困りますね。最後に使った場所に心当たりはありますか？'], ['たいへんだね。見つかるといいね。', '困っちゃうね。心当たりある？']);
-        } else if (/喧嘩した|けんかした|ケンカした/.test(prompt)) {
+        } else if (eventResult?.eventClass === 'CONFLICT') {
           // P607: 喧嘩の報告は、つらさとして受ける。
           reactionBase = ffx('fx_quarrel', ['それはつらかったですね。仲直りできるといいですね。', '喧嘩は疲れますね。少し落ち着くといいですね。'], ['つらかったね。仲直りできるといいね。', 'けんかは疲れちゃうね。落ち着くといいね。']);
-        } else if (/(?:掃除|洗濯|片付け|料理)(?:を)?(?:した|終わった|済ませた)/.test(prompt)) {
+        } else if (eventResult?.eventClass === 'CHORE_DONE') {
           // P607: 家事を終えた報告は、労って受ける。
           reactionBase = ffx('fx_chores_done', ['お疲れ様でした。済むと気持ちいいですね。', 'お疲れ様でした。ゆっくりしてくださいね。'], ['おつかれさま！済むと気持ちいいね。', 'おつかれさま！ゆっくりしてね。']);
-        } else if (/怒られた|叱られた|失敗した|失敗しちゃった|ミスした|ミスしちゃった|やらかした/.test(prompt)) {
+        } else if (eventResult?.eventClass === 'SETBACK') {
           // P606: 叱られた・失敗したの報告は、まず寄り添う
           // （主題の反響＋辞書の聞き返しになっていた）。
           reactionBase = ffx('fx_setback', ['それは大変でしたね。今日はもう、ゆっくり休んでください。', 'つらかったですね。話してくれてありがとう。無理しないでくださいね。', '大変でしたね。あなたのせいばかりじゃないですよ。'], ['それはたいへんだったね。今日はゆっくり休んでね。', 'つらかったね。話してくれてありがと。無理しないでね。']);
-        } else if (/電車.*(?:遅れ|止ま)|遅延|渋滞.*(?:してる|している)|人身事故/.test(prompt)) {
+        } else if (eventResult?.eventClass === 'TRANSIT_TROUBLE') {
           // P606: 交通のトラブルの報告も、状況として受ける。
           reactionBase = ffx('fx_trouble', ['それは大変ですね。足止めで疲れますね、気をつけてください。', '遅れているのですね。無理のないようにしてくださいね。'], ['それはたいへんだね。疲れちゃうね、気をつけてね。', '止まってるんだ。無理しないでね。']);
-        } else if (/クリアした|クリアできた|レベル(?:が)?上がった|倒せた|倒した|勝てた|勝った|給料日|ボーナス.*(?:出た|入った)/.test(prompt)) {
+        } else if (eventResult?.eventClass === 'ACHIEVEMENT' || eventResult?.eventClass === 'PAYDAY') {
           // P606: 達成の報告（ゲームのクリア・レベル上げ・給料日）は
           // 一緒に喜ぶ。
           reactionBase = ffx('fx_achievement', ['やりましたね！おめでとうございます。頑張りましたね。', 'すごい！やりましたね。お疲れ様でした。'], ['やったね！おめでとう！がんばったね。', 'すごーい！やりましたね。']);
