@@ -508,6 +508,13 @@ export class ConversationCoreService {
       if (why) {
         return this.buildResult('RESOLVED', 'why_followup_answer', this.applyPersonaVoice(why), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P688: 終わったクイズの成績を聞かれたら、残した記録で答える。
+      if (/クイズ/.test(prompt) && /(?:成績|結果|何問|何点|正解)/.test(prompt) && !quizService.isActive()) {
+        const last = quizService.lastResult();
+        if (last) {
+          return this.buildResult('RESOLVED', 'quiz_last_result_answer', this.applyPersonaVoice(`さっきのクイズは、${last.answered}問中${last.correct}問正解でした。`), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -2774,6 +2781,9 @@ export class ConversationCoreService {
    * 歌詞作りの形で受ける。
    */
   private playInvitationAnswer(prompt: string): string | undefined {
+    // P688: 「さっきのクイズ何問正解だった？」は誘いではなく
+    // 終わった遊びについての質問。ここでは扱わない。
+    if (/(?:何問|成績|結果|何点|正解だった)/.test(prompt)) return undefined;
     if (/しりとり/.test(prompt)) {
       // P669: 開始と同時にしりとりの状態を作り、続けられるようにする。
       // P678: 別の遊びからの切り替えでは、前の遊びの状態を畳む。

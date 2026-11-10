@@ -9,7 +9,15 @@ import { worldModelGraphService } from '../../selfAwareness/services/worldModelG
  */
 
 const KEY = 'miki_quiz_v1';
+const LAST_RESULT_KEY = 'miki_quiz_last_result_v1';
 const TIMEOUT_MS = 30 * 60_000;
+
+/** P688: 終わったクイズの成績を残す（後から聞かれたときに答える）。 */
+function recordResult(answered: number, correct: number): void {
+  try {
+    storageService.setItem(LAST_RESULT_KEY, JSON.stringify({ answered, correct, at: Date.now() }));
+  } catch { /* 成績の記録は補助 */ }
+}
 
 interface QuizQuestion {
   from: string;
@@ -64,6 +72,15 @@ class QuizService {
     return !!load();
   }
 
+  /** P688: 直近のクイズの成績（終わったもの）。 */
+  lastResult(): { answered: number; correct: number } | undefined {
+    try {
+      const raw = JSON.parse(storageService.getItem(LAST_RESULT_KEY) || 'null');
+      if (raw && typeof raw.answered === 'number' && typeof raw.correct === 'number') return raw;
+    } catch { /* 無ければ undefined */ }
+    return undefined;
+  }
+
   /** 出題状態を畳む（別の遊びへの切り替え時）。 */
   end(): void {
     save(undefined);
@@ -85,6 +102,7 @@ class QuizService {
     const text = String(prompt || '').trim();
     if (/(?:やめる|おわり|終わり|もういい|やめたい)/.test(text)) {
       save(undefined);
+      recordResult(state.asked - 1, state.correct);
       return `分かりました、ここまでにしましょう。${state.asked - 1}問答えて、${state.correct}問正解でした。また遊びましょう！`;
     }
     if (text.length > 24 || /[？?]/.test(text)) return undefined;
@@ -100,6 +118,7 @@ class QuizService {
     const [next, ...rest] = state.queue;
     if (!next) {
       save(undefined);
+      recordResult(state.asked, correct);
       return `${verdict}\n問題はここまでです。${state.asked}問中${correct}問正解でした！`;
     }
     save({ active: true, queue: rest, current: next, asked: state.asked + 1, correct, updatedAt: Date.now() });

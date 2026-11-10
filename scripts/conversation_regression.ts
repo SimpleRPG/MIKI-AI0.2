@@ -1575,6 +1575,15 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P687 なんでには記録した根拠で答える', why.replyText.includes('クオッカ') && why.replyText.includes('覚えている'), why.replyText.slice(0, 160));
 }
 
+// ---- 終わったクイズの成績を後から答えられる（P688） ----
+{
+  const start = await conversationCoreService.execute({ prompt: 'クイズ出して' } as any);
+  check('P688 クイズ開始', start.replyText.includes('第1問'), start.replyText.slice(0, 120));
+  await conversationCoreService.execute({ prompt: 'やめる' } as any);
+  const result = await conversationCoreService.execute({ prompt: 'さっきのクイズ、何問正解だった？' } as any);
+  check('P688 成績を記録から答える', result.replyText.includes('問中') && result.replyText.includes('正解でした'), result.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
