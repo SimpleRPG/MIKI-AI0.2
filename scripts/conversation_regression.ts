@@ -1192,6 +1192,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P647 知らない語は正直に言い、学習の対象になる', unknownTerm.replyText.includes('まだ知らない') || unknownTerm.replyText.includes('調べている'), unknownTerm.replyText.slice(0, 200));
 }
 
+// ---- 日を指定した状態の質問にその日の記録で答える（P648） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { dayKeyService } = await import('../src/miki/memory/services/dayKeyService');
+  // 昨日の昼（ローカル日付基準で確実に「昨日」になる時刻）に置く。
+  const yesterdayNoon = new Date(`${dayKeyService.daysAgo(1)}T12:00:00`).getTime();
+  storageService.setItem('miki_user_state_trail_v1', JSON.stringify([{ signal: 'fatigue', at: yesterdayNoon }, { signal: 'fatigue', at: yesterdayNoon + 3600_000 }]));
+  const yesterdayState = await conversationCoreService.execute({ prompt: '昨日は疲れてた？' } as any);
+  check('P648 昨日の疲れは記録で答える', yesterdayState.replyText.includes('昨日は') && yesterdayState.replyText.includes('疲れ'), yesterdayState.replyText.slice(0, 200));
+  const dayBeforeState = await conversationCoreService.execute({ prompt: '一昨日は疲れてた？' } as any);
+  check('P648 一昨日に記録が無ければ聞いてないと答える', dayBeforeState.replyText.includes('一昨日は') && dayBeforeState.replyText.includes('聞いてない'), dayBeforeState.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

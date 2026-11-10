@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
+import { dayKeyOf } from '../../memory/services/dayKeyService';
 
 /**
  * P524: 相手の状態の流れ。
@@ -118,6 +119,11 @@ export class UserStateTrailService {
     const hits = this.load().filter((e) => e.signal === signal);
     if (hits.length === 0) return undefined;
     return hits[hits.length - 1].at;
+  }
+
+  /** P648: 指定した日（YYYY-MM-DD）にその兆候が何回記録されたか。 */
+  public countOnDay(signal: UserStateSignal, day: string): number {
+    return this.load().filter((e) => e.signal === signal && dayKeyOf(e.at) === day).length;
   }
 
   /** P634: その兆候が「解消した」と言われた時刻（無ければ undefined）。 */

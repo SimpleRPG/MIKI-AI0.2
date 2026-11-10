@@ -2605,7 +2605,6 @@ export class ConversationCoreService {
    * 前の会話と今が地続きになる。
    */
   private userStateRecallAnswer(prompt: string): string | undefined {
-    if (!/(?:取れた|抜けた|治った|良くなった|落ち着いた|どう|まだ)/.test(prompt)) return undefined;
     if (!/(?:？|\?|か[？。]|の[？。]|どう)/.test(prompt)) return undefined;
     const table: Array<{ re: RegExp; signal: 'fatigue' | 'pain' | 'anxiety' | 'loneliness' | 'hunger' | 'thirst'; label: string }> = [
       { re: /疲れ|眠気|眠い|だる/, signal: 'fatigue', label: '疲れ' },
@@ -2617,6 +2616,19 @@ export class ConversationCoreService {
     ];
     const hit = table.find((t) => t.re.test(prompt));
     if (!hit) return undefined;
+    // P648: 日を指定した過去の状態の質問（「昨日は疲れてた？」）は、
+    // その日の記録で答える。経過の質問（取れた？等）とは別の形。
+    const dayMatch = /(一昨日|おととい|昨日|きのう)/.test(prompt)
+      ? { daysAgo: /(?:一昨日|おととい)/.test(prompt) ? 2 : 1, label: /(?:一昨日|おととい)/.test(prompt) ? '一昨日' : '昨日' }
+      : undefined;
+    if (dayMatch && /(?:てた|だった|はどう|の方は|の方)/.test(prompt)) {
+      try {
+        const count = userStateTrailService.countOnDay(hit.signal, dayKeyService.daysAgo(dayMatch.daysAgo));
+        if (count > 0) return `${dayMatch.label}は、${hit.label}って言ってましたね。`;
+        return `${dayMatch.label}は、${hit.label}の話は聞いてないですね。`;
+      } catch { return undefined; }
+    }
+    if (!/(?:取れた|抜けた|治った|良くなった|落ち着いた|どう|まだ)/.test(prompt)) return undefined;
     try {
       const lastAt = userStateTrailService.lastRecordedAt(hit.signal);
       const resolvedAt = userStateTrailService.resolvedAt(hit.signal);
