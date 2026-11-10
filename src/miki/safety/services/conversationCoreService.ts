@@ -2317,6 +2317,21 @@ export class ConversationCoreService {
     if (/何曜日/.test(prompt)) {
       return `今日は${weekdays[now.getDay()]}曜日です。`;
     }
+    // P675: N日後・N週間後・Nか月後（と前）の日付も計算して答える。
+    const offsetMatch = prompt.match(/(\d+)\s*(日|週間|か月|ヶ月|ヵ月)(後|前)/);
+    if (offsetMatch && /(?:何日|いつ|曜日|[？?])/.test(prompt)) {
+      const n = Number(offsetMatch[1]);
+      const unit = offsetMatch[2];
+      const sign = offsetMatch[3] === '後' ? 1 : -1;
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (unit === '日') d.setDate(d.getDate() + sign * n);
+      else if (unit === '週間') d.setDate(d.getDate() + sign * n * 7);
+      else d.setMonth(d.getMonth() + sign * n);
+      const label = `${n}${unit}${offsetMatch[3]}`;
+      return sign > 0
+        ? `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`
+        : `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）でした。`;
+    }
     const remainYear = /(?:あと何日で)?今年(?:は)?(?:あと何日|終わるまで何日|終わる)/.test(prompt) || /今年(?:は)?あと何日/.test(prompt);
     if (/あと何日/.test(prompt) && /今年/.test(prompt) || remainYear) {
       const end = new Date(now.getFullYear(), 11, 31);
@@ -2344,6 +2359,11 @@ export class ConversationCoreService {
     };
     const half = p.match(/^(\d+(?:\.\d+)?)\s*の\s*半分(?:は|って)?$/);
     if (half) return `${half[1]}の半分は${format(Number(half[1]) / 2)}です。`;
+    // P675: 割合（%）と消費税も決定的に計算できる。
+    const tax = p.match(/^(\d+(?:\.\d+)?)\s*円?の消費税\s*(\d+(?:\.\d+)?)\s*(?:%|％|パーセント)(?:は|って)?(?:いくら)?$/);
+    if (tax) return `${tax[1]}円の消費税（${tax[2]}%）は${format(Number(tax[1]) * Number(tax[2]) / 100)}円です。`;
+    const percent = p.match(/^(\d+(?:\.\d+)?)\s*の\s*(\d+(?:\.\d+)?)\s*(?:%|％|パーセント)(?:は|って)?$/);
+    if (percent) return `${percent[1]}の${percent[2]}%は${format(Number(percent[1]) * Number(percent[2]) / 100)}です。`;
     const times = p.match(/^(\d+(?:\.\d+)?)\s*の\s*(\d+(?:\.\d+)?)\s*倍(?:は|って)?$/);
     if (times) return `${times[1]}の${times[2]}倍は${format(Number(times[1]) * Number(times[2]))}です。`;
     const m = p.match(/^(\d+(?:\.\d+)?)\s*([+＋\-−×✕*÷／/])\s*(\d+(?:\.\d+)?)\s*(?:は|＝|=|はいくつ)?$/);

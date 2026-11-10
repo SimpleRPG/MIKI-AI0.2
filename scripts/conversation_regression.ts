@@ -1448,6 +1448,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P674 素の曜日にも答える', dow.replyText.includes('曜日です'), dow.replyText.slice(0, 120));
 }
 
+// ---- 割合と日付の前後計算も即答する（P675） ----
+{
+  const pct = await conversationCoreService.execute({ prompt: '200の10%は？' } as any);
+  check('P675 割合を計算して答える', pct.replyText.includes('200の10%は20です'), pct.replyText.slice(0, 120));
+  const tax = await conversationCoreService.execute({ prompt: '1000円の消費税10%はいくら？' } as any);
+  check('P675 消費税を計算して答える', tax.replyText.includes('100円です'), tax.replyText.slice(0, 120));
+  const future = await conversationCoreService.execute({ prompt: '今日から100日後は何日？' } as any);
+  const d675 = new Date(); d675.setDate(d675.getDate() + 100);
+  check('P675 N日後の日付を計算して答える', future.replyText.includes(`${d675.getMonth() + 1}月${d675.getDate()}日`), future.replyText.slice(0, 120));
+  const past = await conversationCoreService.execute({ prompt: '50日前は何日だった？' } as any);
+  const p675 = new Date(); p675.setDate(p675.getDate() - 50);
+  check('P675 N日前の日付も答える', past.replyText.includes(`${p675.getMonth() + 1}月${p675.getDate()}日`), past.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
