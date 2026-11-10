@@ -953,6 +953,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P623 前日のエピソードが組める', Boolean(ep && ep.summary.includes('引っ越しの相談') && ep.summary.includes('お疲れ気味')), ep ? ep.summary : 'none');
 }
 
+// ---- 「最近何か覚えた？」は学習の記録から答える（P624） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  storageService.setItem('miki_learned_report_v1', JSON.stringify({ 'ツバメ': Date.now() - 24 * 3600_000 }));
+  const learnReply = await conversationCoreService.execute({ prompt: '最近何か覚えた？' } as any);
+  check('P624 最近覚えたことは記録から答える', learnReply.replyText.includes('最近だと') && (learnReply.replyText.includes('ツバメ') || learnReply.replyText.includes('モコロン')), learnReply.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

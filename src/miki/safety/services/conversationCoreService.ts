@@ -364,6 +364,11 @@ export class ConversationCoreService {
       if (dinner) {
         return this.buildResult('RESOLVED', 'dinner_musing_answer', this.applyPersonaVoice(dinner), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P624: 「最近何か覚えた？」は、彼女の学習の記録から答える。
+      const recentLearning = this.recentLearningAnswer(prompt);
+      if (recentLearning) {
+        return this.buildResult('RESOLVED', 'recent_learning_answer', this.applyPersonaVoice(recentLearning), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P614: 彼女の能力・予定への質問は、自分の現状から答える。
       const ability = this.abilityQuestionAnswer(prompt);
       if (ability) {
@@ -2404,6 +2409,38 @@ export class ConversationCoreService {
       return undefined;
     }
     return undefined;
+  }
+
+  /**
+   * P624: 「最近何か覚えた？」——彼女の成長そのものを聞かれたら、
+   * 学習の記録（報告済みの語・検証済みの知識）から答える。成長が
+   * 会話の材料になることで、返答が彼女の変化と一緒に変わる。
+   */
+  private recentLearningAnswer(prompt: string): string | undefined {
+    if (!/(?:最近|この頃|このごろ)/.test(prompt)) return undefined;
+    if (!/(?:覚えた|学んだ|勉強した|覚え|学ん|身につ)/.test(prompt)) return undefined;
+    const terms: string[] = [];
+    try {
+      const reported = JSON.parse(storageService.getItem('miki_learned_report_v1') || '{}') as Record<string, number>;
+      const recent = Object.entries(reported)
+        .filter(([, at]) => Date.now() - Number(at || 0) < 30 * 24 * 3600_000)
+        .sort((a, b) => Number(b[1]) - Number(a[1]));
+      for (const [term] of recent.slice(0, 2)) terms.push(term);
+    } catch { /* 語が無ければ知識だけ */ }
+    const facts: string[] = [];
+    try {
+      const claims = claimDatabaseService.getAllClaims()
+        .filter((c: any) => c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED');
+      for (const c of claims.slice(-2)) {
+        const st = String((c as any).statement || '').replace(/。$/, '');
+        if (st) facts.push(st.slice(0, 40));
+      }
+    } catch { /* 知識が無ければ語だけ */ }
+    const parts: string[] = [];
+    if (terms.length > 0) parts.push(`「${terms.join('」や「')}」という言葉`);
+    if (facts.length > 0) parts.push(`「${facts.join('」「')}」という話`);
+    if (parts.length === 0) return '最近は、まだ目立って覚えたものは無いです。これからですね。';
+    return `最近だと、${parts.join('と、')}を覚えました。`;
   }
 
   /** P614: 彼女の能力への質問（歌える？/描ける？/英語話せる？）には、自分の現状を正直に答える（調査の「答えられない」に倒れていた）。 */
