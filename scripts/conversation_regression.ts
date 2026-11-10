@@ -1242,6 +1242,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P654 もう一回は直前の発言を繰り返す', repeat.replyText.includes('もう一回言いますね') && !repeat.replyText.includes('やってみます'), repeat.replyText.slice(0, 240));
 }
 
+// ---- 「さっき僕何て言った？」に相手の直前の発言で答える（P655） ----
+{
+  const userRecent = [
+    { id: 'p655-u', role: 'user', content: '明日、港の朝市に行くんだ' },
+    { id: 'p655-a', role: 'assistant', content: 'いいですね。' },
+  ] as any;
+  const userRecall = await conversationCoreService.execute({ prompt: 'さっき僕何て言った？', recentMessages: userRecent } as any);
+  check('P655 相手の発言を引いて答える', userRecall.replyText.includes('港の朝市') && userRecall.replyText.includes('言ってました'), userRecall.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

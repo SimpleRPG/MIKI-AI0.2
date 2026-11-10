@@ -2593,11 +2593,16 @@ export class ConversationCoreService {
   private ownLastUtteranceAnswer(prompt: string, recentMessages: ChatMessage[]): string | undefined {
     const asksRepeat = /(?:もう一回|もう一度)(?:言って|教えて|お願い)/.test(prompt)
       || /(?:聞き取れなかった|聞き逃した)/.test(prompt);
-    const asksRecall = /(?:さっき|今)(?:は|の)?(?:何て|なんて|何を|なにを)?(?:言った|言ってた|言いました)/.test(prompt);
+    const asksRecall = /(?:さっき|今)(?:僕|私|おれ|俺|自分)?(?:は|の)?(?:何て|なんて|何を|なにを)?(?:言った|言ってた|言いました)/.test(prompt);
     if (!asksRepeat && !asksRecall) return undefined;
-    const last = [...recentMessages].reverse().find((m) => m.role === 'assistant' && m.content && m.content.trim().length > 0);
+    // P655: 「さっき僕何て言った？」は相手の発言の引用。主語の印が
+    // ある時は相手側、無い時は自分の側を引く。
+    const userMarked = /(?:僕|私|おれ|俺|自分)/.test(prompt.slice(0, Math.max(0, prompt.search(/言っ|言い/))));
+    const role = asksRecall && userMarked ? 'user' : 'assistant';
+    const last = [...recentMessages].reverse().find((m) => m.role === role && m.content && m.content.trim().length > 0);
     if (!last) return 'さっきの発言は、ここには残っていないです。ごめんなさい。';
     const text = String(last.content).replace(/\s+/g, ' ').trim().slice(0, 140);
+    if (role === 'user') return `「${text}」って言ってましたよ。`;
     return asksRepeat ? `もう一回言いますね。「${text}」` : `さっきは、「${text}」って言いました。`;
   }
 
