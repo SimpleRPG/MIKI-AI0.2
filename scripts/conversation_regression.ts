@@ -1546,6 +1546,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P684 迷いは一緒に整理する形で受ける', lost.replyText.includes('一緒に'), lost.replyText.slice(0, 120));
 }
 
+// ---- 関係の質問には関係の言葉で答える（P685） ----
+{
+  const like = await conversationCoreService.execute({ prompt: '僕のこと好き？' } as any);
+  check('P685 好きかには気持ちで答える', like.replyText.includes('好きです'), like.replyText.slice(0, 120));
+  const remember = await conversationCoreService.execute({ prompt: '僕のこと覚えてる？' } as any);
+  check('P685 「こと」を語として誤爆しない', !remember.replyText.includes('「こと」は'), remember.replyText.slice(0, 120));
+  const ally = await conversationCoreService.execute({ prompt: '味方だよね？' } as any);
+  check('P685 味方かには「もちろんです」で答える', ally.replyText.includes('味方です'), ally.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

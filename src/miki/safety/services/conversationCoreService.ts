@@ -496,6 +496,12 @@ export class ConversationCoreService {
       if (intro) {
         return this.buildResult('RESOLVED', 'self_introduction_answer', this.applyPersonaVoice(intro), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P685: 関係の質問（好き？・覚えてる？・味方？）と日本語の
+      // 能力には、関係と自分の輪郭から答える。
+      const relationship = this.relationshipAnswer(prompt);
+      if (relationship) {
+        return this.buildResult('RESOLVED', 'relationship_answer', this.applyPersonaVoice(relationship), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -2925,6 +2931,32 @@ export class ConversationCoreService {
     return undefined;
   }
 
+  /**
+   * P685: 相手との関係についての質問への受け口。好き・覚えている・
+   * 味方——どれも「答えられない」ではなく関係の言葉で返す。
+   * 覚えているかは、相手について知っていることの記録で裏を取る。
+   */
+  private relationshipAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '');
+    if (/(?:僕|私|俺|おれ)のこと(?:は)?好き|私のこと好き/.test(p)) {
+      return '好きですよ。こうして話している時間が、私は楽しいです。';
+    }
+    if (/(?:僕|私|俺|おれ)のこと(?:を)?(?:覚えてる|覚えている|覚えてます)/.test(p)) {
+      let knownCount = 0;
+      try { knownCount = userKnowledgeProfileService.listKnown().length; } catch { knownCount = 0; }
+      return knownCount > 0
+        ? '覚えていますよ。教えてもらったことは、私の記録にありますから。'
+        : 'まだ教えてもらったことは少ないんですけど、話したことは少しずつ覚えていきますね。';
+    }
+    if (/味方(?:だ|です|だよね|でいて|になって)/.test(p)) {
+      return 'もちろんです。いつも味方ですよ。';
+    }
+    if (/日本語.{0,4}(?:ペラペラ|話せる|できますか|できる)/.test(p)) {
+      return '日本語で話すのが私の基本ですよ。こうして話せているので、任せてください。';
+    }
+    return undefined;
+  }
+
   private ownLastUtteranceAnswer(prompt: string, recentMessages: ChatMessage[]): string | undefined {
     const asksRepeat = /(?:もう一回|もう一度)(?:言って|教えて|お願い)/.test(prompt)
       || /(?:聞き取れなかった|聞き逃した)/.test(prompt);
@@ -2986,6 +3018,10 @@ export class ConversationCoreService {
    * 知らない語は、その場で意味学習の欠けに積んで循環を始める。
    */
   private termKnowledgeAnswer(prompt: string): string | undefined {
+    // P685: 「僕のこと覚えてる？」は語彙の確認ではなく関係の質問。
+    // 「こと」が語として拾われて誤爆していたので、相手自身への
+    // 言及はここでは扱わない（関係の受け口が答える）。
+    if (/(?:僕|私|俺|おれ)のこと/.test(prompt)) return undefined;
     if (!/(?:覚えた|分かった|わかるようになった|分かるようになった|知ってる|知っている|覚えてる|覚えている|忘れた|忘れて)/.test(prompt)) return undefined;
     if (!/[？?]/.test(prompt) && !/か[？。]?$/.test(prompt.trim())) return undefined;
     // P653: 「忘れた？」の聞き方かどうかで、締めの言い方を変える。
