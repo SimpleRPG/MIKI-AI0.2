@@ -233,7 +233,7 @@ class ConversationGraphRuntimeP212Service {
  private selfInquiryDayRecapAnswer():string {
   const now=new Date();
   const today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const topics=conversationOpenTopicService.listPending().filter((r)=>r.openedDay===today).map((r)=>r.topic);
+  const topics=conversationOpenTopicService.listPending().filter((r)=>r.openedDay===today).map((r)=>r.topic).filter((t)=>t&&t.length>=2&&!/おはよう|こんにちは|こんばんは|おやすみ|ただいま|起きた|ありがとう|ごめん|疲れた|眠い|お腹|喉/u.test(t));
   const works=projectNotebookService.listWorkStates().filter((w)=>new Date(w.updatedAt).toDateString()===now.toDateString());
   const parts:string[]=[];
   if(topics.length>0)parts.push(`今日は、${[...new Set(topics)].slice(0,4).join('と')}の話をしましたね`);

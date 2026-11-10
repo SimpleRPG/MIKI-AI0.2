@@ -303,6 +303,16 @@ export class ConversationCoreService {
       if (nextWork) {
         return this.buildResult('RESOLVED', 'next_work_answer', this.applyPersonaVoice(nextWork), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P597: 簡単な計算と、今日の会話の振り返りも、その場で答える
+      // （計算は調査に倒れ、振り返りは P212 にしか無かった）。
+      const arithmetic = this.arithmeticAnswer(prompt);
+      if (arithmetic) {
+        return this.buildResult('RESOLVED', 'arithmetic_answer', arithmetic, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const recap = this.conversationRecapAnswer(prompt, state);
+      if (recap) {
+        return this.buildResult('RESOLVED', 'conversation_recap_answer', this.applyPersonaVoice(recap), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
     }
     // P595: なりチャの開始・終了のターンは、役の挨拶／締めで答える
     // （開始が通常の雑談反応、終了が主題断片の反響になっていた）。
@@ -1919,18 +1929,87 @@ export class ConversationCoreService {
     if (/今(?:は)?何時|何時(?:です)?か|現在時刻|いま何時/.test(prompt)) {
       return `今は${now.getHours()}時${now.getMinutes()}分です。`;
     }
+    // P597: 明後日・一昨日までと、「何日」の形にも広げた。
     const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-    const dayMatch = prompt.match(/(今日|明日|あした|昨日|きのう)(?:は|って)?何曜日/);
-    if (dayMatch) {
-      const offset = dayMatch[1] === '今日' ? 0 : (dayMatch[1] === '明日' || dayMatch[1] === 'あした') ? 1 : -1;
+    const dayOffsets: Record<string, number> = { 今日: 0, 明日: 1, あした: 1, 明後日: 2, 昨日: -1, きのう: -1, 一昨日: -2, おととい: -2 };
+    const dayPattern = '(今日|明日|あした|明後日|昨日|きのう|一昨日|おととい)';
+    const weekdayMatch = prompt.match(new RegExp(`${dayPattern}(?:は|って)?何曜日`));
+    if (weekdayMatch) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + (dayOffsets[weekdayMatch[1]] ?? 0));
+      return `${weekdayMatch[1]}は${weekdays[d.getDay()]}曜日です。`;
+    }
+    const dateMatch = prompt.match(new RegExp(`${dayPattern}(?:は|って)?何日`));
+    if (dateMatch) {
+      const offset = dayOffsets[dateMatch[1]] ?? 0;
       const d = new Date(now);
       d.setDate(d.getDate() + offset);
-      return `${dayMatch[1]}は${weekdays[d.getDay()]}曜日です。`;
+      return offset < 0
+        ? `${dateMatch[1]}は${d.getMonth() + 1}月${d.getDate()}日でした。`
+        : `${dateMatch[1]}は${d.getMonth() + 1}月${d.getDate()}日です。`;
     }
-    if (/今日(?:は)?何日|今日の日付|何月何日/.test(prompt)) {
+    if (/今日の日付|何月何日/.test(prompt)) {
       return `今日は${now.getMonth() + 1}月${now.getDate()}日です。`;
     }
     return undefined;
+  }
+
+  /**
+   * P597: 簡単な計算は、その場で正確に答える（決定的に計算できる
+   * ことは、彼女の強み）。二項演算と「Nの半分」「NのM倍」だけ。
+   */
+  private arithmeticAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '').replace(/[？?。]/g, '').trim();
+    const format = (n: number): string => {
+      if (!Number.isFinite(n)) return '';
+      const rounded = Math.round(n * 10000) / 10000;
+      return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+    };
+    const half = p.match(/^(\d+(?:\.\d+)?)\s*の\s*半分(?:は|って)?$/);
+    if (half) return `${half[1]}の半分は${format(Number(half[1]) / 2)}です。`;
+    const times = p.match(/^(\d+(?:\.\d+)?)\s*の\s*(\d+(?:\.\d+)?)\s*倍(?:は|って)?$/);
+    if (times) return `${times[1]}の${times[2]}倍は${format(Number(times[1]) * Number(times[2]))}です。`;
+    const m = p.match(/^(\d+(?:\.\d+)?)\s*([+＋\-−×✕*÷／/])\s*(\d+(?:\.\d+)?)\s*(?:は|＝|=|はいくつ)?$/);
+    if (!m) return undefined;
+    const a = Number(m[1]);
+    const b = Number(m[3]);
+    const op = m[2];
+    if ((op === '÷' || op === '／' || op === '/') && b === 0) {
+      return '0では割れないんです。それだけは決まっているんです。';
+    }
+    const result = op === '+' || op === '＋' ? a + b
+      : op === '-' || op === '−' ? a - b
+        : op === '×' || op === '✕' || op === '*' ? a * b
+          : a / b;
+    const opLabel = op === '＋' ? '+' : op === '−' ? '-' : op === '✕' || op === '*' ? '×' : op === '／' || op === '/' ? '÷' : op;
+    const value = format(result);
+    if (!value) return undefined;
+    return `${m[1]}${opLabel}${m[3]}は${value}です。`;
+  }
+
+  /** P597: 「今日何の話をしたっけ？」に、開いた話題と作業状態から答える（P212 と同じ材料）。 */
+  private conversationRecapAnswer(prompt: string, state?: any): string | undefined {
+    if (!/(?:何|なに)の話(?:を)?(?:した|してた|していた)|今日(?:は|に)?(?:何|なに)の話|さっき(?:の)?話/.test(prompt)) return undefined;
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const parts: string[] = [];
+    // 挨拶や状態の言葉は「話題」として数えない。
+    const isJunkTopic = (t: string) => !t || t.length < 2 || /おはよう|こんにちは|こんばんは|おやすみ|ただいま|起きた|ありがとう|ごめん|疲れた|眠い|お腹|喉/.test(t);
+    try {
+      let topics = conversationOpenTopicService.listPending().filter((r) => r.openedDay === today).map((r) => r.topic).filter((t) => !isJunkTopic(t));
+      // 開いた話題は短期の台帳（最大3件・消費される）なので、残って
+      // いなければ会話状態の直近の対象から補う。
+      if (topics.length === 0 && Array.isArray(state?.recentEntities)) {
+        topics = (state.recentEntities as string[]).filter((t) => !isJunkTopic(t)).slice(-3);
+      }
+      if (topics.length > 0) parts.push(`今日は、${[...new Set(topics)].slice(0, 4).join('と')}の話をしましたね`);
+      const works = projectNotebookService.listWorkStates().filter((w) => new Date(w.updatedAt).toDateString() === now.toDateString());
+      for (const w of works.slice(0, 2)) {
+        if (w.current) parts.push(`${w.project}では今、「${w.current}」を作っています`);
+      }
+    } catch { /* 補助経路 */ }
+    if (parts.length === 0) return '今日の話は、まだ特に残っていません。これから色々話しましょう。';
+    return parts.join('。') + '。';
   }
 
   /** P594: 「次に何を作ればいい？」へ、作業状態（今の作業・次の手）から答える。 */

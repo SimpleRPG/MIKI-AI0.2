@@ -667,6 +667,18 @@ const bibiStatusReply = await conversationCoreService.execute({ prompt: '最近�
 check('P596 様子聞きもタメ口で自然に', !bibiStatusReply.replyText.includes('嬉しいだよ') && !bibiStatusReply.replyText.includes('どうですか'), bibiStatusReply.replyText.slice(0, 140));
 personaProfileService.switchProfile('persona-default');
 
+// ---- 計算とカレンダーの拡張（P597） ----
+const arithReply = await conversationCoreService.execute({ prompt: '1+1は？' } as any);
+check('P597 足し算にその場で答える', arithReply.replyText.includes('1+1は2です'), arithReply.replyText.slice(0, 100));
+const arithMulReply = await conversationCoreService.execute({ prompt: '15×4は？' } as any);
+check('P597 掛け算にその場で答える', arithMulReply.replyText.includes('60'), arithMulReply.replyText.slice(0, 100));
+const arithHalfReply = await conversationCoreService.execute({ prompt: '100の半分は？' } as any);
+check('P597 半分にその場で答える', arithHalfReply.replyText.includes('50'), arithHalfReply.replyText.slice(0, 100));
+const dayAfterReply = await conversationCoreService.execute({ prompt: '明後日は何曜日？' } as any);
+check('P597 明後日の曜日を答える', /明後日は[日月火水木金土]曜日です/.test(dayAfterReply.replyText), dayAfterReply.replyText.slice(0, 100));
+const yesterdayDateReply = await conversationCoreService.execute({ prompt: '昨日は何日だった？' } as any);
+check('P597 昨日の日付を答える', /昨日は\d+月\d+日でした/.test(yesterdayDateReply.replyText), yesterdayDateReply.replyText.slice(0, 100));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

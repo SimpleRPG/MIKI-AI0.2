@@ -117,6 +117,8 @@ async function main() {
   await turn('T20C 好みを伝える', '僕はラーメンが好きだよ');
   const t20d = await turn('T20D 好みを聞き返す', '僕の好きなものは？');
   check('T20D 伝えた好みを覚えている', t20d.includes('ラーメン'), t20d.slice(0, 140));
+  const t20e = await turn('T20E 今日の振り返り', '今日何の話をしたっけ？');
+  check('T20E 今日の話題を振り返れる', t20e.includes('モコロン') || t20e.includes('ラーメン'), t20e.slice(0, 160));
 
   const t21 = await turn('T21 おやすみ', 'おやすみ');
   check('T21 おやすみで受ける', t21.includes('おやすみ'), t21.slice(0, 120));
