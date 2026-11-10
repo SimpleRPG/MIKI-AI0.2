@@ -446,6 +446,13 @@ export class ConversationCoreService {
       if (ownLast) {
         return this.buildResult('RESOLVED', 'own_last_utterance_answer', this.applyPersonaVoice(ownLast), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P668: 遊びの誘い（遊ぼう・しりとり・歌って・面白い話して）は
+      // 遊びとして受ける。ここで受けないと断片の反響（「ぼう、なる
+      // ほど」）や汎用の作業了承に化ける。
+      const playInvite = this.playInvitationAnswer(prompt);
+      if (playInvite) {
+        return this.buildResult('RESOLVED', 'play_invitation_answer', this.applyPersonaVoice(playInvite), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
       const selfWant = this.selfWantAnswer(prompt);
@@ -2592,6 +2599,41 @@ export class ConversationCoreService {
    * 発言（recentMessages の最後の assistant）を引いて答える。
    * 会話の地続き感は、自分の発言を自分で参照できることから生まれる。
    */
+  /**
+   * P668: 遊びの誘いへの受け口。しりとりは最初の言葉まで出して
+   * 始める。面白い話は、彼女が確かめた知識から一つ語る（材料が
+   * 無ければ正直に言う）。歌は声が出せないことを正直に伝え、
+   * 歌詞作りの形で受ける。
+   */
+  private playInvitationAnswer(prompt: string): string | undefined {
+    if (/しりとり/.test(prompt)) {
+      return 'いいですよ、しりとり！じゃあ私から言いますね。「りんご」。次は「ご」から始まる言葉ですよ。';
+    }
+    if (/(?:面白い|おもしろい|お話|はなし).{0,4}(?:話して|聞かせて|して|ちょうだい)/.test(prompt) || /(?:何か|なんか).{0,3}(?:話して|聞かせて)/.test(prompt)) {
+      try {
+        const claims = claimDatabaseService.getAllClaims()
+          .filter((c) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && c.statement);
+        const latest = claims[claims.length - 1];
+        if (latest) return `じゃあ一つ、私が覚えた話をしますね。${latest.statement}`;
+      } catch { /* 知識が無ければ下の形 */ }
+      return 'まだ話せるネタが少ないんです。何の話がいいですか？動物のこととか、最近のこととか。';
+    }
+    if (/歌(?:って|おう|いたい)/.test(prompt)) {
+      // P588 の方針（解けない依頼も引き受ける形で受ける）は保ち、
+      // 声が出せないことだけ添える。ビービーはタメ口の形で返す
+      // （P589：受け皿の形も人格の口調で）。
+      let bibi = false;
+      try { bibi = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibi = false; }
+      return bibi
+        ? 'いいよ！声で歌うことはできないんだけど、歌詞みたいな短い文なら一緒に作れるよ。'
+        : 'いいですよ！声で歌うことはできないんですけど、歌詞みたいな短い文なら一緒に作れますよ。';
+    }
+    if (/遊ぼう|あそぼう|遊びたい|あそびたい/.test(prompt)) {
+      return 'いいですよ！何して遊びましょう。しりとりでも、クイズでも、お話でも。';
+    }
+    return undefined;
+  }
+
   private ownLastUtteranceAnswer(prompt: string, recentMessages: ChatMessage[]): string | undefined {
     const asksRepeat = /(?:もう一回|もう一度)(?:言って|教えて|お願い)/.test(prompt)
       || /(?:聞き取れなかった|聞き逃した)/.test(prompt);

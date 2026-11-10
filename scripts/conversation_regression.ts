@@ -1343,6 +1343,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P667 「時間溶」を聞き返さない', !melted.replyText.includes('「時間溶」って'), melted.replyText.slice(0, 160));
 }
 
+// ---- 遊びの誘いは遊びとして受ける（P668） ----
+{
+  const asobo = await conversationCoreService.execute({ prompt: '遊ぼう' } as any);
+  check('P668 遊ぼうに誘いとして応じる', asobo.replyText.includes('遊びましょう'), asobo.replyText.slice(0, 160));
+  const shiritori = await conversationCoreService.execute({ prompt: 'しりとりしよう' } as any);
+  check('P668 しりとりは最初の言葉まで出して始める', shiritori.replyText.includes('しりとり') && shiritori.replyText.includes('りんご'), shiritori.replyText.slice(0, 160));
+  const story = await conversationCoreService.execute({ prompt: 'なんか面白い話して' } as any);
+  check('P668 面白い話は知識から語る（作業了承にしない）', !story.replyText.includes('やってみますね'), story.replyText.slice(0, 200));
+  const sing = await conversationCoreService.execute({ prompt: '歌って' } as any);
+  check('P668 歌は正直に受け口を返す', sing.replyText.includes('歌'), sing.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
