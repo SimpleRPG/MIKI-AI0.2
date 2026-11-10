@@ -1505,6 +1505,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P679 褒める頼みに褒める', praise.replyText.includes('えらいです'), praise.replyText.slice(0, 120));
 }
 
+// ---- 会話の切り出しは入口として受ける（P680） ----
+{
+  const consult = await conversationCoreService.execute({ prompt: '相談に乗って' } as any);
+  check('P680 相談の切り出しを聞く姿勢で受ける', consult.replyText.includes('聞きますよ'), consult.replyText.slice(0, 120));
+  const ask = await conversationCoreService.execute({ prompt: '質問していい？' } as any);
+  check('P680 質問の許可には「どうぞ」で返す', ask.replyText.includes('どうぞ'), ask.replyText.slice(0, 120));
+  const favor = await conversationCoreService.execute({ prompt: 'お願いがあるんだけど' } as any);
+  check('P680 お願いの切り出しを受ける', favor.replyText.includes('何ですか'), favor.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -472,6 +472,12 @@ export class ConversationCoreService {
       if (support) {
         return this.buildResult('RESOLVED', 'support_request_answer', this.applyPersonaVoice(support), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P680: 会話の切り出し（相談・話聞いて・質問していい）は入口と
+      // して受ける。断片の反響や「答えられない」に化けていた。
+      const opener = this.conversationOpenerAnswer(prompt);
+      if (opener) {
+        return this.buildResult('RESOLVED', 'conversation_opener_answer', this.applyPersonaVoice(opener), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -2794,6 +2800,30 @@ export class ConversationCoreService {
     }
     if (/笑わせて|笑かして/.test(p)) {
       return 'じゃあ一つ。……布団が吹っ飛んだ！すみません、今のところ私の持ちネタはこれだけです。';
+    }
+    return undefined;
+  }
+
+  /**
+   * P680: 会話の切り出しへの受け口。相談・聞いてほしい・一緒に
+   * 考えて・質問の許可・お願い——どれも「どうぞ、聞きます」の形。
+   */
+  private conversationOpenerAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '');
+    if (/相談(?:に乗って|したい|がある|です|なんだ|聞いて)/.test(p)) {
+      return 'もちろん、聞きますよ。どうしましたか？';
+    }
+    if (/(?:話|はなし)(?:を)?聞いて|聞いてほしい|聞いて欲しい/.test(p)) {
+      return '聞きますよ。どうしましたか？';
+    }
+    if (/一緒に考えて|一緒に考えよう|考えてほしい/.test(p) && !/作り方|レシピ/.test(p)) {
+      return 'いいですよ、一緒に考えましょう。何のことですか？';
+    }
+    if (/質問していい|聞いていい|質問がある|聞きたいことがある|聞きたいんだけど/.test(p)) {
+      return 'もちろん、どうぞ。何ですか？';
+    }
+    if (/お願いがある|お願いしたい|頼みがある|頼みたいことがある/.test(p)) {
+      return 'いいですよ、何ですか？聞きますよ。';
     }
     return undefined;
   }
