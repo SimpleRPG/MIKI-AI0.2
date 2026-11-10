@@ -136,6 +136,23 @@ async function main() {
   check('B3 ビービーの好みは人格ごとに分かれている', Boolean(bibiPreference && bibiPreference.includes('星空')), String(bibiPreference).slice(0, 120));
   personaProfileService.switchProfile('persona-default');
 
+  // ---- 2日目（前日の記録が翌日にどう効くか） ----
+  const dayAgo = Date.now() - 20 * 3600_000;
+  const yesterdayKey = (() => { const d = new Date(Date.now() - 24 * 3600_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  // 前日に開いた話題（拾い直し用）／聞き返した語が背景で学ばれた想定
+  // （辞書に背景由来で入っている）／前日の疲れの記録、を種まきする。
+  storageService.setItem('miki_open_topics_v1', JSON.stringify([{ topic: 'ツバメの巣', openedDay: yesterdayKey, weight: 3 }]));
+  japaneseDictionaryService.addPersonal('クオッカ', { gloss: 'オーストラリアに住む小型の有袋類', semanticIds: ['background-research'] } as any);
+  storageService.setItem('miki_unknown_asked_v1', JSON.stringify({ 'クオッカ': dayAgo }));
+  storageService.setItem('miki_learned_report_v1', '{}');
+  storageService.setItem('miki_user_state_trail_v1', JSON.stringify([{ signal: 'fatigue', at: dayAgo }]));
+  const d21 = await turn('D2-1 翌朝の挨拶', 'おはよう');
+  check('D2-1 前日の話題を彼女から拾う', d21.includes('ツバメの巣'), d21.slice(0, 180));
+  const d22 = await turn('D2-2 昼の挨拶', 'こんにちは');
+  check('D2-2 背景で学んだ語を報告する', d22.includes('クオッカ'), d22.slice(0, 180));
+  const d23 = await turn('D2-3 疲れの継続', '疲れた');
+  check('D2-3 疲れが続いている形で受ける', d23.includes('続いて') || d23.includes('ここ数日') || d23.includes('このところ'), d23.slice(0, 160));
+
   // ---- 結果 ----
   const failures = results.filter(([, ok]) => !ok);
   console.log(`\n==== ${results.length - failures.length}/${results.length} checks passed ====`);
