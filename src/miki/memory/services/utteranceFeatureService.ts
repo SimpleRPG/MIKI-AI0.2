@@ -73,8 +73,16 @@ class UtteranceFeatureService {
       !hasQuestion && !/[？?]/.test(text) ? 'NONE'
       : /(?:何|なに|どこ|いつ|誰|だれ|なぜ|どうして|どれ|いくら|いくつ|どんな|どちら|なんの)/.test(text) ? 'WH'
       : 'YESNO';
+    // P630: 命令・依頼の形の知識はここ（特徴の層）に集約する。
+    // 以前は対話行為の分類（conversationStateService）の中に同等の
+    // パターンが別にあり、判定が二重化していた。
     const imperative = /(?:ください|なさい|てごらん|ってみて)/.test(text)
-      || /(?:して|見て|聞いて|言って|教えて|歌って|描いて)[。！!]?$/.test(text.trim());
+      || /(?:て|して|せて)(?:ください|くれ|ほしい|もらえ|いただけ)/.test(text)
+      || /(?:してください|お願いします|頼む|してくれ|やってくれ|やって|して|しろ|やれ)[。！!]?$/.test(text.trim())
+      || /(?:てほしい|してほしい|お願い)[。！!]?$/.test(text.trim())
+      || /(?:教えて|見せて|聞かせて|読ませて|開けて|閉めて|歌って|書いて|読んで|作って|買って|持って|取って|連れて|座って|描いて|言って)(?:よ|ね)?[。！!]?$/.test(text.trim())
+      || /(?:手伝って|待って|見て|聞いて|止まって)(?:よ|ね)?[。！!]?$/.test(text.trim())
+      || /(?:てて|てきて)(?:よ|ね)?[。！!]?$/.test(text.trim());
     return { aspect, negated, passive, questionForm, imperative, tokens, contentTokens, subject, object, topic };
   }
 

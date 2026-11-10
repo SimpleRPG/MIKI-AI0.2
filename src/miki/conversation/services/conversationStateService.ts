@@ -3,6 +3,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { anaphoraHistoryStack } from '../../../autonomous_modules/anaphora_history_stack';
 import { resolveAnaphoraPure } from '../../../autonomous_modules/anaphora_resolver_sample';
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
+import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 
 /**
  * 作業指示書 v6 優先度9: 会話状態JSON指示 (超軽量版)
@@ -331,23 +332,19 @@ export function classifyDialogueAct(userPrompt: string): DialogueAct {
    *   （「散歩してきた」）は依頼ではない。
    * - 疑問の形（疑問符・疑問詞・文末のか等）でない文は STATEMENT。
    */
-  const looksInterrogative =
-    /[？?]/.test(text) ||
-    /(?:ですか|ますか|でしょうか|かな|かしら)$/.test(text.replace(/[。！!]+$/, '')) ||
-    /(?:何|なぜ|どうして|どう|いつ|どこ|だれ|誰|どれ|どちら|いくら|いくつ)/.test(text);
-  const looksImperative =
-    /(?:て|して|せて)(?:ください|くれ|ほしい|もらえ|いただけ)/.test(text) ||
-    /(?:してください|お願いします|頼む|してくれ|やってくれ|やって|して|しろ|やれ)[。！!]?$/.test(text) ||
-    /(?:てほしい|してほしい|お願い)[。！!]?$/.test(text) ||
-    // P585: 文末の素の依頼形（「〜のこと教えて」「見せて」等）と、
-    // 短い命令形の動詞も依頼として扱う（従来は STATEMENT に落ち、
-    // 知識で答えるべき「教えて」が雑談の反響になっていた）。
-    // P587: 日常の命令形の動詞を足し、「〜てて」「〜てきて」の形と
-    // 文末の「よ／ね」も許す。過去形の報告（「散歩してきた」）や
-    // 接続の「〜て、」は文末の命令形に当たらないので対象外のまま。
-    /(?:教えて|見せて|聞かせて|読ませて|開けて|閉めて|歌って|書いて|読んで|作って|買って|持って|取って|連れて|座って)(?:よ|ね)?[。！!]?$/.test(text) ||
-    /(?:手伝って|待って|見て|聞いて|止まって)(?:よ|ね)?[。！!]?$/.test(text) ||
-    /(?:てて|てきて)(?:よ|ね)?[。！!]?$/.test(text);
+  // P630: 文の形（疑問形か・命令形か）の判定は共有の特徴サービス
+  // （P615）に一元化した。以前はここにも同等のパターン列があり、
+  // 特徴側と分類側で形の知識が二重に育っていた。領域固有の規則
+  // （成果物依頼・推薦依頼などの語彙）は従来どおりこの関数の領分。
+  let looksInterrogative = /[？?]/.test(text)
+    || /(?:ですか|ますか|でしょうか|かな|かしら)$/.test(text.replace(/[。！!]+$/, ''))
+    || /(?:何|なぜ|どうして|どう|いつ|どこ|だれ|誰|どれ|どちら|いくら|いくつ)/.test(text);
+  let looksImperative = false;
+  try {
+    const features = utteranceFeatureService.analyze(text);
+    looksInterrogative = features.questionForm !== 'NONE';
+    looksImperative = features.imperative;
+  } catch { /* 特徴が取れなければ従来の局所判定で続ける */ }
 
   // 11. 一般作業依頼（命令・依頼の形のときだけ）
   if (looksImperative || /お願い|実行して/.test(text)) {

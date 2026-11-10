@@ -1004,6 +1004,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P629 名詞句はそのまま記録される', conversationOpenTopicService.listPending().some((r) => r.topic === '港の朝市'), '');
 }
 
+// ---- 対話行為の形判定は共有特徴で一元化（P630） ----
+{
+  const { classifyDialogueAct } = await import('../src/miki/conversation/services/conversationStateService');
+  check('P630 過去形の報告は STATEMENT', classifyDialogueAct('散歩してきた') === 'STATEMENT', classifyDialogueAct('散歩してきた'));
+  check('P630 状態の共有は CASUAL_CHAT（従来どおり）', classifyDialogueAct('今日は疲れた') === 'CASUAL_CHAT', classifyDialogueAct('今日は疲れた'));
+  check('P630 欲求の文は STATEMENT', classifyDialogueAct('甘いものが食べたい') === 'STATEMENT', classifyDialogueAct('甘いものが食べたい'));
+  check('P630 素の命令形は REQUEST', classifyDialogueAct('歌って') === 'REQUEST', classifyDialogueAct('歌って'));
+  check('P630 手伝っては REQUEST', classifyDialogueAct('手伝って') === 'REQUEST', classifyDialogueAct('手伝って'));
+  check('P630 疑問は QUESTION', classifyDialogueAct('モコロンって何？') === 'QUESTION', classifyDialogueAct('モコロンって何？'));
+  check('P630 か終わりも QUESTION', classifyDialogueAct('それは本当ですか') === 'QUESTION', classifyDialogueAct('それは本当ですか'));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
