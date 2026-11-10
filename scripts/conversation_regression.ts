@@ -1056,6 +1056,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P634 経過の想起は解消として答える', resolvedRecall.replyText.includes('取れたって言ってました'), resolvedRecall.replyText.slice(0, 160));
 }
 
+// ---- エピソードの状態には解消を反映する（P635） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { episodeMemoryService } = await import('../src/miki/conversation/services/episodeMemoryService');
+  const yStart = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 10, 0).getTime(); })();
+  const yk = (() => { const d = new Date(yStart); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  storageService.setItem('miki_episodes_v1', '[]');
+  storageService.setItem('miki_episode_built_day_v1', '[]');
+  storageService.setItem('miki_open_topics_v1', JSON.stringify([{ topic: '港の朝市', openedDay: yk, weight: 2 }]));
+  storageService.setItem('miki_user_state_trail_v1', JSON.stringify([
+    { signal: 'fatigue', at: yStart }, { signal: 'fatigue', at: yStart + 3600_000 },
+  ]));
+  storageService.setItem('miki_user_state_resolved_v1', JSON.stringify({ fatigue: yStart + 2 * 3600_000 }));
+  const ep = episodeMemoryService.yesterdayEpisode();
+  check('P635 解消した日のエピソードは状態を色にしない', Boolean(ep) && ep!.summary.includes('港の朝市') && !ep!.summary.includes('お疲れ気味'), ep ? ep.summary : 'none');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

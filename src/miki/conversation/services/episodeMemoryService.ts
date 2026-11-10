@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { conversationOpenTopicService } from './conversationOpenTopicService';
+import { userStateTrailService } from './userStateTrailService';
 
 /**
  * P623: 1日の会話を「エピソード」として残す。
@@ -109,9 +110,19 @@ class EpisodeMemoryService {
     try {
       const trail = JSON.parse(storageService.getItem('miki_user_state_trail_v1') || '[]') as Array<{ signal: string; at: number }>;
       const counts = new Map<string, number>();
+      const lastAtBySignal = new Map<string, number>();
       for (const e of trail) {
         if (dayKeyOf(Number(e.at || 0)) !== day) continue;
         counts.set(e.signal, (counts.get(e.signal) || 0) + 1);
+        lastAtBySignal.set(e.signal, Math.max(lastAtBySignal.get(e.signal) || 0, Number(e.at || 0)));
+      }
+      // P635: その日のうちに解消した兆候は、その日の色にしない
+      // （夕方に持ち直した日を「お疲れ気味の一日」とまとめない）。
+      for (const [signal, lastAt] of lastAtBySignal.entries()) {
+        try {
+          const resolved = userStateTrailService.resolvedAt(signal as never);
+          if (resolved && dayKeyOf(resolved) === day && resolved >= lastAt) counts.delete(signal);
+        } catch { /* 解消が読めなければ従来どおり */ }
       }
       // 状態は2回以上の兆候があるときだけ口にする（過剰に決めつけない）。
       const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
