@@ -2728,6 +2728,10 @@ export class ConversationCoreService {
       term = features.contentTokens.find((t) => t.length >= 2 && !/(?:覚え|分か|知って|忘れ)/.test(t));
     } catch { return undefined; }
     if (!term) return undefined;
+    // P672: 相手の属性の言葉（名前・住所等）は、語彙の確認ではない。
+    // 「僕の名前覚えてる？」に「『名前』はまだ知らないです」と
+    // 答えない（名前の想起は想起側の領分）。
+    if (/^(?:名前|呼び名|住所|年齢|誕生日|ペット|家族|仕事|学校|会社)$/.test(term)) return undefined;
     try {
       const gloss = japaneseDictionaryService.lookup(term).find((e: any) => e.gloss)?.gloss;
       if (gloss) {

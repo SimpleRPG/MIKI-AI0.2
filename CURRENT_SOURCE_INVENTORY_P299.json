@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1802,
     "sourceFileCount": 1355,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1266,
-    "relativeImportCandidateCount": 4066,
-    "resolvedRelativeImportCandidateCount": 4050,
+    "relativeImportCandidateCount": 4067,
+    "resolvedRelativeImportCandidateCount": 4051,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1703,9 +1703,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 141900,
-      "lines": 1426,
-      "sha256": "e27a7c1b8bae9aeee4e0a0ad7f0c628db98396d82f0de60d01ff9852760e92b4",
+      "bytes": 143241,
+      "lines": 1440,
+      "sha256": "b6204470bc266059c62675c3bd2c87a9bb77ce67c10eee92d69c567b60013d37",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2144,10 +2144,16 @@
           "specifier": "../src/miki/conversation/services/personaProfileService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/personaProfileService.ts"
+        },
+        {
+          "line": 1415,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
         }
       ],
-      "relativeImportCandidateCount": 73,
-      "resolvedRelativeImportCount": 73,
+      "relativeImportCandidateCount": 74,
+      "resolvedRelativeImportCount": 74,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -11566,9 +11572,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationUserFactRecallService.ts",
-      "bytes": 14008,
-      "lines": 286,
-      "sha256": "02ab59b11cc9cb3fd2b7ef71f63da021e926bbd2f58bcd86efd22aa4c99705ec",
+      "bytes": 14939,
+      "lines": 304,
+      "sha256": "462032a2f166ec7da70b220ccc5edde58c107b92df3850a6723794650ca1d1a3",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -27669,9 +27675,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 234574,
-      "lines": 3414,
-      "sha256": "cde72ca342dd66bb126bab2d14ab8be2a5b19c3abb550506aa778ce2d9735799",
+      "bytes": 234954,
+      "lines": 3418,
+      "sha256": "ae2579cbcf4fcdd80260c66e50d1db33b926a4c229685780833000bf137e3d86",
       "relativeImportCandidates": [
         {
           "line": 1,

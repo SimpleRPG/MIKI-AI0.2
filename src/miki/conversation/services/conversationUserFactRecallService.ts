@@ -182,6 +182,24 @@ export class ConversationUserFactRecallService {
         };
       }
     }
+    // P672: 飼っている動物の聞き返し（「僕が飼ってる動物なんだっ
+    // け？」）。事実は「猫を飼ってる」の形の値で取り込まれるため、
+    // 好みと同じく専用の枝で引く。
+    if (/(?:飼ってる|飼っている|飼ってた|ペット)/.test(prompt) && !/(?:みき|ビービー|あなた|君)の/.test(prompt)) {
+      const pets: string[] = [];
+      for (const c of candidates) {
+        const m = String(c.value || c.summary || '').match(/(.+?)を飼って/);
+        if (m && m[1] && !pets.includes(m[1])) pets.push(m[1]);
+      }
+      if (pets.length > 0) {
+        return {
+          candidate: candidates[0],
+          topicLabel: '飼っている動物',
+          answerText: `前に言っていた飼っている動物は「${pets.slice(0, 3).join('」と「')}」だよ。`,
+          reasonLabel: candidates[0].reasonLabel,
+        };
+      }
+    }
     if (/(?:好きなもの|好きなこと|好物|好み|趣味)/.test(prompt) && !/(?:みき|ビービー|あなた|君)の/.test(prompt)) {
       // P638: 苦手の要約（「Xが苦手・好きじゃない」）は「好き」を
       // 含むため、極性で除外しないと好きとして逆に答えてしまう。

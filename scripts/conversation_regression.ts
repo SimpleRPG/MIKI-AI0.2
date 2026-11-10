@@ -1410,6 +1410,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   pp671.switchProfile('persona-default');
 }
 
+// ---- 相手の名前・ペットの聞き返し（P672、アプリ順序で検証） ----
+{
+  const { conversationFactIntakeService: intake672 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem672: any[] = [];
+  mem672 = intake672.intakeFromUserText('僕の名前はきりあだよ', mem672).updatedMemories;
+  mem672 = intake672.intakeFromUserText('僕は猫を飼ってるよ', mem672).updatedMemories;
+  const nameQ = await conversationCoreService.execute({ prompt: '僕の名前覚えてる？', memories: mem672 } as any);
+  check('P672 「僕の名前覚えてる？」を語彙の確認にしない', !nameQ.replyText.includes('今度調べて覚えておきますね') && !nameQ.replyText.includes('「名前」は、まだ知らない'), nameQ.replyText.slice(0, 160));
+  const petQ = await conversationCoreService.execute({ prompt: '僕が飼ってる動物なんだっけ？', memories: mem672 } as any);
+  check('P672 飼っている動物を想起できる', petQ.replyText.includes('猫'), petQ.replyText.slice(0, 160));
+  const petQ2 = await conversationCoreService.execute({ prompt: '僕は何を飼ってる？', memories: mem672 } as any);
+  check('P672 「何を飼ってる？」にも想起で答える', petQ2.replyText.includes('猫'), petQ2.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
