@@ -531,6 +531,16 @@ check('P581 暇を受け止める', boredReply.replyText.includes('暇'), boredR
 const stemReply = await conversationCoreService.execute({ prompt: '明日も頑張る' } as any);
 check('P581 活用の語幹は聞き返さない', !stemReply.replyText.includes('「頑張」って'), stemReply.replyText.slice(0, 120));
 
+// ---- プロジェクトへの意見（P582） ----
+const projectOpinion = await conversationCoreService.execute({ prompt: 'EFRのペット、どう思う？' } as any);
+check('P582 プロジェクトの意見は決め事から答える', projectOpinion.replyText.includes('EFR') && !projectOpinion.replyText.includes('答えられない'), projectOpinion.replyText.slice(0, 160));
+
+// ---- 今日の振り返り（P583） ----
+conversationOpenTopicService.record('モコロン', 2);
+conversationGraphRuntimeP212Service.ingestInput('regression-p583', '今日何の話をしたっけ？');
+const recapAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p583');
+check('P583 今日の話を振り返る', Boolean(recapAnswer && recapAnswer.includes('モコロン')), String(recapAnswer).slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -17,6 +17,7 @@ import { stateSnapshotExportService } from '../../selfAwareness/services/stateSn
 import { knowledgeSelfInspectionService } from '../../selfAwareness/services/knowledgeSelfInspectionService';
 import { selfPreferenceService } from '../../selfAwareness/services/selfPreferenceService';
 import { personaProfileService } from './personaProfileService';
+import { conversationOpenTopicService } from './conversationOpenTopicService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -227,6 +228,19 @@ class ConversationGraphRuntimeP212Service {
   if(findings.length===0)return '自分の知識と語彙を点検しました。今のところ、大きな穴は見つかりませんでした。';
   return `自分の知識と語彙を点検しました。気になるところが${findings.length}件あります。\n`+findings.slice(0,5).map((f,i)=>`${i+1}. ${f}`).join('\n');
  }
+ // P583: 今日の会話の振り返り。開いた話題と作業状態から組み立てる
+ // （会話の記録が、その日の要約として返せるように）。
+ private selfInquiryDayRecapAnswer():string {
+  const now=new Date();
+  const today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const topics=conversationOpenTopicService.listPending().filter((r)=>r.openedDay===today).map((r)=>r.topic);
+  const works=projectNotebookService.listWorkStates().filter((w)=>new Date(w.updatedAt).toDateString()===now.toDateString());
+  const parts:string[]=[];
+  if(topics.length>0)parts.push(`今日は、${[...new Set(topics)].slice(0,4).join('と')}の話をしましたね`);
+  for(const w of works.slice(0,2)){if(w.current)parts.push(`${w.project}では今、「${w.current}」を作っています`);}
+  if(parts.length===0)return '今日の話は、まだ特に残っていません。';
+  return parts.join('。')+'。';
+ }
  // P578: 自分の好み・興味・得意の想起。教示（A）を確かなものとして
  // 先に、頻度から導いた「よく話すもの」（B）を弱く添える。
  private selfInquiryPreferenceAnswer():string {
@@ -365,6 +379,7 @@ class ConversationGraphRuntimeP212Service {
    const projectAnswer=this.selfInquiryProjectAnswer(projectMatch[1]);
    if(projectAnswer)return projectAnswer;
   }
+  if(/(?:今日|きょう)(?:は|に)?(?:何|なに)の話|今日の話|今日話した/u.test(value))return this.selfInquiryDayRecapAnswer();
   if(/さっき(?:何て|なんて|何を|何の話|なんの話|どんな話)/u.test(value)||/(?:何の話|なんの話)(?:してた|だった)/u.test(value)||/前の答え|直前の答え|さっきの答え|さっきの(?:話|こと)/u.test(value))return this.selfInquiryRecallAnswer();
   return undefined;
  }

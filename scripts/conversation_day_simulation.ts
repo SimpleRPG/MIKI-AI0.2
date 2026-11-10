@@ -26,6 +26,8 @@ async function main() {
   const { conversationCoreService } = await import('../src/miki/safety/services/conversationCoreService');
   const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
   const { roleplaySessionService } = await import('../src/miki/conversation/services/roleplaySessionService');
+  const { personaProfileService } = await import('../src/miki/conversation/services/personaProfileService');
+  const { conversationGraphRuntimeP212Service } = await import('../src/miki/conversation/services/conversationGraphRuntimeP212Service');
 
   // ---- 種まき（回帰と同じ最小限） ----
   japaneseDictionaryService.addPersonal('モコロン', { gloss: 'パルワールドに登場する羊のようなパル', semanticIds: ['daysim'] } as any);
@@ -102,6 +104,19 @@ async function main() {
   await turn('T20 明日の迷い', '明日の予定は特にないかな');
   const t21 = await turn('T21 おやすみ', 'おやすみ');
   check('T21 おやすみで受ける', t21.includes('おやすみ'), t21.slice(0, 120));
+
+  // ---- ビービー（人格を切り替えて同じ一日を少し） ----
+  (globalThis as any).window = { dispatchEvent: () => true, addEventListener: () => {}, removeEventListener: () => {} };
+  personaProfileService.switchProfile('persona-bibi');
+  const b1 = await turn('B1 ビービーの挨拶', 'おはよう');
+  check('B1 ビービーは大人の丁寧語で挨拶しない', !b1.includes('ございます') && !b1.includes('なさいます'), b1.slice(0, 120));
+  const b2 = await turn('B2 ビービーの疲れ', '疲れた');
+  check('B2 ビービーの受け止めはタメ口', !b2.includes('なさらず') && !b2.includes('ございます'), b2.slice(0, 120));
+  conversationFactIntakeService.intakeFromUserText('ビービーは星空が好きだよ', []);
+  conversationGraphRuntimeP212Service.ingestInput('daysim-bibi', 'ビービーの好きなものは？');
+  const bibiPreference = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('daysim-bibi');
+  check('B3 ビービーの好みは人格ごとに分かれている', Boolean(bibiPreference && bibiPreference.includes('星空')), String(bibiPreference).slice(0, 120));
+  personaProfileService.switchProfile('persona-default');
 
   // ---- 結果 ----
   const failures = results.filter(([, ok]) => !ok);

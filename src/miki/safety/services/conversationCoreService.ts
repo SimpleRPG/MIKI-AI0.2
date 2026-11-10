@@ -1097,7 +1097,8 @@ export class ConversationCoreService {
         status = 'RESOLVED';
         reason = 'opinion_answer';
         ir = answerContentIrService.buildAnswerIR({
-          conclusion: this.opinionAnswer(prompt, japaneseAnalysis?.contentTokens || [])!,
+          // P583: 意見も人格の声で（ビービーならタメ口に寄せる）。
+          conclusion: this.applyPersonaVoice(this.opinionAnswer(prompt, japaneseAnalysis?.contentTokens || [])!),
           target: compiled.target,
           certainty: 'CONDITIONAL',
           detailLevel: 'BRIEF',
@@ -1109,7 +1110,7 @@ export class ConversationCoreService {
         status = 'RESOLVED';
         reason = 'dictionary_answer';
         ir = answerContentIrService.buildAnswerIR({
-          conclusion: this.dictionaryAnswerForQuestion(prompt, japaneseAnalysis?.contentTokens || [])!,
+          conclusion: this.applyPersonaVoice(this.dictionaryAnswerForQuestion(prompt, japaneseAnalysis?.contentTokens || [])!),
           target: compiled.target,
           certainty: 'HIGH_CONFIDENCE',
           detailLevel: 'BRIEF',
@@ -1645,6 +1646,19 @@ export class ConversationCoreService {
         .filter((p) => p.kind === 'like');
       if (likes.some((p) => p.term === topic)) {
         return `${topic}は、私も好きなんです。${topic}の話を聞くと、なんだか嬉しくなります。`;
+      }
+    } catch { /* 補助経路 */ }
+    // P582: プロジェクトの話なら、決め事が彼女の意見の材料になる
+    // （ゲーム開発の相方として、決め事を踏まえて答える）。
+    try {
+      for (const token of contentTokens || []) {
+        const project = projectNotebookService.findProject(token);
+        if (!project) continue;
+        const decisions = projectNotebookService.listDecisions(project);
+        if (decisions.length > 0) {
+          return `${project}については、「${decisions[0].text.slice(0, 60)}」という決め事がありますね。私は、それが${project}らしさだと思います。`;
+        }
+        return `${project}の話ですね。決め事はまだ聞いていませんが、一緒に作る相方として大事にしたいです。`;
       }
     } catch { /* 補助経路 */ }
     try {
