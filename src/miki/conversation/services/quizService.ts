@@ -100,7 +100,7 @@ class QuizService {
     const state = load();
     if (!state || !state.current) return undefined;
     const text = String(prompt || '').trim();
-    if (/(?:やめる|おわり|終わり|もういい|やめたい)/.test(text)) {
+    if (/(?:やめる|おわり|終わり|もういい|やめたい|やめた)/.test(text)) {
       save(undefined);
       recordResult(state.asked - 1, state.correct);
       return `分かりました、ここまでにしましょう。${state.asked - 1}問答えて、${state.correct}問正解でした。また遊びましょう！`;

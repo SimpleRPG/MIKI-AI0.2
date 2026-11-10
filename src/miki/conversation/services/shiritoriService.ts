@@ -125,7 +125,7 @@ class ShiritoriService {
     const state = load();
     if (!state) return undefined;
     const text = String(prompt || '').trim().replace(/[。！!]+$/g, '');
-    if (/(?:やめる|おわり|終わり|もういい|やめたい)/.test(text)) {
+    if (/(?:やめる|おわり|終わり|もういい|やめたい|やめた)/.test(text)) {
       save(undefined);
       recordOutcome('stopped', state.used.length);
       return '分かりました、ここまでにしましょう。遊んでくれてありがとうございました！';

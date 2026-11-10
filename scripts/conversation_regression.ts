@@ -1690,6 +1690,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P697 「ごはんできた」は達成として祝わない', !gohan.replyText.includes('おめでとう'), gohan.replyText.slice(0, 100));
 }
 
+// ---- 呼びかけ・雨やみ・帰宅宣言・取りやめ（P698） ----
+{
+  const nee = await conversationCoreService.execute({ prompt: 'ねえねえ' } as any);
+  check('P698 「ねえねえ」は呼びかけとして受ける', nee.replyText.includes('なあに') || nee.replyText.includes('どうした'), nee.replyText.slice(0, 80));
+  const mite = await conversationCoreService.execute({ prompt: '見て見て' } as any);
+  check('P698 「見て見て」は作業の了承にしない', mite.replyText.includes('見ます') && !mite.replyText.includes('やってみます'), mite.replyText.slice(0, 80));
+  const yanda = await conversationCoreService.execute({ prompt: '雨やんだ' } as any);
+  check('P698 「雨やんだ」はやんだとして受ける', yanda.replyText.includes('やみ') || yanda.replyText.includes('やんだ'), yanda.replyText.slice(0, 80));
+  const kaeru = await conversationCoreService.execute({ prompt: 'そろそろ帰る' } as any);
+  check('P698 「そろそろ帰る」は見送りで受ける', kaeru.replyText.includes('気をつけて'), kaeru.replyText.slice(0, 80));
+  const cancel = await conversationCoreService.execute({ prompt: 'やっぱやめた' } as any);
+  check('P698 「やっぱやめた」は了承で受ける', cancel.replyText.includes('やめておきましょう'), cancel.replyText.slice(0, 80));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
