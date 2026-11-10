@@ -1462,6 +1462,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P675 N日前の日付も答える', past.replyText.includes(`${p675.getMonth() + 1}月${p675.getDate()}日`), past.replyText.slice(0, 120));
 }
 
+// ---- 単位の換算も共有の換算表で即答する（P676） ----
+{
+  const len = await conversationCoreService.execute({ prompt: '1キロは何メートル？' } as any);
+  check('P676 長さの換算に答える', len.replyText.includes('1000メートルです'), len.replyText.slice(0, 120));
+  const time = await conversationCoreService.execute({ prompt: '1時間は何分？' } as any);
+  check('P676 時間の換算に答える', time.replyText.includes('60分です'), time.replyText.slice(0, 120));
+  const days = await conversationCoreService.execute({ prompt: '3日は何時間？' } as any);
+  check('P676 日と時間の換算に答える', days.replyText.includes('72時間です'), days.replyText.slice(0, 120));
+  const mass = await conversationCoreService.execute({ prompt: '1キロは何グラム？' } as any);
+  check('P676 キロの重さ読みでも答える', mass.replyText.includes('1000グラムです'), mass.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

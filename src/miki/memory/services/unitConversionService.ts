@@ -17,10 +17,10 @@ interface LinearUnit {
 
 const LINEAR_UNITS: LinearUnit[] = [
   // 長さ（基準: m）
-  { key: 'mm', dimension: 'length', dimensionJa: '長さ', toBase: 0.001, names: ['mm', 'ミリメートル'] },
-  { key: 'cm', dimension: 'length', dimensionJa: '長さ', toBase: 0.01, names: ['cm', 'センチメートル'] },
+  { key: 'mm', dimension: 'length', dimensionJa: '長さ', toBase: 0.001, names: ['mm', 'ミリメートル', 'ミリ'] },
+  { key: 'cm', dimension: 'length', dimensionJa: '長さ', toBase: 0.01, names: ['cm', 'センチメートル', 'センチ'] },
   { key: 'm', dimension: 'length', dimensionJa: '長さ', toBase: 1, names: ['m', 'メートル'] },
-  { key: 'km', dimension: 'length', dimensionJa: '長さ', toBase: 1000, names: ['km', 'キロメートル'] },
+  { key: 'km', dimension: 'length', dimensionJa: '長さ', toBase: 1000, names: ['km', 'キロメートル', 'キロ'] },
   { key: 'inch', dimension: 'length', dimensionJa: '長さ', toBase: 0.0254, names: ['インチ', 'inch'] },
   { key: 'foot', dimension: 'length', dimensionJa: '長さ', toBase: 0.3048, names: ['フィート', 'foot', 'feet'] },
   { key: 'yard', dimension: 'length', dimensionJa: '長さ', toBase: 0.9144, names: ['ヤード', 'yard'] },
@@ -55,6 +55,12 @@ const LINEAR_UNITS: LinearUnit[] = [
   { key: 'KiB', dimension: 'data', dimensionJa: 'データ量', toBase: 1024, names: ['KiB'] },
   { key: 'MiB', dimension: 'data', dimensionJa: 'データ量', toBase: 1_048_576, names: ['MiB'] },
   { key: 'GiB', dimension: 'data', dimensionJa: 'データ量', toBase: 1_073_741_824, names: ['GiB'] },
+  // 時間（基準: 秒）— P676 で追加。会話の換算質問（1時間は何分？）用。
+  { key: 'sec', dimension: 'time', dimensionJa: '時間', toBase: 1, names: ['秒', 'sec', 'second', 'seconds'] },
+  { key: 'min', dimension: 'time', dimensionJa: '時間', toBase: 60, names: ['分', 'min', 'minute', 'minutes'] },
+  { key: 'hour', dimension: 'time', dimensionJa: '時間', toBase: 3600, names: ['時間', 'hour', 'hours'] },
+  { key: 'day', dimension: 'time', dimensionJa: '時間', toBase: 86400, names: ['日', 'day', 'days'] },
+  { key: 'week', dimension: 'time', dimensionJa: '時間', toBase: 604800, names: ['週間', 'week', 'weeks'] },
 ];
 
 const TEMPERATURE_KEYS = new Set(['celsius', 'fahrenheit', 'kelvin']);

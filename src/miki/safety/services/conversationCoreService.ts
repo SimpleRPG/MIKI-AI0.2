@@ -36,6 +36,7 @@ import { utteranceFeatureService, isBackchannelText } from '../../memory/service
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
+import { unitConversionService } from '../../memory/services/unitConversionService';
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -366,6 +367,11 @@ export class ConversationCoreService {
       const arithmetic = this.arithmeticAnswer(prompt);
       if (arithmetic) {
         return this.buildResult('RESOLVED', 'arithmetic_answer', arithmetic, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P676: 単位の換算（1時間は何分？）も、共有の換算表で即答する。
+      const unitAnswer = this.unitConversionAnswer(prompt);
+      if (unitAnswer) {
+        return this.buildResult('RESOLVED', 'unit_conversion_answer', unitAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P604: 食事の迷いは、一緒に考える形で受ける。
       const dinner = this.dinnerMusingAnswer(prompt);
@@ -2382,6 +2388,32 @@ export class ConversationCoreService {
     const value = format(result);
     if (!value) return undefined;
     return `${m[1]}${opLabel}${m[3]}は${value}です。`;
+  }
+
+  /**
+   * P676: 単位の換算の質問（「N単位Aは何単位B？」）は、共有の換算
+   * サービス（P491）で決定的に答える。従来は調査に落ちて、生の
+   * 調査結果の断片が返ることもあった。
+   */
+  private unitConversionAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '').replace(/[？?。！!]/g, '').trim();
+    const m = p.match(/^(\d+(?:\.\d+)?)\s*(\S+?)は(?:何|いくつ)(\S+?)(?:です)?(?:か)?$/);
+    if (!m) return undefined;
+    const value = Number(m[1]);
+    const from = m[2].trim();
+    const to = m[3].trim();
+    if (!unitConversionService.isUnit(from) || !unitConversionService.isUnit(to)) return undefined;
+    let converted = unitConversionService.convert(value, from, to);
+    let fromLabel = from;
+    if (converted === null && from === 'キロ') {
+      // 「キロ」は長さ・重さ両方に使われる。次元が合わなければ重さで再試行。
+      converted = unitConversionService.convert(value, 'キログラム', to);
+      if (converted !== null) fromLabel = 'キログラム';
+    }
+    if (converted === null) return undefined;
+    const rounded = Math.round(converted * 10000) / 10000;
+    const shown = Number.isInteger(rounded) ? String(rounded) : String(rounded);
+    return `${m[1]}${fromLabel}は${shown}${to}です。`;
   }
 
   /**
