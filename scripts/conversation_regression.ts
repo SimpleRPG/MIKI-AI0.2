@@ -763,6 +763,16 @@ check('P604 「行ってくる」は送り出しで受ける', shoppingReply.rep
 const earlyRiseReply = await conversationCoreService.execute({ prompt: '明日早起きしなきゃ' } as any);
 check('P604 予定の断片を聞き返さない', !earlyRiseReply.replyText.includes('明日早起'), earlyRiseReply.replyText.slice(0, 120));
 
+// ---- 叱られた・達成・交通トラブルの受け止め（P606） ----
+const scoldedReply = await conversationCoreService.execute({ prompt: '上司に怒られた' } as any);
+check('P606 叱られた報告は寄り添う', scoldedReply.replyText.includes('大変') || scoldedReply.replyText.includes('つら'), scoldedReply.replyText.slice(0, 140));
+const clearedReply = await conversationCoreService.execute({ prompt: 'ゲームクリアした！' } as any);
+check('P606 達成の報告は一緒に喜ぶ', clearedReply.replyText.includes('おめでとう') || clearedReply.replyText.includes('やりました') || clearedReply.replyText.includes('すごい'), clearedReply.replyText.slice(0, 140));
+const trainReply = await conversationCoreService.execute({ prompt: '電車が遅れてる' } as any);
+check('P606 交通トラブルは状況として受ける', trainReply.replyText.includes('大変') || trainReply.replyText.includes('気をつけて'), trainReply.replyText.slice(0, 140));
+const paydayReply = await conversationCoreService.execute({ prompt: '給料日だ！' } as any);
+check('P606 給料日は一緒に喜ぶ', !paydayReply.replyText.startsWith('給料の話ですね'), paydayReply.replyText.slice(0, 140));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
