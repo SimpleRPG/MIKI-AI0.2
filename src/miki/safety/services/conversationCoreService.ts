@@ -2817,6 +2817,25 @@ export class ConversationCoreService {
    * 会話の材料になることで、返答が彼女の変化と一緒に変わる。
    */
   private recentLearningAnswer(prompt: string): string | undefined {
+    // P652: 「今まで何を覚えたか教えて」——一覧の求めは時期を問わず、
+    // 学んだ語（個人辞書）と検証済みの知識から並べて答える。
+    if (/(?:何を|どんなこと|覚えたこと|覚えたもの|学んだこと)/.test(prompt)
+      && /(?:覚えた|学んだ)/.test(prompt)
+      && /(?:教えて|知りたい|ある|見せて)/.test(prompt)) {
+      try {
+        const words = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss).slice(-5).map((e: any) => e.surface);
+        const claims = claimDatabaseService.getAllClaims()
+          .filter((c: any) => c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED')
+          .slice(-3)
+          .map((c: any) => String(c.statement || '').replace(/。$/, '').slice(0, 40))
+          .filter(Boolean);
+        const parts: string[] = [];
+        if (words.length > 0) parts.push(`言葉だと「${words.join('」「')}」`);
+        if (claims.length > 0) parts.push(`知識だと「${claims.join('」「')}」という話`);
+        if (parts.length === 0) return '今のところ、まだ目立って覚えたものは無いです。これから増やしていきますね。';
+        return `今まで覚えたのは、${parts.join('、')}です。`;
+      } catch { return undefined; }
+    }
     if (!/(?:最近|この頃|このごろ)/.test(prompt)) return undefined;
     if (!/(?:覚えた|学んだ|勉強した|覚え|学ん|身につ)/.test(prompt)) return undefined;
     const terms: string[] = [];

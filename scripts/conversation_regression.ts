@@ -1217,6 +1217,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P651 学習量は自分の記録の数で答え、調査へ流れない', volume.replyText.includes('覚えています') && !volume.replyText.includes('ランキング'), volume.replyText.slice(0, 200));
 }
 
+// ---- 学んだものの一覧を求められたら一覧で答える（P652） ----
+{
+  const list = await conversationCoreService.execute({ prompt: '今まで何を覚えたか教えて' } as any);
+  check('P652 学んだ語と知識の一覧で答える', list.replyText.includes('今まで覚えたのは') && (list.replyText.includes('クオッカ') || list.replyText.includes('モコロン')), list.replyText.slice(0, 240));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
