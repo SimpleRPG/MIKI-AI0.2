@@ -30,6 +30,7 @@ import { storageService } from '../../../services/storageService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { shiritoriService } from '../../conversation/services/shiritoriService';
+import { userMemoService } from '../../conversation/services/userMemoService';
 import { quizService } from '../../conversation/services/quizService';
 import { utteranceEventClassifierService } from '../../conversation/services/utteranceEventClassifierService';
 import { utteranceFeatureService, isBackchannelText } from '../../memory/services/utteranceFeatureService';
@@ -433,6 +434,13 @@ export class ConversationCoreService {
       if (unknownAttr) {
         return this.buildResult('RESOLVED', 'unknown_attribute_answer', this.applyPersonaVoice(unknownAttr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P699: 覚える・読み返す・忘れるは明示の操作なので、語彙の
+      // 確認（「覚えていることある？」が「いる」を語として拾う等）
+      // より先に受ける。
+      const memoEarly = this.memoRequestAnswer(prompt);
+      if (memoEarly) {
+        return this.buildResult('RESOLVED', 'memo_request_answer', this.applyPersonaVoice(memoEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P647: 「〈語〉覚えた？」——特定の語についての自分の状態を
       // 答える（P624/P633 の語単位版）。
       const termKnowledge = this.termKnowledgeAnswer(prompt);
@@ -489,6 +497,7 @@ export class ConversationCoreService {
       if (hold) {
         return this.buildResult('RESOLVED', 'hold_request_answer', this.applyPersonaVoice(hold), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+
       // P681: 社交の声かけ（久しぶり・はじめまして・よろしく・
       // 元気出して）は、社交として返す。了承形や反響に化けていた。
       const social = this.socialWarmthAnswer(prompt);
@@ -3646,6 +3655,44 @@ export class ConversationCoreService {
       storageService.setItem('miki_last_opinion_v1', JSON.stringify({ topic, basisType, basisText, at: Date.now() }));
     } catch { /* 記録は補助 */ }
     return reply;
+  }
+
+  /**
+   * P699: 「覚えておいて」は、頼まれた文をメモとして実際に覚える
+   * （従来は断片の反響＋知らない語の聞き返しになっていた）。
+   * 「何があるんだっけ？」で読み返し、「忘れていいよ」で消す。
+   * 覚える・読み返す・忘れるを対の操作としてここで扱う。
+   */
+  private memoRequestAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '');
+    // 忘れる（何も覚えていないときは、その旨を正直に）。
+    if (/^(?:もう)?忘れて(?:いい|ください|ちょうだい|くれる)?[。！!？?よね]*$/.test(p.trim())
+      || /(?:覚えた|メモした)こと.*忘れて/.test(p)) {
+      const n = userMemoService.count();
+      if (n === 0) return '今は特に覚えていることはないですよ。';
+      userMemoService.clear();
+      return '分かりました、忘れておきますね。';
+    }
+    // 読み返す。
+    if (/(?:何がある|なにがある|何かあった|何を覚えて|覚えてること|覚えていること)/.test(p)
+      && /(?:だっけ|ある[？?]|教えて|あるの)/.test(p)) {
+      const items = userMemoService.list();
+      if (items.length === 0) return '今は特に覚えていることはないです。何かあれば言ってくださいね、覚えておきます。';
+      const shown = items.slice(-3).map((m) => `「${m.text}」`).join('');
+      return `覚えているのは${shown}です。`;
+    }
+    // 覚える。
+    if (/(?:覚えておいて|覚えてて|覚えといて|メモして|メモしといて|メモっておいて|メモっといて)/.test(p)) {
+      const content = p
+        .replace(/(?:^|、|,)\s*(?:ねえ|あのさ|あのね)?\s*/, '')
+        .replace(/(?:の)?こと[、,]?\s*(?:覚えておいて|覚えてて|覚えといて|メモして(?:おいて)?|メモしといて|メモっておいて|メモっといて)[。！!？?]*$/, '')
+        .replace(/(?:覚えておいて|覚えてて|覚えといて|メモして(?:おいて)?|メモしといて|メモっておいて|メモっといて)[。！!？?]*$/, '')
+        .trim();
+      if (!content || content === p.trim()) return '分かりました。何を覚えておけばいいですか？';
+      userMemoService.add(content);
+      return `分かりました、「${content}」ですね。覚えておきました。`;
+    }
+    return undefined;
   }
 
   /**

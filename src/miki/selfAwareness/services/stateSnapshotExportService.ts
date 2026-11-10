@@ -125,6 +125,13 @@ class StateSnapshotExportService {
         };
       })(),
       lastOpinion: (() => { try { return JSON.parse(storageService.getItem('miki_last_opinion_v1') || 'null'); } catch { return null; } })(),
+      // P699: 「覚えておいて」のメモも、状態の一部として見えるように。
+      memos: (() => {
+        try {
+          const items = JSON.parse(storageService.getItem('miki_user_memos_v1') || '[]') as Array<{ text?: string }>;
+          return { count: Array.isArray(items) ? items.length : 0, texts: Array.isArray(items) ? items.slice(-3).map((m) => m.text || '') : [] };
+        } catch { return { count: 0, texts: [] }; }
+      })(),
     };
     return {
       snapshot,

@@ -1704,6 +1704,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P698 「やっぱやめた」は了承で受ける', cancel.replyText.includes('やめておきましょう'), cancel.replyText.slice(0, 80));
 }
 
+// ---- 「覚えておいて」の保存・想起・忘却（P699） ----
+{
+  const remember = await conversationCoreService.execute({ prompt: '明日の会議のこと、覚えておいて' } as any);
+  check('P699 覚える頼みは実際に覚える', remember.replyText.includes('覚えておきました') && remember.replyText.includes('明日の会議'), remember.replyText.slice(0, 120));
+  const recall = await conversationCoreService.execute({ prompt: '明日何があるんだっけ？' } as any);
+  check('P699 覚えた内容を読み返せる', recall.replyText.includes('明日の会議'), recall.replyText.slice(0, 120));
+  const forget = await conversationCoreService.execute({ prompt: 'もう忘れていいよ' } as any);
+  check('P699 忘れる頼みで消す', forget.replyText.includes('忘れておきますね'), forget.replyText.slice(0, 80));
+  const recallAfter = await conversationCoreService.execute({ prompt: '覚えていることある？' } as any);
+  check('P699 忘れた後は無いと答える', recallAfter.replyText.includes('特に覚えていることはない'), recallAfter.replyText.slice(0, 100));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
