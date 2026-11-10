@@ -1292,7 +1292,9 @@ export class ConversationCoreService {
       if (missing.length > 0) surface.surfaceText += `\n\n${missing.join('')}`;
     }
     // P565: 知らない語への聞き返しを足し、聞いたことを台帳に残す。
-    if (pendingUnknownQuestion && !surface.surfaceText.includes(pendingUnknownQuestion.question.slice(0, 12))) {
+    // P586: 続きの質問を用意したターンでは聞き返しを足さない
+    // （質問は1ターンに1つまで。語の学習は P498 の背景 gap が担う）。
+    if (pendingUnknownQuestion && !followUpAppend && !surface.surfaceText.includes(pendingUnknownQuestion.question.slice(0, 12))) {
       surface.surfaceText += `\n\n${pendingUnknownQuestion.question}`;
       this.markUnknownAsked(pendingUnknownQuestion.topic);
     }

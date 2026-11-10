@@ -102,6 +102,16 @@ async function main() {
   // ---- 夜 ----
   await turn('T19 一日の感想', '今日は楽しかった');
   await turn('T20 明日の迷い', '明日の予定は特にないかな');
+
+  // ---- 夜の続き：彼女の質問への答えと、小さな依頼（P586/P588） ----
+  const { storageService } = await import('../src/services/storageService');
+  storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+  const t20a = await turn('T20A 質問への答え', 'モコロンは綿毛が取れる、羊みたいなパルだよ');
+  check('T20A 答えを受けて、続きを1つ聞く', (t20a.includes('そっか') || t20a.includes('なるほど')) && t20a.includes('？') && !t20a.includes('いつごろから知っていますか'), t20a.slice(0, 160));
+  check('T20A 質問は1ターンに1つまで', (t20a.match(/[？?]/g) || []).length === 1, t20a.slice(0, 200));
+  const t20b = await turn('T20B 小さな依頼', '歌って');
+  check('T20B 依頼は引き受ける形で受ける', t20b.includes('いい') || t20b.includes('任せて') || t20b.includes('やってみます'), t20b.slice(0, 120));
+
   const t21 = await turn('T21 おやすみ', 'おやすみ');
   check('T21 おやすみで受ける', t21.includes('おやすみ'), t21.slice(0, 120));
 
