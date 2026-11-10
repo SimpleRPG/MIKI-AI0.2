@@ -927,6 +927,16 @@ check('P620 痛くないは痛みの受け止めにならない', !notPainReply.
   check('P621 報告した質問は台帳から消える', !after.some((e) => e.question.includes('クオッカの寿命')), JSON.stringify(after).slice(0, 120));
 }
 
+// ---- 関係の種類ごとの属性（P622） ----
+worldModelGraphService.addRelation({ fromName: 'モコロン', toName: '群れ', type: 'PART_OF', provisional: false, confidence: 0.9 } as any);
+worldModelGraphService.addRelation({ fromName: '綿毛', toName: '布作り', type: 'ENABLES', provisional: false, confidence: 0.9 } as any);
+const partOfReply = await conversationCoreService.execute({ prompt: 'モコロンは何の一部？' } as any);
+check('P622 一部は PART_OF で答える', partOfReply.replyText.includes('群れ'), partOfReply.replyText.slice(0, 140));
+const enablesReply = await conversationCoreService.execute({ prompt: '綿毛があると何ができる？' } as any);
+check('P622 できることは ENABLES で答える', enablesReply.replyText.includes('布作り'), enablesReply.replyText.slice(0, 140));
+const habitatReply = await conversationCoreService.execute({ prompt: 'モコロンってどこに住んでるの？' } as any);
+check('P622 生息地は専用の欠けとして答える', habitatReply.replyText.includes('生息地はまだ知らない'), habitatReply.replyText.slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

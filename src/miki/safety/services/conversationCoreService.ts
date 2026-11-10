@@ -2241,6 +2241,10 @@ export class ConversationCoreService {
    * 背景調査に積む（定義だけ返す／答えられない、で終わらせない）。
    */
   private attributeQuestionAnswer(prompt: string): string | undefined {
+    // P622: 関係の種類ごとの属性（PART_OF / CAUSES / ENABLES）も、
+    // 世界モデルの関係で答えられる範囲を広げる。
+    const specific = this.specificRelationAnswer(prompt);
+    if (specific) return specific;
     let attrLabel: string | undefined;
     let isUse = false;
     if (/(?:何の仲間|なにの仲間|なんの仲間|何の一種|分類)/.test(prompt)) {
@@ -2260,7 +2264,7 @@ export class ConversationCoreService {
       } catch { /* 補助経路 */ }
       return `「${classEntity}」の分類は、まだはっきり知らないです。調べて覚えておきますね。`;
     }
-    if (/(?:どこで|どこに|どこへ|どこから)/.test(prompt) && /(?:捕まえ|釣れ|採れ|取れ|買え|手に入|見つか|会え|生息|いる|ある)/.test(prompt)) attrLabel = '場所';
+    if (/(?:どこで|どこに|どこへ|どこから|生息地)/.test(prompt) && /(?:捕まえ|釣れ|採れ|取れ|買え|手に入|見つか|会え|生息|住んで|棲んで|いる|ある)/.test(prompt)) attrLabel = /(?:生息|住んで|棲んで)/.test(prompt) ? '生息地' : '場所';
     else if (/(?:何に|なにに|何の(?:ため|役)|なんの(?:ため|役))/.test(prompt) && /(?:使う|使える|役立|利用)/.test(prompt)) { attrLabel = '使い道'; isUse = true; }
     else if (/(?:何から|なにから)/.test(prompt) && /(?:できて|作ら|でき)/.test(prompt)) attrLabel = '材料';
     else if (/(?:どうやって|どうすれば|どのように)/.test(prompt)) attrLabel = 'やり方';
@@ -2299,6 +2303,48 @@ export class ConversationCoreService {
       ? `「${entity}」については、${known.join('で、')}ことは知っているのですが、`
       : `「${entity}」のことは知っているのですが、`;
     return `${knownText}${attrLabel}はまだ知らないです。調べて覚えておきますね。`;
+  }
+
+  /**
+   * P622: 関係の種類を直接聞く質問（何の一部？/何を引き起こす？/
+   * あると何ができる？）に、対応する関係で答える。無ければ、その
+   * 属性の欠けとして gap に積む。
+   */
+  private specificRelationAnswer(prompt: string): string | undefined {
+    let relationType: 'PART_OF' | 'CAUSES' | 'ENABLES' | undefined;
+    let label = '';
+    let reverse = false;
+    if (/(?:何の一部|なにの一部|何に入ってる|何に含まれ)/.test(prompt)) { relationType = 'PART_OF'; label = '一部'; }
+    else if (/(?:には何が入って|には何が含まれ|には何がある)/.test(prompt)) { relationType = 'PART_OF'; label = '中身'; reverse = true; }
+    else if (/(?:何を引き起こす|何の原因|どんなことを引き起こす)/.test(prompt)) { relationType = 'CAUSES'; label = '引き起こすこと'; }
+    else if (/(?:があると|を使えば|を使うと).*(?:何ができ|なにができ|できること)/.test(prompt)) { relationType = 'ENABLES'; label = 'できること'; }
+    if (!relationType) return undefined;
+    let entity: string | undefined;
+    try {
+      const features = utteranceFeatureService.analyze(prompt);
+      entity = features.contentTokens.find((t) => {
+        try { return japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0; } catch { return false; }
+      });
+    } catch { return undefined; }
+    if (!entity) return undefined;
+    const relations = worldModelGraphService.relationsOf(entity, relationType)
+      .filter((r) => (reverse ? r.to === entity : r.from === entity));
+    if (relations.length > 0) {
+      const targets = relations.map((r) => (reverse ? r.from : r.to)).join('や');
+      if (relationType === 'PART_OF') return reverse ? `「${entity}」には、${targets}が含まれます。` : `「${entity}」は、${targets}の一部です。`;
+      if (relationType === 'CAUSES') return `「${entity}」は、${targets}を引き起こします。`;
+      return `「${entity}」があると、${targets}ができます。`;
+    }
+    try {
+      knowledgeGapService.detect({
+        query: `「${entity}」の${label}を調べる`,
+        reason: '知っている物への属性の質問に、対応する関係が無かったため。',
+        type: 'UNKNOWN_RELATION',
+        target: entity,
+        priority: 50,
+      });
+    } catch { /* 補助経路 */ }
+    return `「${entity}」の${label}は、まだ知らないです。調べて覚えておきますね。`;
   }
 
   /**
