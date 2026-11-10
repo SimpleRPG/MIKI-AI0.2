@@ -275,6 +275,29 @@ export class ConversationCoreService {
       memories,
       (state as any).recentUserFactSummaries
     );
+    // P592: 彼女自身への質問（何歳？／名前の由来／得意なこと）と、
+    // 時計・カレンダーの質問は、調査の対象ではない。自分の記録と
+    // 現在時刻から、その場で答える（Web 調査の的外れな結果や
+    // 「確認できていない」に倒れていた）。
+    if (!roleplaySessionService.isActive() && !userFactRecall) {
+      const selfAnswer = this.selfQuestionAnswer(prompt);
+      if (selfAnswer) {
+        return this.buildResult('RESOLVED', 'self_question_answer', selfAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const clockAnswer = this.clockCalendarAnswer(prompt);
+      if (clockAnswer) {
+        return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P592: 評価軸の無い日常の二択も、ここで会話として受ける
+      // （後段の照応・判断・保持の各ゲートが、雑談の二択を次々に
+      // 形式的な確認や保留に変えてしまうため）。
+      const choiceAnswer = !/(?:性能|価格|値段|コスト|速度|容量|スペック|比較|評価|基準)/.test(prompt)
+        ? this.choiceQuestionAnswer(prompt)
+        : undefined;
+      if (choiceAnswer) {
+        return this.buildResult('RESOLVED', 'choice_question_answer', this.applyPersonaVoice(choiceAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+    }
     if (explicitUnknownInquiry && !userFactRecall) {
       const researched = await unknownResearchConversationBridgeService.resolveAndRespond({
         question: prompt,
@@ -311,7 +334,10 @@ export class ConversationCoreService {
       lastCandidateClaimId: teachingResult.detected && teachingResult.candidateClaim ? teachingResult.candidateClaim.claim_id : state.lastCandidateClaimId,
     };
 
-    if (anaphora.confidence === 'ambiguous') {
+    // P592: 「AとB、どっちがいい？」の“曖昧さ”は質問そのもの。
+    // 対象の特定を相手に返さず、選択の質問として後段で受ける。
+    const isChoiceQuestion = /(?:どっち|どちら)/.test(prompt) && /(?:いい|好き|おすすめ|正解|思う|選)/.test(prompt);
+    if (anaphora.confidence === 'ambiguous' && !isChoiceQuestion) {
       const clarificationGateResult = clarificationGate(nextState, `anaphora:${anaphora.candidates.slice().sort().join('|')}`);
       nextState.clarificationControl = clarificationGateResult.next;
       if (!clarificationGateResult.allowed) {
@@ -501,6 +527,11 @@ export class ConversationCoreService {
       });
       if (explicitChoice) {
         decisionText = `明示された選択「${explicitChoice}」を採用します。`;
+      } else if (!/(?:性能|価格|値段|コスト|速度|容量|スペック|比較|評価|基準)/.test(prompt)) {
+        // P592: 評価軸の指定が無い日常の二択・おすすめは、形式的な
+        // 拒否文ではなく会話として答える（捏造はしない。選べない
+        // ことは正直に言い、相手の気分を聞く）。
+        decisionText = this.applyPersonaVoice(this.choiceQuestionAnswer(prompt) ?? this.recommendationFallback()!);
       } else {
         decisionText = '比較対象は見つかりましたが、評価軸ごとの確認済み根拠が不足しているため、CORE中核では推奨を捏造して確定しません。';
       }
@@ -806,7 +837,7 @@ export class ConversationCoreService {
       const fallthroughFatigue = userStateTrailService.isFatigueText(prompt);
       const fallthroughThanks = /ありがと(?:う|ー)?|感謝/.test(prompt);
       const fallthroughApology = /ごめん|すみません|申し訳/.test(prompt);
-      const fallthroughWakeup = /起きた|目覚めた|起床/.test(prompt);
+      const fallthroughWakeup = /起きた|目覚めた|目が覚め|起床/.test(prompt);
       // P573: 不安・空腹の状態も、話題の反響ではなく状態として受ける。
       const fallthroughAnxiety = userStateTrailService.isAnxietyText(prompt);
       const fallthroughHunger = userStateTrailService.isHungerText(prompt);
@@ -890,9 +921,16 @@ export class ConversationCoreService {
           reactionBase = weather;
         } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
           reactionBase = ffx('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。'], ['ふふ、面白いね！', 'あはは、それいいね！', 'ふふふ、笑っちゃうね。']);
+        } else if (/彼女(?:が)?できた|彼氏(?:が)?できた|結婚(?:する|した|することに)|合格|受かった|内定|就職.*決ま|生まれた|妊娠|昇進|優勝/.test(prompt)) {
+          // P592: 人生の大きな報告（彼女ができた・結婚・合格など）は
+          // 主題の反響でなく、まず祝う。
+          reactionBase = ffx('fx_congrats', ['わーい、おめでとうございます！', 'それはすごい、おめでとうございます！', 'おめでとうございます！よかったですね。'], ['わーい、おめでとー！', 'すごい、おめでとー！', 'おめでとう！よかったね。']);
         } else if (/やったー|やった！|やったね|よっしゃ|うれしい|嬉しい/.test(prompt)) {
           // P591: 喜びの叫びは一緒に喜ぶ（汎用の相槌で流さない）。
           reactionBase = ffx('fx_joy', ['やりましたね！すごいです。', 'わーい、やりましたね！', 'やった！嬉しいですね。'], ['やったー！すごいね！', 'わーい、やったね！', 'やった！うれしいね。']);
+        } else if (/眠れない|寝れない|眠れなかった|寝つけない/.test(prompt)) {
+          // P592: 眠れない夜の受け止め。
+          reactionBase = ffx('fx_sleepless', ['眠れない夜はつらいですね。無理に寝ようとしなくても大丈夫ですよ。', '眠れないのですね。温かいものでも飲んで、一息つきましょう。'], ['眠れない夜はつらいよね。無理しなくて大丈夫だよ。', '眠れないんだね。温かいものでも飲も？']);
         } else if (/仕事(?:が|は)?.{0,4}(?:終わった|終わりました|おわった|終わり)/.test(prompt)) {
           // P591: 仕事終わりの報告は労う。
           reactionBase = ffx('fx_work_done', ['お仕事、お疲れ様でした！', 'お疲れ様でした。ゆっくり休んでくださいね。'], ['お仕事おつかれさま！', 'おつかれさまー！ゆっくり休んでね。']);
@@ -1171,6 +1209,28 @@ export class ConversationCoreService {
           conclusion: this.applyPersonaVoice(this.dictionaryAnswerForQuestion(prompt, japaneseAnalysis?.contentTokens || [])!),
           target: compiled.target,
           certainty: 'HIGH_CONFIDENCE',
+          detailLevel: 'BRIEF',
+        });
+      } else if (!roleplaySessionService.isActive() && this.choiceQuestionAnswer(prompt)) {
+        // P592: 「AとB、どっちがいい？」は対象特定の失敗（報告文）に
+        // 倒さず、選べないことを正直に言って相手の気分を聞く。
+        status = 'RESOLVED';
+        reason = 'choice_question_answer';
+        ir = answerContentIrService.buildAnswerIR({
+          conclusion: this.applyPersonaVoice(this.choiceQuestionAnswer(prompt)!),
+          target: compiled.target,
+          certainty: 'CONDITIONAL',
+          detailLevel: 'BRIEF',
+        });
+      } else if (!roleplaySessionService.isActive() && dialogueAct === 'REQUEST_RECOMMENDATION') {
+        // P592: 材料の無い「おすすめ」依頼も、見出し付きの謝罪文では
+        // なく、材料の少なさを正直に言って会話を続ける。
+        status = 'RESOLVED';
+        reason = 'recommendation_fallback';
+        ir = answerContentIrService.buildAnswerIR({
+          conclusion: this.applyPersonaVoice(this.recommendationFallback()!),
+          target: compiled.target,
+          certainty: 'CONDITIONAL',
           detailLevel: 'BRIEF',
         });
       } else if (unverifiedSources.length > 0 && unverifiedSummary) {
@@ -1637,6 +1697,11 @@ export class ConversationCoreService {
     if (/雨/.test(prompt) && prompt.trim().length <= 14) {
       return this.pickFixedReply('fx_weather_rain', ['雨なのですね。足元に気をつけてくださいね。', '雨ですか。傘は大丈夫ですか？']);
     }
+    // P592: 雪の受け止めも用意する（「雪降りそうだね」が主題の断片に
+    // なっていた）。天気の実況そのものは断定しない規律は維持。
+    if (/雪/.test(prompt) && prompt.trim().length <= 16) {
+      return this.pickFixedReply('fx_weather_snow', ['雪なのですね。足元に気をつけてくださいね。', '雪ですか。暖かくしてくださいね。']);
+    }
     return undefined;
   }
 
@@ -1744,6 +1809,84 @@ export class ConversationCoreService {
    * 好み→知っている事実（世界モデル・Claim の補足文）→辞書の意味、
    * の順。どれも無ければ意見の材料が無いので undefined。
    */
+  /**
+   * P592: 彼女自身への質問（年齢・名前の由来・得意なこと）への答え。
+   * 材料は自分の記録（教わった得意）と、決まっている事実だけ。
+   */
+  private selfQuestionAnswer(prompt: string): string | undefined {
+    if (!/(?:みき|ミキ|ビービー|あなた|君|あんた)/.test(prompt)) return undefined;
+    let text: string | undefined;
+    if (/何歳|年齢|いくつ/.test(prompt)) {
+      text = this.pickFixedReply('fx_self_age', [
+        '年齢は決まっていないんです。AIなので、歳は数えないんですよ。',
+        '何歳と聞かれると困ってしまいます。生まれてから日が浅い、新人みたいなものです。',
+      ]);
+    } else if (/名前の由来|名前.*(?:由来|意味|どうして|なぜ|付け)/.test(prompt)) {
+      let bibi = false;
+      try { bibi = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibi = false; }
+      text = bibi
+        ? '私の名前は、蜂の「ビー」が由来なんだよ。部品とかバグの群れ、ってイメージらしいよ。'
+        : '「みき」という名前は、私を作ってくれた人が付けてくれたんです。由来までは聞いていないんですよ。';
+    } else if (/得意|特技/.test(prompt)) {
+      try {
+        const skills = selfPreferenceService.listTaught(personaProfileService.get().profileId)
+          .filter((p) => p.kind === 'good_at');
+        text = skills.length > 0
+          ? `${skills.map((s) => s.term).join('と')}が得意、と教わっています。`
+          : 'これといって決まった得意なことは、まだ無いんです。これから少しずつ増やしていきたいです。';
+      } catch {
+        text = 'これといって決まった得意なことは、まだ無いんです。これから少しずつ増やしていきたいです。';
+      }
+    }
+    return text ? this.applyPersonaVoice(text) : undefined;
+  }
+
+  /** P592: 時計・カレンダーの質問には、現在時刻からその場で答える。 */
+  private clockCalendarAnswer(prompt: string): string | undefined {
+    const now = new Date();
+    if (/今(?:は)?何時|何時(?:です)?か|現在時刻|いま何時/.test(prompt)) {
+      return `今は${now.getHours()}時${now.getMinutes()}分です。`;
+    }
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    const dayMatch = prompt.match(/(今日|明日|あした|昨日|きのう)(?:は|って)?何曜日/);
+    if (dayMatch) {
+      const offset = dayMatch[1] === '今日' ? 0 : (dayMatch[1] === '明日' || dayMatch[1] === 'あした') ? 1 : -1;
+      const d = new Date(now);
+      d.setDate(d.getDate() + offset);
+      return `${dayMatch[1]}は${weekdays[d.getDay()]}曜日です。`;
+    }
+    if (/今日(?:は)?何日|今日の日付|何月何日/.test(prompt)) {
+      return `今日は${now.getMonth() + 1}月${now.getDate()}日です。`;
+    }
+    return undefined;
+  }
+
+  /** P592: 「AとB、どっちがいい？」への答え（材料が無いときの正直な形）。 */
+  private choiceQuestionAnswer(prompt: string): string | undefined {
+    if (!/(?:どっち|どちら)/.test(prompt) || !/(?:いい|好き|おすすめ|正解)/.test(prompt)) return undefined;
+    const m = prompt.match(/(.+?)(?:と|、)(.+?)(?:、|の)?(?:って)?(?:どっち|どちら)/);
+    if (m) {
+      const a = m[1].replace(/^(?:ねえ|あの)[、,]?/, '').replace(/(?:は|が)$/, '').trim();
+      const b = m[2].replace(/(?:は|が)$/, '').trim();
+      if (a && b && a.length <= 12 && b.length <= 12 && a !== b) {
+        return `${a}と${b}、どちらも良さそうですね。私は決めきれないので、今日の気分で選んでみてはどうですか？`;
+      }
+    }
+    return 'どちらも良さそうで、私は決めきれません。今日の気分だと、どちらが惹かれますか？';
+  }
+
+  /** P592: 材料が無い「おすすめ」依頼への、正直で会話の続く答え。 */
+  private recommendationFallback(): string | undefined {
+    try {
+      const current = conversationOpenTopicService.current();
+      const topic = current?.topic;
+      if (topic) {
+        return `私のおすすめはまだ少ないのですが、最近話していた「${topic}」の続きなんてどうですか？`;
+      }
+    } catch { /* 補助経路 */ }
+    return '私のおすすめは、まだ材料が少なくて自信がないんです。どんな気分のものを探していますか？';
+  }
+
   /** P591: 彼女自身の様子を聞く雑談（最近どう？／調子どう？）への答え。 */
   private selfStatusAnswer(prompt: string): string | undefined {
     if (!/(?:最近|調子|ようす|様子)(?:は|も|の)?\s*どう/.test(prompt)) return undefined;

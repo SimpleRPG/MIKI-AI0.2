@@ -207,6 +207,10 @@ class UnknownResearchConversationBridgeService {
       };
     }
 
+    // P592: 会話の返答に、表層生成の「温かみ・ユーモア」の定型末尾
+    // （「急がず着実に前へ進もう。誠心誠意…」等）を付けない
+    // （P579 の core 側と同じ規律を、調査橋の IR にも効かせる）。
+    (ir as any).suppressGarnish = true;
     const composed = runtimeConversationCompositionService.compose(ir, 'GENERAL_ANSWER');
     return {
       resolution: status === resolution.status ? resolution : { ...resolution, status, evidenceCount: researchedEvidenceCount },

@@ -608,6 +608,26 @@ check('P591 活用の語幹を聞き返さない', !rainReply.replyText.includes
 const statusReply = await conversationCoreService.execute({ prompt: '最近どう？' } as any);
 check('P591 彼女への様子聞きは自分の状態で答える', (statusReply.replyText.includes('元気') || statusReply.replyText.includes('調子')) && !statusReply.replyText.includes('調べてみた'), statusReply.replyText.slice(0, 140));
 
+// ---- 彼女自身への質問・時計・選択・祝い（P592） ----
+const ageReply = await conversationCoreService.execute({ prompt: 'みきって何歳？' } as any);
+check('P592 年齢の質問は調査に倒さず自分で答える', (ageReply.replyText.includes('歳') || ageReply.replyText.includes('年齢')) && !ageReply.replyText.includes('アラサー'), ageReply.replyText.slice(0, 140));
+const clockReply = await conversationCoreService.execute({ prompt: '今何時？' } as any);
+check('P592 今何時、には現在時刻で答える', /今は\d+時\d+分です/.test(clockReply.replyText), clockReply.replyText.slice(0, 120));
+const weekdayReply = await conversationCoreService.execute({ prompt: '明日って何曜日だっけ' } as any);
+check('P592 明日の曜日はカレンダーで答える', /明日は[日月火水木金土]曜日です/.test(weekdayReply.replyText), weekdayReply.replyText.slice(0, 120));
+const choiceReply = await conversationCoreService.execute({ prompt: '寿司と焼肉、どっちがいいと思う？' } as any);
+check('P592 二択は特定失敗の報告文にしない', choiceReply.replyText.includes('寿司') && choiceReply.replyText.includes('焼肉') && !choiceReply.replyText.includes('特定できません'), choiceReply.replyText.slice(0, 160));
+const congratsReply = await conversationCoreService.execute({ prompt: '彼女できた' } as any);
+check('P592 大きな報告はまず祝う', congratsReply.replyText.includes('おめでとう') || congratsReply.replyText.includes('おめでと'), congratsReply.replyText.slice(0, 120));
+const sleeplessReply = await conversationCoreService.execute({ prompt: '眠れない' } as any);
+check('P592 眠れない夜を受ける', sleeplessReply.replyText.includes('つらい') || sleeplessReply.replyText.includes('無理に') || sleeplessReply.replyText.includes('温かい'), sleeplessReply.replyText.slice(0, 120));
+const snowReply = await conversationCoreService.execute({ prompt: '雪降りそうだね' } as any);
+check('P592 雪の雑談は断片にしない', snowReply.replyText.includes('雪') && !snowReply.replyText.includes('降りの話'), snowReply.replyText.slice(0, 120));
+const recommendReply = await conversationCoreService.execute({ prompt: 'おすすめの暇つぶしある？' } as any);
+check('P592 おすすめ依頼は見出し付き謝罪文にしない', !recommendReply.replyText.includes('【現時点の結論】') && (recommendReply.replyText.includes('おすすめ') || recommendReply.replyText.includes('気分')), recommendReply.replyText.slice(0, 160));
+const bridgeGarnishReply = await conversationCoreService.execute({ prompt: 'ホニャララ5って何？' } as any);
+check('P592 調査橋の返答に定型末尾が付かない', !bridgeGarnishReply.replyText.includes('誠心誠意') && !bridgeGarnishReply.replyText.includes('急がず着実') && !bridgeGarnishReply.replyText.includes('微力ながら'), bridgeGarnishReply.replyText.slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
