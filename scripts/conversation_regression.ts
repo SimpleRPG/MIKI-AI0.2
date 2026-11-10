@@ -1678,6 +1678,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P696 呼び名が無ければ聞き返す', addrUnknown.replyText.includes('何て呼んだら'), addrUnknown.replyText.slice(0, 100));
 }
 
+// ---- 面白いこと要求・高揚の状態・ごはんできた（P697） ----
+{
+  const fun = await conversationCoreService.execute({ prompt: '何か面白いことない？' } as any);
+  check('P697 面白いことの要求は覚えた話で受ける', (fun.replyText.includes('じゃあ一つ') || fun.replyText.includes('ネタが少ない')) && !fun.replyText.includes('出典検索'), fun.replyText.slice(0, 140));
+  const doki = await conversationCoreService.execute({ prompt: 'ドキドキする' } as any);
+  check('P697 ドキドキを心配として受けない', !doki.replyText.includes('心配'), doki.replyText.slice(0, 100));
+  const waku = await conversationCoreService.execute({ prompt: 'ワクワクする' } as any);
+  check('P697 ワクワクを反響で流さない', !waku.replyText.includes('ワクワク、そうなんですね'), waku.replyText.slice(0, 100));
+  const gohan = await conversationCoreService.execute({ prompt: 'ごはんできたよ' } as any);
+  check('P697 「ごはんできた」は達成として祝わない', !gohan.replyText.includes('おめでとう'), gohan.replyText.slice(0, 100));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

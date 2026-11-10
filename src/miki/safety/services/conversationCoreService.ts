@@ -2858,7 +2858,12 @@ export class ConversationCoreService {
       shiritoriService.end();
       return quizService.start();
     }
-    if (/(?:面白い|おもしろい|お話|はなし).{0,4}(?:話して|聞かせて|して|ちょうだい)/.test(prompt) || /(?:何か|なんか).{0,3}(?:話して|聞かせて)/.test(prompt)) {
+    if (/(?:面白い|おもしろい|お話|はなし).{0,4}(?:話して|聞かせて|して|ちょうだい)/.test(prompt) || /(?:何か|なんか).{0,3}(?:話して|聞かせて)/.test(prompt)
+      // P697: 「何か面白いことない？」「暇つぶしに何か」は、面白い
+      // 話の要求。調査に流すと Web の断片がそのまま返っていた。
+      // ただし「おすすめの暇つぶしある？」はおすすめの質問なので
+      // 除く（そちらは recommendation 側の領分）。
+      || /(?:何か|なんか|なにか).{0,4}(?:面白い|おもしろい)こと/.test(prompt) || (/暇つぶし/.test(prompt) && !/おすすめ/.test(prompt))) {
       try {
         const claims = claimDatabaseService.getAllClaims()
           .filter((c) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && c.statement);

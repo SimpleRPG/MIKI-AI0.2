@@ -175,7 +175,10 @@ class UtteranceEventClassifierService {
 
     // P693: 「できた」だけを達成とする（「できる」予定や
     // 「できない」無理とは分ける。否定の無理は core 側の領分）。
-    if (has('でき') && !negated && /(?:できた|できました|できて)/.test(text)) {
+    // P697: 「ごはんできた」は料理が仕上がった知らせで、本人の
+    // 達成報告ではない（「おめでとう」と返っていた）。
+    if (has('でき') && !negated && /(?:できた|できました|できて)/.test(text)
+      && !/(?:ごはん|ご飯|カレー|おかず|ケーキ|お菓子|料理|味噌汁|スープ|お弁当|おやつ)/.test(text)) {
       return { eventClass: 'ACHIEVEMENT', negated, aspect, matchedStem: 'でき（完了）', subject, object };
     }
     // 「失くす」は語幹が「失」+「くし」に割れる。
