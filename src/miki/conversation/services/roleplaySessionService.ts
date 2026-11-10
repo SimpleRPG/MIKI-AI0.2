@@ -42,6 +42,8 @@ export interface RoleplaySession {
   sceneBeats?: number;
   // P554: 弱い終了信号を検出した歩数。3歩以内にもう一度来たら終了が確定する。
   pendingEndBeat?: number;
+  // P577: 既に使った場面進行文（重複排除用）。場面が変わると消える。
+  usedProgressions?: string[];
 }
 
 const ROLES_KEY = 'miki_roleplay_roles_v1';
@@ -238,6 +240,16 @@ export class RoleplaySessionService {
     const session = this.loadSession();
     if (!session) return;
     session.scene = normalizeName(scene);
+    // P577: 場面が変わったら、使った進行文の記録は持ち越さない。
+    session.usedProgressions = [];
+    this.persistSession();
+  }
+
+  /** P577: 使った場面進行文を記録する（重複排除用）。 */
+  public noteProgressionUsed(text: string): void {
+    const session = this.loadSession();
+    if (!session) return;
+    session.usedProgressions = [...(session.usedProgressions ?? []), text].slice(-24);
     this.persistSession();
   }
 

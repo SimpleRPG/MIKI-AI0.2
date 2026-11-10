@@ -15,6 +15,8 @@ import { userKnowledgeProfileService } from './userKnowledgeProfileService';
 import { worldModelCanvasExportService } from '../../selfAwareness/services/worldModelCanvasExportService';
 import { stateSnapshotExportService } from '../../selfAwareness/services/stateSnapshotExportService';
 import { knowledgeSelfInspectionService } from '../../selfAwareness/services/knowledgeSelfInspectionService';
+import { selfPreferenceService } from '../../selfAwareness/services/selfPreferenceService';
+import { personaProfileService } from './personaProfileService';
 import { conversationLanguageComponentGraphP213Service } from './conversationLanguageComponentGraphP213Service';
 import { conversationGraphCompletionP214Service } from './conversationGraphCompletionP214Service';
 import { conversationGraphConnectorP211Service } from './conversationGraphConnectorP211Service';
@@ -225,6 +227,23 @@ class ConversationGraphRuntimeP212Service {
   if(findings.length===0)return '自分の知識と語彙を点検しました。今のところ、大きな穴は見つかりませんでした。';
   return `自分の知識と語彙を点検しました。気になるところが${findings.length}件あります。\n`+findings.slice(0,5).map((f,i)=>`${i+1}. ${f}`).join('\n');
  }
+ // P578: 自分の好み・興味・得意の想起。教示（A）を確かなものとして
+ // 先に、頻度から導いた「よく話すもの」（B）を弱く添える。
+ private selfInquiryPreferenceAnswer():string {
+  const personaId=personaProfileService.get().profileId;
+  const taught=selfPreferenceService.listTaught(personaId);
+  const likes=taught.filter((p)=>p.kind==='like').map((p)=>p.term);
+  const interests=taught.filter((p)=>p.kind==='interest').map((p)=>p.term);
+  const goodAt=taught.filter((p)=>p.kind==='good_at').map((p)=>p.term);
+  const derived=selfPreferenceService.derivedInterests(personaId);
+  const parts:string[]=[];
+  if(likes.length>0)parts.push(`好きなものは、${likes.join('と')}です`);
+  if(interests.length>0)parts.push(`興味があるのは、${interests.join('と')}です`);
+  if(goodAt.length>0)parts.push(`得意なのは、${goodAt.join('と')}です`);
+  if(derived.length>0)parts.push(`よく話すのは、${derived.join('と')}ですね`);
+  if(parts.length===0)return '自分の好きなものは、まだ特に決まっていません。教えてもらえると嬉しいです。';
+  return parts.join('。')+'。';
+ }
  // P555: 作業状態（今の作業・次の手）の想起。相方として「今何を
  // 作ってるの？」に答えるための入口。
  private selfInquiryWorkStateAnswer(value:string):string|undefined {
@@ -331,6 +350,9 @@ class ConversationGraphRuntimeP212Service {
   }
   if(/点検|自分の弱点|弱点はある/u.test(value)){
    return this.selfInquirySelfInspectionAnswer();
+  }
+  if(/好きな(?:もの|こと)|興味が(?:ある|ない)|得意な(?:こと|もの|こと)/u.test(value)){
+   return this.selfInquiryPreferenceAnswer();
   }
   if(/(?:今|現在)(?:何|なに)を(?:作って|して)|(?:今|現在)の作業|次の作業|次は(?:何|なに)|進捗/u.test(value)){
    const workAnswer=this.selfInquiryWorkStateAnswer(value);

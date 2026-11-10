@@ -48,6 +48,7 @@ import { conversationComponentPipelineService } from '../../conversation/service
 import { japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { userKnowledgeProfileService } from '../../conversation/services/userKnowledgeProfileService';
+import { selfPreferenceService } from '../../selfAwareness/services/selfPreferenceService';
 import { runtimeConversationCompositionService } from '../../conversation/services/runtimeConversationCompositionService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
 import { paragraphCompositionService } from '../../conversation/services/paragraphCompositionService';
@@ -162,6 +163,14 @@ export class ConversationCoreService {
     const componentAnalysis = conversationComponentPipelineService.analyzeSync(prompt);
     const japaneseAnalysis = componentAnalysis.analysis;
     stages.japanese = 0; // analysis is intentionally sub-millisecond on supported WebView engines
+
+    // P578-B: 会話に出てくる内容語の頻度を、人格ごとの「よく話す
+    // もの」として数える（好みの導出の材料）。なりチャ中は数えない。
+    try {
+      if (prompt && !roleplaySessionService.isActive()) {
+        selfPreferenceService.observeTerms(personaProfileService.get().profileId, japaneseAnalysis.contentTokens);
+      }
+    } catch { /* 頻度の記録は補助経路 */ }
 
     if (!prompt) {
       return this.buildResult('RESOLVED', 'empty_input', '入力が空です。', state, 'CASUAL_CHAT', 0, [], started, stages);
@@ -689,6 +698,11 @@ export class ConversationCoreService {
         // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
         const taughtAck = this.taughtTermAcknowledgement(prompt);
         if (taughtAck) casualConclusion = taughtAck;
+        // P578: 教わった「自分の好きなもの」の話なら、自分の好きとして受ける。
+        if (!taughtAck && !answeredTopicQuestion) {
+          const selfLike = this.selfLikeReaction(prompt);
+          if (selfLike) casualConclusion = selfLike;
+        }
       }
       // P522: 前の日以前に開いた話題が残っていれば、挨拶のときに
       // 一度だけ拾う。
@@ -801,6 +815,11 @@ export class ConversationCoreService {
                       ? this.pickFixedReply('fx_agree', ['そうですよね。', 'うんうん、分かります。', 'そうですね。同感です。'])
                       : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
                         ?? 'そうなんですね。話してくれてありがとう。'));
+      // P578: 教わった「自分の好きなもの」の話なら、自分の好きとして受ける。
+      if (!taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughClosing) {
+        const like = this.selfLikeReaction(prompt);
+        if (like) reactionBase = like;
+      }
       // P574: 直前の話題質問への答えなら、答えとして受ける（状態の
       // 受け止めと、教わった意味の「覚えた」が優先）。
       if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughClosing) {
@@ -1489,6 +1508,24 @@ export class ConversationCoreService {
       if (Date.now() - Number(rec.at || 0) > 10 * 60_000) return undefined;
       if (!prompt.includes(rec.term)) return undefined;
       return `「${rec.term}」、覚えました！${rec.gloss}ということですね。教えてくれてありがとうございます。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P578: 教わった「自分の好きなもの」が発話に出てきたら、自分の
+   * 好きとして受ける（人格ごとの記録を見る）。
+   */
+  private selfLikeReaction(prompt: string): string | undefined {
+    try {
+      const likes = selfPreferenceService.listTaught(personaProfileService.get().profileId)
+        .filter((p) => p.kind === 'like');
+      const hit = likes.find((p) => prompt.includes(p.term));
+      if (!hit) return undefined;
+      return this.pickFixedReply('fx_self_like', [
+        `${hit.term}、私も好きなんです。`,
+        `${hit.term}の話、嬉しいです。私も好きで。`,
+        `${hit.term}、いいですよね。私も好きなんです。`,
+      ]);
     } catch { return undefined; }
   }
 

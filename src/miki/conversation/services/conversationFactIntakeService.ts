@@ -6,6 +6,7 @@ import { intakeMeaningGuardService } from '../../memory/services/intakeMeaningGu
 import { roleplaySessionService } from './roleplaySessionService';
 import { personaProfileService } from './personaProfileService';
 import { userKnowledgeProfileService } from './userKnowledgeProfileService';
+import { selfPreferenceService } from '../../selfAwareness/services/selfPreferenceService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
@@ -535,6 +536,23 @@ export class ConversationFactIntakeService {
    * 「Xって何？」は知らない側、知らない側だった語を普通の文で
    * 使ったら知っている側へ移す。
    */
+  /**
+   * P578-A: 彼女自身の好みを教わる（「みきはモコロンが好きだよ」）。
+   * 主語が彼女を指す形のときだけ記録する（ユーザーの好みと混同しない）。
+   * 仮定・迷いの形は意味チェックで落とす。
+   */
+  private learnSelfPreferenceFromUserText(text: string): void {
+    const m = String(text || '').match(/(みき|ビービー|あなた|君|あんた)(?:は|って)、?\s*(.{1,16}?)(が好き|に興味がある|が得意)/);
+    if (!m) return;
+    if (!intakeMeaningGuardService.check(text).ok) return;
+    const who = m[1];
+    const term = m[2].trim();
+    if (!term || /^(これ|それ|あれ|何|なに)/.test(term)) return;
+    const kind = m[3] === 'が好き' ? 'like' : m[3] === 'が得意' ? 'good_at' : 'interest';
+    const personaId = who === 'ビービー' ? 'persona-bibi' : who === 'みき' ? 'persona-default' : personaProfileService.get().profileId;
+    selfPreferenceService.recordTaught(personaId, term, kind as 'like' | 'interest' | 'good_at');
+  }
+
   private observeUserKnowledgeSignals(text: string): void {
     const value = String(text || '');
     let questionedTerm: string | undefined;
@@ -587,6 +605,10 @@ export class ConversationFactIntakeService {
     // なくても意味として取り込む。失敗しても取り込みは止めない。
     try {
       this.learnPendingUnknownTerm(text);
+    } catch { /* best-effort */ }
+    // P578-A: 彼女自身の好みの教示（「みきはXが好き」）。
+    try {
+      this.learnSelfPreferenceFromUserText(text);
     } catch { /* best-effort */ }
     // P544: 相手の知識モデル（知っている言葉／知らない言葉）の
     // 材料集め。失敗しても取り込み自体は止めない。

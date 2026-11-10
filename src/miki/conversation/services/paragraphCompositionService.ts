@@ -48,6 +48,41 @@ interface UsageEntry {
 const USAGE_KEY = 'miki_paragraph_material_usage_v1';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// P577: 場面進行の型プール。[場面のパターン, [序盤, 中盤, 終盤]] で、
+// 相ごとに2文ずつ持つ。使った文はセッション側で重複排除される。
+const SCENE_PROGRESSION_POOLS: Array<[RegExp, string[][]]> = [
+  [/教室|学校|授業/, [
+    ['チャイムが鳴って、休み時間になりました。', '窓の外で、運動場の声が大きくなってきました。'],
+    ['黒板の文字が、午後の光で少し見えにくくなってきました。', '通路の向こうで、次の授業の準備が始まりました。'],
+    ['放課後のチャイムが、遠くで鳴りました。', '教室の空気が、少しずつ静かになってきました。'],
+  ]],
+  [/海|浜|港|船/, [
+    ['波の音が、少しずつ強くなってきました。', '遠くの海で、船の汽笛が聞こえました。'],
+    ['潮の香りが、風に乗って濃くなってきました。', '波打ち際の光が、ゆらゆらと揺れています。'],
+    ['夕日の色が、海の端ににじみ始めました。', '波の音だけが、静かに残りました。'],
+  ]],
+  [/森|林|山/, [
+    ['木の間を、風が通り抜けていきました。', 'どこかで、小鳥が鳴き始めました。'],
+    ['木漏れ日が、足元でゆっくり動いていきました。', '遠くで、枝の折れる音がしました。'],
+    ['森の奥が、少しずつ薄暗くなってきました。', '虫の声が、静かに増えてきました。'],
+  ]],
+  [/街|町|店/, [
+    ['通りの向こうで、店の明かりが灯り始めました。', '人通りが、少しずつ増えてきました。'],
+    ['店先のざわめきが、通りに広がってきました。', '誰かの笑い声が、風に乗って聞こえました。'],
+    ['通りの明かりが、一つずつ消え始めました。', '街の音が、少しずつ遠くなってきました。'],
+  ]],
+  [/城|宮殿/, [
+    ['遠くで、鐘が鳴りました。', '廊下を、衛兵の足音が過ぎていきました。'],
+    ['窓から差す光が、床の模様を移していきました。', 'どこかで、扉の開く音がしました。'],
+    ['城の明かりが、順に落とされていきました。', '廊下の静けさが、深くなってきました。'],
+  ]],
+  [/部屋|家|自宅/, [
+    ['窓の外が、少し暗くなってきました。', '時計の針が、カチリと進みました。'],
+    ['部屋の空気が、静かに落ち着いてきました。', '外から、かすかに生活の音が聞こえました。'],
+    ['明かりを落とした部屋が、静かになりました。', '夜の気配が、窓の外に広がってきました。'],
+  ]],
+];
+
 class ParagraphCompositionService {
   // ---- 使用台帳（新しさの物差し） ----
 
@@ -402,19 +437,40 @@ class ParagraphCompositionService {
     if (!scene) return undefined;
     const beat = roleplaySessionService.advanceSceneBeat();
     if (beat % 3 !== 0) return undefined;
-    const stepIndex = Math.floor(beat / 3) - 1;
-    const pools: Array<[RegExp, string[]]> = [
-      [/教室|学校|授業/, ['チャイムが鳴って、休み時間になりました。', '窓の外で、運動場の声が大きくなってきました。']],
-      [/海|浜|港|船/, ['波の音が、少しずつ強くなってきました。', '遠くの海で、船の汽笛が聞こえました。']],
-      [/森|林|山/, ['木の間を、風が通り抜けていきました。', 'どこかで、小鳥が鳴き始めました。']],
-      [/街|町|店/, ['通りの向こうで、店の明かりが灯り始めました。', '人通りが、少しずつ増えてきました。']],
-      [/城|宮殿/, ['遠くで、鐘が鳴りました。', '廊下を、衛兵の足音が過ぎていきました。']],
-      [/部屋|家|自宅/, ['窓の外が、少し暗くなってきました。', '時計の針が、カチリと進みました。']],
-    ];
-    for (const [pattern, pool] of pools) {
-      if (pattern.test(scene)) return ` ${pool[stepIndex % pool.length]}`;
+    const step = Math.floor(beat / 3) - 1;
+    // P577: 序盤（〜2回）→中盤（〜5回）→終盤の3相で型を変え、
+    // 使った文はセッションに記録して繰り返さない。
+    const phase = step <= 1 ? 0 : step <= 4 ? 1 : 2;
+    const used = new Set(session.usedProgressions ?? []);
+    // その相の未使用を優先し、尽きたら他の相の未使用を借りる。
+    // 全部使い切って初めて繰り返しを許す。
+    const pickFrom = (phases: string[][]): string | undefined => {
+      const inPhase = phases[phase].filter((s) => !used.has(s));
+      if (inPhase.length > 0) return inPhase[step % inPhase.length];
+      const anywhere = phases.flat().filter((s) => !used.has(s));
+      if (anywhere.length > 0) return anywhere[step % anywhere.length];
+      const pool = phases[phase];
+      return pool[step % pool.length];
+    };
+    for (const [pattern, phases] of SCENE_PROGRESSION_POOLS) {
+      if (pattern.test(scene)) {
+        const text = pickFrom(phases);
+        if (text) {
+          roleplaySessionService.noteProgressionUsed(text);
+          return ` ${text}`;
+        }
+      }
     }
-    return ` ${scene}の時間が、少し進みました。`;
+    // 汎用: 場面名と、セッションで出た内容語から出来事を組み立てる。
+    const term = (session.notedTerms ?? []).slice(-1)[0];
+    const genericPools: string[][] = [
+      [`${scene}の空気に、少しずつ慣れてきました。`, term ? `${term}の様子が、目に入ってきました。` : `${scene}の時間が、静かに流れ始めました。`],
+      [`${scene}の時間が、ゆっくりと流れていきます。`, term ? `${term}のことが、ふと気になりました。` : `${scene}の空気が、少しずつ変わってきました。`],
+      [`${scene}の空気が、少しずつ静かになってきました。`, `そろそろ、${scene}にも区切りが見えてきました。`],
+    ];
+    const text = pickFrom(genericPools);
+    if (text) roleplaySessionService.noteProgressionUsed(text);
+    return text ? ` ${text}` : undefined;
   }
 }
 

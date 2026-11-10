@@ -28,6 +28,7 @@ const { conversationGraphRuntimeP212Service} = await import('../src/miki/convers
 const { roleplaySessionService} = await import('../src/miki/conversation/services/roleplaySessionService');
 const { classifyDialogueAct } = await import('../src/miki/conversation/services/conversationStateService');
 const { reviewReflectionService } = await import('../src/miki/selfAwareness/services/reviewReflectionService');
+const { selfPreferenceService } = await import('../src/miki/selfAwareness/services/selfPreferenceService');
 const { worldModelCanvasExportService } = await import('../src/miki/selfAwareness/services/worldModelCanvasExportService');
 const { associationGraphService } = await import('../src/miki/memory/services/associationGraphService');
 const { knowledgeConsolidationService } = await import('../src/miki/selfAwareness/services/knowledgeConsolidationService');
@@ -462,6 +463,39 @@ const guardTrip = await conversationCoreService.execute({ prompt: '昨日は晴�
 check('P575 本物の時間の混在は今もガードが止める', String((guardTrip as any).replyText || '').includes('時間・状態条件が混在'), String((guardTrip as any).replyText || '').slice(0, 160));
 const hot = await conversationCoreService.execute({ prompt: '暑いね' } as any);
 check('P576 暑さの雑談に季節感のある受け止め', String((hot as any).replyText || '').includes('水分') || String((hot as any).replyText || '').includes('珍しい') || String((hot as any).replyText || '').includes('体調'), String((hot as any).replyText || '').slice(0, 160));
+
+// ---- 場面進行の3相と重複排除（P577） ----
+const p577Role = roleplaySessionService.saveRole({ name: '進行テスト役', stance: '案内人', world: 'テスト世界', toneHint: '', userRole: '' } as any);
+roleplaySessionService.startSession(p577Role as any, 'persona-default');
+roleplaySessionService.setScene('教室');
+const progressions: string[] = [];
+for (let i = 0; i < 30; i++) {
+  const s = paragraphCompositionService.sceneProgressionSuffix();
+  if (s) progressions.push(s.trim());
+}
+check('P577 進行文は使い切るまで重複しない', progressions.length >= 6 && new Set(progressions.slice(0, 6)).size === 6, progressions.slice(0, 6).join(' / '));
+roleplaySessionService.setScene('異世界の宿屋');
+roleplaySessionService.noteTurn('ここは魔法の宿屋だね');
+const genericProgressions: string[] = [];
+for (let i = 0; i < 12; i++) {
+  const s = paragraphCompositionService.sceneProgressionSuffix();
+  if (s) genericProgressions.push(s.trim());
+}
+check('P577 未対応の場面でも汎用文の連発にならない', genericProgressions.length >= 3 && !genericProgressions.some((t) => t.includes('の時間が、少し進みました')) && new Set(genericProgressions).size >= 3, genericProgressions.join(' / '));
+roleplaySessionService.endSession();
+
+// ---- 自分の好み（P578: 教示A＋頻度導出B） ----
+conversationFactIntakeService.intakeFromUserText('みきはモコロンが好きだよ', []);
+check('P578-A 教示で自分の好きを記録', selfPreferenceService.listTaught('persona-default').some((p) => p.term === 'モコロン' && p.kind === 'like'), JSON.stringify(selfPreferenceService.listTaught('persona-default')));
+conversationFactIntakeService.intakeFromUserText('ビービーは星空が好きだよ', []);
+check('P578-A 人格ごとに分かれる', selfPreferenceService.listTaught('persona-bibi').some((p) => p.term === '星空') && !selfPreferenceService.listTaught('persona-default').some((p) => p.term === '星空'), '');
+conversationGraphRuntimeP212Service.ingestInput('regression-p578', 'みきの好きなものは？');
+const preferenceAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p578');
+check('P578 好きなものを聞くと答える', Boolean(preferenceAnswer && preferenceAnswer.includes('モコロン')), String(preferenceAnswer).slice(0, 160));
+const likeReply = await conversationCoreService.execute({ prompt: 'モコロンかわいい' } as any);
+check('P578 好きなものの話は自分の好きとして受ける', likeReply.replyText.includes('私も好き'), likeReply.replyText);
+for (let i = 0; i < 7; i++) selfPreferenceService.observeTerms('persona-default', ['星空観察']);
+check('P578-B 頻度から「よく話すもの」を導く', selfPreferenceService.derivedInterests('persona-default').includes('星空観察'), JSON.stringify(selfPreferenceService.derivedInterests('persona-default')));
 
 // ---- 結果 ----
 let fail = 0;
