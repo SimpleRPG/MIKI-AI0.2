@@ -1661,6 +1661,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P695 「ちょっと待って」は待機で答える', hold.replyText.includes('待って') && !hold.replyText.includes('やってみます'), hold.replyText.slice(0, 100));
 }
 
+// ---- 「僕のこと何て呼ぶ？」（P696） ----
+{
+  const { conversationFactIntakeService: intake696 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem696: any[] = [];
+  const run696 = async (q: string) => {
+    const iq = intake696.intakeFromUserText(q, mem696);
+    mem696 = iq.updatedMemories;
+    const r = await conversationCoreService.execute({ prompt: q, memories: mem696 } as any);
+    return r.replyText;
+  };
+  await run696('僕の名前はきりあだよ');
+  const addr = await run696('僕のこと何て呼ぶ？');
+  check('P696 呼び方は教わった名前で答える', addr.includes('「きりあ」と呼んで'), addr.slice(0, 100));
+  const addrUnknown = await conversationCoreService.execute({ prompt: '僕のこと何て呼ぶ？', memories: [] } as any);
+  check('P696 呼び名が無ければ聞き返す', addrUnknown.replyText.includes('何て呼んだら'), addrUnknown.replyText.slice(0, 100));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

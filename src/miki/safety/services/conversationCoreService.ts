@@ -564,6 +564,20 @@ export class ConversationCoreService {
       if (recentExp) {
         return this.buildResult('RESOLVED', 'recent_experience_answer', this.applyPersonaVoice(recentExp), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P692/P696: 保持済みの相手の名前（呼び名）。名前の想起と、
+      // 「何て呼ぶ？」の両方が同じ引き方を使う。
+      const knownUserName = (memories || []).find((mm: any) => mm && mm.factValue &&
+        (mm.factAttribute === '名前・呼び名' ||
+          (mm.factAttribute === '名前' && /^(?:僕|私|俺|おれ|名前|ユーザー)$/.test(String(mm.factEntity || '')))))?.factValue;
+      // P696: 「僕のこと何て呼ぶ？」は、彼女が相手をどう呼ぶかの
+      // 質問。教わった呼び名で答え、無ければ聞き返すのが自然
+      // （未検証の受け流しになっていた）。
+      if (/(?:僕|私|俺|おれ)のこと(?:何て|なんて|何と)呼|(?:何て|なんて)(?:呼んで(?:る|いる|くれる)|呼べば|呼んだら)/.test(prompt)) {
+        if (knownUserName) {
+          return this.buildResult('RESOLVED', 'user_address_answer', this.applyPersonaVoice(`あなたのことは「${knownUserName}」と呼んでいますよ。`), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
+        return this.buildResult('RESOLVED', 'user_address_unknown_answer', this.applyPersonaVoice('まだ呼び名を聞いていませんでした。何て呼んだらいいですか？'), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 相手の名前を聞かれて、保持済みの事実に無いときは、
       // 汎用の「答えられない」でなく、まだ教わっていないと正直に言う。
       if (/(?:僕|私|俺|わたし)の名前|名前.*(?:知ってる|覚えてる|覚えている)/.test(prompt)) {
@@ -573,9 +587,7 @@ export class ConversationCoreService {
         if (!isTeaching) {
           // P692: 保持済みの名前があれば、知らないと言わず名前で答える
           // （従来は事実の有無を見ずに常に「知らない」だった）。
-          const knownName = (memories || []).find((mm: any) => mm && mm.factValue &&
-            (mm.factAttribute === '名前・呼び名' ||
-              (mm.factAttribute === '名前' && /^(?:僕|私|俺|おれ|名前|ユーザー)$/.test(String(mm.factEntity || '')))))?.factValue;
+          const knownName = knownUserName;
           if (knownName) {
             return this.buildResult('RESOLVED', 'user_name_known_answer', this.applyPersonaVoice(`覚えていますよ。「${knownName}」ですよね。`), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
           }
