@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1798,
     "sourceFileCount": 1351,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1262,
-    "relativeImportCandidateCount": 4006,
-    "resolvedRelativeImportCandidateCount": 3990,
+    "relativeImportCandidateCount": 4008,
+    "resolvedRelativeImportCandidateCount": 3992,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1697,9 +1697,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 101083,
-      "lines": 929,
-      "sha256": "5f8fb7aa7a08b94bac0e3b0910f436f100bc66d23af04647a36484e1488170ec",
+      "bytes": 102382,
+      "lines": 943,
+      "sha256": "2544a15a29d39c9564601979d6d26612dff45e5911a480634079ce031383db93",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -1892,10 +1892,22 @@
           "specifier": "../src/miki/conversation/services/userStateTrailService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/userStateTrailService.ts"
+        },
+        {
+          "line": 918,
+          "specifier": "../src/services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 919,
+          "specifier": "../src/miki/memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         }
       ],
-      "relativeImportCandidateCount": 32,
-      "resolvedRelativeImportCount": 32,
+      "relativeImportCandidateCount": 34,
+      "resolvedRelativeImportCount": 34,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27296,9 +27308,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 190151,
-      "lines": 2739,
-      "sha256": "b24243aa4a90be5b0e3d46d37f3ac6ece7373379f5e04a682c95b0b7417438a6",
+      "bytes": 192197,
+      "lines": 2777,
+      "sha256": "95364d7cde188d3530dee0deccd8fea8fe0425b03425f6a8b8f64c8c1cd23a9d",
       "relativeImportCandidates": [
         {
           "line": 1,

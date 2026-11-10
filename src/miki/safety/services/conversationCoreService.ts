@@ -917,10 +917,14 @@ export class ConversationCoreService {
           casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
         } else {
           // P571/P570: 挨拶の場で、彼女の側の近況も1件だけ出す。
-          // 優先順位は、背景で学べた語の報告 → 今日の振り返り。
+          // 優先順位は、背景で学べた語の報告 → 解けた質問の報告 →
+          // 今日の振り返り。
           const report = this.learnedTermReport();
+          const resolvedReport = report ? undefined : this.resolvedQuestionReport();
           if (report) {
             casualConclusion += `\n${report}`;
+          } else if (resolvedReport) {
+            casualConclusion += `\n${resolvedReport}`;
           } else {
             const mention = this.reflectionMention();
             if (mention) {
@@ -1888,6 +1892,40 @@ export class ConversationCoreService {
         return gloss
           ? `そういえば、この前聞いた「${term}」、調べて覚えました。${String(gloss).slice(0, 60)}という意味だそうです。`
           : `そういえば、この前聞いた「${term}」、調べて覚えました。`;
+      }
+    } catch { /* 報告は補助 */ }
+    return undefined;
+  }
+
+  /**
+   * P621: 答えられなかった質問（P617 の台帳）が、検証済みの知識
+   * （SUPPORTED な Claim）で答えられるようになっていたら、挨拶の
+   * ときに一度だけ彼女から報告する。報告したら台帳から消す。
+   * これで「質問」単位でも、分からない→分かるの循環が閉じる。
+   */
+  private resolvedQuestionReport(): string | undefined {
+    try {
+      if (roleplaySessionService.isActive()) return undefined;
+      const ledger = JSON.parse(storageService.getItem('miki_unanswered_questions_v1') || '[]') as Array<{ question: string; at: number }>;
+      if (ledger.length === 0) return undefined;
+      const claims = claimDatabaseService.getAllClaims()
+        .filter((c: any) => c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED');
+      if (claims.length === 0) return undefined;
+      for (let i = 0; i < ledger.length; i++) {
+        const entry = ledger[i];
+        if (Date.now() - Number(entry.at || 0) < 3600_000) continue;
+        const tokens = utteranceFeatureService.analyze(entry.question).contentTokens.filter((t) => t.length >= 2);
+        if (tokens.length === 0) continue;
+        const main = tokens[0];
+        const hit = claims.find((c: any) => {
+          const st = String(c.statement || '');
+          if (!st.includes(main)) return false;
+          return tokens.length === 1 || tokens.slice(1).some((t) => st.includes(t));
+        });
+        if (!hit) continue;
+        ledger.splice(i, 1);
+        storageService.setItem('miki_unanswered_questions_v1', JSON.stringify(ledger));
+        return `そういえば、この前の「${entry.question}」、分かりました。${String((hit as any).statement).slice(0, 90)}`;
       }
     } catch { /* 報告は補助 */ }
     return undefined;

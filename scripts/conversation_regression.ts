@@ -913,6 +913,20 @@ check('P618 似てるかは説明から答える', similarReply.replyText.includ
 const notPainReply = await conversationCoreService.execute({ prompt: '痛くないよ' } as any);
 check('P620 痛くないは痛みの受け止めにならない', !notPainReply.replyText.includes('痛むときは'), notPainReply.replyText.slice(0, 120));
 
+// ---- 解けた質問は彼女から報告する（P621） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { claimDatabaseService } = await import('../src/miki/memory/services/claimDatabaseService');
+  storageService.setItem('miki_unanswered_questions_v1', JSON.stringify([{ question: 'クオッカの寿命はどのくらい？', at: Date.now() - 2 * 3600_000 }]));
+  claimDatabaseService.registerClaim({ statement: 'クオッカの寿命は10年ほどです。', world: 'REAL', kind: 'FACT', status: 'SUPPORTED', source: 'regression-p621' } as any);
+  const greet1 = await conversationCoreService.execute({ prompt: 'おはよう' } as any);
+  const greet2 = await conversationCoreService.execute({ prompt: 'こんにちは' } as any);
+  const combined = greet1.replyText + '\n' + greet2.replyText;
+  check('P621 解けた質問が挨拶で報告される', combined.includes('分かりました') && combined.includes('寿命は10年'), combined.slice(0, 240));
+  const after = JSON.parse(storageService.getItem('miki_unanswered_questions_v1') || '[]') as Array<{ question: string }>;
+  check('P621 報告した質問は台帳から消える', !after.some((e) => e.question.includes('クオッカの寿命')), JSON.stringify(after).slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
