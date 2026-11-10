@@ -342,6 +342,11 @@ export class ConversationCoreService {
       if (arithmetic) {
         return this.buildResult('RESOLVED', 'arithmetic_answer', arithmetic, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P604: 食事の迷いは、一緒に考える形で受ける。
+      const dinner = this.dinnerMusingAnswer(prompt);
+      if (dinner) {
+        return this.buildResult('RESOLVED', 'dinner_musing_answer', this.applyPersonaVoice(dinner), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const recap = multiPart ? undefined : this.conversationRecapAnswer(prompt, state);
       if (recap) {
         return this.buildResult('RESOLVED', 'conversation_recap_answer', this.applyPersonaVoice(recap), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -756,7 +761,7 @@ export class ConversationCoreService {
       // P572: 別れ・出発・帰宅の挨拶は、会話の締めとして最優先で受ける
       // （「行ってきます」に「こんにちは」と返していた等）。
       // P603: 「また明日」と寝る宣言（「もう寝るね」）も締めの挨拶。
-      const closingFamily = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|また明日|バイバイ|さようなら|さよなら|寝(?:る|ます|よう)(?:ね|よ|な)/.test(prompt);
+      const closingFamily = /おやすみ|行ってきます|いってきます|行ってくる|いってくる|ただいま|じゃあね|じゃね|またね|また明日|バイバイ|さようなら|さよなら|寝(?:る|ます|よう)(?:ね|よ|な)/.test(prompt);
       let casualConclusion: string;
       if (/おやすみ/.test(prompt)) {
         casualConclusion = fx('fx_goodnight',
@@ -768,7 +773,7 @@ export class ConversationCoreService {
         casualConclusion = fx('fx_goodnight',
           ['おやすみなさい。今日も一日お疲れ様でした。', 'おやすみなさい。ゆっくり休んでくださいね。', 'おやすみなさい。いい夢を。'],
           ['おやすみ！ゆっくり寝てね。', 'おやすみー！いい夢みてね。', 'おやすみ！今日もがんばったね。']);
-      } else if (/行ってきます|いってきます/.test(prompt)) {
+      } else if (/行ってきます|いってきます|行ってくる|いってくる/.test(prompt)) {
         casualConclusion = fx('fx_departure',
           ['行ってらっしゃい！気をつけてくださいね。', '行ってらっしゃい。いい日になりますように。', '行ってらっしゃい。帰りを待っていますね。'],
           ['いってらっしゃい！気をつけてね。', 'いってらっしゃい！がんばってね。', 'いってらっしゃーい！待ってるね。']);
@@ -946,13 +951,13 @@ export class ConversationCoreService {
       const fallthroughPain = userStateTrailService.isPainText(prompt);
       // P572: 別れ・出発・帰宅の挨拶（宣言文で来た場合）。
       // P603: 「また明日」と寝る宣言も締めに数える。
-      const fallthroughClosing = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|また明日|バイバイ|さようなら|さよなら/.test(prompt)
+      const fallthroughClosing = /おやすみ|行ってきます|いってきます|行ってくる|いってくる|ただいま|じゃあね|じゃね|またね|また明日|バイバイ|さようなら|さよなら/.test(prompt)
         || (/寝(?:る|ます|よう)(?:ね|よ|な|。|！|!|$)/.test(prompt) && prompt.length <= 20);
       const fallthroughClosingText = !fallthroughClosing
         ? undefined
         : /おやすみ|寝(?:る|ます|よう)(?:ね|よ|な|。|！|!|$)/.test(prompt)
           ? this.pickFixedReply('fx_goodnight', ['おやすみなさい。今日も一日お疲れ様でした。', 'おやすみなさい。ゆっくり休んでくださいね。', 'おやすみなさい。いい夢を。'])
-          : /行ってきます|いってきます/.test(prompt)
+          : /行ってきます|いってきます|行ってくる|いってくる/.test(prompt)
             ? this.pickFixedReply('fx_departure', ['行ってらっしゃい！気をつけてくださいね。', '行ってらっしゃい。いい日になりますように。', '行ってらっしゃい。帰りを待っていますね。'])
             : /ただいま/.test(prompt)
               ? this.pickFixedReply('fx_homecoming', ['おかえりなさい！お疲れ様でした。', 'おかえりなさい。ゆっくりしてくださいね。', 'おかえりなさいませ！待っていましたよ。'])
@@ -1068,6 +1073,10 @@ export class ConversationCoreService {
         } else if (/仕事(?:が|は)?.{0,4}(?:終わった|終わりました|おわった|終わり)/.test(prompt)) {
           // P591: 仕事終わりの報告は労う。
           reactionBase = ffx('fx_work_done', ['お仕事、お疲れ様でした！', 'お疲れ様でした。ゆっくり休んでくださいね。'], ['お仕事おつかれさま！', 'おつかれさまー！ゆっくり休んでね。']);
+        } else if (/(?:明日|あした|今日)は(?:お)?休み|休み(?:だよ|です|なんだ|なんです)/.test(prompt)) {
+          // P604: 休みの宣言は、ゆっくりしてもらう形で受ける
+          // （汎用の相槌になっていた）。
+          reactionBase = ffx('fx_dayoff', ['お休みですか。ゆっくりしてくださいね。', 'いいですね、のんびりできますね。今日は休む日にしましょう。'], ['お休みなんだ。ゆっくりしてね。', 'いいね、のんびりしよ。']);
         } else if (!roleplaySessionService.isActive() && /(?:電話(?:を)?(?:かけ|し)て|起こして|アラーム.*(?:セット|かけて)|メール.*送って|メッセージ.*送って)/.test(prompt)) {
           // P593: 端末の外の行為（電話・目覚まし・送信）は、引き受けた
           // ふりをせず、できないことを正直に言う。
@@ -1909,6 +1918,9 @@ export class ConversationCoreService {
       // P581: 活用の語幹（「頑張」+「る」等）も聞き返さない。
       const topic = (unknownTerms || []).find((t) => {
         if (t.length < 2 || !prompt.includes(t) || projectNotebookService.findProject(t)) return false;
+        // P604: 時間の語で始まる複合（「明日早起」等）は予定の断片で、
+        // 語の意味を聞く対象ではない。
+        if (/^(?:今日|明日|昨日|朝|昼|夕方|夜|今朝|今夜|週末|今週|来週)/.test(t)) return false;
         const after = prompt.slice(prompt.indexOf(t) + t.length, prompt.indexOf(t) + t.length + 1);
         // P591: 「雨降」+って、「仕事終」+わった のような活用の語幹も
         // 聞き返さない（直後の「わ」「っ」も語幹の続きとみなす）。
@@ -2053,6 +2065,15 @@ export class ConversationCoreService {
     const value = format(result);
     if (!value) return undefined;
     return `${m[1]}${opLabel}${m[3]}は${value}です。`;
+  }
+
+  /** P604: 食事の迷い（「晩ごはん何にしよう」）には、気分を聞き返して一緒に考える。 */
+  private dinnerMusingAnswer(prompt: string): string | undefined {
+    if (!/(?:晩ごはん|夕飯|夕食|昼ごはん|昼食|朝ごはん|朝食|ごはん|食事).*(?:何にしよ|なにしよ|何がいい|なにがいい|何食べ|なに食べ)/.test(prompt)) return undefined;
+    return this.pickFixedReply('fx_dinner_musing', [
+      '迷いますね。和食と洋食、どっちの気分ですか？温かい汁物があると落ち着きますよ。',
+      '決めるの、迷いますよね。軽く済ませるか、しっかり食べるか、どっちの気分ですか？',
+    ]);
   }
 
   /** P597: 「今日何の話をしたっけ？」に、開いた話題と作業状態から答える（P212 と同じ材料）。 */
@@ -2277,7 +2298,7 @@ export class ConversationCoreService {
   private pickReactionTopic(prompt: string, contentTokens: string[]): string | undefined {
     // P601: 時間の名詞（朝・昼・夕方・夜）も主題にしない（物語の
     // 受け止めが「夕方、なるほど」になっていた）。
-    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
+    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
     const candidates = (contentTokens || []).filter((t) => t.length >= 2 && !stop.test(t));
     // 断片らしさを採点する: 活用の語幹・複合語の途中・「〜たい」の
     // 形は主題にしない。助詞や文頭の後ろにある語を優先する。

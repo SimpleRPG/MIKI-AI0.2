@@ -30,7 +30,9 @@ const HUNGER_PATTERN = /(?:お腹すいた|おなかすいた|お腹空いた|�
 const LONELINESS_PATTERN = /(?:寂しい|さみしい|淋しい|孤独|ひとりぼっち|一人ぼっち|会いたい|あいたい)/;
 const THIRST_PATTERN = /(?:喉乾いた|のど乾いた|喉かわいた|喉が渇いた|のどかわいた|水分)/;
 // P591: 痛みも状態として受ける（「頭痛い」に「頭痛、そうなんですね」とだけ返っていた）。
-const PAIN_PATTERN = /(?:頭痛|腹痛|歯痛|腰痛|肩こり|痛い|いたい|ズキズキ|疼)/;
+// P604: かなの「いたい」は、助詞の後か文頭のときだけ痛みとみなす
+// （「飼いたい」「買いたい」のような〜たい（希望）に誤爆していた）。
+const PAIN_PATTERN = /(?:頭痛|腹痛|歯痛|腰痛|肩こり|痛い|痛み|痛く|ズキズキ|疼|(?:^|[がはも、。！!？?\s])いたい)/;
 
 export class UserStateTrailService {
   private static instance: UserStateTrailService;

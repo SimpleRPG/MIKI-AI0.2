@@ -749,6 +749,20 @@ check('P603 「また明日ね」は別れの挨拶で受ける', (farewellReply
 const listenReply = await conversationCoreService.execute({ prompt: 'ねえ、聞いて' } as any);
 check('P603 「ねえ、聞いて」は聞く姿勢で受ける', (listenReply.replyText.includes('聞いてる') || listenReply.replyText.includes('聞かせて')) && !listenReply.replyText.includes('やってみます'), listenReply.replyText.slice(0, 120));
 
+// ---- 痛みの誤爆・休み・食事の迷い・行ってくる（P604） ----
+const wantPetReply = await conversationCoreService.execute({ prompt: '猫飼いたいな' } as any);
+check('P604 「飼いたい」を痛みと誤認しない', !wantPetReply.replyText.includes('痛む') && !wantPetReply.replyText.includes('痛いのは'), wantPetReply.replyText.slice(0, 120));
+const kanaAcheReply = await conversationCoreService.execute({ prompt: '足がいたい' } as any);
+check('P604 かなの痛みは痛みとして受ける', kanaAcheReply.replyText.includes('大丈夫') || kanaAcheReply.replyText.includes('痛'), kanaAcheReply.replyText.slice(0, 120));
+const dayoffReply = await conversationCoreService.execute({ prompt: '明日は休みだよ' } as any);
+check('P604 休みの宣言は休む形で受ける', dayoffReply.replyText.includes('ゆっくり') || dayoffReply.replyText.includes('のんびり') || dayoffReply.replyText.includes('お休み'), dayoffReply.replyText.slice(0, 120));
+const dinnerReply = await conversationCoreService.execute({ prompt: '晩ごはん何にしよう' } as any);
+check('P604 食事の迷いは一緒に考える', dinnerReply.replyText.includes('気分'), dinnerReply.replyText.slice(0, 140));
+const shoppingReply = await conversationCoreService.execute({ prompt: '買い物行ってくる' } as any);
+check('P604 「行ってくる」は送り出しで受ける', shoppingReply.replyText.includes('行ってらっしゃい') || shoppingReply.replyText.includes('いってらっしゃい'), shoppingReply.replyText.slice(0, 120));
+const earlyRiseReply = await conversationCoreService.execute({ prompt: '明日早起きしなきゃ' } as any);
+check('P604 予定の断片を聞き返さない', !earlyRiseReply.replyText.includes('明日早起'), earlyRiseReply.replyText.slice(0, 120));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
