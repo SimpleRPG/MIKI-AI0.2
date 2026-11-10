@@ -841,6 +841,18 @@ check('P613 「助かった」は安堵として受ける', reliefReply.replyTex
 const ventingReply = await conversationCoreService.execute({ prompt: '仕事で嫌なことがあってさ' } as any);
 check('P613 愚痴は寄り添って聞く', ventingReply.replyText.includes('嫌な思い') || ventingReply.replyText.includes('大変') || ventingReply.replyText.includes('聞かせて'), ventingReply.replyText.slice(0, 140));
 
+// ---- 彼女の能力・予定、作り方の聞き返し、もっと話したい（P614） ----
+const songReply = await conversationCoreService.execute({ prompt: '歌歌える？' } as any);
+check('P614 歌えるかには現状を正直に答える', !songReply.replyText.includes('答えられない') && songReply.replyText.includes('歌'), songReply.replyText.slice(0, 140));
+const drawReply = await conversationCoreService.execute({ prompt: '絵描ける？' } as any);
+check('P614 描けるかには勉強中と答える', drawReply.replyText.includes('描') && (drawReply.replyText.includes('まだ') || drawReply.replyText.includes('勉強')), drawReply.replyText.slice(0, 160));
+const scheduleReply = await conversationCoreService.execute({ prompt: '明日の予定は？' } as any);
+check('P614 彼女の予定は正直に答える', scheduleReply.replyText.includes('予定'), scheduleReply.replyText.slice(0, 140));
+const recipeReply = await conversationCoreService.execute({ prompt: '料理の作り方教えて' } as any);
+check('P614 料理名が無ければ聞き返す', recipeReply.replyText.includes('何の料理') || recipeReply.replyText.includes('どの料理'), recipeReply.replyText.slice(0, 140));
+const talkMoreReply = await conversationCoreService.execute({ prompt: 'もっと話したい' } as any);
+check('P614 もっと話したいには温かく応じる', talkMoreReply.replyText.includes('話') && !talkMoreReply.replyText.includes('もっとの話'), talkMoreReply.replyText.slice(0, 140));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

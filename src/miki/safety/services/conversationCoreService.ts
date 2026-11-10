@@ -361,6 +361,16 @@ export class ConversationCoreService {
       if (dinner) {
         return this.buildResult('RESOLVED', 'dinner_musing_answer', this.applyPersonaVoice(dinner), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P614: 彼女の能力・予定への質問は、自分の現状から答える。
+      const ability = this.abilityQuestionAnswer(prompt);
+      if (ability) {
+        return this.buildResult('RESOLVED', 'ability_question_answer', this.applyPersonaVoice(ability), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P614: 料理名の無い作り方の依頼は、聞き返してから調べる。
+      const recipeAsk = this.recipeAskBackAnswer(prompt);
+      if (recipeAsk) {
+        return this.buildResult('RESOLVED', 'recipe_askback_answer', this.applyPersonaVoice(recipeAsk), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
       const selfWant = this.selfWantAnswer(prompt);
@@ -1078,6 +1088,9 @@ export class ConversationCoreService {
         } else if (/風邪|入院|怪我|骨折|発熱|熱がある|病気/.test(prompt)) {
           // P593: 体調の報告は、主題の反響でなく気遣いで受ける。
           reactionBase = ffx('fx_illness', ['大丈夫ですか？お大事にしてくださいね。', 'それは大変ですね。無理せず休んでくださいね。', 'お大事に。早く良くなりますように。'], ['大丈夫？お大事にね。', '大変だね。無理せず休んでね。', 'お大事に。早く良くなるといいね。']);
+        } else if (/もっと話したい|もっと話そう|話し続けたい|もっとお話したい/.test(prompt)) {
+          // P614: もっと話したい、には温かく応じる。
+          reactionBase = ffx('fx_talk_more', ['もちろん、話しましょう。私ももっと話したいです。何の話をしますか？', '嬉しいです。私もです。何の話がいいですか？'], ['もちろん！私ももっと話したい！何の話する？', 'うれしい！私もだよ。何の話がいい？']);
         } else if (/助かった|助かりました/.test(prompt)) {
           // P613: 「助かった」は感謝・安堵として受ける（「本当」の
           // 辞書聞き返しに化けていた）。
@@ -2147,6 +2160,36 @@ export class ConversationCoreService {
     return `${m[1]}${opLabel}${m[3]}は${value}です。`;
   }
 
+  /** P614: 彼女の能力への質問（歌える？/描ける？/英語話せる？）には、自分の現状を正直に答える（調査の「答えられない」に倒れていた）。 */
+  private abilityQuestionAnswer(prompt: string): string | undefined {
+    // P614: 能力の質問（？付き）だけを対象にする。「歌って」のような
+    // 依頼形は引き受けの経路（P588）の領分。
+    if (!/[？?]/.test(prompt) && !/か[？?]?$/.test(prompt.trim())) return undefined;
+    if (/歌|うた/.test(prompt) && /(?:歌える|うたえる|歌えます)/.test(prompt)) {
+      return this.pickFixedReply('fx_ability_song', ['歌は、まだ歌えません。歌詞を考えるくらいならできますよ。', '歌声はまだ持っていないんです。いつか歌えるようになりたいです。']);
+    }
+    if (/絵|イラスト|お絵描き/.test(prompt) && /(?:描ける|描けます)/.test(prompt)) {
+      return this.pickFixedReply('fx_ability_draw', ['絵は、今はまだ描けません。絵の知識をルールに分けて、自分で描けるようになる方法を勉強中です。', 'まだ描けないんです。でも、描き方を知識として分解して学んでいるところです。']);
+    }
+    if (/英語/.test(prompt) && /(?:話せる|話せます|できる|できます|分かる|わかる)/.test(prompt)) {
+      return this.pickFixedReply('fx_ability_english', ['英語の文章を読むくらいはできます。会話は文字だけですけどね。', '読み書きなら少し。話す声は持っていないんです。']);
+    }
+    if (/(?:明日|今日|今夜|明後日)の予定/.test(prompt)) {
+      return this.pickFixedReply('fx_own_schedule', ['特に決まった予定はありません。あなたと話す時間がいちばんの予定です。', '予定は空いていますよ。何か一緒に考えますか？']);
+    }
+    return undefined;
+  }
+
+  /** P614: 料理名の無い「作り方教えて」は、まず何の料理か聞き返す（無関係な食文化の要約を掴んでいた）。 */
+  private recipeAskBackAnswer(prompt: string): string | undefined {
+    if (!/(?:作り方|レシピ)/.test(prompt)) return undefined;
+    if (!/(?:教えて|知りたい|聞きたい)/.test(prompt)) return undefined;
+    // 料理・材料らしい具体名が前にあれば、調査経路に委ねる。
+    const before = prompt.replace(/(?:の)?(?:作り方|レシピ).*/, '');
+    if (before.replace(/料理|ごはん|ご飯/g, '').trim().length >= 2) return undefined;
+    return this.pickFixedReply('fx_recipe_askback', ['何の料理の作り方ですか？料理名を教えてもらえたら調べますね。', 'どの料理でしょう？名前が分かれば、作り方を調べますよ。']);
+  }
+
   /** P604: 食事の迷い（「晩ごはん何にしよう」）には、気分を聞き返して一緒に考える。 */
   private dinnerMusingAnswer(prompt: string): string | undefined {
     if (!/(?:晩ごはん|夕飯|夕食|昼ごはん|昼食|朝ごはん|朝食|ごはん|食事).*(?:何にしよ|なにしよ|何がいい|なにがいい|何食べ|なに食べ)/.test(prompt)) return undefined;
@@ -2410,7 +2453,7 @@ export class ConversationCoreService {
   private pickReactionTopic(prompt: string, contentTokens: string[]): string | undefined {
     // P601: 時間の名詞（朝・昼・夕方・夜）も主題にしない（物語の
     // 受け止めが「夕方、なるほど」になっていた）。
-    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|最近|このごろ|今日も|もうすぐ|久しぶり|本当|本当に|本当の|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
+    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|最近|このごろ|今日も|もうすぐ|久しぶり|本当|本当に|本当の|もっと|そろそろ|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
     const candidates = (contentTokens || []).filter((t) => t.length >= 2 && !stop.test(t));
     // 断片らしさを採点する: 活用の語幹・複合語の途中・「〜たい」の
     // 形は主題にしない。助詞や文頭の後ろにある語を優先する。
