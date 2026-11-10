@@ -245,9 +245,17 @@ export class ConversationCoreService {
     // P579: 未知語は「今の発話に出ている語」だけを対象にする。解釈側が
     // 会話状態から持ち越した語で調査が暴走するのを防ぐ（過去の話題の
     // 語で検索してしまう事故があった）。
+    // P598: 複合質問（「Xって何？あと今何時？」）で、先の対象が辞書で
+    // 答えられる場合は、後の部分の未知語で調査橋を発動しない（橋が
+    // 全体を「確認できていない」に変えてしまうため）。
+    const compoundKnownSubject = /[？?、,]\s*(?:あと|それと|ついでに)/.test(prompt)
+      && (japaneseAnalysis?.contentTokens || []).some((t: string) => {
+        try { return japaneseDictionaryService.lookup(t).some((e: any) => e && e.gloss); } catch { return false; }
+      });
     const explicitUnknownInquiry = unknownTerms.length > 0
       && unknownTerms.some((t) => prompt.includes(t))
-      && /意味|定義|とは|何|調べ|検索|教えて|使い方/.test(prompt);
+      && /意味|定義|とは|何|調べ|検索|教えて|使い方/.test(prompt)
+      && !compoundKnownSubject;
     // P498: 雑談の中で出た未知語は、その場で聞き返さなくても
     // 意味学習の gap として残す。従来はターンの解釈に使われる
     // だけで、明示的に意味を聞かれない限り学習の入口に入らず、
@@ -280,11 +288,24 @@ export class ConversationCoreService {
     // 現在時刻から、その場で答える（Web 調査の的外れな結果や
     // 「確認できていない」に倒れていた）。
     if (!roleplaySessionService.isActive() && !userFactRecall) {
-      const selfAnswer = this.selfQuestionAnswer(prompt);
+      // P598: 知識への明示の訂正（「XじゃなくてY」）は、古い知識の
+      // 言い直しで返さず、訂正として受ける。
+      if (dialogueAct === 'CORRECTION' && /(?:じゃなくて|ではなく)/.test(prompt)) {
+        const cm = prompt.match(/(?:じゃなくて|ではなく)\s*(.{1,20}?)(?:だよ|です|なんだ|。|．|！|!|$)/);
+        const corrected = cm?.[1]?.replace(/^(?:それは|これは)/, '').trim();
+        const text = corrected
+          ? `ごめん、教えてくれてありがとう。「${corrected}」で覚え直しますね。`
+          : 'ごめんなさい、教えてくれてありがとう。覚え直しますね。';
+        return this.buildResult('RESOLVED', 'correction_received', this.applyPersonaVoice(text), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P598: 複数の質問が一文に入っているときは、単純な即答（時刻
+      // など）が全体を飲み込まないよう、即答系を止める。
+      const multiPart = /[？?、,]\s*(?:あと|それと|ついでに)/.test(prompt);
+      const selfAnswer = multiPart ? undefined : this.selfQuestionAnswer(prompt);
       if (selfAnswer) {
         return this.buildResult('RESOLVED', 'self_question_answer', selfAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const clockAnswer = this.clockCalendarAnswer(prompt);
+      const clockAnswer = multiPart ? undefined : this.clockCalendarAnswer(prompt);
       if (clockAnswer) {
         return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -303,13 +324,19 @@ export class ConversationCoreService {
       if (nextWork) {
         return this.buildResult('RESOLVED', 'next_work_answer', this.applyPersonaVoice(nextWork), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P598: プロジェクトの完成・進捗の質問は、作業状態から答える
+      // （会話状態に残った別話題の知識で返っていた）。
+      const projectStatus = this.projectStatusAnswer(prompt, japaneseAnalysis?.contentTokens || []);
+      if (projectStatus) {
+        return this.buildResult('RESOLVED', 'project_status_answer', this.applyPersonaVoice(projectStatus), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P597: 簡単な計算と、今日の会話の振り返りも、その場で答える
       // （計算は調査に倒れ、振り返りは P212 にしか無かった）。
       const arithmetic = this.arithmeticAnswer(prompt);
       if (arithmetic) {
         return this.buildResult('RESOLVED', 'arithmetic_answer', arithmetic, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const recap = this.conversationRecapAnswer(prompt, state);
+      const recap = multiPart ? undefined : this.conversationRecapAnswer(prompt, state);
       if (recap) {
         return this.buildResult('RESOLVED', 'conversation_recap_answer', this.applyPersonaVoice(recap), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -974,6 +1001,12 @@ export class ConversationCoreService {
           reactionBase = weather;
         } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
           reactionBase = ffx('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。'], ['ふふ、面白いね！', 'あはは、それいいね！', 'ふふふ、笑っちゃうね。']);
+        } else if (/消えたい|死にたい|いなくなりたい|生まれてこなければ/.test(prompt)) {
+          // P598: 強い苦しさの言葉は、汎用の相槌で流さず、まず受け止める。
+          reactionBase = ffx('fx_distress', ['話してくれてありがとう。とてもつらい気持ちなんですね。私はここにいますよ。よかったら、少し話を聞かせてください。', 'それはとてもつらいですね。一人で抱え込まないでください。私はそばにいます。しんどさが続くときは、専門の相談先にも頼ってくださいね。'], ['話してくれてありがと。つらいんだね。私はここにいるよ。よかったら話を聞かせて。', 'つらいね。一人で抱え込まないでね。そばにいるよ。']);
+        } else if (/どうでもいい|全部.*(?:嫌|ダメ|だめ)|もう.*(?:どうでも|ダメだ|だめだ)/.test(prompt)) {
+          // P598: 投げやりな気持ちも、主題の反響でなく受ける。
+          reactionBase = ffx('fx_giveup', ['そんな日もありますよ。今日はもう無理しなくていいです。ゆっくりしましょう。', '大丈夫、今日は休む日にしてしまいましょう。また明日考えましょう。'], ['そんな日もあるよ。今日はもう無理しないで、ゆっくりしよ。', '大丈夫、今日はお休みの日にしちゃお。また明日考えよ。']);
         } else if (/風邪|入院|怪我|骨折|発熱|熱がある|病気/.test(prompt)) {
           // P593: 体調の報告は、主題の反響でなく気遣いで受ける。
           reactionBase = ffx('fx_illness', ['大丈夫ですか？お大事にしてくださいね。', 'それは大変ですね。無理せず休んでくださいね。', 'お大事に。早く良くなりますように。'], ['大丈夫？お大事にね。', '大変だね。無理せず休んでね。', 'お大事に。早く良くなるといいね。']);
@@ -2010,6 +2043,22 @@ export class ConversationCoreService {
     } catch { /* 補助経路 */ }
     if (parts.length === 0) return '今日の話は、まだ特に残っていません。これから色々話しましょう。';
     return parts.join('。') + '。';
+  }
+
+  /** P598: プロジェクトの完成・進捗の質問へ、作業状態から答える。 */
+  private projectStatusAnswer(prompt: string, contentTokens: string[]): string | undefined {
+    if (!/(?:いつ).*(?:完成|できる|終わ)|完成.*(?:いつ|するの)|進捗|どこまで.*(?:でき|進ん)/.test(prompt)) return undefined;
+    try {
+      for (const token of contentTokens || []) {
+        const project = projectNotebookService.findProject(token);
+        if (!project) continue;
+        const ws = projectNotebookService.getWorkState(project);
+        const current = ws?.current ? `今は「${ws.current}」を作っているところです。` : '今の作業は、まだ聞いていません。';
+        const next = ws?.next ? `次の手は「${ws.next}」です。` : '';
+        return `${project}の完成時期は、まだ決まっていません。${current}${next}一緒に進めていきましょう。`;
+      }
+    } catch { /* 補助経路 */ }
+    return undefined;
   }
 
   /** P594: 「次に何を作ればいい？」へ、作業状態（今の作業・次の手）から答える。 */

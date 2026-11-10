@@ -679,6 +679,19 @@ check('P597 明後日の曜日を答える', /明後日は[日月火水木金土
 const yesterdayDateReply = await conversationCoreService.execute({ prompt: '昨日は何日だった？' } as any);
 check('P597 昨日の日付を答える', /昨日は\d+月\d+日でした/.test(yesterdayDateReply.replyText), yesterdayDateReply.replyText.slice(0, 100));
 
+// ---- 訂正の受け取り・苦しさ・プロジェクト進捗・複合質問（P598） ----
+const correctionReply = await conversationCoreService.execute({ prompt: 'モコロンは羊じゃなくて牛だよ' } as any);
+check('P598 知識への訂正は訂正として受ける', (correctionReply.replyText.includes('覚え直し') || correctionReply.replyText.includes('覚え直し')) && !correctionReply.replyText.includes('【結論事項】'), correctionReply.replyText.slice(0, 140));
+const distressReply = await conversationCoreService.execute({ prompt: '消えたい' } as any);
+check('P598 強い苦しさは受け止める', distressReply.replyText.includes('ここにいます') || distressReply.replyText.includes('そばにいます') || distressReply.replyText.includes('抱え込まない'), distressReply.replyText.slice(0, 160));
+const giveupReply = await conversationCoreService.execute({ prompt: 'もう全部どうでもいい' } as any);
+check('P598 投げやりな気持ちを受ける', (giveupReply.replyText.includes('無理しなく') || giveupReply.replyText.includes('ゆっくり') || giveupReply.replyText.includes('休む日')) && !giveupReply.replyText.includes('全部って'), giveupReply.replyText.slice(0, 140));
+const projectStatusReply = await conversationCoreService.execute({ prompt: 'EFRっていつ完成するの？' } as any);
+check('P598 完成時期はプロジェクトの状態で答える', projectStatusReply.replyText.includes('EFR') && (projectStatusReply.replyText.includes('完成時期') || projectStatusReply.replyText.includes('決まって')) && !projectStatusReply.replyText.includes('モコロン'), projectStatusReply.replyText.slice(0, 160));
+const multiPartReply = await conversationCoreService.execute({ prompt: 'モコロンって何？あと今何時？' } as any);
+check('P598 複合質問は片方だけに飲み込まれない', multiPartReply.replyText.includes('羊'), multiPartReply.replyText.slice(0, 140));
+check('P598 要約から空港一覧のような表を採用しない', cleanWebSummary('空港 [ 編集 ] 都市 ICAO IATA 空港名 アウアス空港 (Ahuás Airport) アマパラ MHAM アマパラ空港', ['空港']) === '', cleanWebSummary('空港 [ 編集 ] 都市 ICAO IATA 空港名 アウアス空港', ['空港']));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

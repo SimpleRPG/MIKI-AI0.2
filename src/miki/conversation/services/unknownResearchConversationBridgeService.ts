@@ -57,7 +57,7 @@ const WEB_CHROME_PHRASES = [
 ];
 
 // P595: ページの操作系テキスト（ナビゲーション）の目印。
-const NAV_MARKERS = ['アップロード', 'コモンズ', 'ヘルプ', 'お知らせ', 'ログイン', '目次', 'ページ先頭', 'メインメニュー', 'サイドバー', '特別ページ', '個人用ツール', 'アカウント作成'];
+const NAV_MARKERS = ['アップロード', 'コモンズ', 'ヘルプ', 'お知らせ', 'ログイン', '目次', 'ページ先頭', 'メインメニュー', 'サイドバー', '特別ページ', '個人用ツール', 'アカウント作成', '編集', 'ICAO', 'IATA', '空港名', '一覧'];
 
 export function cleanWebSummary(text: string, terms: string[]): string {
   let t = String(text || '');
