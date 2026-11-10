@@ -561,6 +561,21 @@ check('P586 続きの質問は深さ1の保留として残る', Boolean(followPe
 check('P586 深さ1では続きを作らない', (conversationCoreService as any).buildFollowUpQuestion({ terms: ['モコロン'], question: 'モコロンの綿毛は、どう使いますか？', depth: 1 }, 'モコロンは綿毛が取れる、羊みたいなパルだよ', ['モコロン', '綿毛']) === undefined);
 check('P586 短い答えには続きを聞かない', (conversationCoreService as any).buildFollowUpQuestion({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', depth: 0 }, 'うん', ['うん']) === undefined);
 
+// ---- 命令形の分類拡張（P587） ----
+check('P587 「窓を開けて」は依頼', classifyDialogueAct('窓を開けて') === 'REQUEST');
+check('P587 「ちょっと待ってて」は依頼', classifyDialogueAct('ちょっと待ってて') === 'REQUEST');
+check('P587 「それ買ってきて」は依頼', classifyDialogueAct('それ買ってきて') === 'REQUEST');
+check('P587 「歌って」は依頼', classifyDialogueAct('歌って') === 'REQUEST');
+check('P587 「開けてよ」は依頼', classifyDialogueAct('窓を開けてよ') === 'REQUEST');
+check('P587 過去形の報告は依頼にしない', classifyDialogueAct('昨日は散歩してきた') !== 'REQUEST');
+check('P587 宣言文は宣言のまま', classifyDialogueAct('モコロンは羊みたいなパルだよ') === 'STATEMENT');
+
+// ---- 解けない依頼は引き受ける形で受ける（P588） ----
+const singReply = await conversationCoreService.execute({ prompt: '歌って' } as any);
+check('P588 「歌って」に引き受ける返答', (singReply.replyText.includes('いい') || singReply.replyText.includes('任せて') || singReply.replyText.includes('やってみます')) && !singReply.replyText.includes('話してくれてありがとう'), singReply.replyText.slice(0, 120));
+const waitReply = await conversationCoreService.execute({ prompt: 'ちょっと待ってて' } as any);
+check('P588 「待ってて」が断片の反響にならない', !waitReply.replyText.includes('ちょっ、'), waitReply.replyText.slice(0, 120));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

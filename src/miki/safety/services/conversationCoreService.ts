@@ -872,6 +872,11 @@ export class ConversationCoreService {
           reactionBase = weather;
         } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
           reactionBase = this.pickFixedReply('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。']);
+        } else if (dialogueAct === 'REQUEST') {
+          // P588: どの経路でも解けなかった依頼は、汎用の相槌ではなく
+          // 依頼として引き受ける形で受ける（「歌って」に「そうなん
+          // ですね」と返していた）。引き受けた上で、続きは相手に委ねる。
+          reactionBase = this.pickFixedReply('fx_request_ack', ['うん、いいよ。任せて。', '分かりました。やってみますね。', 'はい、いいですよ。']);
         }
       }
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
@@ -1611,6 +1616,9 @@ export class ConversationCoreService {
       if (Date.now() - Number(pending.at || 0) > 30 * 60_000) return undefined;
       if (looksInterrogative(prompt)) return undefined;
       if (/^(?:おはよう|おやすみ|こんにちは|こんばんは|ただいま|行ってきます|いってきます|じゃあね|ありがとう|ごめん)/.test(prompt.trim())) return undefined;
+      // P588: 依頼の形で来た発言は、短くても質問への答えではない
+      // （「歌って」が保留中の質問への答えとして消費されていた）。
+      if (/(?:てて|てきて|教えて|見せて|聞かせて|開けて|閉めて|歌って|書いて|読んで|作って|買って|持って|取って|手伝って|待って|見て|聞いて|止まって)(?:よ|ね)?[。！!]?$/.test(prompt.trim())) return undefined;
       const terms = pending.terms || [];
       if (terms.some((t) => t && prompt.includes(t))) return pending;
       return prompt.trim().length <= 25 ? pending : undefined;
