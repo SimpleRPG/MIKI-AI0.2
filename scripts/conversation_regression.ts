@@ -1567,6 +1567,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   personaProfileService.switchProfile('persona-default');
 }
 
+// ---- 意見の根拠を記録して「なんで」に答える（P687） ----
+{
+  const op = await conversationCoreService.execute({ prompt: 'クオッカってかわいいと思う？' } as any);
+  check('P687 意見が返る', op.replyText.includes('かわいいと思います') || op.replyText.includes('かわいい'), op.replyText.slice(0, 140));
+  const why = await conversationCoreService.execute({ prompt: 'なんでそう思うの？' } as any);
+  check('P687 なんでには記録した根拠で答える', why.replyText.includes('クオッカ') && why.replyText.includes('覚えている'), why.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

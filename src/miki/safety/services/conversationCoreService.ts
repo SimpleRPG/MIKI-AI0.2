@@ -502,6 +502,12 @@ export class ConversationCoreService {
       if (relationship) {
         return this.buildResult('RESOLVED', 'relationship_answer', this.applyPersonaVoice(relationship), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P687: 直前の意見への「なんでそう思うの？」は、意見のときに
+      // 記録した根拠で答える。
+      const why = this.whyFollowupAnswer(prompt);
+      if (why) {
+        return this.buildResult('RESOLVED', 'why_followup_answer', this.applyPersonaVoice(why), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -3467,10 +3473,10 @@ export class ConversationCoreService {
     // P601: 相手自身への意見（「僕のことどう思う？」）は、知識の
     // 材料ではなく、関係そのもので答える。
     if (/(?:僕|私|おれ|オレ|自分)のこと/.test(prompt)) {
-      return this.pickFixedReply('fx_user_opinion', [
+      return this.notedOpinion('あなた', 'relationship', '', this.pickFixedReply('fx_user_opinion', [
         'いつも色々な話をしてくれる、大事な相方だと思っています。これからも一緒に色々作っていきたいです。',
         '話していると楽しいですよ。私にとっては、一緒に考えてくれる頼もしい相手です。',
-      ]);
+      ]));
     }
     const topic = this.pickReactionTopic(prompt, contentTokens);
     if (!topic) return undefined;
@@ -3478,7 +3484,7 @@ export class ConversationCoreService {
       const likes = selfPreferenceService.listTaught(personaProfileService.get().profileId)
         .filter((p) => p.kind === 'like');
       if (likes.some((p) => p.term === topic)) {
-        return `${topic}は、私も好きなんです。${topic}の話を聞くと、なんだか嬉しくなります。`;
+        return this.notedOpinion(topic, 'preference', `「${topic}」は私の好きなものとして教わっている`, `${topic}は、私も好きなんです。${topic}の話を聞くと、なんだか嬉しくなります。`);
       }
     } catch { /* 補助経路 */ }
     // P582: プロジェクトの話なら、決め事が彼女の意見の材料になる
@@ -3489,7 +3495,7 @@ export class ConversationCoreService {
         if (!project) continue;
         const decisions = projectNotebookService.listDecisions(project);
         if (decisions.length > 0) {
-          return `${project}については、「${decisions[0].text.slice(0, 60)}」という決め事がありますね。私は、それが${project}らしさだと思います。`;
+          return this.notedOpinion(project, 'decision', `「${decisions[0].text.slice(0, 60)}」という決め事がある`, `${project}については、「${decisions[0].text.slice(0, 60)}」という決め事がありますね。私は、それが${project}らしさだと思います。`);
         }
         return `${project}の話ですね。決め事はまだ聞いていませんが、一緒に作る相方として大事にしたいです。`;
       }
@@ -3497,19 +3503,54 @@ export class ConversationCoreService {
     try {
       const facts = paragraphCompositionService.buildSupplements({ subjectTerms: [topic], supportingClaims: [], excludeText: prompt });
       if (facts.length > 0) {
-        if (opinionAdjective) return `${facts.slice(0, 2).join('')}私は${topic}、${opinionAdjective}と思います。`;
+        if (opinionAdjective) return this.notedOpinion(topic, 'knowledge', facts[0], `${facts.slice(0, 2).join('')}私は${topic}、${opinionAdjective}と思います。`);
         const closer = this.pickFixedReply('fx_opinion', [
           `私は${topic}の話、もっと聞いてみたいです。`,
           `私は${topic}、いいなと思います。`,
           `${topic}の話、私は好きですよ。`,
         ]);
-        return `${facts.slice(0, 2).join('')}${closer}`;
+        return this.notedOpinion(topic, 'knowledge', facts[0], `${facts.slice(0, 2).join('')}${closer}`);
       }
     } catch { /* 補助経路 */ }
     const dict = this.dictionaryAnswerForQuestion(`${topic}とは`, [topic]);
     if (dict) {
-      if (opinionAdjective) return `${dict}私は${topic}、${opinionAdjective}と思います。`;
-      return `${dict}私は${topic}、いいなと思います。`;
+      if (opinionAdjective) return this.notedOpinion(topic, 'knowledge', dict.split('。')[0] + '。', `${dict}私は${topic}、${opinionAdjective}と思います。`);
+      return this.notedOpinion(topic, 'knowledge', dict.split('。')[0] + '。', `${dict}私は${topic}、いいなと思います。`);
+    }
+    return undefined;
+  }
+
+  /**
+   * P687: 意見を返したとき、その根拠（知識・好み・決め事・関係）を
+   * 記録しておく。「なんでそう思うの？」への追質問に、記録から
+   * 答えるため（従来は根拠がどこにも残らず、受け流しになっていた）。
+   */
+  private notedOpinion(topic: string, basisType: string, basisText: string, reply: string): string {
+    try {
+      storageService.setItem('miki_last_opinion_v1', JSON.stringify({ topic, basisType, basisText, at: Date.now() }));
+    } catch { /* 記録は補助 */ }
+    return reply;
+  }
+
+  /** P687: 直前の意見への「なんで？」に、記録した根拠で答える。 */
+  private whyFollowupAnswer(prompt: string): string | undefined {
+    if (!/(?:なんで|どうして)/.test(prompt)) return undefined;
+    if (!/(?:そう思う|そうなの|そう言った|そうなる|理由|なんで[？?]?$|どうして[？?]?$)/.test(prompt.trim())) return undefined;
+    let record: { topic?: string; basisType?: string; basisText?: string; at?: number } | undefined;
+    try { record = JSON.parse(storageService.getItem('miki_last_opinion_v1') || 'null') || undefined; } catch { record = undefined; }
+    if (!record || !record.at || Date.now() - record.at > 30 * 60 * 1000) return undefined;
+    const head = record.topic && record.topic !== 'あなた' ? `「${record.topic}」の話ですね。` : 'さっきの話ですね。';
+    if (record.basisType === 'knowledge' && record.basisText) {
+      return `${head}「${record.basisText.replace(/。$/, '')}」と覚えているので、そう言いました。`;
+    }
+    if (record.basisType === 'preference' && record.basisText) {
+      return `${head}${record.basisText}ので、そう言いました。`;
+    }
+    if (record.basisType === 'decision' && record.basisText) {
+      return `${head}${record.basisText}ので、それを踏まえて言いました。`;
+    }
+    if (record.basisType === 'relationship') {
+      return `${head}いつも色々な話をしてくれる、大事な相方だと思っているからです。`;
     }
     return undefined;
   }
