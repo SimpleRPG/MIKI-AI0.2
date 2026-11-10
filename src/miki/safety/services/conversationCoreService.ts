@@ -726,7 +726,13 @@ export class ConversationCoreService {
             casualConclusion += `\n${report}`;
           } else {
             const mention = this.reflectionMention();
-            if (mention) casualConclusion += `\n${mention}`;
+            if (mention) {
+              casualConclusion += `\n${mention}`;
+            } else {
+              // P580: 時間帯・季節の感覚（1日1回まで、最も弱い添え）。
+              const timeSense = this.timeSenseMention();
+              if (timeSense) casualConclusion += `\n${timeSense}`;
+            }
           }
         }
       }
@@ -842,7 +848,10 @@ export class ConversationCoreService {
         || fallthroughThanks || fallthroughApology || fallthroughWakeup || fallthroughAgreement;
       if (!taughtAck && !answeredTopicQuestion && !chainMatched) {
         const weather = this.weatherRemark(prompt);
-        if (weather) {
+        if (/暇/.test(prompt)) {
+          // P581: 暇の受け止め（話題を一緒に開く誘い）。
+          reactionBase = this.pickFixedReply('fx_bored', ['暇ですね。何か面白い話でもしましょうか。', '暇な時間ですね。何か気になることはありますか？', '暇ですね。最近、面白かったことはありますか？']);
+        } else if (weather) {
           reactionBase = weather;
         } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
           reactionBase = this.pickFixedReply('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。']);
@@ -1082,6 +1091,17 @@ export class ConversationCoreService {
           nextActions: latent.suggestedProactiveAction ? [latent.suggestedProactiveAction] : [],
           detailLevel: 'STANDARD',
         });
+      } else if (!roleplaySessionService.isActive() && this.opinionAnswer(prompt, japaneseAnalysis?.contentTokens || [])) {
+        // P581: 「Xどう思う？」への意見。好みか知識があれば、それを
+        // 核に自分の言葉で答える（「答えられない」に倒さない）。
+        status = 'RESOLVED';
+        reason = 'opinion_answer';
+        ir = answerContentIrService.buildAnswerIR({
+          conclusion: this.opinionAnswer(prompt, japaneseAnalysis?.contentTokens || [])!,
+          target: compiled.target,
+          certainty: 'CONDITIONAL',
+          detailLevel: 'BRIEF',
+        });
       } else if (!roleplaySessionService.isActive() && this.dictionaryAnswerForQuestion(prompt, japaneseAnalysis?.contentTokens || [])) {
         // P579: 辞書（教わった意味を含む）に答えがある語の質問は、
         // 未検証の調査結果より先に辞書から答える（手元の知識が
@@ -1106,7 +1126,8 @@ export class ConversationCoreService {
           reasons: unverifiedSources.map((s) => `出典: ${s.title}（${s.url}）`),
           exceptions: ['調査結果は未検証です'],
           certainty: 'UNKNOWN',
-          detailLevel: 'STANDARD',
+          // P581: 会話の表層に見出し（【整理の結論】等）を付けない。
+          detailLevel: 'BRIEF',
         });
       } else {
         // P456 (C): 未解決返答の表層分離。ユーザー向け文面は「分からない」を
@@ -1141,7 +1162,8 @@ export class ConversationCoreService {
                   : 'ごめん、今の知識ではそれには答えられないよ。',
             target: compiled.target,
             certainty: 'UNKNOWN',
-            detailLevel: inRoleplay ? 'BRIEF' : 'STANDARD',
+            // P581: 「答えられない」も会話の文で返す（見出しを付けない）。
+            detailLevel: 'BRIEF',
           });
         }
       }
@@ -1453,6 +1475,49 @@ export class ConversationCoreService {
   }
 
   /**
+   * P580: 時間帯と季節の感覚。挨拶の場で、深夜なら夜更かしへの
+   * 声かけ、季節の節目なら暦の一言を、1日1回だけ添える。天気の
+   * 実況は断定しない（P576 と同じ規律）——暦と時計の事実だけを言う。
+   */
+  private timeSenseMention(): string | undefined {
+    try {
+      if (roleplaySessionService.isActive()) return undefined;
+      const now = new Date();
+      const dayKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+      let ledger: Record<string, string> = {};
+      try { ledger = JSON.parse(storageService.getItem('miki_time_sense_v1') || '{}'); } catch { ledger = {}; }
+      const hour = now.getHours();
+      if ((hour >= 23 || hour < 5) && ledger.night !== dayKey) {
+        ledger.night = dayKey;
+        try { storageService.setItem('miki_time_sense_v1', JSON.stringify(ledger)); } catch { /* 台帳は補助 */ }
+        return this.pickFixedReply('fx_night', [
+          'もう夜遅い時間ですね。無理しないでくださいね。',
+          '夜更かしですね。ほどほどに休んでくださいね。',
+          'もうこんな時間ですね。今日はもう休みましょう。',
+        ]);
+      }
+      if (ledger.season !== dayKey) {
+        const month = now.getMonth() + 1;
+        const seasonForms: Record<number, string[]> = {
+          1: ['新しい年になりましたね。今年もよろしくお願いします。', '1月ですね。寒さの厳しい頃です、温かくしてくださいね。'],
+          3: ['もう3月ですね。春が近づいてきました。', '3月になりましたね。季節の変わり目、体調に気をつけてくださいね。'],
+          6: ['もう6月ですね。雨の多い季節です。', '6月になりましたね。蒸し暑くなってきますね。'],
+          8: ['8月ですね。暑い日が続く頃です、水分を忘れずに。', 'もう8月ですね。夏本番です、無理しないでくださいね。'],
+          10: ['もう10月ですね。過ごしやすい季節です。', '10月になりましたね。秋が深まってきます。'],
+          12: ['もう12月ですね。今年もあと少しです。', '12月になりましたね。寒さが増してくる頃です。'],
+        };
+        const forms = seasonForms[month];
+        if (forms) {
+          ledger.season = dayKey;
+          try { storageService.setItem('miki_time_sense_v1', JSON.stringify(ledger)); } catch { /* 台帳は補助 */ }
+          return this.pickFixedReply('fx_season', forms);
+        }
+      }
+      return undefined;
+    } catch { return undefined; }
+  }
+
+  /**
    * P570: 今日の振り返りがまだ表に出ていなければ、挨拶のときに
    * 一度だけ口に出す。古い振り返りは聞かれたときだけ答える。
    */
@@ -1527,7 +1592,12 @@ export class ConversationCoreService {
       if (roleplaySessionService.isActive()) return undefined;
       // P579: プロジェクトとして知っている語（EFR 等）は、辞書に
       // 無くても「知らない語」として聞き返さない。
-      const topic = (unknownTerms || []).find((t) => t.length >= 2 && prompt.includes(t) && !projectNotebookService.findProject(t));
+      // P581: 活用の語幹（「頑張」+「る」等）も聞き返さない。
+      const topic = (unknownTerms || []).find((t) => {
+        if (t.length < 2 || !prompt.includes(t) || projectNotebookService.findProject(t)) return false;
+        const after = prompt.slice(prompt.indexOf(t) + t.length, prompt.indexOf(t) + t.length + 1);
+        return !/[るりれろたてますないだ]/.test(after);
+      });
       if (!topic) return undefined;
       const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
       if (Date.now() - (asked[topic] || 0) <= 7 * 24 * 3600_000) return undefined;
@@ -1559,6 +1629,40 @@ export class ConversationCoreService {
       if (!prompt.includes(rec.term)) return undefined;
       return `「${rec.term}」、覚えました！${rec.gloss}ということですね。教えてくれてありがとうございます。`;
     } catch { return undefined; }
+  }
+
+  /**
+   * P581: 「Xどう思う？」への意見を組み立てる。核は、教わった自分の
+   * 好み→知っている事実（世界モデル・Claim の補足文）→辞書の意味、
+   * の順。どれも無ければ意見の材料が無いので undefined。
+   */
+  private opinionAnswer(prompt: string, contentTokens: string[]): string | undefined {
+    if (!/(?:どう思う|どう感じる|好きですか|おすすめ)/.test(prompt)) return undefined;
+    const topic = this.pickReactionTopic(prompt, contentTokens);
+    if (!topic) return undefined;
+    try {
+      const likes = selfPreferenceService.listTaught(personaProfileService.get().profileId)
+        .filter((p) => p.kind === 'like');
+      if (likes.some((p) => p.term === topic)) {
+        return `${topic}は、私も好きなんです。${topic}の話を聞くと、なんだか嬉しくなります。`;
+      }
+    } catch { /* 補助経路 */ }
+    try {
+      const facts = paragraphCompositionService.buildSupplements({ subjectTerms: [topic], supportingClaims: [], excludeText: prompt });
+      if (facts.length > 0) {
+        const closer = this.pickFixedReply('fx_opinion', [
+          `私は${topic}の話、もっと聞いてみたいです。`,
+          `私は${topic}、いいなと思います。`,
+          `${topic}の話、私は好きですよ。`,
+        ]);
+        return `${facts.slice(0, 2).join('')}${closer}`;
+      }
+    } catch { /* 補助経路 */ }
+    const dict = this.dictionaryAnswerForQuestion(`${topic}とは`, [topic]);
+    if (dict) {
+      return `${dict}私は${topic}、いいなと思います。`;
+    }
+    return undefined;
   }
 
   /**

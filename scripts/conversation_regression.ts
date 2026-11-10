@@ -512,6 +512,25 @@ check('P579 聞き返しへの説明は取り込む', japaneseDictionaryService.
 const fragReply = await conversationCoreService.execute({ prompt: '猫に触りたいな' } as any);
 check('P579 活用の断片を主題にしない', !fragReply.replyText.includes('触り、'), fragReply.replyText.slice(0, 120));
 
+// ---- 時間帯・季節の感覚（P580） ----
+const RealDate = Date;
+class FakeNightDate extends RealDate {
+  constructor(...args: any[]) { super(...(args.length ? args : ['2026-12-24T23:30:00+09:00'] as any)); }
+  static now() { return new RealDate('2026-12-24T23:30:00+09:00').getTime(); }
+}
+(globalThis as any).Date = FakeNightDate;
+const nightGreeting = await conversationCoreService.execute({ prompt: 'こんばんは' } as any);
+(globalThis as any).Date = RealDate;
+check('P580 深夜の挨拶では夜更かしに触れる', nightGreeting.replyText.includes('夜遅い') || nightGreeting.replyText.includes('夜更かし') || nightGreeting.replyText.includes('こんな時間'), nightGreeting.replyText.slice(0, 160));
+
+// ---- 意見・暇・語幹の聞き返し（P581） ----
+const opinionReply = await conversationCoreService.execute({ prompt: 'モコロンどう思う？' } as any);
+check('P581 意見を聞かれたら知っていることで答える', !opinionReply.replyText.includes('答えられない') && opinionReply.replyText.includes('モコロン'), opinionReply.replyText.slice(0, 160));
+const boredReply = await conversationCoreService.execute({ prompt: '暇だ' } as any);
+check('P581 暇を受け止める', boredReply.replyText.includes('暇'), boredReply.replyText.slice(0, 120));
+const stemReply = await conversationCoreService.execute({ prompt: '明日も頑張る' } as any);
+check('P581 活用の語幹は聞き返さない', !stemReply.replyText.includes('「頑張」って'), stemReply.replyText.slice(0, 120));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
