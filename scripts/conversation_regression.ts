@@ -1629,6 +1629,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P692 自分の名前の質問は従来どおり', selfName.replyText.includes('MIKI-AI'), selfName.replyText.slice(0, 80));
 }
 
+// ---- 断片の聞き返し・安堵と体の受け止め・できたの達成（P693） ----
+{
+  const densha = await conversationCoreService.execute({ prompt: '電車混んでた' } as any);
+  check('P693 テ形の断片を聞き返さない', !densha.replyText.includes('「電車混」って'), densha.replyText.slice(0, 120));
+  const hotto = await conversationCoreService.execute({ prompt: 'ほっとした' } as any);
+  check('P693 安堵は安堵として受ける', hotto.replyText.includes('よかった'), hotto.replyText.slice(0, 100));
+  const kata = await conversationCoreService.execute({ prompt: '肩こった' } as any);
+  check('P693 肩こりは気遣いで受ける', kata.replyText.includes('無理しないで') || kata.replyText.includes('お疲れ'), kata.replyText.slice(0, 100));
+  const dekita = await conversationCoreService.execute({ prompt: '半分くらいできた' } as any);
+  check('P693 「できた」は達成として受ける', dekita.replyText.includes('やりましたね') || dekita.replyText.includes('すごい'), dekita.replyText.slice(0, 100));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

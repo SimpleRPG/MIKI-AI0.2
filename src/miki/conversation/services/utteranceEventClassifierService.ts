@@ -173,6 +173,11 @@ class UtteranceEventClassifierService {
       return { eventClass, negated, aspect, matchedStem: stem, subject, object };
     }
 
+    // P693: 「できた」だけを達成とする（「できる」予定や
+    // 「できない」無理とは分ける。否定の無理は core 側の領分）。
+    if (has('でき') && !negated && /(?:できた|できました|できて)/.test(text)) {
+      return { eventClass: 'ACHIEVEMENT', negated, aspect, matchedStem: 'でき（完了）', subject, object };
+    }
     // 「失くす」は語幹が「失」+「くし」に割れる。
     if (tokenSet.has('失') && /(?:くし|くす|くした)/.test(text)) {
       return { eventClass: 'LOSS', negated, aspect, matchedStem: '失（くす）', subject, object };
