@@ -1252,6 +1252,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P655 相手の発言を引いて答える', userRecall.replyText.includes('港の朝市') && userRecall.replyText.includes('言ってました'), userRecall.replyText.slice(0, 200));
 }
 
+// ---- 相槌は話題として反響しない（P656） ----
+{
+  for (const filler of ['うん', 'へー', 'はい']) {
+    const r = await conversationCoreService.execute({ prompt: filler } as any);
+    check(`P656 相槌「${filler}」を話題にしない`, !r.replyText.includes(`${filler}の話`), r.replyText.slice(0, 120));
+  }
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
