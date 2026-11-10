@@ -262,7 +262,13 @@ class ConversationGraphRuntimeP212Service {
  // 作ってるの？」に答えるための入口。
  private selfInquiryWorkStateAnswer(value:string):string|undefined {
   const project=projectNotebookService.findProjectInText(value);
-  if(!project)return undefined;
+  // P602: プロジェクト名が無い聞き方（「今の作業は？」）では、
+  // 作業状態のあるプロジェクトをまとめて答える。
+  if(!project){
+   const states=projectNotebookService.listWorkStates().filter((s)=>s.current||s.next);
+   if(states.length===0)return '今の作業は、まだ聞いていません。';
+   return states.map((s)=>`${s.project}：${[s.current?`今は「${s.current}」`:'',s.next?`次は「${s.next}」`:''].filter(Boolean).join('、')}`).join('\n');
+  }
   const state=projectNotebookService.getWorkState(project);
   if(!state||(!state.current&&!state.next))return `${project}の作業状態は、まだ聞いていません。`;
   const parts:string[]=[];
@@ -348,6 +354,9 @@ class ConversationGraphRuntimeP212Service {
   if(/(?:今の|現在の)役|何の役(?!に)|役名|なりチャの(?:場面|あらすじ|続き)|あらすじ(?:は|って|を?(?:教えて|見せて))/u.test(value)){
    const roleAnswer=this.selfInquiryRoleAnswer();
    if(roleAnswer)return roleAnswer;
+   // P602: 役が無いときも、自己照会として答える（通常経路に委ねると
+   // Web 調査の的外れな結果になっていた）。
+   return '今は役を被っていません。いつもの私のままです。';
   }
   if(/状態.*(?:書き出|エクスポート)|(?:書き出|エクスポート).*状態/u.test(value)){
    return this.selfInquiryStateSnapshotAnswer();
@@ -374,6 +383,17 @@ class ConversationGraphRuntimeP212Service {
   }
   const projectAspectAnswer=this.selfInquiryProjectAspectAnswer(value,semantic?.terms??[]);
   if(projectAspectAnswer)return projectAspectAnswer;
+  // P602: プロジェクト名の無い聞き方（「決めたこと教えて」）では、
+  // プロジェクトごとの件数と最初の決め事をまとめて答える。
+  if(/^(?:決めたこと|決め事|決まり|決定事項)(?:を)?(?:教えて|見せて|は|って)?[？?。]?$/u.test(value)){
+   const lines:string[]=[];
+   for(const p of projectNotebookService.listProjects()){
+    const ds=projectNotebookService.listDecisions(p);
+    if(ds.length>0)lines.push(`${p}（${ds.length}件）：${ds[0].text}`);
+   }
+   if(lines.length===0)return '決め事は、まだプロジェクトノートに登録されていません。';
+   return `決め事は、プロジェクトごとにあります。\n`+lines.join('\n')+'\n詳しく聞きたいプロジェクトがあれば、名前を言ってください。';
+  }
   const projectMatch=value.match(/(.{1,24}?)(?:の)?(?:決め事|決まり|決めたこと|決定事項|方針|ルール)/u);
   if(projectMatch){
    const projectAnswer=this.selfInquiryProjectAnswer(projectMatch[1]);

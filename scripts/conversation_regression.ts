@@ -717,6 +717,17 @@ check('P601 絵の見せっこは目がないことを正直に言う', showVisu
 const continuationReply = await conversationCoreService.execute({ prompt: 'それでね、そのあと雨が降ってきて大変だった' } as any);
 check('P601 話の続きは確認文で返さない', !continuationReply.replyText.includes('特定できません') && !continuationReply.replyText.includes('候補:'), continuationReply.replyText.slice(0, 140));
 
+// ---- 自己照会の名無しの聞き方（P602） ----
+conversationGraphRuntimeP212Service.ingestInput('regression-p602a', '今何の役？');
+const noRoleAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p602a');
+check('P602 役が無いときも自己照会で答える', Boolean(noRoleAnswer && noRoleAnswer.includes('被っていません')), String(noRoleAnswer).slice(0, 120));
+conversationGraphRuntimeP212Service.ingestInput('regression-p602b', '決めたこと教えて');
+const bareDecisionsAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p602b');
+check('P602 名無しの決め事質問にまとめて答える', Boolean(bareDecisionsAnswer && bareDecisionsAnswer.includes('EFR')), String(bareDecisionsAnswer).slice(0, 160));
+conversationGraphRuntimeP212Service.ingestInput('regression-p602c', '今の作業は？');
+const bareWorkAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p602c');
+check('P602 名無しの作業質問に答える', Boolean(bareWorkAnswer && bareWorkAnswer.length > 0), String(bareWorkAnswer).slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
