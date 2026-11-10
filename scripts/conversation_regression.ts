@@ -1484,6 +1484,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P677 引用符なしでも文字数に答える', cnt2.replyText.includes('3文字です'), cnt2.replyText.slice(0, 120));
 }
 
+// ---- 遊びの切り替えは進行中の1手に化けない（P678） ----
+{
+  const startS = await conversationCoreService.execute({ prompt: 'しりとりしよう' } as any);
+  check('P678 しりとり開始', startS.replyText.includes('りんご'), startS.replyText.slice(0, 100));
+  const switchQ = await conversationCoreService.execute({ prompt: 'クイズ出して' } as any);
+  check('P678 対戦中の切り替えでクイズが始まる', switchQ.replyText.includes('クイズ') && switchQ.replyText.includes('でしょう'), switchQ.replyText.slice(0, 140));
+  const backS = await conversationCoreService.execute({ prompt: 'しりとりしよう' } as any);
+  check('P678 クイズからしりとりへも切り替わる', backS.replyText.includes('りんご'), backS.replyText.slice(0, 100));
+  await conversationCoreService.execute({ prompt: 'やめる' } as any);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

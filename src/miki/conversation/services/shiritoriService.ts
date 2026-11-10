@@ -89,6 +89,11 @@ class ShiritoriService {
     return !!load();
   }
 
+  /** 対戦状態を畳む（別の遊びへの切り替え時）。 */
+  end(): void {
+    save(undefined);
+  }
+
   /** 開始：最初の言葉（りんご）を出して状態を作る。 */
   start(): string {
     save({ active: true, requiredKana: 'こ', requiredDisplay: 'ご', used: ['りんご'], updatedAt: Date.now() });

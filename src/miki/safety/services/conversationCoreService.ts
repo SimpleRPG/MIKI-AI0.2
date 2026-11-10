@@ -459,6 +459,13 @@ export class ConversationCoreService {
       if (ownLast) {
         return this.buildResult('RESOLVED', 'own_last_utterance_answer', this.applyPersonaVoice(ownLast), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P668/P678: 遊びの誘い・切り替えは、進行中の遊びの応答より
+      // 先に受ける。対戦中に「クイズ出して」と言われたら、しりとりの
+      // 1手として扱わず、遊びを切り替えるため。
+      const playInvite = this.playInvitationAnswer(prompt);
+      if (playInvite) {
+        return this.buildResult('RESOLVED', 'play_invitation_answer', this.applyPersonaVoice(playInvite), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -474,13 +481,6 @@ export class ConversationCoreService {
         if (shiritoriMove) {
           return this.buildResult('RESOLVED', 'shiritori_move', this.applyPersonaVoice(shiritoriMove), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
         }
-      }
-      // P668: 遊びの誘い（遊ぼう・しりとり・歌って・面白い話して）は
-      // 遊びとして受ける。ここで受けないと断片の反響（「ぼう、なる
-      // ほど」）や汎用の作業了承に化ける。
-      const playInvite = this.playInvitationAnswer(prompt);
-      if (playInvite) {
-        return this.buildResult('RESOLVED', 'play_invitation_answer', this.applyPersonaVoice(playInvite), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
@@ -2734,10 +2734,13 @@ export class ConversationCoreService {
   private playInvitationAnswer(prompt: string): string | undefined {
     if (/しりとり/.test(prompt)) {
       // P669: 開始と同時にしりとりの状態を作り、続けられるようにする。
+      // P678: 別の遊びからの切り替えでは、前の遊びの状態を畳む。
+      quizService.end();
       return shiritoriService.start();
     }
     if (/クイズ|なぞなぞ|問題出して|もんだい出して/.test(prompt)) {
       // P670: クイズも開始と同時に状態を作り、答え合わせまで続ける。
+      shiritoriService.end();
       return quizService.start();
     }
     if (/(?:面白い|おもしろい|お話|はなし).{0,4}(?:話して|聞かせて|して|ちょうだい)/.test(prompt) || /(?:何か|なんか).{0,3}(?:話して|聞かせて)/.test(prompt)) {

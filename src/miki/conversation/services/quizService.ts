@@ -64,6 +64,11 @@ class QuizService {
     return !!load();
   }
 
+  /** 出題状態を畳む（別の遊びへの切り替え時）。 */
+  end(): void {
+    save(undefined);
+  }
+
   start(): string {
     const queue = buildQuestions();
     if (queue.length === 0) {
