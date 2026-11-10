@@ -382,6 +382,11 @@ export class ConversationCoreService {
       if (weeklyRecall) {
         return this.buildResult('RESOLVED', 'weekly_recall_answer', this.applyPersonaVoice(weeklyRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P633: 「何が分からないの？」は、彼女の未解決の欠けから答える。
+      const openGap = this.openGapAnswer(prompt);
+      if (openGap) {
+        return this.buildResult('RESOLVED', 'open_gap_answer', this.applyPersonaVoice(openGap), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P624: 「最近何か覚えた？」は、彼女の学習の記録から答える。
       const recentLearning = this.recentLearningAnswer(prompt);
       if (recentLearning) {
@@ -2493,6 +2498,29 @@ export class ConversationCoreService {
       if (episodes.length === 0) return '今週の記録は、まだあまり残ってないです。これからですね。';
       const lines = episodes.slice(-3).map((e) => e.summary.replace(/^昨日は、/, ''));
       return `今週は、${lines.join(' ')}`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P633: 「何が分からないの？」——彼女の自己点検（未解決の知識の
+   * 欠け）を会話でも答えられるようにする。P624（覚えたこと）と
+   * 対になる、自分の輪郭のもう片側。
+   */
+  private openGapAnswer(prompt: string): string | undefined {
+    if (!/(?:何が分から|何がわから|分からないこと|わからないこと|まだ知らないこと|苦手なこと|苦手なもの)/.test(prompt)) return undefined;
+    try {
+      const displays: string[] = [];
+      for (const gap of knowledgeGapService.listOpen(20)) {
+        if ((gap.priority || 0) < 40) continue;
+        const display = String(gap.query || '')
+          .replace(/を調べる$/, '')
+          .replace(/^用語の意味を学ぶ[:：]\s*/, '')
+          .slice(0, 24);
+        if (display && !displays.includes(display)) displays.push(display);
+        if (displays.length >= 3) break;
+      }
+      if (displays.length === 0) return '今のところ、大きな分からないは無いです。';
+      return `まだ分からないのは、${displays.map((d) => `「${d}」`).join('と')}です。調べて覚えるつもりです。`;
     } catch { return undefined; }
   }
 

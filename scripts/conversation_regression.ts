@@ -1036,6 +1036,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     && utteranceFeatureService.analyze('今日は暑いね').socialAct === undefined, '');
 }
 
+// ---- 「何が分からないの？」は未解決の欠けから答える（P633） ----
+{
+  const { knowledgeGapService } = await import('../src/miki/unknown/services/knowledgeGapService');
+  knowledgeGapService.detect({ query: '「クオッカ」の生息地を調べる', reason: 'regression-p633', type: 'UNKNOWN_RELATION', target: 'クオッカ', priority: 50 });
+  const gapReply = await conversationCoreService.execute({ prompt: '何が分からないの？' } as any);
+  check('P633 分からないことは欠けの台帳から答える', gapReply.replyText.includes('まだ分からないのは') && gapReply.replyText.includes('クオッカ'), gapReply.replyText.slice(0, 220));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

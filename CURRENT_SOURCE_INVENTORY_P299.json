@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1799,
     "sourceFileCount": 1352,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1263,
-    "relativeImportCandidateCount": 4024,
-    "resolvedRelativeImportCandidateCount": 4008,
+    "relativeImportCandidateCount": 4025,
+    "resolvedRelativeImportCandidateCount": 4009,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1697,9 +1697,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 111970,
-      "lines": 1052,
-      "sha256": "92c0d91993baf55e46435f4b60eed42bc03716b94ea8922bd1644d747cc50143",
+      "bytes": 112667,
+      "lines": 1060,
+      "sha256": "e1f3ab938fc1d9a7fc335f169d5b0ca7ecbb2ddc69e3140c93bec702489bf864",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -1970,10 +1970,16 @@
           "specifier": "../src/miki/memory/services/utteranceFeatureService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/utteranceFeatureService.ts"
+        },
+        {
+          "line": 1041,
+          "specifier": "../src/miki/unknown/services/knowledgeGapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
         }
       ],
-      "relativeImportCandidateCount": 45,
-      "resolvedRelativeImportCount": 45,
+      "relativeImportCandidateCount": 46,
+      "resolvedRelativeImportCount": 46,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27409,9 +27415,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 202847,
-      "lines": 2953,
-      "sha256": "e15bae0b8be24014b571dc37593aabd9f18e7fa91d7d76e0fd14bcc2026fe320",
+      "bytes": 204424,
+      "lines": 2981,
+      "sha256": "434673763913b05a75c37c2d550efd9e0dee76070f96092f285c43ed1b1b2e86",
       "relativeImportCandidates": [
         {
           "line": 1,
