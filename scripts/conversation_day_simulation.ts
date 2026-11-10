@@ -185,6 +185,14 @@ async function main() {
   check('D3-5 正解が判定される', d35.includes('正解'), d35.slice(0, 200));
   const d36 = await turn('D3-6 遊びを終える', 'やめる');
   check('D3-6 終了できる', d36.includes('ここまでにしましょう') || d36.includes('ここまでです'), d36.slice(0, 200));
+  // P688: 終わったクイズの成績を、後から聞いて答えられる。
+  const d37 = await turn('D3-7 クイズの成績を聞く', 'さっきのクイズ、何問正解だった？');
+  check('D3-7 成績を記録から答える', d37.includes('問中') && d37.includes('正解でした'), d37.slice(0, 200));
+  // P687: 意見→「なんで？」の流れも、アプリ順序で効く。
+  const d38 = await turn('D3-8 意見を聞く', 'クオッカってかわいいと思う？');
+  check('D3-8 意見が返る', d38.includes('かわいい'), d38.slice(0, 200));
+  const d39 = await turn('D3-9 なんでと聞く', 'なんでそう思うの？');
+  check('D3-9 根拠で答える', d39.includes('クオッカ') && d39.includes('覚えている'), d39.slice(0, 200));
 
   // ---- 結果 ----
   const failures = results.filter(([, ok]) => !ok);
