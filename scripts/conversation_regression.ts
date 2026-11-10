@@ -1282,6 +1282,15 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P658 相槌の語群は一か所で判定できる', isBackchannelText('へー') && isBackchannelText('うんうんうん') && !isBackchannelText('モコロン'), '');
 }
 
+// ---- 頻度導出の好みに相槌を数えない（P659） ----
+{
+  const { selfPreferenceService } = await import('../src/miki/selfAwareness/services/selfPreferenceService');
+  for (let i = 0; i < 8; i++) selfPreferenceService.observeTerms('persona-p659', ['うん', 'へー']);
+  check('P659 相槌は頻度導出の興味にならない', !selfPreferenceService.derivedInterests('persona-p659').includes('うん') && !selfPreferenceService.derivedInterests('persona-p659').includes('へー'), JSON.stringify(selfPreferenceService.derivedInterests('persona-p659')));
+  for (let i = 0; i < 8; i++) selfPreferenceService.observeTerms('persona-p659', ['星空']);
+  check('P659 通常の語は頻度導出される', selfPreferenceService.derivedInterests('persona-p659').includes('星空'), JSON.stringify(selfPreferenceService.derivedInterests('persona-p659')));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

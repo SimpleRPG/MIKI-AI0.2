@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
+import { isBackchannelText } from '../../memory/services/utteranceFeatureService';
 
 /*
  * P578: みき／ビービー自身の「好き・興味・得意」の置き場。
@@ -77,8 +78,10 @@ class SelfPreferenceService {
   /** B: 会話の内容語を数える（1回の呼び出しでは同じ語は1回まで）。 */
   public observeTerms(personaId: string, terms: string[]): void {
     if (!personaId || !Array.isArray(terms) || terms.length === 0) return;
+    // P659: 相槌は頻度が高くても「よく話すもの」ではない。相槌の
+    // 語群は共有の特徴層（isBackchannelText）で判定する。
     const unique = [...new Set(terms.map((t) => String(t || '').trim()))]
-      .filter((t) => t.length >= 2 && !FREQUENCY_STOPWORDS.has(t));
+      .filter((t) => t.length >= 2 && !FREQUENCY_STOPWORDS.has(t) && !isBackchannelText(t));
     if (unique.length === 0) return;
     const all = this.loadAll();
     const state = all[personaId] ?? this.emptyState();

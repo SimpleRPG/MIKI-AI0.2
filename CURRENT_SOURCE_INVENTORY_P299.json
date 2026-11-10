@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1800,
     "sourceFileCount": 1353,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1264,
-    "relativeImportCandidateCount": 4055,
-    "resolvedRelativeImportCandidateCount": 4039,
+    "relativeImportCandidateCount": 4057,
+    "resolvedRelativeImportCandidateCount": 4041,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1703,9 +1703,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 131877,
-      "lines": 1298,
-      "sha256": "2bbcc4ea086630da635abd9405cb7bccdf64790f469c94f112e6cf00832fe15f",
+      "bytes": 132749,
+      "lines": 1307,
+      "sha256": "520565f99192c2937923886b070bd1c0ce6f8e53241ebac99a3bea7a849a5356",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2120,10 +2120,16 @@
           "specifier": "../src/miki/memory/services/utteranceFeatureService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/utteranceFeatureService.ts"
+        },
+        {
+          "line": 1287,
+          "specifier": "../src/miki/selfAwareness/services/selfPreferenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/selfPreferenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 69,
-      "resolvedRelativeImportCount": 69,
+      "relativeImportCandidateCount": 70,
+      "resolvedRelativeImportCount": 70,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -29173,9 +29179,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/selfPreferenceService.ts",
-      "bytes": 4384,
-      "lines": 109,
-      "sha256": "b51166781434d424f1adc80f7a445d08e6151020ab575e8b912f2595c328b7ba",
+      "bytes": 4660,
+      "lines": 112,
+      "sha256": "620612c3bfe93ef62055ea379fe0a5c8030d9c1bd3887c63895f5d828b3b9816",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -29188,10 +29194,16 @@
           "specifier": "../../../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../memory/services/utteranceFeatureService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/utteranceFeatureService.ts"
         }
       ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
