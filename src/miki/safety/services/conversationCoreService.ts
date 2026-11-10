@@ -534,7 +534,11 @@ export class ConversationCoreService {
     // P565: 知らない語への聞き返し（候補）。合成の後段で足す。
     let pendingUnknownQuestion: { topic: string; question: string } | undefined;
     // P574: 直前の話題質問への答えとして来た発言かどうか。
-    const answeredTopicQuestion = this.consumePendingTopicQuestion(prompt);
+    // P586: 保留レコード自体も受け取り、答えへの続きの質問に使う。
+    const answeredPending = this.consumePendingTopicQuestion(prompt);
+    const answeredTopicQuestion = Boolean(answeredPending);
+    // P586: 答えへの続きの質問（合成の後段で足す）。
+    let followUpAppend: { question: string; terms: string[] } | undefined;
     if (potentialUnknowns.length > 0) reason += `; potential_unknowns=${potentialUnknowns.length}${potentialUnknownGapId ? `; promoted_gap=${potentialUnknownGapId}` : ''}`;
     let verifiedResearchClaimId: string | undefined;
     let verifiedResearchOutcome: 'SUPPORTED' | 'DEVICE_VERIFIED' | undefined;
@@ -702,10 +706,12 @@ export class ConversationCoreService {
         // P574: 直前の話題質問への答えなら、答えとして受ける。
         if (answeredTopicQuestion) {
           casualConclusion = this.pickFixedReply('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。']);
+          // P586: 答えの内容から、もう一歩だけ続きを聞く候補を用意する。
+          if (answeredPending) followUpAppend = this.buildFollowUpQuestion(answeredPending, prompt, japaneseAnalysis?.contentTokens || []);
         }
         // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
         const taughtAck = this.taughtTermAcknowledgement(prompt);
-        if (taughtAck) casualConclusion = taughtAck;
+        if (taughtAck) { casualConclusion = taughtAck; followUpAppend = undefined; }
         // P578: 教わった「自分の好きなもの」の話なら、自分の好きとして受ける。
         if (!taughtAck && !answeredTopicQuestion) {
           const selfLike = this.selfLikeReaction(prompt);
@@ -850,6 +856,8 @@ export class ConversationCoreService {
       // 受け止めと、教わった意味の「覚えた」が優先）。
       if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughClosing) {
         reactionBase = this.pickFixedReply('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。']);
+        // P586: 答えの内容から、もう一歩だけ続きを聞く候補を用意する。
+        if (answeredPending) followUpAppend = this.buildFollowUpQuestion(answeredPending, prompt, japaneseAnalysis?.contentTokens || []);
       }
       // P576: 定型の受け止めに当たらなかった発話のうち、天気の定番と
       // 笑いは専用の形で受ける（天気は日付から季節感を添える）。
@@ -1249,7 +1257,10 @@ export class ConversationCoreService {
     // 用意しておく（未知語の質問が付かない場合に表層側が使う）。
     if (
       (ir.strategy === 'ASK_QUESTION' || ir.strategy === 'DEEPEN' || ir.strategy === 'EXPAND_TOPIC') &&
-      !(ir as any).topic_question
+      !(ir as any).topic_question &&
+      // P586: 続きの質問を用意したターンでは、戦略側の質問は足さない
+      // （質問が2つ並ぶと尋問になる）。
+      !followUpAppend
     ) {
       try {
         const topicQuestion = paragraphCompositionService.buildTopicQuestion(
@@ -1280,10 +1291,24 @@ export class ConversationCoreService {
       surface.surfaceText += `\n\n${pendingUnknownQuestion.question}`;
       this.markUnknownAsked(pendingUnknownQuestion.topic);
     }
+    // P586: 話題質問への答えには、答えの内容から作った続きの質問を
+    // 足し、その質問を深さ1の保留として残す（次も答えとして読める
+    // が、さらに続きは聞かない＝尋問にしない）。
+    if (followUpAppend && !surface.surfaceText.includes(followUpAppend.question.slice(0, 12)) && !roleplaySessionService.isActive()) {
+      surface.surfaceText += `\n\n${followUpAppend.question}`;
+      try {
+        storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({
+          terms: followUpAppend.terms,
+          question: followUpAppend.question,
+          at: Date.now(),
+          depth: 1,
+        }));
+      } catch { /* 保留は補助 */ }
+    }
     // P574: 話題の質問が実際に表に出たら、次の発言を「その答え」
     // として読めるよう保留しておく（多ターンの継続）。
     const topicQuestion = (ir as any).topic_question as string | undefined;
-    if (topicQuestion && surface.surfaceText.includes(topicQuestion) && !roleplaySessionService.isActive()) {
+    if (topicQuestion && surface.surfaceText.includes(topicQuestion) && !roleplaySessionService.isActive() && !followUpAppend) {
       try {
         storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({
           terms: [nextState.currentTopic, ...(japaneseAnalysis?.contentTokens || [])].filter(Boolean).slice(0, 6),
@@ -1577,19 +1602,44 @@ export class ConversationCoreService {
    * 保留は見たら必ず消す（宙に浮かせない）。質問形や挨拶で来たら
    * 答えではない。短い宣言文か、質問の語を含む宣言文を答えとみなす。
    */
-  private consumePendingTopicQuestion(prompt: string): boolean {
+  private consumePendingTopicQuestion(prompt: string): { terms?: string[]; question?: string; depth?: number } | undefined {
     try {
       const raw = storageService.getItem('miki_pending_topic_question_v1');
-      if (!raw) return false;
+      if (!raw) return undefined;
       storageService.removeItem('miki_pending_topic_question_v1');
-      const pending = JSON.parse(raw) as { terms?: string[]; at?: number };
-      if (Date.now() - Number(pending.at || 0) > 30 * 60_000) return false;
-      if (looksInterrogative(prompt)) return false;
-      if (/^(?:おはよう|おやすみ|こんにちは|こんばんは|ただいま|行ってきます|いってきます|じゃあね|ありがとう|ごめん)/.test(prompt.trim())) return false;
+      const pending = JSON.parse(raw) as { terms?: string[]; question?: string; depth?: number; at?: number };
+      if (Date.now() - Number(pending.at || 0) > 30 * 60_000) return undefined;
+      if (looksInterrogative(prompt)) return undefined;
+      if (/^(?:おはよう|おやすみ|こんにちは|こんばんは|ただいま|行ってきます|いってきます|じゃあね|ありがとう|ごめん)/.test(prompt.trim())) return undefined;
       const terms = pending.terms || [];
-      if (terms.some((t) => t && prompt.includes(t))) return true;
-      return prompt.trim().length <= 25;
-    } catch { return false; }
+      if (terms.some((t) => t && prompt.includes(t))) return pending;
+      return prompt.trim().length <= 25 ? pending : undefined;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P586: 彼女の話題質問への答えに、答えの内容からもう一歩だけ
+   * 続きを聞く質問を作る。尋問にならないよう深さは1段まで
+   * （depth>=1 の保留への答えには作らない）。答えが短すぎる場合や、
+   * 前と同じ質問しか作れない場合は出さない。
+   */
+  private buildFollowUpQuestion(
+    pending: { terms?: string[]; question?: string; depth?: number },
+    prompt: string,
+    contentTokens: string[],
+  ): { question: string; terms: string[] } | undefined {
+    try {
+      if ((pending.depth ?? 0) >= 1) return undefined;
+      if (prompt.trim().length < 8) return undefined;
+      const shared = (pending.terms || []).filter((t) => t && prompt.includes(t));
+      const terms = (shared.length > 0 ? shared : contentTokens || [])
+        .filter((t) => t && t.length >= 2)
+        .slice(0, 4);
+      if (terms.length === 0) return undefined;
+      const question = paragraphCompositionService.buildTopicQuestion(terms);
+      if (!question || question === pending.question) return undefined;
+      return { question, terms };
+    } catch { return undefined; }
   }
 
   /**
