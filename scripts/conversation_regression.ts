@@ -1307,6 +1307,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P661 絵文字だけを話題にしない', !emoji.replyText.startsWith('😊、'), emoji.replyText.slice(0, 120));
 }
 
+// ---- 指示語は話題として反響しない（P662） ----
+{
+  const sono = await conversationCoreService.execute({ prompt: 'その映画、ふーんって感じだった' } as any);
+  check('P662 「その」を話題にしない', !sono.replyText.includes('そのですか') && !sono.replyText.includes('そのの話'), sono.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
