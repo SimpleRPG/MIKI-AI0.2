@@ -70,11 +70,16 @@ class UtteranceFeatureService {
 
     const negated = /(?:なかっ|なかった|ません|できない|できなかった|ではない|じゃない)/.test(text) || /(?:^|[がはも、。！!？?\s])ない/.test(text);
     const passive = /(?:られた|られる|られました|れます|られて)/.test(text);
+    // P666: 文末の「んだ／のだ」は説明の形で、その「だ」は過去では
+    // ない（「好きなんだ」が完了相になり家事完了と誤判定されて
+    // いた）。完了の判定では末尾の んだ／のだ を除いてから見る
+    // （「作ったんだ」は「た」が残るので完了のまま）。
+    const aspectText = text.replace(/(?:んだ|のだ)(?=[。！!？?]|よ|ね|$)/, '');
     const aspect: UtteranceAspect =
       /(?:たい|ほしい|欲しい)(?:[。！!？?]|な|の|です|けど|が|$)/.test(text) ? 'DESIDERATIVE'
       : /(?:なきゃ|なければ|ないと(?:いけない)?|なあかん)/.test(text) ? 'OBLIGATION'
       : /(?:てる|ている|てます|でる)(?:[。！!？?]|よ|ね|$)/.test(text) ? 'ONGOING'
-      : /(?:た|だ|した|できた|ました)(?:[。！!？?]|よ|ね|$)/.test(text) || /(?:た|だ)$/.test(text.trim()) ? 'COMPLETED'
+      : /(?:た|だ|した|できた|ました)(?:[。！!？?]|よ|ね|$)/.test(aspectText) || /(?:た|だ)$/.test(aspectText.trim()) ? 'COMPLETED'
       : /(?:しよう|しましょう|ようと思う)/.test(text) ? 'VOLITIONAL'
       : 'OTHER';
     const questionForm: QuestionForm =
