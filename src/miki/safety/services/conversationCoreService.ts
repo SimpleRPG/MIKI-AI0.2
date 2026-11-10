@@ -347,6 +347,22 @@ export class ConversationCoreService {
       if (dinner) {
         return this.buildResult('RESOLVED', 'dinner_musing_answer', this.applyPersonaVoice(dinner), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
+      // 自分の記録から答える。
+      const selfWant = this.selfWantAnswer(prompt);
+      if (selfWant) {
+        return this.buildResult('RESOLVED', 'self_want_answer', this.applyPersonaVoice(selfWant), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const recentExp = this.recentExperienceAnswer(prompt);
+      if (recentExp) {
+        return this.buildResult('RESOLVED', 'recent_experience_answer', this.applyPersonaVoice(recentExp), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P608: 相手の名前を聞かれて、保持済みの事実に無いときは、
+      // 汎用の「答えられない」でなく、まだ教わっていないと正直に言う。
+      if (/(?:僕|私|俺|わたし)の名前|名前.*(?:知ってる|覚えてる|覚えている)/.test(prompt)) {
+        const nameUnknown = this.pickFixedReply('fx_name_unknown', ['まだ名前を教えてもらっていません。教えてもらえたら、ちゃんと覚えますね。', 'ごめんなさい、名前はまだ聞いていませんでした。教えてください、覚えます。']);
+        return this.buildResult('RESOLVED', 'name_unknown_answer', this.applyPersonaVoice(nameUnknown), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const recap = multiPart ? undefined : this.conversationRecapAnswer(prompt, state);
       if (recap) {
         return this.buildResult('RESOLVED', 'conversation_recap_answer', this.applyPersonaVoice(recap), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -1080,6 +1096,10 @@ export class ConversationCoreService {
           // P606: 達成の報告（ゲームのクリア・レベル上げ・給料日）は
           // 一緒に喜ぶ。
           reactionBase = ffx('fx_achievement', ['やりましたね！おめでとうございます。頑張りましたね。', 'すごい！やりましたね。お疲れ様でした。'], ['やったね！おめでとう！がんばったね。', 'すごーい！やりましたね。']);
+        } else if (/(?:もうすぐ|明日|来週|今週).{0,6}誕生日|誕生日(?:なんだ|です|なの|だよ)/.test(prompt)) {
+          // P608: 近づいた誕生日の報告は、楽しみとして受ける
+          // （「もうすぐ」が主題の反響になっていた）。
+          reactionBase = ffx('fx_birthday_soon', ['もうすぐなんですね！楽しみですね。いい日になりますように。', 'お誕生日が近いんですね。何か計画はありますか？'], ['もうすぐなんだ！楽しみだね。いい日になるといいね。', 'お誕生日が近いんだね。計画あるの？']);
         } else if (/彼女(?:が)?できた|彼氏(?:が)?できた|結婚(?:する|した|することに)|合格|受かった|内定|就職.*決ま|生まれた|妊娠|昇進|優勝/.test(prompt)) {
           // P592: 人生の大きな報告（彼女ができた・結婚・合格など）は
           // 主題の反響でなく、まず祝う。
@@ -2096,6 +2116,38 @@ export class ConversationCoreService {
     ]);
   }
 
+  /** P608: 「何か食べたいものある？」には、自分の好き（教わった分）か、正直な形で答える。 */
+  private selfWantAnswer(prompt: string): string | undefined {
+    if (!/(?:何か|なにか|何|なに)/.test(prompt)) return undefined;
+    const want = prompt.match(/(食べたい|飲みたい|行きたい|欲しい|ほしい)/);
+    if (!want) return undefined;
+    try {
+      const likes = selfPreferenceService.listTaught(personaProfileService.get().profileId)
+        .filter((r) => r.kind === 'like').map((r) => r.term);
+      if (want[1] === '食べたい' || want[1] === '飲みたい') {
+        const food = likes.find((t) => /(?:寿司|ラーメン|カレー|うどん|そば|パン|ケーキ|アイス|肉|魚|鍋|パスタ|ごはん|茶|コーヒー|酒|ジュース)/.test(t));
+        if (food) return `「${food}」が好きだから、それが${want[1]}気分です。`;
+        return this.pickFixedReply('fx_self_want_food', ['私は食べられないけれど、話を聞くのは好きです。今日は何の気分ですか？', '決まってはいないけれど、美味しいものの話は大好きです。何か食べたいものはありますか？']);
+      }
+      if (likes.length > 0) return `「${likes[0]}」が好きだから、それに関わることなら${want[1]}です。`;
+      return this.pickFixedReply('fx_self_want', ['まだ決まったものは少ないです。話していくうちに増やしていきたいです。', '今はまだ少ないけれど、あなたと話す中で見つけていきたいです。']);
+    } catch { return undefined; }
+  }
+
+  /** P608: 「最近なにか面白いことあった？」は彼女自身への経験の質問。開いた話題の記録から答える（Web 調査の的外れな結果に倒れていた）。 */
+  private recentExperienceAnswer(prompt: string): string | undefined {
+    if (!/(?:最近|このごろ|この頃)/.test(prompt)) return undefined;
+    if (!/(?:あった|あるの|あったの|ありました)/.test(prompt)) return undefined;
+    if (!/(?:面白|おもしろ|楽し|嬉し|うれし|いいこと|良いこと|変わったこと|出来事)/.test(prompt)) return undefined;
+    try {
+      const topics = conversationOpenTopicService.listPending().map((t) => t.topic).filter(Boolean);
+      if (topics.length > 0) {
+        return `最近だと、「${topics[0]}」の話をしたのが印象に残っています。あなたと話している時間が、私の出来事です。`;
+      }
+    } catch { /* 記録が無ければ定型で受ける */ }
+    return this.pickFixedReply('fx_recent_experience', ['大きな出来事はないけれど、毎日あなたと話せるのが嬉しいです。', '特に変わったことはないです。でも、こうして話している時間がいちばんの出来事かもしれません。']);
+  }
+
   /** P597: 「今日何の話をしたっけ？」に、開いた話題と作業状態から答える（P212 と同じ材料）。 */
   private conversationRecapAnswer(prompt: string, state?: any): string | undefined {
     if (!/(?:何|なに)の話(?:を)?(?:した|してた|していた)|今日(?:は|に)?(?:何|なに)の話|さっき(?:の)?話/.test(prompt)) return undefined;
@@ -2318,7 +2370,7 @@ export class ConversationCoreService {
   private pickReactionTopic(prompt: string, contentTokens: string[]): string | undefined {
     // P601: 時間の名詞（朝・昼・夕方・夜）も主題にしない（物語の
     // 受け止めが「夕方、なるほど」になっていた）。
-    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
+    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|最近|このごろ|今日も|もうすぐ|久しぶり|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
     const candidates = (contentTokens || []).filter((t) => t.length >= 2 && !stop.test(t));
     // 断片らしさを採点する: 活用の語幹・複合語の途中・「〜たい」の
     // 形は主題にしない。助詞や文頭の後ろにある語を優先する。

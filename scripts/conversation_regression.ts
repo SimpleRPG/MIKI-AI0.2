@@ -781,6 +781,16 @@ check('P607 喧嘩はつらさとして受ける', quarrelReply.replyText.includ
 const choresReply = await conversationCoreService.execute({ prompt: '部屋の掃除した' } as any);
 check('P607 家事の完了は労う', choresReply.replyText.includes('お疲れ様') || choresReply.replyText.includes('おつかれ'), choresReply.replyText.slice(0, 140));
 
+// ---- 彼女への経験・望み・名前の質問、近づいた誕生日（P608） ----
+const recentExpReply = await conversationCoreService.execute({ prompt: '最近なにか面白いことあった？' } as any);
+check('P608 最近の出来事は自分の記録から答える', !recentExpReply.replyText.includes('調べてみたけれど'), recentExpReply.replyText.slice(0, 160));
+const selfWantReply = await conversationCoreService.execute({ prompt: '何か食べたいものある？' } as any);
+check('P608 食べたいものの質問は正直に答える', !selfWantReply.replyText.includes('答えられない') && !selfWantReply.replyText.includes('【'), selfWantReply.replyText.slice(0, 160));
+const nameUnknownReply = await conversationCoreService.execute({ prompt: '僕の名前知ってる？' } as any);
+check('P608 名前はまだ教わっていないと正直に言う', nameUnknownReply.replyText.includes('まだ') && (nameUnknownReply.replyText.includes('名前') || nameUnknownReply.replyText.includes('覚えます')), nameUnknownReply.replyText.slice(0, 160));
+const birthdaySoonReply = await conversationCoreService.execute({ prompt: 'もうすぐ誕生日なんだ' } as any);
+check('P608 近づいた誕生日は楽しみとして受ける', birthdaySoonReply.replyText.includes('誕生日') || birthdaySoonReply.replyText.includes('楽しみ'), birthdaySoonReply.replyText.slice(0, 140));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
