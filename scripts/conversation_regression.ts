@@ -1732,6 +1732,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P700 「約束して」は約束として受ける', promise.replyText.includes('約束します') && !promise.replyText.includes('やってみます'), promise.replyText.slice(0, 80));
 }
 
+// ---- 秘密・冗談・拗ね・褒め・義務（P701） ----
+{
+  const secret = await conversationCoreService.execute({ prompt: 'これ内緒だよ' } as any);
+  check('P701 内緒は守る約束として受ける', secret.replyText.includes('内緒にしておきます') || secret.replyText.includes('秘密ですね'), secret.replyText.slice(0, 100));
+  const joke = await conversationCoreService.execute({ prompt: '冗談だよ' } as any);
+  check('P701 冗談は冗談として受ける', joke.replyText.includes('冗談でしたか'), joke.replyText.slice(0, 80));
+  const sulk = await conversationCoreService.execute({ prompt: 'もう知らない' } as any);
+  check('P701 「もう知らない」は謝って受ける', sulk.replyText.includes('ごめん'), sulk.replyText.slice(0, 100));
+  const smart = await conversationCoreService.execute({ prompt: '頭いいね' } as any);
+  check('P701 「頭いいね」は褒めとして受ける', smart.replyText.includes('ありがとう') || smart.replyText.includes('嬉しい') || smart.replyText.includes('うれしい'), smart.replyText.slice(0, 80));
+  const secretAsk = await conversationCoreService.execute({ prompt: '秘密教えて' } as any);
+  check('P701 「秘密教えて」は遊びとして受ける', secretAsk.replyText.includes('内緒') && !secretAsk.replyText.includes('調べるキュー'), secretAsk.replyText.slice(0, 100));
+  const must = await conversationCoreService.execute({ prompt: '明日早起きしなきゃ' } as any);
+  check('P701 義務のつぶやきは労って受ける', must.replyText.includes('無理しないで') || must.replyText.includes('応援'), must.replyText.slice(0, 80));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
