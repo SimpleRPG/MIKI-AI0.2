@@ -1313,6 +1313,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P662 「その」を話題にしない', !sono.replyText.includes('そのですか') && !sono.replyText.includes('そのの話'), sono.replyText.slice(0, 160));
 }
 
+// ---- 単位と動詞断片は話題として反響しない（P663） ----
+{
+  const unit = await conversationCoreService.execute({ prompt: '今日は3時間も歩いた' } as any);
+  check('P663 数字に付いた単位を話題にしない', !unit.replyText.includes('時間の話ですね'), unit.replyText.slice(0, 160));
+  const frag = await conversationCoreService.execute({ prompt: '昨日は2回も電話した' } as any);
+  check('P663 動詞断片を話題にしない', !frag.replyText.includes('したですか'), frag.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
