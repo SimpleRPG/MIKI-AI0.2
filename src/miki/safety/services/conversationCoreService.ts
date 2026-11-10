@@ -30,6 +30,8 @@ import { storageService } from '../../../services/storageService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { utteranceEventClassifierService } from '../../conversation/services/utteranceEventClassifierService';
+import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
+import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -370,6 +372,11 @@ export class ConversationCoreService {
       const recipeAsk = this.recipeAskBackAnswer(prompt);
       if (recipeAsk) {
         return this.buildResult('RESOLVED', 'recipe_askback_answer', this.applyPersonaVoice(recipeAsk), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P616: 知っている物への属性の質問は、世界モデルの関係で答える。
+      const attribute = this.attributeQuestionAnswer(prompt);
+      if (attribute) {
+        return this.buildResult('RESOLVED', 'attribute_question_answer', this.applyPersonaVoice(attribute), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
@@ -2158,6 +2165,56 @@ export class ConversationCoreService {
     const value = format(result);
     if (!value) return undefined;
     return `${m[1]}${opLabel}${m[3]}は${value}です。`;
+  }
+
+  /**
+   * P616: 知っている物への属性の質問（どこで捕まえられる？/何に使うの？）は、
+   * 世界モデルの関係で答える。関係があればそれを使い、無ければ
+   * 知っている範囲を添えて正直に言い、UNKNOWN_RELATION の gap として
+   * 背景調査に積む（定義だけ返す／答えられない、で終わらせない）。
+   */
+  private attributeQuestionAnswer(prompt: string): string | undefined {
+    let attrLabel: string | undefined;
+    let isUse = false;
+    if (/(?:どこで|どこに|どこへ|どこから)/.test(prompt) && /(?:捕まえ|釣れ|採れ|取れ|買え|手に入|見つか|会え|生息|いる|ある)/.test(prompt)) attrLabel = '場所';
+    else if (/(?:何に|なにに|何の(?:ため|役)|なんの(?:ため|役))/.test(prompt) && /(?:使う|使える|役立|利用)/.test(prompt)) { attrLabel = '使い道'; isUse = true; }
+    else if (/(?:何から|なにから)/.test(prompt) && /(?:できて|作ら|でき)/.test(prompt)) attrLabel = '材料';
+    else if (/(?:どうやって|どうすれば|どのように)/.test(prompt)) attrLabel = 'やり方';
+    if (!attrLabel) return undefined;
+    let entity: string | undefined;
+    try {
+      const features = utteranceFeatureService.analyze(prompt);
+      entity = features.contentTokens.find((t) => {
+        try {
+          return japaneseDictionaryService.has(t)
+            || worldModelGraphService.relationsOf(t).length > 0
+            || worldModelGraphService.entities().some((e) => e.name === t);
+        } catch { return false; }
+      });
+    } catch { return undefined; }
+    if (!entity) return undefined;
+    const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
+    const usedFor = relations.filter((r) => r.type === 'USED_FOR');
+    if (isUse && usedFor.length > 0) {
+      return `「${entity}」は、${usedFor.map((r) => r.to).join('や')}に使われます。`;
+    }
+    const known: string[] = [];
+    const isA = relations.filter((r) => r.type === 'IS_A');
+    if (isA.length > 0) known.push(`${isA.map((r) => r.to).join('・')}の一種`);
+    if (!isUse && usedFor.length > 0) known.push(`${usedFor.map((r) => r.to).join('・')}に使われる`);
+    try {
+      knowledgeGapService.detect({
+        query: `「${entity}」の${attrLabel}を調べる`,
+        reason: '知っている物への属性の質問に、関係が無くて答えられなかったため、背景で調べる。',
+        type: 'UNKNOWN_RELATION',
+        target: entity,
+        priority: 50,
+      });
+    } catch { /* gap への接続は補助経路 */ }
+    const knownText = known.length > 0
+      ? `「${entity}」については、${known.join('で、')}ことは知っているのですが、`
+      : `「${entity}」のことは知っているのですが、`;
+    return `${knownText}${attrLabel}はまだ知らないです。調べて覚えておきますね。`;
   }
 
   /** P614: 彼女の能力への質問（歌える？/描ける？/英語話せる？）には、自分の現状を正直に答える（調査の「答えられない」に倒れていた）。 */

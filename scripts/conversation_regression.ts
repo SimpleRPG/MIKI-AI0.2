@@ -872,6 +872,18 @@ check('P614 もっと話したいには温かく応じる', talkMoreReply.replyT
   check('P615 否定を取る', f7.negated, String(f7.negated));
 }
 
+// ---- 知っている物への属性質問（P616） ----
+const attrUseReply = await conversationCoreService.execute({ prompt: 'モコロンは何に使うの？' } as any);
+check('P616 使い道は世界モデルの関係で答える', attrUseReply.replyText.includes('綿毛'), attrUseReply.replyText.slice(0, 160));
+const attrPlaceReply = await conversationCoreService.execute({ prompt: 'モコロンってどこで捕まえられる？' } as any);
+check('P616 場所は知らない範囲を添えて正直に答える', attrPlaceReply.replyText.includes('まだ知らない') && attrPlaceReply.replyText.includes('調べて'), attrPlaceReply.replyText.slice(0, 180));
+{
+  const { storageService } = await import('../src/services/storageService');
+  const gaps = JSON.parse(storageService.getItem('miki_knowledge_gaps_v1') || '[]') as Array<Record<string, unknown>>;
+  const gap = gaps.find((g) => g.type === 'UNKNOWN_RELATION' && String(g.query || '').includes('モコロン'));
+  check('P616 属性の欠けが調査 gap に積まれる', Boolean(gap), 'gap not found');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
