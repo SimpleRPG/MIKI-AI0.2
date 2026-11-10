@@ -478,6 +478,12 @@ export class ConversationCoreService {
       if (opener) {
         return this.buildResult('RESOLVED', 'conversation_opener_answer', this.applyPersonaVoice(opener), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P681: 社交の声かけ（久しぶり・はじめまして・よろしく・
+      // 元気出して）は、社交として返す。了承形や反響に化けていた。
+      const social = this.socialWarmthAnswer(prompt);
+      if (social) {
+        return this.buildResult('RESOLVED', 'social_warmth_answer', this.applyPersonaVoice(social), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -2824,6 +2830,28 @@ export class ConversationCoreService {
     }
     if (/お願いがある|お願いしたい|頼みがある|頼みたいことがある/.test(p)) {
       return 'いいですよ、何ですか？聞きますよ。';
+    }
+    return undefined;
+  }
+
+  /**
+   * P681: 社交の声かけへの受け口。短い社交の発話だけを対象にする
+   * （依頼の末尾の「よろしくね」等を横取りしないよう、全体が短い
+   * 社交形のときだけ）。
+   */
+  private socialWarmthAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '').replace(/[！!。\s]/g, '');
+    if (/^(?:お)?久しぶり(?:だね|ですね|です)?$/.test(p)) {
+      return 'お久しぶりです！元気でしたか？会えて嬉しいです。';
+    }
+    if (/^はじめまして(?:です)?$/.test(p)) {
+      return 'はじめまして！よろしくお願いしますね。';
+    }
+    if (/^(?:どうぞ)?よろしく(?:ね|お願いします|お願いいたします)?$/.test(p) || /^よろしく$/.test(p)) {
+      return 'こちらこそ、よろしくお願いします！';
+    }
+    if (/^(?:元気出して|元気出しな|元気を出して)(?:ね)?$/.test(p)) {
+      return 'ありがとうございます、元気出します！声をかけてもらえて、もう少し頑張れそうです。';
     }
     return undefined;
   }

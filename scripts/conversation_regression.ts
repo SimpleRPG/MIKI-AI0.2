@@ -1515,6 +1515,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P680 お願いの切り出しを受ける', favor.replyText.includes('何ですか'), favor.replyText.slice(0, 120));
 }
 
+// ---- 社交の声かけは社交として返す（P681） ----
+{
+  const reunion = await conversationCoreService.execute({ prompt: '久しぶり' } as any);
+  check('P681 久しぶりに再会の形で返す', reunion.replyText.includes('お久しぶりです'), reunion.replyText.slice(0, 120));
+  const first = await conversationCoreService.execute({ prompt: 'はじめまして' } as any);
+  check('P681 はじめましてに挨拶で返す', first.replyText.includes('はじめまして'), first.replyText.slice(0, 120));
+  const cheerHer = await conversationCoreService.execute({ prompt: '元気出して' } as any);
+  check('P681 彼女への励ましは感謝で受ける', cheerHer.replyText.includes('ありがとう'), cheerHer.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
