@@ -937,6 +937,22 @@ check('P622 できることは ENABLES で答える', enablesReply.replyText.inc
 const habitatReply = await conversationCoreService.execute({ prompt: 'モコロンってどこに住んでるの？' } as any);
 check('P622 生息地は専用の欠けとして答える', habitatReply.replyText.includes('生息地はまだ知らない'), habitatReply.replyText.slice(0, 160));
 
+// ---- 前日のエピソード（P623） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { episodeMemoryService } = await import('../src/miki/conversation/services/episodeMemoryService');
+  const yk = (() => { const d = new Date(Date.now() - 24 * 3600_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  storageService.setItem('miki_episodes_v1', '[]');
+  storageService.setItem('miki_episode_built_day_v1', '');
+  storageService.setItem('miki_open_topics_v1', JSON.stringify([{ topic: '引っ越しの相談', openedDay: yk, weight: 3 }]));
+  const yStart = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, 10, 0).getTime(); })();
+  storageService.setItem('miki_user_state_trail_v1', JSON.stringify([
+    { signal: 'fatigue', at: yStart }, { signal: 'fatigue', at: yStart + 3600_000 },
+  ]));
+  const ep = episodeMemoryService.yesterdayEpisode();
+  check('P623 前日のエピソードが組める', Boolean(ep && ep.summary.includes('引っ越しの相談') && ep.summary.includes('お疲れ気味')), ep ? ep.summary : 'none');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

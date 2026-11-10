@@ -32,6 +32,7 @@ import { roleplaySessionService } from '../../conversation/services/roleplaySess
 import { utteranceEventClassifierService } from '../../conversation/services/utteranceEventClassifierService';
 import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
+import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { reviewReflectionService } from '../../selfAwareness/services/reviewReflectionService';
 import { paraphraseService } from '../../memory/services/paraphraseService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
@@ -912,7 +913,14 @@ export class ConversationCoreService {
       // P522: 前の日以前に開いた話題が残っていれば、挨拶のときに
       // 一度だけ拾う。
       if (/おはよ(?:う|ー)?|こんにちは|ただいま|こんばんは|やあ/.test(prompt)) {
-        const openTopic = conversationOpenTopicService.takeCallbackTopic();
+        // P623: 前日のエピソードが組めるなら、話題の単体拾いより
+        // 先に「昨日のこと」として出す（話題は消費して二重に出さない）。
+        const episode = (() => { try { return episodeMemoryService.yesterdayEpisode(); } catch { return undefined; } })();
+        if (episode) {
+          if (episode.topics.length > 0) conversationOpenTopicService.takeCallbackTopic();
+          casualConclusion += `\n${episode.summary}その後、どうですか？`;
+        }
+        const openTopic = episode ? undefined : conversationOpenTopicService.takeCallbackTopic();
         if (openTopic) {
           casualConclusion += `\nそういえば、前に話していた「${openTopic}」の件、その後どうなりました？`;
         } else {
