@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1799,
     "sourceFileCount": 1352,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1263,
-    "relativeImportCandidateCount": 4014,
-    "resolvedRelativeImportCandidateCount": 3998,
+    "relativeImportCandidateCount": 4015,
+    "resolvedRelativeImportCandidateCount": 3999,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1697,9 +1697,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 105347,
-      "lines": 977,
-      "sha256": "70b832f9c7d8d7837712276178562075d3277905cd51968639815c33e2aef03e",
+      "bytes": 106729,
+      "lines": 991,
+      "sha256": "83ac8d6c9fe81d1d9403a0a1ee9cbb885ce32d3b9058bf127e7fbec7b5f95540",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -1922,10 +1922,16 @@
           "specifier": "../src/services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 966,
+          "specifier": "../src/services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
         }
       ],
-      "relativeImportCandidateCount": 37,
-      "resolvedRelativeImportCount": 37,
+      "relativeImportCandidateCount": 38,
+      "resolvedRelativeImportCount": 38,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -12041,9 +12047,9 @@
     },
     {
       "path": "src/miki/conversation/services/userStateTrailService.ts",
-      "bytes": 6657,
-      "lines": 146,
-      "sha256": "a4c5167a2279f7a1c66ebb286e4da5013e7f315b8133d2630d81cc01865abdf9",
+      "bytes": 6972,
+      "lines": 153,
+      "sha256": "1fcdb5a26a7b8feb6d15a66f66b775ad0705cfc494dc1c3e8ec82f37219ea812",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27349,9 +27355,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 197926,
-      "lines": 2868,
-      "sha256": "d36327d888f4bf7ac5523f9d1b18826f33c80642fc0acaf3b6b35e05fc481899",
+      "bytes": 201682,
+      "lines": 2933,
+      "sha256": "3288fe6da6ee7b48d79b131ef70274dd268d2eba873b064cd736026cd1b0c1dc",
       "relativeImportCandidates": [
         {
           "line": 1,

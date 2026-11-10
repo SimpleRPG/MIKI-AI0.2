@@ -364,6 +364,15 @@ export class ConversationCoreService {
       if (dinner) {
         return this.buildResult('RESOLVED', 'dinner_musing_answer', this.applyPersonaVoice(dinner), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P625/P626: 状態の経過と会話の振り返りは、記録から答える。
+      const stateRecall = this.userStateRecallAnswer(prompt);
+      if (stateRecall) {
+        return this.buildResult('RESOLVED', 'user_state_recall_answer', this.applyPersonaVoice(stateRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const episodeRecall = this.episodeRecallAnswer(prompt);
+      if (episodeRecall) {
+        return this.buildResult('RESOLVED', 'episode_recall_answer', this.applyPersonaVoice(episodeRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P624: 「最近何か覚えた？」は、彼女の学習の記録から答える。
       const recentLearning = this.recentLearningAnswer(prompt);
       if (recentLearning) {
@@ -2408,6 +2417,62 @@ export class ConversationCoreService {
       }
       return undefined;
     }
+    return undefined;
+  }
+
+  /**
+   * P625: 「疲れ取れた？」——ユーザーの状態の経過を聞かれたら、
+   * 状態の流れの記録から答える。記録が会話の材料になることで、
+   * 前の会話と今が地続きになる。
+   */
+  private userStateRecallAnswer(prompt: string): string | undefined {
+    if (!/(?:取れた|抜けた|治った|良くなった|落ち着いた|どう|まだ)/.test(prompt)) return undefined;
+    if (!/(?:？|\?|か[？。]|の[？。]|どう)/.test(prompt)) return undefined;
+    const table: Array<{ re: RegExp; signal: 'fatigue' | 'pain' | 'anxiety' | 'loneliness' | 'hunger' | 'thirst'; label: string }> = [
+      { re: /疲れ|眠気|眠い|だる/, signal: 'fatigue', label: '疲れ' },
+      { re: /痛み|頭痛|痛い/, signal: 'pain', label: '痛み' },
+      { re: /不安|心配/, signal: 'anxiety', label: '不安' },
+      { re: /寂し|孤独/, signal: 'loneliness', label: '寂しさ' },
+      { re: /お腹|空腹/, signal: 'hunger', label: 'お腹' },
+      { re: /喉|のど/, signal: 'thirst', label: '喉の渇き' },
+    ];
+    const hit = table.find((t) => t.re.test(prompt));
+    if (!hit) return undefined;
+    try {
+      const lastAt = userStateTrailService.lastRecordedAt(hit.signal);
+      if (!lastAt) return `${hit.label}の話は、最近は聞いてないですね。今はどうですか？`;
+      const diffMs = Date.now() - lastAt;
+      const when = diffMs < 3600_000 ? 'さっき'
+        : diffMs < 24 * 3600_000 ? `${Math.max(1, Math.round(diffMs / 3600_000))}時間くらい前`
+          : `${Math.round(diffMs / (24 * 3600_000))}日くらい前`;
+      return `${hit.label}は、${when}にそう言ってましたね。その後はどうですか？`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P626: 「昨日何の話したっけ？」——エピソード（P623）と今日の
+   * 開いた話題から、会話の振り返りに直接答える。
+   */
+  private episodeRecallAnswer(prompt: string): string | undefined {
+    if (!/(?:何の話|どんな話|何話し|話したっけ|話してた)/.test(prompt)) return undefined;
+    try {
+      if (/(?:昨日|きのう)/.test(prompt)) {
+        const episode = episodeMemoryService.yesterdayEpisode();
+        if (episode) return `${episode.summary}覚えてますよ。`;
+        return '昨日の話は、まだ記録に残ってないです。';
+      }
+      if (/(?:今日|きょう)/.test(prompt)) {
+        const now = new Date();
+        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const todays = conversationOpenTopicService.listPending()
+          .filter((r) => r.openedDay === todayKey)
+          .map((r) => r.topic)
+          .filter(Boolean)
+          .slice(0, 3);
+        if (todays.length > 0) return `今日は「${todays.join('」や「')}」の話をしましたね。`;
+        return '今日は、まだこれといった話題は無いですね。これからですね。';
+      }
+    } catch { return undefined; }
     return undefined;
   }
 

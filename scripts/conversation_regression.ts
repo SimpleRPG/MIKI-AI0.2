@@ -961,6 +961,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P624 最近覚えたことは記録から答える', learnReply.replyText.includes('最近だと') && (learnReply.replyText.includes('ツバメ') || learnReply.replyText.includes('モコロン')), learnReply.replyText.slice(0, 200));
 }
 
+// ---- 状態の経過と会話の振り返り（P625/P626） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  storageService.setItem('miki_user_state_trail_v1', JSON.stringify([{ signal: 'fatigue', at: Date.now() - 3 * 3600_000 }]));
+  const stateRecallReply = await conversationCoreService.execute({ prompt: '疲れ取れた？' } as any);
+  check('P625 疲れの経過は記録の時刻で答える', stateRecallReply.replyText.includes('3時間くらい前') && stateRecallReply.replyText.includes('その後はどうですか'), stateRecallReply.replyText.slice(0, 160));
+  const yk = (() => { const d = new Date(Date.now() - 24 * 3600_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+  storageService.setItem('miki_open_topics_v1', JSON.stringify([{ topic: '港の朝市', openedDay: yk, weight: 2 }]));
+  storageService.setItem('miki_episodes_v1', '[]');
+  storageService.setItem('miki_episode_built_day_v1', '');
+  const episodeRecallReply = await conversationCoreService.execute({ prompt: '昨日何の話したっけ？' } as any);
+  check('P626 昨日の話はエピソードで答える', episodeRecallReply.replyText.includes('港の朝市') && episodeRecallReply.replyText.includes('覚えてますよ'), episodeRecallReply.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

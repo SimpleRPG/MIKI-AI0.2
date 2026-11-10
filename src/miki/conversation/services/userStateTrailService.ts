@@ -112,6 +112,13 @@ export class UserStateTrailService {
   }
 
   /** 発話から兆候を読み、あれば記録して返す。 */
+  /** P625: その兆候が最後に記録された時刻（無ければ undefined）。 */
+  public lastRecordedAt(signal: UserStateSignal): number | undefined {
+    const hits = this.load().filter((e) => e.signal === signal);
+    if (hits.length === 0) return undefined;
+    return hits[hits.length - 1].at;
+  }
+
   public recordFromText(text: string): UserStateSignal | undefined {
     const source = affirmedText(text);
     const signal: UserStateSignal | undefined = FATIGUE_PATTERN.test(source)
