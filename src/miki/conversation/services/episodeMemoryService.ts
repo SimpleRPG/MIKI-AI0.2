@@ -60,14 +60,34 @@ class EpisodeMemoryService {
 
   /** 前日のエピソードを（未構築なら今構築して）返す。無ければ undefined。 */
   public yesterdayEpisode(): Episode | undefined {
-    const yk = yesterdayKey();
-    const existing = this.loadEpisodes().find((e) => e.day === yk);
+    return this.ensureEpisode(yesterdayKey());
+  }
+
+  /** P627: 過去7日分のエピソードを（組めるものは組んで）日付順に返す。 */
+  public recentEpisodes(days = 7): Episode[] {
+    const out: Episode[] = [];
+    const now = new Date();
+    for (let i = days; i >= 1; i--) {
+      const key = dayKeyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i).getTime());
+      const ep = this.ensureEpisode(key);
+      if (ep) out.push(ep);
+    }
+    return out.sort((a, b) => a.day.localeCompare(b.day));
+  }
+
+  private ensureEpisode(day: string): Episode | undefined {
+    const existing = this.loadEpisodes().find((e) => e.day === day);
     if (existing) return existing;
     try {
-      if (storageService.getItem(BUILT_KEY) === yk) return undefined;
+      const built = JSON.parse(storageService.getItem(BUILT_KEY) || '[]') as string[];
+      if (Array.isArray(built) && built.includes(day)) return undefined;
     } catch { /* 読めなければ構築を試す */ }
-    const episode = this.buildFor(yk);
-    try { storageService.setItem(BUILT_KEY, yk); } catch { /* 補助経路 */ }
+    const episode = this.buildFor(day);
+    try {
+      const built = JSON.parse(storageService.getItem(BUILT_KEY) || '[]') as string[];
+      const next = Array.isArray(built) ? [...built, day] : [day];
+      storageService.setItem(BUILT_KEY, JSON.stringify(next.slice(-14)));
+    } catch { /* 補助経路 */ }
     if (!episode) return undefined;
     const episodes = this.loadEpisodes();
     episodes.push(episode);

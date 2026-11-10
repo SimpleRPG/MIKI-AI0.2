@@ -373,6 +373,10 @@ export class ConversationCoreService {
       if (episodeRecall) {
         return this.buildResult('RESOLVED', 'episode_recall_answer', this.applyPersonaVoice(episodeRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const weeklyRecall = this.weeklyRecallAnswer(prompt);
+      if (weeklyRecall) {
+        return this.buildResult('RESOLVED', 'weekly_recall_answer', this.applyPersonaVoice(weeklyRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P624: 「最近何か覚えた？」は、彼女の学習の記録から答える。
       const recentLearning = this.recentLearningAnswer(prompt);
       if (recentLearning) {
@@ -2340,6 +2344,7 @@ export class ConversationCoreService {
     else if (/(?:には何が入って|には何が含まれ|には何がある)/.test(prompt)) { relationType = 'PART_OF'; label = '中身'; reverse = true; }
     else if (/(?:何を引き起こす|何の原因|どんなことを引き起こす)/.test(prompt)) { relationType = 'CAUSES'; label = '引き起こすこと'; }
     else if (/(?:があると|を使えば|を使うと).*(?:何ができ|なにができ|できること)/.test(prompt)) { relationType = 'ENABLES'; label = 'できること'; }
+    else if (/(?:で|から)(?:何が作れ|なにが作れ|何作れ|何ができ|なにができ)/.test(prompt)) { relationType = 'ENABLES'; label = '作れるもの'; }
     if (!relationType) return undefined;
     let entity: string | undefined;
     try {
@@ -2464,6 +2469,21 @@ export class ConversationCoreService {
       // 今日の振り返りは既存の要約経路（P597）の領分なので触らない。
     } catch { return undefined; }
     return undefined;
+  }
+
+  /**
+   * P627: 「今週はどんな週だった？」——エピソード（P623）の蓄積から
+   * 週単位で振り返る。日々の記録が週の物語になる。
+   */
+  private weeklyRecallAnswer(prompt: string): string | undefined {
+    if (!/(?:今週|この1週間|この一週間|この七日|この７日)/.test(prompt)) return undefined;
+    if (!/(?:何があった|どんな|振り返|何の話|どうだった|何した)/.test(prompt)) return undefined;
+    try {
+      const episodes = episodeMemoryService.recentEpisodes(7);
+      if (episodes.length === 0) return '今週の記録は、まだあまり残ってないです。これからですね。';
+      const lines = episodes.slice(-3).map((e) => e.summary.replace(/^昨日は、/, ''));
+      return `今週は、${lines.join(' ')}`;
+    } catch { return undefined; }
   }
 
   /**

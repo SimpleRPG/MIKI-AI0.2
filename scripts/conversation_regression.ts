@@ -975,6 +975,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P626 昨日の話はエピソードで答える', episodeRecallReply.replyText.includes('港の朝市') && episodeRecallReply.replyText.includes('覚えてますよ'), episodeRecallReply.replyText.slice(0, 200));
 }
 
+// ---- 週の振り返りと作れるものの質問（P627/P628） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const dayKey = (n: number) => { const d = new Date(); const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() - n); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+  storageService.setItem('miki_episodes_v1', JSON.stringify([
+    { day: dayKey(3), topics: ['引っ越しの相談'], summary: '昨日は、「引っ越しの相談」の話をしましたね。' },
+    { day: dayKey(2), topics: ['港の朝市'], summary: '昨日は、「港の朝市」の話をしましたね。' },
+  ]));
+  const weeklyReply = await conversationCoreService.execute({ prompt: '今週はどんな週だった？' } as any);
+  check('P627 今週の振り返りはエピソードの蓄積で答える', weeklyReply.replyText.includes('今週は') && weeklyReply.replyText.includes('引っ越しの相談'), weeklyReply.replyText.slice(0, 260));
+  const craftReply = await conversationCoreService.execute({ prompt: '綿毛で何が作れる？' } as any);
+  check('P628 作れるものは ENABLES で答える', craftReply.replyText.includes('布作り'), craftReply.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
