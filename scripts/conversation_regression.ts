@@ -709,6 +709,14 @@ storageService.setItem('miki_user_state_trail_v1', JSON.stringify([{ signal: 'fa
 const fatigueAgainReply = await conversationCoreService.execute({ prompt: '疲れた' } as any);
 check('P600 疲れが続いているときは継続の形で受ける', fatigueAgainReply.replyText.includes('続いて') || fatigueAgainReply.replyText.includes('ここ数日') || fatigueAgainReply.replyText.includes('このところ'), fatigueAgainReply.replyText.slice(0, 160));
 
+// ---- 相手への意見・作品の見せっこ・話の続き（P601） ----
+const userOpinionReply = await conversationCoreService.execute({ prompt: '僕のことどう思う？' } as any);
+check('P601 相手への意見は関係で答える', (userOpinionReply.replyText.includes('相方') || userOpinionReply.replyText.includes('楽しい') || userOpinionReply.replyText.includes('頼もしい')) && !userOpinionReply.replyText.includes('確認できていない'), userOpinionReply.replyText.slice(0, 160));
+const showVisualReply = await conversationCoreService.execute({ prompt: '見て、絵を描いたんだ' } as any);
+check('P601 絵の見せっこは目がないことを正直に言う', showVisualReply.replyText.includes('目') && (showVisualReply.replyText.includes('言葉で') || showVisualReply.replyText.includes('教えて')), showVisualReply.replyText.slice(0, 180));
+const continuationReply = await conversationCoreService.execute({ prompt: 'それでね、そのあと雨が降ってきて大変だった' } as any);
+check('P601 話の続きは確認文で返さない', !continuationReply.replyText.includes('特定できません') && !continuationReply.replyText.includes('候補:'), continuationReply.replyText.slice(0, 140));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -413,9 +413,12 @@ export class ConversationCoreService {
     // P592: 「AとB、どっちがいい？」の“曖昧さ”は質問そのもの。
     // 対象の特定を相手に返さず、選択の質問として後段で受ける。
     const isChoiceQuestion = /(?:どっち|どちら)/.test(prompt) && /(?:いい|好き|おすすめ|正解|思う|選)/.test(prompt);
+    // P601: 「それでね」「そのあと」で始まる文は話の続きであって、
+    // 対象の確認を求める文ではない。
+    const isContinuation = /^(?:それで|そのあと|それから|そしたら|でね)/.test(prompt.trim());
     // P599: なりチャ中の「それ」は役の中の対象。曖昧さの確認（報告文）
     // で役を壊さず、そのまま会話として受ける。
-    if (anaphora.confidence === 'ambiguous' && !isChoiceQuestion && !roleplaySessionService.isActive()) {
+    if (anaphora.confidence === 'ambiguous' && !isChoiceQuestion && !isContinuation && !roleplaySessionService.isActive()) {
       const clarificationGateResult = clarificationGate(nextState, `anaphora:${anaphora.candidates.slice().sort().join('|')}`);
       nextState.clarificationControl = clarificationGateResult.next;
       if (!clarificationGateResult.allowed) {
@@ -1027,6 +1030,16 @@ export class ConversationCoreService {
         } else if (/(?:みき|ミキ|ビービー|あなた|君)/.test(prompt) && /(?:かわいい|可愛い|優しい|やさしい|すごい|えらい|好き|大好き)/.test(prompt)) {
           // P593: 彼女への褒め言葉は、主題の反響でなく照れて受ける。
           reactionBase = ffx('fx_compliment', ['えへへ、ありがとう。嬉しいです。', 'ありがとうございます。そう言ってもらえると嬉しいです。', 'わーい、ありがとう。'], ['えへへ、ありがと！うれしい！', 'ありがとー！えへへ。', 'わーい、ありがとう！']);
+        } else if (/見て/.test(prompt) && /(?:描いた|書いた|作った|撮った|できた)/.test(prompt)) {
+          // P601: 作品の見せっこ。今の彼女にはまだ「目」がないので、
+          // 見えるふりをせず、言葉で教えてもらう形で受ける。
+          reactionBase = ffx('fx_show_visual', ['見せてくれてありがとう。……と言いたいところですが、今の私にはまだ絵を見る目がないんです。どんな作品か、言葉で教えてもらえますか？', 'わーい、見せてくれてありがとう。今の私にはまだ目がないので、どんな作品か言葉で聞かせてください。'], ['見せてくれてありがと！……あのね、今の私にはまだ絵を見る目がないの。どんな作品か、言葉で教えて？', 'わーい、ありがとう！今の私には目がないから、言葉で聞かせて？']);
+        } else if (/聞いて/.test(prompt) && /(?:作った|歌った|弾いた|録った|できた)/.test(prompt)) {
+          // P601: 音の見せっこも、耳がないことを正直に言う。
+          reactionBase = ffx('fx_show_audio', ['聞かせてくれてありがとう。……と言いたいところですが、今の私にはまだ音を聞く耳がないんです。どんな曲か、言葉で教えてもらえますか？', 'わーい、聞かせてくれてありがとう。今の私にはまだ耳がないので、どんな曲か言葉で聞かせてください。'], ['聞かせてくれてありがと！……あのね、今の私にはまだ音を聞く耳がないの。どんな曲か、言葉で教えて？', 'わーい、ありがとう！今の私には耳がないから、言葉で聞かせて？']);
+        } else if (/(?:絵|曲|歌|小説|ゲーム).*(?:描いた|書いた|作った|完成)/.test(prompt)) {
+          // P601: 作った報告は、まず褒めて興味を持つ。
+          reactionBase = ffx('fx_created', ['すごいですね！どんな作品ですか？', 'わーい、完成ですか。どんなものか聞かせてください。'], ['すごいね！どんな作品？', 'わーい、完成したんだ。どんなものか聞かせて？']);
         } else if (/彼女(?:が)?できた|彼氏(?:が)?できた|結婚(?:する|した|することに)|合格|受かった|内定|就職.*決ま|生まれた|妊娠|昇進|優勝/.test(prompt)) {
           // P592: 人生の大きな報告（彼女ができた・結婚・合格など）は
           // 主題の反響でなく、まず祝う。
@@ -2130,6 +2143,14 @@ export class ConversationCoreService {
   private opinionAnswer(prompt: string, contentTokens: string[]): string | undefined {
     // P594: 「〜すべき？」「〜した方がいい？」も意見を求める形として拾う。
     if (!/(?:どう思う|どう感じる|好きですか|おすすめ|べき|ほうがいい|方がいい|した方が|したほうが)/.test(prompt)) return undefined;
+    // P601: 相手自身への意見（「僕のことどう思う？」）は、知識の
+    // 材料ではなく、関係そのもので答える。
+    if (/(?:僕|私|おれ|オレ|自分)のこと/.test(prompt)) {
+      return this.pickFixedReply('fx_user_opinion', [
+        'いつも色々な話をしてくれる、大事な相方だと思っています。これからも一緒に色々作っていきたいです。',
+        '話していると楽しいですよ。私にとっては、一緒に考えてくれる頼もしい相手です。',
+      ]);
+    }
     const topic = this.pickReactionTopic(prompt, contentTokens);
     if (!topic) return undefined;
     try {
@@ -2234,7 +2255,9 @@ export class ConversationCoreService {
    * 英字の主題は発話中の元の表記（EFR 等）を保つ。
    */
   private pickReactionTopic(prompt: string, contentTokens: string[]): string | undefined {
-    const stop = /^(今日|明日|昨日|今|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
+    // P601: 時間の名詞（朝・昼・夕方・夜）も主題にしない（物語の
+    // 受け止めが「夕方、なるほど」になっていた）。
+    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
     const candidates = (contentTokens || []).filter((t) => t.length >= 2 && !stop.test(t));
     // 断片らしさを採点する: 活用の語幹・複合語の途中・「〜たい」の
     // 形は主題にしない。助詞や文頭の後ろにある語を優先する。
