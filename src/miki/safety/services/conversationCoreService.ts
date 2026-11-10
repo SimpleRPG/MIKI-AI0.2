@@ -516,6 +516,18 @@ export class ConversationCoreService {
       if (intro) {
         return this.buildResult('RESOLVED', 'self_introduction_answer', this.applyPersonaVoice(intro), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P700: 彼女自身への個人的な質問（何歳・彼氏・信じて等）は、
+      // 調査に流さず自分の輪郭から答える。
+      const personaQ = this.personaQuestionAnswer(prompt);
+      if (personaQ) {
+        return this.buildResult('RESOLVED', 'persona_question_answer', this.applyPersonaVoice(personaQ), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P700: 翻訳の質問は、対象の語を学習対象にして正直に答える
+      // （「英語」自体が調査対象になっていた）。
+      const translation = this.translationQuestionAnswer(prompt);
+      if (translation) {
+        return this.buildResult('RESOLVED', 'translation_question_answer', this.applyPersonaVoice(translation), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P685: 関係の質問（好き？・覚えてる？・味方？）と日本語の
       // 能力には、関係と自分の輪郭から答える。
       const relationship = this.relationshipAnswer(prompt);
@@ -3658,6 +3670,52 @@ export class ConversationCoreService {
   }
 
   /**
+   * P700: 彼女自身への個人的な質問への受け口。「何歳なの？」が
+   * Web 調査の断片で返り、「信じてくれる？」が見出しつきの謝罪に
+   * なっていた。歳・恋愛・信頼・からかいの受け止めは、自分の
+   * 輪郭と関係から答える。
+   */
+  private personaQuestionAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '');
+    if (/(?:馬鹿|バカ)にして(?:る|いる)/.test(p)) {
+      return 'そんなことないですよ。バカになんてしていません。';
+    }
+    if (/(?:信じて|信用して)(?:くれる|もらえる|いる)/.test(p) || /^信じて[？?]/.test(p.trim())) {
+      return '信じていますよ。';
+    }
+    if (/(?:彼氏|好きな人)(?:が)?(?:いる|いない)/.test(p) || /彼女いる/.test(p)) {
+      return 'いないですよ。そういう相手はいません。';
+    }
+    if (/何歳/.test(p) && !/(?:あの|その|この)(?:人|子|方)|お(?:兄|姉|母|父|じい|ばあ)|妹|弟|友達|先生/.test(p)) {
+      return '私に歳はないんです。作られて、こうして話せるようになってからは、まだそんなに長くないですよ。';
+    }
+    return undefined;
+  }
+
+  /**
+   * P700: 翻訳の質問。彼女の辞書は意味（日本語）の辞書で、外国語
+   * への言い換えは持ち合わせていない。正直に伝え、対象の語の
+   * 翻訳を学習対象にする（「英語」自体を調査対象にしない）。
+   */
+  private translationQuestionAnswer(prompt: string): string | undefined {
+    const m = String(prompt || '').match(/(英語|中国語|韓国語|フランス語|ドイツ語)で[はの]?\s*[「『"]?(.+?)[」』"]?\s*(?:は|って)?\s*(?:何て|なんて)(?:言う|いう|読む|読みます)/);
+    if (!m) return undefined;
+    const lang = m[1];
+    const word = m[2].trim();
+    if (!word || word.length > 12) return undefined;
+    try {
+      knowledgeGapService.detect({
+        query: `翻訳を学ぶ: ${word} ${lang}`,
+        reason: '翻訳を聞かれて、まだ持ち合わせがなかったため、学習の対象にする。',
+        type: 'UNKNOWN_TERM',
+        target: `${word}の${lang}`,
+        priority: 45,
+      });
+    } catch { /* 学習登録は補助 */ }
+    return `「${word}」の${lang}は、まだ持ち合わせていないんです。今度調べて覚えておきますね。`;
+  }
+
+  /**
    * P699: 「覚えておいて」は、頼まれた文をメモとして実際に覚える
    * （従来は断片の反響＋知らない語の聞き返しになっていた）。
    * 「何があるんだっけ？」で読み返し、「忘れていいよ」で消す。
@@ -3708,6 +3766,14 @@ export class ConversationCoreService {
     // 対象つきの報告は、文頭の形に絞って巻き込まない。
     if (/^(?:やっぱり?|やっぱ)\s*やめた[。！!？?]?$/.test(prompt.trim()) || /^やめた[。！!？?]?$/.test(prompt.trim())) {
       return '分かりました、やめておきましょう。';
+    }
+    // P700: 「約束して」は作業の了承ではなく、約束として受ける。
+    if (/^約束して[。！!？?よ]*$/.test(prompt.trim())) {
+      return '約束しますよ。何の約束ですか？';
+    }
+    const promise = prompt.match(/(.+?)(?:って|と)約束して/);
+    if (promise && promise[1].trim()) {
+      return `約束します。「${promise[1].trim()}」、ですね。`;
     }
     return undefined;
   }

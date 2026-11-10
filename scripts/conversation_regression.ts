@@ -1716,6 +1716,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P699 忘れた後は無いと答える', recallAfter.replyText.includes('特に覚えていることはない'), recallAfter.replyText.slice(0, 100));
 }
 
+// ---- 彼女自身への質問・翻訳・約束（P700） ----
+{
+  const age = await conversationCoreService.execute({ prompt: '何歳なの？' } as any);
+  check('P700 年齢は調査に流さず自分の輪郭で答える', age.replyText.includes('歳はない') && !age.replyText.includes('調べてみたら'), age.replyText.slice(0, 120));
+  const lover = await conversationCoreService.execute({ prompt: '彼氏いるの？' } as any);
+  check('P700 彼氏の質問は自分の輪郭で答える', lover.replyText.includes('いないですよ'), lover.replyText.slice(0, 100));
+  const trust = await conversationCoreService.execute({ prompt: '信じてくれる？' } as any);
+  check('P700 信頼の質問は関係で答える', trust.replyText.includes('信じていますよ'), trust.replyText.slice(0, 80));
+  const tease = await conversationCoreService.execute({ prompt: '僕のことバカにしてる？' } as any);
+  check('P700 からかいの心配は否定して受ける', tease.replyText.includes('バカになんてしていません'), tease.replyText.slice(0, 80));
+  const trans = await conversationCoreService.execute({ prompt: '英語で「猫」は何て言うの？' } as any);
+  check('P700 翻訳は対象の語で正直に答える', trans.replyText.includes('「猫」の英語は') && !trans.replyText.includes('「英語」はまだ確認できていない'), trans.replyText.slice(0, 120));
+  const promise = await conversationCoreService.execute({ prompt: '約束して' } as any);
+  check('P700 「約束して」は約束として受ける', promise.replyText.includes('約束します') && !promise.replyText.includes('やってみます'), promise.replyText.slice(0, 80));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
