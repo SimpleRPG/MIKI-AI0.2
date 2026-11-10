@@ -1556,6 +1556,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P685 味方かには「もちろんです」で答える', ally.replyText.includes('味方です'), ally.replyText.slice(0, 120));
 }
 
+// ---- ビービー口調の新しい取りこぼし（P686） ----
+{
+  (globalThis as any).window = { dispatchEvent: () => true, addEventListener: () => {}, removeEventListener: () => {} };
+  personaProfileService.switchProfile('persona-bibi');
+  const consultB = await conversationCoreService.execute({ prompt: '相談に乗って' } as any);
+  check('P686 ビービーでも相談の受けがタメ口になる', consultB.replyText.includes('どうしたの？'), consultB.replyText.slice(0, 120));
+  const musingB = await conversationCoreService.execute({ prompt: 'もうこんな時間だ' } as any);
+  check('P686 ビービーでも時間の相づちがタメ口になる', !musingB.replyText.includes('ですね'), musingB.replyText.slice(0, 120));
+  personaProfileService.switchProfile('persona-default');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

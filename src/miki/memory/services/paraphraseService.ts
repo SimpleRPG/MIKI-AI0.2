@@ -141,6 +141,11 @@ function casualizeEndings(text: string, forVoice = false): string {
   out = out.split('ですよ、').join('だよ、');
   out = out.split('ですよ！').join('だよ！');
   out = out.split('ですよ。').join('だよ。');
+  // P686: 新しい受け口の答えで残っていた形（読点つきの「ですね、」、
+  // 「どうしましたか？」「何ですか？」）も寄せる。
+  out = out.split('どうしましたか？').join('どうしたの？');
+  out = out.split('何ですか？').join('何なの？');
+  out = out.split('ですね、').join('だね、');
   out = out.split('ですね。').join('だね。');
   out = out.split('です。').join('だよ。');
   out = out.split('だろう。').join('だろうね。');
