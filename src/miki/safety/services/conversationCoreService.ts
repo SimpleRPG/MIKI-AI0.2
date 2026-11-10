@@ -484,6 +484,12 @@ export class ConversationCoreService {
       if (social) {
         return this.buildResult('RESOLVED', 'social_warmth_answer', this.applyPersonaVoice(social), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P683: 時間の経過・週末・曜日のつぶやきには、実際の時刻と
+      // 曜日で応じる。断片の反響（「もうの話ですね」）に化けていた。
+      const musing = this.timeMusingAnswer(prompt);
+      if (musing) {
+        return this.buildResult('RESOLVED', 'time_musing_answer', this.applyPersonaVoice(musing), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -2852,6 +2858,36 @@ export class ConversationCoreService {
     }
     if (/^(?:元気出して|元気出しな|元気を出して)(?:ね)?$/.test(p)) {
       return 'ありがとうございます、元気出します！声をかけてもらえて、もう少し頑張れそうです。';
+    }
+    return undefined;
+  }
+
+  /**
+   * P683: 時間にまつわるつぶやきへの受け口。実際の時刻・曜日を
+   * 材料に相づちを打つ（曜日が違えば、事実でそっと正す）。
+   */
+  private timeMusingAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '');
+    const now = new Date();
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    const todayName = weekdays[now.getDay()];
+    if (/もうこんな時間|時間(?:が)?経つの(?:は)?早い|時間が経つのは早い|あっという間だね|あっという間ですね/.test(p)) {
+      return `本当ですね、もう${now.getHours()}時${now.getMinutes()}分です。話しているとあっという間ですね。`;
+    }
+    if (/今日はもう遅い|もう遅いね|もう遅い時間/.test(p)) {
+      return `本当ですね、もう${now.getHours()}時${now.getMinutes()}分です。遅い時間なので、無理しないでくださいね。`;
+    }
+    const dowMusing = p.match(/(月|火|水|木|金|土|日)曜日か/);
+    if (dowMusing && p.length <= 12) {
+      return dowMusing[1] === todayName
+        ? `そうですね、今日は${todayName}曜日です。`
+        : `今日は${todayName}曜日ですよ。`;
+    }
+    if (/週末だね|週末ですね|やっと週末/.test(p)) {
+      const day = now.getDay();
+      if (day === 0 || day === 6) return '週末ですね。ゆっくりできていますか？';
+      const until = 6 - day;
+      return `週末はあと${until}日ですね。今日は${todayName}曜日、あと少しですよ。`;
     }
     return undefined;
   }

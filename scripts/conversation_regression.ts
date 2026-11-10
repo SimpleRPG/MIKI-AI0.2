@@ -1525,6 +1525,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P681 彼女への励ましは感謝で受ける', cheerHer.replyText.includes('ありがとう'), cheerHer.replyText.slice(0, 120));
 }
 
+// ---- 時間のつぶやきには実際の時刻・曜日で応じる（P683） ----
+{
+  const flies = await conversationCoreService.execute({ prompt: 'もうこんな時間だ' } as any);
+  check('P683 時間の経過には時刻を添えて相づち', /もう\d+時\d+分です/.test(flies.replyText), flies.replyText.slice(0, 120));
+  const nowD = new Date();
+  const names = ['日', '月', '火', '水', '木', '金', '土'];
+  const wrongDay = names[(nowD.getDay() + 2) % 7];
+  const dowM = await conversationCoreService.execute({ prompt: `${wrongDay}曜日か…` } as any);
+  check('P683 違う曜日は事実で正す', dowM.replyText.includes(`今日は${names[nowD.getDay()]}曜日ですよ`), dowM.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
