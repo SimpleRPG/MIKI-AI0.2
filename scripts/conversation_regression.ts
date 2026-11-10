@@ -1299,6 +1299,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P660 今日の振り返りの質問は従来どおり答える', recapQ.replyText.includes('話をしましたね') || recapQ.replyText.includes('今日は'), recapQ.replyText.slice(0, 160));
 }
 
+// ---- 笑いの反応も話題として反響しない（P661） ----
+{
+  const www = await conversationCoreService.execute({ prompt: 'ｗｗｗ' } as any);
+  check('P661 ｗｗｗを話題にしない', !www.replyText.includes('www、'), www.replyText.slice(0, 120));
+  const emoji = await conversationCoreService.execute({ prompt: '😊' } as any);
+  check('P661 絵文字だけを話題にしない', !emoji.replyText.startsWith('😊、'), emoji.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

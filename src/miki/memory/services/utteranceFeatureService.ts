@@ -143,5 +143,11 @@ export function isBackchannelText(text: string): boolean {
   if (!t) return false;
   if (BACKCHANNEL_SET.has(t)) return true;
   if (/^(うん)+$/.test(t) || /^へー+$/.test(t) || /^ふーん$/.test(t)) return true;
+  // P661: 笑いの反応（ｗｗｗ・「わらう」だけ等）と、記号・絵文字だけの
+  // 入力も話題ではない（「www、そうなんですね」という反響になって
+  // いた）。相槌と同じ「話題ではない反応」としてここで判定する。
+  if (/^[wｗ]+$/i.test(t)) return true;
+  if (/^(わらう|笑う|わらた|笑った)$/.test(t)) return true;
+  if (!/[ぁ-んァ-ヶ一-龠a-zA-Z0-9]/.test(t)) return true;
   return false;
 }
