@@ -420,6 +420,12 @@ export class ConversationCoreService {
       if (unknownAttr) {
         return this.buildResult('RESOLVED', 'unknown_attribute_answer', this.applyPersonaVoice(unknownAttr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P647: 「〈語〉覚えた？」——特定の語についての自分の状態を
+      // 答える（P624/P633 の語単位版）。
+      const termKnowledge = this.termKnowledgeAnswer(prompt);
+      if (termKnowledge) {
+        return this.buildResult('RESOLVED', 'term_knowledge_answer', this.applyPersonaVoice(termKnowledge), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
       const selfWant = this.selfWantAnswer(prompt);
@@ -2557,6 +2563,40 @@ export class ConversationCoreService {
       });
     } catch { /* gap への接続は補助経路 */ }
     return `「${entity}」が${label}かは、まだ知らないです。調べて覚えておきますね。`;
+  }
+
+  /**
+   * P647: 「クオッカ覚えた？」——特定の語について、自分の知識の
+   * 状態（覚えた／調べ中／まだ知らない）を答える。P624（最近覚えた
+   * こと）と P633（分からないこと）の、語単位の自己点検。
+   * 知らない語は、その場で意味学習の欠けに積んで循環を始める。
+   */
+  private termKnowledgeAnswer(prompt: string): string | undefined {
+    if (!/(?:覚えた|分かった|わかるようになった|分かるようになった|知ってる|知っている)/.test(prompt)) return undefined;
+    if (!/[？?]/.test(prompt) && !/か[？。]?$/.test(prompt.trim())) return undefined;
+    let term: string | undefined;
+    try {
+      const features = utteranceFeatureService.analyze(prompt);
+      term = features.contentTokens.find((t) => t.length >= 2 && !/(?:覚え|分か|知って)/.test(t));
+    } catch { return undefined; }
+    if (!term) return undefined;
+    try {
+      const gloss = japaneseDictionaryService.lookup(term).find((e: any) => e.gloss)?.gloss;
+      if (gloss) return `覚えました。「${term}」は、${String(gloss).slice(0, 60)}という意味です。`;
+      const hasKnowledge = worldModelGraphService.relationsOf(term).length > 0
+        || claimDatabaseService.getAllClaims().some((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(term));
+      if (hasKnowledge) return `「${term}」については、覚えていることがあります。`;
+      const open = knowledgeGapService.listOpen(50).some((g) => (g as any).identity?.target === term);
+      if (open) return `「${term}」は、まだ調べているところです。分かったら報告しますね。`;
+      knowledgeGapService.detect({
+        query: `用語の意味を学ぶ: ${term}`,
+        reason: '覚えたか聞かれて、まだ知らない語だったため、意味学習の対象にする。',
+        type: 'UNKNOWN_TERM',
+        target: term,
+        priority: 45,
+      });
+      return `「${term}」は、まだ知らないです。今度調べて覚えておきますね。`;
+    } catch { return undefined; }
   }
 
   /**

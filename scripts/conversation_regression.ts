@@ -1184,6 +1184,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P646 先週の振り返りは先週のエピソードで答える', lastWeek.replyText.includes('先週は') && lastWeek.replyText.includes('港の朝市') && lastWeek.replyText.includes('引っ越しの相談'), lastWeek.replyText.slice(0, 260));
 }
 
+// ---- 「〈語〉覚えた？」に自分の状態で答える（P647） ----
+{
+  const knownTerm = await conversationCoreService.execute({ prompt: 'クオッカ覚えた？' } as any);
+  check('P647 知っている語は覚えたと意味つきで答える', knownTerm.replyText.includes('覚えました') && knownTerm.replyText.includes('クオッカ'), knownTerm.replyText.slice(0, 200));
+  const unknownTerm = await conversationCoreService.execute({ prompt: 'パッションフルーツ覚えた？' } as any);
+  check('P647 知らない語は正直に言い、学習の対象になる', unknownTerm.replyText.includes('まだ知らない') || unknownTerm.replyText.includes('調べている'), unknownTerm.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
