@@ -773,6 +773,14 @@ check('P606 交通トラブルは状況として受ける', trainReply.replyText
 const paydayReply = await conversationCoreService.execute({ prompt: '給料日だ！' } as any);
 check('P606 給料日は一緒に喜ぶ', !paydayReply.replyText.startsWith('給料の話ですね'), paydayReply.replyText.slice(0, 140));
 
+// ---- 落とし物・喧嘩・家事の受け止め（P607） ----
+const lostReply = await conversationCoreService.execute({ prompt: '財布なくした' } as any);
+check('P607 なくし物は心配して受ける', lostReply.replyText.includes('見つかる') || lostReply.replyText.includes('大変') || lostReply.replyText.includes('困り'), lostReply.replyText.slice(0, 140));
+const quarrelReply = await conversationCoreService.execute({ prompt: '友達と喧嘩した' } as any);
+check('P607 喧嘩はつらさとして受ける', quarrelReply.replyText.includes('つら') || quarrelReply.replyText.includes('仲直り') || quarrelReply.replyText.includes('落ち着') || quarrelReply.replyText.includes('疲れ'), quarrelReply.replyText.slice(0, 140));
+const choresReply = await conversationCoreService.execute({ prompt: '部屋の掃除した' } as any);
+check('P607 家事の完了は労う', choresReply.replyText.includes('お疲れ様') || choresReply.replyText.includes('おつかれ'), choresReply.replyText.slice(0, 140));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
