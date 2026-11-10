@@ -439,6 +439,13 @@ export class ConversationCoreService {
       if (learningVolume) {
         return this.buildResult('RESOLVED', 'learning_volume_answer', this.applyPersonaVoice(learningVolume), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P654: 「さっき何て言った？」「もう一回言って」——直前の自分の
+      // 発言を引いて答える。ここで受けないと「答えられない」や
+      // 汎用の作業了承に化ける。
+      const ownLast = this.ownLastUtteranceAnswer(prompt, recentMessages);
+      if (ownLast) {
+        return this.buildResult('RESOLVED', 'own_last_utterance_answer', this.applyPersonaVoice(ownLast), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
       const selfWant = this.selfWantAnswer(prompt);
@@ -2576,6 +2583,22 @@ export class ConversationCoreService {
       });
     } catch { /* gap への接続は補助経路 */ }
     return `「${entity}」が${label}かは、まだ知らないです。調べて覚えておきますね。`;
+  }
+
+  /**
+   * P654: 「さっき何て言った？」「もう一回言って」——直前の自分の
+   * 発言（recentMessages の最後の assistant）を引いて答える。
+   * 会話の地続き感は、自分の発言を自分で参照できることから生まれる。
+   */
+  private ownLastUtteranceAnswer(prompt: string, recentMessages: ChatMessage[]): string | undefined {
+    const asksRepeat = /(?:もう一回|もう一度)(?:言って|教えて|お願い)/.test(prompt)
+      || /(?:聞き取れなかった|聞き逃した)/.test(prompt);
+    const asksRecall = /(?:さっき|今)(?:は|の)?(?:何て|なんて|何を|なにを)?(?:言った|言ってた|言いました)/.test(prompt);
+    if (!asksRepeat && !asksRecall) return undefined;
+    const last = [...recentMessages].reverse().find((m) => m.role === 'assistant' && m.content && m.content.trim().length > 0);
+    if (!last) return 'さっきの発言は、ここには残っていないです。ごめんなさい。';
+    const text = String(last.content).replace(/\s+/g, ' ').trim().slice(0, 140);
+    return asksRepeat ? `もう一回言いますね。「${text}」` : `さっきは、「${text}」って言いました。`;
   }
 
   /**

@@ -1229,6 +1229,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P653 知っている語は忘れてないと意味つきで答える', notForgotten.replyText.includes('忘れてない') && notForgotten.replyText.includes('クオッカ'), notForgotten.replyText.slice(0, 200));
 }
 
+// ---- 「さっき何て言った？」に直前の自分の発言で答える（P654） ----
+{
+  const firstReply = await conversationCoreService.execute({ prompt: 'クオッカ覚えた？' } as any);
+  const recent = [
+    { id: 'p654-u', role: 'user', content: 'クオッカ覚えた？' },
+    { id: 'p654-a', role: 'assistant', content: firstReply.replyText },
+  ] as any;
+  const recall = await conversationCoreService.execute({ prompt: 'さっき何て言った？', recentMessages: recent } as any);
+  check('P654 さっきの発言を引いて答える', recall.replyText.includes('さっきは') && recall.replyText.includes('クオッカ'), recall.replyText.slice(0, 240));
+  const repeat = await conversationCoreService.execute({ prompt: 'もう一回言って', recentMessages: recent } as any);
+  check('P654 もう一回は直前の発言を繰り返す', repeat.replyText.includes('もう一回言いますね') && !repeat.replyText.includes('やってみます'), repeat.replyText.slice(0, 240));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
