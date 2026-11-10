@@ -1641,6 +1641,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P693 「できた」は達成として受ける', dekita.replyText.includes('やりましたね') || dekita.replyText.includes('すごい'), dekita.replyText.slice(0, 100));
 }
 
+// ---- 意向形の相談と、彼女への状態質問（P694） ----
+{
+  const lunch = await conversationCoreService.execute({ prompt: 'お昼何食べよう' } as any);
+  check('P694 食事の相談は調査に流れない', lunch.replyText.includes('気分はどっち') && !lunch.replyText.includes('調べるキュー'), lunch.replyText.slice(0, 120));
+  const activity = await conversationCoreService.execute({ prompt: '何しようかな' } as any);
+  check('P694 活動の相談も一緒に考える形', activity.replyText.includes('何しましょうね'), activity.replyText.slice(0, 100));
+  const sleepy = await conversationCoreService.execute({ prompt: '眠くない？' } as any);
+  check('P694 彼女の眠さは自分の在り方で答える', sleepy.replyText.includes('眠くならない'), sleepy.replyText.slice(0, 100));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

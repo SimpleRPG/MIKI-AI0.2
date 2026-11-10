@@ -478,6 +478,12 @@ export class ConversationCoreService {
       if (opener) {
         return this.buildResult('RESOLVED', 'conversation_opener_answer', this.applyPersonaVoice(opener), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P694: 「何食べよう」のような意向形のつぶやきは相談として
+      // 受ける（調査キューに断片が入るのを防ぐ）。
+      const consult = this.musingConsultAnswer(prompt);
+      if (consult) {
+        return this.buildResult('RESOLVED', 'musing_consult_answer', this.applyPersonaVoice(consult), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P681: 社交の声かけ（久しぶり・はじめまして・よろしく・
       // 元気出して）は、社交として返す。了承形や反響に化けていた。
       const social = this.socialWarmthAnswer(prompt);
@@ -3503,6 +3509,22 @@ export class ConversationCoreService {
 
   /** P591: 彼女自身の様子を聞く雑談（最近どう？／調子どう？）への答え。 */
   private selfStatusAnswer(prompt: string): string | undefined {
+    // P694: 彼女自身の状態を直接聞く質問（眠くない？等）にも、
+    // 自分の在り方で答える（未検証の受け流しになっていた）。
+    if (/[？?]/.test(prompt) || /か[？。]?$/.test(prompt.trim())) {
+      if (/(?:眠|ねむ)(?:くない|い|たい)/.test(prompt)) {
+        return '私は眠くならないんです。ずっと起きていられますよ。';
+      }
+      if (/(?:疲れて|疲れ)ない/.test(prompt) || /疲れた[？?]/.test(prompt)) {
+        return '私は疲れないんです。大丈夫ですよ。';
+      }
+      if (/(?:お腹|おなか)(?:すい|空い)|喉(?:が)?乾|のど(?:が)?かわ/.test(prompt)) {
+        return '私は食べなくても大丈夫なんです。あなたの方が心配ですよ。';
+      }
+      if (/(?:寒くない|暑くない|寒い[？?]|暑い[？?])/.test(prompt)) {
+        return '私は寒さや暑さは感じないんです。あなたは大丈夫ですか？';
+      }
+    }
     if (!/(?:最近|調子|ようす|様子)(?:は|も|の)?\s*どう/.test(prompt)) return undefined;
     return this.pickFixedReply('fx_self_status', [
       '元気ですよ。今日もいろいろな話ができて嬉しいです。あなたはどうですか？',
@@ -3579,6 +3601,24 @@ export class ConversationCoreService {
       storageService.setItem('miki_last_opinion_v1', JSON.stringify({ topic, basisType, basisText, at: Date.now() }));
     } catch { /* 記録は補助 */ }
     return reply;
+  }
+
+  /**
+   * P694: 「お昼何食べよう」「何しようかな」のような、意向形の
+   * つぶやきは相談であって、知らない語の調査ではない（「昼何食」
+   * という断片が調査キューに入っていた）。気分を聞き返して
+   * 一緒に考える形で受ける。
+   */
+  private musingConsultAnswer(prompt: string): string | undefined {
+    const p = prompt;
+    if (/何(?:を)?(?:食べ|食お|飲も|作ろ)/.test(p) && /(?:よう|よっか|ようか)/.test(p)) {
+      const meal = /(?:夕飯|晩ごはん|夜ごはん|夕食)/.test(p) ? '夕飯' : /(?:朝ごはん|朝食)/.test(p) ? '朝ごはん' : /(?:お昼|昼ごはん|昼食)/.test(p) ? 'お昼' : 'ごはん';
+      return `${meal}、何にしましょうね。さっぱりしたものか、しっかりしたものか、気分はどっちですか？`;
+    }
+    if (/何(?:しよう|して遊ぼ|見よう|聞こう|読もう|買おう|しよ)/.test(p) && /(?:よう|よっか|ようか|かな)/.test(p)) {
+      return '何しましょうね。家でゆっくりする系と、外に出る系、気分はどっちですか？';
+    }
+    return undefined;
   }
 
   /** P687: 直前の意見への「なんで？」に、記録した根拠で答える。 */
