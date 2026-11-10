@@ -484,6 +484,11 @@ export class ConversationCoreService {
       if (consult) {
         return this.buildResult('RESOLVED', 'musing_consult_answer', this.applyPersonaVoice(consult), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P695: 「ちょっと待って」は待機の頼みとして受ける。
+      const hold = this.holdRequestAnswer(prompt);
+      if (hold) {
+        return this.buildResult('RESOLVED', 'hold_request_answer', this.applyPersonaVoice(hold), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P681: 社交の声かけ（久しぶり・はじめまして・よろしく・
       // 元気出して）は、社交として返す。了承形や反響に化けていた。
       const social = this.socialWarmthAnswer(prompt);
@@ -1285,6 +1290,10 @@ export class ConversationCoreService {
             : ffx('fx_bored_stale', ['つまらないですね。何か面白い話でもしましょうか。', '退屈ですね。最近、面白かったことはありますか？', 'つまらない時間ですね。何か気になることはありますか？'], ['つまんないねー。何か面白い話しよ？', '退屈だね。最近、面白かったことある？', 'つまんないね。何か気になることある？']);
         } else if (weather) {
           reactionBase = weather;
+        } else if (/夢を見|夢見|夢に出|夢の中で/.test(prompt)) {
+          // P695: 夢の報告は、断片の反響でなく内容を聞く形で受ける
+          // （「昨日変な夢見た」が「昨日変、なるほど」になっていた）。
+          reactionBase = ffx('fx_dream', ['どんな夢でしたか？よかったら聞かせてください。', 'へえ、どんな夢だったんですか？気になります。'], ['どんな夢？気になる！', 'へえ、どんな夢だったの？聞かせて！']);
         } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
           reactionBase = ffx('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。'], ['ふふ、面白いね！', 'あはは、それいいね！', 'ふふふ、笑っちゃうね。']);
         } else if (/消えたい|死にたい|いなくなりたい|生まれてこなければ/.test(prompt)) {
@@ -1388,7 +1397,7 @@ export class ConversationCoreService {
           // P593: 端末の外の行為（電話・目覚まし・送信）は、引き受けた
           // ふりをせず、できないことを正直に言う。
           reactionBase = ffx('fx_cannot', ['ごめんなさい、それは私にはできないんです。電話や目覚ましみたいな端末のことは、手が届かなくて。', 'ごめん、それは私にはできないんです。お話なら、いつでも聞きますよ。'], ['ごめん、それはできないの。電話とかは手が届かなくて。', 'ごめんね、それはできないんだ。お話ならいつでもいいよ。']);
-        } else if (/聞いて(?:ほしい|欲しい|くれる|もらえる)|^(?:ねえ|ちょっと|あのさ)[、,]?\s*聞いて[。！!？?]?$|^聞いて[。！!？?]?$/.test(prompt.trim())) {
+        } else if (/聞いて(?:ほしい|欲しい|くれる|もらえる)|^(?:ねえ|ちょっと|あのさ|あのね|話変わるけど|話は変わるけど|そういえば|ところで)[、,]?\s*聞いて[。！!？?]?$|^聞いて[。！!？?]?$/.test(prompt.trim())) {
           // P603: 「ねえ、聞いて」は依頼ではなく、話を聞いてほしい
           // 声かけ。引き受け文（「やってみますね」）にせず、聞く
           // 姿勢で受ける。
@@ -3601,6 +3610,17 @@ export class ConversationCoreService {
       storageService.setItem('miki_last_opinion_v1', JSON.stringify({ topic, basisType, basisText, at: Date.now() }));
     } catch { /* 記録は補助 */ }
     return reply;
+  }
+
+  /**
+   * P695: 「ちょっと待って」は作業の依頼ではなく、待機の頼み。
+   * 汎用の了承（やってみます）でなく、待つ旨で答える。
+   */
+  private holdRequestAnswer(prompt: string): string | undefined {
+    if (/^(?:ちょっと|少し|少々)?\s*待って(?:て)?(?:ください|くれる|もらえる|も)?[。！!？?ねよ]*$/.test(prompt.trim())) {
+      return '分かりました。待っていますね。';
+    }
+    return undefined;
   }
 
   /**

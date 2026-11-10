@@ -1651,6 +1651,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P694 彼女の眠さは自分の在り方で答える', sleepy.replyText.includes('眠くならない'), sleepy.replyText.slice(0, 100));
 }
 
+// ---- 話題転換つき聞いて・夢・待って（P695） ----
+{
+  const listen = await conversationCoreService.execute({ prompt: '話変わるけど、聞いて' } as any);
+  check('P695 話題転換＋聞いては傾聴で受ける', (listen.replyText.includes('聞いてるよ') || listen.replyText.includes('聞かせて')) && !listen.replyText.includes('聞いてですか'), listen.replyText.slice(0, 100));
+  const dream = await conversationCoreService.execute({ prompt: '昨日変な夢見た' } as any);
+  check('P695 夢の報告は内容を聞く', dream.replyText.includes('どんな夢'), dream.replyText.slice(0, 100));
+  const hold = await conversationCoreService.execute({ prompt: 'ちょっと待って' } as any);
+  check('P695 「ちょっと待って」は待機で答える', hold.replyText.includes('待って') && !hold.replyText.includes('やってみます'), hold.replyText.slice(0, 100));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
