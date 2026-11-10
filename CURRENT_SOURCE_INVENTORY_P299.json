@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1802,
     "sourceFileCount": 1355,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1266,
-    "relativeImportCandidateCount": 4065,
-    "resolvedRelativeImportCandidateCount": 4049,
+    "relativeImportCandidateCount": 4066,
+    "resolvedRelativeImportCandidateCount": 4050,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1703,9 +1703,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 141009,
-      "lines": 1414,
-      "sha256": "a141c097d57a2b6330cdec02b8cdfd5f54d09998cc234cb8e3ccc76aa96c6417",
+      "bytes": 141900,
+      "lines": 1426,
+      "sha256": "e27a7c1b8bae9aeee4e0a0ad7f0c628db98396d82f0de60d01ff9852760e92b4",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2138,10 +2138,16 @@
           "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
+        },
+        {
+          "line": 1403,
+          "specifier": "../src/miki/conversation/services/personaProfileService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/personaProfileService.ts"
         }
       ],
-      "relativeImportCandidateCount": 72,
-      "resolvedRelativeImportCount": 72,
+      "relativeImportCandidateCount": 73,
+      "resolvedRelativeImportCount": 73,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -25340,9 +25346,9 @@
     },
     {
       "path": "src/miki/memory/services/paraphraseService.ts",
-      "bytes": 14299,
-      "lines": 298,
-      "sha256": "7d8c54b9061163be9fd9a9fd8aa36a6849d95d6d93ae1d273a8df62ff23e337c",
+      "bytes": 15347,
+      "lines": 312,
+      "sha256": "af053a39470c11e83e3d66e998b15860953b5cc3dc173d67a3780eb69c14590c",
       "relativeImportCandidates": [
         {
           "line": 1,

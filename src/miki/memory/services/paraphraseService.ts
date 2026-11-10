@@ -127,11 +127,25 @@ function casualizeEndings(text: string, forVoice = false): string {
   // 通るものだけが採用される）。
   out = out.split('ないでくださいね。').join('ないでね。');
   out = out.split('てくださいね。').join('てね。');
+  // P671: 遊び系の答えで残っていた丁寧形も寄せる（誘いの「ましょ
+  // う」、了承の「分かりました」、感謝の「ありがとうございまし
+  // た」、読点で続く文中の「ですよ、」）。いずれも丁寧さだけの
+  // 違いで、意味保存チェックが通るものだけ採用される。
+  out = out.split('ありがとうございました。').join('ありがとう！');
+  out = out.split('ありがとうございました！').join('ありがとう！');
+  out = out.split('分かりました。').join('わかったよ。');
+  out = out.split('分かりました！').join('わかったよ！');
+  out = out.split('分かりました、').join('わかったよ、');
+  out = out.split('ましょう。').join('ましょ。');
+  out = out.split('ましょう！').join('ましょ！');
+  out = out.split('ですよ、').join('だよ、');
+  out = out.split('ですよ！').join('だよ！');
   out = out.split('ですよ。').join('だよ。');
   out = out.split('ですね。').join('だね。');
   out = out.split('です。').join('だよ。');
   out = out.split('だろう。').join('だろうね。');
   if (out.endsWith('である')) out = `${out.slice(0, -3)}だよ`;
+  else if (out.endsWith('ましょう')) out = `${out.slice(0, -4)}ましょ`;
   else if (out.endsWith('たいです')) out = `${out.slice(0, -4)}たいな`;
   else if (out.endsWith('しいです')) out = `${out.slice(0, -2)}よ`;
   else if (out.endsWith('ないです')) out = `${out.slice(0, -4)}ないよ`;

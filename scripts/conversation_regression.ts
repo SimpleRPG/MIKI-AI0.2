@@ -1398,6 +1398,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P670 材料が尽きたら成績を伝えて終わる', /問中\d+問正解でした/.test(finished), finished.slice(0, 200));
 }
 
+// ---- ビービーの口調変換：遊び系の答えの丁寧形も寄る（P671） ----
+{
+  const { personaProfileService: pp671 } = await import('../src/miki/conversation/services/personaProfileService');
+  pp671.switchProfile('persona-bibi');
+  const play = await conversationCoreService.execute({ prompt: '遊ぼう' } as any);
+  check('P671 ビービーの誘いの返事がタメ口になる', !play.replyText.includes('ですよ') && !play.replyText.includes('ましょう'), play.replyText.slice(0, 160));
+  const start671 = await conversationCoreService.execute({ prompt: 'しりとりしよう' } as any);
+  const quit671 = await conversationCoreService.execute({ prompt: 'やめる' } as any);
+  check('P671 ビービーの了承がタメ口になる', quit671.replyText.includes('わかった'), quit671.replyText.slice(0, 160));
+  pp671.switchProfile('persona-default');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
