@@ -700,6 +700,15 @@ const irrelevantPresentation = selectUnverifiedPresentation(
 );
 check('P599 検索語を含まない要約は提示しない', irrelevantPresentation === null, JSON.stringify(irrelevantPresentation));
 
+// ---- 継続の仕組み（別日の拾い直し・疲れの継続形）（P600） ----
+const yesterdayKey = (() => { const d = new Date(Date.now() - 24 * 3600_000); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+storageService.setItem('miki_open_topics_v1', JSON.stringify([{ topic: 'ツバメの巣', openedDay: yesterdayKey, weight: 3 }]));
+const callbackReply = await conversationCoreService.execute({ prompt: 'おはよう' } as any);
+check('P600 別日の挨拶で前の話題を拾う', callbackReply.replyText.includes('ツバメの巣'), callbackReply.replyText.slice(0, 160));
+storageService.setItem('miki_user_state_trail_v1', JSON.stringify([{ signal: 'fatigue', at: Date.now() - 26 * 3600_000 }]));
+const fatigueAgainReply = await conversationCoreService.execute({ prompt: '疲れた' } as any);
+check('P600 疲れが続いているときは継続の形で受ける', fatigueAgainReply.replyText.includes('続いて') || fatigueAgainReply.replyText.includes('ここ数日') || fatigueAgainReply.replyText.includes('このところ'), fatigueAgainReply.replyText.slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

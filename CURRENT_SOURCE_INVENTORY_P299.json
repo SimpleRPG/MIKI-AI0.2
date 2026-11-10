@@ -1697,9 +1697,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 77970,
-      "lines": 716,
-      "sha256": "beb9a2b5b2dd1a6f3f406f9d0cfb704495e0e448e6d883dbccc41977799cf665",
+      "bytes": 79137,
+      "lines": 725,
+      "sha256": "2370d2558d5923bb139fc56c5d601a74bdd31cdc44886cb14bee67f3fdbb0b84",
       "relativeImportCandidates": [
         {
           "line": 19,
