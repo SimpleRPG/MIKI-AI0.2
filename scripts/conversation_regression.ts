@@ -1087,6 +1087,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P637 質問文そのものは分からないこととして読み上げない', gapReply2.replyText.includes('クオッカ') && !gapReply2.replyText.includes('僕の好きなものは？'), gapReply2.replyText.slice(0, 220));
 }
 
+// ---- 苦手も極性つきで覚える（P638） ----
+{
+  // 事実の取り込みは呼び出し側（アプリ入口）の役目なので、通し検証と
+  // 同じく intake を通してから execute に memories を渡す。
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let memories: any[] = [];
+  const say = async (text: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, memories);
+    memories = intake.updatedMemories;
+    return conversationCoreService.execute({ prompt: text, memories } as any);
+  };
+  await say('僕は納豆が好きじゃないよ');
+  await say('僕は辛いものが苦手だよ');
+  await say('僕はラーメンが好きだよ');
+  const dislikeRecall = await say('僕の苦手なものは？');
+  check('P638 苦手なものは極性つきで想起できる', dislikeRecall.replyText.includes('納豆') && dislikeRecall.replyText.includes('辛いもの'), dislikeRecall.replyText.slice(0, 220));
+  const likeRecall = await say('僕の好きなものは？');
+  check('P638 苦手が好きとして逆に答えられず、好きは想起できる', likeRecall.replyText.includes('ラーメン') && !likeRecall.replyText.includes('納豆'), likeRecall.replyText.slice(0, 220));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -168,8 +168,24 @@ export class ConversationUserFactRecallService {
     // 対象・属性を持たない形で取り込まれるため、通常のキー照合では
     // 引けない。値を持つ好み候補をまとめて答える。彼女自身の好み
     // （「みきの好きなものは？」）は対象外（自己照会の領分）。
+    // P638: 苦手なものの聞き返し。極性（苦手・好きじゃない）を
+    // 含む要約だけを対象にする。
+    if (/(?:苦手なもの|苦手なこと|嫌いなもの|嫌いなこと)/.test(prompt) && !/(?:みき|ビービー|あなた|君)の/.test(prompt)) {
+      const dislikes = candidates.filter((c) => c.value && /苦手|好きじゃない|嫌い/.test(c.summary));
+      if (dislikes.length > 0) {
+        const values = [...new Set(dislikes.map((c) => c.value as string))].slice(0, 3);
+        return {
+          candidate: dislikes[0],
+          topicLabel: '苦手なもの',
+          answerText: `前に言っていた苦手なものは「${values.join('」と「')}」だよ。`,
+          reasonLabel: dislikes[0].reasonLabel,
+        };
+      }
+    }
     if (/(?:好きなもの|好きなこと|好物|好み|趣味)/.test(prompt) && !/(?:みき|ビービー|あなた|君)の/.test(prompt)) {
-      const prefs = candidates.filter((c) => c.value && /好き|興味がある/.test(c.summary));
+      // P638: 苦手の要約（「Xが苦手・好きじゃない」）は「好き」を
+      // 含むため、極性で除外しないと好きとして逆に答えてしまう。
+      const prefs = candidates.filter((c) => c.value && /好き|興味がある/.test(c.summary) && !/苦手|じゃない|ではない/.test(c.summary));
       if (prefs.length > 0) {
         const values = [...new Set(prefs.map((c) => c.value as string))].slice(0, 3);
         return {

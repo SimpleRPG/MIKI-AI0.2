@@ -197,7 +197,18 @@ function linkNameAndCategory(facts: ExtractedFact[]): void {
 
 /** 旧 autoExtractMemory の4パターン（互換カテゴリで取り込む）。 */
 function extractLegacy(sentence: string): ExtractedFact | null {
-  let m = sentence.match(/(?:私|僕|自分|おれ|オレ)は?(.+?)(?:が好き|が作りたい|を開発したい|に興味がある)/);
+  // P638: 苦手・好きじゃないも好みとして取り込む（極性つき）。
+  // 好きのパターンより先に見ること（「が好きじゃない」が
+  // 「が好き」に部分一致して、逆の意味で覚える事故を防ぐ）。
+  let m = sentence.match(/(?:私|僕|自分|おれ|オレ)は?(.+?)(?:が苦手|が嫌い|が好きじゃない|が好きではない|は苦手)/);
+  if (m && m[1]) {
+    const raw = m[1].trim();
+    if (raw.length > 1 && raw.length < 50) {
+      const content = `${raw}が苦手・好きじゃない`;
+      return { kind: 'preference', category: 'preference', value: raw, statement: content, summary: content.slice(0, 40) };
+    }
+  }
+  m = sentence.match(/(?:私|僕|自分|おれ|オレ)は?(.+?)(?:が好き|が作りたい|を開発したい|に興味がある)/);
   if (m && m[1]) {
     const raw = m[1].trim();
     if (raw.length > 1 && raw.length < 50) {
