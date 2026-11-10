@@ -556,8 +556,21 @@ export class ConversationCoreService {
       // P608: 相手の名前を聞かれて、保持済みの事実に無いときは、
       // 汎用の「答えられない」でなく、まだ教わっていないと正直に言う。
       if (/(?:僕|私|俺|わたし)の名前|名前.*(?:知ってる|覚えてる|覚えている)/.test(prompt)) {
-        const nameUnknown = this.pickFixedReply('fx_name_unknown', ['まだ名前を教えてもらっていません。教えてもらえたら、ちゃんと覚えますね。', 'ごめんなさい、名前はまだ聞いていませんでした。教えてください、覚えます。']);
-        return this.buildResult('RESOLVED', 'name_unknown_answer', this.applyPersonaVoice(nameUnknown), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        // P692: 名前を教える文（「僕の名前は○○だよ」）は質問では
+        // ない。教わった直後に「まだ聞いていません」と返さない。
+        const isTeaching = /(?:名前|呼び名)は?.+?(?:だよ|です|って呼んで)/.test(prompt) && !/[？?]/.test(prompt);
+        if (!isTeaching) {
+          // P692: 保持済みの名前があれば、知らないと言わず名前で答える
+          // （従来は事実の有無を見ずに常に「知らない」だった）。
+          const knownName = (memories || []).find((mm: any) => mm && mm.factValue &&
+            (mm.factAttribute === '名前・呼び名' ||
+              (mm.factAttribute === '名前' && /^(?:僕|私|俺|おれ|名前|ユーザー)$/.test(String(mm.factEntity || '')))))?.factValue;
+          if (knownName) {
+            return this.buildResult('RESOLVED', 'user_name_known_answer', this.applyPersonaVoice(`覚えていますよ。「${knownName}」ですよね。`), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+          }
+          const nameUnknown = this.pickFixedReply('fx_name_unknown', ['まだ名前を教えてもらっていません。教えてもらえたら、ちゃんと覚えますね。', 'ごめんなさい、名前はまだ聞いていませんでした。教えてください、覚えます。']);
+          return this.buildResult('RESOLVED', 'name_unknown_answer', this.applyPersonaVoice(nameUnknown), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
       }
       const recap = multiPart ? undefined : this.conversationRecapAnswer(prompt, state);
       if (recap) {
@@ -2868,7 +2881,10 @@ export class ConversationCoreService {
   private selfIntroductionAnswer(prompt: string): string | undefined {
     const p = String(prompt || '');
     const asksIntro = /自己紹介/.test(p);
-    const asksName = /(?:あなたの|君の|お前の|あんたの)?名前(?:は|って|を教えて)/.test(p) && !/僕|私|俺|自分の名前/.test(p);
+    // P692: 「猫の名前はモチだよ」のような、持ち主つきの名前の文を
+    // 自分の名前への質問と誤認しない（「Xの名前」は彼女の名前ではない）。
+    const otherOwnerName = /[^\s]の名前/.test(p) && !/(?:あなたの|君の|お前の|あんたの)名前/.test(p);
+    const asksName = !otherOwnerName && /(?:あなたの|君の|お前の|あんたの)?名前(?:は|って|を教えて)/.test(p) && !/僕|私|俺|自分の名前/.test(p);
     const asksWho = /(?:君は|あなたは|あんたは)誰/.test(p);
     if (!asksIntro && !asksName && !asksWho) return undefined;
     let name = 'MIKI-AI';

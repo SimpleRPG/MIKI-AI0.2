@@ -196,6 +196,23 @@ function linkNameAndCategory(facts: ExtractedFact[]): void {
 }
 
 /** 旧 autoExtractMemory の4パターン（互換カテゴリで取り込む）。 */
+/**
+ * P692: 「Xの名前は〜」「Xのことは〜って呼んで」の X（持ち主）を返す。
+ * 持ち主が相手本人（一人称）のときと、持ち主が無いときは null
+ * （＝本人の identity として扱う従来経路）。
+ */
+function nameOwnerOf(sentence: string, marker: string): string | null {
+  const idx = sentence.indexOf(marker);
+  if (idx <= 0) return null;
+  const prefix = sentence.slice(0, idx).replace(/[、,。\s]+$/g, '');
+  const m = prefix.match(/(.+?)の$/);
+  if (!m) return null;
+  const owner = m[1].trim().split(/[、,]/).pop()?.trim() || '';
+  if (!owner || owner.length > 12) return null;
+  if (/^(?:僕|私|おれ|俺|自分|あたし|わたし)$/.test(owner)) return null;
+  return owner;
+}
+
 function extractLegacy(sentence: string): ExtractedFact | null {
   // P638: 苦手・好きじゃないも好みとして取り込む（極性つき）。
   // 好きのパターンより先に見ること（「が好きじゃない」が
@@ -228,6 +245,12 @@ function extractLegacy(sentence: string): ExtractedFact | null {
   if (m && m[1]) {
     const raw = m[1].trim();
     if (raw.length > 0 && raw.length < 50) {
+      // P692: 「猫のことはモチって呼んで」のように持ち主が付いた
+      // 呼び名は、相手本人の identity スロットに入れない。
+      const owner = nameOwnerOf(sentence, 'ことは');
+      if (owner) {
+        return { kind: 'identity', category: 'profile', attribute: `${owner}の名前`, value: raw, statement: sentence, summary: `${owner}の名前は${raw}` };
+      }
       return { kind: 'identity', category: 'profile', attribute: '名前・呼び名', value: raw, statement: sentence, summary: `呼び名は${raw}` };
     }
   }
@@ -235,6 +258,13 @@ function extractLegacy(sentence: string): ExtractedFact | null {
   if (m && m[1]) {
     const raw = m[1].trim();
     if (raw.length > 0 && raw.length < 50) {
+      // P692: 「猫の名前はモチ」は猫の名前であって、相手本人の
+      // 名前ではない。持ち主つきは持ち主の属性として持つ
+      // （本人の名前スロットを別者の名前で汚さない）。
+      const owner = nameOwnerOf(sentence, '名前');
+      if (owner) {
+        return { kind: 'identity', category: 'profile', attribute: `${owner}の名前`, value: raw, statement: sentence, summary: `${owner}の名前は${raw}` };
+      }
       return { kind: 'identity', category: 'profile', attribute: '名前・呼び名', value: raw, statement: sentence, summary: `呼び名は${raw}` };
     }
   }

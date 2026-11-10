@@ -187,7 +187,9 @@ class UtteranceEventClassifierService {
       return { eventClass: 'ACHIEVEMENT', negated, aspect, matchedStem: '当（たる）', subject, object };
     }
     // 物を「忘れた」は置き忘れ＝喪失寄り（約束・名前など情報系は除く）。
-    if (has('忘れ') && aspect === 'COMPLETED') {
+    // P692: 「忘れないで（ね）」「忘れずに」は、彼女への
+    // 「覚えていて」という依頼であって、置き忘れの報告ではない。
+    if (has('忘れ') && aspect === 'COMPLETED' && !/忘れ(?:ないで|ずに)/.test(text)) {
       const idx = tokens.indexOf('忘れ');
       const before = idx > 0 ? tokens[idx - 1] : undefined;
       if (before && !['約束', 'こと', 'もの', '名前', '宿題', '仕事', '用事'].includes(before)) {

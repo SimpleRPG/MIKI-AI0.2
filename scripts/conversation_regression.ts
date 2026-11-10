@@ -1606,6 +1606,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P691 意見の記録が入る', !!body691.lastOpinion && typeof body691.lastOpinion.topic === 'string', JSON.stringify(body691.lastOpinion || {}).slice(0, 160));
 }
 
+// ---- 持ち主つきの名前と、名前の教示・想起（P692） ----
+{
+  const { conversationFactIntakeService: intake692 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem692: any[] = [];
+  const run692 = async (q: string) => {
+    const iq = intake692.intakeFromUserText(q, mem692);
+    mem692 = iq.updatedMemories;
+    const r = await conversationCoreService.execute({ prompt: q, memories: mem692 } as any);
+    return { reply: r.replyText, added: iq.added as any[] };
+  };
+  const teach = await run692('猫の名前はモチだよ、忘れないでね');
+  check('P692 猫の名前は持ち主つきで取り込まれる', teach.added.some((a) => a.factAttribute === '猫の名前' && a.factValue === 'モチ'), JSON.stringify(teach.added).slice(0, 160));
+  check('P692 教示の返事が自己紹介や置き忘れにならない', !teach.reply.includes('MIKI-AIです') && !teach.reply.includes('最後に使った場所'), teach.reply.slice(0, 120));
+  const petName = await run692('猫の名前なんだっけ？');
+  check('P692 猫の名前を想起できる', petName.reply.includes('モチ'), petName.reply.slice(0, 120));
+  const teachUser = await run692('僕の名前はきりあだよ');
+  check('P692 名前を教えた直後に知らないと言わない', !teachUser.reply.includes('まだ聞いていません') && !teachUser.reply.includes('教えてもらっていません'), teachUser.reply.slice(0, 120));
+  const recallUser = await run692('僕の名前覚えてる？');
+  check('P692 教わった名前は名前で答える', recallUser.reply.includes('覚えていますよ') && recallUser.reply.includes('きりあ'), recallUser.reply.slice(0, 120));
+  const selfName = await conversationCoreService.execute({ prompt: '君の名前は？' } as any);
+  check('P692 自分の名前の質問は従来どおり', selfName.replyText.includes('MIKI-AI'), selfName.replyText.slice(0, 80));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
