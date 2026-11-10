@@ -2629,9 +2629,16 @@ export class ConversationCoreService {
    * 週単位で振り返る。日々の記録が週の物語になる。
    */
   private weeklyRecallAnswer(prompt: string): string | undefined {
-    if (!/(?:今週|この1週間|この一週間|この七日|この７日)/.test(prompt)) return undefined;
     if (!/(?:何があった|どんな|振り返|何の話|どうだった|何した)/.test(prompt)) return undefined;
     try {
+      // P646: 先週の振り返りも、エピソードの蓄積（7〜13日前）で答える。
+      if (/(?:先週)/.test(prompt)) {
+        const episodes = episodeMemoryService.episodesInRange(7, 13);
+        if (episodes.length === 0) return '先週の記録は、残ってないです。';
+        const lines = episodes.slice(-3).map((e) => e.summary.replace(/^昨日は、/, ''));
+        return `先週は、${lines.join(' ')}`;
+      }
+      if (!/(?:今週|この1週間|この一週間|この七日|この７日)/.test(prompt)) return undefined;
       const episodes = episodeMemoryService.recentEpisodes(7);
       if (episodes.length === 0) return '今週の記録は、まだあまり残ってないです。これからですね。';
       const lines = episodes.slice(-3).map((e) => e.summary.replace(/^昨日は、/, ''));

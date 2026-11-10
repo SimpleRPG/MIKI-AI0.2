@@ -1172,6 +1172,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P645 一昨日の話は一昨日のエピソードで答える', dayBefore.replyText.includes('一昨日は') && dayBefore.replyText.includes('港の朝市') && !dayBefore.replyText.includes('ツバメの巣'), dayBefore.replyText.slice(0, 220));
 }
 
+// ---- 先週の振り返りもエピソードで答える（P646） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { daysAgoKey } = await import('../src/miki/memory/services/dayKeyService');
+  storageService.setItem('miki_episodes_v1', JSON.stringify([
+    { day: daysAgoKey(9), topics: ['港の朝市'], summary: '昨日は、「港の朝市」の話をしましたね。' },
+    { day: daysAgoKey(8), topics: ['引っ越しの相談'], summary: '昨日は、「引っ越しの相談」の話をしましたね。お疲れ気味の一日でしたね。' },
+  ]));
+  const lastWeek = await conversationCoreService.execute({ prompt: '先週はどんな週だった？' } as any);
+  check('P646 先週の振り返りは先週のエピソードで答える', lastWeek.replyText.includes('先週は') && lastWeek.replyText.includes('港の朝市') && lastWeek.replyText.includes('引っ越しの相談'), lastWeek.replyText.slice(0, 260));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

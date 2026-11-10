@@ -62,6 +62,16 @@ class EpisodeMemoryService {
     return this.ensureEpisode(daysAgoKey(daysAgo));
   }
 
+  /** P646: N〜M日前のエピソードを日付順に返す（先週の振り返り用）。 */
+  public episodesInRange(fromDaysAgo: number, toDaysAgo: number): Episode[] {
+    const out: Episode[] = [];
+    for (let i = toDaysAgo; i >= fromDaysAgo; i--) {
+      const ep = this.ensureEpisode(daysAgoKey(i));
+      if (ep) out.push(ep);
+    }
+    return out.sort((a, b) => a.day.localeCompare(b.day));
+  }
+
   /** P627: 過去7日分のエピソードを（組めるものは組んで）日付順に返す。 */
   public recentEpisodes(days = 7): Episode[] {
     const out: Episode[] = [];
