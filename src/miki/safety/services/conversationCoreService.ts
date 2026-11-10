@@ -705,7 +705,7 @@ export class ConversationCoreService {
         if (reaction) casualConclusion = reaction;
         // P574: 直前の話題質問への答えなら、答えとして受ける。
         if (answeredTopicQuestion) {
-          casualConclusion = this.pickFixedReply('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。']);
+          casualConclusion = fx('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。'], ['そっか、教えてくれてありがと！', 'なるほどー、そういうことなんだ。', 'そっかそっか、分かったよ。ありがと！']);
           // P586: 答えの内容から、もう一歩だけ続きを聞く候補を用意する。
           if (answeredPending) followUpAppend = this.buildFollowUpQuestion(answeredPending, prompt, japaneseAnalysis?.contentTokens || []);
         }
@@ -791,6 +791,13 @@ export class ConversationCoreService {
       // P547: 宣言文として来た疲れの発話（「今日はへとへとだよ」）も、
       // 話題の反響ではなく共感で受ける。判定の語彙は userStateTrailService に集約。
       // P548: 感謝・謝罪も同じで、分類が宣言文でも社交の受け止めを優先する。
+      // P589: 受け皿側の定型も人格で出し分ける（P564 は CASUAL 側のみ
+      // だったため、答えの受け止めや依頼の引き受けがビービーでも
+      // 丁寧語のまま残っていた）。
+      let bibiFallthrough = false;
+      try { bibiFallthrough = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibiFallthrough = false; }
+      const ffx = (category: string, mikiForms: string[], bibiForms: string[]) =>
+        this.pickFixedReply(bibiFallthrough ? `${category}_bibi` : category, bibiFallthrough ? bibiForms : mikiForms);
       const fallthroughFatigue = userStateTrailService.isFatigueText(prompt);
       const fallthroughThanks = /ありがと(?:う|ー)?|感謝/.test(prompt);
       const fallthroughApology = /ごめん|すみません|申し訳/.test(prompt);
@@ -855,7 +862,7 @@ export class ConversationCoreService {
       // P574: 直前の話題質問への答えなら、答えとして受ける（状態の
       // 受け止めと、教わった意味の「覚えた」が優先）。
       if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughClosing) {
-        reactionBase = this.pickFixedReply('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。']);
+        reactionBase = ffx('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。'], ['そっか、教えてくれてありがと！', 'なるほどー、そういうことなんだ。', 'そっかそっか、分かったよ。ありがと！']);
         // P586: 答えの内容から、もう一歩だけ続きを聞く候補を用意する。
         if (answeredPending) followUpAppend = this.buildFollowUpQuestion(answeredPending, prompt, japaneseAnalysis?.contentTokens || []);
       }
@@ -867,16 +874,16 @@ export class ConversationCoreService {
         const weather = this.weatherRemark(prompt);
         if (/暇/.test(prompt)) {
           // P581: 暇の受け止め（話題を一緒に開く誘い）。
-          reactionBase = this.pickFixedReply('fx_bored', ['暇ですね。何か面白い話でもしましょうか。', '暇な時間ですね。何か気になることはありますか？', '暇ですね。最近、面白かったことはありますか？']);
+          reactionBase = ffx('fx_bored', ['暇ですね。何か面白い話でもしましょうか。', '暇な時間ですね。何か気になることはありますか？', '暇ですね。最近、面白かったことはありますか？'], ['ひまだねー。何か面白い話しよ？', 'ひまな時間だね。何か気になることある？', 'ひまだね。最近、面白かったことある？']);
         } else if (weather) {
           reactionBase = weather;
         } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
-          reactionBase = this.pickFixedReply('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。']);
+          reactionBase = ffx('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。'], ['ふふ、面白いね！', 'あはは、それいいね！', 'ふふふ、笑っちゃうね。']);
         } else if (dialogueAct === 'REQUEST') {
           // P588: どの経路でも解けなかった依頼は、汎用の相槌ではなく
           // 依頼として引き受ける形で受ける（「歌って」に「そうなん
           // ですね」と返していた）。引き受けた上で、続きは相手に委ねる。
-          reactionBase = this.pickFixedReply('fx_request_ack', ['うん、いいよ。任せて。', '分かりました。やってみますね。', 'はい、いいですよ。']);
+          reactionBase = ffx('fx_request_ack', ['うん、いいよ。任せて。', '分かりました。やってみますね。', 'はい、いいですよ。'], ['うん、いいよ！まかせて！', '分かった、やってみるね！', 'うん、いいよー。']);
         }
       }
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする

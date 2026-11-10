@@ -576,6 +576,15 @@ check('P588 「歌って」に引き受ける返答', (singReply.replyText.inclu
 const waitReply = await conversationCoreService.execute({ prompt: 'ちょっと待ってて' } as any);
 check('P588 「待ってて」が断片の反響にならない', !waitReply.replyText.includes('ちょっ、'), waitReply.replyText.slice(0, 120));
 
+// ---- 受け皿側の定型もビービーの形に（P589） ----
+personaProfileService.switchProfile('persona-bibi');
+const bibiSing = await conversationCoreService.execute({ prompt: '歌って' } as any);
+check('P589 ビービーの依頼の引き受けはタメ口', (bibiSing.replyText.includes('まかせて') || bibiSing.replyText.includes('やってみるね') || bibiSing.replyText.includes('いいよ')) && !bibiSing.replyText.includes('分かりました'), bibiSing.replyText.slice(0, 120));
+storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+const bibiAnswerAck = await conversationCoreService.execute({ prompt: 'モコロンは綿毛が取れる、羊みたいなパルだよ' } as any);
+check('P589 ビービーの答えの受け止めはタメ口', (bibiAnswerAck.replyText.includes('ありがと') || bibiAnswerAck.replyText.includes('なんだ')) && !bibiAnswerAck.replyText.includes('そういうことなんですね'), bibiAnswerAck.replyText.slice(0, 160));
+personaProfileService.switchProfile('persona-default');
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
