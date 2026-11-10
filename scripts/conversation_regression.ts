@@ -1260,6 +1260,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 }
 
+// ---- 開いた話題の記録境界：相槌と文は保存しない（P657） ----
+{
+  const { conversationOpenTopicService } = await import('../src/miki/conversation/services/conversationOpenTopicService');
+  const { storageService } = await import('../src/services/storageService');
+  storageService.setItem('miki_open_topics_v1', '[]');
+  conversationOpenTopicService.record('へー');
+  conversationOpenTopicService.record('そういえば今日は暑いね');
+  const topics = conversationOpenTopicService.listPending().map((r: any) => r.topic);
+  check('P657 相槌は話題として保存しない', !topics.includes('へー'), JSON.stringify(topics));
+  check('P657 文まるごとは話題として保存しない', !topics.includes('そういえば今日は暑いね'), JSON.stringify(topics));
+  conversationOpenTopicService.record('港の朝市');
+  const topics2 = conversationOpenTopicService.listPending().map((r: any) => r.topic);
+  check('P657 名詞句の話題は保存される', topics2.includes('港の朝市'), JSON.stringify(topics2));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
