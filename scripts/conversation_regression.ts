@@ -989,6 +989,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P628 作れるものは ENABLES で答える', craftReply.replyText.includes('布作り'), craftReply.replyText.slice(0, 160));
 }
 
+// ---- 話題の記録は境界で検証する（P629） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { conversationOpenTopicService } = await import('../src/miki/conversation/services/conversationOpenTopicService');
+  storageService.setItem('miki_open_topics_v1', '[]');
+  conversationOpenTopicService.record('おはよう、今起きたよ', 1);
+  const afterGreeting = conversationOpenTopicService.listPending();
+  check('P629 挨拶文は話題として記録されない', !afterGreeting.some((r) => r.topic.includes('起きた')), JSON.stringify(afterGreeting).slice(0, 120));
+  conversationOpenTopicService.record('今日はモコロンの調子が心配だ', 2);
+  const afterSentence = conversationOpenTopicService.listPending();
+  check('P629 文からは話題語を抽出して記録する', afterSentence.some((r) => r.topic === 'モコロン' || r.topic === '調子'), JSON.stringify(afterSentence).slice(0, 160));
+  conversationOpenTopicService.record('港の朝市', 1);
+  check('P629 名詞句はそのまま記録される', conversationOpenTopicService.listPending().some((r) => r.topic === '港の朝市'), '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

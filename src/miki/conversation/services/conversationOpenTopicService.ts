@@ -1,4 +1,5 @@
 import { storageService } from '../../../services/storageService';
+import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 
 /**
  * P522: 開いた話題の保持。
@@ -82,7 +83,7 @@ export class ConversationOpenTopicService {
    * 重要度が低く古いものから外す（P553）。
    */
   public record(topic?: string, salience = 1): void {
-    const clean = String(topic || '').trim();
+    const clean = this.normalizeTopic(String(topic || '').trim());
     if (!clean || clean.length > 24) return;
     const weight = Math.max(1, Math.min(5, Math.round(salience) || 1));
     const records = this.load();
@@ -95,6 +96,32 @@ export class ConversationOpenTopicService {
     records.push({ topic: clean, openedDay: dayKey(Date.now()), weight });
     records.sort((a, b) => (a.weight || 1) - (b.weight || 1) || a.openedDay.localeCompare(b.openedDay));
     this.save(records.slice(-3));
+  }
+
+  /**
+   * P629: 記録の境界で「話題らしさ」を検証する。呼び出し側は
+   * 状態の currentTopic を渡すが、それは主題が取れないときに
+   * 発話文そのものに落ちることがあり、「おはよう、今起きたよ」の
+   * ような文が話題として保存されて、翌日の拾い直しやエピソード
+   * （P623）を汚していた。短い名詞句だけを通し、文らしい入力は
+   * 共有の特徴（主題・目的語・内容語）から話題語を抽出して
+   * から記録する。抽出できなければ記録しない。
+   */
+  private normalizeTopic(raw: string): string {
+    if (!raw) return '';
+    const looksLikeTopicPhrase = !/[。、！？!?]/.test(raw)
+      && raw.length <= 12
+      && !/(?:です|ます|だよ|だね|した|して|たい|ない|れる)$/.test(raw);
+    if (looksLikeTopicPhrase) return raw;
+    try {
+      const features = utteranceFeatureService.analyze(raw);
+      const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|最近|これ|それ|あれ|ここ|そこ|本当|もっと|ちょっと|少し)$/;
+      const usable = (t?: string): string | undefined => (t && t.length >= 2 && t.length <= 12 && !stop.test(t) ? t : undefined);
+      return usable(features.topic) || usable(features.object) || usable(features.subject)
+        || features.contentTokens.map(usable).find(Boolean) || '';
+    } catch {
+      return '';
+    }
   }
 
   /** 保持している話題の一覧（テスト・状態書き出し用）。 */
