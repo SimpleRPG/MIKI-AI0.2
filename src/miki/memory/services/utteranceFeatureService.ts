@@ -77,6 +77,21 @@ class UtteranceFeatureService {
       || /(?:して|見て|聞いて|言って|教えて|歌って|描いて)[。！!]?$/.test(text.trim());
     return { aspect, negated, passive, questionForm, imperative, tokens, contentTokens, subject, object, topic };
   }
+
+  /**
+   * P620: 渡された語幹が否定の連なりを伴う箇所を取り除いた文を返す。
+   * 「痛くない」「不安じゃない」「心配ない」のような、語彙としては
+   * 状態語を含むが意味は否定、という箇所を数えないために使う。
+   * 語彙（どの語が状態語か）は呼び出し側の領分で、否定の形の知識は
+   * ここ（特徴の層）に集約する。
+   */
+  public maskNegatedMentions(text: string, stems: string[]): string {
+    const source = String(text || '');
+    if (!source || stems.length === 0) return source;
+    const escaped = stems.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const span = new RegExp(`(?:${escaped})(?:い|く|て|では|じゃ)?(?:ない|なかった|ありません|ません)`, 'g');
+    return source.replace(span, '');
+  }
 }
 
 export const utteranceFeatureService = UtteranceFeatureService.getInstance();

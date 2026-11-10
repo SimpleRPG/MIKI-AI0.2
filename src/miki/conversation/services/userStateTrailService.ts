@@ -1,4 +1,5 @@
 import { storageService } from '../../../services/storageService';
+import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 
 /**
  * P524: 相手の状態の流れ。
@@ -34,6 +35,21 @@ const THIRST_PATTERN = /(?:喉乾いた|のど乾いた|喉かわいた|喉が�
 // （「飼いたい」「買いたい」のような〜たい（希望）に誤爆していた）。
 const PAIN_PATTERN = /(?:頭痛|腹痛|歯痛|腰痛|肩こり|痛い|痛み|痛く|ズキズキ|疼|(?:^|[がはも、。！!？?\s])いたい)/;
 
+// P620: 状態語が否定されている箇所（痛くない・不安じゃない・心配ない等）は
+// 兆候として数えない。否定の形の知識は共有の特徴サービス（P615）に寄せ、
+// 状態語の語彙だけをここに持ち、否定された言及を取り除いてから
+// 語彙パターンを当てる（移行前は「痛くないよ」が痛みの受け止めに、
+// 「心配ないよ」が不安の継続形になっていた）。
+const STATE_STEMS = ['疲れ', 'しんど', 'だる', '眠', 'ねむ', '痛', '不安', '心配', '寂し', 'さみし', '孤独', '緊張', '怖', 'こわ'];
+
+function affirmedText(text: string): string {
+  try {
+    return utteranceFeatureService.maskNegatedMentions(String(text || ''), STATE_STEMS);
+  } catch {
+    return String(text || '');
+  }
+}
+
 export class UserStateTrailService {
   private static instance: UserStateTrailService;
 
@@ -67,37 +83,37 @@ export class UserStateTrailService {
 
   /** P547: 疲労の言い回しかどうかだけを見る（記録はしない）。判定の語彙はここに集約する。 */
   public isFatigueText(text: string): boolean {
-    return FATIGUE_PATTERN.test(String(text || ''));
+    return FATIGUE_PATTERN.test(affirmedText(text));
   }
 
   /** P573: 不安の言い回しかどうかだけを見る（記録はしない）。 */
   public isAnxietyText(text: string): boolean {
-    return ANXIETY_PATTERN.test(String(text || ''));
+    return ANXIETY_PATTERN.test(affirmedText(text));
   }
 
   /** P573: 空腹の言い回しかどうかだけを見る（記録はしない）。 */
   public isHungerText(text: string): boolean {
-    return HUNGER_PATTERN.test(String(text || ''));
+    return HUNGER_PATTERN.test(affirmedText(text));
   }
 
   /** P584: 寂しさの言い回しかどうかだけを見る（記録はしない）。 */
   public isLonelinessText(text: string): boolean {
-    return LONELINESS_PATTERN.test(String(text || ''));
+    return LONELINESS_PATTERN.test(affirmedText(text));
   }
 
   /** P584: 喉の渇きの言い回しかどうかだけを見る（記録はしない）。 */
   public isThirstText(text: string): boolean {
-    return THIRST_PATTERN.test(String(text || ''));
+    return THIRST_PATTERN.test(affirmedText(text));
   }
 
   /** P591: 痛みの言い回しかどうかだけを見る（記録はしない）。 */
   public isPainText(text: string): boolean {
-    return PAIN_PATTERN.test(String(text || ''));
+    return PAIN_PATTERN.test(affirmedText(text));
   }
 
   /** 発話から兆候を読み、あれば記録して返す。 */
   public recordFromText(text: string): UserStateSignal | undefined {
-    const source = String(text || '');
+    const source = affirmedText(text);
     const signal: UserStateSignal | undefined = FATIGUE_PATTERN.test(source)
       ? 'fatigue'
       : ANXIETY_PATTERN.test(source)

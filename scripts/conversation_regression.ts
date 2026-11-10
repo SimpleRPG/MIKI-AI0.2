@@ -902,6 +902,17 @@ check('P618 確認の質問は関係で正す', confirmReply.replyText.includes(
 const similarReply = await conversationCoreService.execute({ prompt: 'モコロンと羊って似てる？' } as any);
 check('P618 似てるかは説明から答える', similarReply.replyText.includes('似ている') || similarReply.replyText.includes('似てる'), similarReply.replyText.slice(0, 160));
 
+// ---- 状態の否定は兆候として数えない（P620） ----
+{
+  const { userStateTrailService } = await import('../src/miki/conversation/services/userStateTrailService');
+  check('P620 「痛くない」は痛みと判定しない', !userStateTrailService.isPainText('痛くないよ') && userStateTrailService.recordFromText('痛くないよ') !== 'pain', '');
+  check('P620 「心配ない」は不安と判定しない', userStateTrailService.recordFromText('心配ないよ') !== 'anxiety', '');
+  check('P620 「不安じゃない」は不安と判定しない', userStateTrailService.recordFromText('不安じゃないよ') !== 'anxiety', '');
+  check('P620 肯定の状態は従来どおり数える', userStateTrailService.isPainText('頭が痛い') && userStateTrailService.recordFromText('今日は疲れた') === 'fatigue', '');
+}
+const notPainReply = await conversationCoreService.execute({ prompt: '痛くないよ' } as any);
+check('P620 痛くないは痛みの受け止めにならない', !notPainReply.replyText.includes('痛むときは'), notPainReply.replyText.slice(0, 120));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
