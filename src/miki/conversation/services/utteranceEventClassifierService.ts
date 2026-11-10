@@ -183,8 +183,8 @@ class UtteranceEventClassifierService {
     if (tokens.some((t) => t.includes('クリア')) && aspect === 'COMPLETED') {
       return { eventClass: 'ACHIEVEMENT', negated, aspect, matchedStem: 'クリア', subject, object };
     }
-    // 量の名詞が主題で「上がった」は達成。
-    if (has('上') && /(?:上がっ|あがっ)/.test(text) && [...this.measureNouns()].some((n) => tokenSet.has(n))) {
+    // 量の名詞が主題で「上がった」は達成（名詞側は分割に備えて原文でも照合）。
+    if (has('上') && /(?:上がっ|あがっ)/.test(text) && [...this.measureNouns()].some((n) => tokenSet.has(n) || text.includes(n))) {
       return { eventClass: 'ACHIEVEMENT', negated, aspect, matchedStem: '上が（量）', subject, object };
     }
     return undefined;

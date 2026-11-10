@@ -36,12 +36,12 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1796,
-    "sourceFileCount": 1349,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1260,
-    "relativeImportCandidateCount": 3995,
-    "resolvedRelativeImportCandidateCount": 3977,
-    "unresolvedRelativeImportCandidateCount": 18
+    "trackedPathCountExcludingControlPaths": 1797,
+    "sourceFileCount": 1350,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1261,
+    "relativeImportCandidateCount": 3997,
+    "resolvedRelativeImportCandidateCount": 3981,
+    "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
     {
@@ -1860,12 +1860,13 @@
         {
           "line": 806,
           "specifier": "../src/miki/conversation/services/utteranceEventClassifierService",
-          "resolution": "UNRESOLVED_CANDIDATE"
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/utteranceEventClassifierService.ts"
         }
       ],
       "relativeImportCandidateCount": 27,
-      "resolvedRelativeImportCount": 26,
-      "unresolvedRelativeImportCount": 1
+      "resolvedRelativeImportCount": 27,
+      "unresolvedRelativeImportCount": 0
     },
     {
       "path": "scripts/diagnose_production_build.mjs",
@@ -11970,6 +11971,29 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/conversation/services/utteranceEventClassifierService.ts",
+      "bytes": 10038,
+      "lines": 194,
+      "sha256": "e7fe5704d3b2840067359fb9bb1edf276bd986b8c63f8e3da19bca1f9207465a",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../research/services/japaneseAnalysisService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27328,7 +27352,8 @@
         {
           "line": 32,
           "specifier": "../../conversation/services/utteranceEventClassifierService",
-          "resolution": "UNRESOLVED_CANDIDATE"
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/utteranceEventClassifierService.ts"
         },
         {
           "line": 33,
@@ -27608,8 +27633,8 @@
         }
       ],
       "relativeImportCandidateCount": 64,
-      "resolvedRelativeImportCount": 63,
-      "unresolvedRelativeImportCount": 1
+      "resolvedRelativeImportCount": 64,
+      "unresolvedRelativeImportCount": 0
     },
     {
       "path": "src/miki/safety/services/deterministicRuntimePolicyService.ts",
