@@ -835,6 +835,12 @@ check('P612 置き忘れは喪失寄りに受ける', umbrellaReply.replyText.in
 const recoveredReply = await conversationCoreService.execute({ prompt: '風邪治った' } as any);
 check('P612 回復は喜んで受ける', recoveredReply.replyText.includes('よかった') && !recoveredReply.replyText.includes('良くなりますように'), recoveredReply.replyText.slice(0, 140));
 
+// ---- 助かった・愚痴の受け止め（P613） ----
+const reliefReply = await conversationCoreService.execute({ prompt: '本当に助かった' } as any);
+check('P613 「助かった」は安堵として受ける', reliefReply.replyText.includes('よかった') || reliefReply.replyText.includes('嬉しい') || reliefReply.replyText.includes('うれしい'), reliefReply.replyText.slice(0, 140));
+const ventingReply = await conversationCoreService.execute({ prompt: '仕事で嫌なことがあってさ' } as any);
+check('P613 愚痴は寄り添って聞く', ventingReply.replyText.includes('嫌な思い') || ventingReply.replyText.includes('大変') || ventingReply.replyText.includes('聞かせて'), ventingReply.replyText.slice(0, 140));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
