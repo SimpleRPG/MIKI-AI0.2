@@ -10,7 +10,7 @@ import { storageService } from '../../../services/storageService';
  * だけで、発話そのものは残さない。
  */
 
-export type UserStateSignal = 'fatigue' | 'positive' | 'anxiety' | 'hunger' | 'loneliness' | 'thirst';
+export type UserStateSignal = 'fatigue' | 'positive' | 'anxiety' | 'hunger' | 'loneliness' | 'thirst' | 'pain';
 
 interface UserStateTrailEntry {
   signal: UserStateSignal;
@@ -29,6 +29,8 @@ const HUNGER_PATTERN = /(?:お腹すいた|おなかすいた|お腹空いた|�
 // P584: 寂しさと喉の渇きも状態として受ける。
 const LONELINESS_PATTERN = /(?:寂しい|さみしい|淋しい|孤独|ひとりぼっち|一人ぼっち|会いたい|あいたい)/;
 const THIRST_PATTERN = /(?:喉乾いた|のど乾いた|喉かわいた|喉が渇いた|のどかわいた|水分)/;
+// P591: 痛みも状態として受ける（「頭痛い」に「頭痛、そうなんですね」とだけ返っていた）。
+const PAIN_PATTERN = /(?:頭痛|腹痛|歯痛|腰痛|肩こり|痛い|いたい|ズキズキ|疼)/;
 
 export class UserStateTrailService {
   private static instance: UserStateTrailService;
@@ -86,6 +88,11 @@ export class UserStateTrailService {
     return THIRST_PATTERN.test(String(text || ''));
   }
 
+  /** P591: 痛みの言い回しかどうかだけを見る（記録はしない）。 */
+  public isPainText(text: string): boolean {
+    return PAIN_PATTERN.test(String(text || ''));
+  }
+
   /** 発話から兆候を読み、あれば記録して返す。 */
   public recordFromText(text: string): UserStateSignal | undefined {
     const source = String(text || '');
@@ -93,15 +100,17 @@ export class UserStateTrailService {
       ? 'fatigue'
       : ANXIETY_PATTERN.test(source)
         ? 'anxiety'
-        : HUNGER_PATTERN.test(source)
-          ? 'hunger'
-          : LONELINESS_PATTERN.test(source)
-            ? 'loneliness'
-            : THIRST_PATTERN.test(source)
-              ? 'thirst'
-              : POSITIVE_PATTERN.test(source)
-                ? 'positive'
-                : undefined;
+        : PAIN_PATTERN.test(source)
+          ? 'pain'
+          : HUNGER_PATTERN.test(source)
+            ? 'hunger'
+            : LONELINESS_PATTERN.test(source)
+              ? 'loneliness'
+              : THIRST_PATTERN.test(source)
+                ? 'thirst'
+                : POSITIVE_PATTERN.test(source)
+                  ? 'positive'
+                  : undefined;
     if (!signal) return undefined;
     const entries = this.load();
     entries.push({ signal, at: Date.now() });

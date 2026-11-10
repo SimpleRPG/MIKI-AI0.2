@@ -594,6 +594,20 @@ const rotQ3 = paragraphCompositionService.buildTopicQuestion(['モコロン']);
 check('P590 同じ主題の質問が回って変わる', Boolean(rotQ1 && rotQ2 && rotQ3) && rotQ1 !== rotQ2 && rotQ2 !== rotQ3, [rotQ1, rotQ2, rotQ3].join(' / '));
 check('P590 最初は関係の質問から始まる', Boolean(rotQ1 && !/いつごろから|思い出すことが多い|印象に残って/.test(rotQ1)), String(rotQ1));
 
+// ---- 日常発話の穴埋め（P591） ----
+const painReply = await conversationCoreService.execute({ prompt: '頭痛い' } as any);
+check('P591 痛みは状態として受ける', painReply.replyText.includes('大丈夫') || painReply.replyText.includes('つらい') || painReply.replyText.includes('休ん'), painReply.replyText.slice(0, 120));
+const staleReply = await conversationCoreService.execute({ prompt: 'つまらん' } as any);
+check('P591 つまらなさを受け止め、断片の反響にしない', (staleReply.replyText.includes('面白い話') || staleReply.replyText.includes('退屈') || staleReply.replyText.includes('つまらな')) && !staleReply.replyText.includes('つまの話'), staleReply.replyText.slice(0, 120));
+const joyReply = await conversationCoreService.execute({ prompt: 'やったー！' } as any);
+check('P591 喜びは一緒に喜ぶ', joyReply.replyText.includes('やりました') || joyReply.replyText.includes('わーい') || joyReply.replyText.includes('嬉しい'), joyReply.replyText.slice(0, 120));
+const workDoneReply = await conversationCoreService.execute({ prompt: '仕事終わった' } as any);
+check('P591 仕事終わりは労い、語幹を聞き返さない', workDoneReply.replyText.includes('お疲れ様') && !workDoneReply.replyText.includes('どんなもの'), workDoneReply.replyText.slice(0, 140));
+const rainReply = await conversationCoreService.execute({ prompt: '雨降ってきた' } as any);
+check('P591 活用の語幹を聞き返さない', !rainReply.replyText.includes('どんなものですか'), rainReply.replyText.slice(0, 140));
+const statusReply = await conversationCoreService.execute({ prompt: '最近どう？' } as any);
+check('P591 彼女への様子聞きは自分の状態で答える', (statusReply.replyText.includes('元気') || statusReply.replyText.includes('調子')) && !statusReply.replyText.includes('調べてみた'), statusReply.replyText.slice(0, 140));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

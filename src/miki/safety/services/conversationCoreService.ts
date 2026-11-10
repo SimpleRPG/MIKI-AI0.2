@@ -703,6 +703,11 @@ export class ConversationCoreService {
       if (!isPhatic) {
         const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
         if (reaction) casualConclusion = reaction;
+        // P591: つまらなさ・退屈は、主題の断片（「つまの話ですね」）で
+        // なく気持ちとして受ける（CASUAL 側にも受け止めを置く）。
+        if (/つまら|退屈/.test(prompt)) {
+          casualConclusion = fx('fx_bored_stale', ['つまらないですね。何か面白い話でもしましょうか。', '退屈ですね。最近、面白かったことはありますか？', 'つまらない時間ですね。何か気になることはありますか？'], ['つまんないねー。何か面白い話しよ？', '退屈だね。最近、面白かったことある？', 'つまんないね。何か気になることある？']);
+        }
         // P574: 直前の話題質問への答えなら、答えとして受ける。
         if (answeredTopicQuestion) {
           casualConclusion = fx('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。'], ['そっか、教えてくれてありがと！', 'なるほどー、そういうことなんだ。', 'そっかそっか、分かったよ。ありがと！']);
@@ -808,6 +813,8 @@ export class ConversationCoreService {
       // P584: 寂しさ・喉の渇きも状態として受ける。
       const fallthroughLoneliness = userStateTrailService.isLonelinessText(prompt);
       const fallthroughThirst = userStateTrailService.isThirstText(prompt);
+      // P591: 痛みも状態として受ける。
+      const fallthroughPain = userStateTrailService.isPainText(prompt);
       // P572: 別れ・出発・帰宅の挨拶（宣言文で来た場合）。
       const fallthroughClosing = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|バイバイ|さようなら|さよなら/.test(prompt);
       const fallthroughClosingText = !fallthroughClosing
@@ -823,7 +830,7 @@ export class ConversationCoreService {
       const trimmedPrompt = prompt.trim();
       const fallthroughAgreement = trimmedPrompt.length <= 10 && /^(?:そうだね|そうそう|だよね|わかる|うん|はい|なるほど)/.test(trimmedPrompt);
       const fallthroughPhatic = fallthroughFatigue || fallthroughThanks || fallthroughApology || fallthroughWakeup
-        || fallthroughAnxiety || fallthroughHunger || fallthroughLoneliness || fallthroughThirst || fallthroughClosing || fallthroughAgreement;
+        || fallthroughAnxiety || fallthroughHunger || fallthroughLoneliness || fallthroughThirst || fallthroughPain || fallthroughClosing || fallthroughAgreement;
       // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
       const taughtAck = this.taughtTermAcknowledgement(prompt);
       let reactionBase = taughtAck ?? (fallthroughFatigue
@@ -842,7 +849,9 @@ export class ConversationCoreService {
                 : this.pickFixedReply('fx_lonely', ['寂しいのですね。私はここにいますよ、話しましょう。', 'ひとりじゃないですよ。そばにいますね。', '寂しいときは声をかけてくださいね。私でよければ一緒にいます。']))
               : fallthroughThirst
                 ? this.pickFixedReply('fx_thirst', ['喉が渇いたのですね。何か飲んでくださいね。', '水分を取ってくださいね。', '喉が渇きましたか。一息ついて飲み物をどうぞ。'])
-                : fallthroughClosingText
+                : fallthroughPain
+                  ? this.pickFixedReply('fx_pain', ['大丈夫ですか？痛むときは無理しないでくださいね。', '痛いのはつらいですね。休めるときに休んでくださいね。', '大丈夫ですか？温かくして休んでくださいね。'])
+                  : fallthroughClosingText
               ? fallthroughClosingText
               : fallthroughThanks
                 ? 'どういたしまして！お役に立てて何よりです。'
@@ -855,30 +864,38 @@ export class ConversationCoreService {
                       : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
                         ?? 'そうなんですね。話してくれてありがとう。'));
       // P578: 教わった「自分の好きなもの」の話なら、自分の好きとして受ける。
-      if (!taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughClosing) {
+      if (!taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughPain && !fallthroughClosing) {
         const like = this.selfLikeReaction(prompt);
         if (like) reactionBase = like;
       }
       // P574: 直前の話題質問への答えなら、答えとして受ける（状態の
       // 受け止めと、教わった意味の「覚えた」が優先）。
-      if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughClosing) {
+      if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughPain && !fallthroughClosing) {
         reactionBase = ffx('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。'], ['そっか、教えてくれてありがと！', 'なるほどー、そういうことなんだ。', 'そっかそっか、分かったよ。ありがと！']);
         // P586: 答えの内容から、もう一歩だけ続きを聞く候補を用意する。
         if (answeredPending) followUpAppend = this.buildFollowUpQuestion(answeredPending, prompt, japaneseAnalysis?.contentTokens || []);
       }
       // P576: 定型の受け止めに当たらなかった発話のうち、天気の定番と
       // 笑いは専用の形で受ける（天気は日付から季節感を添える）。
-      const chainMatched = fallthroughFatigue || fallthroughAnxiety || fallthroughHunger || fallthroughLoneliness || fallthroughThirst || Boolean(fallthroughClosingText)
+      const chainMatched = fallthroughFatigue || fallthroughAnxiety || fallthroughHunger || fallthroughLoneliness || fallthroughThirst || fallthroughPain || Boolean(fallthroughClosingText)
         || fallthroughThanks || fallthroughApology || fallthroughWakeup || fallthroughAgreement;
       if (!taughtAck && !answeredTopicQuestion && !chainMatched) {
         const weather = this.weatherRemark(prompt);
-        if (/暇/.test(prompt)) {
-          // P581: 暇の受け止め（話題を一緒に開く誘い）。
-          reactionBase = ffx('fx_bored', ['暇ですね。何か面白い話でもしましょうか。', '暇な時間ですね。何か気になることはありますか？', '暇ですね。最近、面白かったことはありますか？'], ['ひまだねー。何か面白い話しよ？', 'ひまな時間だね。何か気になることある？', 'ひまだね。最近、面白かったことある？']);
+        if (/暇|つまら|退屈/.test(prompt)) {
+          // P581/P591: 暇・つまらなさの受け止め（話題を一緒に開く誘い）。
+          reactionBase = /暇/.test(prompt)
+            ? ffx('fx_bored', ['暇ですね。何か面白い話でもしましょうか。', '暇な時間ですね。何か気になることはありますか？', '暇ですね。最近、面白かったことはありますか？'], ['ひまだねー。何か面白い話しよ？', 'ひまな時間だね。何か気になることある？', 'ひまだね。最近、面白かったことある？'])
+            : ffx('fx_bored_stale', ['つまらないですね。何か面白い話でもしましょうか。', '退屈ですね。最近、面白かったことはありますか？', 'つまらない時間ですね。何か気になることはありますか？'], ['つまんないねー。何か面白い話しよ？', '退屈だね。最近、面白かったことある？', 'つまんないね。何か気になることある？']);
         } else if (weather) {
           reactionBase = weather;
         } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
           reactionBase = ffx('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。'], ['ふふ、面白いね！', 'あはは、それいいね！', 'ふふふ、笑っちゃうね。']);
+        } else if (/やったー|やった！|やったね|よっしゃ|うれしい|嬉しい/.test(prompt)) {
+          // P591: 喜びの叫びは一緒に喜ぶ（汎用の相槌で流さない）。
+          reactionBase = ffx('fx_joy', ['やりましたね！すごいです。', 'わーい、やりましたね！', 'やった！嬉しいですね。'], ['やったー！すごいね！', 'わーい、やったね！', 'やった！うれしいね。']);
+        } else if (/仕事(?:が|は)?.{0,4}(?:終わった|終わりました|おわった|終わり)/.test(prompt)) {
+          // P591: 仕事終わりの報告は労う。
+          reactionBase = ffx('fx_work_done', ['お仕事、お疲れ様でした！', 'お疲れ様でした。ゆっくり休んでくださいね。'], ['お仕事おつかれさま！', 'おつかれさまー！ゆっくり休んでね。']);
         } else if (dialogueAct === 'REQUEST') {
           // P588: どの経路でも解けなかった依頼は、汎用の相槌ではなく
           // 依頼として引き受ける形で受ける（「歌って」に「そうなん
@@ -1119,6 +1136,18 @@ export class ConversationCoreService {
           worldScope: verifiedClaim.world,
           nextActions: latent.suggestedProactiveAction ? [latent.suggestedProactiveAction] : [],
           detailLevel: 'STANDARD',
+        });
+      } else if (!roleplaySessionService.isActive() && this.selfStatusAnswer(prompt)) {
+        // P591: 「最近どう？」のような、彼女自身への様子聞きは調査の
+        // 対象ではない（未検証の提示や「見つからなかった」に倒れて
+        // いた）。自分の状態として答える。
+        status = 'RESOLVED';
+        reason = 'self_status_smalltalk';
+        ir = answerContentIrService.buildAnswerIR({
+          conclusion: this.applyPersonaVoice(this.selfStatusAnswer(prompt)!),
+          target: compiled.target,
+          certainty: 'CERTAIN',
+          detailLevel: 'BRIEF',
         });
       } else if (!roleplaySessionService.isActive() && this.opinionAnswer(prompt, japaneseAnalysis?.contentTokens || [])) {
         // P581: 「Xどう思う？」への意見。好みか知識があれば、それを
@@ -1673,7 +1702,9 @@ export class ConversationCoreService {
       const topic = (unknownTerms || []).find((t) => {
         if (t.length < 2 || !prompt.includes(t) || projectNotebookService.findProject(t)) return false;
         const after = prompt.slice(prompt.indexOf(t) + t.length, prompt.indexOf(t) + t.length + 1);
-        return !/[るりれろたてますないだ]/.test(after);
+        // P591: 「雨降」+って、「仕事終」+わった のような活用の語幹も
+        // 聞き返さない（直後の「わ」「っ」も語幹の続きとみなす）。
+        return !/[るりれろたてますないだわっ]/.test(after);
       });
       if (!topic) return undefined;
       const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
@@ -1713,6 +1744,16 @@ export class ConversationCoreService {
    * 好み→知っている事実（世界モデル・Claim の補足文）→辞書の意味、
    * の順。どれも無ければ意見の材料が無いので undefined。
    */
+  /** P591: 彼女自身の様子を聞く雑談（最近どう？／調子どう？）への答え。 */
+  private selfStatusAnswer(prompt: string): string | undefined {
+    if (!/(?:最近|調子|ようす|様子)(?:は|も|の)?\s*どう/.test(prompt)) return undefined;
+    return this.pickFixedReply('fx_self_status', [
+      '元気ですよ。今日もいろいろな話ができて嬉しいです。あなたはどうですか？',
+      '調子はいいですよ。最近覚えたことも少しずつ増えてきました。',
+      '元気です。声をかけてくれてありがとう。あなたはどうですか？',
+    ]);
+  }
+
   private opinionAnswer(prompt: string, contentTokens: string[]): string | undefined {
     if (!/(?:どう思う|どう感じる|好きですか|おすすめ)/.test(prompt)) return undefined;
     const topic = this.pickReactionTopic(prompt, contentTokens);
