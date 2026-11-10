@@ -85,9 +85,11 @@ async function main() {
   check('T10 続いている疲れとして受ける', t10.includes('続いて') || t10.includes('ここ数日'), t10.slice(0, 160));
 
   // ---- なりチャ ----
-  await turn('T11 なりチャ開始', '猫カフェの店員になって');
+  const t11 = await turn('T11 なりチャ開始', '猫カフェの店員になって');
   check('T11 セッションが始まる', roleplaySessionService.isActive());
-  await turn('T12 役のまま質問', 'おすすめのメニューは？');
+  check('T11 開始は役の挨拶で返る', t11.includes('猫カフェの店員') && t11.includes('なります'), t11.slice(0, 140));
+  const t12 = await turn('T12 役のまま質問', 'おすすめのメニューは？');
+  check('T12 役の中の質問に調査テキストが混ざらない', !t12.includes('ウィキ') && !t12.includes('ログイン') && !t12.includes('アップロード'), t12.slice(0, 140));
   await turn('T13 場面の設定', '場面は猫カフェの店内だよ');
   const scene = roleplaySessionService.getSession()?.scene || '';
   console.log(`(場面: ${scene || '未設定'})`);
@@ -96,8 +98,9 @@ async function main() {
   const rp3 = await turn('T16 場面の雑談3', 'もう少しここにいたいな');
   const rp4 = await turn('T17 場面の雑談4', '静かで落ち着くね');
   check('T14-17 場面の返答が全部同じにならない', new Set([rp1, rp2, rp3, rp4]).size >= 3, [rp1, rp2, rp3, rp4].map((r) => r.slice(0, 40)).join(' / '));
-  await turn('T18 なりチャ終了', 'なりチャ終わり');
+  const t18 = await turn('T18 なりチャ終了', 'なりチャ終わり');
   check('T18 セッションが終わる', !roleplaySessionService.isActive());
+  check('T18 終了は締めの言葉で返る', t18.includes('おしまい'), t18.slice(0, 160));
 
   // ---- 夜 ----
   await turn('T19 一日の感想', '今日は楽しかった');

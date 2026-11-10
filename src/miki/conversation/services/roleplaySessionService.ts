@@ -198,6 +198,19 @@ export class RoleplaySessionService {
     } catch { /* 控えは補助経路 */ }
   }
 
+  // P595: 開始・終了が起きたターンを会話コアが拾うための一回限りの
+  // 印（開始の挨拶・終了の締めを、そのターンの返答にするため）。
+  private pendingTransition: { type: 'started' | 'ended'; roleName: string; summary?: string; sourceText: string; at: number } | null = null;
+
+  /** P595: 直近の開始・終了を取り出す（見たら消える。30秒を過ぎたら無効）。 */
+  public takeTransition(): { type: 'started' | 'ended'; roleName: string; summary?: string; sourceText: string } | undefined {
+    const t = this.pendingTransition;
+    this.pendingTransition = null;
+    if (!t) return undefined;
+    if (Date.now() - t.at > 30_000) return undefined;
+    return t;
+  }
+
   /** セッションを終える。あらすじは役に保存して次回の継続に使う。 */
   public endSession(): RoleplaySession | null {
     const session = this.loadSession();
@@ -275,7 +288,8 @@ export class RoleplaySessionService {
     // 来たときだけ確定する。
     if (/なりチャ(?:終わり|おわり|終了|おしまい)|役を(?:終わり|おわり|終了|やめて)|なりきり(?:終わり|終了)/.test(source)) {
       if (this.isActive()) {
-        this.endSession();
+        const ended = this.endSession();
+        this.pendingTransition = { type: 'ended', roleName: ended?.roleName || '', summary: ended?.summary, sourceText: source, at: Date.now() };
         return 'ended';
       }
       return undefined;
@@ -285,7 +299,8 @@ export class RoleplaySessionService {
       if (!session) return undefined;
       const beats = session.sceneBeats || 0;
       if (session.pendingEndBeat !== undefined && beats - session.pendingEndBeat <= 3) {
-        this.endSession();
+        const ended = this.endSession();
+        this.pendingTransition = { type: 'ended', roleName: ended?.roleName || session.roleName || '', summary: ended?.summary, sourceText: source, at: Date.now() };
         return 'ended';
       }
       session.pendingEndBeat = beats;
@@ -318,6 +333,7 @@ export class RoleplaySessionService {
       if (!name) return undefined;
       const role = this.findRole(name) ?? this.saveRole({ name, stance: '', world: '', toneHint: '', userRole: '' });
       this.startSession(role, personaId);
+      this.pendingTransition = { type: 'started', roleName: role.name, sourceText: source, at: Date.now() };
       return 'started';
     }
     return undefined;

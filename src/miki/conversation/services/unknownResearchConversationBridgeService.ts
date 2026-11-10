@@ -56,6 +56,9 @@ const WEB_CHROME_PHRASES = [
   'バグの報告', '練習用ページ', '井戸端', '寄付',
 ];
 
+// P595: ページの操作系テキスト（ナビゲーション）の目印。
+const NAV_MARKERS = ['アップロード', 'コモンズ', 'ヘルプ', 'お知らせ', 'ログイン', '目次', 'ページ先頭', 'メインメニュー', 'サイドバー', '特別ページ', '個人用ツール', 'アカウント作成'];
+
 export function cleanWebSummary(text: string, terms: string[]): string {
   let t = String(text || '');
   t = t.replace(/^[^。]{0,60}? - (?:Wikipedia|ウィキペディア)\s*/u, '');
@@ -63,8 +66,12 @@ export function cleanWebSummary(text: string, terms: string[]): string {
   t = t.replace(/\s+/g, ' ').trim();
   if (!t) return '';
   const sentences = t.split(/(?<=。)/).map((s) => s.trim()).filter(Boolean);
-  const withTerm = sentences.find((s) => terms.some((term) => term && s.includes(term)));
-  const chosen = withTerm || sentences[0] || t;
+  // P595: ページの操作系テキスト（ナビゲーション）の目印が複数ある
+  // 文は本文ではないとみなして採用しない（「アップロード ヘルプ
+  // ログイン 目次…」のような案内文の塊が要約に化けていた）。
+  const clean = sentences.filter((s) => NAV_MARKERS.filter((m) => s.includes(m)).length < 2);
+  const withTerm = clean.find((s) => terms.some((term) => term && s.includes(term)));
+  const chosen = withTerm || clean[0] || '';
   return chosen.replace(/[。．]\s*$/, '').slice(0, 120);
 }
 

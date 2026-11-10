@@ -304,7 +304,30 @@ export class ConversationCoreService {
         return this.buildResult('RESOLVED', 'next_work_answer', this.applyPersonaVoice(nextWork), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
     }
-    if (explicitUnknownInquiry && !userFactRecall) {
+    // P595: なりチャの開始・終了のターンは、役の挨拶／締めで答える
+    // （開始が通常の雑談反応、終了が主題断片の反響になっていた）。
+    const rpTransitionRaw = roleplaySessionService.takeTransition();
+    // 印は、それを起こした発話そのもののターンでのみ効く（取り込みと
+    // 実行がずれたときに、別の発話へ挨拶・締めが漏れないため）。
+    const rpTransition = rpTransitionRaw && rpTransitionRaw.sourceText.trim() === prompt.trim() ? rpTransitionRaw : undefined;
+    if (rpTransition?.type === 'started') {
+      const role = roleplaySessionService.getActiveRole();
+      const parts = [`分かりました、${rpTransition.roleName}になります。`];
+      if (role?.world) parts.push(`ここは${role.world}です。`);
+      if (role?.lastSummary) parts.push(`前回は、${role.lastSummary}`);
+      parts.push('よろしくお願いします。さあ、始めましょうか。');
+      return this.buildResult('RESOLVED', 'roleplay_started', this.applyPersonaVoice(parts.join('')), state, dialogueAct, 0, ['roleplaySessionService'], started, stages);
+    }
+    if (rpTransition?.type === 'ended') {
+      const closing = rpTransition.summary
+        ? `${rpTransition.roleName}の役はおしまいです。${rpTransition.summary} お疲れ様でした、楽しかったです。`
+        : `${rpTransition.roleName}の役はおしまいです。お疲れ様でした、楽しかったです。`;
+      return this.buildResult('RESOLVED', 'roleplay_ended', this.applyPersonaVoice(closing), state, dialogueAct, 0, ['roleplaySessionService'], started, stages);
+    }
+    // P595: なりチャ中は調査橋を発動しない（役の中の質問に Web 調査の
+    // 未検証テキストが混ざって役が壊れていた）。分からないことは
+    // 未解決チェーンの役の形（fx_roleplay_unknown）で答える。
+    if (explicitUnknownInquiry && !userFactRecall && !roleplaySessionService.isActive()) {
       const researched = await unknownResearchConversationBridgeService.resolveAndRespond({
         question: prompt,
         unknownTerms: unknownTerms.filter((t) => prompt.includes(t)),

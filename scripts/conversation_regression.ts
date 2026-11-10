@@ -654,6 +654,11 @@ projectNotebookService.intakeFromUserText('次は当たり判定を作る');
 const nextWorkReply = await conversationCoreService.execute({ prompt: '次何作ればいいと思う？' } as any);
 check('P594 次の作業は作業状態から答える', nextWorkReply.replyText.includes('当たり判定'), nextWorkReply.replyText.slice(0, 160));
 
+// ---- なりチャの開始・終了の返答と、調査要約の掃除（P595） ----
+const { cleanWebSummary } = await import('../src/miki/conversation/services/unknownResearchConversationBridgeService');
+check('P595 要約からページの案内文を採用しない', cleanWebSummary('アップロード (ウィキメディア・コモンズ) ヘルプ ヘルプ 利用 お知らせ 検索 検索 表示 ログイン ログイン 目次 ページ先頭 概要 シリーズ作品', ['概要']) === '', cleanWebSummary('アップロード (ウィキメディア・コモンズ) ヘルプ ヘルプ 利用 お知らせ 検索 ログイン 目次 ページ先頭', ['概要']));
+check('P595 正常な要約は残る', cleanWebSummary('モコロンは羊のようなパルです。綿毛が取れます。', ['モコロン']).includes('モコロンは羊のようなパルです'), cleanWebSummary('モコロンは羊のようなパルです。綿毛が取れます。', ['モコロン']));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
