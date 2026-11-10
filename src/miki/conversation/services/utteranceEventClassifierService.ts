@@ -134,8 +134,15 @@ class UtteranceEventClassifierService {
     const has = (stem: string) => tokenSet.has(stem) || tokens.some((t) => t.length > stem.length && t.endsWith(stem));
 
     // 名詞出来事（動詞が無い報告）。
+    // P665: 言及しただけでは出来事にしない。「給料日まであと少し」
+    // （まだ先）や「給料日いつ？」（質問）で祝わない。到着の形
+    // （今日は〜だ／入った等）がある時だけ給料日として受ける。
     if (/(?:給料日|ボーナス)/.test(text)) {
-      return { eventClass: 'PAYDAY', negated, aspect, matchedStem: '給料日', subject, object };
+      const notYet = /(?:まで|あと|まだ|いつ|今度|来週|明日|来月|先|待ち|遠い)/.test(text) || features.questionForm !== 'NONE';
+      const arrived = /(?:今日|やっと|ついに|入った|入りました|もらった|もらいました|振り込|出た|だ[よ。！!]|です[。！!]|だった)/.test(text);
+      if (!notYet && arrived) {
+        return { eventClass: 'PAYDAY', negated, aspect, matchedStem: '給料日', subject, object };
+      }
     }
 
     // 交通：主体＋遅れ系、または渋滞・人身事故そのもの。
