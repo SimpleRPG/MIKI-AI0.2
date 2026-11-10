@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_day_simulation.ts",
-      "bytes": 12186,
-      "lines": 164,
-      "sha256": "9691902d97f6954a55012a8e6b2583f0651becaeb34ab214c213dbd7d5c0065c",
+      "bytes": 12819,
+      "lines": 171,
+      "sha256": "fd85b651ec9581d3e5e26c79c5fc168fce6edd46ab6b8379832af1932d87b913",
       "relativeImportCandidates": [
         {
           "line": 23,

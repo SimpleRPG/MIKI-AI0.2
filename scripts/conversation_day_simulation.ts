@@ -120,6 +120,13 @@ async function main() {
   const t20e = await turn('T20E 今日の振り返り', '今日何の話をしたっけ？');
   check('T20E 今日の話題を振り返れる', t20e.includes('モコロン') || t20e.includes('ラーメン'), t20e.slice(0, 160));
 
+  const t22 = await turn('T22 使い道の質問', 'モコロンは何に使うの？');
+  check('T22 使い道は関係で答える', t22.includes('綿毛'), t22.slice(0, 160));
+  const t23 = await turn('T23 場所の質問', 'モコロンってどこで捕まえられる？');
+  check('T23 場所は正直に言って調べる形', t23.includes('まだ知らない') && t23.includes('調べて'), t23.slice(0, 180));
+  const t24 = await turn('T24 確認の質問', 'モコロンは鳥じゃないの？');
+  check('T24 確認は関係で正す', t24.includes('パル') && !t24.includes('答えられない'), t24.slice(0, 160));
+
   const t21 = await turn('T21 おやすみ', 'おやすみ');
   check('T21 おやすみで受ける', t21.includes('おやすみ'), t21.slice(0, 120));
 
