@@ -1495,6 +1495,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   await conversationCoreService.execute({ prompt: 'やめる' } as any);
 }
 
+// ---- 気持ちの頼みは気持ちで受ける（P679） ----
+{
+  const cheer = await conversationCoreService.execute({ prompt: '応援して' } as any);
+  check('P679 応援の頼みに気持ちで返す', cheer.replyText.includes('応援しています'), cheer.replyText.slice(0, 120));
+  const comfort = await conversationCoreService.execute({ prompt: '慰めて' } as any);
+  check('P679 慰めの頼みに寄り添う', comfort.replyText.includes('そばにいます'), comfort.replyText.slice(0, 120));
+  const praise = await conversationCoreService.execute({ prompt: '褒めて' } as any);
+  check('P679 褒める頼みに褒める', praise.replyText.includes('えらいです'), praise.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

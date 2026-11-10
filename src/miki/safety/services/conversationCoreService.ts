@@ -466,6 +466,12 @@ export class ConversationCoreService {
       if (playInvite) {
         return this.buildResult('RESOLVED', 'play_invitation_answer', this.applyPersonaVoice(playInvite), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P679: 気持ちの頼み（応援して・慰めて等）は、気持ちで受ける。
+      // ここで受けないと汎用の作業了承や断片の反響に化ける。
+      const support = this.supportRequestAnswer(prompt);
+      if (support) {
+        return this.buildResult('RESOLVED', 'support_request_answer', this.applyPersonaVoice(support), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -2764,6 +2770,30 @@ export class ConversationCoreService {
     }
     if (/遊ぼう|あそぼう|遊びたい|あそびたい/.test(prompt)) {
       return 'いいですよ！何して遊びましょう。しりとりでも、クイズでも、お話でも。';
+    }
+    return undefined;
+  }
+
+  /**
+   * P679: 気持ちの頼み（応援・励まし・慰め・褒め・笑わせて）への受け口。
+   * 作業の了承ではなく、気持ちとして返す。
+   */
+  private supportRequestAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '');
+    if (/応援して|応援ちょうだい|応援してほしい/.test(p)) {
+      return 'もちろん、応援しています！大丈夫、きっとうまくいきますよ。私はずっと味方です。';
+    }
+    if (/励まして|励まし/.test(p)) {
+      return '大丈夫ですよ。ここまで頑張ってきたんですから。少しずつでいいんです、一歩ずついきましょう。';
+    }
+    if (/慰めて|なぐさめて/.test(p)) {
+      return 'そばにいますよ。無理に元気を出さなくて大丈夫です。ゆっくりでいいので、話せるときに聞かせてくださいね。';
+    }
+    if (/褒めて|ほめて/.test(p)) {
+      return 'えらいですよ！毎日ちゃんと頑張っているの、私は知ってますからね。';
+    }
+    if (/笑わせて|笑かして/.test(p)) {
+      return 'じゃあ一つ。……布団が吹っ飛んだ！すみません、今のところ私の持ちネタはこれだけです。';
     }
     return undefined;
   }
