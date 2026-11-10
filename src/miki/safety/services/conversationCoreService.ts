@@ -2404,7 +2404,12 @@ export class ConversationCoreService {
     let features;
     try { features = utteranceFeatureService.analyze(prompt); } catch { return undefined; }
     const known = features.contentTokens.filter((t) => {
-      try { return japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0; } catch { return false; }
+      try {
+        return japaneseDictionaryService.has(t)
+          || worldModelGraphService.relationsOf(t).length > 0
+          // P642: 辞書・関係が無くても、検証済みの知識がある物は「知っている物」として扱う。
+          || claimDatabaseService.getAllClaims().some((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(t));
+      } catch { return false; }
     });
     if (known.length === 0) return undefined;
     // 似ているか：2つの既知の物について、片方の説明にもう片方が出れば手がかりがある。
@@ -2422,7 +2427,7 @@ export class ConversationCoreService {
       } catch { return undefined; }
     }
     // 確認の質問：Xは Y じゃないの？/なの？ に、関係と照らして答える。
-    const confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*(?:じゃないの|なの|ですか|なのですか)[？?]?$/);
+    const confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*(?:じゃないの|なの|ですか|なのですか|の)[？?]?$/);
     if (confirmMatch && /[？?]/.test(prompt)) {
       const entity = known.find((t) => prompt.startsWith(t) || prompt.includes(`${t}って`) || prompt.includes(`${t}は`));
       if (!entity) return undefined;
@@ -2441,6 +2446,22 @@ export class ConversationCoreService {
       if (targets.length > 0) {
         return `「${entity}」は${candidate}ではなく、${targets.join('・')}と関係があると覚えています。`;
       }
+      // P642: 関係が無くても、検証済みの知識（Claim）があれば
+      // それを根拠に確認へ答える。従来は Claim の文がそのまま
+      // 出るだけで、聞かれた候補（例：「魚なの？」）に答えて
+      // いなかった。候補が知識に含まれれば肯定し、含まれなければ
+      // 知識の側を提示して正す。知識が無い候補を否定はしない。
+      try {
+        const claims = claimDatabaseService.getAllClaims()
+          .filter((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(entity));
+        if (claims.length > 0) {
+          const hit = claims.find((c: any) => String(c.statement || '').includes(candidate));
+          if (hit) return `はい、そのとおりです。${String((hit as any).statement).slice(0, 90)}`;
+          const statement = String((claims[0] as any).statement || '');
+          const body = statement.replace(new RegExp(`^${entity}は`), '').replace(/。$/, '');
+          if (body) return `「${entity}」は${candidate}じゃなくて、${body}です。`;
+        }
+      } catch { /* Claim 照合は補助 */ }
       return undefined;
     }
     return undefined;

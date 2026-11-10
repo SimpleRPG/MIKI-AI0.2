@@ -1134,6 +1134,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P640 解消された欠けは RESOLVED になる', moco?.status === 'RESOLVED', JSON.stringify(moco || {}).slice(0, 160));
 }
 
+// ---- 確認の質問に検証済みの知識で答える（P642） ----
+{
+  const { claimDatabaseService } = await import('../src/miki/memory/services/claimDatabaseService');
+  const { japaneseDictionaryService } = await import('../src/miki/research/services/japaneseDictionaryService');
+  japaneseDictionaryService.addPersonal('ホタルイカ', { gloss: '発光する小さなイカ', semanticIds: ['regression-p642'] } as any);
+  claimDatabaseService.registerClaim({ statement: 'ホタルイカは発光する小さなイカです。', world: 'REAL', kind: 'FACT', status: 'SUPPORTED', source: 'regression-p642' } as any);
+  const confirmYes = await conversationCoreService.execute({ prompt: 'ホタルイカって発光するの？' } as any);
+  check('P642 候補が知識に合えば根拠つきで肯定する', confirmYes.replyText.includes('そのとおり') && confirmYes.replyText.includes('発光'), confirmYes.replyText.slice(0, 200));
+  const confirmNo = await conversationCoreService.execute({ prompt: 'ホタルイカって魚なの？' } as any);
+  check('P642 候補が知識と違えば知識の側を提示して正す', confirmNo.replyText.includes('魚じゃなくて') && confirmNo.replyText.includes('イカ'), confirmNo.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
