@@ -1321,6 +1321,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P663 動詞断片を話題にしない', !frag.replyText.includes('したですか'), frag.replyText.slice(0, 160));
 }
 
+// ---- 話題の断片の反響・出来事の誤爆を止める（P664〜P666） ----
+{
+  const stem = await conversationCoreService.execute({ prompt: '最近忙しくてさ' } as any);
+  check('P664 形容詞の語幹を話題にしない', !stem.replyText.includes('しく、'), stem.replyText.slice(0, 160));
+  const doko = await conversationCoreService.execute({ prompt: '今度の休み、どこか行きたい' } as any);
+  check('P664 不定の指示語を話題にしない', !doko.replyText.includes('どこかの話'), doko.replyText.slice(0, 160));
+  const notYet = await conversationCoreService.execute({ prompt: '給料日まであと少し' } as any);
+  check('P665 まだ先の給料日では祝わない', !notYet.replyText.includes('おめでとう'), notYet.replyText.slice(0, 160));
+  const payday = await conversationCoreService.execute({ prompt: '今日は給料日だ' } as any);
+  check('P665 当日の給料日は祝う', payday.replyText.includes('おめでとう') || payday.replyText.includes('やりました'), payday.replyText.slice(0, 160));
+  const like = await conversationCoreService.execute({ prompt: '料理作るの好きなんだ' } as any);
+  check('P666 「作るのが好き」は家事完了で受けない', !like.replyText.includes('お疲れ様でした'), like.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
