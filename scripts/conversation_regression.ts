@@ -301,6 +301,7 @@ const yearNeed = autonomousSearchService.detectNeedForSearch(`${nextYear}年の�
 check('P551 来年の年号でも最新情報として拾う', yearNeed.needsSearch === true, JSON.stringify(yearNeed));
 
 // ---- 話題質問のフォールバック（P552） ----
+storageService.setItem('miki_topic_question_usage_v1', '{}');
 const relationQuestion = paragraphCompositionService.buildTopicQuestion(['モコロン']);
 check('P552 関係がある主題では従来の質問が優先', Boolean(relationQuestion && relationQuestion.includes('モコロン') && !relationQuestion.includes('いつごろから')), String(relationQuestion));
 const freshQuestion = paragraphCompositionService.buildTopicQuestion(['カピバラ']);
@@ -584,6 +585,14 @@ storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms:
 const bibiAnswerAck = await conversationCoreService.execute({ prompt: 'モコロンは綿毛が取れる、羊みたいなパルだよ' } as any);
 check('P589 ビービーの答えの受け止めはタメ口', (bibiAnswerAck.replyText.includes('ありがと') || bibiAnswerAck.replyText.includes('なんだ')) && !bibiAnswerAck.replyText.includes('そういうことなんですね'), bibiAnswerAck.replyText.slice(0, 160));
 personaProfileService.switchProfile('persona-default');
+
+// ---- 話題質問の回転（P590） ----
+storageService.setItem('miki_topic_question_usage_v1', '{}');
+const rotQ1 = paragraphCompositionService.buildTopicQuestion(['モコロン']);
+const rotQ2 = paragraphCompositionService.buildTopicQuestion(['モコロン']);
+const rotQ3 = paragraphCompositionService.buildTopicQuestion(['モコロン']);
+check('P590 同じ主題の質問が回って変わる', Boolean(rotQ1 && rotQ2 && rotQ3) && rotQ1 !== rotQ2 && rotQ2 !== rotQ3, [rotQ1, rotQ2, rotQ3].join(' / '));
+check('P590 最初は関係の質問から始まる', Boolean(rotQ1 && !/いつごろから|思い出すことが多い|印象に残って/.test(rotQ1)), String(rotQ1));
 
 // ---- 結果 ----
 let fail = 0;

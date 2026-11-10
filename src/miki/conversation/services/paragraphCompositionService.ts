@@ -285,14 +285,19 @@ class ParagraphCompositionService {
       }
       if (!subject) {
         // P552: 世界モデルの実体でない話題でも、相手の経験に聞く形なら出せる。
-        return this.experienceQuestion(terms[0]);
+        // P590: 経験の質問も、主題ごとの台帳で形を回す。
+        return this.pickRotatingQuestion(terms[0], this.experienceForms(terms[0]));
       }
+      // P590: 候補（関係の質問→連想→経験）を全部集めて、主題ごとの
+      // 台帳で回す。従来は一番確信度の高い関係の質問が毎回同じに
+      // なっていた。材料（関係・連想）が増えれば候補も増える。
+      const candidates: string[] = [];
       const mine = relations
         .filter((r) => r.from === subject || r.to === subject)
         .sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
       for (const r of mine) {
         const q = this.questionForRelation(r.type, subject, r.from === subject ? r.to : r.from, r.from === subject);
-        if (q) return q;
+        if (q && !candidates.includes(q)) candidates.push(q);
       }
       // P552: 確定した関係が無い主題では、連想があれば連想として聞き、
       // それも無ければ相手の経験に聞く。知らない事実そのものは聞かない
@@ -300,24 +305,36 @@ class ParagraphCompositionService {
       associationGraphService.ensureBuilt();
       const assoc = associationGraphService.associations(subject, 1)[0];
       if (assoc && assoc.name !== subject) {
-        return `${subject}の話になると、${assoc.name}のことも思い出します。${assoc.name}とは、どんなつながりがあるのですか？`;
+        const q = `${subject}の話になると、${assoc.name}のことも思い出します。${assoc.name}とは、どんなつながりがあるのですか？`;
+        if (!candidates.includes(q)) candidates.push(q);
       }
-      return this.experienceQuestion(subject);
+      for (const q of this.experienceForms(subject)) {
+        if (!candidates.includes(q)) candidates.push(q);
+      }
+      return this.pickRotatingQuestion(subject, candidates);
     } catch {
       return undefined;
     }
   }
 
-  /** P552: 主題について、相手の経験・印象に聞く質問。形は主題から決定的に選ぶ。 */
-  private experienceQuestion(subject: string): string {
-    const forms = [
+  /** P590: 主題ごとの使用台帳で候補を回す（同じ主題に同じ質問を繰り返さない）。 */
+  private pickRotatingQuestion(subject: string, candidates: string[]): string | undefined {
+    if (candidates.length === 0) return undefined;
+    let usage: Record<string, number> = {};
+    try { usage = JSON.parse(storageService.getItem('miki_topic_question_usage_v1') || '{}'); } catch { usage = {}; }
+    const idx = (usage[subject] || 0) % candidates.length;
+    usage[subject] = (usage[subject] || 0) + 1;
+    try { storageService.setItem('miki_topic_question_usage_v1', JSON.stringify(usage)); } catch { /* 台帳は補助 */ }
+    return candidates[idx];
+  }
+
+  /** P590: 経験の質問の形（全部）。 */
+  private experienceForms(subject: string): string[] {
+    return [
       `${subject}は、いつごろから知っていますか？`,
       `${subject}は、どんなときに思い出すことが多いですか？`,
       `${subject}のことで、印象に残っていることはありますか？`,
     ];
-    let h = 0;
-    for (const ch of subject) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    return forms[h % forms.length];
   }
 
   private questionForRelation(type: string, subject: string, other: string, subjectIsFrom: boolean): string | undefined {
