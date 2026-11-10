@@ -497,6 +497,21 @@ check('P578 好きなものの話は自分の好きとして受ける', likeRepl
 for (let i = 0; i < 7; i++) selfPreferenceService.observeTerms('persona-default', ['星空観察']);
 check('P578-B 頻度から「よく話すもの」を導く', selfPreferenceService.derivedInterests('persona-default').includes('星空観察'), JSON.stringify(selfPreferenceService.derivedInterests('persona-default')));
 
+// ---- 通し検証で見つけた穴（P579） ----
+conversationFactIntakeService.intakeFromUserText('ツバメって、鳥のことだよ', []);
+check('P579 短い説明も意味として覚える', japaneseDictionaryService.has('ツバメ'));
+const dictReply = await conversationCoreService.execute({ prompt: 'ツバメって何？' } as any);
+check('P579 教わった語の質問に辞書から答える', dictReply.replyText.includes('鳥'), dictReply.replyText.slice(0, 160));
+check('P579 知識の回答に定型末尾が付かない', !dictReply.replyText.includes('誠心誠意') && !dictReply.replyText.includes('理由は'), dictReply.replyText.slice(0, 160));
+storageService.setItem('miki_unknown_pending_v1', JSON.stringify({ term: 'ホニャララ2', askedAt: Date.now() }));
+conversationFactIntakeService.intakeFromUserText('ホニャララ2かわいいよね', []);
+check('P579 感想は意味として取り込まない', !japaneseDictionaryService.has('ホニャララ2'));
+storageService.setItem('miki_unknown_pending_v1', JSON.stringify({ term: 'ホニャララ3', askedAt: Date.now() }));
+conversationFactIntakeService.intakeFromUserText('ホニャララ3は山に住む鳥だよ', []);
+check('P579 聞き返しへの説明は取り込む', japaneseDictionaryService.has('ホニャララ3'));
+const fragReply = await conversationCoreService.execute({ prompt: '猫に触りたいな' } as any);
+check('P579 活用の断片を主題にしない', !fragReply.replyText.includes('触り、'), fragReply.replyText.slice(0, 120));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

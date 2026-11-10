@@ -45,6 +45,29 @@ function queryTerms(query: string): string[] {
  *   照会と無関係な要約は使わず、出典先頭の抜粋に倒す。
  * 材料が揃わなければ null（提示せず、従来の未解決の返しに倒す）。
  */
+// P579: 取得したページ本文の先頭には、サイトの案内文（「コンテンツ
+// にスキップ」「メインメニュー」等）が混ざる。要約として提示する
+// 前に取り除き、照会語を含む文を優先して拾う。
+const WEB_CHROME_PHRASES = [
+  'コンテンツにスキップ', 'メインメニュー', 'サイドバーに移動', 'サイドバー',
+  'コミュニティ・ポータル', '最近の出来事', '新しいページ', '最近の更新',
+  'おまかせ表示', 'メインページ', '案内', '非表示',
+  '特別ページ', '個人用ツール', 'アカウント作成', 'ウィキペディアに関するお問い合わせ',
+  'バグの報告', '練習用ページ', '井戸端', '寄付',
+];
+
+export function cleanWebSummary(text: string, terms: string[]): string {
+  let t = String(text || '');
+  t = t.replace(/^[^。]{0,60}? - (?:Wikipedia|ウィキペディア)\s*/u, '');
+  for (const p of WEB_CHROME_PHRASES) t = t.split(p).join(' ');
+  t = t.replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const sentences = t.split(/(?<=。)/).map((s) => s.trim()).filter(Boolean);
+  const withTerm = sentences.find((s) => terms.some((term) => term && s.includes(term)));
+  const chosen = withTerm || sentences[0] || t;
+  return chosen.replace(/[。．]\s*$/, '').slice(0, 120);
+}
+
 export function selectUnverifiedPresentation(
   evidence: EvidenceRecord[],
   query: string,
@@ -68,10 +91,10 @@ export function selectUnverifiedPresentation(
   let summary = '';
   const rawSummary = typeof researchSummary === 'string' ? researchSummary.trim() : '';
   if (rawSummary && !/検索に失敗|失敗しました/.test(rawSummary) && isRelevant(rawSummary)) {
-    summary = rawSummary.replace(/[。．]\s*$/, '').slice(0, 120);
+    summary = cleanWebSummary(rawSummary, terms);
   }
   if (!summary) {
-    summary = String(usable[0].snippet || '').trim().replace(/[。．]\s*$/, '').slice(0, 120);
+    summary = cleanWebSummary(String(usable[0].snippet || ''), terms);
   }
   if (!summary) return null;
   return { summary, sources };

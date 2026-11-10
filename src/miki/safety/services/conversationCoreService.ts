@@ -48,6 +48,7 @@ import { conversationComponentPipelineService } from '../../conversation/service
 import { japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { userKnowledgeProfileService } from '../../conversation/services/userKnowledgeProfileService';
+import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { selfPreferenceService } from '../../selfAwareness/services/selfPreferenceService';
 import { runtimeConversationCompositionService } from '../../conversation/services/runtimeConversationCompositionService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
@@ -241,7 +242,12 @@ export class ConversationCoreService {
     const unknownTerms = Array.isArray(vocabulary?.unknowns)
       ? vocabulary.unknowns.map((item: any) => String(item.term || '')).filter(Boolean).slice(0, 3)
       : [];
-    const explicitUnknownInquiry = unknownTerms.length > 0 && /意味|定義|とは|何|調べ|検索|教えて|使い方/.test(prompt);
+    // P579: 未知語は「今の発話に出ている語」だけを対象にする。解釈側が
+    // 会話状態から持ち越した語で調査が暴走するのを防ぐ（過去の話題の
+    // 語で検索してしまう事故があった）。
+    const explicitUnknownInquiry = unknownTerms.length > 0
+      && unknownTerms.some((t) => prompt.includes(t))
+      && /意味|定義|とは|何|調べ|検索|教えて|使い方/.test(prompt);
     // P498: 雑談の中で出た未知語は、その場で聞き返さなくても
     // 意味学習の gap として残す。従来はターンの解釈に使われる
     // だけで、明示的に意味を聞かれない限り学習の入口に入らず、
@@ -272,7 +278,7 @@ export class ConversationCoreService {
     if (explicitUnknownInquiry && !userFactRecall) {
       const researched = await unknownResearchConversationBridgeService.resolveAndRespond({
         question: prompt,
-        unknownTerms,
+        unknownTerms: unknownTerms.filter((t) => prompt.includes(t)),
         // P457 (G): 調査入口の統一。明示の検索語がある場合だけでなく、
         // 検索要否判定（「Xとは？」等の定義・事実照会を含む）が調査対象と
         // 判定した場合も、未知語の問い合わせ自体も、同じ調査経路へ進める。
@@ -597,7 +603,6 @@ export class ConversationCoreService {
       // 合流点の補足（関係の文）で出す。質問・依頼・訂正は従来どおり
       // Claim 経路で答える。
       const claim = claimMatch.bestClaim;
-      const memoryReasons = relevantMemories.slice(0, 2).map((m: any) => memoryReasonLabel(m));
       ir = answerContentIrService.buildAnswerIR({
         conclusion: claim.statement,
         target: compiled.target,
@@ -605,7 +610,10 @@ export class ConversationCoreService {
         // 実行ステップ、潜在意図の既定アクション）を混ぜない。
         // それらは「次のステップ」や理由として表層に出て、知識の
         // 質問への答えを報告文書にしていた。
-        reasons: [...memoryReasons],
+        // P579: 記憶の由来ラベル（「理由はあなたが話していた内容:
+        // …」）も、解像度の高い候補では理由として表層に出てしまう
+        // ため載せない（由来はログと記憶側に残る）。
+        reasons: [],
         conditions: claimMatch.scopeNotes,
         certainty: claimMatch.confidence === 'CERTAIN' ? 'CERTAIN' : 'CONDITIONAL',
         worldScope: claim.world,
@@ -734,7 +742,10 @@ export class ConversationCoreService {
       ir = answerContentIrService.buildAnswerIR({
         conclusion: casualConclusion,
         target: '日常対話・挨拶・共感',
-        reasons: ['日常対話・挨拶・感情の受け止めとして認識しました。'],
+        // P579: 理由は診断情報。IR に載せると、BRIEF でない解像度の
+        // 候補が選ばれたときに「理由は…として認識しました」が
+        // 返答へ漏れる（P569 の Claim 経路と同じ事故）。
+        reasons: [],
         // P558: 以前は定型の「前提」が付き、表面生成で「前提として、
         // …受け付けています場合、」という壊れた前置きが雑談の返答に
         // 混入していた。日常対話に前提条件は要らない。
@@ -1071,6 +1082,18 @@ export class ConversationCoreService {
           nextActions: latent.suggestedProactiveAction ? [latent.suggestedProactiveAction] : [],
           detailLevel: 'STANDARD',
         });
+      } else if (!roleplaySessionService.isActive() && this.dictionaryAnswerForQuestion(prompt, japaneseAnalysis?.contentTokens || [])) {
+        // P579: 辞書（教わった意味を含む）に答えがある語の質問は、
+        // 未検証の調査結果より先に辞書から答える（手元の知識が
+        // 最も確か）。解決済みとして扱う。
+        status = 'RESOLVED';
+        reason = 'dictionary_answer';
+        ir = answerContentIrService.buildAnswerIR({
+          conclusion: this.dictionaryAnswerForQuestion(prompt, japaneseAnalysis?.contentTokens || [])!,
+          target: compiled.target,
+          certainty: 'HIGH_CONFIDENCE',
+          detailLevel: 'BRIEF',
+        });
       } else if (unverifiedSources.length > 0 && unverifiedSummary) {
         // P457 (H): 2段構えの1段目。検証昇格には届かなかった調査結果を、
         // 未検証であることを明示し出典を添えて提示する。検証済みの答えとは
@@ -1091,16 +1114,36 @@ export class ConversationCoreService {
         // 記憶本文の引用、調査の工程説明）は表層 IR に載せない。診断は
         // result.reason / result.knowledgeGapId / ログ / Gap レコード側に残る。
         // 「分からないと言う」姿勢自体は維持し、作話で埋めない。
-        ir = answerContentIrService.buildAnswerIR({
-          conclusion: researchPerformed && researchEvidenceCount > 0
-            ? '調べてみたけれど、確かな答えとして言える情報までは見つからなかったよ。'
-            : relevantMemories.length > 0
-              ? '関連しそうな内容は覚えているけれど、確かな答えとして言えるほどは確認できていないよ。'
-              : 'ごめん、今の知識ではそれには答えられないよ。',
-          target: compiled.target,
-          certainty: 'UNKNOWN',
-          detailLevel: 'STANDARD',
-        });
+        // P579: なりチャ中に答えられない質問は、検証の言い方では
+        // なく役のままの「分からない」で受ける（【確定事項】の
+        // 見出しが付く STANDARD 骨格も使わない）。
+        const inRoleplay = roleplaySessionService.isActive();
+        // P579: 辞書（教わった意味を含む）に答えがある語の質問は、
+        // 「答えられない」に倒す前に辞書から答える。
+        const dictAnswer = inRoleplay ? undefined : this.dictionaryAnswerForQuestion(prompt, japaneseAnalysis?.contentTokens || []);
+        if (dictAnswer) {
+          status = 'RESOLVED';
+          reason = 'dictionary_answer';
+          ir = answerContentIrService.buildAnswerIR({
+            conclusion: dictAnswer,
+            target: compiled.target,
+            certainty: 'HIGH_CONFIDENCE',
+            detailLevel: 'BRIEF',
+          });
+        } else {
+          ir = answerContentIrService.buildAnswerIR({
+            conclusion: inRoleplay
+              ? this.pickFixedReply('fx_roleplay_unknown', ['ごめん、それは分からないや。', 'うーん、それは私も知らなくて…。', 'それは分からないけど、他に聞きたいことはある？'])
+              : researchPerformed && researchEvidenceCount > 0
+                ? '調べてみたけれど、確かな答えとして言える情報までは見つからなかったよ。'
+                : relevantMemories.length > 0
+                  ? '関連しそうな内容は覚えているけれど、確かな答えとして言えるほどは確認できていないよ。'
+                  : 'ごめん、今の知識ではそれには答えられないよ。',
+            target: compiled.target,
+            certainty: 'UNKNOWN',
+            detailLevel: inRoleplay ? 'BRIEF' : 'STANDARD',
+          });
+        }
       }
 
       // 研究結果が得られても、Verifierが昇格条件を満たさない限りRESOLVEDへしない。
@@ -1184,6 +1227,11 @@ export class ConversationCoreService {
       } catch { /* 質問の用意は補助経路 */ }
     }
 
+    // P579: 会話の返答に、表層生成の「温かみ・ユーモア」の定型
+    // 末尾（「急がず着実に前へ進もう。いつでも誠心誠意サポート
+    // させていただきます。」等）を付けない。雑談の文は既に彼女の
+    // 形で組み立ててあり、知識の回答は綺麗に終わるべきもの。
+    (ir as any).suppressGarnish = true;
     const runtimeComposition = runtimeConversationCompositionService.compose(ir, skeleton, { maxCandidates: 4, timeBudgetMs: 12, assembledCode });
     let surface = { surfaceText: runtimeComposition.surfaceText };
 
@@ -1477,7 +1525,9 @@ export class ConversationCoreService {
   private probeUnknownWord(prompt: string, unknownTerms: string[]): { topic: string; question: string } | undefined {
     try {
       if (roleplaySessionService.isActive()) return undefined;
-      const topic = (unknownTerms || []).find((t) => t.length >= 2 && prompt.includes(t));
+      // P579: プロジェクトとして知っている語（EFR 等）は、辞書に
+      // 無くても「知らない語」として聞き返さない。
+      const topic = (unknownTerms || []).find((t) => t.length >= 2 && prompt.includes(t) && !projectNotebookService.findProject(t));
       if (!topic) return undefined;
       const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
       if (Date.now() - (asked[topic] || 0) <= 7 * 24 * 3600_000) return undefined;
@@ -1509,6 +1559,27 @@ export class ConversationCoreService {
       if (!prompt.includes(rec.term)) return undefined;
       return `「${rec.term}」、覚えました！${rec.gloss}ということですね。教えてくれてありがとうございます。`;
     } catch { return undefined; }
+  }
+
+  /**
+   * P579: 意味を聞く質問に、辞書（個人辞書＝教わった意味を含む）
+   * から答える。Claim が無い語でも、辞書に意味があれば答えられる。
+   */
+  private dictionaryAnswerForQuestion(prompt: string, contentTokens: string[]): string | undefined {
+    if (!/(?:とは|って何|ってなに|の意味|何だっけ|なんだっけ|どういう意味|どういうもの)/.test(prompt)) return undefined;
+    for (const term of contentTokens || []) {
+      if (!term || term.length < 2 || !prompt.includes(term)) continue;
+      const entry = japaneseDictionaryService.lookup(term).find((e: any) => e.gloss);
+      if (!entry) continue;
+      const gloss = String(entry.gloss).slice(0, 80);
+      let answer = `${term}は、${gloss}です。`;
+      try {
+        const restated = paraphraseService.restate(gloss, { style: 'casual' });
+        if (restated.changed) answer += `つまり、${restated.text}ってことです。`;
+      } catch { /* 言い換えは補助 */ }
+      return answer;
+    }
+    return undefined;
   }
 
   /**
@@ -1546,10 +1617,46 @@ export class ConversationCoreService {
    * 感情の手がかり（上向き／大変）で受け止め方を変える。定型の
    * 挨拶文と違い、そのターンの内容に触れた一文になる。
    */
+  /**
+   * P579: 雑談の受け止めに使う主題語の選択。形態素の断片（活用の
+   * 語幹「触り」、形容詞の語幹「静か」、「なりチャ」の「なり」、
+   * 「楽しかった」の「った」等）を主題にすると「触り、そうなん
+   * ですね」のような壊れた反響になるため、断片らしい候補を落とす。
+   * 英字の主題は発話中の元の表記（EFR 等）を保つ。
+   */
+  private pickReactionTopic(prompt: string, contentTokens: string[]): string | undefined {
+    const stop = /^(今日|明日|昨日|今|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
+    const candidates = (contentTokens || []).filter((t) => t.length >= 2 && !stop.test(t));
+    // 断片らしさを採点する: 活用の語幹・複合語の途中・「〜たい」の
+    // 形は主題にしない。助詞や文頭の後ろにある語を優先する。
+    const score = (t: string): number => {
+      if (/たい$/.test(t)) return -1;
+      const i = prompt.indexOf(t);
+      if (i < 0) return 1;
+      const after = prompt.slice(i + t.length, i + t.length + 2);
+      if (/^(たい|たく|た|ない|れる|せる|ちゃ)/.test(after)) return -1;
+      if (/^[ァ-ヶー]/.test(after)) return -1;
+      const before = i > 0 ? prompt[i - 1] : '';
+      if (before && /[ぁ-ん]/.test(before)) return -1;
+      if (before && /[はがをにのへとや、。・「」\s]/.test(before)) return 2;
+      return 1;
+    };
+    let raw: string | undefined;
+    let bestScore = -1;
+    for (const t of candidates) {
+      const s = score(t);
+      if (s > bestScore) { raw = t; bestScore = s; }
+    }
+    if (!raw || bestScore < 0) return undefined;
+    if (/^[a-z0-9]+$/i.test(raw)) {
+      const m = prompt.match(new RegExp(raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+      if (m) return m[0];
+    }
+    return raw;
+  }
+
   private buildCasualReaction(prompt: string, contentTokens: string[]): string | null {
-    const term = (contentTokens || []).find(
-      (t) => t.length >= 2 && !/^(今日|明日|昨日|今|これ|それ|あれ|ここ|そこ)$/.test(t)
-    );
+    const term = this.pickReactionTopic(prompt, contentTokens);
     if (!term) return null;
     // P556: 形の選択は長さハッシュだけだと、似た長さの発話で毎日
     // 同じ形が返り続ける。カテゴリごとに前回使った形を覚えておき、

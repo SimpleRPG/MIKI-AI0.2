@@ -230,7 +230,8 @@
     "verify:autonomous-worker-safety-p293": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_autonomous_worker_safety_p293.mjs",
     "verify:source-relation-ledger-p293": "python scripts/generate_source_relation_ledger_p293.py && python scripts/verify_source_relation_ledger_p293.py",
     "verify:lora-retirement-p293": "python scripts/verify_lora_retirement_p293.py",
-    "verify:autonomy-p293": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_autonomous_worker_safety_p293.mjs && node scripts/verify_production_worker_cancellation_p292.mjs && node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_core_autonomy_regressions_p291.mjs && node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_blackboard_corrupt_snapshot_p291.mjs && python scripts/verify_lora_retirement_p293.py && python scripts/verify_source_relation_ledger_p293.py"
+    "verify:autonomy-p293": "node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_autonomous_worker_safety_p293.mjs && node scripts/verify_production_worker_cancellation_p292.mjs && node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_core_autonomy_regressions_p291.mjs && node --experimental-strip-types --loader ./scripts/ts-strip-loader-phase62.mjs scripts/verify_blackboard_corrupt_snapshot_p291.mjs && python scripts/verify_lora_retirement_p293.py && python scripts/verify_source_relation_ledger_p293.py",
+    "test:day": "tsx scripts/conversation_day_simulation.ts"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^8.1.0",

@@ -315,7 +315,11 @@ export class AnswerContentIrService {
       }
     }
 
-    surfaceText = surfaceGrammarAndStyleService.applyWarmthAndHumor(surfaceText, persona);
+    // P579: 会話経路（core）からの IR は、温かみ・ユーモアの定型
+    // 末尾を付けない（suppressGarnish）。分析系の直接描画は従来どおり。
+    if (!(ir as any).suppressGarnish) {
+      surfaceText = surfaceGrammarAndStyleService.applyWarmthAndHumor(surfaceText, persona);
+    }
 
     // 活用規則・助詞選択規則の破綻検査と修復
     const grammarInspection = surfaceGrammarAndStyleService.validateGrammarAndParticles(surfaceText);

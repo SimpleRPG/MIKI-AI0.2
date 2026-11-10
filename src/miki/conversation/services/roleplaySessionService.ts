@@ -294,6 +294,18 @@ export class RoleplaySessionService {
       systemLogger.info('CHAT', '🎭 [なりチャ] 弱い終了信号を検出しました。もう一度で終了します。');
       return undefined;
     }
+    // P579: 場面の設定・変更（「場面は〜だよ」）。セッション中の
+    // 発言として処理し、場面だけを差し替える。
+    if (this.isActive()) {
+      const sceneMatch = source.match(/場面は(.{1,24}?)(?:だよ|です|。|．|$)/);
+      if (sceneMatch) {
+        const scene = normalizeName(sceneMatch[1]);
+        if (scene) {
+          this.setScene(scene);
+          systemLogger.info('CHAT', `🎭 [なりチャ] 場面を「${scene}」に設定しました。`);
+        }
+      }
+    }
     const startMatch =
       source.match(/(.{1,20}?)(?:として)(?:話して|演じて|なりきって)/) ??
       source.match(/(.{1,20}?)(?:に)(?:なりきって)/) ??

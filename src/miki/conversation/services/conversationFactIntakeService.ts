@@ -468,7 +468,9 @@ export class ConversationFactIntakeService {
    * - なりチャ中は入口自体が閉じる（intakeFromUserText のゲート）。
    */
   private learnTermFromUserExplanation(text: string): void {
-    const pattern = /^(.{1,12}?)(?:っていうのは|ってのは|って|とは)、?(.{4,80}?)(?:のこと(?:だ|です|だよ|ですね)?|という意味(?:だ|です|だよ)?|を指す言葉|というもの(?:だ|です)?)[。．]?$/;
+    // P579: 説明が短い語（「海鳥」「鳥」等）も拾うため下限は1字。
+    // 形自体（〜って、Xのこと）が十分に特定的で、誤認は起きにくい。
+    const pattern = /^(.{1,12}?)(?:っていうのは|ってのは|って|とは)、?(.{1,80}?)(?:のこと(?:だ|です|だよ|ですね)?|という意味(?:だ|です|だよ)?|を指す言葉|というもの(?:だ|です)?)[。．]?$/;
     for (const sentence of String(text || '').split(/(?<=。)/)) {
       const m = sentence.trim().match(pattern);
       if (!m) continue;
@@ -521,6 +523,10 @@ export class ConversationFactIntakeService {
     }
     gloss = gloss.replace(/(?:ということ)?(?:だよ|ですね|です|だ)?。?$/, '').trim();
     if (gloss.length < 3 || gloss.length > 80) return;
+    // P579: 感想だけの文（「かわいいよね」「好きだよ」等）は意味の
+    // 説明ではないので取り込まない。聞き返しへの返事が雑談の
+    // 感想だった場合に、感想を意味として登録してしまう事故の対策。
+    if (/^(かわいい|すごい|大きい|小さい|高い|安い|美味しい|おいしい|楽しい|嬉しい|うれしい|強い|弱い|速い|早い|遅い|重い|軽い|明るい|暗い|好き|大好き|嫌い)(よね|ね|よ)?$/.test(gloss)) return;
     if (!value.includes(term) && !/^それ/.test(value) && value.length > 40) return;
     const existing = japaneseDictionaryService.lookup(term);
     // 既に意味がある語（本物の辞書・Web学習・教示済み）は上書きしない。
