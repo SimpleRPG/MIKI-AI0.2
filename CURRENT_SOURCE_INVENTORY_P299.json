@@ -36,12 +36,12 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1800,
-    "sourceFileCount": 1353,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1264,
-    "relativeImportCandidateCount": 4059,
-    "resolvedRelativeImportCandidateCount": 4042,
-    "unresolvedRelativeImportCandidateCount": 17
+    "trackedPathCountExcludingControlPaths": 1801,
+    "sourceFileCount": 1354,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1265,
+    "relativeImportCandidateCount": 4061,
+    "resolvedRelativeImportCandidateCount": 4045,
+    "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
     {
@@ -12041,6 +12041,29 @@
       ],
       "relativeImportCandidateCount": 13,
       "resolvedRelativeImportCount": 13,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/conversation/services/shiritoriService.ts",
+      "bytes": 6553,
+      "lines": 155,
+      "sha256": "78ce3bf3de25f31c310b07bb11d9caac827929bc841f2a7ddb3db12905f2cd0c",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27720,7 +27743,8 @@
         {
           "line": 32,
           "specifier": "../../conversation/services/shiritoriService",
-          "resolution": "UNRESOLVED_CANDIDATE"
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/shiritoriService.ts"
         },
         {
           "line": 33,
@@ -28030,8 +28054,8 @@
         }
       ],
       "relativeImportCandidateCount": 69,
-      "resolvedRelativeImportCount": 68,
-      "unresolvedRelativeImportCount": 1
+      "resolvedRelativeImportCount": 69,
+      "unresolvedRelativeImportCount": 0
     },
     {
       "path": "src/miki/safety/services/deterministicRuntimePolicyService.ts",
