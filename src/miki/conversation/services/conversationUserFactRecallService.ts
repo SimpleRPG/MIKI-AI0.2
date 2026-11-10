@@ -164,6 +164,23 @@ export class ConversationUserFactRecallService {
     const candidates = collectCandidates(memories, stateSummaries);
     if (candidates.length === 0) return null;
 
+    // P593: 好みの聞き返し（「僕の好きなものは？」）。好みの事実は
+    // 対象・属性を持たない形で取り込まれるため、通常のキー照合では
+    // 引けない。値を持つ好み候補をまとめて答える。彼女自身の好み
+    // （「みきの好きなものは？」）は対象外（自己照会の領分）。
+    if (/(?:好きなもの|好きなこと|好物|好み|趣味)/.test(prompt) && !/(?:みき|ビービー|あなた|君)の/.test(prompt)) {
+      const prefs = candidates.filter((c) => c.value && /好き|興味がある/.test(c.summary));
+      if (prefs.length > 0) {
+        const values = [...new Set(prefs.map((c) => c.value as string))].slice(0, 3);
+        return {
+          candidate: prefs[0],
+          topicLabel: '好きなもの',
+          answerText: `前に言っていた好きなものは「${values.join('」と「')}」だよ。`,
+          reasonLabel: prefs[0].reasonLabel,
+        };
+      }
+    }
+
     // P457 (E): 値からの逆引き。「逃げ場がないって何の武器だっけ？」のように
     // 保持済みの値（名前など）そのものを指す聞き返しは、値の完全一致で引く。
     const byValue = this.matchByValue(prompt, candidates);

@@ -334,6 +334,16 @@ export class ConversationCoreService {
       lastCandidateClaimId: teachingResult.detected && teachingResult.candidateClaim ? teachingResult.candidateClaim.claim_id : state.lastCandidateClaimId,
     };
 
+    // P593: 短い訂正（「それ違うよ」）は、照応の曖昧さを理由に候補の
+    // 確認（報告文）で返さず、訂正として受ける。
+    if (anaphora.confidence === 'ambiguous' && dialogueAct === 'CORRECTION' && /^(?:それ|これ|あれ)(?:は)?(?:違う|ちがう|間違)/.test(prompt.trim())) {
+      const text = this.applyPersonaVoice(this.pickFixedReply('fx_correction_ack', [
+        'ごめんなさい、違ったんですね。どこが違うか教えてもらえますか？',
+        'ごめんなさい、間違えました。直したいので、教えてもらえますか？',
+      ]));
+      return this.buildResult('RESOLVED', 'correction_acknowledged', text, nextState, dialogueAct, 0, [], started, stages);
+    }
+
     // P592: 「AとB、どっちがいい？」の“曖昧さ”は質問そのもの。
     // 対象の特定を相手に返さず、選択の質問として後段で受ける。
     const isChoiceQuestion = /(?:どっち|どちら)/.test(prompt) && /(?:いい|好き|おすすめ|正解|思う|選)/.test(prompt);
@@ -739,6 +749,10 @@ export class ConversationCoreService {
         if (/つまら|退屈/.test(prompt)) {
           casualConclusion = fx('fx_bored_stale', ['つまらないですね。何か面白い話でもしましょうか。', '退屈ですね。最近、面白かったことはありますか？', 'つまらない時間ですね。何か気になることはありますか？'], ['つまんないねー。何か面白い話しよ？', '退屈だね。最近、面白かったことある？', 'つまんないね。何か気になることある？']);
         }
+        // P593: 彼女への褒め言葉は照れて受ける（CASUAL 側）。
+        if (/(?:みき|ミキ|ビービー|あなた|君)/.test(prompt) && /(?:かわいい|可愛い|優しい|やさしい|すごい|えらい|好き|大好き)/.test(prompt)) {
+          casualConclusion = fx('fx_compliment', ['えへへ、ありがとう。嬉しいです。', 'ありがとうございます。そう言ってもらえると嬉しいです。', 'わーい、ありがとう。'], ['えへへ、ありがと！うれしい！', 'ありがとー！えへへ。', 'わーい、ありがとう！']);
+        }
         // P574: 直前の話題質問への答えなら、答えとして受ける。
         if (answeredTopicQuestion) {
           casualConclusion = fx('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。'], ['そっか、教えてくれてありがと！', 'なるほどー、そういうことなんだ。', 'そっかそっか、分かったよ。ありがと！']);
@@ -921,6 +935,15 @@ export class ConversationCoreService {
           reactionBase = weather;
         } else if (/笑う|笑った|笑える|大笑い/.test(prompt)) {
           reactionBase = ffx('fx_laugh', ['ふふ、面白いですね。', 'あはは、それはいいですね。', 'ふふふ、笑っちゃいますね。'], ['ふふ、面白いね！', 'あはは、それいいね！', 'ふふふ、笑っちゃうね。']);
+        } else if (/風邪|入院|怪我|骨折|発熱|熱がある|病気/.test(prompt)) {
+          // P593: 体調の報告は、主題の反響でなく気遣いで受ける。
+          reactionBase = ffx('fx_illness', ['大丈夫ですか？お大事にしてくださいね。', 'それは大変ですね。無理せず休んでくださいね。', 'お大事に。早く良くなりますように。'], ['大丈夫？お大事にね。', '大変だね。無理せず休んでね。', 'お大事に。早く良くなるといいね。']);
+        } else if (/泣きたい|泣きそう|悲しくて|涙.*出/.test(prompt)) {
+          // P593: 泣きたい気持ちは、汎用の相槌で流さない。
+          reactionBase = ffx('fx_sad', ['無理しなくて大丈夫ですよ。私はそばにいます。', 'つらいですね。話したくなったら聞きますよ。'], ['無理しなくて大丈夫だよ。そばにいるよ。', 'つらいね。話したくなったら聞くよ。']);
+        } else if (/(?:みき|ミキ|ビービー|あなた|君)/.test(prompt) && /(?:かわいい|可愛い|優しい|やさしい|すごい|えらい|好き|大好き)/.test(prompt)) {
+          // P593: 彼女への褒め言葉は、主題の反響でなく照れて受ける。
+          reactionBase = ffx('fx_compliment', ['えへへ、ありがとう。嬉しいです。', 'ありがとうございます。そう言ってもらえると嬉しいです。', 'わーい、ありがとう。'], ['えへへ、ありがと！うれしい！', 'ありがとー！えへへ。', 'わーい、ありがとう！']);
         } else if (/彼女(?:が)?できた|彼氏(?:が)?できた|結婚(?:する|した|することに)|合格|受かった|内定|就職.*決ま|生まれた|妊娠|昇進|優勝/.test(prompt)) {
           // P592: 人生の大きな報告（彼女ができた・結婚・合格など）は
           // 主題の反響でなく、まず祝う。
@@ -934,6 +957,10 @@ export class ConversationCoreService {
         } else if (/仕事(?:が|は)?.{0,4}(?:終わった|終わりました|おわった|終わり)/.test(prompt)) {
           // P591: 仕事終わりの報告は労う。
           reactionBase = ffx('fx_work_done', ['お仕事、お疲れ様でした！', 'お疲れ様でした。ゆっくり休んでくださいね。'], ['お仕事おつかれさま！', 'おつかれさまー！ゆっくり休んでね。']);
+        } else if (!roleplaySessionService.isActive() && /(?:電話(?:を)?(?:かけ|し)て|起こして|アラーム.*(?:セット|かけて)|メール.*送って|メッセージ.*送って)/.test(prompt)) {
+          // P593: 端末の外の行為（電話・目覚まし・送信）は、引き受けた
+          // ふりをせず、できないことを正直に言う。
+          reactionBase = ffx('fx_cannot', ['ごめんなさい、それは私にはできないんです。電話や目覚ましみたいな端末のことは、手が届かなくて。', 'ごめん、それは私にはできないんです。お話なら、いつでも聞きますよ。'], ['ごめん、それはできないの。電話とかは手が届かなくて。', 'ごめんね、それはできないんだ。お話ならいつでもいいよ。']);
         } else if (dialogueAct === 'REQUEST') {
           // P588: どの経路でも解けなかった依頼は、汎用の相槌ではなく
           // 依頼として引き受ける形で受ける（「歌って」に「そうなん
@@ -1814,8 +1841,13 @@ export class ConversationCoreService {
    * 材料は自分の記録（教わった得意）と、決まっている事実だけ。
    */
   private selfQuestionAnswer(prompt: string): string | undefined {
-    if (!/(?:みき|ミキ|ビービー|あなた|君|あんた)/.test(prompt)) return undefined;
     let text: string | undefined;
+    // P593: 彼女の機嫌を聞く形は、呼びかけ語が無くても彼女への質問。
+    if (/怒ってる|怒っている|機嫌/.test(prompt) && !/(?:彼|彼女|お母|お父|母|父|上司|先生|あの人)/.test(prompt)) {
+      text = '怒っていませんよ。大丈夫です。';
+      return this.applyPersonaVoice(text);
+    }
+    if (!/(?:みき|ミキ|ビービー|あなた|君|あんた)/.test(prompt)) return undefined;
     if (/何歳|年齢|いくつ/.test(prompt)) {
       text = this.pickFixedReply('fx_self_age', [
         '年齢は決まっていないんです。AIなので、歳は数えないんですよ。',

@@ -111,6 +111,9 @@ async function main() {
   check('T20A 質問は1ターンに1つまで', (t20a.match(/[？?]/g) || []).length === 1, t20a.slice(0, 200));
   const t20b = await turn('T20B 小さな依頼', '歌って');
   check('T20B 依頼は引き受ける形で受ける', t20b.includes('いい') || t20b.includes('任せて') || t20b.includes('やってみます'), t20b.slice(0, 120));
+  await turn('T20C 好みを伝える', '僕はラーメンが好きだよ');
+  const t20d = await turn('T20D 好みを聞き返す', '僕の好きなものは？');
+  check('T20D 伝えた好みを覚えている', t20d.includes('ラーメン'), t20d.slice(0, 140));
 
   const t21 = await turn('T21 おやすみ', 'おやすみ');
   check('T21 おやすみで受ける', t21.includes('おやすみ'), t21.slice(0, 120));

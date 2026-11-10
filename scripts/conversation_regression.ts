@@ -628,6 +628,18 @@ check('P592 おすすめ依頼は見出し付き謝罪文にしない', !recomme
 const bridgeGarnishReply = await conversationCoreService.execute({ prompt: 'ホニャララ5って何？' } as any);
 check('P592 調査橋の返答に定型末尾が付かない', !bridgeGarnishReply.replyText.includes('誠心誠意') && !bridgeGarnishReply.replyText.includes('急がず着実') && !bridgeGarnishReply.replyText.includes('微力ながら'), bridgeGarnishReply.replyText.slice(0, 160));
 
+// ---- 体調・悲しみ・褒め・できないこと・機嫌（P593） ----
+const illnessReply = await conversationCoreService.execute({ prompt: '風邪ひいた' } as any);
+check('P593 体調の報告は気遣いで受ける', illnessReply.replyText.includes('お大事に') || illnessReply.replyText.includes('大丈夫') || illnessReply.replyText.includes('休んで'), illnessReply.replyText.slice(0, 120));
+const sadReply = await conversationCoreService.execute({ prompt: '泣きたい' } as any);
+check('P593 泣きたい気持ちを受ける', sadReply.replyText.includes('そばにいます') || sadReply.replyText.includes('大丈夫') || sadReply.replyText.includes('聞きます'), sadReply.replyText.slice(0, 120));
+const complimentReply = await conversationCoreService.execute({ prompt: 'みきかわいいね' } as any);
+check('P593 褒め言葉は照れて受ける', (complimentReply.replyText.includes('ありがとう') || complimentReply.replyText.includes('嬉しい') || complimentReply.replyText.includes('えへへ')) && !complimentReply.replyText.includes('みきですか'), complimentReply.replyText.slice(0, 120));
+const cannotReply = await conversationCoreService.execute({ prompt: '明日7時に起こして' } as any);
+check('P593 できない依頼は引き受けたふりをしない', cannotReply.replyText.includes('できない'), cannotReply.replyText.slice(0, 140));
+const moodReply = await conversationCoreService.execute({ prompt: '怒ってる？' } as any);
+check('P593 機嫌の質問には自分の状態で答える', moodReply.replyText.includes('怒っていません') || moodReply.replyText.includes('怒ってない'), moodReply.replyText.slice(0, 120));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

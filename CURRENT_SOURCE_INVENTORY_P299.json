@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_day_simulation.ts",
-      "bytes": 9571,
-      "lines": 139,
-      "sha256": "0e38e428f7247ca4cf6812906a7ae586bb207b2cddb552b5807c19439a34368c",
+      "bytes": 9839,
+      "lines": 142,
+      "sha256": "516e96b28bd9037ffd7f1a404de141fc4eb82ec5ae0b59c8a1e16f42417f8811",
       "relativeImportCandidates": [
         {
           "line": 23,
@@ -1697,9 +1697,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 68439,
-      "lines": 644,
-      "sha256": "f4d11a05ca567c98df9c8e324ec1e2aa16a272f7ef6764591efd79464ee7840c",
+      "bytes": 70149,
+      "lines": 656,
+      "sha256": "266e0906b713b967439cc6fc419319218abc708abeb5ef1b16af455b263563e1",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -11242,9 +11242,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationUserFactRecallService.ts",
-      "bytes": 11966,
-      "lines": 253,
-      "sha256": "7130de6a2a0eca7f050b58be220147c6523304a8b7ee52b7effbdff195f116fe",
+      "bytes": 12971,
+      "lines": 270,
+      "sha256": "4cabd7f37bb6fb11a909c63a78bbcfc212e80ef2de18f55eb94e678a79cf0fb6",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -27202,9 +27202,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 135199,
-      "lines": 2135,
-      "sha256": "fc3562e02b1d13a2ef91306cc50c211aea3064aff7ada0adcd4c64b548234e76",
+      "bytes": 139400,
+      "lines": 2167,
+      "sha256": "a5832df6f302fcafc98999341d91a5f4b07915474c70c6e1a3d3887d8f6e948b",
       "relativeImportCandidates": [
         {
           "line": 1,
