@@ -24,6 +24,8 @@ export interface UtteranceFeatures {
   correction: boolean;
   /** P632: 社交行為（挨拶・別れ・感謝・謝罪）。 */
   socialAct?: 'GREETING' | 'FAREWELL' | 'THANKS' | 'APOLOGY';
+  /** P658: 発話全体が相槌・感動詞だけかどうか。 */
+  backchannel: boolean;
   /** WORD トークンの surface（語幹を含む）。 */
   tokens: string[];
   contentTokens: string[];
@@ -45,7 +47,7 @@ class UtteranceFeatureService {
     const text = String(prompt || '');
     const fallback: UtteranceFeatures = {
       aspect: 'OTHER', negated: false, passive: false, questionForm: 'NONE',
-      imperative: false, correction: false, tokens: [], contentTokens: [],
+      imperative: false, correction: false, backchannel: false, tokens: [], contentTokens: [],
     };
     if (!text) return fallback;
     let tokens: string[] = [];
@@ -101,7 +103,10 @@ class UtteranceFeatureService {
       : /(?:ありがとう|ありがと|感謝|サンキュー)/.test(text) ? 'THANKS'
       : /(?:ごめん|すみません|申し訳)/.test(text) ? 'APOLOGY'
       : undefined;
-    return { aspect, negated, passive, questionForm, imperative, correction, socialAct, tokens, contentTokens, subject, object, topic };
+    // P658: 相槌の判定も形の知識としてここに集約する（P656/P657 で
+    // 話題の反響と話題の記録に別々に入れた停止リストを一本化）。
+    const backchannel = isBackchannelText(text);
+    return { aspect, negated, passive, questionForm, imperative, correction, socialAct, backchannel, tokens, contentTokens, subject, object, topic };
   }
 
   /**
@@ -121,3 +126,22 @@ class UtteranceFeatureService {
 }
 
 export const utteranceFeatureService = UtteranceFeatureService.getInstance();
+
+/**
+ * P658: 相槌・感動詞の語群。「話題ではない反応」の知識はここが
+ * 唯一の出所（話題の反響 P656・話題の記録 P657 が消費する）。
+ * 語単体にも発話全体にも使う（末尾の句読点は無視する）。
+ */
+const BACKCHANNEL_SET = new Set([
+  'うん', 'うんうん', 'ううん', 'へー', 'へえ', 'ふーん', 'ふうん', 'はい', 'なるほど',
+  'おー', 'あー', 'えー', 'ええ', 'まじ', 'まじで', 'そうか', 'そっか', 'そうね', 'そうだね',
+  'ほんと', '本当', 'すごい', 'やばい', 'わー', 'わあ',
+]);
+
+export function isBackchannelText(text: string): boolean {
+  const t = String(text || '').trim().replace(/[。、！!？?\s]+$/g, '');
+  if (!t) return false;
+  if (BACKCHANNEL_SET.has(t)) return true;
+  if (/^(うん)+$/.test(t) || /^へー+$/.test(t) || /^ふーん$/.test(t)) return true;
+  return false;
+}

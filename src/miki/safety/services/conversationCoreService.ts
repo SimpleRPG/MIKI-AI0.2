@@ -30,7 +30,7 @@ import { storageService } from '../../../services/storageService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { utteranceEventClassifierService } from '../../conversation/services/utteranceEventClassifierService';
-import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
+import { utteranceFeatureService, isBackchannelText } from '../../memory/services/utteranceFeatureService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
@@ -3202,10 +3202,11 @@ export class ConversationCoreService {
   private pickReactionTopic(prompt: string, contentTokens: string[]): string | undefined {
     // P601: 時間の名詞（朝・昼・夕方・夜）も主題にしない（物語の
     // 受け止めが「夕方、なるほど」になっていた）。
-    // P656: 相槌（うん・へー・はい等）も主題にしない（「うんの話
-    // ですね」という反響になっていた）。相槌は話題ではなく反応。
-    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|最近|このごろ|今日も|もうすぐ|久しぶり|本当|本当に|本当の|もっと|そろそろ|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい|うん|うんうん|ううん|へー|へえ|ふーん|ふうん|はい|なるほど|おー|あー|えー|ええ|まじ|そうか|そっか|そうね|そうだね)$/;
-    const candidates = (contentTokens || []).filter((t) => t.length >= 2 && !stop.test(t));
+    // P656/P658: 相槌（うん・へー・はい等）も主題にしない（「うんの
+    // 話ですね」という反響になっていた）。相槌の語群は共有の特徴
+    // 層（isBackchannelText）が唯一の出所。
+    const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|最近|このごろ|今日も|もうすぐ|久しぶり|本当|本当に|本当の|もっと|そろそろ|これ|それ|あれ|ここ|そこ|もう少し|ちょっと|少し|すこし|静か|確か|豊か|穏やか|鮮やか|明らか|滑らか|和やか|った|れた|ない|たい)$/;
+    const candidates = (contentTokens || []).filter((t) => t.length >= 2 && !stop.test(t) && !isBackchannelText(t));
     // 断片らしさを採点する: 活用の語幹・複合語の途中・「〜たい」の
     // 形は主題にしない。助詞や文頭の後ろにある語を優先する。
     const score = (t: string): number => {

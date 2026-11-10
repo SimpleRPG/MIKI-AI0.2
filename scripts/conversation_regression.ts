@@ -1275,6 +1275,13 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P657 名詞句の話題は保存される', topics2.includes('港の朝市'), JSON.stringify(topics2));
 }
 
+// ---- 相槌の判定は共有の特徴層が唯一の出所（P658） ----
+{
+  const { utteranceFeatureService, isBackchannelText } = await import('../src/miki/memory/services/utteranceFeatureService');
+  check('P658 特徴に相槌フラグが載る', utteranceFeatureService.analyze('うん').backchannel === true && utteranceFeatureService.analyze('港の朝市に行きたい').backchannel === false, '');
+  check('P658 相槌の語群は一か所で判定できる', isBackchannelText('へー') && isBackchannelText('うんうんうん') && !isBackchannelText('モコロン'), '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

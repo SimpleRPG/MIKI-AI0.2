@@ -1,5 +1,5 @@
 import { storageService } from '../../../services/storageService';
-import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
+import { utteranceFeatureService, isBackchannelText } from '../../memory/services/utteranceFeatureService';
 import { dayKeyOf } from '../../memory/services/dayKeyService';
 
 /**
@@ -105,12 +105,12 @@ export class ConversationOpenTopicService {
    */
   private normalizeTopic(raw: string): string {
     if (!raw) return '';
-    // P657: 相槌・感動詞は短くても話題ではない。文末の ね/よ/わ で
-    // 終わる入力も「文」なので短さだけで名詞句とみなさない
+    // P657/P658: 相槌・感動詞は短くても話題ではない。文末の ね/よ/わ
+    // で終わる入力も「文」なので短さだけで名詞句とみなさない
     // （「へー」や「そういえば今日は暑いね」が丸ごと話題として
     // 保存され、翌日の拾い直しとエピソードを汚していた）。
-    const filler = /^(うん|うんうん|ううん|へー|へえ|ふーん|ふうん|はい|なるほど|おー|あー|えー|ええ|まじ|そうか|そっか|そうね|そうだね|ありがとう|ごめん|すごい|やばい)$/;
-    if (filler.test(raw)) return '';
+    // 相槌の語群は共有の特徴層（isBackchannelText）が唯一の出所。
+    if (isBackchannelText(raw) || /^(ありがとう|ごめん|ごめんね)$/.test(raw)) return '';
     const looksLikeTopicPhrase = !/[。、！？!?]/.test(raw)
       && raw.length <= 12
       && !/(?:です|ます|だよ|だね|した|して|たい|ない|れる)$/.test(raw)
@@ -118,8 +118,8 @@ export class ConversationOpenTopicService {
     if (looksLikeTopicPhrase) return raw;
     try {
       const features = utteranceFeatureService.analyze(raw);
-      const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|最近|これ|それ|あれ|ここ|そこ|本当|もっと|ちょっと|少し|うん|へー|はい|なるほど|そういえば|今日は)$/;
-      const usable = (t?: string): string | undefined => (t && t.length >= 2 && t.length <= 12 && !stop.test(t) ? t : undefined);
+      const stop = /^(今日|明日|昨日|今|朝|昼|夕方|夜|夜中|午前|午後|今朝|今夜|週末|今週|来週|最近|これ|それ|あれ|ここ|そこ|本当|もっと|ちょっと|少し|そういえば|今日は)$/;
+      const usable = (t?: string): string | undefined => (t && t.length >= 2 && t.length <= 12 && !stop.test(t) && !isBackchannelText(t) ? t : undefined);
       return usable(features.topic) || usable(features.object) || usable(features.subject)
         || features.contentTokens.map(usable).find(Boolean) || '';
     } catch {
