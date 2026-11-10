@@ -432,6 +432,13 @@ export class ConversationCoreService {
       if (adjOpinion) {
         return this.buildResult('RESOLVED', 'adjective_opinion_answer', this.applyPersonaVoice(adjOpinion), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P651: 「何語くらい覚えた？」——自分の学習量の質問は自分の
+      // 記録で答える。ここで受けないと「何語」が調査の検索語に化けて
+      // 無関係なWeb結果を返してしまう。
+      const learningVolume = this.learningVolumeAnswer(prompt);
+      if (learningVolume) {
+        return this.buildResult('RESOLVED', 'learning_volume_answer', this.applyPersonaVoice(learningVolume), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
       const selfWant = this.selfWantAnswer(prompt);
@@ -2569,6 +2576,30 @@ export class ConversationCoreService {
       });
     } catch { /* gap への接続は補助経路 */ }
     return `「${entity}」が${label}かは、まだ知らないです。調べて覚えておきますね。`;
+  }
+
+  /**
+   * P651: 「何語くらい覚えたの？」「どのくらい知ってるの？」——
+   * 自分の学習の量を聞かれたら、自分の記録（個人辞書・検証済みの
+   * 知識・関係）の数で答える。自己点検の量的な側面。
+   */
+  private learningVolumeAnswer(prompt: string): string | undefined {
+    if (!/(?:覚えた|学んだ|知ってる|知っている|覚えてる|覚えている)/.test(prompt)) return undefined;
+    if (!/(?:何語|いくつ|どのくらい|どれくらい|何件|何個|たくさん)/.test(prompt)) return undefined;
+    if (!/[？?]/.test(prompt) && !/(?:教えて|知りたい)/.test(prompt)) return undefined;
+    try {
+      const words = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss).length;
+      const claims = claimDatabaseService.getAllClaims().filter((c: any) => c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED').length;
+      const relations = worldModelGraphService.relations().length;
+      if (words === 0 && claims === 0 && relations === 0) {
+        return 'まだ覚えたてで、数えられるほどは増えていないです。これから少しずつ増やしていきますね。';
+      }
+      const parts: string[] = [];
+      if (words > 0) parts.push(`言葉は${words}語くらい`);
+      if (claims > 0) parts.push(`確かめた知識は${claims}件くらい`);
+      if (relations > 0) parts.push(`ものの関係は${relations}件くらい`);
+      return `今のところ、${parts.join('、')}覚えています。まだまだ増やしていきますね。`;
+    } catch { return undefined; }
   }
 
   /**
