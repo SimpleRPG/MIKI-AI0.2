@@ -2520,11 +2520,20 @@ export class ConversationCoreService {
       const displays: string[] = [];
       for (const gap of knowledgeGapService.listOpen(20)) {
         if ((gap.priority || 0) < 40) continue;
-        const display = String(gap.query || '')
+        let display = String(gap.query || '')
           .replace(/を調べる$/, '')
           .replace(/^用語の意味を学ぶ[:：]\s*/, '')
           .slice(0, 24);
-        if (display && !displays.includes(display)) displays.push(display);
+        // P637: 答えられなかった質問そのものが query に入っている
+        // 欠け（P617由来）は、対象語で提示する。質問文をそのまま
+        // 「分からないこと」として読み上げない。
+        const target = (gap as any).identity?.target as string | undefined;
+        if ((display.includes('？') || display.includes('?') || display.length > 14) && target) {
+          display = String(target).slice(0, 24);
+        }
+        // 好み等の聞き返しは知識の欠けとして読み上げない。
+        if (/^(?:僕の|私の|君の|あなたの)/.test(display)) continue;
+        if (display && display.length >= 2 && !displays.includes(display)) displays.push(display);
         if (displays.length >= 3) break;
       }
       if (displays.length === 0) return '今のところ、大きな分からないは無いです。';

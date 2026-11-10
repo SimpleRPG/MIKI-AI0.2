@@ -1079,6 +1079,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P636 日付キーはゼロ詰めで統一される', dayKeyService.of(new Date(2026, 0, 5, 12, 0).getTime()) === '2026-01-05' && dayKeyService.today() === dayKeyService.of(Date.now()) && dayKeyService.yesterday() === dayKeyService.daysAgo(1), dayKeyService.of(new Date(2026, 0, 5, 12, 0).getTime()));
 }
 
+// ---- 分からないことの提示の選別（P637） ----
+{
+  const { knowledgeGapService } = await import('../src/miki/unknown/services/knowledgeGapService');
+  knowledgeGapService.detect({ query: '僕の好きなものは？', reason: 'regression-p637', type: 'INSUFFICIENT_EVIDENCE', target: '好きなもの', priority: 40 });
+  const gapReply2 = await conversationCoreService.execute({ prompt: '何が分からないの？' } as any);
+  check('P637 質問文そのものは分からないこととして読み上げない', gapReply2.replyText.includes('クオッカ') && !gapReply2.replyText.includes('僕の好きなものは？'), gapReply2.replyText.slice(0, 220));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
