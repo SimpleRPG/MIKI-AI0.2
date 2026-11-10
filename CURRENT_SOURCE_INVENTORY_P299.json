@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1797,
     "sourceFileCount": 1350,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1261,
-    "relativeImportCandidateCount": 3997,
-    "resolvedRelativeImportCandidateCount": 3981,
+    "relativeImportCandidateCount": 3998,
+    "resolvedRelativeImportCandidateCount": 3982,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1697,9 +1697,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 91270,
-      "lines": 828,
-      "sha256": "8b2b25b1cbcef06b2bd53ac12abac976eb01c204b3c35d37cc2e15168019c10d",
+      "bytes": 92174,
+      "lines": 841,
+      "sha256": "96af775a02e43860643f3beb0ab918c8378c005676e8a32b5a6344be0449bd07",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -1862,10 +1862,16 @@
           "specifier": "../src/miki/conversation/services/utteranceEventClassifierService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/utteranceEventClassifierService.ts"
+        },
+        {
+          "line": 817,
+          "specifier": "../src/services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
         }
       ],
-      "relativeImportCandidateCount": 27,
-      "resolvedRelativeImportCount": 27,
+      "relativeImportCandidateCount": 28,
+      "resolvedRelativeImportCount": 28,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27243,9 +27249,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 172407,
-      "lines": 2507,
-      "sha256": "44a01b59ad06b1341aa268bf1c3dbde7ac58464003cfa4b675b1555d1b7d9782",
+      "bytes": 174156,
+      "lines": 2531,
+      "sha256": "3453339f240b4b4f562cd1fff203d9ff6896d69efc94294941f22653a82558bc",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -28839,9 +28845,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/stateSnapshotExportService.ts",
-      "bytes": 6628,
-      "lines": 136,
-      "sha256": "8ab28ae7d700837318774f2f47b0f9cfec7e5d28553a2c381163fe4773e149a3",
+      "bytes": 7207,
+      "lines": 141,
+      "sha256": "72fe487797ed6424dff65b269194eb2d468a138159e86294941389e9bbdc3a27",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -276,6 +276,19 @@ export class ConversationCoreService {
         }
       } catch { /* 意味学習への接続は補助経路。失敗しても会話は止めない。 */ }
     }
+    // P611: 直前の固定形の受け止めが、この発話で訂正されたら
+    // 「外れ」として台帳に残す（分類の種表・形の見直し材料）。
+    try {
+      if (/(?:違う|そうじゃない|そういうことじゃ|そういう意味じゃ|伝わってない|わかってない|分かってない)/.test(prompt)) {
+        const last = JSON.parse(storageService.getItem('miki_last_reception_v1') || 'null') as { prompt: string; category: string; eventClass?: string; at: number } | null;
+        if (last && Date.now() - last.at < 10 * 60_000) {
+          const review = JSON.parse(storageService.getItem('miki_reception_review_v1') || '[]') as unknown[];
+          review.push({ prevPrompt: last.prompt, category: last.category, eventClass: last.eventClass, correction: prompt, at: Date.now() });
+          storageService.setItem('miki_reception_review_v1', JSON.stringify(review.slice(-50)));
+          storageService.setItem('miki_last_reception_v1', 'null');
+        }
+      }
+    } catch { /* 台帳は補助経路 */ }
     // P456 (A): 本人が伝えた事実への聞き返しは、未知語の調査橋より先に
     // 保持済みの本人発言由来の事実で照合する。一致したときだけ想起経路へ進み、
     // 一致しなければ従来経路（調査橋・Claim 照合・分からない）に委ねる。
@@ -952,8 +965,13 @@ export class ConversationCoreService {
       // 丁寧語のまま残っていた）。
       let bibiFallthrough = false;
       try { bibiFallthrough = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibiFallthrough = false; }
-      const ffx = (category: string, mikiForms: string[], bibiForms: string[]) =>
-        this.pickFixedReply(bibiFallthrough ? `${category}_bibi` : category, bibiFallthrough ? bibiForms : mikiForms);
+      // P611: どの固定形カテゴリで受けたかを残し、直後に訂正されたら
+      // 「外れ」として台帳に移す（教師が後で分類を見直す材料）。
+      let lastReceptionCategory: string | undefined;
+      const ffx = (category: string, mikiForms: string[], bibiForms: string[]) => {
+        lastReceptionCategory = category;
+        return this.pickFixedReply(bibiFallthrough ? `${category}_bibi` : category, bibiFallthrough ? bibiForms : mikiForms);
+      };
       // P609: 報告系の出来事（喪失・後退・達成・対立・家事・交通）は、
       // 文字列の正規表現列挙でなく、形態素の特徴による分類で判定する
       // （語幹クラス × 相 × 否定 × 意味役割）。言い換えに強くなる。
@@ -1152,6 +1170,12 @@ export class ConversationCoreService {
       // 聞き返す（P498 の背景学習とは別に、会話の中でも学ぶ入口）。
       // 候補だけ用意し、実際に足すのは合成の後段（P525 と同じ場所）。
       if (!fallthroughPhatic) pendingUnknownQuestion = this.probeUnknownWord(prompt, unknownTerms);
+      // P611: 今回の受け止めを記録する（次の発話が訂正なら外れ台帳へ）。
+      if (lastReceptionCategory) {
+        try {
+          storageService.setItem('miki_last_reception_v1', JSON.stringify({ prompt, category: lastReceptionCategory, eventClass: eventResult?.eventClass, at: Date.now() }));
+        } catch { /* 台帳は補助経路 */ }
+      }
       ir = answerContentIrService.buildAnswerIR({
         conclusion: this.applyPersonaVoice(reaction),
         target: '日常対話',

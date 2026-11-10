@@ -812,6 +812,19 @@ check('P609 初めての物でも喪失として受ける', passLostReply.replyT
   check('P610 拡張した量の名詞で達成になる', measured?.eventClass === 'ACHIEVEMENT', JSON.stringify(measured));
 }
 
+// ---- 受け止めの外れを台帳に残す（P611） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  storageService.setItem('miki_reception_review_v1', '[]');
+  storageService.setItem('miki_last_reception_v1', 'null');
+  await conversationCoreService.execute({ prompt: '財布なくした' } as any);
+  const recorded = JSON.parse(storageService.getItem('miki_last_reception_v1') || 'null');
+  check('P611 受け止めが記録される', Boolean(recorded && recorded.category === 'fx_lost'), JSON.stringify(recorded));
+  await conversationCoreService.execute({ prompt: '違う、そうじゃないんだ' } as any);
+  const review = JSON.parse(storageService.getItem('miki_reception_review_v1') || '[]');
+  check('P611 直後の訂正で外れ台帳に移る', review.length === 1 && review[0].category === 'fx_lost', JSON.stringify(review).slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

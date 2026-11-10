@@ -97,6 +97,11 @@ class StateSnapshotExportService {
       },
       associationEdges: associationGraphService.edgeCount(),
       selfInspection,
+      // P611: 受け止めの「外れ」の記録（直後に訂正された分類）。
+      // 教師が次のログで点検し、分類の種表や形を見直すための材料。
+      receptionReview: (() => { try { return JSON.parse(storageService.getItem('miki_reception_review_v1') || '[]'); } catch { return []; } })(),
+      // P610: 動詞クラス表の拡張分（学習・教師で足された分）。
+      verbEventClassExtensions: (() => { try { return JSON.parse(storageService.getItem('miki_verb_event_classes_v1') || '{}'); } catch { return {}; } })(),
     };
     return {
       snapshot,
