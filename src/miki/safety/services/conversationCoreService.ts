@@ -515,6 +515,18 @@ export class ConversationCoreService {
           return this.buildResult('RESOLVED', 'quiz_last_result_answer', this.applyPersonaVoice(`さっきのクイズは、${last.answered}問中${last.correct}問正解でした。`), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
         }
       }
+      // P689: 終わったしりとりの勝敗を聞かれたら、残した記録で答える。
+      if (/しりとり/.test(prompt) && /(?:勝った|勝敗|どっちが勝|誰が勝)/.test(prompt) && !shiritoriService.isActive()) {
+        const last = shiritoriService.lastResult();
+        if (last) {
+          const text = last.winner === 'miki'
+            ? `さっきのしりとりは、私の勝ちでした。${last.usedCount}語続きましたよ。`
+            : last.winner === 'user'
+              ? `さっきのしりとりは、あなたの勝ちでした。${last.usedCount}語続きましたよ。`
+              : `さっきのしりとりは、途中で終わりました。${last.usedCount}語続きましたよ。`;
+          return this.buildResult('RESOLVED', 'shiritori_last_result_answer', this.applyPersonaVoice(text), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
+      }
       // P670: クイズの出題中は、短い返事を答えとして判定する
       // （出題の材料は彼女の世界モデルの関係）。
       if (quizService.isActive()) {
@@ -2783,7 +2795,8 @@ export class ConversationCoreService {
   private playInvitationAnswer(prompt: string): string | undefined {
     // P688: 「さっきのクイズ何問正解だった？」は誘いではなく
     // 終わった遊びについての質問。ここでは扱わない。
-    if (/(?:何問|成績|結果|何点|正解だった)/.test(prompt)) return undefined;
+    // P689: しりとりの勝敗の質問も同じ。
+    if (/(?:何問|成績|結果|何点|正解だった|勝った|勝敗)/.test(prompt)) return undefined;
     if (/しりとり/.test(prompt)) {
       // P669: 開始と同時にしりとりの状態を作り、続けられるようにする。
       // P678: 別の遊びからの切り替えでは、前の遊びの状態を畳む。

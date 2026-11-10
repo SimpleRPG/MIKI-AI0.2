@@ -1584,6 +1584,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P688 成績を記録から答える', result.replyText.includes('問中') && result.replyText.includes('正解でした'), result.replyText.slice(0, 120));
 }
 
+// ---- 終わったしりとりの勝敗を後から答えられる（P689） ----
+{
+  // 前の対戦が残っていたら畳んでから、新規に始める。
+  await conversationCoreService.execute({ prompt: 'やめる' } as any);
+  await conversationCoreService.execute({ prompt: 'しりとりしよう' } as any);
+  const lose = await conversationCoreService.execute({ prompt: 'ごん' } as any);
+  check('P689 ん終わりで彼女の勝ち', lose.replyText.includes('私の勝ち'), lose.replyText.slice(0, 100));
+  const result = await conversationCoreService.execute({ prompt: 'さっきのしりとり、どっちが勝った？' } as any);
+  check('P689 勝敗を記録から答える', result.replyText.includes('私の勝ちでした'), result.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

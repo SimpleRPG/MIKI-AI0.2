@@ -14,6 +14,14 @@ import { japaneseDictionaryService } from '../../research/services/japaneseDicti
  */
 
 const KEY = 'miki_shiritori_v1';
+const LAST_RESULT_KEY = 'miki_shiritori_last_result_v1';
+
+/** P689: 終わったしりとりの勝敗を残す（後から聞かれたときに答える）。 */
+function recordOutcome(winner: 'miki' | 'user' | 'stopped', usedCount: number): void {
+  try {
+    storageService.setItem(LAST_RESULT_KEY, JSON.stringify({ winner, usedCount, at: Date.now() }));
+  } catch { /* 勝敗の記録は補助 */ }
+}
 const TIMEOUT_MS = 30 * 60_000;
 
 interface ShiritoriState {
@@ -85,6 +93,15 @@ function save(s: ShiritoriState | undefined): void {
 }
 
 class ShiritoriService {
+  /** P689: 直近のしりとりの勝敗（終わったもの）。 */
+  lastResult(): { winner: 'miki' | 'user' | 'stopped'; usedCount: number } | undefined {
+    try {
+      const raw = JSON.parse(storageService.getItem(LAST_RESULT_KEY) || 'null');
+      if (raw && (raw.winner === 'miki' || raw.winner === 'user' || raw.winner === 'stopped')) return raw;
+    } catch { /* 無ければ undefined */ }
+    return undefined;
+  }
+
   isActive(): boolean {
     return !!load();
   }
@@ -110,6 +127,7 @@ class ShiritoriService {
     const text = String(prompt || '').trim().replace(/[。！!]+$/g, '');
     if (/(?:やめる|おわり|終わり|もういい|やめたい)/.test(text)) {
       save(undefined);
+      recordOutcome('stopped', state.used.length);
       return '分かりました、ここまでにしましょう。遊んでくれてありがとうございました！';
     }
     // 単語らしい形（短く、文の印が無い）でなければ会話に譲る。
@@ -135,6 +153,7 @@ class ShiritoriService {
     }
     if (lastKana(reading) === 'ん') {
       save(undefined);
+      recordOutcome('miki', state.used.length + 1);
       return `あっ、「${text}」は「ん」で終わっちゃいましたね。今回は私の勝ちです！また遊びましょう。`;
     }
 
@@ -148,6 +167,7 @@ class ShiritoriService {
     const pick = candidates[0];
     if (!pick) {
       save(undefined);
+      recordOutcome('user', used.length);
       return `「${lastKanaDisplay(reading)}」から始まる言葉が、思いつかないです……。参りました、私の負けです！`;
     }
     const nextNeed = lastKana(pick.reading);
