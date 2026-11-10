@@ -174,6 +174,18 @@ async function main() {
   const d32 = await turn('D3-2 昨日の状態', '昨日は疲れてた？');
   check('D3-2 昨日の疲れは記録で答える', d32.includes('昨日は') && d32.includes('疲れ'), d32.slice(0, 200));
 
+  // ---- 3日目の遊び（P682：アプリ順序でも遊びが一続きに動くか） ----
+  const { worldModelGraphService: wmSim } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  wmSim.addRelation({ fromName: 'モコロン', toName: 'パル', type: 'IS_A' } as any);
+  const d33 = await turn('D3-3 しりとり開始', 'しりとりしよう');
+  check('D3-3 アプリ順序でもしりとりが始まる', d33.includes('りんご'), d33.slice(0, 160));
+  const d34 = await turn('D3-4 遊びの切り替え', 'クイズ出して');
+  check('D3-4 対戦中の切り替えでクイズが始まる', d34.includes('クイズ') && d34.includes('でしょう'), d34.slice(0, 200));
+  const d35 = await turn('D3-5 クイズの答え', 'パル');
+  check('D3-5 正解が判定される', d35.includes('正解'), d35.slice(0, 200));
+  const d36 = await turn('D3-6 遊びを終える', 'やめる');
+  check('D3-6 終了できる', d36.includes('ここまでにしましょう') || d36.includes('ここまでです'), d36.slice(0, 200));
+
   // ---- 結果 ----
   const failures = results.filter(([, ok]) => !ok);
   console.log(`\n==== ${results.length - failures.length}/${results.length} checks passed ====`);

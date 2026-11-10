@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1802,
     "sourceFileCount": 1355,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1266,
-    "relativeImportCandidateCount": 4069,
-    "resolvedRelativeImportCandidateCount": 4053,
+    "relativeImportCandidateCount": 4070,
+    "resolvedRelativeImportCandidateCount": 4054,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_day_simulation.ts",
-      "bytes": 14014,
-      "lines": 185,
-      "sha256": "d30f33c8276aded64a71d08689ec068eb6f3129fea9295418c13aa0d121442e4",
+      "bytes": 15081,
+      "lines": 197,
+      "sha256": "eefe5547dd24ea44ba8d083dcdb0f9a17c062569c7c520904f59178625b260a5",
       "relativeImportCandidates": [
         {
           "line": 23,
@@ -1695,10 +1695,16 @@
           "specifier": "../src/miki/memory/services/dayKeyService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/dayKeyService.ts"
+        },
+        {
+          "line": 178,
+          "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
         }
       ],
-      "relativeImportCandidateCount": 10,
-      "resolvedRelativeImportCount": 10,
+      "relativeImportCandidateCount": 11,
+      "resolvedRelativeImportCount": 11,
       "unresolvedRelativeImportCount": 0
     },
     {
