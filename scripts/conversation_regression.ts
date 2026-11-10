@@ -894,6 +894,14 @@ check('P616 場所は知らない範囲を添えて正直に答える', attrPlac
   check('P617 答えられなかった質問が台帳に残る（重複なし）', ledger.filter((e) => e.question.includes('クオッカの寿命')).length === 1, JSON.stringify(ledger).slice(0, 160));
 }
 
+// ---- 分類・確認・類似の質問（P618） ----
+const classReply = await conversationCoreService.execute({ prompt: 'モコロンって何の仲間？' } as any);
+check('P618 分類は IS_A で答える', classReply.replyText.includes('パル') && classReply.replyText.includes('仲間'), classReply.replyText.slice(0, 140));
+const confirmReply = await conversationCoreService.execute({ prompt: 'モコロンは鳥じゃないの？' } as any);
+check('P618 確認の質問は関係で正す', confirmReply.replyText.includes('パル') && !confirmReply.replyText.includes('答えられない'), confirmReply.replyText.slice(0, 160));
+const similarReply = await conversationCoreService.execute({ prompt: 'モコロンと羊って似てる？' } as any);
+check('P618 似てるかは説明から答える', similarReply.replyText.includes('似ている') || similarReply.replyText.includes('似てる'), similarReply.replyText.slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

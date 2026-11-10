@@ -378,6 +378,11 @@ export class ConversationCoreService {
       if (attribute) {
         return this.buildResult('RESOLVED', 'attribute_question_answer', this.applyPersonaVoice(attribute), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P618: 確認の質問と「似てる？」も、関係と説明から答える。
+      const confirmSim = this.confirmationAndSimilarityAnswer(prompt);
+      if (confirmSim) {
+        return this.buildResult('RESOLVED', 'confirmation_similarity_answer', this.applyPersonaVoice(confirmSim), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P608: 彼女の「したい」への質問と、最近の出来事の質問は、
       // 自分の記録から答える。
       const selfWant = this.selfWantAnswer(prompt);
@@ -2200,6 +2205,23 @@ export class ConversationCoreService {
   private attributeQuestionAnswer(prompt: string): string | undefined {
     let attrLabel: string | undefined;
     let isUse = false;
+    if (/(?:何の仲間|なにの仲間|なんの仲間|何の一種|分類)/.test(prompt)) {
+      // P618: 分類の質問は IS_A の関係で答える。
+      let classEntity: string | undefined;
+      try {
+        const features = utteranceFeatureService.analyze(prompt);
+        classEntity = features.contentTokens.find((t) => {
+          try { return japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0; } catch { return false; }
+        });
+      } catch { classEntity = undefined; }
+      if (!classEntity) return undefined;
+      const isA = worldModelGraphService.relationsOf(classEntity).filter((r) => r.from === classEntity && r.type === 'IS_A');
+      if (isA.length > 0) return `「${classEntity}」は、${isA.map((r) => r.to).join('・')}の仲間です。`;
+      try {
+        knowledgeGapService.detect({ query: `「${classEntity}」の分類を調べる`, reason: '知っている物の分類を聞かれて、関係が無かったため。', type: 'UNKNOWN_RELATION', target: classEntity, priority: 50 });
+      } catch { /* 補助経路 */ }
+      return `「${classEntity}」の分類は、まだはっきり知らないです。調べて覚えておきますね。`;
+    }
     if (/(?:どこで|どこに|どこへ|どこから)/.test(prompt) && /(?:捕まえ|釣れ|採れ|取れ|買え|手に入|見つか|会え|生息|いる|ある)/.test(prompt)) attrLabel = '場所';
     else if (/(?:何に|なにに|何の(?:ため|役)|なんの(?:ため|役))/.test(prompt) && /(?:使う|使える|役立|利用)/.test(prompt)) { attrLabel = '使い道'; isUse = true; }
     else if (/(?:何から|なにから)/.test(prompt) && /(?:できて|作ら|でき)/.test(prompt)) attrLabel = '材料';
@@ -2239,6 +2261,57 @@ export class ConversationCoreService {
       ? `「${entity}」については、${known.join('で、')}ことは知っているのですが、`
       : `「${entity}」のことは知っているのですが、`;
     return `${knownText}${attrLabel}はまだ知らないです。調べて覚えておきますね。`;
+  }
+
+  /**
+   * P618: 知っている物への確認の質問（「モコロンは鳥じゃないの？」）と
+   * 似ているかの質問（「モコロンと羊って似てる？」）に、辞書と
+   * 世界モデルの関係から答える。
+   */
+  private confirmationAndSimilarityAnswer(prompt: string): string | undefined {
+    let features;
+    try { features = utteranceFeatureService.analyze(prompt); } catch { return undefined; }
+    const known = features.contentTokens.filter((t) => {
+      try { return japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0; } catch { return false; }
+    });
+    if (known.length === 0) return undefined;
+    // 似ているか：2つの既知の物について、片方の説明にもう片方が出れば手がかりがある。
+    if (/(?:似てる|似ている|そっくり|似てます)/.test(prompt) && known.length >= 2) {
+      const [a, b] = known;
+      try {
+        const glossA = japaneseDictionaryService.lookup(a).map((e: any) => String(e.gloss || '')).join(' ');
+        const glossB = japaneseDictionaryService.lookup(b).map((e: any) => String(e.gloss || '')).join(' ');
+        if (glossA.includes(b)) return `「${a}」は「${b}のような姿」と覚えているので、姿は似ているようです。`;
+        if (glossB.includes(a)) return `「${b}」は「${a}のような姿」と覚えているので、姿は似ているようです。`;
+        const isAof = (x: string) => worldModelGraphService.relationsOf(x).filter((r) => r.from === x && r.type === 'IS_A').map((r) => r.to);
+        const shared = isAof(a).filter((t) => isAof(b).includes(t));
+        if (shared.length > 0) return `どちらも${shared.join('・')}の仲間なので、近いところはあると思います。`;
+        return `「${a}」と「${b}」が似ているかどうかは、まだはっきり知らないです。`;
+      } catch { return undefined; }
+    }
+    // 確認の質問：Xは Y じゃないの？/なの？ に、関係と照らして答える。
+    const confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*(?:じゃないの|なの|ですか|なのですか)[？?]?$/);
+    if (confirmMatch && /[？?]/.test(prompt)) {
+      const entity = known.find((t) => prompt.startsWith(t) || prompt.includes(`${t}って`) || prompt.includes(`${t}は`));
+      if (!entity) return undefined;
+      const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか)/.test(t)).slice(-1)[0];
+      if (!candidate || candidate === entity) return undefined;
+      const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
+      const targets = relations.map((r) => r.to);
+      if (targets.includes(candidate)) {
+        return `はい、「${entity}」は${candidate}です。`;
+      }
+      const isA = relations.filter((r) => r.type === 'IS_A').map((r) => r.to);
+      const usedFor = relations.filter((r) => r.type === 'USED_FOR').map((r) => r.to);
+      if (isA.length > 0) {
+        return `${candidate}じゃなくて、「${entity}」は${isA.join('・')}の一種です${usedFor.length > 0 ? `。${usedFor.join('・')}に使われます` : ''}。`;
+      }
+      if (targets.length > 0) {
+        return `「${entity}」は${candidate}ではなく、${targets.join('・')}と関係があると覚えています。`;
+      }
+      return undefined;
+    }
+    return undefined;
   }
 
   /** P614: 彼女の能力への質問（歌える？/描ける？/英語話せる？）には、自分の現状を正直に答える（調査の「答えられない」に倒れていた）。 */
