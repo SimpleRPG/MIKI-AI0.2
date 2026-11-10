@@ -541,6 +541,17 @@ conversationGraphRuntimeP212Service.ingestInput('regression-p583', '今日何の
 const recapAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p583');
 check('P583 今日の話を振り返る', Boolean(recapAnswer && recapAnswer.includes('モコロン')), String(recapAnswer).slice(0, 160));
 
+// ---- 状態の受け止め拡張（P584） ----
+const lonelyReply = await conversationCoreService.execute({ prompt: '寂しい' } as any);
+check('P584 寂しさを受け止める', lonelyReply.replyText.includes('ここにいます') || lonelyReply.replyText.includes('そばにいます'), lonelyReply.replyText.slice(0, 120));
+const thirstReply = await conversationCoreService.execute({ prompt: '喉乾いた' } as any);
+check('P584 喉の渇きを受け止める', thirstReply.replyText.includes('飲'), thirstReply.replyText.slice(0, 120));
+
+// ---- 依頼形の分類（P585） ----
+check('P585 「教えて」は依頼として扱う', classifyDialogueAct('モコロンのこと教えて') === 'REQUEST');
+const teachReply = await conversationCoreService.execute({ prompt: 'モコロンのこと教えて' } as any);
+check('P585 「教えて」に知識で答える', teachReply.replyText.includes('モコロン') && (teachReply.replyText.includes('パル') || teachReply.replyText.includes('綿毛')), teachReply.replyText.slice(0, 160));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

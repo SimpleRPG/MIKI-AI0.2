@@ -1691,9 +1691,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 57395,
-      "lines": 557,
-      "sha256": "bf8a09f3517091128e7db65212a13091bfe025de9dd62827521cb42ae5d45e29",
+      "bytes": 58445,
+      "lines": 568,
+      "sha256": "45480cd56f54e288cdf02f07e9670e949ca92aacf8b5f5cbf2b98ca4b8caa5cb",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -11036,9 +11036,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationStateService.ts",
-      "bytes": 60671,
-      "lines": 1243,
-      "sha256": "37bfc64ee06a44044792ee2e597d486c50c5891f31e3780157940166149d2d7c",
+      "bytes": 61115,
+      "lines": 1248,
+      "sha256": "9444717e847ca87c78e73ecc3e66665d716672558300869ec11a03d0a0976aa1",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -11071,79 +11071,79 @@
           "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         },
         {
-          "line": 506,
+          "line": 511,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 514,
+          "line": 519,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 525,
+          "line": 530,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 539,
+          "line": 544,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 551,
+          "line": 556,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 573,
+          "line": 578,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 574,
+          "line": 579,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 585,
+          "line": 590,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 600,
+          "line": 605,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 609,
+          "line": 614,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 653,
+          "line": 658,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 711,
+          "line": 716,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 711,
+          "line": 716,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
@@ -11934,9 +11934,9 @@
     },
     {
       "path": "src/miki/conversation/services/userStateTrailService.ts",
-      "bytes": 4089,
-      "lines": 102,
-      "sha256": "23ccb62caf075261c93d210c14714b4f09ef427d35e1f741ff6f86eae5429a94",
+      "bytes": 4988,
+      "lines": 119,
+      "sha256": "89010d6dbd8bb4e38a18dc44a7d2344151a5a410199de137e0bb024aee3d4caf",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -27196,9 +27196,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 114614,
-      "lines": 1875,
-      "sha256": "213deb4ab9edacb6afedf03f07b2ad205f9a92787a1f750cc74cc9229e7c4c89",
+      "bytes": 115824,
+      "lines": 1884,
+      "sha256": "07b458d9a73c753a6faa91f4b7bebf8d37c7b7c496dd3a597bbdd74e39b0c121",
       "relativeImportCandidates": [
         {
           "line": 1,

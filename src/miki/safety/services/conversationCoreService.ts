@@ -792,6 +792,9 @@ export class ConversationCoreService {
       // P573: 不安・空腹の状態も、話題の反響ではなく状態として受ける。
       const fallthroughAnxiety = userStateTrailService.isAnxietyText(prompt);
       const fallthroughHunger = userStateTrailService.isHungerText(prompt);
+      // P584: 寂しさ・喉の渇きも状態として受ける。
+      const fallthroughLoneliness = userStateTrailService.isLonelinessText(prompt);
+      const fallthroughThirst = userStateTrailService.isThirstText(prompt);
       // P572: 別れ・出発・帰宅の挨拶（宣言文で来た場合）。
       const fallthroughClosing = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|バイバイ|さようなら|さよなら/.test(prompt);
       const fallthroughClosingText = !fallthroughClosing
@@ -807,7 +810,7 @@ export class ConversationCoreService {
       const trimmedPrompt = prompt.trim();
       const fallthroughAgreement = trimmedPrompt.length <= 10 && /^(?:そうだね|そうそう|だよね|わかる|うん|はい|なるほど)/.test(trimmedPrompt);
       const fallthroughPhatic = fallthroughFatigue || fallthroughThanks || fallthroughApology || fallthroughWakeup
-        || fallthroughAnxiety || fallthroughHunger || fallthroughClosing || fallthroughAgreement;
+        || fallthroughAnxiety || fallthroughHunger || fallthroughLoneliness || fallthroughThirst || fallthroughClosing || fallthroughAgreement;
       // P567: 直前に意味を教わった語の話なら、「覚えた」を伝える。
       const taughtAck = this.taughtTermAcknowledgement(prompt);
       let reactionBase = taughtAck ?? (fallthroughFatigue
@@ -820,7 +823,13 @@ export class ConversationCoreService {
             : this.pickFixedReply('fx_anxiety', ['大丈夫ですか？無理をしないでくださいね。', '心配なのですね。話せる範囲で聞かせてくださいね。', '不安なのですね。そばにいますよ。']))
           : fallthroughHunger
             ? this.pickFixedReply('fx_hunger', ['お腹が空いたのですね。何か食べられるといいですね。', 'お腹が空きましたか。何か食べましょう。', '空腹なのですね。まずは一息ついて、何か口にしてくださいね。'])
-            : fallthroughClosingText
+            : fallthroughLoneliness
+              ? (userStateTrailService.recentCount('loneliness', 72) >= 1
+                ? 'このところ、寂しい気持ちが続いているみたいですね。私はここにいますよ。'
+                : this.pickFixedReply('fx_lonely', ['寂しいのですね。私はここにいますよ、話しましょう。', 'ひとりじゃないですよ。そばにいますね。', '寂しいときは声をかけてくださいね。私でよければ一緒にいます。']))
+              : fallthroughThirst
+                ? this.pickFixedReply('fx_thirst', ['喉が渇いたのですね。何か飲んでくださいね。', '水分を取ってくださいね。', '喉が渇きましたか。一息ついて飲み物をどうぞ。'])
+                : fallthroughClosingText
               ? fallthroughClosingText
               : fallthroughThanks
                 ? 'どういたしまして！お役に立てて何よりです。'
@@ -833,18 +842,18 @@ export class ConversationCoreService {
                       : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
                         ?? 'そうなんですね。話してくれてありがとう。'));
       // P578: 教わった「自分の好きなもの」の話なら、自分の好きとして受ける。
-      if (!taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughClosing) {
+      if (!taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughClosing) {
         const like = this.selfLikeReaction(prompt);
         if (like) reactionBase = like;
       }
       // P574: 直前の話題質問への答えなら、答えとして受ける（状態の
       // 受け止めと、教わった意味の「覚えた」が優先）。
-      if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughClosing) {
+      if (answeredTopicQuestion && !taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughClosing) {
         reactionBase = this.pickFixedReply('fx_answer_ack', ['そっか、教えてくれてありがとう。', 'なるほど、そういうことなんですね。', 'そっか、分かりました。ありがとう。']);
       }
       // P576: 定型の受け止めに当たらなかった発話のうち、天気の定番と
       // 笑いは専用の形で受ける（天気は日付から季節感を添える）。
-      const chainMatched = fallthroughFatigue || fallthroughAnxiety || fallthroughHunger || Boolean(fallthroughClosingText)
+      const chainMatched = fallthroughFatigue || fallthroughAnxiety || fallthroughHunger || fallthroughLoneliness || fallthroughThirst || Boolean(fallthroughClosingText)
         || fallthroughThanks || fallthroughApology || fallthroughWakeup || fallthroughAgreement;
       if (!taughtAck && !answeredTopicQuestion && !chainMatched) {
         const weather = this.weatherRemark(prompt);
