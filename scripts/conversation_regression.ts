@@ -1146,6 +1146,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P642 候補が知識と違えば知識の側を提示して正す', confirmNo.replyText.includes('魚じゃなくて') && confirmNo.replyText.includes('イカ'), confirmNo.replyText.slice(0, 200));
 }
 
+// ---- 属性の質問に検証済みの知識で答える（P643） ----
+{
+  const { claimDatabaseService } = await import('../src/miki/memory/services/claimDatabaseService');
+  claimDatabaseService.registerClaim({ statement: 'クオッカはオーストラリアのロットネスト島に生息しています。', world: 'REAL', kind: 'FACT', status: 'SUPPORTED', source: 'regression-p643' } as any);
+  const habitat = await conversationCoreService.execute({ prompt: 'クオッカはどこに住んでるの？' } as any);
+  check('P643 生息地は知識の文で答える', habitat.replyText.includes('ロットネスト島') && !habitat.replyText.includes('まだ知らない'), habitat.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

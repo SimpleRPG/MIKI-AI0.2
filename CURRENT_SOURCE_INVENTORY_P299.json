@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1800,
     "sourceFileCount": 1353,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1264,
-    "relativeImportCandidateCount": 4043,
-    "resolvedRelativeImportCandidateCount": 4027,
+    "relativeImportCandidateCount": 4044,
+    "resolvedRelativeImportCandidateCount": 4028,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1697,9 +1697,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 121449,
-      "lines": 1162,
-      "sha256": "f802fd6b4c62c2d97dc83d91ae6ddbbd1d41ab5125cfbad3f38a77dddcdeccbb",
+      "bytes": 122173,
+      "lines": 1170,
+      "sha256": "9f4b852d7f658ea187e0557469c63eee0c0538cd2c0462a06f068f410057ef8f",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2054,10 +2054,16 @@
           "specifier": "../src/miki/research/services/japaneseDictionaryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
+        },
+        {
+          "line": 1151,
+          "specifier": "../src/miki/memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         }
       ],
-      "relativeImportCandidateCount": 59,
-      "resolvedRelativeImportCount": 59,
+      "relativeImportCandidateCount": 60,
+      "resolvedRelativeImportCount": 60,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27527,9 +27533,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 209553,
-      "lines": 3054,
-      "sha256": "d15b26aef7a5d82556c4d2634e02fa7e97ffc34358bedf20f7b8873b95fb002f",
+      "bytes": 211115,
+      "lines": 3076,
+      "sha256": "71443aec73f9d9ffc1ce896740101b439526169a39162628368514986a0d4f3e",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -2306,6 +2306,11 @@ export class ConversationCoreService {
       if (!classEntity) return undefined;
       const isA = worldModelGraphService.relationsOf(classEntity).filter((r) => r.from === classEntity && r.type === 'IS_A');
       if (isA.length > 0) return `「${classEntity}」は、${isA.map((r) => r.to).join('・')}の仲間です。`;
+      // P643: 関係が無くても、検証済みの知識に分類が書かれていればそれで答える。
+      try {
+        const claim = claimDatabaseService.getAllClaims().find((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(classEntity) && String(c.statement || '').includes('の一種'));
+        if (claim) return String((claim as any).statement).slice(0, 120);
+      } catch { /* 補助経路 */ }
       try {
         knowledgeGapService.detect({ query: `「${classEntity}」の分類を調べる`, reason: '知っている物の分類を聞かれて、関係が無かったため。', type: 'UNKNOWN_RELATION', target: classEntity, priority: 50 });
       } catch { /* 補助経路 */ }
@@ -2333,6 +2338,23 @@ export class ConversationCoreService {
     if (isUse && usedFor.length > 0) {
       return `「${entity}」は、${usedFor.map((r) => r.to).join('や')}に使われます。`;
     }
+    // P643: 関係で答えられない属性でも、検証済みの知識（Claim）に
+    // その属性が書かれていれば、知識の文で答える。従来は関係だけを
+    // 見ていたため、生息地の Claim を持っていても「生息地はまだ
+    // 知らない」と答えていた。キーワードが合う知識だけを使う
+    // （無関係な知識の押し付けはしない）。
+    try {
+      const keywords: Record<string, string[]> = {
+        '生息地': ['生息', '住ん', '棲ん'],
+        '場所': ['生息', '住ん', '棲ん'],
+        '使い道': ['使わ', '使え', '用い', '役立'],
+      };
+      const keys = keywords[attrLabel];
+      if (keys) {
+        const claim = claimDatabaseService.getAllClaims().find((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(entity) && keys.some((k) => String(c.statement || '').includes(k)));
+        if (claim) return String((claim as any).statement).slice(0, 120);
+      }
+    } catch { /* 補助経路 */ }
     const known: string[] = [];
     const isA = relations.filter((r) => r.type === 'IS_A');
     if (isA.length > 0) known.push(`${isA.map((r) => r.to).join('・')}の一種`);
