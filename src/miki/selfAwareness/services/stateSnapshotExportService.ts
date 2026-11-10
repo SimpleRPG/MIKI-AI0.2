@@ -104,6 +104,10 @@ class StateSnapshotExportService {
       verbEventClassExtensions: (() => { try { return JSON.parse(storageService.getItem('miki_verb_event_classes_v1') || '{}'); } catch { return {}; } })(),
       // P617: 答えられなかった質問の台帳（調査で解けたら消えていく想定の入口）。
       unansweredQuestions: (() => { try { return JSON.parse(storageService.getItem('miki_unanswered_questions_v1') || '[]'); } catch { return []; } })(),
+      // P639: 日々のエピソード（P623）と状態の解消の記録（P634）も
+      // 点検材料に含める（実機ログで P623〜P635 を数えるため）。
+      episodes: (() => { try { return JSON.parse(storageService.getItem('miki_episodes_v1') || '[]'); } catch { return []; } })(),
+      stateResolved: (() => { try { return JSON.parse(storageService.getItem('miki_user_state_resolved_v1') || '{}'); } catch { return {}; } })(),
     };
     return {
       snapshot,

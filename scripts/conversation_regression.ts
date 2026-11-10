@@ -1052,6 +1052,9 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   storageService.setItem('miki_user_state_resolved_v1', '{}');
   check('P634 回復の宣言は兆候として積まれない', userStateTrailService.recordFromText('疲れ取れたよ') === undefined && userStateTrailService.recordFromText('疲れた') === 'fatigue', '');
   check('P634 解消の記録が残り、解消前の記録は継続数から外れる', Boolean(userStateTrailService.resolvedAt('fatigue')) && userStateTrailService.recentCount('fatigue', 72) <= 1, String(userStateTrailService.recentCount('fatigue', 72)));
+  // 想起の確認は、解消の時刻を最後の兆候より後に置いて決定的にする
+  // （同一ミリ秒に並ぶと前後が入れ替わり、検証が揺れるため）。
+  storageService.setItem('miki_user_state_resolved_v1', JSON.stringify({ fatigue: Date.now() + 1000 }));
   const resolvedRecall = await conversationCoreService.execute({ prompt: '疲れ取れた？' } as any);
   check('P634 経過の想起は解消として答える', resolvedRecall.replyText.includes('取れたって言ってました'), resolvedRecall.replyText.slice(0, 160));
 }
@@ -1105,6 +1108,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P638 苦手なものは極性つきで想起できる', dislikeRecall.replyText.includes('納豆') && dislikeRecall.replyText.includes('辛いもの'), dislikeRecall.replyText.slice(0, 220));
   const likeRecall = await say('僕の好きなものは？');
   check('P638 苦手が好きとして逆に答えられず、好きは想起できる', likeRecall.replyText.includes('ラーメン') && !likeRecall.replyText.includes('納豆'), likeRecall.replyText.slice(0, 220));
+}
+
+// ---- スナップショットにエピソードと解消が載る（P639） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { stateSnapshotExportService } = await import('../src/miki/selfAwareness/services/stateSnapshotExportService');
+  storageService.setItem('miki_episodes_v1', JSON.stringify([{ day: '2026-11-10', topics: ['港の朝市'], summary: '昨日は、「港の朝市」の話をしましたね。' }]));
+  storageService.setItem('miki_user_state_resolved_v1', JSON.stringify({ fatigue: 1794000000000 }));
+  stateSnapshotExportService.exportNow();
+  const saved = JSON.parse(storageService.getItem('miki_state_snapshot_v1') || '{}') as { json?: string };
+  check('P639 スナップショットにエピソードと解消が載る', Boolean(saved.json && saved.json.includes('港の朝市') && saved.json.includes('stateResolved')), (saved.json || '').slice(0, 160));
 }
 
 // ---- 結果 ----
