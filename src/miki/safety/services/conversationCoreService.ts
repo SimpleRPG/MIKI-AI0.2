@@ -30,6 +30,7 @@ import { storageService } from '../../../services/storageService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { shiritoriService } from '../../conversation/services/shiritoriService';
+import { quizService } from '../../conversation/services/quizService';
 import { utteranceEventClassifierService } from '../../conversation/services/utteranceEventClassifierService';
 import { utteranceFeatureService, isBackchannelText } from '../../memory/services/utteranceFeatureService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
@@ -446,6 +447,14 @@ export class ConversationCoreService {
       const ownLast = this.ownLastUtteranceAnswer(prompt, recentMessages);
       if (ownLast) {
         return this.buildResult('RESOLVED', 'own_last_utterance_answer', this.applyPersonaVoice(ownLast), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P670: クイズの出題中は、短い返事を答えとして判定する
+      // （出題の材料は彼女の世界モデルの関係）。
+      if (quizService.isActive()) {
+        const quizReply = quizService.respond(prompt);
+        if (quizReply) {
+          return this.buildResult('RESOLVED', 'quiz_answer', this.applyPersonaVoice(quizReply), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
       }
       // P669: しりとり対戦中は、単語らしい発話を対戦の1手として
       // 受ける（彼女の語彙から言葉を返す）。
@@ -2618,6 +2627,10 @@ export class ConversationCoreService {
     if (/しりとり/.test(prompt)) {
       // P669: 開始と同時にしりとりの状態を作り、続けられるようにする。
       return shiritoriService.start();
+    }
+    if (/クイズ|なぞなぞ|問題出して|もんだい出して/.test(prompt)) {
+      // P670: クイズも開始と同時に状態を作り、答え合わせまで続ける。
+      return quizService.start();
     }
     if (/(?:面白い|おもしろい|お話|はなし).{0,4}(?:話して|聞かせて|して|ちょうだい)/.test(prompt) || /(?:何か|なんか).{0,3}(?:話して|聞かせて)/.test(prompt)) {
       try {

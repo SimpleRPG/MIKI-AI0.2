@@ -1370,6 +1370,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P669 やめるで対戦が終わる', quit.replyText.includes('ここまで'), quit.replyText.slice(0, 120));
 }
 
+// ---- クイズは彼女の知識から出題し、答え合わせまで続く（P670） ----
+{
+  const { worldModelGraphService: wm670 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const answerFor = (reply: string): string | undefined => {
+    const m = reply.match(/「(.+?)」は(?:何の仲間|何に使われる)でしょう/);
+    if (!m) return undefined;
+    const kind = reply.includes('何の仲間') ? 'IS_A' : 'USED_FOR';
+    const rel = wm670.relations().find((r) => r.from === m[1] && r.type === kind && !r.provisional)
+      || wm670.relations().find((r) => r.from === m[1] && r.type === kind);
+    return rel?.to;
+  };
+  let reply = (await conversationCoreService.execute({ prompt: 'クイズ出して' } as any)).replyText;
+  check('P670 クイズが始まり第1問が出る', reply.includes('クイズです') && reply.includes('第1問'), reply.slice(0, 160));
+  let correctSeen = 0; let wrongSeen = 0; let finished = '';
+  for (let i = 0; i < 16; i += 1) {
+    const expected = answerFor(reply);
+    if (!expected) break;
+    const giveWrong = i === 2;
+    const ans = (await conversationCoreService.execute({ prompt: giveWrong ? 'ぜんぜん違う答え' : expected } as any)).replyText;
+    if (ans.includes('正解です')) correctSeen += 1;
+    if (ans.includes('残念、正解は')) wrongSeen += 1;
+    if (ans.includes('問題はここまでです')) { finished = ans; break; }
+    reply = ans;
+  }
+  check('P670 正解と不正解を判定する', correctSeen >= 2 && wrongSeen === 1, `correct=${correctSeen} wrong=${wrongSeen}`);
+  check('P670 材料が尽きたら成績を伝えて終わる', /問中\d+問正解でした/.test(finished), finished.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
