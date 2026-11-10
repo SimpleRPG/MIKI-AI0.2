@@ -288,6 +288,12 @@ export class ConversationCoreService {
     // 現在時刻から、その場で答える（Web 調査の的外れな結果や
     // 「確認できていない」に倒れていた）。
     if (!roleplaySessionService.isActive() && !userFactRecall) {
+      // P603: 短い別れの挨拶は、そのまま締めとして返す（状態次第で
+      // 分析的な合成や時間ガードに逸れることがあった）。
+      if (/^(?:じゃあ[、,]?\s*)?(?:じゃあね|じゃね|またね|また明日(?:ね|よ)?|バイバイ|さようなら|さよなら)[！!。]?$/.test(prompt.trim())) {
+        const bye = this.pickFixedReply('fx_goodbye', ['さようなら。またいつでも声をかけてくださいね。', 'じゃあ、また！今日もありがとうございました。', 'さようなら。またお話ししましょうね。']);
+        return this.buildResult('RESOLVED', 'farewell_closing', this.applyPersonaVoice(bye), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P598: 知識への明示の訂正（「XじゃなくてY」）は、古い知識の
       // 言い直しで返さず、訂正として受ける。
       if (dialogueAct === 'CORRECTION' && /(?:じゃなくて|ではなく)/.test(prompt)) {
@@ -749,9 +755,16 @@ export class ConversationCoreService {
         this.pickFixedReply(bibiCasual ? `${category}_bibi` : category, bibiCasual ? bibiForms : mikiForms);
       // P572: 別れ・出発・帰宅の挨拶は、会話の締めとして最優先で受ける
       // （「行ってきます」に「こんにちは」と返していた等）。
-      const closingFamily = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|バイバイ|さようなら|さよなら/.test(prompt);
+      // P603: 「また明日」と寝る宣言（「もう寝るね」）も締めの挨拶。
+      const closingFamily = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|また明日|バイバイ|さようなら|さよなら|寝(?:る|ます|よう)(?:ね|よ|な)/.test(prompt);
       let casualConclusion: string;
       if (/おやすみ/.test(prompt)) {
+        casualConclusion = fx('fx_goodnight',
+          ['おやすみなさい。今日も一日お疲れ様でした。', 'おやすみなさい。ゆっくり休んでくださいね。', 'おやすみなさい。いい夢を。'],
+          ['おやすみ！ゆっくり寝てね。', 'おやすみー！いい夢みてね。', 'おやすみ！今日もがんばったね。']);
+      } else if (/寝(?:る|ます|よう)(?:ね|よ|な|。|！|!|$)/.test(prompt) && prompt.length <= 20) {
+        // P603: 寝る宣言（「もう寝るね」）はおやすみとして受ける
+        // （「もうの話ですね」という断片反響になっていた）。
         casualConclusion = fx('fx_goodnight',
           ['おやすみなさい。今日も一日お疲れ様でした。', 'おやすみなさい。ゆっくり休んでくださいね。', 'おやすみなさい。いい夢を。'],
           ['おやすみ！ゆっくり寝てね。', 'おやすみー！いい夢みてね。', 'おやすみ！今日もがんばったね。']);
@@ -763,7 +776,7 @@ export class ConversationCoreService {
         casualConclusion = fx('fx_homecoming',
           ['おかえりなさい！お疲れ様でした。', 'おかえりなさい。ゆっくりしてくださいね。', 'おかえりなさいませ！待っていましたよ。'],
           ['おかえり！おつかれさま。', 'おかえりー！ゆっくりしてね。', 'おかえり！待ってたよ。']);
-      } else if (/じゃあね|じゃね|またね|バイバイ|さようなら|さよなら/.test(prompt)) {
+      } else if (/じゃあね|じゃね|またね|また明日|バイバイ|さようなら|さよなら/.test(prompt)) {
         casualConclusion = fx('fx_goodbye',
           ['さようなら。またいつでも声をかけてくださいね。', 'じゃあ、また！今日もありがとうございました。', 'さようなら。またお話ししましょうね。'],
           ['じゃあね！また話そうね。', 'ばいばーい！またね。', 'じゃあ、また！待ってるね。']);
@@ -932,10 +945,12 @@ export class ConversationCoreService {
       // P591: 痛みも状態として受ける。
       const fallthroughPain = userStateTrailService.isPainText(prompt);
       // P572: 別れ・出発・帰宅の挨拶（宣言文で来た場合）。
-      const fallthroughClosing = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|バイバイ|さようなら|さよなら/.test(prompt);
+      // P603: 「また明日」と寝る宣言も締めに数える。
+      const fallthroughClosing = /おやすみ|行ってきます|いってきます|ただいま|じゃあね|じゃね|またね|また明日|バイバイ|さようなら|さよなら/.test(prompt)
+        || (/寝(?:る|ます|よう)(?:ね|よ|な|。|！|!|$)/.test(prompt) && prompt.length <= 20);
       const fallthroughClosingText = !fallthroughClosing
         ? undefined
-        : /おやすみ/.test(prompt)
+        : /おやすみ|寝(?:る|ます|よう)(?:ね|よ|な|。|！|!|$)/.test(prompt)
           ? this.pickFixedReply('fx_goodnight', ['おやすみなさい。今日も一日お疲れ様でした。', 'おやすみなさい。ゆっくり休んでくださいね。', 'おやすみなさい。いい夢を。'])
           : /行ってきます|いってきます/.test(prompt)
             ? this.pickFixedReply('fx_departure', ['行ってらっしゃい！気をつけてくださいね。', '行ってらっしゃい。いい日になりますように。', '行ってらっしゃい。帰りを待っていますね。'])
@@ -1057,6 +1072,11 @@ export class ConversationCoreService {
           // P593: 端末の外の行為（電話・目覚まし・送信）は、引き受けた
           // ふりをせず、できないことを正直に言う。
           reactionBase = ffx('fx_cannot', ['ごめんなさい、それは私にはできないんです。電話や目覚ましみたいな端末のことは、手が届かなくて。', 'ごめん、それは私にはできないんです。お話なら、いつでも聞きますよ。'], ['ごめん、それはできないの。電話とかは手が届かなくて。', 'ごめんね、それはできないんだ。お話ならいつでもいいよ。']);
+        } else if (/聞いて(?:ほしい|欲しい|くれる|もらえる)|^(?:ねえ|ちょっと|あのさ)[、,]?\s*聞いて[。！!？?]?$|^聞いて[。！!？?]?$/.test(prompt.trim())) {
+          // P603: 「ねえ、聞いて」は依頼ではなく、話を聞いてほしい
+          // 声かけ。引き受け文（「やってみますね」）にせず、聞く
+          // 姿勢で受ける。
+          reactionBase = ffx('fx_listen', ['うん、聞いてるよ。どうしたの？', 'はい、聞かせてください。どうしました？'], ['うん、聞いてるよ。どうしたの？', '聞かせて聞かせて！どうしたの？']);
         } else if (dialogueAct === 'REQUEST') {
           // P588: どの経路でも解けなかった依頼は、汎用の相槌ではなく
           // 依頼として引き受ける形で受ける（「歌って」に「そうなん

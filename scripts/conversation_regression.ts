@@ -514,10 +514,23 @@ const fragReply = await conversationCoreService.execute({ prompt: '猫に触り�
 check('P579 活用の断片を主題にしない', !fragReply.replyText.includes('触り、'), fragReply.replyText.slice(0, 120));
 
 // ---- 時間帯・季節の感覚（P580） ----
+// P603: 挨拶の添えは優先順位つき（拾い直し→学習報告→振り返り→
+// 時間帯）なので、時間帯だけが残るよう他の一回性台帳を先に閉じる
+// （従来は実行状態で結果が揺れていた）。
+try {
+  const askedTerms = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}');
+  const reportedAll: Record<string, number> = {};
+  for (const term of Object.keys(askedTerms)) reportedAll[term] = Date.now();
+  storageService.setItem('miki_learned_report_v1', JSON.stringify(reportedAll));
+} catch { /* 台帳は補助 */ }
+storageService.setItem('miki_reflection_surfaced_v1', '9999999999999');
+storageService.setItem('miki_open_topics_v1', '');
+storageService.setItem('miki_time_sense_v1', '');
 const RealDate = Date;
 class FakeNightDate extends RealDate {
-  constructor(...args: any[]) { super(...(args.length ? args : ['2026-12-24T23:30:00+09:00'] as any)); }
-  static now() { return new RealDate('2026-12-24T23:30:00+09:00').getTime(); }
+  // ローカル時刻で 23:30 を作る（タイムゾーンに依らず「深夜」になる）。
+  constructor(...args: any[]) { super(...(args.length ? args : [2026, 11, 24, 23, 30] as any)); }
+  static now() { return new RealDate(2026, 11, 24, 23, 30).getTime(); }
 }
 (globalThis as any).Date = FakeNightDate;
 const nightGreeting = await conversationCoreService.execute({ prompt: 'こんばんは' } as any);
@@ -727,6 +740,14 @@ check('P602 名無しの決め事質問にまとめて答える', Boolean(bareDe
 conversationGraphRuntimeP212Service.ingestInput('regression-p602c', '今の作業は？');
 const bareWorkAnswer = conversationGraphRuntimeP212Service.getSelfInquiryAnswer('regression-p602c');
 check('P602 名無しの作業質問に答える', Boolean(bareWorkAnswer && bareWorkAnswer.length > 0), String(bareWorkAnswer).slice(0, 160));
+
+// ---- 締めの挨拶の残りと、聞いてほしい声かけ（P603） ----
+const sleepReply = await conversationCoreService.execute({ prompt: 'もう寝るね' } as any);
+check('P603 寝る宣言はおやすみで受ける', sleepReply.replyText.includes('おやすみ'), sleepReply.replyText.slice(0, 120));
+const farewellReply = await conversationCoreService.execute({ prompt: 'また明日ね' } as any);
+check('P603 「また明日ね」は別れの挨拶で受ける', (farewellReply.replyText.includes('さようなら') || farewellReply.replyText.includes('また')) && !farewellReply.replyText.includes('の話ですね'), farewellReply.replyText.slice(0, 120));
+const listenReply = await conversationCoreService.execute({ prompt: 'ねえ、聞いて' } as any);
+check('P603 「ねえ、聞いて」は聞く姿勢で受ける', (listenReply.replyText.includes('聞いてる') || listenReply.replyText.includes('聞かせて')) && !listenReply.replyText.includes('やってみます'), listenReply.replyText.slice(0, 120));
 
 // ---- 結果 ----
 let fail = 0;
