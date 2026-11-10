@@ -692,6 +692,14 @@ const multiPartReply = await conversationCoreService.execute({ prompt: 'モコ�
 check('P598 複合質問は片方だけに飲み込まれない', multiPartReply.replyText.includes('羊'), multiPartReply.replyText.slice(0, 140));
 check('P598 要約から空港一覧のような表を採用しない', cleanWebSummary('空港 [ 編集 ] 都市 ICAO IATA 空港名 アウアス空港 (Ahuás Airport) アマパラ MHAM アマパラ空港', ['空港']) === '', cleanWebSummary('空港 [ 編集 ] 都市 ICAO IATA 空港名 アウアス空港', ['空港']));
 
+// ---- 無関係な調査要約の不採用（P599） ----
+const { selectUnverifiedPresentation } = await import('../src/miki/conversation/services/unknownResearchConversationBridgeService');
+const irrelevantPresentation = selectUnverifiedPresentation(
+  [{ status: 'ACCEPTED', url: 'https://example.com/list', title: 'モコロンの食べ物まとめ', snippet: '空港の一覧である。各地の空港をまとめた。' } as any],
+  'モコロン 何 食べる',
+);
+check('P599 検索語を含まない要約は提示しない', irrelevantPresentation === null, JSON.stringify(irrelevantPresentation));
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -103,6 +103,11 @@ export function selectUnverifiedPresentation(
   if (!summary) {
     summary = cleanWebSummary(String(usable[0].snippet || ''), terms);
   }
+  // P599: 要約文そのものが検索語を含まない場合は、無関係なページの
+  // 冒頭文を拾っているだけなので提示しない（調査キューの形に倒す）。
+  if (summary && terms.length > 0 && !terms.some((t) => summary.includes(t))) {
+    summary = '';
+  }
   if (!summary) return null;
   return { summary, sources };
 }

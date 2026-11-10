@@ -413,7 +413,9 @@ export class ConversationCoreService {
     // P592: 「AとB、どっちがいい？」の“曖昧さ”は質問そのもの。
     // 対象の特定を相手に返さず、選択の質問として後段で受ける。
     const isChoiceQuestion = /(?:どっち|どちら)/.test(prompt) && /(?:いい|好き|おすすめ|正解|思う|選)/.test(prompt);
-    if (anaphora.confidence === 'ambiguous' && !isChoiceQuestion) {
+    // P599: なりチャ中の「それ」は役の中の対象。曖昧さの確認（報告文）
+    // で役を壊さず、そのまま会話として受ける。
+    if (anaphora.confidence === 'ambiguous' && !isChoiceQuestion && !roleplaySessionService.isActive()) {
       const clarificationGateResult = clarificationGate(nextState, `anaphora:${anaphora.candidates.slice().sort().join('|')}`);
       nextState.clarificationControl = clarificationGateResult.next;
       if (!clarificationGateResult.allowed) {
