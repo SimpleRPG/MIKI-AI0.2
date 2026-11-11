@@ -857,7 +857,46 @@ export class ConversationFactIntakeService {
       } catch { /* 統治メモリへの記録は補助経路 */ }
     });
 
+    // P724: 訂正で事実が差し替わったら、教わって覚えた語の辞書の
+    // 説明（gloss）も生かされている事実から作り直す。事実側だけが
+    // 直って gloss が古いままだと、彼女は訂正済みの内容を言い続け
+    // る（「小さい」と訂正された後も「小さい動物」と答える）。
+    try { this.refreshTaughtGlossAfterCorrection(updated, isUserFact); } catch { /* 補助経路 */ }
+
     return { added, updatedMemories: updated, replaced, invalidated };
+  }
+
+  /** P724: 訂正・置換された事実の対象について、教わった語の gloss を現在の事実から再構築する。 */
+  private refreshTaughtGlossAfterCorrection(updated: MemoryItem[], _isUserFact: (m: MemoryItem) => boolean): void {
+    // 注: isUserFact は active な事実だけを数える述語なので、無効化
+    // された事実の検出には使えない。ここでは factEntity を持つ記録
+    // を直接見る。
+    const affected = new Set<string>();
+    for (const m of updated) {
+      if ((m as any).invalidatedByUser || (m as any).replacedBy) {
+        const e = String((m as any).factEntity || '').trim();
+        if (e) affected.add(e);
+      }
+    }
+    if (affected.size === 0) return;
+    for (const entity of affected) {
+      const entry = japaneseDictionaryService.listPersonal().find((e: any) => e.surface === entity);
+      if (!entry) continue;
+      const taught = Array.isArray((entry as any).semanticIds) && (entry as any).semanticIds.some((s: string) => String(s).includes('user-taught'));
+      if (!taught) continue;
+      const values: string[] = [];
+      for (const m of updated) {
+        if (m.active === false || (m as any).replacedBy || (m as any).invalidatedByUser) continue;
+        if (String((m as any).factEntity || '') !== entity) continue;
+        const v = String((m as any).factValue || '').trim();
+        if (v && !values.includes(v)) values.push(v);
+      }
+      if (values.length > 0) {
+        japaneseDictionaryService.addPersonal(entity, { gloss: values.join('、'), semanticIds: ['learned:user-taught'], pos: 'UNKNOWN' } as any);
+      } else {
+        japaneseDictionaryService.removePersonal(entity);
+      }
+    }
   }
 }
 

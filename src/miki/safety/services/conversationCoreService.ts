@@ -2894,6 +2894,9 @@ export class ConversationCoreService {
     if (/(?:どこで|どこに|どこへ|どこから|生息地)/.test(prompt) && /(?:捕まえ|釣れ|採れ|取れ|買え|手に入|見つか|会え|生息|住んで|棲んで|いる|ある)/.test(prompt)) attrLabel = /(?:生息|住んで|棲んで)/.test(prompt) ? '生息地' : '場所';
     else if (/(?:何に|なにに|何の(?:ため|役)|なんの(?:ため|役))/.test(prompt) && /(?:使う|使える|役立|利用)/.test(prompt)) { attrLabel = '使い道'; isUse = true; }
     else if (/(?:何から|なにから)/.test(prompt) && /(?:できて|作ら|でき)/.test(prompt)) attrLabel = '材料';
+    // P724: 食性の質問も属性として受ける。ここで受けないと定義の
+    // 説明文が「何食べるの？」への答えとして出てしまっていた。
+    else if (/(?:何を食べ|何食べ|何を食|何が餌|餌は何|食べ物は何)/.test(prompt)) attrLabel = '食べ物';
     else if (/(?:どうやって|どうすれば|どのように)/.test(prompt)) attrLabel = 'やり方';
     if (!attrLabel) return undefined;
     let entity: string | undefined;
@@ -2923,6 +2926,7 @@ export class ConversationCoreService {
         '生息地': ['生息', '住ん', '棲ん'],
         '場所': ['生息', '住ん', '棲ん'],
         '使い道': ['使わ', '使え', '用い', '役立'],
+        '食べ物': ['食べ', '食'],
       };
       const keys = keywords[attrLabel];
       if (keys) {
@@ -2939,6 +2943,7 @@ export class ConversationCoreService {
         '生息地': ['生息', '住ん', '住む', '棲ん', '棲む'],
         '場所': ['生息', '住ん', '住む', '棲ん', '棲む'],
         '使い道': ['使わ', '使え', '用い', '役立'],
+        '食べ物': ['食べ', '食', '餌', '草食', '肉食'],
       };
       const gk = glossKeys[attrLabel];
       if (gk) {
@@ -4326,7 +4331,8 @@ export class ConversationCoreService {
    * から答える。Claim が無い語でも、辞書に意味があれば答えられる。
    */
   private dictionaryAnswerForQuestion(prompt: string, contentTokens: string[]): string | undefined {
-    if (!/(?:とは|って何|ってなに|の意味|何だっけ|なんだっけ|どういう意味|どういうもの)/.test(prompt)) return undefined;
+    if (!/(?:とは|って何|ってなに|の意味|何だっけ|なんだっけ|どういう意味|どういうもの)/.test(prompt)
+      && !/(?:どんな|何の).{0,8}だっけ/.test(prompt)) return undefined;
     for (const term of contentTokens || []) {
       if (!term || term.length < 2 || !prompt.includes(term)) continue;
       const entry = japaneseDictionaryService.lookup(term).find((e: any) => e.gloss);

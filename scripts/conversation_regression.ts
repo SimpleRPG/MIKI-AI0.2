@@ -2069,6 +2069,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P723 意見の理由を記録から答える', why723.replyText.includes('ユキカゲ'), why723.replyText.slice(0, 130));
 }
 
+// ---- 訂正と教わった語の説明の整合（P724） ----
+{
+  const { conversationFactIntakeService: intake724 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { japaneseDictionaryService: dict724 } = await import('../src/miki/research/services/japaneseDictionaryService');
+  let mem724: any[] = []; const hist724: any[] = []; let st724: any = undefined;
+  const run724 = async (q: string) => {
+    mem724 = intake724.intakeFromUserText(q, mem724).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem724, recentMessages: hist724.slice(-8), conversationState: st724 } as any);
+    st724 = r.nextConversationState;
+    hist724.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run724('ハナカゲは南の島に住む小さい動物だよ');
+  const food724 = await run724('ハナカゲって何食べるの？');
+  check('P724 食性の質問に説明文で誤魔化さない', food724.replyText.includes('食べ物はまだ知らない'), food724.replyText.slice(0, 130));
+  await run724('ごめん、ハナカゲは小さいじゃなくて中くらいの大きさだよ');
+  const gloss724 = dict724.listPersonal().find((e: any) => e.surface === 'ハナカゲ')?.gloss || '';
+  check('P724 訂正で辞書の説明も作り直される', gloss724.includes('中くらいの大きさ') && !gloss724.includes('小さい'), gloss724);
+  const recall724 = await run724('ハナカゲってどんな動物だっけ？');
+  check('P724 思い出しは訂正後の説明で答える', recall724.replyText.includes('中くらいの大きさ') && !recall724.replyText.includes('小さい動物'), recall724.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
