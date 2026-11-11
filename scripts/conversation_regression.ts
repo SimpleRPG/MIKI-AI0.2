@@ -2626,6 +2626,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P772 過ぎた予定は明日の側には出ない', !tomorrowRecall772.replyText.includes('眼科'), tomorrowRecall772.replyText.slice(0, 150));
 }
 
+// ---- P773: 曜日の予定 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem773: any[] = []; const hist773: any[] = []; let st773: any = undefined;
+  const run773 = async (t: string) => {
+    mem773 = conversationFactIntakeService.intakeFromUserText(t, mem773).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem773, recentMessages: hist773.slice(-8), conversationState: st773 } as any);
+    st773 = r.nextConversationState;
+    hist773.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run773('金曜日に歯医者の予定があるよ');
+  const fri773 = await run773('金曜日の予定は何だっけ？');
+  check('P773 曜日の予定を控えて答える', fri773.replyText.includes('歯医者'), fri773.replyText.slice(0, 150));
+  await run773('来週の月曜日に会議の予定があるよ');
+  const mon773 = await run773('来週の月曜日の予定は何だっけ？');
+  check('P773 来週の曜日の予定も区別して答える', mon773.replyText.includes('会議'), mon773.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

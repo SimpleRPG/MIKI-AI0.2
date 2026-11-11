@@ -3666,7 +3666,11 @@ export class ConversationCoreService {
     // ない。疑問の形の時だけ受ける。
     if (!/[？?]/.test(prompt) && !/(?:だっけ|何)/.test(prompt)) return undefined;
     if (!/(?:だっけ|何|ある|あって|教えて)/.test(prompt)) return undefined;
-    const whenRaw = prompt.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+    // P773: 曜日の予定も聞き返せる（取り込み側と同じ解決規則）。
+    const wdMatch = prompt.match(/(来週の|今週の)?(月|火|水|木|金|土|日)曜日/);
+    const whenRaw = wdMatch
+      ? (wdMatch[1] === '来週の' ? `来週の${wdMatch[2]}曜日` : `${wdMatch[2]}曜日`)
+      : prompt.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
     if (!whenRaw) return undefined;
     const when = whenRaw === 'あした' ? '明日' : whenRaw;
     try {
@@ -3678,6 +3682,13 @@ export class ConversationCoreService {
       let targetDate: string | undefined;
       if (offset >= 0) {
         const d = new Date(Date.now() + offset * 86400000);
+        targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      } else if (wdMatch) {
+        const target = '日月火水木金土'.indexOf(wdMatch[2]);
+        const now = new Date();
+        let delta = (target - now.getDay() + 7) % 7;
+        if (wdMatch[1] === '来週の') delta += 7;
+        const d = new Date(now.getTime() + delta * 86400000);
         targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       }
       const hits = plans.filter((p) => (p.date && targetDate ? p.date === targetDate : p.when === when));

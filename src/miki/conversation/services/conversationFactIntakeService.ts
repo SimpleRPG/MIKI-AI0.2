@@ -464,7 +464,7 @@ export class ConversationFactIntakeService {
     // 変えた」）は事実の訂正ではない。予定台帳側で処理するので、
     // ここでは訂正として読まない。
     const isPlanChange = /(?:予定|予約|約束)/.test(working) && /(?:変えた|変更)/.test(working)
-      && /(?:明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/.test(working);
+      && /(?:明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度|(?:来週の|今週の)?[月火水木金土日]曜日)/.test(working);
     const correction = isPlanChange ? null : working.match(/(?:^|[、。]\s*)(.{1,30}?)(?:じゃなくて|ではなく(?:て)?)[、,]?(.+)$/);
     if (correction) {
       // P708: 「ごめん、犬じゃなくて猫だった」では、誤り側の切り出しに
@@ -817,12 +817,32 @@ export class ConversationFactIntakeService {
    */
   /** P772: 時期の語を実際の日付に解決する（今日/明日/明後日のみ）。 */
   private planDateFor(when: string): string | undefined {
+    // P773: 曜日も日付に解決する（直近のその曜日、来週指定は+7）。
+    const wd = when.match(/^(来週の)?(月|火|水|木|金|土|日)曜日$/);
+    if (wd) {
+      const target = '日月火水木金土'.indexOf(wd[2]);
+      const now = new Date();
+      let delta = (target - now.getDay() + 7) % 7;
+      if (wd[1]) delta += 7;
+      const d = new Date(now.getTime() + delta * 86400000);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${mm}-${dd}`;
+    }
     const offset = when === '今日' || when === '今夜' ? 0 : when === '明日' ? 1 : when === '明後日' ? 2 : -1;
     if (offset < 0) return undefined;
     const d = new Date(Date.now() + offset * 86400000);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${d.getFullYear()}-${mm}-${dd}`;
+  }
+
+  /** P773: 発話から時期の語を取り出す（曜日を優先）。 */
+  private planWhenOf(t: string): string | undefined {
+    const wd = t.match(/(来週の|今週の)?(月|火|水|木|金|土|日)曜日/);
+    if (wd) return wd[1] === '来週の' ? `来週の${wd[2]}曜日` : `${wd[2]}曜日`;
+    const raw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+    return raw === 'あした' ? '明日' : raw;
   }
 
   /** P772: 控えが「その日」に当たるか（日付持ちは日付で、無ければ時期の語で）。 */
@@ -839,10 +859,10 @@ export class ConversationFactIntakeService {
       // P768: 予定の変更文そのものは控えに残さない（変更後の
       // 内容だけが changeUserPlanIfAny で控えられる）。
       if (/(?:じゃなくて|ではなく)/.test(t) && /(?:変えた|変更)/.test(t)) return;
-      const whenRaw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+      const whenRaw = this.planWhenOf(t);
       if (!whenRaw) return;
       if (!/(?:予定|予約|約束)/.test(t) && !/(?:がある|に行く|へ行く|に行きます|に行くんだ|あるんだ|行くよ)/.test(t)) return;
-      const when = whenRaw === 'あした' ? '明日' : whenRaw;
+      const when = whenRaw;
       const key = 'miki_user_plans_v1';
       const raw = storageService.getItem(key);
       const plans: Array<{ when: string; text: string; at: number; date?: string }> = raw ? JSON.parse(raw) : [];
@@ -868,8 +888,8 @@ export class ConversationFactIntakeService {
       if (!raw) return;
       const plans: Array<{ when: string; text: string; at: number }> = JSON.parse(raw);
       if (!Array.isArray(plans) || plans.length === 0) return;
-      const whenRaw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
-      const when = whenRaw === 'あした' ? '明日' : whenRaw;
+      const whenRaw = this.planWhenOf(t);
+      const when = whenRaw;
       const tokens = utteranceFeatureService.analyze(t).contentTokens
         .filter((w) => w.length >= 2 && !/^(?:キャンセル|中止|取り消し|予定|予約|約束|明日|今日|今夜|今週|来週|週末|今度|明後日)$/.test(w));
       if (tokens.length === 0) return;
@@ -896,9 +916,9 @@ export class ConversationFactIntakeService {
       if (!/(?:変えた|変更)/.test(t)) return;
       const ch = t.match(/(.{1,16}?)(?:じゃなくて|ではなく|じゃなしに)(.{1,16}?)(?:に変えた|に変更|にした|に変え)/);
       if (!ch) return;
-      const whenRaw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+      const whenRaw = this.planWhenOf(t);
       if (!whenRaw) return;
-      const when = whenRaw === 'あした' ? '明日' : whenRaw;
+      const when = whenRaw;
       const wrongTokens = utteranceFeatureService.analyze(ch[1]).contentTokens
         .filter((w) => w.length >= 2 && !/^(?:予定|予約|約束|明日|今日|今夜|今週|来週|週末|今度|明後日)$/.test(w));
       const rightText = ch[2].replace(/^(?:、|\s)+/, '').replace(/(?:よ|ね|です)$/, '').trim();
