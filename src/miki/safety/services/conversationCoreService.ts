@@ -432,6 +432,10 @@ export class ConversationCoreService {
       if (nextPlan) {
         return this.buildResult('RESOLVED', 'next_plan_answer', this.applyPersonaVoice(nextPlan), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const planCount = multiPart ? undefined : this.planCountAnswer(prompt);
+      if (planCount) {
+        return this.buildResult('RESOLVED', 'plan_count_answer', this.applyPersonaVoice(planCount), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const clockAnswer = multiPart ? undefined : this.clockCalendarAnswer(prompt);
       if (clockAnswer) {
         return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -508,6 +512,10 @@ export class ConversationCoreService {
       const measDiff = this.measureDifferenceAnswer(prompt);
       if (measDiff && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_difference_answer', this.applyPersonaVoice(measDiff), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const measRange = this.measureRangeAnswer(prompt);
+      if (measRange) {
+        return this.buildResult('RESOLVED', 'measure_range_answer', this.applyPersonaVoice(measRange), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       const measThr = this.measureThresholdAnswer(prompt);
       if (measThr && !multiPart) {
@@ -3382,6 +3390,56 @@ export class ConversationCoreService {
    * P759: 「30キロより重い動物はいる？」——閾値で絞って答える。
    * 実測値の物差し（P756〜）があれば、範囲の質問にも使える。
    */
+  /**
+   * P783: 「10キロから20キロの間の動物は？」——範囲で絞る。
+   * 閾値（P759）の両側版。単位から次元を決め、範囲内のものを挙げる。
+   */
+  private measureRangeAnswer(prompt: string): string | undefined {
+    const m = prompt.match(/(\d+(?:\.\d+)?)\s*(トン|キログラム|キロ|グラム|kg|g)?\s*から\s*(\d+(?:\.\d+)?)\s*(トン|キログラム|キロ|グラム|kg|g|センチメートル|センチ|メートル|cm|m|年|歳)?\s*の間/);
+    if (!m) return undefined;
+    if (!/[？?]|は$|いる|ある/.test(prompt)) return undefined;
+    const unit2 = m[4] || m[2] || '';
+    let label: '重さ' | '大きさ' | '寿命' = '重さ';
+    let conv = (v: number, u: string) => (u === 'トン' ? v * 1000 : (u === 'グラム' || u === 'g') ? v / 1000 : v);
+    if (/センチ|メートル|cm|m/.test(unit2)) { label = '大きさ'; conv = (v: number, u: string) => (u === 'メートル' || u === 'm') ? v * 100 : v; }
+    if (unit2 === '年' || unit2 === '歳') { label = '寿命'; conv = (v: number) => v; }
+    const lo = Math.min(conv(Number(m[1]), m[2] || unit2), conv(Number(m[3]), unit2));
+    const hi = Math.max(conv(Number(m[1]), m[2] || unit2), conv(Number(m[3]), unit2));
+    const catM = prompt.match(/(動物|鳥|魚|虫|植物|生き物)/);
+    const cat = catM ? catM[1] : undefined;
+    const hits: Array<{ name: string; v: number }> = [];
+    for (const e of japaneseDictionaryService.listPersonal() as any[]) {
+      const gloss = String(e?.gloss || '');
+      if (!gloss || !e?.surface) continue;
+      if (cat && !this.taughtScopeMatch(e, cat)) continue;
+      const mv = this.measureFromText(gloss, label);
+      if (!mv) continue;
+      if (mv.value >= lo && mv.value <= hi) hits.push({ name: String(e.surface), v: mv.value });
+    }
+    if (hits.length === 0) return `その範囲の${cat || 'もの'}は、今知っている中にはいないです。`;
+    hits.sort((a, b) => a.v - b.v);
+    const unitLabel = label === '重さ' ? 'キロ' : label === '大きさ' ? 'センチ' : '年';
+    return `${lo}${unitLabel}から${hi}${unitLabel}の間なのは、${hits.map((h) => `「${h.name}」`).join('と')}です。`;
+  }
+
+  /**
+   * P784: 「予定、何個ある？」——控えの件数を答える。
+   */
+  private planCountAnswer(prompt: string): string | undefined {
+    if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
+    if (!/(?:何個|いくつ|何件|何つ)/.test(prompt)) return undefined;
+    if (!/[？?]/.test(prompt) && !/(?:ある|教えて)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const live = plans.filter((p) => !p.date || p.date >= todayKey);
+      if (live.length === 0) return '今は予定を聞いていないです。';
+      return `予定は${live.length}件あります。`;
+    } catch { return undefined; }
+  }
+
   private measureThresholdAnswer(prompt: string): string | undefined {
     const thrM = prompt.match(/(\d+(?:\.\d+)?)\s*(トン|キログラム|キロ|グラム|センチメートル|センチ|メートル|kg|cm|m)/i);
     if (!thrM) {

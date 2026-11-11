@@ -2759,6 +2759,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P782 彼女自身の予定の質問は従来どおり', !hers782.replyText.includes('まだ聞いていない'), hers782.replyText.slice(0, 130));
 }
 
+// ---- P783-P784: 範囲で絞る／予定の件数 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  japaneseDictionaryService.addPersonal('レンジ獣D', { gloss: '重さ9キロの小さい動物', semanticIds: ['learned:user-taught'], pos: 'NOUN', source: 'PERSONAL' } as any);
+  japaneseDictionaryService.addPersonal('レンジ獣E', { gloss: '重さ16キロの中くらいの動物', semanticIds: ['learned:user-taught'], pos: 'NOUN', source: 'PERSONAL' } as any);
+  japaneseDictionaryService.addPersonal('レンジ獣F', { gloss: '重さ45キロの大きい動物', semanticIds: ['learned:user-taught'], pos: 'NOUN', source: 'PERSONAL' } as any);
+  let mem783: any[] = []; const hist783: any[] = []; let st783: any = undefined;
+  const run783 = async (t: string) => {
+    mem783 = conversationFactIntakeService.intakeFromUserText(t, mem783).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem783, recentMessages: hist783.slice(-8), conversationState: st783 } as any);
+    st783 = r.nextConversationState;
+    hist783.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const range783 = await run783('10キロから20キロの間の動物は？');
+  check('P783 範囲内のものだけを挙げる', range783.replyText.includes('レンジ獣E') && !range783.replyText.includes('レンジ獣D') && !range783.replyText.includes('レンジ獣F'), range783.replyText.slice(0, 130));
+  const count783 = await run783('予定、何個ある？');
+  check('P784 予定の件数を答える', /予定は\d+件あります/.test(count783.replyText), count783.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
