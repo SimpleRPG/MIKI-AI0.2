@@ -2403,6 +2403,9 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   await run744('僕は猫を2匹飼ってるよ');
   const petCount744 = await run744('猫は何匹飼ってたっけ？');
   check('P750 飼っている数も答える', petCount744.replyText.includes('2匹'), petCount744.replyText.slice(0, 130));
+  await run744('僕の出身は長野だよ');
+  const origin744 = await run744('僕の出身ってどこだっけ？');
+  check('P751 場所の聞き返しでも本人の事実を答える', origin744.replyText.includes('長野'), origin744.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----
