@@ -300,8 +300,20 @@ export class AnswerContentIrService {
       !isEmpathyOnly &&
       !/[？?]\s*$/.test(surfaceText)
     ) {
+      // P733: 教わったばかりの語と、その説明の中の語は、その場で
+      // 聞き返さない（P721 の規律を、戦略質問の付加にも広げる）。
+      // 説明の中の知らない語は、分解で知識の欠けに積まれている。
+      let taughtGloss = '';
+      let taughtTerm = '';
+      try {
+        const taught = JSON.parse(storageService.getItem('miki_recently_taught_v1') || 'null');
+        if (taught && Date.now() - Number(taught.at || 0) <= 60_000) {
+          taughtTerm = String(taught.term || '');
+          taughtGloss = String(taught.gloss || '');
+        }
+      } catch { /* 補助判定 */ }
       const unknownTerm = (ir.unknown_terms || []).find(
-        (t: string) => t && !surfaceText.includes(`「${t}」`)
+        (t: string) => t && !surfaceText.includes(`「${t}」`) && t !== taughtTerm && !(taughtGloss && taughtGloss.includes(t))
       );
       if (unknownTerm) {
         surfaceText += `\n\nそういえば、「${unknownTerm}」という言葉はまだ覚えていません。どういう意味か教えてもらえますか？`;

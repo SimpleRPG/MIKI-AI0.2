@@ -446,6 +446,18 @@ export class ConversationCoreService {
       if (compareAnswer) {
         return this.buildResult('RESOLVED', 'comparison_count_answer', compareAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P731: 「Xの仲間って他にいる？」——世界モデルの分類から
+      // 兄弟を答える（仮の関係だけが根拠なら出所を添える）。
+      const sibling = this.siblingAnswer(prompt);
+      if (sibling && !multiPart) {
+        return this.buildResult('RESOLVED', 'sibling_answer', this.applyPersonaVoice(sibling), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
+      // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
+      const glossCompare = this.glossComparisonAnswer(prompt);
+      if (glossCompare && !multiPart) {
+        return this.buildResult('RESOLVED', 'gloss_comparison_answer', this.applyPersonaVoice(glossCompare), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P604: 食事の迷いは、一緒に考える形で受ける。
       const dinner = this.dinnerMusingAnswer(prompt);
       if (dinner) {
@@ -2851,6 +2863,91 @@ export class ConversationCoreService {
   }
 
   /**
+   * P731: 「Xの仲間って他にいる？」に、世界モデルの IS_A から
+   * 同じ分類の相手（兄弟）を答える。分類の根拠が仮の関係だけの
+   * ときは、教わった範囲の話として出す。
+   */
+  private siblingAnswer(prompt: string): string | undefined {
+    if (!/(?:仲間|なかま)/.test(prompt)) return undefined;
+    if (!/(?:他|ほか|いる|ある)/.test(prompt)) return undefined;
+    let tokens: string[] = [];
+    try { tokens = utteranceFeatureService.analyze(prompt).contentTokens || []; } catch { return undefined; }
+    try {
+      for (const t of tokens) {
+        if (!t || t.length < 2) continue;
+        const isA = worldModelGraphService.relationsOf(t).filter((r) => r.from === t && r.type === 'IS_A');
+        if (isA.length === 0) continue;
+        const categories = isA.map((r) => r.to);
+        // 直近に学んだ仲間から挙げる（会話の流れに近い順）。
+        const siblings = [...new Set(worldModelGraphService.relations()
+          .filter((r) => r.type === 'IS_A' && categories.includes(r.to) && r.from !== t)
+          .sort((x, y) => Number((y as any).createdAt || 0) - Number((x as any).createdAt || 0))
+          .map((r) => r.from))].slice(0, 3);
+        const category = categories[0];
+        const allProvisional = isA.every((r) => r.provisional);
+        if (siblings.length > 0) {
+          return allProvisional
+            ? `教わった説明の中では、${siblings.join('と')}も${category}の仲間だよ。`
+            : `うん、${siblings.join('と')}も${category}の仲間だよ。`;
+        }
+        return allProvisional
+          ? `教わった説明の中では、他に${category}の仲間は知らないです。`
+          : `他に${category}の仲間は、まだ知らないです。`;
+      }
+    } catch { return undefined; }
+    return undefined;
+  }
+
+  /**
+   * P732: 「AとB、どっちが大きい／重い／速い？」に、知っている
+   * 説明文の中の手がかり（大きい・小さい等の語）で答える。両方
+   * に手がかりがあって食い違えば比べ、片方だけなら足りない
+   * 部分を正直に言う。手がかりが無くても、知っている物同士の
+   * 比較なら「材料が足りない」と会話の形で答える（下流の作業
+   * 書式に落とさない）。
+   */
+  private glossComparisonAnswer(prompt: string): string | undefined {
+    if (!/(?:どっちが|どちらが)/.test(prompt)) return undefined;
+    const dims: Array<{ re: RegExp; label: string; adj: string; plus: RegExp; minus: RegExp; plusText: string; minusText: string }> = [
+      { re: /大き|小さ/, label: '大きさ', adj: '大きい', plus: /大き|でか/, minus: /小さ|小柄/, plusText: '大きい', minusText: '小さい' },
+      { re: /重/, label: '重さ', adj: '重い', plus: /重/, minus: /軽/, plusText: '重い', minusText: '軽い' },
+      { re: /速|早/, label: '速さ', adj: '速い', plus: /速|俊敏/, minus: /遅|のろ/, plusText: '速い', minusText: '遅い' },
+    ];
+    const dim = dims.find((d) => d.re.test(prompt));
+    if (!dim) return undefined;
+    let tokens: string[] = [];
+    try { tokens = utteranceFeatureService.analyze(prompt).contentTokens || []; } catch { return undefined; }
+    const entities: Array<{ name: string; gloss: string; taught: boolean }> = [];
+    for (const t of tokens) {
+      if (!t || t.length < 2 || entities.some((e) => e.name === t)) continue;
+      try {
+        const entry = japaneseDictionaryService.lookup(t).find((e: any) => e.gloss);
+        if (entry) entities.push({ name: t, gloss: String(entry.gloss), taught: Array.isArray((entry as any).semanticIds) && (entry as any).semanticIds.includes('learned:user-taught') });
+      } catch { /* 補助判定 */ }
+      if (entities.length >= 2) break;
+    }
+    if (entities.length < 2) return undefined;
+    const [a, b] = entities;
+    const cue = (g: string) => (dim.plus.test(g) ? 1 : dim.minus.test(g) ? -1 : 0);
+    const ca = cue(a.gloss);
+    const cb = cue(b.gloss);
+    const cueText = (c: number) => (c > 0 ? dim.plusText : dim.minusText);
+    const srcNote = a.taught || b.taught ? '教わった説明では' : '覚えている説明では';
+    if (ca !== 0 && cb !== 0) {
+      if (ca === cb) return `${srcNote}、「${a.name}」も「${b.name}」も${cueText(ca)}方なので、${dim.label}ははっきりとは比べられないです。`;
+      const winner = ca > cb ? a : b;
+      return `${srcNote}、「${a.name}」は${cueText(ca)}、「${b.name}」は${cueText(cb)}ので、${winner.name}の方が${dim.adj}と思います。`;
+    }
+    if (ca !== 0 || cb !== 0) {
+      const knownE = ca !== 0 ? a : b;
+      const otherE = ca !== 0 ? b : a;
+      const c = ca !== 0 ? ca : cb;
+      return `${dim.label}比べは、まだ材料が足りないです。「${knownE.name}」は${cueText(c)}と聞いているけど、「${otherE.name}」の${dim.label}は知らないです。`;
+    }
+    return `${dim.label}比べは、まだ材料が足りなくて分からないです。`;
+  }
+
+  /**
    * P616: 知っている物への属性の質問（どこで捕まえられる？/何に使うの？）は、
    * 世界モデルの関係で答える。関係があればそれを使い、無ければ
    * 知っている範囲を添えて正直に言い、UNKNOWN_RELATION の gap として
@@ -2962,8 +3059,9 @@ export class ConversationCoreService {
     } catch { /* 補助経路 */ }
     const known: string[] = [];
     const isA = relations.filter((r) => r.type === 'IS_A');
-    if (isA.length > 0) known.push(`${isA.map((r) => r.to).join('・')}の一種`);
-    if (!isUse && usedFor.length > 0) known.push(`${usedFor.map((r) => r.to).join('・')}に使われる`);
+    // P731: 「〜の一種ことは」という崩れを直し、命題の形で並べる。
+    if (isA.length > 0) known.push(`${isA.map((r) => r.to).join('・')}の一種だということ`);
+    if (!isUse && usedFor.length > 0) known.push(`${usedFor.map((r) => r.to).join('・')}に使われるということ`);
     try {
       knowledgeGapService.detect({
         query: `「${entity}」の${attrLabel}を調べる`,
@@ -2974,7 +3072,7 @@ export class ConversationCoreService {
       });
     } catch { /* gap への接続は補助経路 */ }
     const knownText = known.length > 0
-      ? `「${entity}」については、${known.join('で、')}ことは知っているのですが、`
+      ? `「${entity}」については、${known.join('、')}は知っているのですが、`
       : `「${entity}」のことは知っているのですが、`;
     return `${knownText}${attrLabel}はまだ知らないです。調べて覚えておきますね。`;
   }

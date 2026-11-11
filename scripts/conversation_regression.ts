@@ -2180,6 +2180,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P730 教えたの忘れた、は教わった話題で答える', forgot729.replyText.includes('忘れてない') && forgot729.replyText.includes('アオカゲ'), forgot729.replyText.slice(0, 130));
 }
 
+// ---- 仲間・比べ・聞き返しの規律（P731/P732/P733） ----
+{
+  const { conversationFactIntakeService: intake731 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem731: any[] = []; const hist731: any[] = []; let st731: any = undefined;
+  const run731 = async (q: string) => {
+    mem731 = intake731.intakeFromUserText(q, mem731).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem731, recentMessages: hist731.slice(-8), conversationState: st731 } as any);
+    st731 = r.nextConversationState;
+    hist731.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run731('クオッカはオーストラリアに住む小さい動物だよ');
+  const teach731 = await run731('ワラルーはオーストラリアに住む大きな動物だよ');
+  check('P733 教わった説明の中の語をその場で聞き返さない', !teach731.replyText.includes('という言葉はまだ覚えていません'), teach731.replyText.slice(0, 160));
+  const sib731 = await run731('クオッカの仲間って他にいる？');
+  check('P731 仲間は教わった分類から答える', sib731.replyText.includes('ワラルー') && sib731.replyText.includes('動物の仲間'), sib731.replyText.slice(0, 130));
+  const cmp731 = await run731('クオッカとワラルー、どっちが大きい？');
+  check('P732 説明の手がかりで大きさを比べる', cmp731.replyText.includes('ワラルーの方が大きい'), cmp731.replyText.slice(0, 130));
+  const cmpPartial731 = await run731('クオッカとアオカゲ、どっちが大きい？');
+  check('P732 手がかりが片方だけなら足りないと言う', cmpPartial731.replyText.includes('材料が足りない') || cmpPartial731.replyText.includes('比べ'), cmpPartial731.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
