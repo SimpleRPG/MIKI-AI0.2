@@ -1919,6 +1919,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P713 日常の文はプロジェクトにならない', !nb713.listProjects().includes('鞄'), JSON.stringify(nb713.listProjects()));
 }
 
+// ---- なりチャのあらすじに断片が混ざらない（P714） ----
+{
+  const { conversationFactIntakeService: intake714 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { roleplaySessionService: rp714 } = await import('../src/miki/conversation/services/roleplaySessionService');
+  if (rp714.isActive()) rp714.endSession();
+  intake714.intakeFromUserText('なりチャしよう。僕は旅人で、みきは森の宿屋の主人ね', []);
+  await conversationCoreService.execute({ prompt: 'なりチャしよう。僕は旅人で、みきは森の宿屋の主人ね' } as any);
+  rp714.noteTurn('やあ、今日は泊まれますか？');
+  rp714.noteTurn('この辺りで危ない場所はありますか？');
+  intake714.intakeFromUserText('なりチャ終わり', []);
+  const end714 = await conversationCoreService.execute({ prompt: 'なりチャ終わり' } as any);
+  check('P714 あらすじに語幹の断片が混ざらない', !end714.replyText.includes('まれの話'), end714.replyText.slice(0, 160));
+  if (rp714.isActive()) rp714.endSession();
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

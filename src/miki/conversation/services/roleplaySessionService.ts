@@ -1,6 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { contentTermsFromTokens, japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
+import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 
 /**
  * P514: なりチャの役レイヤー。
@@ -225,7 +226,15 @@ export class RoleplaySessionService {
     if (!session.summary && session.notedTerms && session.notedTerms.length > 0) {
       const frequency = new Map<string, number>();
       for (const term of session.notedTerms) frequency.set(term, (frequency.get(term) ?? 0) + 1);
+      // P714: 語幹の断片（「泊まれますか」から切り出された「まれ」等）
+      // はあらすじの言葉にしない。辞書にある語か、漢字・カタカナを
+      // 含む語だけを残す（断片しか無ければ、あらすじは作らない）。
       const topTerms = [...frequency.entries()]
+        .filter(([term]) => {
+          try {
+            return japaneseDictionaryService.has(term) || /[一-龠ァ-ヶ]/.test(term);
+          } catch { return /[一-龠ァ-ヶ]/.test(term); }
+        })
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
         .map(([term]) => term);

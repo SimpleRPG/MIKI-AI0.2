@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4085,
-    "resolvedRelativeImportCandidateCount": 4069,
+    "relativeImportCandidateCount": 4088,
+    "resolvedRelativeImportCandidateCount": 4072,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 185917,
-      "lines": 1935,
-      "sha256": "9fe5693209585a5f87d6fd07ccb6ba406b3b9d790662f37583fdeb3913277b0f",
+      "bytes": 187033,
+      "lines": 1950,
+      "sha256": "0f9859b4fc2defe712e913ce659b85caa89ec263e15271afe66ddd29adc77169",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2228,10 +2228,22 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 1924,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 1925,
+          "specifier": "../src/miki/conversation/services/roleplaySessionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/roleplaySessionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 86,
-      "resolvedRelativeImportCount": 86,
+      "relativeImportCandidateCount": 88,
+      "resolvedRelativeImportCount": 88,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -12052,9 +12064,9 @@
     },
     {
       "path": "src/miki/conversation/services/roleplaySessionService.ts",
-      "bytes": 15806,
-      "lines": 366,
-      "sha256": "748261b168bf2540d5041a05f641ef6c1a182a7d184e936b09a36c71c5b56049",
+      "bytes": 16401,
+      "lines": 375,
+      "sha256": "1b55e55efd19cdffd444db9020e2dabe10a84a9d8324136be07bf426f1b234a8",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12073,10 +12085,16 @@
           "specifier": "../../research/services/japaneseAnalysisService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseAnalysisService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "../../research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
       "unresolvedRelativeImportCount": 0
     },
     {
