@@ -73,6 +73,10 @@ function extractRecallKey(prompt: string): string | null {
       // P749: 「誕生日っていつだっけ」の「いつ」は疑問の枠で、
       // キー（属性名）には含めない。
       .replace(/(?:は|って)?いつ$/, '')
+      // P750: 「身長はどのくらい？」「体重って何キロだっけ？」の
+      // 量の聞き方も疑問の枠として落とし、属性名だけをキーにする。
+      .replace(/(?:は|って)?(?:どのくらい|どれくらい)$/, '')
+      .replace(/(?:は|って)?何(?:キログラム|キロ|グラム|センチメートル|センチ|メートル|歳|才|匹|個)$/, '')
       .replace(/(?:は|って)$/, '')
       .trim();
   }
@@ -189,9 +193,24 @@ export class ConversationUserFactRecallService {
     // け？」）。事実は「猫を飼ってる」の形の値で取り込まれるため、
     // 好みと同じく専用の枝で引く。
     if (/(?:飼ってる|飼っている|飼ってた|ペット)/.test(prompt) && !/(?:みき|ビービー|あなた|君)の/.test(prompt)) {
+      // P750: 「何匹飼ってたっけ？」には数で答える。値は
+      // 「猫を2匹飼ってる」の形で、匹数の分だけ正規表現を広げる。
+      if (/何(?:匹|頭|羽)/.test(prompt)) {
+        for (const c of candidates) {
+          const cm = String(c.value || c.summary || '').match(/(.+?)を(\d+)\s*(匹|頭|羽)/);
+          if (cm) {
+            return {
+              candidate: c,
+              topicLabel: '飼っている動物の数',
+              answerText: `前に言っていた飼っている${cm[1]}は「${cm[2]}${cm[3]}」だよ。`,
+              reasonLabel: c.reasonLabel,
+            };
+          }
+        }
+      }
       const pets: string[] = [];
       for (const c of candidates) {
-        const m = String(c.value || c.summary || '').match(/(.+?)を飼って/);
+        const m = String(c.value || c.summary || '').match(/(.+?)を(?:\d+\s*(?:匹|頭|羽))?\s*飼って/);
         if (m && m[1] && !pets.includes(m[1])) pets.push(m[1]);
       }
       if (pets.length > 0) {

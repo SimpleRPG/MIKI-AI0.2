@@ -2394,6 +2394,15 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   await run744('僕の誕生日は3月5日だよ');
   const bday744 = await run744('僕の誕生日っていつだっけ？');
   check('P749 誕生日は日付のまま覚えて答える', bday744.replyText.includes('3月5日'), bday744.replyText.slice(0, 130));
+  await run744('僕の身長は175センチだよ');
+  const height744 = await run744('僕の身長はどのくらい？');
+  check('P750 身長は単位ごと覚えて答える', height744.replyText.includes('175センチ'), height744.replyText.slice(0, 130));
+  await run744('僕の体重は60キロだよ');
+  const weight744 = await run744('僕の体重って何キロだっけ？');
+  check('P750 体重は単位ごと覚えて答える', weight744.replyText.includes('60キロ') && !weight744.replyText.includes('http'), weight744.replyText.slice(0, 130));
+  await run744('僕は猫を2匹飼ってるよ');
+  const petCount744 = await run744('猫は何匹飼ってたっけ？');
+  check('P750 飼っている数も答える', petCount744.replyText.includes('2匹'), petCount744.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----
