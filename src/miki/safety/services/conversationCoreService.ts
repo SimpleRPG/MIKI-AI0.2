@@ -481,6 +481,14 @@ export class ConversationCoreService {
       if (ranking && !multiPart) {
         return this.buildResult('RESOLVED', 'taught_ranking_answer', this.applyPersonaVoice(ranking), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const measDiff = this.measureDifferenceAnswer(prompt);
+      if (measDiff && !multiPart) {
+        return this.buildResult('RESOLVED', 'measure_difference_answer', this.applyPersonaVoice(measDiff), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const measThr = this.measureThresholdAnswer(prompt);
+      if (measThr && !multiPart) {
+        return this.buildResult('RESOLVED', 'measure_threshold_answer', this.applyPersonaVoice(measThr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P739: 「最初に教えたのって何だっけ？」——教示記録の
       // 順序から答える（「最初」が未知語として調査に落ちない）。
       const taughtOrder = this.taughtOrderAnswer(prompt);
@@ -3287,6 +3295,71 @@ export class ConversationCoreService {
       if (measured.length < 2) return undefined;
       const items = measured.map((x) => `「${x.name}」（${x.meas!.disp}）`).join('、');
       return `${dim.adj}順だと、${items}です。${tail}`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P759: 「オオモとカワモ、何キロ差がある？」——二つの実測値の
+   * 差を計算して答える（P743の属性想起は片方の値しか言えなかった）。
+   */
+  private measureDifferenceAnswer(prompt: string): string | undefined {
+    if (!/(?:差|違い)/.test(prompt)) return undefined;
+    if (!/(?:何キロ|何センチ|どれくらい|どのくらい|何グラム)/.test(prompt)) return undefined;
+    const label: '重さ' | '大きさ' = /(?:センチ|メートル)/.test(prompt) ? '大きさ' : '重さ';
+    let tokens: string[] = [];
+    try { tokens = utteranceFeatureService.analyze(prompt).contentTokens || []; } catch { return undefined; }
+    const ents: Array<{ name: string; meas: { value: number; disp: string } }> = [];
+    for (const t of tokens) {
+      if (!t || ents.some((e) => e.name === t)) continue;
+      let gloss = '';
+      try { gloss = String(japaneseDictionaryService.lookup(t).find((e: any) => e.gloss)?.gloss || ''); } catch { /* 補助判定 */ }
+      if (!gloss) continue;
+      const meas = this.measureFromText(gloss, label);
+      if (meas) ents.push({ name: t, meas });
+      if (ents.length >= 2) break;
+    }
+    if (ents.length < 2) return undefined;
+    const [a, b] = ents;
+    const diff = Math.abs(a.meas.value - b.meas.value);
+    const unit = label === '重さ' ? 'キロ' : 'センチ';
+    const diffText = label === '重さ' && diff < 1 ? `${Math.round(diff * 1000)}グラム` : `${Number.isInteger(diff) ? diff : Math.round(diff * 10) / 10}${unit}`;
+    return `「${a.name}」は${a.meas.disp}、「${b.name}」は${b.meas.disp}なので、差は${diffText}です。`;
+  }
+
+  /**
+   * P759: 「30キロより重い動物はいる？」——閾値で絞って答える。
+   * 実測値の物差し（P756〜）があれば、範囲の質問にも使える。
+   */
+  private measureThresholdAnswer(prompt: string): string | undefined {
+    const thrM = prompt.match(/(\d+(?:\.\d+)?)\s*(トン|キログラム|キロ|グラム|センチメートル|センチ|メートル|kg|cm|m)/i);
+    if (!thrM) return undefined;
+    const dirM = prompt.match(/(?:より|超える|以上|以下|未満)/);
+    if (!dirM) return undefined;
+    const unit = thrM[2];
+    const label: '重さ' | '大きさ' = /(?:トン|キロ|グラム|kg)/i.test(unit) ? '重さ' : '大きさ';
+    const thr = this.measureFromText(`${thrM[1]}${unit}`, label);
+    if (!thr) return undefined;
+    const greater = /(?:より重い|より大きい|超える|以上)/.test(prompt);
+    const lesser = /(?:より軽い|より小さい|以下|未満)/.test(prompt);
+    if (!greater && !lesser) return undefined;
+    const inclusive = /(?:以上|以下)/.test(prompt);
+    try {
+      const categoryMatch = prompt.match(/(生き物|動物|鳥|魚|虫|植物|食べ物|飲み物)/);
+      const cat = categoryMatch ? (categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1]) : '';
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss)
+        .filter((e: any) => !cat || this.taughtScopeMatch(e, cat));
+      const measured = entries
+        .map((e: any) => ({ name: String(e.surface), meas: this.measureFromText(String(e.gloss), label) }))
+        .filter((x) => x.meas);
+      if (measured.length === 0) return undefined;
+      const hits = measured.filter((x) => greater
+        ? (inclusive ? x.meas!.value >= thr.value : x.meas!.value > thr.value)
+        : (inclusive ? x.meas!.value <= thr.value : x.meas!.value < thr.value));
+      const adjWord = label === '重さ' ? (greater ? '重い' : '軽い') : (greater ? '大きい' : '小さい');
+      if (hits.length === 0) return `今知っている中では、${thr.disp}より${adjWord}ものはいないです。`;
+      const names = hits.slice(0, 4).map((x) => `「${x.name}」（${x.meas!.disp}）`).join('、');
+      return `います。${names}です。`;
     } catch { return undefined; }
   }
 

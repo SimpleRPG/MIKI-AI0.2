@@ -2490,6 +2490,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P758 重い順に並べる', rank757.replyText.indexOf('オオモ') >= 0 && rank757.replyText.indexOf('オオモ') < rank757.replyText.indexOf('ミナモ') && rank757.replyText.indexOf('ミナモ') < rank757.replyText.indexOf('カワモ'), rank757.replyText.slice(0, 150));
   const second757 = await run757('2番目に重いのは？');
   check('P758 2番目に重いものに答える', second757.replyText.includes('ミナモ'), second757.replyText.slice(0, 130));
+  const diff757 = await run757('オオモとカワモ、何キロ差がある？');
+  check('P759 重さの差を計算する', diff757.replyText.includes('75キロ'), diff757.replyText.slice(0, 130));
+  const thr757 = await run757('30キロより重い動物はいる？');
+  check('P759 閾値より重いものを挙げる', thr757.replyText.includes('オオモ') && !thr757.replyText.includes('カワモ'), thr757.replyText.slice(0, 130));
+  const thrNone757 = await run757('100キロより重い動物はいる？');
+  check('P759 閾値を超えるものが無ければ無いと言う', thrNone757.replyText.includes('いない'), thrNone757.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----
