@@ -2923,6 +2923,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P793 一番年上も決める', old793.replyText.includes('一番年上のは弟'), old793.replyText.slice(0, 130));
 }
 
+// ---- P794: 人の属性の事実で並べる・平均する ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem794: any[] = []; const hist794: any[] = []; let st794: any = undefined;
+  const run794 = async (t: string) => {
+    mem794 = conversationFactIntakeService.intakeFromUserText(t, mem794).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem794, recentMessages: hist794.slice(-8), conversationState: st794 } as any);
+    st794 = r.nextConversationState;
+    hist794.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run794('僕の身長は170センチだよ');
+  await run794('妹の身長は155センチだよ');
+  await run794('弟の身長は162センチだよ');
+  const rank794 = await run794('背が高い順に並べて');
+  check('P794 背が高い順に並べる', rank794.replyText.includes('僕（170センチ）') && rank794.replyText.indexOf('僕') < rank794.replyText.indexOf('弟') && rank794.replyText.indexOf('弟') < rank794.replyText.indexOf('妹'), rank794.replyText.slice(0, 150));
+  const avg794 = await run794('みんなの平均身長は？');
+  check('P794 平均身長を出す', avg794.replyText.includes('約162.3センチ'), avg794.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -525,6 +525,10 @@ export class ConversationCoreService {
       if (superlative && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_superlative_answer', this.applyPersonaVoice(superlative), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const factRanking = this.factRankingAnswer(prompt, memories);
+      if (factRanking) {
+        return this.buildResult('RESOLVED', 'fact_ranking_answer', this.applyPersonaVoice(factRanking), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const ranking = this.taughtRankingAnswer(prompt);
       if (ranking && !multiPart) {
         return this.buildResult('RESOLVED', 'taught_ranking_answer', this.applyPersonaVoice(ranking), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -544,6 +548,10 @@ export class ConversationCoreService {
       const measThr = this.measureThresholdAnswer(prompt);
       if (measThr && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_threshold_answer', this.applyPersonaVoice(measThr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const factAgg = this.factAggregateAnswer(prompt, memories);
+      if (factAgg) {
+        return this.buildResult('RESOLVED', 'fact_aggregate_answer', this.applyPersonaVoice(factAgg), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       const measAgg = this.measureAggregateAnswer(prompt);
       if (measAgg && !multiPart) {
@@ -3649,6 +3657,52 @@ export class ConversationCoreService {
    * P761: 「教えた動物の平均の重さは？」「全部合わせると何キロ？」
    * ——実測値の合計と平均。数値の無いものは対象外と添える。
    */
+  /** P794: 人の属性の事実を集める（順位・平均用）。 */
+  private factAttributeValues(prompt: string, memories: any[]): { attr: string; unit: string; rows: Array<{ name: string; v: number; disp: string }>; minus: boolean; cueLabel: string } | undefined {
+    let attr = ''; let label: '重さ' | '大きさ' | '年齢' = '年齢'; let unit = '歳'; let minus = false; let cueLabel = '';
+    if (/背が高|身長/.test(prompt)) { attr = '身長'; label = '大きさ'; unit = 'センチ'; cueLabel = '背が高い'; if (/背が低/.test(prompt)) { minus = true; cueLabel = '背が低い'; } }
+    else if (/年上|年下|年齢/.test(prompt)) { attr = '年齢'; label = '年齢'; unit = '歳'; cueLabel = '年上'; if (/年下/.test(prompt)) { minus = true; cueLabel = '年下'; } }
+    else if (/重|軽|体重/.test(prompt)) { attr = '体重'; label = '重さ'; unit = 'キロ'; cueLabel = '重い'; if (/軽/.test(prompt) && !/重/.test(prompt)) { minus = true; cueLabel = '軽い'; } }
+    else return undefined;
+    const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    const byEntity = new Map<string, { v: number; disp: string }>();
+    for (const mm of memories || []) {
+      if (!mm || mm.active === false || mm.replacedBy) continue;
+      if (String(mm.factAttribute || '') !== attr) continue;
+      const rawEntity = String(mm.factEntity || '');
+      if (!rawEntity) continue;
+      const name = selfSet.has(rawEntity) ? '僕' : rawEntity;
+      if (label === '年齢') {
+        const n = Number(String(mm.factValue || '').match(/(\d+(?:\.\d+)?)/)?.[1]);
+        if (Number.isFinite(n)) byEntity.set(name, { v: n, disp: `${n}歳` });
+      } else {
+        const mv = this.measureFromText(String(mm.factValue || ''), label);
+        if (mv) byEntity.set(name, { v: mv.value, disp: mv.disp });
+      }
+    }
+    if (byEntity.size < 2) return undefined;
+    return { attr, unit, rows: [...byEntity.entries()].map(([name, m]) => ({ name, ...m })), minus, cueLabel };
+  }
+
+  /** P794: 「背が高い順に並べて」——人の事実で並べる。 */
+  private factRankingAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/(?:順に並べて|順で並べて|並べて|並び替えて)/.test(prompt)) return undefined;
+    const got = this.factAttributeValues(prompt, memories);
+    if (!got) return undefined;
+    const rows = [...got.rows].sort((a, b) => (got.minus ? a.v - b.v : b.v - a.v));
+    return `${got.cueLabel}順だと、${rows.map((r) => `${r.name}（${r.disp}）`).join('、')}です。`;
+  }
+
+  /** P794: 「みんなの平均身長は？」——人の事実で平均する。 */
+  private factAggregateAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/平均/.test(prompt)) return undefined;
+    const got = this.factAttributeValues(prompt, memories);
+    if (!got) return undefined;
+    const avg = got.rows.reduce((s, r) => s + r.v, 0) / got.rows.length;
+    const disp = Number.isInteger(avg) ? String(avg) : String(Math.round(avg * 10) / 10);
+    return `平均${got.attr}は約${disp}${got.unit}です（${got.rows.length}人分）。`;
+  }
+
   private measureAggregateAnswer(prompt: string): string | undefined {
     const isAvg = /(?:平均)/.test(prompt);
     const isSum = /(?:全部合わせ|合計|ぜんぶ合わせ)/.test(prompt);
