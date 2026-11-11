@@ -3044,6 +3044,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P799 肯定のペット想起は従来どおり', posPet799.replyText.includes('猫'), posPet799.replyText.slice(0, 130));
 }
 
+// ---- P800: 裸の否定は事実を作らず、既存事実を無効化する ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem800: any[] = []; const hist800: any[] = []; let st800: any = undefined;
+  const run800 = async (t: string) => {
+    mem800 = conversationFactIntakeService.intakeFromUserText(t, mem800).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem800, recentMessages: hist800.slice(-8), conversationState: st800 } as any);
+    st800 = r.nextConversationState;
+    hist800.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run800('僕の身長は170センチじゃないよ');
+  const noFact800 = mem800.filter((m: any) => m.active !== false && m.factAttribute === '身長');
+  check('P800 否定だけでは事実ができない', noFact800.length === 0, JSON.stringify(noFact800).slice(0, 120));
+  await run800('僕の身長は170センチだよ');
+  await run800('やっぱり僕の身長は170センチじゃないよ');
+  const after800 = await run800('僕の身長って何センチだっけ？');
+  check('P800 否定で既存事実が消えて肯定で答えない', !after800.replyText.includes('「170センチ」だよ'), after800.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

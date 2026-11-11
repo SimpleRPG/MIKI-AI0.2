@@ -503,6 +503,17 @@ export class ConversationFactIntakeService {
     let contextEntity: string | undefined;
     for (const sentence of splitSentences(working)) {
       if (facts.length >= MAX_FACTS_PER_UTTERANCE) break;
+      // P800: 裸の否定（「僕の身長は170センチじゃない」）は、
+      // 数値パスが否定を落として「170センチ」という事実を
+      // 作ってしまう事故の元。否定された値は事実として作らず、
+      // 既存の一致事実の無効化として扱う（訂正と同じ出口）。
+      const bareNeg = sentence.match(/^(.{1,24}?)の([^のはがをにへ]{1,12}?)は\s*([0-9][0-9,.]*)\s*(センチメートル|キログラム|センチ|メートル|キロ|グラム|トン|％|%|万|円|個|人|匹|点|歳|才)?\s*(?:じゃない|ではない|じゃありません|ではありません)(?:よ|ね|です)?[。！!]?$/);
+      if (bareNeg) {
+        const ent = cleanEntity(bareNeg[1]);
+        const val = bareNeg[3].replace(/,/g, '') + (bareNeg[4] || '');
+        if (ent) invalidations.push(`${ent}の${bareNeg[2].trim()}は${val}`);
+        continue;
+      }
       const fact = extractFromSentence(sentence, contextEntity);
       if (fact) {
         // P546: 仮定・引用・伝聞・冗談の文から拾えた形でも、本人の
