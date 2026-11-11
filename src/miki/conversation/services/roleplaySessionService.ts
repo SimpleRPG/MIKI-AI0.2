@@ -248,10 +248,26 @@ export class RoleplaySessionService {
       role.lastSummary = session.summary;
       this.persistRoles();
     }
+    // P742: 最後に終わった役を覚えておく（振り返りと再開の材料）。
+    try {
+      storageService.setItem('miki_roleplay_last_ended_v1', JSON.stringify({ roleId: session.roleId, summary: session.summary || '', at: Date.now() }));
+    } catch { /* 記録は補助経路 */ }
     this.session = null;
     this.persistSession();
     systemLogger.info('CHAT', `🎭 [なりチャ] ${session.roleName} の役を終了しました。`);
     return session;
+  }
+
+  /** P742: 最後に終わった役とそのあらすじ（振り返り・再開用）。 */
+  public lastEndedRole(): { role: RoleDefinition; summary?: string } | undefined {
+    try {
+      const raw = storageService.getItem('miki_roleplay_last_ended_v1');
+      if (!raw) return undefined;
+      const rec = JSON.parse(raw);
+      const role = this.loadRoles().find((r) => r.roleId === rec.roleId);
+      if (!role) return undefined;
+      return { role, summary: (typeof rec.summary === 'string' && rec.summary) ? rec.summary : role.lastSummary };
+    } catch { return undefined; }
   }
 
   /** P536: 場面進行の歩数を1つ進めて返す（セッションに永続化）。 */
@@ -316,6 +332,17 @@ export class RoleplaySessionService {
         const ended = this.endSession();
         this.pendingTransition = { type: 'ended', roleName: ended?.roleName || '', summary: ended?.summary, sourceText: source, at: Date.now() };
         return 'ended';
+      }
+      return undefined;
+    }
+    // P742: 「前回のなりチャの続き」——最後に終わった役を、その
+    // あらすじと一緒に再開する。
+    if (!this.isActive() && /(?:(?:前回|さっき|この前)の?(?:なりチャ|なりきり)の?(?:続き|つづき)|(?:なりチャ|なりきり)の(?:続き|つづき))/.test(source)) {
+      const last = this.lastEndedRole();
+      if (last) {
+        this.startSession(last.role, personaId);
+        this.pendingTransition = { type: 'started', roleName: last.role.name, summary: last.summary, sourceText: source, at: Date.now() };
+        return 'started';
       }
       return undefined;
     }

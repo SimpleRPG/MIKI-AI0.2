@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4122,
-    "resolvedRelativeImportCandidateCount": 4106,
+    "relativeImportCandidateCount": 4126,
+    "resolvedRelativeImportCandidateCount": 4110,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 217879,
-      "lines": 2312,
-      "sha256": "666d7f9f521b8592494fc827e9e456527481836b4e1733a246b1fff92296487d",
+      "bytes": 220747,
+      "lines": 2344,
+      "sha256": "03993e7450c004f6bb2bf71de8e2111980a4fd8817efa3a1e9da42850f592d39",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2420,10 +2420,34 @@
           "specifier": "../src/miki/memory/services/projectNotebookService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/projectNotebookService.ts"
+        },
+        {
+          "line": 2301,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 2302,
+          "specifier": "../src/miki/research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
+        },
+        {
+          "line": 2303,
+          "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
+        },
+        {
+          "line": 2304,
+          "specifier": "../src/miki/conversation/services/roleplaySessionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/roleplaySessionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 118,
-      "resolvedRelativeImportCount": 118,
+      "relativeImportCandidateCount": 122,
+      "resolvedRelativeImportCount": 122,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -11118,9 +11142,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationFactIntakeService.ts",
-      "bytes": 59667,
-      "lines": 1084,
-      "sha256": "cc630baffadf16e7dbab9d2a314007256bc2f340997b0d42539b1a0ec5a900b5",
+      "bytes": 60352,
+      "lines": 1094,
+      "sha256": "abf03117f0d0a1055d1c6c653c4e6f0b670ca3606ab4a30671853ab7080946b4",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -12268,9 +12292,9 @@
     },
     {
       "path": "src/miki/conversation/services/roleplaySessionService.ts",
-      "bytes": 17190,
-      "lines": 386,
-      "sha256": "f5c0f85d93383963c38af4d23bc64648a2e290891db540a94627ac4b986243ff",
+      "bytes": 18725,
+      "lines": 413,
+      "sha256": "853bf0b3dfcd714ab7c8e8a647e401754c940bc4e19565ff6a9c1bfb543eca2e",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -28004,9 +28028,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 341603,
-      "lines": 4956,
-      "sha256": "338b48557215b2953ab9fccfd125d7edfe5faf323fa6e338a97e67128263babc",
+      "bytes": 343962,
+      "lines": 5001,
+      "sha256": "6e9c1a8e1348682e3ee14248103f3382f978821fbae4d1b46a213add57252334",
       "relativeImportCandidates": [
         {
           "line": 1,

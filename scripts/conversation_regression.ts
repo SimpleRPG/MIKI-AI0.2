@@ -2296,6 +2296,38 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P741 日常の作りたいはプロジェクトにならない', !nb741.listProjects().includes('ケーキ'), JSON.stringify(nb741.listProjects()));
 }
 
+// ---- 聞き返しの保留の汚染防止・なりチャの振り返りと再開・範囲判定（P742） ----
+{
+  const { conversationFactIntakeService: intake742 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { japaneseDictionaryService: dict742 } = await import('../src/miki/research/services/japaneseDictionaryService');
+  const { worldModelGraphService: wm742 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { roleplaySessionService: rp742 } = await import('../src/miki/conversation/services/roleplaySessionService');
+  let mem742: any[] = []; const hist742: any[] = []; let st742: any = undefined;
+  const run742 = async (q: string) => {
+    mem742 = intake742.intakeFromUserText(q, mem742).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem742, recentMessages: hist742.slice(-8), conversationState: st742 } as any);
+    st742 = r.nextConversationState;
+    hist742.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  // 聞き返し（保留）が立った直後に別の主題の教示文を言っても、
+  // 保留中の語にその説明が付かないこと。
+  await run742('ゾルバの話だけどね');
+  await run742('ルナカエルは月に光る不思議なカエルだよ');
+  check('P742 別の主題の文が保留中の語の意味にならない', dict742.lookup('ゾルバ').every((e: any) => !e.gloss) && wm742.relationsOf('ゾルバ').length === 0, JSON.stringify(dict742.lookup('ゾルバ')));
+  check('P742 教示そのものは通常どおり覚える', dict742.lookup('ルナカエル').some((e: any) => String(e.gloss || '').includes('カエル')), JSON.stringify(dict742.lookup('ルナカエル')));
+  await run742('ホシカエルは星空に光る小さなカエルだよ');
+  const list742 = await run742('今まで僕が教えた生き物、全部言ってみて');
+  check('P742 カエルの一種も「教えた生き物」に入る', list742.replyText.includes('ルナカエル') && list742.replyText.includes('ホシカエル'), list742.replyText.slice(0, 140));
+  await run742('なりチャしよう。みきは星の港の案内人、僕は船乗りね');
+  await run742('やっぱり終わりにしよう');
+  const recap742 = await run742('さっきのなりチャ、どんな話だった？');
+  check('P742 終わったなりチャを振り返れる', recap742.replyText.includes('星の港の案内人'), recap742.replyText.slice(0, 140));
+  const resume742 = await run742('前回のなりチャの続きしよう');
+  check('P742 前回のなりチャを再開できる', resume742.replyText.includes('星の港の案内人') && rp742.isActive(), resume742.replyText.slice(0, 140));
+  await run742('なりチャ終わり');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

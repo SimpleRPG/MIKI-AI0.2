@@ -625,6 +625,12 @@ export class ConversationCoreService {
           }
         }
       } catch { /* なりチャの受け口は補助 */ }
+      // P742: 「さっきのなりチャ、どんな話だった？」——最後に
+      // 終わった役のあらすじで振り返る。
+      const rpRecap = this.roleplayRecapAnswer(prompt);
+      if (rpRecap && !multiPart) {
+        return this.buildResult('RESOLVED', 'roleplay_recap_answer', this.applyPersonaVoice(rpRecap), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const support = this.supportRequestAnswer(prompt);
       if (support) {
         return this.buildResult('RESOLVED', 'support_request_answer', this.applyPersonaVoice(support), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -2979,6 +2985,23 @@ export class ConversationCoreService {
   }
 
   /**
+   * P742: 教わった語が、聞かれた分類の範囲に入るかの判定。
+   * 「動物・生き物」は生き物全般の範囲として扱い、説明文や
+   * 分類に生き物の分類語（カエル・鳥・獣など）があれば含める
+   * （「カエルの一種」と教わった語が「教えた生き物」に
+   * 入らない、という取りこぼしの対策）。
+   */
+  private taughtScopeMatch(entry: any, cat: string): boolean {
+    const gloss = String(entry?.gloss || '');
+    const isA = worldModelGraphService.relationsOf(String(entry?.surface || '')).filter((r) => r.from === entry.surface && r.type === 'IS_A').map((r) => r.to);
+    if (cat === '動物') {
+      const creatures = ['動物', '鳥', '魚', '虫', '獣', 'カエル', '哺乳類', '爬虫類', '両生類', '昆虫', '生き物'];
+      return creatures.some((c) => gloss.includes(c) || isA.includes(c));
+    }
+    return gloss.includes(cat) || isA.includes(cat);
+  }
+
+  /**
    * P734: 「今まで僕が教えた生き物、全部言ってみて」に、個人辞書
    * の教示記録（user-taught）から一覧で答える。分類の語があれば
    * その範囲に絞る（説明文か仮の分類に分類語を含むもの）。
@@ -2994,11 +3017,22 @@ export class ConversationCoreService {
       let scoped = entries;
       if (categoryMatch) {
         const cat = categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1];
-        scoped = entries.filter((e: any) => String(e.gloss).includes(cat)
-          || worldModelGraphService.relationsOf(String(e.surface)).some((r) => r.from === e.surface && r.type === 'IS_A' && r.to === cat));
+        scoped = entries.filter((e: any) => this.taughtScopeMatch(e, cat));
         if (scoped.length === 0) return `${categoryMatch[1]}で教わったものは、まだ無いです。`;
       }
-      const names = scoped.map((e: any) => String(e.surface)).slice(0, 8);
+      // P742: 新しい順に、同名は1回だけ、言い方の断片が混ざった
+      // 登録（「〜っていうの」等）は除いて並べる。古い登録から
+      // 並べると、件数の上限で最近の話題が落ちてしまう。
+      const seenNames = new Set<string>();
+      const names: string[] = [];
+      for (const e of [...scoped].reverse()) {
+        const name = String((e as any).surface || '');
+        if (!name || seenNames.has(name)) continue;
+        if (/(?:っていうの|というの|のこと)$/.test(name)) continue;
+        seenNames.add(name);
+        names.push(name);
+        if (names.length >= 12) break;
+      }
       const tail = scoped.length > names.length ? 'など' : '';
       return `あなたに教わったのは、${names.join('と')}${tail}です。`;
     } catch { return undefined; }
@@ -3026,8 +3060,7 @@ export class ConversationCoreService {
       const cat = categoryMatch ? (categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1]) : '';
       const entries = japaneseDictionaryService.listPersonal()
         .filter((e: any) => e.gloss)
-        .filter((e: any) => !cat || String(e.gloss).includes(cat)
-          || worldModelGraphService.relationsOf(String(e.surface)).some((r) => r.from === e.surface && r.type === 'IS_A' && r.to === cat));
+        .filter((e: any) => !cat || this.taughtScopeMatch(e, cat));
       if (entries.length === 0) return undefined;
       const scored = entries.map((e: any) => {
         const g = String(e.gloss);
@@ -3840,6 +3873,18 @@ export class ConversationCoreService {
    * こと）と P633（分からないこと）の、語単位の自己点検。
    * 知らない語は、その場で意味学習の欠けに積んで循環を始める。
    */
+  private roleplayRecapAnswer(prompt: string): string | undefined {
+    if (!/(?:なりチャ|なりきり)/.test(prompt)) return undefined;
+    if (!/(?:どんな話|あらすじ|話だった|何の話|振り返)/.test(prompt)) return undefined;
+    try {
+      if (roleplaySessionService.isActive()) return undefined;
+      const last = roleplaySessionService.lastEndedRole();
+      if (!last) return undefined;
+      if (last.summary) return `さっきのなりチャは、${last.summary}`;
+      return `さっきは「${last.role.name}」の役でなりチャをしていました。`;
+    } catch { return undefined; }
+  }
+
   private forgetTermAnswer(prompt: string): string | undefined {
     if (/[？?]/.test(prompt)) return undefined;
     if (!/(?:忘れて|消して|削除して)/.test(prompt)) return undefined;

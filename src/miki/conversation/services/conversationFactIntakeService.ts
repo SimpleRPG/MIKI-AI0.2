@@ -696,6 +696,16 @@ export class ConversationFactIntakeService {
     if (/[？?]/.test(value) || /ですか|ますか|でしょうか/.test(value)) return;
     if (/^(違う|ちがう|いや|じゃなくて|それは違う)/.test(value)) return;
     if (/知らない|わからない|分からない|知らん/.test(value)) return;
+    // P742: 別の主題の文（「ルナカエルは〜だよ」）は、聞き返した
+    // 語の説明ではない。主題が保留中の語でも「それ」でもない文は
+    // 消費しない。ほかの主題の説明が無関係な語に付いてしまう
+    // 事故（辞書と関係の汚染）の対策。主題の無い短い答え
+    // （「鳥の一種だよ」等）は従来どおり受ける。
+    const subjectMatch = value.match(/^(.{1,14}?)(?:は|って|とは)/);
+    if (subjectMatch) {
+      const subj = subjectMatch[1].replace(/^(?:その|この|あの)/, '').trim();
+      if (subj && subj !== term && !/^それ/.test(value)) return;
+    }
     if (!intakeMeaningGuardService.check(value).ok) return;
     const firstSentence = value.split(/(?<=。)/)[0].trim();
     let gloss = firstSentence;
