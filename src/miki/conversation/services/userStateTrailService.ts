@@ -48,11 +48,23 @@ const PAIN_PATTERN = /(?:頭痛|腹痛|歯痛|腰痛|肩こり|痛い|痛み|痛
 const STATE_STEMS = ['疲れ', 'しんど', 'だる', '眠', 'ねむ', '痛', '不安', '心配', '寂し', 'さみし', '孤独', '緊張', '怖', 'こわ'];
 
 function affirmedText(text: string): string {
+  let result: string;
   try {
-    return utteranceFeatureService.maskNegatedMentions(String(text || ''), STATE_STEMS);
+    result = utteranceFeatureService.maskNegatedMentions(String(text || ''), STATE_STEMS);
   } catch {
-    return String(text || '');
+    result = String(text || '');
   }
+  // P711: 笑いの文脈の「痛い」（笑いすぎてお腹痛い）は痛みの状態
+  // ではない。返答側では P704 で受け方を直したが、記録側は痛み
+  // として数えたままだったので、笑いを含む文では痛みの語幹を
+  // 落としてから判定する（文単位。他の文の本物の痛みは残す）。
+  if (/笑/.test(result) && /(?:痛い|いたい|痛く)/.test(result)) {
+    result = result
+      .split(/(?<=[。！!？?])/)
+      .map((sentence) => (/笑/.test(sentence) ? sentence.replace(/痛/g, '') : sentence))
+      .join('');
+  }
+  return result;
 }
 
 export class UserStateTrailService {

@@ -1879,6 +1879,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P710 それがモコロンとして答えられる', home710.replyText.includes('「モコロン」'), home710.replyText.slice(0, 120));
 }
 
+// ---- 笑いの痛みは状態に記録しない（P711） ----
+{
+  const { userStateTrailService: trail711 } = await import('../src/miki/conversation/services/userStateTrailService');
+  check('P711 笑いすぎてお腹痛いは痛みとして数えない', !trail711.isPainText('笑いすぎてお腹痛い'), '');
+  check('P711 本物の痛みは数える', trail711.isPainText('頭が痛い'), '');
+  check('P711 別の文の痛みは残る', trail711.isPainText('笑った。でも頭が痛い'), '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
