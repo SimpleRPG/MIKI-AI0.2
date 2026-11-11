@@ -2018,7 +2018,7 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   };
   await run720('ホシカゲは南の島に住む小さい動物だよ');
   const cls720 = await run720('それって何科の動物？');
-  check('P720 何科の質問は直近の話題の分類として正直に答える', cls720.replyText.includes('ホシカゲ') && cls720.replyText.includes('分類'), cls720.replyText.slice(0, 130));
+  check('P720 何科の質問は直近の話題の分類として正直に答える', cls720.replyText.includes('ホシカゲ') && (cls720.replyText.includes('分類') || cls720.replyText.includes('仲間')), cls720.replyText.slice(0, 130));
   check('P720 複合語の名指しをしない', !cls720.replyText.includes('動物、何科') && !cls720.replyText.includes('何科、動物'), cls720.replyText.slice(0, 130));
 }
 
@@ -2108,6 +2108,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P725 振り返りは話した話題を全部挙げる', recap725.replyText.includes('クオッカ') && recap725.replyText.includes('モコロン'), recap725.replyText.slice(0, 130));
   const other725 = await run725('他には何か話した？');
   check('P725 他には、には残りか無い旨を答える', other725.replyText.includes('他は特に') || (other725.replyText.includes('他には') && !other725.replyText.includes('クオッカとモコロン')), other725.replyText.slice(0, 130));
+}
+
+// ---- 教わった説明の分解（P726/P727） ----
+{
+  const { conversationFactIntakeService: intake726 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { worldModelGraphService: wm726 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { claimDatabaseService: claims726 } = await import('../src/miki/memory/services/claimDatabaseService');
+  const { knowledgeGapService: gaps726 } = await import('../src/miki/unknown/services/knowledgeGapService');
+  // 素の文で教わる経路（P726 本体）
+  intake726.intakeFromUserText('ソラカゲは北の山に住む白い鳥だよ', []);
+  const rel726 = wm726.relationsOf('ソラカゲ').find((r: any) => r.from === 'ソラカゲ' && r.type === 'IS_A');
+  check('P726 教わった説明から仮の分類関係ができる', !!rel726 && rel726.to === '鳥' && rel726.provisional === true, JSON.stringify(rel726 || null));
+  const cl726 = claims726.getAllClaims().find((c: any) => String(c.statement).includes('ソラカゲ'));
+  check('P726 教わった説明がClaimとして登録される', !!cl726 && cl726.status === 'CANDIDATE', cl726 ? `${cl726.statement}|${cl726.status}` : 'no claim');
+  // 定型で教わる経路（P727）
+  intake726.intakeFromUserText('ミナカゲって、川辺に住む小さい魚のことだよ', []);
+  const rel727 = wm726.relationsOf('ミナカゲ').find((r: any) => r.from === 'ミナカゲ' && r.type === 'IS_A');
+  check('P727 定型の教わりでも仮の分類関係ができる', !!rel727 && rel727.to === '魚' && rel727.provisional === true, JSON.stringify(rel727 || null));
+  const gap727 = gaps726.listOpen(500).some((g: any) => (g as any).identity?.target === '川辺');
+  check('P727 説明の中の知らない語が知識の欠けになる', gap727, '川辺の欠けが無い');
+  // 分類の質問には、仮の関係を断定せず出所を添えて答える（P726）
+  let st726: any = undefined; const hist726: any[] = [];
+  const run726 = async (q: string) => {
+    const r: any = await conversationCoreService.execute({ prompt: q, recentMessages: hist726.slice(-8), conversationState: st726 } as any);
+    st726 = r.nextConversationState;
+    hist726.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const cls726 = await run726('ソラカゲって何科？');
+  check('P726 仮の分類は出所を添えて断定しない', cls726.replyText.includes('ソラカゲ') && cls726.replyText.includes('鳥') && cls726.replyText.includes('教わった説明'), cls726.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----

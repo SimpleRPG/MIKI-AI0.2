@@ -2880,7 +2880,10 @@ export class ConversationCoreService {
       }
       if (!classEntity) return undefined;
       const isA = worldModelGraphService.relationsOf(classEntity).filter((r) => r.from === classEntity && r.type === 'IS_A');
-      if (isA.length > 0) return `「${classEntity}」は、${isA.map((r) => r.to).join('・')}の仲間です。`;
+      // P726: 確定した関係は断定するが、仮の関係（教わった説明から
+      // の分解など）だけの時は、出所を添えて断定しない。
+      if (isA.length > 0 && isA.some((r) => !r.provisional)) return `「${classEntity}」は、${isA.filter((r) => !r.provisional).map((r) => r.to).join('・')}の仲間です。`;
+      if (isA.length > 0) return `教わった説明からすると、「${classEntity}」は${isA.map((r) => r.to).join('・')}の仲間だと思います。`;
       // P643: 関係が無くても、検証済みの知識に分類が書かれていればそれで答える。
       try {
         const claim = claimDatabaseService.getAllClaims().find((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(classEntity) && String(c.statement || '').includes('の一種'));
@@ -3059,10 +3062,26 @@ export class ConversationCoreService {
       if (targets.includes(candidate)) {
         return `はい、「${entity}」は${candidate}です。`;
       }
-      const isA = relations.filter((r) => r.type === 'IS_A').map((r) => r.to);
-      const usedFor = relations.filter((r) => r.type === 'USED_FOR').map((r) => r.to);
+      // P727: 検証済みの知識が候補を裏付けるなら、関係による正し
+      // より先に肯定する。教わった説明の分解で仮の関係が増えた
+      // 結果、述語の確認（「発光するの？」）まで「〜じゃなくて
+      // 一種です」と正してしまう崩れの対策（検証済み > 仮の関係）。
+      try {
+        const verifiedHit = claimDatabaseService.getAllClaims()
+          .filter((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(entity))
+          .find((c: any) => String(c.statement || '').includes(candidate));
+        if (verifiedHit) return `はい、そのとおりです。${String((verifiedHit as any).statement).slice(0, 90)}`;
+      } catch { /* 知識照合は補助経路 */ }
+      const isARelations = relations.filter((r) => r.type === 'IS_A');
+      const isA = isARelations.map((r) => r.to);
+      const usedFor = relations.filter((r) => r.type === 'USED_FOR' && !r.provisional).map((r) => r.to);
+      if (isA.length > 0 && isARelations.some((r) => !r.provisional)) {
+        const confirmed = isARelations.filter((r) => !r.provisional).map((r) => r.to);
+        return `${candidate}じゃなくて、「${entity}」は${confirmed.join('・')}の一種です${usedFor.length > 0 ? `。${usedFor.join('・')}に使われます` : ''}。`;
+      }
+      // P727: 分類の根拠が仮の関係だけの時は、断定せず出所を添える。
       if (isA.length > 0) {
-        return `${candidate}じゃなくて、「${entity}」は${isA.join('・')}の一種です${usedFor.length > 0 ? `。${usedFor.join('・')}に使われます` : ''}。`;
+        return `${candidate}じゃなくて、教わった説明では「${entity}」は${isA.join('・')}の仲間だと思います。`;
       }
       if (targets.length > 0) {
         return `「${entity}」は${candidate}ではなく、${targets.join('・')}と関係があると覚えています。`;

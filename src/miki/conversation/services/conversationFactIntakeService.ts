@@ -8,6 +8,10 @@ import { personaProfileService } from './personaProfileService';
 import { userKnowledgeProfileService } from './userKnowledgeProfileService';
 import { selfPreferenceService } from '../../selfAwareness/services/selfPreferenceService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
+import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
+import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
 
@@ -563,6 +567,8 @@ export class ConversationFactIntakeService {
       // P567: 直近に教わった記録（会話側の「覚えました」の材料）。
       try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
       systemLogger.info('CHAT', `📖 [意味学習] ユーザーから「${term}」の意味を教わりました: ${gloss}`);
+      // P727: 定型の教わり経路でも説明を分解する（P726と共通の分解）。
+      try { this.decomposeTaughtGloss(term, gloss, `${term}は${gloss}`); } catch { /* 分解は補助経路 */ }
     }
   }
 
@@ -590,6 +596,77 @@ export class ConversationFactIntakeService {
       try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
       try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
       systemLogger.info('CHAT', `📖 [意味学習] ユーザーの説明文から「${term}」の意味を学びました: ${gloss}`);
+      // P726: 説明を分解して、さらに知識を増やす（下のメソッド）。
+      try { this.decomposeTaughtGloss(term, gloss, String(fact.statement || `${term}は${gloss}`)); } catch { /* 分解は補助経路 */ }
+    }
+  }
+
+  /**
+   * P726: 教わった説明を分解して、語彙の登録だけで終わらせない。
+   * きりあの本線「知識をルールに分解する」の会話側の入り口:
+   * 1. 説明文を Claim として登録する（出所は本人の発言として
+   *    CANDIDATE）。これで知識照合・連想グラフ・統合パスの材料に
+   *    なる（従来は辞書と事実だけに閉じていた）。
+   * 2. 説明の末尾の分類語から、仮の IS_A 関係を世界モデルに載せる
+   *    （「〜に住む小さい動物」→ 動物の一種。仮の関係の規律どおり
+   *    provisional・低確信度で、確定とは言わない）。
+   * 3. 説明の中の知らない語は、その場で聞き返さず（P721）、知識
+   *    の欠けとして積んで背景学習に回す。
+   */
+  private decomposeTaughtGloss(term: string, gloss: string, statement: string): void {
+    // 1. Claim 登録（重複は claimDatabaseService 側で抑えられる）。
+    try {
+      const claimText = /です。?$|だ。?$/.test(statement) ? (statement.endsWith('。') ? statement : `${statement}。`) : `${statement}です。`;
+      claimDatabaseService.registerClaim({
+        statement: claimText,
+        world: 'REAL',
+        kind: 'FACT_CLAIM',
+        status: 'CANDIDATE',
+        source: 'USER_CLAIM',
+        self_provenance: 'USER_CONFIRMED',
+        maturity: 'DEFINED',
+        origin_source_id: 'user_conversation_teaching',
+        independence_cluster_id: 'cluster_user_teaching',
+      } as any);
+    } catch { /* Claim 登録は補助経路 */ }
+    // 説明の内容語を分解する。
+    let tokens: string[] = [];
+    try { tokens = utteranceFeatureService.analyze(gloss).contentTokens || []; } catch { tokens = []; }
+    // P727: 分類語には鳥・魚・木のような1字漢字も多いので、1字は
+    // 漢字だけ通す（ひらがな1字は断片として落とす）。
+    const clean = tokens.filter((t) => t && (t.length >= 2 || /^[一-龠]$/.test(t)) && t !== term && !/^(こと|もの|ため)$/.test(t));
+    // 2. 末尾の分類語 → 仮の IS_A。分類語は説明の最後の名詞らしい
+    // 語（「〜に住む小さい動物」の動物）。文頭の場所名（オーストラ
+    // リア）などを拾わないよう、後ろから探し、辞書に無い語は
+    // 「最後の語で、漢字かカタカナで終わる」場合だけ認める。
+    try {
+      const category = [...clean].reverse().find((t, idx) => {
+        try {
+          const entries = japaneseDictionaryService.lookup(t);
+          if (entries.length > 0) return entries.some((e: any) => ['NOUN', 'PROPER_NOUN', 'TECHNICAL', 'UNKNOWN'].includes(String(e?.pos || '')));
+        } catch { /* 補助判定 */ }
+        return idx === 0 && /[一-龠ァ-ヶー]$/.test(t);
+      });
+      if (category && category !== term) {
+        worldModelGraphService.addRelation({ fromName: term, toName: category, type: 'IS_A', provisional: true, confidence: 0.3 } as any);
+      }
+    } catch { /* 関係は補助経路 */ }
+    // 3. 知らない構成語 → 知識の欠け（背景学習行き）。対象は漢字・
+    // カタカナだけの語に限る（動詞・形容詞の語幹は語彙の欠けでは
+    // ない）。
+    for (const w of clean) {
+      try {
+        if (w.length < 2) continue; // 1字は分類語専用（欠けにはしない）
+        if (japaneseDictionaryService.has(w)) continue;
+        if (!/^[一-龠ァ-ヶー]+$/.test(w)) continue;
+        knowledgeGapService.detect({
+          query: `「${w}」について調べる`,
+          reason: `教わった「${term}」の説明の中に出てきた語で、まだ知らないため。`,
+          type: 'UNKNOWN_TERM',
+          target: w,
+          priority: 35,
+        } as any);
+      } catch { /* 欠けの記録は補助経路 */ }
     }
   }
 
@@ -634,6 +711,8 @@ export class ConversationFactIntakeService {
     try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
     try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
     systemLogger.info('CHAT', `📖 [意味学習] 聞き返した「${term}」の意味を教わりました: ${gloss}`);
+    // P727: 聞き返しへの答えの経路でも説明を分解する（P726と共通）。
+    try { this.decomposeTaughtGloss(term, gloss, `${term}は${gloss}`); } catch { /* 分解は補助経路 */ }
   }
 
   /**
