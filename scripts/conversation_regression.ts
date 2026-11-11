@@ -2413,6 +2413,10 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   await run744('来週、旅行に行く予定だよ');
   const planWeek744 = await run744('来週の予定って何だっけ？');
   check('P752 来週の予定も答える', planWeek744.replyText.includes('旅行'), planWeek744.replyText.slice(0, 130));
+  await run744('明日の18時に友達とご飯の約束もあるよ');
+  await run744('やっぱり明日の歯医者はキャンセルしたよ');
+  const planAfterCancel744 = await run744('明日の予定って何だっけ？');
+  check('P753 キャンセルした予定は答えず、残りは答える', !planAfterCancel744.replyText.includes('歯医者') && planAfterCancel744.replyText.includes('ご飯'), planAfterCancel744.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----

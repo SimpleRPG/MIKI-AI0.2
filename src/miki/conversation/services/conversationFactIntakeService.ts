@@ -820,7 +820,37 @@ export class ConversationFactIntakeService {
     } catch { /* 予定の控えは補助経路 */ }
   }
 
+  /**
+   * P753: 「やっぱり明日の歯医者はキャンセルした」——予定の
+   * 取り消しは、控えから該当の予定を外す。合言葉は時期の語と
+   * 内容語の重なりで判定し、関係ない予定は残す。
+   */
+  private cancelUserPlanIfAny(text: string): void {
+    try {
+      const t = String(text || '').trim();
+      if (!t || /[？?]/.test(t)) return;
+      if (!/(?:キャンセル|中止|取り消し|取り消した|やめた|無くなった|なくなった|無しになった|なしになった)/.test(t)) return;
+      const key = 'miki_user_plans_v1';
+      const raw = storageService.getItem(key);
+      if (!raw) return;
+      const plans: Array<{ when: string; text: string; at: number }> = JSON.parse(raw);
+      if (!Array.isArray(plans) || plans.length === 0) return;
+      const whenRaw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+      const when = whenRaw === 'あした' ? '明日' : whenRaw;
+      const tokens = utteranceFeatureService.analyze(t).contentTokens
+        .filter((w) => w.length >= 2 && !/^(?:キャンセル|中止|取り消し|予定|予約|約束|明日|今日|今夜|今週|来週|週末|今度|明後日)$/.test(w));
+      if (tokens.length === 0) return;
+      const kept = plans.filter((p) => {
+        if (when && p.when !== when) return true;
+        return !tokens.some((w) => p.text.includes(w));
+      });
+      if (kept.length !== plans.length) storageService.setItem(key, JSON.stringify(kept));
+    } catch { /* 予定の取り消しは補助経路 */ }
+  }
+
   public intakeFromUserText(text: string, existingMemories: MemoryItem[]): FactIntakeResult {
+    // P753: 予定の取り消しは控えから外す（先に処理する）。
+    this.cancelUserPlanIfAny(text);
     // P752: 予定の発言は予定の控えにも残す（事実取り込みとは別枠）。
     this.recordUserPlanIfAny(text);
     // P514: なりチャの開始・終了と、セッション中の創作分離。
