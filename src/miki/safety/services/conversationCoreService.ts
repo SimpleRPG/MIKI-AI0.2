@@ -497,6 +497,10 @@ export class ConversationCoreService {
       if (habitatList && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_habitat_list_answer', this.applyPersonaVoice(habitatList), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const traitList = this.glossTraitListAnswer(prompt);
+      if (traitList && !multiPart) {
+        return this.buildResult('RESOLVED', 'gloss_trait_list_answer', this.applyPersonaVoice(traitList), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P739: 「最初に教えたのって何だっけ？」——教示記録の
       // 順序から答える（「最初」が未知語として調査に落ちない）。
       const taughtOrder = this.taughtOrderAnswer(prompt);
@@ -3435,6 +3439,30 @@ export class ConversationCoreService {
   }
 
   /**
+   * P763: 「夜行性の動物はいる？」——教わった説明の中の性質の語で
+   * 絞って挙げる（P762の場所版の一般化）。説明文が材料なので、
+   * 性質の語が増えても同じ受け口で効く。
+   */
+  private glossTraitListAnswer(prompt: string): string | undefined {
+    const m = prompt.match(/([一-龠ァ-ヶー]{2,})[のな](?:動物|鳥|魚|虫|植物|生き物)/);
+    if (!m) return undefined;
+    if (!/[？?]/.test(prompt) && !/(?:いる|ある|教えて|何)/.test(prompt)) return undefined;
+    const trait = m[1].replace(/^(?:教えた|教えてもらった)/, '');
+    if (!trait || trait.length < 2) return undefined;
+    // 分類の疑問語（何科・何目…）は性質ではない（分類質問は
+    // 属性質問の受け口の領分）。
+    if (/何/.test(trait)) return undefined;
+    if (/^(?:動物|鳥|魚|虫|植物|生き物|大きい|小さい|重い|軽い|可愛い|かわいい)$/.test(trait)) return undefined;
+    try {
+      const entries = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss);
+      const hits = entries.filter((e: any) => String(e.gloss).includes(trait)).map((e: any) => String(e.surface));
+      const uniq = [...new Set(hits)].slice(0, 6);
+      if (uniq.length === 0) return `今知っている中では、${trait}ものはいないです。`;
+      return `います。${uniq.map((n) => `「${n}」`).join('と')}が${trait}だと聞いています。`;
+    } catch { return undefined; }
+  }
+
+  /**
    * P744: 「クオッカもワラルーも動物なの？」「〜も〜もオーストラリアに
    * 住んでるの？」——二つまとめた確認に、それぞれの分類・説明と
    * 照らして答える。片方だけ分かる時は、その旨を分けて言う。
@@ -4384,7 +4412,7 @@ export class ConversationCoreService {
    */
   private learningVolumeAnswer(prompt: string): string | undefined {
     if (!/(?:覚えた|学んだ|知ってる|知っている|覚えてる|覚えている)/.test(prompt)) return undefined;
-    if (!/(?:何語|いくつ|どのくらい|どれくらい|何件|何個|たくさん)/.test(prompt)) return undefined;
+    if (!/(?:何語|いくつ|どのくらい|どれくらい|何件|何個|何種類|たくさん)/.test(prompt)) return undefined;
     if (!/[？?]/.test(prompt) && !/(?:教えて|知りたい)/.test(prompt)) return undefined;
     try {
       const words = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss).length;
@@ -4539,7 +4567,7 @@ export class ConversationCoreService {
     // P672: 相手の属性の言葉（名前・住所等）は、語彙の確認ではない。
     // 「僕の名前覚えてる？」に「『名前』はまだ知らないです」と
     // 答えない（名前の想起は想起側の領分）。
-    if (/^(?:名前|呼び名|住所|年齢|誕生日|ペット|家族|仕事|学校|会社|さっき|今日|昨日|明日)$/.test(term)) return undefined;
+    if (/^(?:名前|呼び名|住所|年齢|誕生日|ペット|家族|仕事|学校|会社|さっき|今日|昨日|明日|今まで|これまで|最近|いつも)$/.test(term)) return undefined;
     try {
       const gloss = japaneseDictionaryService.lookup(term).find((e: any) => e.gloss)?.gloss;
       if (gloss) {
@@ -4765,6 +4793,20 @@ export class ConversationCoreService {
         .sort((a, b) => Number(b[1]) - Number(a[1]));
       for (const [term] of recent.slice(0, 2)) terms.push(term);
     } catch { /* 語が無ければ知識だけ */ }
+    // P764: 会話で教わった語は調査の学習台帳ではなく個人辞書に
+    // 入る。最近の学習の答えは、そちらも見る（登録順＝新しさの
+    // 代理として末尾から取る）。
+    try {
+      const taught = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'))
+        .slice(-3)
+        .reverse();
+      for (const e of taught) {
+        const s = String((e as any).surface || '');
+        if (s && !terms.includes(s)) terms.push(s);
+        if (terms.length >= 3) break;
+      }
+    } catch { /* 辞書が読めなければ台帳だけ */ }
     const facts: string[] = [];
     try {
       const claims = claimDatabaseService.getAllClaims()

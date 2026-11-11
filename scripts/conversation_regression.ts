@@ -2540,6 +2540,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P762 その場所のものが無ければ無いと言う', habNone762.replyText.includes('いない'), habNone762.replyText.slice(0, 130));
 }
 
+// ---- P763-P765: 性質で絞る／最近覚えた語／覚えた量 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem763: any[] = []; const hist763: any[] = []; let st763: any = undefined;
+  const run763 = async (t: string) => {
+    mem763 = conversationFactIntakeService.intakeFromUserText(t, mem763).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem763, recentMessages: hist763.slice(-8), conversationState: st763 } as any);
+    st763 = r.nextConversationState;
+    hist763.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run763('ヨルモは夜行性の動物だよ');
+  await run763('ヒルモは昼に活動する動物だよ');
+  const trait763 = await run763('夜行性の動物はいる？');
+  check('P763 性質の語で絞って挙げる', trait763.replyText.includes('ヨルモ') && !trait763.replyText.includes('ヒルモ'), trait763.replyText.slice(0, 130));
+  const recent763 = await run763('最近覚えた言葉は何？');
+  check('P764 最近覚えた語は個人辞書からも答える', recent763.replyText.includes('ヨルモ') || recent763.replyText.includes('ヒルモ'), recent763.replyText.slice(0, 130));
+  const volume763 = await run763('今まで何種類の言葉を覚えた？');
+  check('P765 覚えた量は数を数えて答える', volume763.replyText.includes('言葉は') && volume763.replyText.includes('覚えています'), volume763.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
