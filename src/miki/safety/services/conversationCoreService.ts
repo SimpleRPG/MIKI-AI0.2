@@ -514,7 +514,7 @@ export class ConversationCoreService {
       if (provenance && !multiPart) {
         return this.buildResult('RESOLVED', 'knowledge_provenance_answer', this.applyPersonaVoice(provenance), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const termKnowledge = this.termKnowledgeAnswer(prompt);
+      const termKnowledge = this.termKnowledgeAnswer(prompt, state, recentMessages);
       if (termKnowledge) {
         return this.buildResult('RESOLVED', 'term_knowledge_answer', this.applyPersonaVoice(termKnowledge), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -529,6 +529,12 @@ export class ConversationCoreService {
           return this.buildResult('RESOLVED', 'dictionary_answer', this.applyPersonaVoice(dictEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
         }
       } catch { /* 辞書の手前答えは補助 */ }
+      // P730: 「Xについて教えて」——知っている語なら手持ちの知識で
+      // 答える。知らない語は従来どおり調査側に回す。
+      const tellAbout = this.tellAboutAnswer(prompt);
+      if (tellAbout && !multiPart) {
+        return this.buildResult('RESOLVED', 'tell_about_answer', this.applyPersonaVoice(tellAbout), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P650: 形容つきの意見質問は、知識照合より先に意見として答える
       // （Claim がそのまま返ると「どう思う」に答えたことにならない）。
       const adjOpinion = this.adjectiveOpinionAnswer(prompt);
@@ -3048,18 +3054,36 @@ export class ConversationCoreService {
       } catch { return undefined; }
     }
     // 確認の質問：Xは Y じゃないの？/なの？ に、関係と照らして答える。
-    const confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*(?:じゃないの|なの|ですか|なのですか|の)[？?]?$/);
+    const confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*(?:じゃないよね|じゃないの|じゃないですか|ではないよね|ではないの|なの|ですか|なのですか|の)[？?]?$/);
     // P644: 疑問詞で始まる中身（「何を食べるの？」等）は確認ではなく
     // 属性の質問。確認として扱うと、無関係な知識で「じゃなくて」と
     // 正す崩れになるため、ここでは扱わない。
     if (confirmMatch && /[？?]/.test(prompt) && !/^(?:何|なに|どの|どう|いつ|どこ|だれ|誰)/.test(confirmMatch[2].trim())) {
       const entity = known.find((t) => prompt.startsWith(t) || prompt.includes(`${t}って`) || prompt.includes(`${t}は`));
       if (!entity) return undefined;
-      const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか)/.test(t)).slice(-1)[0];
+      const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか|よね|でしょ)/.test(t) && !/^(?:じゃ|ない)$/.test(t)).slice(-1)[0];
       if (!candidate || candidate === entity) return undefined;
       const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
       const targets = relations.map((r) => r.to);
+      // P729: 否定の確認（「〜じゃないよね？」）は、相手の見立てが
+      // 知識と合うかどうかで答える。知識と合えば同意し、確かな
+      // 関係とぶつかれば正す。根拠が仮の関係だけなら断定しない。
+      const negatedConfirm = /(?:じゃないよね|じゃないの|じゃないですか|ではないよね|ではないの)[？?]?$/.test(prompt.trim());
+      if (negatedConfirm) {
+        const candRels = relations.filter((r) => r.to === candidate);
+        if (candRels.some((r) => !r.provisional)) return `いえ、「${entity}」は${candidate}だよ。`;
+        if (candRels.length > 0) return `教わった説明では、「${entity}」は${candidate}の仲間みたいだよ。`;
+        const isAAll = relations.filter((r) => r.type === 'IS_A');
+        if (isAAll.some((r) => !r.provisional)) return `うん、${candidate}じゃなくて、「${entity}」は${isAAll.filter((r) => !r.provisional).map((r) => r.to).join('・')}の一種だよ。`;
+        if (isAAll.length > 0) return `うん、${candidate}じゃないよ。教わった説明では、「${entity}」は${isAAll.map((r) => r.to).join('・')}の仲間だと思います。`;
+        return undefined;
+      }
       if (targets.includes(candidate)) {
+        // P729: 肯定の根拠が仮の関係だけなら、断定せず出所を添える。
+        const rels = relations.filter((r) => r.to === candidate);
+        if (rels.length > 0 && rels.every((r) => r.provisional)) {
+          return `教わった説明では、「${entity}」は${candidate}の仲間だと思います。`;
+        }
         return `はい、「${entity}」は${candidate}です。`;
       }
       // P727: 検証済みの知識が候補を裏付けるなら、関係による正し
@@ -3546,7 +3570,41 @@ export class ConversationCoreService {
    * こと）と P633（分からないこと）の、語単位の自己点検。
    * 知らない語は、その場で意味学習の欠けに積んで循環を始める。
    */
-  private termKnowledgeAnswer(prompt: string): string | undefined {
+  private tellAboutAnswer(prompt: string): string | undefined {
+    if (!/(?:について|のこと)/.test(prompt)) return undefined;
+    // P730: 「もっと／詳しく」の深掘り形だけをここで受ける。素の
+    // 「Xについて教えて」は、裏付け提示の既存経路（P544で検証
+    // 済みの形）が担う。
+    if (!/(?:もっと|詳しく|くわしく)/.test(prompt)) return undefined;
+    if (!/(?:教えて|知りたい|聞かせて)/.test(prompt)) return undefined;
+    let tokens: string[] = [];
+    try { tokens = utteranceFeatureService.analyze(prompt).contentTokens || []; } catch { return undefined; }
+    const entity = tokens.find((t) => {
+      if (!t || t.length < 2 || /^(?:こと|もの|ため)$/.test(t)) return false;
+      try {
+        if (japaneseDictionaryService.lookup(t).some((e: any) => e.gloss)) return true;
+        if (worldModelGraphService.relationsOf(t).length > 0) return true;
+        return claimDatabaseService.getAllClaims().some((c: any) => c.status !== 'SUPERSEDED' && String(c.statement || '').includes(t));
+      } catch { return false; }
+    });
+    if (!entity) return undefined;
+    try {
+      const entry = japaneseDictionaryService.lookup(entity).find((e: any) => e.gloss);
+      if (entry) {
+        const taught = Array.isArray((entry as any).semanticIds) && (entry as any).semanticIds.includes('learned:user-taught');
+        const base = taught
+          ? `「${entity}」について知っているのは、あなたに教わった説明で、${String(entry.gloss).slice(0, 80)}、ということです。`
+          : `「${entity}」は、${String(entry.gloss).slice(0, 80)}、と覚えています。`;
+        const claim = claimDatabaseService.getAllClaims().find((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(entity));
+        return claim && !base.includes(String(claim.statement).slice(0, 12)) ? `${base} ${String(claim.statement).slice(0, 90)}` : base;
+      }
+      const claim = claimDatabaseService.getAllClaims().find((c: any) => c.status !== 'SUPERSEDED' && String(c.statement || '').includes(entity));
+      if (claim) return `「${entity}」については、${String(claim.statement).slice(0, 90)}と覚えています。`;
+    } catch { return undefined; }
+    return undefined;
+  }
+
+  private termKnowledgeAnswer(prompt: string, state?: any, recentMessages?: any[]): string | undefined {
     // P685: 「僕のこと覚えてる？」は語彙の確認ではなく関係の質問。
     // 「こと」が語として拾われて誤爆していたので、相手自身への
     // 言及はここでは扱わない（関係の受け口が答える）。
@@ -3555,6 +3613,23 @@ export class ConversationCoreService {
     if (!/[？?]/.test(prompt) && !/か[？。]?$/.test(prompt.trim())) return undefined;
     // P653: 「忘れた？」の聞き方かどうかで、締めの言い方を変える。
     const forgotFraming = /忘/.test(prompt);
+    // P730: 「さっき教えたの、忘れた？」は語そのものではなく
+    // 教わった話題への言及。時間を指す語（さっき）を語として
+    // 拾わず、教わった記録のある直近の話題で答える。
+    if (/(?:教えた|教わった)/.test(prompt)) {
+      try {
+        const candidates = this.recentTopicCandidates(state, recentMessages);
+        for (const cand of candidates) {
+          const g = japaneseDictionaryService.lookup(cand).find((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'))?.gloss;
+          if (g) {
+            return forgotFraming
+              ? `忘れてないですよ。「${cand}」は、${String(g).slice(0, 60)}という意味です。`
+              : `覚えています。「${cand}」は、${String(g).slice(0, 60)}という意味です。`;
+          }
+        }
+      } catch { /* 話題の解決は補助経路 */ }
+      return undefined;
+    }
     let term: string | undefined;
     try {
       const features = utteranceFeatureService.analyze(prompt);
@@ -3564,7 +3639,7 @@ export class ConversationCoreService {
     // P672: 相手の属性の言葉（名前・住所等）は、語彙の確認ではない。
     // 「僕の名前覚えてる？」に「『名前』はまだ知らないです」と
     // 答えない（名前の想起は想起側の領分）。
-    if (/^(?:名前|呼び名|住所|年齢|誕生日|ペット|家族|仕事|学校|会社)$/.test(term)) return undefined;
+    if (/^(?:名前|呼び名|住所|年齢|誕生日|ペット|家族|仕事|学校|会社|さっき|今日|昨日|明日)$/.test(term)) return undefined;
     try {
       const gloss = japaneseDictionaryService.lookup(term).find((e: any) => e.gloss)?.gloss;
       if (gloss) {

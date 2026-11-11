@@ -2158,6 +2158,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P728 訂正で根拠を失った仮の分類は消える', relAfter728.length === 0, JSON.stringify(relAfter728));
 }
 
+// ---- 確認の受け口と「について教えて」（P729/P730） ----
+{
+  const { conversationFactIntakeService: intake729 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem729: any[] = []; const hist729: any[] = []; let st729: any = undefined;
+  const run729 = async (q: string) => {
+    mem729 = intake729.intakeFromUserText(q, mem729).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem729, recentMessages: hist729.slice(-8), conversationState: st729 } as any);
+    st729 = r.nextConversationState;
+    hist729.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run729('アオカゲは深い森に住む小さい鳥だよ');
+  const hedged729 = await run729('アオカゲって鳥なの？');
+  check('P729 仮の分類の肯定は断定しない', hedged729.replyText.includes('教わった説明') && hedged729.replyText.includes('鳥') && !hedged729.replyText.includes('は鳥です'), hedged729.replyText.slice(0, 130));
+  const negOk729 = await run729('アオカゲって魚じゃないよね？');
+  check('P729 否定の確認には知識に沿って同意する', negOk729.replyText.includes('魚じゃないよ') && negOk729.replyText.includes('鳥'), negOk729.replyText.slice(0, 130));
+  const tell729 = await run729('アオカゲについてもっと教えて');
+  check('P730 について教えて、には手持ちの説明で答える', tell729.replyText.includes('教わった説明') && tell729.replyText.includes('深い森'), tell729.replyText.slice(0, 130));
+  const forgot729 = await run729('さっき教えたの、もう忘れた？');
+  check('P730 教えたの忘れた、は教わった話題で答える', forgot729.replyText.includes('忘れてない') && forgot729.replyText.includes('アオカゲ'), forgot729.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
