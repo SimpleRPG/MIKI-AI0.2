@@ -2900,6 +2900,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P792 身長の差を答える', heightDiff792.replyText.includes('15センチ違います'), heightDiff792.replyText.slice(0, 130));
 }
 
+// ---- P793: 人の属性の事実から一番を決める ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem793: any[] = []; const hist793: any[] = []; let st793: any = undefined;
+  const run793 = async (t: string) => {
+    mem793 = conversationFactIntakeService.intakeFromUserText(t, mem793).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem793, recentMessages: hist793.slice(-8), conversationState: st793 } as any);
+    st793 = r.nextConversationState;
+    hist793.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run793('僕の身長は170センチだよ');
+  await run793('妹の身長は155センチだよ');
+  await run793('弟の身長は162センチだよ');
+  const tall793 = await run793('みんなで一番背が高いのは誰？');
+  check('P793 一番背が高い人を事実から決める', tall793.replyText.includes('一番背が高いのは僕'), tall793.replyText.slice(0, 130));
+  await run793('僕の年齢は25歳だよ');
+  await run793('妹の年齢は20歳だよ');
+  await run793('弟の年齢は28歳だよ');
+  const old793 = await run793('みんなで一番年上なのは誰？');
+  check('P793 一番年上も決める', old793.replyText.includes('一番年上のは弟'), old793.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

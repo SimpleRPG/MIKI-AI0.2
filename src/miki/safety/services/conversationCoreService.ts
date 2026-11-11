@@ -517,6 +517,10 @@ export class ConversationCoreService {
       }
       // P735: 「教えた動物の中で一番大きいのは？」——説明文の
       // 手がかりで最上級に答える。
+      const factSuper = this.factSuperlativeAnswer(prompt, memories);
+      if (factSuper) {
+        return this.buildResult('RESOLVED', 'fact_superlative_answer', this.applyPersonaVoice(factSuper), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const superlative = this.glossSuperlativeAnswer(prompt);
       if (superlative && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_superlative_answer', this.applyPersonaVoice(superlative), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3316,6 +3320,43 @@ export class ConversationCoreService {
       if (m) return { value: p.f(parseFloat(m[1])), disp: m[0] };
     }
     return undefined;
+  }
+
+  /**
+   * P793: 「みんなで一番背が高いのは誰？」「一番年上なのは？」——
+   * 人の属性の事実全体から最上位を決める（説明文の一番はP735）。
+   */
+  private factSuperlativeAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/一番/.test(prompt)) return undefined;
+    let attr = ''; let label: '重さ' | '大きさ' | '年齢' = '年齢'; let minus = false; let cue = '';
+    if (/背が高/.test(prompt)) { attr = '身長'; label = '大きさ'; cue = '背が高い'; }
+    else if (/背が低/.test(prompt)) { attr = '身長'; label = '大きさ'; minus = true; cue = '背が低い'; }
+    else if (/年上/.test(prompt)) { attr = '年齢'; label = '年齢'; cue = '年上'; }
+    else if (/年下/.test(prompt)) { attr = '年齢'; label = '年齢'; minus = true; cue = '年下'; }
+    else if (/重い/.test(prompt)) { attr = '体重'; label = '重さ'; cue = '重い'; }
+    else if (/軽い/.test(prompt)) { attr = '体重'; label = '重さ'; minus = true; cue = '軽い'; }
+    else return undefined;
+    const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    const byEntity = new Map<string, { v: number; disp: string }>();
+    for (const mm of memories || []) {
+      if (!mm || mm.active === false || mm.replacedBy) continue;
+      if (String(mm.factAttribute || '') !== attr) continue;
+      const rawEntity = String(mm.factEntity || '');
+      if (!rawEntity) continue;
+      const name = selfSet.has(rawEntity) ? '僕' : rawEntity;
+      if (label === '年齢') {
+        const n = Number(String(mm.factValue || '').match(/(\d+(?:\.\d+)?)/)?.[1]);
+        if (Number.isFinite(n)) byEntity.set(name, { v: n, disp: `${n}歳` });
+      } else {
+        const mv = this.measureFromText(String(mm.factValue || ''), label);
+        if (mv) byEntity.set(name, { v: mv.value, disp: mv.disp });
+      }
+    }
+    if (byEntity.size < 2) return undefined;
+    const entries = [...byEntity.entries()].map(([name, m]) => ({ name, ...m }));
+    entries.sort((a, b) => (minus ? a.v - b.v : b.v - a.v));
+    const top = entries[0];
+    return `一番${cue}のは${top.name}です（${top.disp}）。`;
   }
 
   private glossSuperlativeAnswer(prompt: string): string | undefined {
