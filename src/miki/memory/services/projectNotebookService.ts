@@ -33,6 +33,7 @@ export interface ProjectWorkState {
 
 const STORAGE_KEY = 'miki_project_notebook_v1';
 const WORK_STATE_KEY = 'miki_project_work_state_v1';
+const REGISTRY_KEY = 'miki_project_registry_v1';
 
 const SEED_DECISIONS: ReadonlyArray<{ project: string; text: string }> = [
   { project: 'EFR', text: 'マップは表示しない（難易度が下がるため）。' },
@@ -108,7 +109,58 @@ export class ProjectNotebookService {
   public listProjects(): string[] {
     const seen = new Set<string>();
     for (const decision of this.ensureLoaded()) seen.add(decision.project);
+    for (const entry of this.loadRegistry()) seen.add(entry.name);
     return [...seen];
+  }
+
+  // ---- P713: プロジェクトの登録簿 ----
+  // 決め事が1件も無い新規プロジェクトは、従来は存在自体を記録できず、
+  // 後続の決定発言（プロジェクト名を含まないもの）が紐付けられなかった。
+  // 名前と最終言及時刻だけを持つ軽い登録簿を別に持つ。
+  private registry: Array<{ name: string; lastMentionedAt: number }> | null = null;
+
+  private loadRegistry(): Array<{ name: string; lastMentionedAt: number }> {
+    if (this.registry) return this.registry;
+    let loaded: Array<{ name: string; lastMentionedAt: number }> = [];
+    try {
+      const raw = storageService.getItem(REGISTRY_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) loaded = parsed.filter((e) => e && typeof e.name === 'string');
+      }
+    } catch { loaded = []; }
+    this.registry = loaded;
+    return this.registry;
+  }
+
+  private persistRegistry(): void {
+    try { storageService.setItem(REGISTRY_KEY, JSON.stringify(this.registry ?? [])); } catch { /* 保存は補助経路 */ }
+  }
+
+  /** プロジェクト名を登録し、「今のプロジェクト」として印を付ける。 */
+  public registerProject(name: string): string | undefined {
+    const clean = normalizeText(name).replace(/[。、！!？?]+$/, '');
+    if (!clean || clean.length < 2 || clean.length > 20) return undefined;
+    const registry = this.loadRegistry();
+    const existing = registry.find((e) => normalizeProjectKey(e.name) === normalizeProjectKey(clean));
+    if (existing) {
+      existing.lastMentionedAt = Date.now();
+      this.persistRegistry();
+      return existing.name;
+    }
+    registry.push({ name: clean, lastMentionedAt: Date.now() });
+    this.persistRegistry();
+    systemLogger.info('SYSTEM', `📓 [プロジェクトノート] プロジェクト「${clean}」を登録しました`);
+    return clean;
+  }
+
+  /** 直近（2時間以内）に言及されたプロジェクト。決定の紐付け先。 */
+  public currentProject(): string | undefined {
+    const registry = this.loadRegistry();
+    if (registry.length === 0) return undefined;
+    const freshest = [...registry].sort((a, b) => b.lastMentionedAt - a.lastMentionedAt)[0];
+    if (Date.now() - freshest.lastMentionedAt > 2 * 60 * 60 * 1000) return undefined;
+    return freshest.name;
   }
 
   /** 質問文などからプロジェクトを特定する。別名・部分一致に対応。 */
@@ -145,12 +197,30 @@ export class ProjectNotebookService {
   public intakeFromUserText(text: string): ProjectDecision | undefined {
     const source = String(text || '');
     if (!source.trim()) return undefined;
+    // P713: プロジェクトの開始宣言（「Xを作りたい」「Xに〜を入れたい」）
+    // を登録簿に残す。決め事が無くてもプロジェクトが存在できるように。
+    try {
+      const intro = source.match(/([^。．、！!？?]{1,14}?)(?:を作りたい|を作ろう|を作っていく|の開発を(?:始め|はじめ)|の開発をする)/)
+        || source.match(/([^。．、！!？?]{1,14}?)(?:に)(?:.{1,12}?)を(?:入れたい|作りたい|付けたい)/);
+      if (intro) {
+        const candidate = normalizeText(intro[1]).replace(/^(?:今度は|新しい|その|この)/, '').trim();
+        // 日常の文（「鞄に本を入れたい」「ケーキを作りたい」）を
+        // プロジェクトと誤認しないよう、作り物らしい名前か、
+        // 文脈がゲーム・アプリ開発の時だけ登録する。
+        const projectLike = /ゲーム|RPG|アプリ|ツール|システム|サイト|ソフト/i.test(candidate)
+          || /(?:ゲーム|アプリ|システム)(?:作り|開発)/.test(source);
+        if (candidate && projectLike && !/ゲーム作り|話$/.test(candidate)) this.registerProject(candidate);
+      }
+    } catch { /* 登録は補助経路 */ }
     // P555: 作業状態の発言（「今〜を作ってる」「次は〜を作る」）も拾う。
     try { this.intakeWorkStateFromUserText(source); } catch { /* best-effort */ }
     if (/[？?]\s*$/.test(source.trim()) || /教えて|聞かせて/.test(source)) return undefined;
-    if (!/決め(た|る|ました|よう)|ことにし(た|ます|よう|よ)|決定(した|する|しました)/.test(source)) return undefined;
-    const project = this.findProjectInText(source);
+    // P713: 決定の言い方に「仕様にする／しよう」「〜で決まり」も加える。
+    if (!/決め(た|る|ました|よう)|ことにし(た|ます|よう|よ)|決定(した|する|しました)|仕様に(?:する|しよう)|(?:で|に)決まり/.test(source)) return undefined;
+    // P713: プロジェクト名が文中に無ければ、直近のプロジェクトに紐付ける。
+    const project = this.findProjectInText(source) || this.currentProject();
     if (!project) return undefined;
+    try { this.registerProject(project); } catch { /* 言及の記録は補助 */ }
     const sentences = source.split(/(?<=。)/).map((s) => s.trim()).filter(Boolean);
     const sentence = sentences.find((s) => this.findProjectInText(s) === project) ?? source.trim();
     // P546: 形は決め事でも、仮定・引用・伝聞なら本人の決定として

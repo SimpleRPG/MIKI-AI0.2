@@ -1905,6 +1905,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (rp712.isActive()) rp712.endSession();
 }
 
+// ---- ゲーム作りの決定が残り、思い出せる（P713） ----
+{
+  const { projectNotebookService: nb713 } = await import('../src/miki/memory/services/projectNotebookService');
+  const { conversationFactIntakeService: intake713 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  intake713.intakeFromUserText('今度はゲーム作りの話。脱出ゲームに鍵の仕掛けを入れたいんだ', []);
+  check('P713 新規プロジェクトが登録される', nb713.listProjects().includes('脱出ゲーム'), JSON.stringify(nb713.listProjects()));
+  intake713.intakeFromUserText('鍵は死んでも無くならない専用ポケットに入れる仕様にしよう', []);
+  check('P713 仕様の決定が直近のプロジェクトに記録される', nb713.listDecisions('脱出ゲーム').some((d) => d.text.includes('専用ポケット')), JSON.stringify(nb713.listDecisions('脱出ゲーム').map((d) => d.text)));
+  const recall713 = await conversationCoreService.execute({ prompt: 'さっき決めた鍵の仕様、覚えてる？' } as any);
+  check('P713 決めた仕様を思い出せる', recall713.replyText.includes('覚えています') && recall713.replyText.includes('脱出ゲーム'), recall713.replyText.slice(0, 140));
+  nb713.intakeFromUserText('鞄に本を入れたい', []);
+  check('P713 日常の文はプロジェクトにならない', !nb713.listProjects().includes('鞄'), JSON.stringify(nb713.listProjects()));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

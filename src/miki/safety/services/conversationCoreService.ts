@@ -416,6 +416,10 @@ export class ConversationCoreService {
       if (projectStatus) {
         return this.buildResult('RESOLVED', 'project_status_answer', this.applyPersonaVoice(projectStatus), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const decisionRecall = this.decisionRecallAnswer(prompt, japaneseAnalysis?.contentTokens || []);
+      if (decisionRecall) {
+        return this.buildResult('RESOLVED', 'decision_recall_answer', this.applyPersonaVoice(decisionRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P597: 簡単な計算と、今日の会話の振り返りも、その場で答える
       // （計算は調査に倒れ、振り返りは P212 にしか無かった）。
       const arithmetic = this.arithmeticAnswer(prompt);
@@ -3747,6 +3751,26 @@ export class ConversationCoreService {
     } catch { /* 補助経路 */ }
     if (parts.length === 0) return '今日の話は、まだ特に残っていません。これから色々話しましょう。';
     return parts.join('。') + '。';
+  }
+
+  /**
+   * P713: 「さっき決めた鍵の仕様、覚えてる？」——決め事の想起。
+   * プロジェクト名が無くても、質問の言葉と決め事の文が重なれば
+   * その決め事を答える（従来は決め事の想起口が無く、「さっき」が
+   * 未知語として処理されていた）。
+   */
+  private decisionRecallAnswer(prompt: string, contentTokens: string[]): string | undefined {
+    if (!/(?:決めた|決め事|決まった|仕様)/.test(prompt)) return undefined;
+    if (!/(?:覚えて|何だっけ|なんだっけ|何だった|なんだっけ|思い出)/.test(prompt)) return undefined;
+    try {
+      const keys = (contentTokens || []).filter((t) => (t.length >= 2 || /[一-龠ァ-ヶ]/.test(t)) && !/^(決めた|決め事|決まった|仕様|さっき|覚えて|何だっけ)$/.test(t));
+      const decisions = projectNotebookService.listDecisions();
+      // 新しい決め事から探す（「さっき決めた」は直近の決定のはず）。
+      const hit = [...decisions].reverse().find((d) => keys.some((k) => d.text.includes(k)));
+      if (hit) return `覚えています。${hit.project}の決め事で、「${hit.text.slice(0, 90)}」と決めています。`;
+      if (decisions.length > 0) return `決め事は${decisions.length}件覚えていますが、その内容は見つかりませんでした。プロジェクト名か、決めた言葉で聞いてもらえますか？`;
+    } catch { /* 補助経路 */ }
+    return undefined;
   }
 
   /** P598: プロジェクトの完成・進捗の質問へ、作業状態から答える。 */
