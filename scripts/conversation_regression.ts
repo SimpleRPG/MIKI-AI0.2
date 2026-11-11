@@ -2005,6 +2005,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P719 話題の再説明は知っている内容で語る', retell719.replyText.includes('ホシカゲ') && retell719.replyText.includes('南の島'), retell719.replyText.slice(0, 130));
 }
 
+// ---- 分類の質問（何科）と、調査側の複合語（P720） ----
+{
+  const { conversationFactIntakeService: intake720 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem720: any[] = []; const hist720: any[] = []; let st720: any = undefined;
+  const run720 = async (q: string) => {
+    mem720 = intake720.intakeFromUserText(q, mem720).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem720, recentMessages: hist720.slice(-8), conversationState: st720 } as any);
+    st720 = r.nextConversationState;
+    hist720.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run720('ホシカゲは南の島に住む小さい動物だよ');
+  const cls720 = await run720('それって何科の動物？');
+  check('P720 何科の質問は直近の話題の分類として正直に答える', cls720.replyText.includes('ホシカゲ') && cls720.replyText.includes('分類'), cls720.replyText.slice(0, 130));
+  check('P720 複合語の名指しをしない', !cls720.replyText.includes('動物、何科') && !cls720.replyText.includes('何科、動物'), cls720.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

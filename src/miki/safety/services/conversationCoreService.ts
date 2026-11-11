@@ -283,7 +283,17 @@ export class ConversationCoreService {
     // 断片「何食」の調査になっていた。置き換えたら未知語も数え直す。
     try {
       const ana = interpretation.anaphora;
-      if (ana?.resolved && ana?.confidence === 'unique' && ana?.detectedExpression) {
+      // P720: 解けた先が総称（動物・もの等）なら、それは指示語の
+      // 指す固有の対象ではない。置き換えると「動物って何科の動物？」
+      // のような文になるため、総称への置き換えはしない。同じ理由で、
+      // 辞書にも関係にも裏付けの無い断片（「い動物」等）への置き換え
+      // もしない。置き換えは裏付けのある実体だけにする。
+      const genericReferent = /^(動物|植物|もの|こと|場所|人|食べ物|飲み物|鳥|魚|虫|花|木)$/.test(String(ana?.resolved || ''));
+      let validatedReferent = false;
+      try {
+        validatedReferent = !!ana?.resolved && (japaneseDictionaryService.has(String(ana.resolved)) || worldModelGraphService.relationsOf(String(ana.resolved)).length > 0);
+      } catch { validatedReferent = false; }
+      if (ana?.resolved && ana?.confidence === 'unique' && ana?.detectedExpression && !genericReferent && validatedReferent) {
         const re = new RegExp(`^${ana.detectedExpression}(って|は|の|が|を|も|に|って何)`);
         if (re.test(prompt)) {
           prompt = prompt.replace(re, `${ana.resolved}$1`);
@@ -475,7 +485,7 @@ export class ConversationCoreService {
         return this.buildResult('RESOLVED', 'recipe_askback_answer', this.applyPersonaVoice(recipeAsk), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P616: 知っている物への属性の質問は、世界モデルの関係で答える。
-      const attribute = this.attributeQuestionAnswer(prompt);
+      const attribute = this.attributeQuestionAnswer(prompt, state, recentMessages);
       if (attribute) {
         return this.buildResult('RESOLVED', 'attribute_question_answer', this.applyPersonaVoice(attribute), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -2265,7 +2275,12 @@ export class ConversationCoreService {
     return list.filter((t) => {
       if (t.length < 2) return false;
       if (/^(それ|これ|あれ|どれ|ここ|そこ|あそこ|どっち|どちら|もの|こと|ため)$/.test(t)) return false;
-      if (list.some((a) => a !== t && list.some((b) => b !== t && b !== a && a + b === t))) return false;
+      // P720: 辞書で知っている語（教わった語を含む）は、形態素の
+      // 分割片の連結と一致しても本物の語として残す。「ホシカゲ」が
+      // ホシ+カゲに割れるせいで対象の記録から落ちていた。
+      let known = false;
+      try { known = japaneseDictionaryService.has(t); } catch { known = false; }
+      if (!known && list.some((a) => a !== t && list.some((b) => b !== t && b !== a && a + b === t))) return false;
       return true;
     }).slice(-4);
   }
@@ -2788,22 +2803,34 @@ export class ConversationCoreService {
    * 知っている範囲を添えて正直に言い、UNKNOWN_RELATION の gap として
    * 背景調査に積む（定義だけ返す／答えられない、で終わらせない）。
    */
-  private attributeQuestionAnswer(prompt: string): string | undefined {
+  private attributeQuestionAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
     // P622: 関係の種類ごとの属性（PART_OF / CAUSES / ENABLES）も、
     // 世界モデルの関係で答えられる範囲を広げる。
     const specific = this.specificRelationAnswer(prompt);
     if (specific) return specific;
     let attrLabel: string | undefined;
     let isUse = false;
-    if (/(?:何の仲間|なにの仲間|なんの仲間|何の一種|分類)/.test(prompt)) {
+    if (/(?:何の仲間|なにの仲間|なんの仲間|何の一種|分類|何科|何目|何綱|何門|何属)/.test(prompt)) {
       // P618: 分類の質問は IS_A の関係で答える。
       let classEntity: string | undefined;
       try {
         const features = utteranceFeatureService.analyze(prompt);
-        classEntity = features.contentTokens.find((t) => {
+        const findEntity = (allowGeneric: boolean) => features.contentTokens.find((t) => {
+          // P720: 指示語そのものは分類の対象ではない（辞書に代名詞の
+          // エントリがあると「それの分類は…」になってしまう）。
+          if (/^(それ|これ|あれ|どれ)$/.test(t)) return false;
+          // P720: 「それって何科の動物？」の「動物」は分類の観点で
+          // あって対象ではない。指示語がある時は総称を対象にしない。
+          if (!allowGeneric && /^(動物|植物|もの|こと|場所|人|食べ物|飲み物|鳥|魚|虫|花|木)$/.test(t)) return false;
           try { return japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0; } catch { return false; }
         });
+        classEntity = findEntity(false) || findEntity(true);
       } catch { classEntity = undefined; }
+      // P720: 「それって何科？」のように指示語で聞かれた場合、文中の
+      // 語（「動物」等の総称）に対象が無ければ、直近の話題を対象にする。
+      if (!classEntity || (/^(?:それ|これ|あれ)/.test(prompt.trim()) && /^(動物|植物|もの|こと|場所|人|食べ物|飲み物|鳥|魚|虫|花|木)$/.test(classEntity))) {
+        classEntity = this.recentTopicCandidates(state, recentMessages)[0] || classEntity;
+      }
       if (!classEntity) return undefined;
       const isA = worldModelGraphService.relationsOf(classEntity).filter((r) => r.from === classEntity && r.type === 'IS_A');
       if (isA.length > 0) return `「${classEntity}」は、${isA.map((r) => r.to).join('・')}の仲間です。`;

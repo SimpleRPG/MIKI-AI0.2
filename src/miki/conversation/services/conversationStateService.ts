@@ -1160,7 +1160,18 @@ export function resolveAnaphora(
         // 一番最近の対象を指すのが普通なので、最新の候補で解く
         // （「どっち」等の選択の照応は対象外）。
         if (reduced.length >= 1 && (expr === 'それ' || expr === 'これ' || expr === 'あれ')) {
-          const latest = reduced[reduced.length - 1];
+          // P720: 最新の候補が辞書に無い断片（「住む小」等）や総称
+          // （「動物」）の場合、その手前の「辞書で知っている固有の
+          // 対象」を優先する。断片や総称が指示語の指す先になることは
+          // まず無い。
+          let latest = reduced[reduced.length - 1];
+          try {
+            const knownSpecific = [...reduced].reverse().find((item) => {
+              if (/^(動物|植物|もの|こと|場所|人|食べ物|飲み物|鳥|魚|虫|花|木)$/.test(item)) return false;
+              try { return japaneseDictionaryService.has(item); } catch { return false; }
+            });
+            if (knownSpecific) latest = knownSpecific;
+          } catch { /* 補助 */ }
           const retry = resolveAnaphoraPure(p, [latest]);
           if (retry.detectedExpression && retry.confidence === 'unique') {
             return {

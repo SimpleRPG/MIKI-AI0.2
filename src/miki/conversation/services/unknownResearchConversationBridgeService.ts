@@ -161,7 +161,9 @@ class UnknownResearchConversationBridgeService {
       }
     }
 
-    const termsLabel = input.unknownTerms.join('、');
+    // P720: 未知語が複数あっても、連結して実在しない複合語を
+    // 作らない。代表（先頭）の語だけを名指す。
+    const termsLabel = input.unknownTerms[0] || '';
     let ir: any;
     if (status === 'REUSED_SUPPORTED') {
       // 検証済みの過去調査の再利用。本文（タイトル・snippet・URL 付き）をそのまま提示する。
