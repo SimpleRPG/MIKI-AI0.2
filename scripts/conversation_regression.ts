@@ -2815,6 +2815,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P786 次の誕生日の年齢を答える', age786.replyText.includes('3月5日') && age786.replyText.includes('26歳'), age786.replyText.slice(0, 130));
 }
 
+// ---- P787: 年齢の事実同士で比べる ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem787: any[] = []; const hist787: any[] = []; let st787: any = undefined;
+  const run787 = async (t: string) => {
+    mem787 = conversationFactIntakeService.intakeFromUserText(t, mem787).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem787, recentMessages: hist787.slice(-8), conversationState: st787 } as any);
+    st787 = r.nextConversationState;
+    hist787.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run787('僕の年齢は25歳だよ');
+  await run787('妹の年齢は20歳だよ');
+  const older787 = await run787('僕と妹、どっちが年上？');
+  check('P787 年上を事実で比べる', older787.replyText.includes('僕の方が年上') && older787.replyText.includes('25歳'), older787.replyText.slice(0, 130));
+  const younger787 = await run787('僕と妹、どっちが年下？');
+  check('P787 年下も比べる', younger787.replyText.includes('妹の方が年下'), younger787.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

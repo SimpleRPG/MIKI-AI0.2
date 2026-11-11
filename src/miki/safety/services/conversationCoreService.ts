@@ -497,6 +497,10 @@ export class ConversationCoreService {
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
+      const factAgeCompare = this.factAgeComparisonAnswer(prompt, memories);
+      if (factAgeCompare) {
+        return this.buildResult('RESOLVED', 'fact_age_comparison_answer', this.applyPersonaVoice(factAgeCompare), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const glossCompare = this.glossComparisonAnswer(prompt, memories);
       if (glossCompare && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_comparison_answer', this.applyPersonaVoice(glossCompare), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3049,6 +3053,42 @@ export class ConversationCoreService {
    * 比較なら「材料が足りない」と会話の形で答える（下流の作業
    * 書式に落とさない）。
    */
+  /**
+   * P787: 「僕と妹、どっちが年上？」——年齢の事実同士で比べる。
+   * 説明文の実測値比べ（P756）とは別に、人の属性の事実を見る。
+   */
+  private factAgeComparisonAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/(?:年上|年下)/.test(prompt)) return undefined;
+    if (!/どっち|どちら/.test(prompt)) return undefined;
+    const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    const ageOf = (name: string): { label: string; age: number } | undefined => {
+      const targets = selfSet.has(name) ? [...selfSet] : [name];
+      const fact = (memories || []).find((mm: any) => mm && mm.active !== false && !mm.replacedBy
+        && String(mm.factAttribute || '') === '年齢' && targets.includes(String(mm.factEntity || ''))
+        && /\d/.test(String(mm.factValue || '')));
+      if (!fact) return undefined;
+      const age = Number(String(fact.factValue).match(/(\d+)/)?.[1]);
+      return Number.isFinite(age) ? { label: name, age } : undefined;
+    };
+    const tokens = utteranceFeatureService.analyze(prompt).contentTokens
+      .filter((w: string) => w.length >= 1 && !/^(?:年上|年下|どっち|どちら)$/.test(w));
+    const found: Array<{ label: string; age: number }> = [];
+    for (const t of tokens) {
+      const hit = ageOf(t);
+      if (hit && !found.some((f) => f.label === hit.label)) found.push(hit);
+      if (found.length >= 2) break;
+    }
+    if (found.length < 2) return undefined;
+    const [a, b] = found;
+    if (a.age === b.age) return `${a.label}と${b.label}は同じ${a.age}歳です。`;
+    const older = a.age > b.age ? a : b;
+    const younger = a.age > b.age ? b : a;
+    if (/年下/.test(prompt) && !/年上/.test(prompt)) {
+      return `${younger.label}の方が年下です（${a.label}は${a.age}歳、${b.label}は${b.age}歳）。`;
+    }
+    return `${older.label}の方が年上です（${a.label}は${a.age}歳、${b.label}は${b.age}歳）。`;
+  }
+
   private glossComparisonAnswer(prompt: string, memories: any[] = []): string | undefined {
     if (!/(?:どっちが|どちらが)/.test(prompt)) return undefined;
     const dims: Array<{ re: RegExp; label: string; adj: string; plus: RegExp; minus: RegExp; plusText: string; minusText: string }> = [
