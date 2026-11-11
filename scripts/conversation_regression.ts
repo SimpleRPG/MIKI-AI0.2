@@ -2140,6 +2140,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P726 仮の分類は出所を添えて断定しない', cls726.replyText.includes('ソラカゲ') && cls726.replyText.includes('鳥') && cls726.replyText.includes('教わった説明'), cls726.replyText.slice(0, 130));
 }
 
+// ---- 訂正で分解の生成物も追従する（P728） ----
+{
+  const { conversationFactIntakeService: intake728 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { worldModelGraphService: wm728 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { claimDatabaseService: claims728 } = await import('../src/miki/memory/services/claimDatabaseService');
+  let mem728: any[] = [];
+  mem728 = intake728.intakeFromUserText('カゼカゲは高原に住む小さい鳥だよ', mem728).updatedMemories;
+  const relBefore728 = wm728.relationsOf('カゼカゲ').find((r: any) => r.from === 'カゼカゲ' && r.type === 'IS_A');
+  check('P728 教わった直後は仮の分類がある', !!relBefore728 && relBefore728.to === '鳥' && relBefore728.provisional === true, JSON.stringify(relBefore728 || null));
+  mem728 = intake728.intakeFromUserText('ごめん、カゼカゲは小さいじゃなくて中くらいの大きさだよ', mem728).updatedMemories;
+  const claimList728 = claims728.getAllClaims().filter((c: any) => String(c.statement).includes('カゼカゲ'));
+  const oldClaim728 = claimList728.find((c: any) => String(c.statement).includes('小さい鳥'));
+  const newClaim728 = claimList728.find((c: any) => String(c.statement).includes('中くらいの大きさ'));
+  check('P728 訂正で古い知識は差し替わり新しい知識が残る', !!oldClaim728 && oldClaim728.status === 'SUPERSEDED' && !!newClaim728 && newClaim728.status === 'CANDIDATE', JSON.stringify(claimList728.map((c: any) => `${c.statement}|${c.status}`)));
+  const relAfter728 = wm728.relationsOf('カゼカゲ').filter((r: any) => r.from === 'カゼカゲ' && r.type === 'IS_A');
+  check('P728 訂正で根拠を失った仮の分類は消える', relAfter728.length === 0, JSON.stringify(relAfter728));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

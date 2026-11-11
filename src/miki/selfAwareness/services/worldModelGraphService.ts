@@ -238,6 +238,27 @@ class WorldModelGraphService {
     return relation;
   }
 
+  /**
+   * P728: 出典の Claim が差し替え・撤回されたとき、その Claim を
+   * 出典から外す。仮の関係で出典が無くなれば関係自体を取り除く。
+   * 確定した関係や、他の出典も持つ関係は残す。
+   */
+  public detachClaimFromRelations(claimId: string): number {
+    if (!claimId) return 0;
+    const state = this.load();
+    let dropped = 0;
+    let touched = false;
+    state.relations = state.relations.filter((r) => {
+      if (!r.sourceClaimIds.includes(claimId)) return true;
+      touched = true;
+      r.sourceClaimIds = r.sourceClaimIds.filter((id) => id !== claimId);
+      if (r.provisional && r.sourceClaimIds.length === 0) { dropped++; return false; }
+      return true;
+    });
+    if (touched) this.save();
+    return dropped;
+  }
+
   public entities(): WorldEntity[] {
     return [...this.load().entities];
   }

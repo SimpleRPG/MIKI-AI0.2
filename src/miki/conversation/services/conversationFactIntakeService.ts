@@ -615,9 +615,12 @@ export class ConversationFactIntakeService {
    */
   private decomposeTaughtGloss(term: string, gloss: string, statement: string): void {
     // 1. Claim 登録（重複は claimDatabaseService 側で抑えられる）。
+    // P728: 登録した Claim の ID を覚え、関係の出典に紐付ける
+    // （訂正で Claim が差し替わったときに関係も追従できるように）。
+    let taughtClaimId = '';
     try {
       const claimText = /です。?$|だ。?$/.test(statement) ? (statement.endsWith('。') ? statement : `${statement}。`) : `${statement}です。`;
-      claimDatabaseService.registerClaim({
+      const registered = claimDatabaseService.registerClaim({
         statement: claimText,
         world: 'REAL',
         kind: 'FACT_CLAIM',
@@ -628,6 +631,7 @@ export class ConversationFactIntakeService {
         origin_source_id: 'user_conversation_teaching',
         independence_cluster_id: 'cluster_user_teaching',
       } as any);
+      if (registered?.claim_id) taughtClaimId = String(registered.claim_id);
     } catch { /* Claim 登録は補助経路 */ }
     // 説明の内容語を分解する。
     let tokens: string[] = [];
@@ -641,6 +645,9 @@ export class ConversationFactIntakeService {
     // 「最後の語で、漢字かカタカナで終わる」場合だけ認める。
     try {
       const category = [...clean].reverse().find((t, idx) => {
+        // P728: 形容詞の語幹（「大きさ」の「大」等）は分類語ではない。
+        // 後ろに形容詞の活用（き・く・かっ）が続けば語幹とみなす。
+        if (new RegExp(`${t}(?:き|く|かっ|くな)`).test(gloss)) return false;
         try {
           const entries = japaneseDictionaryService.lookup(t);
           if (entries.length > 0) return entries.some((e: any) => ['NOUN', 'PROPER_NOUN', 'TECHNICAL', 'UNKNOWN'].includes(String(e?.pos || '')));
@@ -648,7 +655,7 @@ export class ConversationFactIntakeService {
         return idx === 0 && /[一-龠ァ-ヶー]$/.test(t);
       });
       if (category && category !== term) {
-        worldModelGraphService.addRelation({ fromName: term, toName: category, type: 'IS_A', provisional: true, confidence: 0.3 } as any);
+        worldModelGraphService.addRelation({ fromName: term, toName: category, type: 'IS_A', provisional: true, confidence: 0.3, ...(taughtClaimId ? { sourceClaimId: taughtClaimId } : {}) } as any);
       }
     } catch { /* 関係は補助経路 */ }
     // 3. 知らない構成語 → 知識の欠け（背景学習行き）。対象は漢字・
@@ -974,6 +981,52 @@ export class ConversationFactIntakeService {
         japaneseDictionaryService.addPersonal(entity, { gloss: values.join('、'), semanticIds: ['learned:user-taught'], pos: 'UNKNOWN' } as any);
       } else {
         japaneseDictionaryService.removePersonal(entity);
+      }
+      // P728: 分解の生成物（Claim・仮の関係）も訂正に追従させる。
+      try { this.refreshDecompositionAfterCorrection(entity, values); } catch { /* 分解の追従は補助経路 */ }
+    }
+  }
+
+  /**
+   * P728: 訂正で教わった語の説明が作り直されたら、P726 の分解の
+   * 生成物も追従させる。古い Claim は新しい Claim へ差し替え
+   * （SUPERSEDED）、古い Claim を出典とする仮の関係は外し、
+   * 新しい説明から分類を分解し直す。説明が残らなければ、Claim
+   * を引退させ仮の関係も外す（訂正前の知識を言い続けない）。
+   */
+  private refreshDecompositionAfterCorrection(entity: string, values: string[]): void {
+    const olds = claimDatabaseService.getAllClaims().filter((c: any) =>
+      String(c.origin_source_id || '') === 'user_conversation_teaching'
+      && String(c.statement || '').startsWith(`${entity}は`)
+      && !(c as any).superseded_by
+      && c.status !== 'SUPERSEDED');
+    if (olds.length === 0) return;
+    if (values.length > 0) {
+      const newGloss = values.join('、');
+      const registered = claimDatabaseService.registerClaim({
+        statement: `${entity}は${newGloss}です。`,
+        world: 'REAL',
+        kind: 'FACT_CLAIM',
+        status: 'CANDIDATE',
+        source: 'USER_CLAIM',
+        self_provenance: 'USER_CONFIRMED',
+        maturity: 'DEFINED',
+        origin_source_id: 'user_conversation_teaching',
+        independence_cluster_id: 'cluster_user_teaching',
+      } as any);
+      const newId = registered?.claim_id ? String(registered.claim_id) : '';
+      for (const old of olds) {
+        if (newId && old.claim_id !== newId) {
+          try { claimDatabaseService.supersedeClaim(old.claim_id, newId, '訂正に伴い、教わった説明の知識を差し替え'); } catch { /* 補助経路 */ }
+        }
+        try { worldModelGraphService.detachClaimFromRelations(old.claim_id); } catch { /* 補助経路 */ }
+      }
+      // 新しい説明から分類を分解し直す（Claim 登録は重複で抑えられる）。
+      try { this.decomposeTaughtGloss(entity, newGloss, `${entity}は${newGloss}`); } catch { /* 補助経路 */ }
+    } else {
+      for (const old of olds) {
+        try { worldModelGraphService.detachClaimFromRelations(old.claim_id); } catch { /* 補助経路 */ }
+        try { claimDatabaseService.setVerificationStatus(old.claim_id, 'SUPERSEDED' as any, '教わった説明が撤回されたため'); } catch { /* 補助経路 */ }
       }
     }
   }

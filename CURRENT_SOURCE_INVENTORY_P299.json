@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4109,
-    "resolvedRelativeImportCandidateCount": 4093,
+    "relativeImportCandidateCount": 4112,
+    "resolvedRelativeImportCandidateCount": 4096,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 203954,
-      "lines": 2156,
-      "sha256": "4481e43b386d2b7d58cb7c2958d70d9ddbf698eb01ffbc1b68c22446b0829f27",
+      "bytes": 205826,
+      "lines": 2174,
+      "sha256": "335d04d9b44f055a0e503331edc5a7f6905c9844bb546f1b02eeaa5432112829",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2342,10 +2342,28 @@
           "specifier": "../src/miki/unknown/services/knowledgeGapService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
+        },
+        {
+          "line": 2145,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 2146,
+          "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
+        },
+        {
+          "line": 2147,
+          "specifier": "../src/miki/memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         }
       ],
-      "relativeImportCandidateCount": 105,
-      "resolvedRelativeImportCount": 105,
+      "relativeImportCandidateCount": 108,
+      "resolvedRelativeImportCount": 108,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -11040,9 +11058,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationFactIntakeService.ts",
-      "bytes": 53983,
-      "lines": 982,
-      "sha256": "c981b942896470b260c17045df633dd9aa32b59e6eef76ec50628195723587d5",
+      "bytes": 57189,
+      "lines": 1035,
+      "sha256": "29d218f4b2031d2f5f997f794e5632146efcff43dc786bf9063cd9844fa86428",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -29723,9 +29741,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/worldModelGraphService.ts",
-      "bytes": 34326,
-      "lines": 771,
-      "sha256": "6569e4b819c8e6e3de31c4f3b5ef32d3d4da35057003d44d345be61d31ba64c8",
+      "bytes": 35134,
+      "lines": 792,
+      "sha256": "86d9a35429576225529ac5ae93f69e89fe2dc017dca4cbec10c6a78b3f160c47",
       "relativeImportCandidates": [
         {
           "line": 1,
