@@ -541,6 +541,10 @@ export class ConversationCoreService {
       if (measDiff && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_difference_answer', this.applyPersonaVoice(measDiff), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const factThr = this.factThresholdAnswer(prompt, memories);
+      if (factThr) {
+        return this.buildResult('RESOLVED', 'fact_threshold_answer', this.applyPersonaVoice(factThr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const measRange = this.measureRangeAnswer(prompt);
       if (measRange) {
         return this.buildResult('RESOLVED', 'measure_range_answer', this.applyPersonaVoice(measRange), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3657,6 +3661,30 @@ export class ConversationCoreService {
    * P761: 「教えた動物の平均の重さは？」「全部合わせると何キロ？」
    * ——実測値の合計と平均。数値の無いものは対象外と添える。
    */
+  /** P795: 「身長160センチ以上の人は誰？」——人の事実を閾値で絞る。 */
+  private factThresholdAnswer(prompt: string, memories: any[] = []): string | undefined {
+    const tm = prompt.match(/(\d+(?:\.\d+)?)\s*(センチメートル|センチ|メートル|キログラム|キロ|グラム|トン|歳|年)/);
+    if (!tm) return undefined;
+    if (!/(?:以上|以下|未満|超|より)/.test(prompt)) return undefined;
+    const got = this.factAttributeValues(prompt, memories);
+    if (!got) return undefined;
+    const label = got.attr === '身長' ? '大きさ' : got.attr === '体重' ? '重さ' : '年齢';
+    const thr = label === '年齢'
+      ? Number(tm[1])
+      : this.measureFromText(`${tm[1]}${tm[2]}`, label as '重さ' | '大きさ')?.value;
+    if (thr === undefined || !Number.isFinite(thr)) return undefined;
+    let keep: (v: number) => boolean;
+    if (/未満|より小さい|より低い|より軽い|より若い/.test(prompt)) keep = (v) => v < thr;
+    else if (/以下/.test(prompt)) keep = (v) => v <= thr;
+    else if (/超/.test(prompt) && !/以上/.test(prompt)) keep = (v) => v > thr;
+    else keep = (v) => v >= thr;
+    const hits = got.rows.filter((r) => keep(r.v));
+    if (hits.length === 0) return '今知っている中では、条件に合う人はいないです。';
+    const names = hits.map((r) => `「${r.name}」`).join('と');
+    if (/(?:何人|何名)/.test(prompt)) return `${hits.length}人です。${names}です。`;
+    return `${names}です。`;
+  }
+
   /** P794: 人の属性の事実を集める（順位・平均用）。 */
   private factAttributeValues(prompt: string, memories: any[]): { attr: string; unit: string; rows: Array<{ name: string; v: number; disp: string }>; minus: boolean; cueLabel: string } | undefined {
     let attr = ''; let label: '重さ' | '大きさ' | '年齢' = '年齢'; let unit = '歳'; let minus = false; let cueLabel = '';

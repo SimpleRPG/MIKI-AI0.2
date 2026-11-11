@@ -2943,6 +2943,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P794 平均身長を出す', avg794.replyText.includes('約162.3センチ'), avg794.replyText.slice(0, 130));
 }
 
+// ---- P795: 人の属性の事実を閾値で絞る ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem795: any[] = []; const hist795: any[] = []; let st795: any = undefined;
+  const run795 = async (t: string) => {
+    mem795 = conversationFactIntakeService.intakeFromUserText(t, mem795).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem795, recentMessages: hist795.slice(-8), conversationState: st795 } as any);
+    st795 = r.nextConversationState;
+    hist795.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run795('僕の身長は170センチだよ');
+  await run795('妹の身長は155センチだよ');
+  await run795('弟の身長は162センチだよ');
+  const over795 = await run795('身長160センチ以上の人は誰？');
+  check('P795 閾値以上で絞る', over795.replyText.includes('僕') && over795.replyText.includes('弟') && !over795.replyText.includes('妹'), over795.replyText.slice(0, 130));
+  const under795 = await run795('身長160センチ未満の人は何人？');
+  check('P795 閾値未満を数える', under795.replyText.includes('1人です') && under795.replyText.includes('妹'), under795.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
