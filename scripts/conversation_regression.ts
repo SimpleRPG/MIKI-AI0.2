@@ -1934,6 +1934,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (rp714.isActive()) rp714.endSession();
 }
 
+// ---- 読点で繋いだ教え方が取り込まれる（P715） ----
+{
+  const { conversationFactIntakeService: intake715 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const facts715 = intake715.extractUserFacts('僕は猫を飼ってるよ、名前はモチ');
+  check('P715 猫を飼っている事実が名前の節を飲み込まない', facts715.facts.some((f: any) => String(f.value || '').includes('猫を飼って')), JSON.stringify(facts715.facts));
+  check('P715 名前が猫の名前として結びつく', facts715.facts.some((f: any) => f.entity === '猫' && f.attribute === '名前' && f.value === 'モチ'), JSON.stringify(facts715.facts));
+  let mem715: any[] = [];
+  mem715 = intake715.intakeFromUserText('僕は猫を飼ってるよ、名前はモチ', mem715).updatedMemories;
+  const recall715 = await conversationCoreService.execute({ prompt: '僕の猫の名前なんだっけ？', memories: mem715 } as any);
+  check('P715 猫の名前を思い出せる', recall715.replyText.includes('モチ'), recall715.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

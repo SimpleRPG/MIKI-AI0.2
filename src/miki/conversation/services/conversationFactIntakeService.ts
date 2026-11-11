@@ -466,6 +466,11 @@ export class ConversationFactIntakeService {
       }
     }
 
+    // P715: 「猫を飼ってるよ、名前はモチ」のように、名前の節が読点で
+    // 繋がっている場合は文として切り分ける（従来は飼っている事実の
+    // 値に名前の節まで飲み込まれ、名前が取り込まれなかった）。
+    working = working.replace(/、(?=(?:名前|呼び名)は)/g, '。');
+
     const facts: ExtractedFact[] = [];
     // P457 (E): 同一発言内の対象の文脈。「名前はV」のような省略文を、
     // 直前に出た対象へ結びつけるために使う。
@@ -483,6 +488,20 @@ export class ConversationFactIntakeService {
       }
     }
     linkNameAndCategory(facts);
+    // P715: 同じ発言に「Xを飼ってる」と裸の「名前はV」がある場合、
+    // その名前は本人の名前ではなく、飼っている動物の名前として
+    // 結びつける（本人の名前スロットを汚さない）。
+    {
+      const petFact = facts.find((f) => /(?:を飼って|を飼育)/.test(String(f.value || '')));
+      const animal = petFact ? String(petFact.value).match(/^(.{1,8}?)を(?:飼って|飼育)/)?.[1] : undefined;
+      const bareName = facts.find((f) => f.attribute === '名前・呼び名' || (f.entity === '名前' && f.attribute === '名前'));
+      if (animal && bareName) {
+        bareName.entity = animal;
+        bareName.attribute = '名前';
+        bareName.statement = `${animal}の名前は${bareName.value}`;
+        bareName.summary = bareName.statement;
+      }
+    }
 
     // 「攻撃力は1200じゃなくて1137」のように訂正後の値だけが残る場合は、
     // 訂正前の対象＋属性を引き継いで新事実として合成する。
