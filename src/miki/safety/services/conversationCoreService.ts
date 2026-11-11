@@ -483,6 +483,23 @@ export class ConversationCoreService {
       if (eitherOr) {
         return this.buildResult('RESOLVED', 'either_or_recall_answer', this.applyPersonaVoice(eitherOr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P744: 「XもYも〜なの？」——二つまとめた確認に、それぞれの
+      // 分類・説明と照らして答える。
+      const dualConfirm = this.dualConfirmAnswer(prompt);
+      if (dualConfirm && !multiPart) {
+        return this.buildResult('RESOLVED', 'dual_confirm_answer', this.applyPersonaVoice(dualConfirm), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P745: 「XとYは何が違うの？」——説明文の手がかりの差で答える。
+      const difference = this.glossDifferenceAnswer(prompt);
+      if (difference && !multiPart) {
+        return this.buildResult('RESOLVED', 'gloss_difference_answer', this.applyPersonaVoice(difference), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P746: 「別の言い方で言い直して」——言い換えサービス（生成＋
+      // 意味保存チェック）で、知っている説明を言い直す。
+      const paraphraseReq = this.paraphraseRequestAnswer(prompt);
+      if (paraphraseReq && !multiPart) {
+        return this.buildResult('RESOLVED', 'paraphrase_request_answer', this.applyPersonaVoice(paraphraseReq), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P604: 食事の迷いは、一緒に考える形で受ける。
       const dinner = this.dinnerMusingAnswer(prompt);
       if (dinner) {
@@ -3073,6 +3090,103 @@ export class ConversationCoreService {
       if (winners.length > 1) return `一番${dim.label}ものは、${winners.map((w) => w.name).join('と')}が同じくらいだと思います。`;
       const srcNote = winners[0].taught ? '教わった説明の中では' : '覚えている説明の中では';
       return `${srcNote}、「${winners[0].name}」が一番${dim.label}と思います。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P744: 「クオッカもワラルーも動物なの？」「〜も〜もオーストラリアに
+   * 住んでるの？」——二つまとめた確認に、それぞれの分類・説明と
+   * 照らして答える。片方だけ分かる時は、その旨を分けて言う。
+   */
+  private dualConfirmAnswer(prompt: string): string | undefined {
+    if (!/[？?]/.test(prompt)) return undefined;
+    const m = prompt.match(/^(.{2,12}?)も(.{2,12}?)も(.+)$/);
+    if (!m) return undefined;
+    const a = m[1].trim();
+    const b = m[2].trim();
+    if (a === b) return undefined;
+    const known = (t: string) => {
+      try { return japaneseDictionaryService.lookup(t).some((e: any) => e.gloss) || worldModelGraphService.relationsOf(t).length > 0; } catch { return false; }
+    };
+    if (!known(a) || !known(b)) return undefined;
+    const pred = m[3].replace(/(?:なの|の|よね|ですか|でしょ)[？?]?$/, '').replace(/[？?]+$/, '').trim();
+    if (!pred || pred.length > 20) return undefined;
+    const judge = (t: string): boolean => {
+      try {
+        const isA = worldModelGraphService.relationsOf(t).filter((r) => r.from === t && r.type === 'IS_A').map((r) => r.to);
+        if (isA.includes(pred)) return true;
+        const gloss = japaneseDictionaryService.lookup(t).map((e: any) => String(e.gloss || '')).join(' ');
+        if (gloss.includes(pred)) return true;
+        if (/(?:住ん|生息|棲ん)/.test(pred) && /(?:住|生息|棲)/.test(gloss)) return true;
+        return false;
+      } catch { return false; }
+    };
+    const ja = judge(a);
+    const jb = judge(b);
+    if (ja && jb) {
+      const isCategory = [a, b].some((t) => worldModelGraphService.relationsOf(t).some((r) => r.from === t && r.type === 'IS_A' && r.to === pred));
+      if (isCategory) {
+        const provOnly = [a, b].every((t) => {
+          const rels = worldModelGraphService.relationsOf(t).filter((r) => r.from === t && r.type === 'IS_A' && r.to === pred);
+          return rels.length === 0 || rels.every((r) => r.provisional);
+        });
+        return provOnly ? `うん、教わった説明では、どちらも${pred}の仲間だよ。` : `うん、どちらも${pred}の仲間だよ。`;
+      }
+      return `うん、どちらも${pred}、と聞いています。`;
+    }
+    if (ja !== jb) {
+      const yes = ja ? a : b;
+      const no = ja ? b : a;
+      return `「${yes}」はそうだと思います。でも「${no}」の方は、まだ分からないです。`;
+    }
+    return undefined;
+  }
+
+  /**
+   * P745: 「XとYは何が違うの？」——説明文の手がかりの差で答える。
+   * 大きさが逆なら大きさの違いを、そうでなければ説明そのものを
+   * 並べて見せる（分からない違いを invent しない）。
+   */
+  private glossDifferenceAnswer(prompt: string): string | undefined {
+    if (!/(?:何が違う|どう違う|違いは|ちがいは)/.test(prompt)) return undefined;
+    try {
+      const f = utteranceFeatureService.analyze(prompt);
+      const glossed = [...new Set(f.contentTokens.filter((t) => japaneseDictionaryService.lookup(t).some((e: any) => e.gloss)))];
+      const [a, b] = glossed;
+      if (!a || !b) return undefined;
+      const glossOf = (t: string) => String(japaneseDictionaryService.lookup(t).find((e: any) => e.gloss)?.gloss || '');
+      const ga = glossOf(a);
+      const gb = glossOf(b);
+      if (!ga || !gb) return undefined;
+      const cue = (g: string) => (/大き|でか/.test(g) ? 1 : /小さ|小柄/.test(g) ? -1 : 0);
+      if (cue(ga) !== 0 && cue(gb) !== 0 && cue(ga) !== cue(gb)) {
+        const big = cue(ga) > cue(gb) ? a : b;
+        const small = big === a ? b : a;
+        return `大きさが違います。教わった説明では、「${big}」は大きい、「${small}」は小さいそうです。`;
+      }
+      if (ga === gb) return '教わった説明では、どちらも同じように聞いていて、違いは分からないです。';
+      return `教わった説明では、「${a}」は${ga}、「${b}」は${gb}、と聞いています。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P746: 「Xのこと、別の言い方で言い直して」——言い換えは
+   * 生成＋意味保存チェックのセット（paraphraseService.restate）
+   * で行い、チェックを通った言い換えだけを出す。通らなければ
+   * 今の言い方が一番正確だと正直に言う。
+   */
+  private paraphraseRequestAnswer(prompt: string): string | undefined {
+    if (!/(?:言い直し|言い換え|別の言い方|違う言い方)/.test(prompt)) return undefined;
+    try {
+      const f = utteranceFeatureService.analyze(prompt);
+      const target = f.contentTokens.find((t) => japaneseDictionaryService.lookup(t).some((e: any) => e.gloss));
+      if (!target) return undefined;
+      const gloss = String(japaneseDictionaryService.lookup(target).find((e: any) => e.gloss)?.gloss || '');
+      if (!gloss) return undefined;
+      const sentence = `「${target}」は${gloss}です。`;
+      const r = paraphraseService.restate(sentence, { style: 'plain' });
+      if (r.changed && r.check.ok) return `言い直すと、こうなります。${r.text}`;
+      return `今の私の語彙では、この説明はこの言い方が一番正確なんです。${sentence}`;
     } catch { return undefined; }
   }
 

@@ -2358,6 +2358,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P743 知らない重さは正直に言う', none743.replyText.includes('重さはまだ知らない'), none743.replyText.slice(0, 130));
 }
 
+// ---- 二つまとめた確認・違い・言い直し（P744-P746） ----
+{
+  const { conversationFactIntakeService: intake744 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem744: any[] = []; const hist744: any[] = []; let st744: any = undefined;
+  const run744 = async (q: string) => {
+    mem744 = intake744.intakeFromUserText(q, mem744).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem744, recentMessages: hist744.slice(-8), conversationState: st744 } as any);
+    st744 = r.nextConversationState;
+    hist744.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run744('アメカゲは雨の森に住む小さい獣だよ');
+  await run744('ユアカゲは雨の森に住む大きな獣だよ');
+  const dual744 = await run744('アメカゲもユアカゲも雨の森に住んでるの？');
+  check('P744 二つまとめた生息の確認に答える', dual744.replyText.includes('どちらも') && dual744.replyText.includes('雨の森に住んでる'), dual744.replyText.slice(0, 130));
+  const dualCat744 = await run744('アメカゲもユアカゲも獣なの？');
+  check('P744 二つまとめた分類の確認に答える', dualCat744.replyText.includes('どちらも') && dualCat744.replyText.includes('獣の仲間'), dualCat744.replyText.slice(0, 130));
+  const dualNo744 = await run744('アメカゲもユアカゲも鳥なの？');
+  check('P744 根拠のない二つの確認には断定しない', !dualNo744.replyText.includes('どちらも鳥'), dualNo744.replyText.slice(0, 130));
+  const diff744 = await run744('アメカゲとユアカゲは何が違うの？');
+  check('P745 違いは説明の手がかりで答える', diff744.replyText.includes('大きさが違います') && diff744.replyText.includes('ユアカゲ'), diff744.replyText.slice(0, 130));
+  const para744 = await run744('アメカゲのこと、別の言い方で言い直して');
+  check('P746 言い直しの依頼には言い換えか正直な限界で答える', para744.replyText.includes('言い直すと') || para744.replyText.includes('一番正確'), para744.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
