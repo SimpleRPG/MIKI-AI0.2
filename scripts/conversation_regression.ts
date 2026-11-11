@@ -1946,6 +1946,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P715 猫の名前を思い出せる', recall715.replyText.includes('モチ'), recall715.replyText.slice(0, 120));
 }
 
+// ---- ビービーへの呼びかけと、幼い口調の形容詞（P716） ----
+{
+  const { paraphraseService: para716 } = await import('../src/miki/memory/services/paraphraseService');
+  check('P716 形容詞＋ですねが崩れない', (para716.applyCasualVoice('気持ちがいいですね。') as any).text === '気持ちがいいね。', JSON.stringify(para716.applyCasualVoice('気持ちがいいですね。')));
+  check('P716 形容詞＋ですよが崩れない', (para716.applyCasualVoice('それは嬉しいですよ。') as any).text === 'それは嬉しいよ。', JSON.stringify(para716.applyCasualVoice('それは嬉しいですよ。')));
+  check('P716 名詞＋ですねは通常変換', (para716.applyCasualVoice('猫ですね。') as any).text === '猫だね。', JSON.stringify(para716.applyCasualVoice('猫ですね。')));
+  const { personaProfileService: persona716 } = await import('../src/miki/conversation/services/personaProfileService');
+  (globalThis as any).window = { dispatchEvent: () => true, addEventListener: () => {}, removeEventListener: () => {} };
+  persona716.switchProfile('persona-bibi');
+  try {
+    const g716 = await conversationCoreService.execute({ prompt: 'おはよう、ビービー' } as any);
+    check('P716 ビービーへの呼びかけ挨拶が通る', g716.replyText.includes('おはよう') && !g716.replyText.includes('の話だね'), g716.replyText.slice(0, 100));
+    const h716 = await conversationCoreService.execute({ prompt: 'ビービー、元気？' } as any);
+    check('P716 ビービーへの元気聞きが通る', h716.replyText.includes('元気'), h716.replyText.slice(0, 100));
+  } finally {
+    persona716.switchProfile('persona-default');
+  }
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

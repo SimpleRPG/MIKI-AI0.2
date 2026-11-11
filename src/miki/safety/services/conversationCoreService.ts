@@ -4185,7 +4185,10 @@ export class ConversationCoreService {
     const numericUnit = (t: string): boolean =>
       /^(時間|分|秒|時|回|個|人|日|週間|か月|ヶ月|年|月|歳|才|匹|頭|羽|本|枚|台|冊|件|円|キロ|メートル|センチ|グラム)$/.test(t)
       && new RegExp(`[0-9０-９]\\s*${t}`).test(prompt);
-    const candidates = (contentTokens || []).filter((t) => t.length >= 2 && !stop.test(t) && !isBackchannelText(t) && !verbFragment.test(t) && !numericUnit(t));
+    // P716: 自分たちの名前（みき／ビービー）は呼びかけであって
+    // 主題ではない（「おはよう、ビービー」が「ビービーの話だね」に
+    // なっていた）。
+    const candidates = (contentTokens || []).filter((t) => t.length >= 2 && t !== 'ビービー' && t !== 'みき' && !stop.test(t) && !isBackchannelText(t) && !verbFragment.test(t) && !numericUnit(t));
     // 断片らしさを採点する: 活用の語幹・複合語の途中・「〜たい」の
     // 形は主題にしない。助詞や文頭の後ろにある語を優先する。
     const score = (t: string): number => {
