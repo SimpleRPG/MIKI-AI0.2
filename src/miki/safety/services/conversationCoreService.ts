@@ -4114,17 +4114,27 @@ export class ConversationCoreService {
     // 出して、次の誕生日までの日数を数える。
     if (/(?:誕生日)/.test(prompt)) {
       try {
-        const fact = (memories || []).find((m: any) => m && m.active !== false && !m.replacedBy
+        // P798: 名前つきで聞かれたら、その人の誕生日事実を選ぶ
+        // （以前は誰の事実でも「あなたの誕生日」と呼んでいた）。
+        const bFacts = (memories || []).filter((m: any) => m && m.active !== false && !m.replacedBy
           && String(m.factAttribute || '') === '誕生日' && String(m.factValue || ''));
+        const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+        const fact = bFacts.find((m: any) => {
+          const e = String(m.factEntity || '');
+          return e && !selfSet.has(e) && prompt.includes(e);
+        }) || bFacts.find((m: any) => selfSet.has(String(m.factEntity || ''))) || bFacts[0];
         const dm = fact ? String(fact.factValue).match(/(\d{1,2})月(\d{1,2})日/) : null;
         if (dm) {
+          const entity = String(fact.factEntity || '');
+          const isSelf = !entity || selfSet.has(entity);
+          const label = isSelf ? 'あなたの誕生日' : `${entity}の誕生日`;
           const now = new Date();
           const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
           let cand = new Date(now.getFullYear(), Number(dm[1]) - 1, Number(dm[2]));
           if (cand.getTime() < today.getTime()) cand = new Date(now.getFullYear() + 1, Number(dm[1]) - 1, Number(dm[2]));
           const days = Math.round((cand.getTime() - today.getTime()) / 86400000);
-          if (days === 0) return 'あなたの誕生日は今日です。おめでとうございます。';
-          return `あなたの誕生日（${Number(dm[1])}月${Number(dm[2])}日）まで、あと${days}日です。`;
+          if (days === 0) return isSelf ? 'あなたの誕生日は今日です。おめでとうございます。' : `${label}は今日です。`;
+          return `${label}（${Number(dm[1])}月${Number(dm[2])}日）まで、あと${days}日です。`;
         }
       } catch { /* 予定の数え方へ */ }
     }

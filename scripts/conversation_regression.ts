@@ -3000,6 +3000,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P797 今週の一覧は週内だけ', week797.replyText.includes('週内テストの予定') && !week797.replyText.includes('遠方テストの予定'), week797.replyText.slice(0, 200));
 }
 
+// ---- P798: 誕生日カウントダウンは名前で人を選ぶ ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem798: any[] = []; const hist798: any[] = []; let st798: any = undefined;
+  const run798 = async (t: string) => {
+    mem798 = conversationFactIntakeService.intakeFromUserText(t, mem798).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem798, recentMessages: hist798.slice(-8), conversationState: st798 } as any);
+    st798 = r.nextConversationState;
+    hist798.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run798('僕の誕生日は3月5日だよ');
+  await run798('妹の誕生日は5月10日だよ');
+  const sis798 = await run798('妹の誕生日まであと何日？');
+  check('P798 妹の誕生日を妹と呼ぶ', sis798.replyText.includes('妹の誕生日（5月10日）'), sis798.replyText.slice(0, 130));
+  const self798 = await run798('僕の誕生日まであと何日？');
+  check('P798 自分の誕生日は従来どおり', self798.replyText.includes('あなたの誕生日（3月5日）'), self798.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
