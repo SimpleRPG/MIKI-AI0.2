@@ -132,6 +132,13 @@ class StateSnapshotExportService {
           return { count: Array.isArray(items) ? items.length : 0, texts: Array.isArray(items) ? items.slice(-3).map((m) => m.text || '') : [] };
         } catch { return { count: 0, texts: [] }; }
       })(),
+      // P752: 話してくれた予定の控えも、状態の一部として見えるように。
+      plans: (() => {
+        try {
+          const items = JSON.parse(storageService.getItem('miki_user_plans_v1') || '[]') as Array<{ when?: string; text?: string }>;
+          return { count: Array.isArray(items) ? items.length : 0, items: Array.isArray(items) ? items.slice(-5).map((p) => ({ when: p.when || '', text: p.text || '' })) : [] };
+        } catch { return { count: 0, items: [] }; }
+      })(),
     };
     return {
       snapshot,

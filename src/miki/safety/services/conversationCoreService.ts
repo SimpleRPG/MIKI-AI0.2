@@ -534,6 +534,13 @@ export class ConversationCoreService {
       if (recentLearning) {
         return this.buildResult('RESOLVED', 'recent_learning_answer', this.applyPersonaVoice(recentLearning), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P752: 「明日の予定って何だっけ？」——話してくれた予定の
+      // 控えから答える（彼女自身の予定の受け口P614より先に、
+      // 本人が話した予定を優先する）。
+      const planRecall = this.planRecallAnswer(prompt);
+      if (planRecall && !multiPart) {
+        return this.buildResult('RESOLVED', 'plan_recall_answer', this.applyPersonaVoice(planRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P614: 彼女の能力・予定への質問は、自分の現状から答える。
       const ability = this.abilityQuestionAnswer(prompt);
       if (ability) {
@@ -3252,6 +3259,31 @@ export class ConversationCoreService {
       const [first, second] = uniq;
       if (earlier) return `先に教わったのは「${first}」です。その次が「${second}」です。`;
       return `後に教わったのは「${second}」です。その前が「${first}」です。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P752: 「明日の予定って何だっけ？」——取り込み側で控えた
+   * 予定（miki_user_plans_v1）から、時期の語が合うものを答える。
+   * 控えが無ければ従来経路に委ねる（「空いています」と勝手に
+   * 断定する別の受け口より、まず本人の話した予定を優先する）。
+   */
+  private planRecallAnswer(prompt: string): string | undefined {
+    if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
+    // 予定を話す文そのもの（「〜予約があるんだ」）は聞き返しでは
+    // ない。疑問の形の時だけ受ける。
+    if (!/[？?]/.test(prompt) && !/(?:だっけ|何)/.test(prompt)) return undefined;
+    if (!/(?:何だっけ|何だった|なんだっけ|ある|あって|教えて|何か)/.test(prompt)) return undefined;
+    const whenRaw = prompt.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+    if (!whenRaw) return undefined;
+    const when = whenRaw === 'あした' ? '明日' : whenRaw;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans: Array<{ when: string; text: string }> = raw ? JSON.parse(raw) : [];
+      const hits = plans.filter((p) => p.when === when);
+      if (hits.length === 0) return undefined;
+      const texts = [...new Set(hits.map((p) => p.text))].slice(-3);
+      return `${when}の予定は、${texts.map((t) => `「${t}」`).join('と')}、と話していましたよ。`;
     } catch { return undefined; }
   }
 

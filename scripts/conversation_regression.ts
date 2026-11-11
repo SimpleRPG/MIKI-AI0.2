@@ -2406,6 +2406,13 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   await run744('僕の出身は長野だよ');
   const origin744 = await run744('僕の出身ってどこだっけ？');
   check('P751 場所の聞き返しでも本人の事実を答える', origin744.replyText.includes('長野'), origin744.replyText.slice(0, 130));
+  const planStmt744 = await run744('明日の15時に歯医者の予約があるんだ');
+  check('P752 予定を話す文は聞き返しと誤認しない', !planStmt744.replyText.includes('と話していました'), planStmt744.replyText.slice(0, 130));
+  const plan744 = await run744('明日の予定って何だっけ？');
+  check('P752 話した予定を答える', plan744.replyText.includes('歯医者') && !plan744.replyText.includes('空いています'), plan744.replyText.slice(0, 130));
+  await run744('来週、旅行に行く予定だよ');
+  const planWeek744 = await run744('来週の予定って何だっけ？');
+  check('P752 来週の予定も答える', planWeek744.replyText.includes('旅行'), planWeek744.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----

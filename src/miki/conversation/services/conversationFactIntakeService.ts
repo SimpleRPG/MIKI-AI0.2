@@ -794,7 +794,35 @@ export class ConversationFactIntakeService {
     }
   }
 
+  /**
+   * P752: 「明日の15時に歯医者の予約がある」「来週、旅行に行く
+   * 予定」のような予定の発言を、予定として控える。事実の
+   * 取り込み（属性・値）には乗らない形のため、専用の控えに
+   * 分ける。会話側の planRecallAnswer が「明日の予定は？」に
+   * この控えから答える。
+   */
+  private recordUserPlanIfAny(text: string): void {
+    try {
+      const t = String(text || '').trim();
+      if (!t || /[？?]/.test(t)) return;
+      if (/(?:ですか|ますか|でしょうか|教えて|お願い|してほしい)/.test(t)) return;
+      const whenRaw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+      if (!whenRaw) return;
+      if (!/(?:予定|予約|約束)/.test(t) && !/(?:がある|に行く|へ行く|に行きます|に行くんだ|あるんだ|行くよ)/.test(t)) return;
+      const when = whenRaw === 'あした' ? '明日' : whenRaw;
+      const key = 'miki_user_plans_v1';
+      const raw = storageService.getItem(key);
+      const plans: Array<{ when: string; text: string; at: number }> = raw ? JSON.parse(raw) : [];
+      const cleanText = t.replace(/。$/, '').slice(0, 80);
+      if (plans.some((p) => p.when === when && p.text === cleanText)) return;
+      plans.push({ when, text: cleanText, at: Date.now() });
+      storageService.setItem(key, JSON.stringify(plans.slice(-20)));
+    } catch { /* 予定の控えは補助経路 */ }
+  }
+
   public intakeFromUserText(text: string, existingMemories: MemoryItem[]): FactIntakeResult {
+    // P752: 予定の発言は予定の控えにも残す（事実取り込みとは別枠）。
+    this.recordUserPlanIfAny(text);
     // P514: なりチャの開始・終了と、セッション中の創作分離。
     // 演じている間の発言は創作であり、本人の現実の事実として
     // 取り込まない。開始・終了の指示文自体も事実にしない。
