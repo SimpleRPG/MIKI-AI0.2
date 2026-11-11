@@ -1975,6 +1975,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P717 教わった説明から生息地に答える', hab717.replyText.includes('オーストラリア'), hab717.replyText.slice(0, 130));
 }
 
+// ---- 「覚えました」は教えている時だけ・形容詞の語幹は主題にしない（P718） ----
+{
+  const { conversationFactIntakeService: intake718 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  intake718.intakeFromUserText('ホシカゲは南の島に住む小さい動物だよ', []);
+  const teach718 = await conversationCoreService.execute({ prompt: 'ホシカゲは南の島に住む小さい動物だよ' } as any);
+  check('P718 教えている発話では覚えたことを伝える', teach718.replyText.includes('覚えました'), teach718.replyText.slice(0, 110));
+  const mention718 = await conversationCoreService.execute({ prompt: '昨日ホシカゲの動画見たよ' } as any);
+  check('P718 言及しただけでは繰り返さない', !mention718.replyText.includes('覚えました'), mention718.replyText.slice(0, 110));
+  const adj718 = await conversationCoreService.execute({ prompt: 'ホシカゲ可愛かったなあ' } as any);
+  check('P718 形容詞の語幹を主題にしない', !adj718.replyText.includes('可愛、') && !adj718.replyText.includes('可愛の話'), adj718.replyText.slice(0, 110));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

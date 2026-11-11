@@ -2560,6 +2560,13 @@ export class ConversationCoreService {
       if (!rec.term || !rec.gloss) return undefined;
       if (Date.now() - Number(rec.at || 0) > 10 * 60_000) return undefined;
       if (!prompt.includes(rec.term)) return undefined;
+      // P718: 「覚えました」を返すのは、教えている最中の発話だけ。
+      // 説明（gloss）の冒頭が発話に含まれている時だけにし、言及した
+      // だけの発話（「昨日クオッカの動画見たよ」）では繰り返さない。
+      // 返したら記録は消費する（同じ教え直しには新しい記録が要る）。
+      const glossHead = rec.gloss.slice(0, Math.min(6, rec.gloss.length));
+      if (!prompt.includes(glossHead)) return undefined;
+      storageService.removeItem('miki_recently_taught_v1');
       return `「${rec.term}」、覚えました！${rec.gloss}ということですね。教えてくれてありがとうございます。`;
     } catch { return undefined; }
   }
@@ -4213,6 +4220,10 @@ export class ConversationCoreService {
       if (i < 0) return 1;
       const after = prompt.slice(i + t.length, i + t.length + 2);
       if (/^(たい|たく|た|ない|れる|せる|ちゃ|て|で)/.test(after)) return -1;
+      // P718: 形容詞の語幹（「可愛かった」の可愛）の後ろには活用の
+      // 続き（かった・くない・くて）が来る。名詞の後ろには来ない
+      // 続きなので、語幹と判断して主題にしない。
+      if (/^(かっ|くな|くて|くも)/.test(after)) return -1;
       if (/^[ァ-ヶー]/.test(after)) return -1;
       const before = i > 0 ? prompt[i - 1] : '';
       if (before && /[ぁ-ん]/.test(before)) return -1;
