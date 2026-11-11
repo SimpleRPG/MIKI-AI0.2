@@ -2689,6 +2689,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P775 昨日の予定も日付で引いて答える', past776.replyText.includes('眼科'), past776.replyText.slice(0, 150));
 }
 
+// ---- P777-P779: 予定までの日数／次の予定／メモの読み返し ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem777: any[] = []; const hist777: any[] = []; let st777: any = undefined;
+  const run777 = async (t: string) => {
+    mem777 = conversationFactIntakeService.intakeFromUserText(t, mem777).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem777, recentMessages: hist777.slice(-8), conversationState: st777 } as any);
+    st777 = r.nextConversationState;
+    hist777.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run777('明日は歯医者の予定があるよ');
+  await run777('12月3日に結婚式の予定があるよ');
+  const now777 = new Date();
+  const expDays777 = Math.round((new Date(now777.getFullYear(), 11, 3).getTime() - new Date(now777.getFullYear(), now777.getMonth(), now777.getDate()).getTime()) / 86400000);
+  const count777 = await run777('結婚式まであと何日？');
+  check('P777 予定までの日数を数える', count777.replyText.includes('12月3日') && count777.replyText.includes(`あと${expDays777}日`), count777.replyText.slice(0, 150));
+  const next777 = await run777('次の予定は何？');
+  check('P778 次の予定を答える', next777.replyText.includes('次の予定は') && next777.replyText.includes('「'), next777.replyText.slice(0, 150));
+  const memoW777 = await run777('牛乳を買うってメモして');
+  check('P779 メモの内容は「って」を除いて覚える', memoW777.replyText.includes('「牛乳を買う」'), memoW777.replyText.slice(0, 130));
+  const memoR777 = await run777('メモ、何かあったっけ？');
+  check('P779 メモを読み返せる', memoR777.replyText.includes('牛乳を買う'), memoR777.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -424,6 +424,14 @@ export class ConversationCoreService {
       if (upcomingPlans) {
         return this.buildResult('RESOLVED', 'upcoming_plans_answer', this.applyPersonaVoice(upcomingPlans), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const planCountdown = multiPart ? undefined : this.planCountdownAnswer(prompt);
+      if (planCountdown) {
+        return this.buildResult('RESOLVED', 'plan_countdown_answer', this.applyPersonaVoice(planCountdown), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const nextPlan = multiPart ? undefined : this.nextPlanAnswer(prompt);
+      if (nextPlan) {
+        return this.buildResult('RESOLVED', 'next_plan_answer', this.applyPersonaVoice(nextPlan), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const clockAnswer = multiPart ? undefined : this.clockCalendarAnswer(prompt);
       if (clockAnswer) {
         return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3747,6 +3755,52 @@ export class ConversationCoreService {
   }
 
   /**
+   * P777: 「結婚式まであと何日？」——日付の付いた控えから数える。
+   */
+  private planCountdownAnswer(prompt: string): string | undefined {
+    if (!/(?:あと何日|まで何日|何日後|までどのくらい)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const tokens = utteranceFeatureService.analyze(prompt).contentTokens
+        .filter((w: string) => w.length >= 2 && !/^(?:あと|何日|まで|予定)$/.test(w));
+      const dated = plans.filter((p) => p.date && p.date >= todayKey)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      const hit = dated.find((p) => tokens.some((w) => p.text.includes(w)));
+      if (!hit) return undefined;
+      const [y, mo, da] = String(hit.date).split('-').map(Number);
+      const days = Math.round((new Date(y, mo - 1, da).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+      const wd = '日月火水木金土'[new Date(y, mo - 1, da).getDay()];
+      if (days === 0) return `それは今日（${mo}月${da}日）ですよ。`;
+      return `「${hit.text}」は${mo}月${da}日（${wd}）なので、あと${days}日です。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P778: 「次の予定は何？」——一番近い日付の控えを答える。
+   */
+  private nextPlanAnswer(prompt: string): string | undefined {
+    if (!/(?:次の|直近の|近いうちの)/.test(prompt)) return undefined;
+    if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
+    if (!/[？?]/.test(prompt) && !/(?:何|教えて)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const upcoming = plans.filter((p) => p.date && p.date >= todayKey)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (upcoming.length === 0) return 'これからの予定は、今は聞いていないです。';
+      const p = upcoming[0];
+      const [y, mo, da] = String(p.date).split('-').map(Number);
+      const wd = '日月火水木金土'[new Date(y, mo - 1, da).getDay()];
+      return `次の予定は、${mo}月${da}日（${wd}）の「${p.text}」です。`;
+    } catch { return undefined; }
+  }
+
+  /**
    * P739: 「最初に教えたのって何だっけ？」「最後に教えたのは？」
    * に、個人辞書の教示記録の順序（登録順）から答える。
    */
@@ -5440,8 +5494,10 @@ export class ConversationCoreService {
       return '分かりました、忘れておきますね。';
     }
     // 読み返す。
+    // P779: 「何かあったっけ？」は「だっけ」を含まない（あったっけ）。
+    // 読み返しの形として拾う。
     if (/(?:何がある|なにがある|何かあった|何を覚えて|覚えてること|覚えていること)/.test(p)
-      && /(?:だっけ|ある[？?]|教えて|あるの)/.test(p)) {
+      && /(?:だっけ|あったっけ|たっけ|ある[？?]|教えて|あるの)/.test(p)) {
       const items = userMemoService.list();
       if (items.length === 0) return '今は特に覚えていることはないです。何かあれば言ってくださいね、覚えておきます。';
       const shown = items.slice(-3).map((m) => `「${m.text}」`).join('');
@@ -5451,7 +5507,7 @@ export class ConversationCoreService {
     if (/(?:覚えておいて|覚えてて|覚えといて|メモして|メモしといて|メモっておいて|メモっといて)/.test(p)) {
       const content = p
         .replace(/(?:^|、|,)\s*(?:ねえ|あのさ|あのね)?\s*/, '')
-        .replace(/(?:の)?こと[、,]?\s*(?:覚えておいて|覚えてて|覚えといて|メモして(?:おいて)?|メモしといて|メモっておいて|メモっといて)[。！!？?]*$/, '')
+        .replace(/(?:の)?(?:こと|って)[、,]?\s*(?:覚えておいて|覚えてて|覚えといて|メモして(?:おいて)?|メモしといて|メモっておいて|メモっといて)[。！!？?]*$/, '')
         .replace(/(?:覚えておいて|覚えてて|覚えといて|メモして(?:おいて)?|メモしといて|メモっておいて|メモっといて)[。！!？?]*$/, '')
         .trim();
       if (!content || content === p.trim()) return '分かりました。何を覚えておけばいいですか？';
