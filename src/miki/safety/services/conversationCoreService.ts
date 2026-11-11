@@ -386,6 +386,18 @@ export class ConversationCoreService {
       }
       // P598: 知識への明示の訂正（「XじゃなくてY」）は、古い知識の
       // 言い直しで返さず、訂正として受ける。
+      // P768: 予定の変更文は訂正ではなく予定の受け止めで返す
+      // （台帳側は取り込みで処理済み）。
+      if (dialogueAct === 'CORRECTION' && /(?:じゃなくて|ではなく)/.test(prompt)
+        && /(?:予定|予約|約束)/.test(prompt) && /(?:変えた|変更)/.test(prompt)
+        && /(?:明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/.test(prompt)) {
+        const chm = prompt.match(/(?:じゃなくて|ではなく)\s*(.{1,16}?)(?:に変えた|に変更|にした|に変え)/);
+        const right = chm?.[1]?.trim();
+        const text = right
+          ? `分かりました、予定は「${right}」に変えておきますね。`
+          : '分かりました、予定を変えておきますね。';
+        return this.buildResult('RESOLVED', 'plan_change_received', this.applyPersonaVoice(text), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       if (dialogueAct === 'CORRECTION' && /(?:じゃなくて|ではなく)/.test(prompt)) {
         const cm = prompt.match(/(?:じゃなくて|ではなく)\s*(.{1,20}?)(?:だよ|です|なんだ|。|．|！|!|$)/);
         const corrected = cm?.[1]?.replace(/^(?:それは|これは)/, '').trim();
@@ -605,6 +617,10 @@ export class ConversationCoreService {
       const forget = this.forgetTermAnswer(prompt);
       if (forget && !multiPart) {
         return this.buildResult('RESOLVED', 'forget_term_answer', this.applyPersonaVoice(forget), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const forgetFact = this.forgetFactAnswer(prompt);
+      if (forgetFact && !multiPart) {
+        return this.buildResult('RESOLVED', 'forget_fact_answer', this.applyPersonaVoice(forgetFact), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P647: 「〈語〉覚えた？」——特定の語についての自分の状態を
       // 答える（P624/P633 の語単位版）。
@@ -4450,8 +4466,11 @@ export class ConversationCoreService {
    * す」になっていた。個人辞書の user-taught の印で判定する。
    */
   private knowledgeProvenanceAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
-    if (!/(?:なんで|どうして|なぜ)/.test(prompt)) return undefined;
-    if (!/(?:知ってる|知っている|知ってた|覚えてる|覚えている|知った|覚えた)/.test(prompt)) return undefined;
+    // P766: 「誰に教わったの？」も出所の質問。なんで形と同じ材料
+    // （教わった語）で、答えの形だけ変える。
+    const whoForm = /(?:誰に教わっ|誰から教わっ|誰に聞い|誰から聞い)/.test(prompt);
+    if (!whoForm && !/(?:なんで|どうして|なぜ)/.test(prompt)) return undefined;
+    if (!whoForm && !/(?:知ってる|知っている|知ってた|覚えてる|覚えている|知った|覚えた)/.test(prompt)) return undefined;
     const taught = (term: string): boolean => {
       try {
         return japaneseDictionaryService.listPersonal().some((e: any) => e.surface === term && Array.isArray(e.semanticIds) && e.semanticIds.some((s: string) => String(s).includes('user-taught')));
@@ -4460,10 +4479,14 @@ export class ConversationCoreService {
     try {
       const features = utteranceFeatureService.analyze(prompt);
       const inPrompt = features.contentTokens.find((t) => t.length >= 2 && taught(t));
-      if (inPrompt) return `「${inPrompt}」は、あなたに教えてもらったから知っているんです。`;
+      if (inPrompt) return whoForm
+        ? `「${inPrompt}」は、あなたに教えてもらいました。`
+        : `「${inPrompt}」は、あなたに教えてもらったから知っているんです。`;
     } catch { /* 補助経路 */ }
     const recent = this.recentTopicCandidates(state, recentMessages).find((t) => taught(t));
-    if (recent) return `「${recent}」は、あなたに教えてもらったから知っているんです。`;
+    if (recent) return whoForm
+      ? `「${recent}」は、あなたに教えてもらいました。`
+      : `「${recent}」は、あなたに教えてもらったから知っているんです。`;
     return undefined;
   }
 
@@ -4493,6 +4516,19 @@ export class ConversationCoreService {
       if (rec && typeof rec.term === 'string' && Date.now() - Number(rec.at || 0) <= 60_000 && prompt.includes(rec.term)) {
         storageService.removeItem('miki_recently_forgotten_v1');
         return `分かりました、「${rec.term}」のことは忘れますね。`;
+      }
+    } catch { /* 補助判定 */ }
+    return undefined;
+  }
+
+  private forgetFactAnswer(prompt: string): string | undefined {
+    if (/[？?]/.test(prompt)) return undefined;
+    if (!/(?:忘れて|消して)/.test(prompt)) return undefined;
+    try {
+      const rec = JSON.parse(storageService.getItem('miki_recently_forgotten_fact_v1') || 'null');
+      if (rec && typeof rec.label === 'string' && rec.label && Date.now() - Number(rec.at || 0) <= 60_000) {
+        storageService.removeItem('miki_recently_forgotten_fact_v1');
+        return `分かりました、その話は忘れますね。`;
       }
     } catch { /* 補助判定 */ }
     return undefined;

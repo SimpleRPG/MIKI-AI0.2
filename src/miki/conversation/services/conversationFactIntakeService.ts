@@ -460,7 +460,12 @@ export class ConversationFactIntakeService {
     let pendingCorrection: { entity: string; attribute?: string } | null = null;
     let correctionPair: { wrong: string; right: string } | undefined;
 
-    const correction = working.match(/(?:^|[、。]\s*)(.{1,30}?)(?:じゃなくて|ではなく(?:て)?)[、,]?(.+)$/);
+    // P768: 予定の変更文（「明日の予定、歯医者じゃなくて美容院に
+    // 変えた」）は事実の訂正ではない。予定台帳側で処理するので、
+    // ここでは訂正として読まない。
+    const isPlanChange = /(?:予定|予約|約束)/.test(working) && /(?:変えた|変更)/.test(working)
+      && /(?:明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/.test(working);
+    const correction = isPlanChange ? null : working.match(/(?:^|[、。]\s*)(.{1,30}?)(?:じゃなくて|ではなく(?:て)?)[、,]?(.+)$/);
     if (correction) {
       // P708: 「ごめん、犬じゃなくて猫だった」では、誤り側の切り出しに
       // 「ごめん、」まで含まれて無効化が一致しなかった。区切りの
@@ -815,6 +820,9 @@ export class ConversationFactIntakeService {
       const t = String(text || '').trim();
       if (!t || /[？?]/.test(t)) return;
       if (/(?:ですか|ますか|でしょうか|教えて|お願い|してほしい)/.test(t)) return;
+      // P768: 予定の変更文そのものは控えに残さない（変更後の
+      // 内容だけが changeUserPlanIfAny で控えられる）。
+      if (/(?:じゃなくて|ではなく)/.test(t) && /(?:変えた|変更)/.test(t)) return;
       const whenRaw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
       if (!whenRaw) return;
       if (!/(?:予定|予約|約束)/.test(t) && !/(?:がある|に行く|へ行く|に行きます|に行くんだ|あるんだ|行くよ)/.test(t)) return;
@@ -857,7 +865,42 @@ export class ConversationFactIntakeService {
     } catch { /* 予定の取り消しは補助経路 */ }
   }
 
+  /**
+   * P768: 「明日の予定、歯医者じゃなくて美容院に変えた」——予定の
+   * 変更は、古い控えを外して新しい内容で控え直す。事実の訂正
+   * （P708）の形と似ているが、対象は予定台帳であり、事実層には
+   * 触らない（呼び出し側で訂正読みを止める）。
+   */
+  private changeUserPlanIfAny(text: string): void {
+    try {
+      const t = String(text || '').trim();
+      if (!t || /[？?]/.test(t)) return;
+      if (!/(?:予定|予約|約束)/.test(t)) return;
+      if (!/(?:変えた|変更)/.test(t)) return;
+      const ch = t.match(/(.{1,16}?)(?:じゃなくて|ではなく|じゃなしに)(.{1,16}?)(?:に変えた|に変更|にした|に変え)/);
+      if (!ch) return;
+      const whenRaw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+      if (!whenRaw) return;
+      const when = whenRaw === 'あした' ? '明日' : whenRaw;
+      const wrongTokens = utteranceFeatureService.analyze(ch[1]).contentTokens
+        .filter((w) => w.length >= 2 && !/^(?:予定|予約|約束|明日|今日|今夜|今週|来週|週末|今度|明後日)$/.test(w));
+      const rightText = ch[2].replace(/^(?:、|\s)+/, '').replace(/(?:よ|ね|です)$/, '').trim();
+      if (!rightText) return;
+      const key = 'miki_user_plans_v1';
+      const raw = storageService.getItem(key);
+      const plans: Array<{ when: string; text: string; at: number }> = raw ? JSON.parse(raw) : [];
+      const kept = plans.filter((p) => !(p.when === when && wrongTokens.some((w) => p.text.includes(w))));
+      const newText = `${rightText}の予定`;
+      if (!kept.some((p) => p.when === when && p.text === newText)) {
+        kept.push({ when, text: newText, at: Date.now() });
+      }
+      storageService.setItem(key, JSON.stringify(kept.slice(-20)));
+    } catch { /* 予定の変更は補助経路 */ }
+  }
+
   public intakeFromUserText(text: string, existingMemories: MemoryItem[]): FactIntakeResult {
+    // P768: 予定の変更は最初に処理する（取り消し・記録より先）。
+    this.changeUserPlanIfAny(text);
     // P753: 予定の取り消しは控えから外す（先に処理する）。
     this.cancelUserPlanIfAny(text);
     // P752: 予定の発言は予定の控えにも残す（事実取り込みとは別枠）。
@@ -1056,6 +1099,9 @@ export class ConversationFactIntakeService {
     // 知識・関係・事実の全部から外す（定義を読み上げるだけに
     // ならないように）。
     try { this.forgetTaughtTermFromRequest(text, updated); } catch { /* 補助経路 */ }
+    // P767: 「僕が犬を飼ってるって話、忘れて」——事実そのものの
+    // 忘却依頼（語の忘却とは別）。
+    try { this.forgetUserFactFromRequest(text, updated); } catch { /* 補助経路 */ }
 
     return { added, updatedMemories: updated, replaced, invalidated };
   }
@@ -1181,6 +1227,41 @@ export class ConversationFactIntakeService {
       try { storageService.setItem('miki_recently_forgotten_v1', JSON.stringify({ term, at: Date.now() })); } catch { /* 補助経路 */ }
       systemLogger.info('CHAT', `🗑 [意味学習] 依頼により「${term}」を忘れました`);
       return;
+    }
+  }
+
+  /**
+   * P767: 「僕が犬を飼ってるって話、忘れて」——語ではなく、本人の
+   * 事実そのものを消す依頼。発話の内容語と重なる有効な本人事実を
+   * 無効化する（語の忘却 P736 とは別の受け口）。
+   */
+  private forgetUserFactFromRequest(text: string, updated: MemoryItem[]): void {
+    const t = String(text || '');
+    if (/[？?]/.test(t)) return;
+    if (!/(?:忘れて|消して)/.test(t)) return;
+    for (const m of updated) {
+      if (m.active === false) continue;
+      const rec = m as any;
+      if (String(rec.source || '') !== 'user_statement') continue;
+      // 照合の鍵は事実の側から作る：値そのもの（「犬を飼ってる」）か、
+      // 事実文の内容語。内容語は漢字・カタカナなら1文字でも鍵に
+      // なる（「犬」は1文字の語）。
+      const keys: string[] = [];
+      const val = String(rec.factValue || '');
+      if (val.length >= 2) keys.push(val);
+      try {
+        for (const w of utteranceFeatureService.analyze(String(rec.content || '')).contentTokens) {
+          if (/^(?:僕|私|俺|話|こと|って|その|この)$/.test(w)) continue;
+          if (w.length >= 2 || /^[一-龠ァ-ヶー]$/.test(w)) keys.push(w);
+        }
+      } catch { /* 値の鍵だけでも照合する */ }
+      const hit = keys.some((k) => k && t.includes(k));
+      if (!hit) continue;
+      rec.active = false;
+      rec.invalidatedByUser = true;
+      const label = String(rec.factSummary || rec.content || rec.factValue || '').slice(0, 30);
+      try { storageService.setItem('miki_recently_forgotten_fact_v1', JSON.stringify({ label, at: Date.now() })); } catch { /* 補助経路 */ }
+      systemLogger.info('CHAT', `🗑 [事実忘却] 依頼により事実を無効化: ${label}`);
     }
   }
 }

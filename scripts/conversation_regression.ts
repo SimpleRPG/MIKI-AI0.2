@@ -2561,6 +2561,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P765 覚えた量は数を数えて答える', volume763.replyText.includes('言葉は') && volume763.replyText.includes('覚えています'), volume763.replyText.slice(0, 130));
 }
 
+// ---- P766-P768: 出所（誰に）／事実の忘却／予定の変更 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem766: any[] = []; const hist766: any[] = []; let st766: any = undefined;
+  const run766 = async (t: string) => {
+    mem766 = conversationFactIntakeService.intakeFromUserText(t, mem766).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem766, recentMessages: hist766.slice(-8), conversationState: st766 } as any);
+    st766 = r.nextConversationState;
+    hist766.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run766('クオッカは夜行性の動物だよ');
+  const who766 = await run766('クオッカのこと、誰に教わったの？');
+  check('P766 誰に教わったかは教えた本人と答える', who766.replyText.includes('あなたに教えてもらいました'), who766.replyText.slice(0, 130));
+  await run766('僕は犬を飼ってるよ');
+  const forget766 = await run766('僕が犬を飼ってるって話、忘れてほしい');
+  check('P767 事実の忘却を受け付ける', forget766.replyText.includes('忘れます'), forget766.replyText.slice(0, 130));
+  const pet766 = await run766('僕って何か飼ってたっけ？');
+  check('P767 忘れた事実は想起に出ない', !pet766.replyText.includes('飼っている動物は「犬」'), pet766.replyText.slice(0, 130));
+  await run766('明日は歯医者の予定があるよ');
+  const change766 = await run766('明日の予定、歯医者じゃなくて美容院に変えたよ');
+  check('P768 予定の変更は予定として受ける', change766.replyText.includes('美容院') && change766.replyText.includes('変えておきます'), change766.replyText.slice(0, 130));
+  const plan766 = await run766('明日の予定は何だっけ？');
+  check('P768 変更後の予定だけが残る', plan766.replyText.includes('美容院') && !plan766.replyText.includes('歯医者'), plan766.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
