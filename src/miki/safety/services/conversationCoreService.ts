@@ -924,7 +924,7 @@ export class ConversationCoreService {
         // P592: 評価軸の指定が無い日常の二択・おすすめは、形式的な
         // 拒否文ではなく会話として答える（捏造はしない。選べない
         // ことは正直に言い、相手の気分を聞く）。
-        decisionText = this.applyPersonaVoice(this.choiceQuestionAnswer(prompt) ?? this.recommendationFallback()!);
+        decisionText = this.applyPersonaVoice(this.choiceQuestionAnswer(prompt) ?? this.recommendationFallback(prompt)!);
       } else {
         decisionText = '比較対象は見つかりましたが、評価軸ごとの確認済み根拠が不足しているため、CORE中核では推奨を捏造して確定しません。';
       }
@@ -1840,7 +1840,7 @@ export class ConversationCoreService {
         status = 'RESOLVED';
         reason = 'recommendation_fallback';
         ir = answerContentIrService.buildAnswerIR({
-          conclusion: this.applyPersonaVoice(this.recommendationFallback()!),
+          conclusion: this.applyPersonaVoice(this.recommendationFallback(prompt)!),
           target: compiled.target,
           certainty: 'CONDITIONAL',
           detailLevel: 'BRIEF',
@@ -3727,7 +3727,15 @@ export class ConversationCoreService {
   }
 
   /** P592: 材料が無い「おすすめ」依頼への、正直で会話の続く答え。 */
-  private recommendationFallback(): string | undefined {
+  private recommendationFallback(prompt: string = ''): string | undefined {
+    // P709: 分野を指定されたおすすめ（「おすすめの映画ある？」）に、
+    // 会話の話題の続きをその分野のものとして勧めてはいけない。
+    // 分野があるときは、その分野に絞って正直に聞き返す。
+    const category = String(prompt || '').match(/(?:おすすめ|お勧め|お薦め)の?\s*(映画|本|漫画|マンガ|アニメ|音楽|曲|歌|ゲーム|お店|店|レストラン|カフェ|場所|旅行|旅先|食べ物|飲み物|アプリ|アニメ映画)/)?.[1]
+      || (/(?:映画|本|漫画|マンガ|アニメ|音楽|ゲーム)(?:の)?(?:おすすめ|お勧め|お薦め)/.test(prompt) ? String(prompt).match(/(映画|本|漫画|マンガ|アニメ|音楽|ゲーム)/)?.[1] : undefined);
+    if (category) {
+      return `${category}のおすすめは、まだ材料が少なくて自信がないんです。どんな気分の${category}がいいですか？`;
+    }
     try {
       const current = conversationOpenTopicService.current();
       const topic = current?.topic;

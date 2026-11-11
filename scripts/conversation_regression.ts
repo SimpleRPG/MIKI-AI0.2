@@ -1855,6 +1855,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P708 訂正した名前が想起に反映される', name708.replyText.includes('ムギ') && !name708.replyText.includes('「モチ」だよ'), name708.replyText.slice(0, 140));
 }
 
+// ---- おすすめは分野に絞る（P709） ----
+{
+  const movie709 = await conversationCoreService.execute({ prompt: 'おすすめの映画ある？' } as any);
+  check('P709 映画のおすすめは映画に絞って聞き返す', movie709.replyText.includes('映画') && !movie709.replyText.includes('の続きなんて'), movie709.replyText.slice(0, 120));
+  const game709 = await conversationCoreService.execute({ prompt: 'ゲームのおすすめある？' } as any);
+  check('P709 ゲームのおすすめはゲームに絞る', game709.replyText.includes('ゲーム') && !game709.replyText.includes('の続きなんて'), game709.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
