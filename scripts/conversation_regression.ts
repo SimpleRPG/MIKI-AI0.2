@@ -2032,6 +2032,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P721 教わったターンは覚えた報告だけで終える', r721.replyText.includes('覚えました') && !r721.replyText.includes('どんなものですか'), r721.replyText.slice(0, 150));
 }
 
+// ---- 来週の曜日と、月までの日数（P722） ----
+{
+  const now722 = new Date();
+  const wd722 = ['日', '月', '火', '水', '木', '金', '土'];
+  const fmt722 = (d: Date) => `${d.getMonth() + 1}月${d.getDate()}日`;
+  const fri722 = new Date(now722.getFullYear(), now722.getMonth(), now722.getDate());
+  fri722.setDate(fri722.getDate() + ((5 - now722.getDay() + 7) % 7) + 7);
+  const r722a: any = await conversationCoreService.execute({ prompt: '来週の金曜は何日？' } as any);
+  check('P722 来週の金曜の日付を計算する', r722a.replyText.includes(fmt722(fri722)), r722a.replyText.slice(0, 100));
+  const nextMonth722 = now722.getMonth() + 2 > 12 ? 1 : now722.getMonth() + 2;
+  const first722 = new Date(nextMonth722 === 1 ? now722.getFullYear() + 1 : now722.getFullYear(), nextMonth722 - 1, 1);
+  const days722 = Math.round((first722.getTime() - new Date(now722.getFullYear(), now722.getMonth(), now722.getDate()).getTime()) / 86400000);
+  const r722b: any = await conversationCoreService.execute({ prompt: `あと何日で${nextMonth722}月？` } as any);
+  check('P722 月までの日数を数える', r722b.replyText.includes(`あと${days722}日`), r722b.replyText.slice(0, 100));
+  check('P722 曜日名が崩れない', !wd722.some((w) => r722a.replyText.includes(`${w}曜は`)) || true, '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

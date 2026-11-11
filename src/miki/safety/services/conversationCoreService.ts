@@ -2705,6 +2705,35 @@ export class ConversationCoreService {
         ? `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`
         : `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）でした。`;
     }
+    // P722: 「来週の金曜は何日？」は来週のその曜日の日付を計算する
+    // （今週の同じ曜日から7日後。再来週は14日後）。「今週の金曜」は
+    // 過ぎた曜日だと意味が曖昧になるので、未来にある場合だけ答える。
+    const weekMatch = prompt.match(/(来週|再来週|今週)の([日月火水木金土])曜/);
+    if (weekMatch && /(?:何日|いつ|何曜日|[？?])/.test(prompt)) {
+      const target = weekdays.indexOf(weekMatch[2]);
+      const delta = (target - now.getDay() + 7) % 7;
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (weekMatch[1] === '今週') {
+        if (delta === 0) return `今週の${weekMatch[2]}曜日は今日、${d.getMonth() + 1}月${d.getDate()}日です。`;
+        d.setDate(d.getDate() + delta);
+        return `今週の${weekMatch[2]}曜日は${d.getMonth() + 1}月${d.getDate()}日です。`;
+      }
+      const weeks = weekMatch[1] === '来週' ? 1 : 2;
+      d.setDate(d.getDate() + delta + 7 * weeks);
+      return `${weekMatch[1]}の${weekMatch[2]}曜日は${d.getMonth() + 1}月${d.getDate()}日です。`;
+    }
+    // P722: 「あと何日で12月？」は、その月の1日までの日数を数える。
+    const untilMonth = prompt.match(/あと何日で(\d{1,2})月/);
+    if (untilMonth) {
+      const m = Number(untilMonth[1]);
+      if (m >= 1 && m <= 12) {
+        if (m === now.getMonth() + 1) return `もう${m}月です。`;
+        const year = m > now.getMonth() + 1 ? now.getFullYear() : now.getFullYear() + 1;
+        const first = new Date(year, m - 1, 1);
+        const days = Math.round((first.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+        return `${m}月まであと${days}日です。`;
+      }
+    }
     const remainYear = /(?:あと何日で)?今年(?:は)?(?:あと何日|終わるまで何日|終わる)/.test(prompt) || /今年(?:は)?あと何日/.test(prompt);
     if (/あと何日/.test(prompt) && /今年/.test(prompt) || remainYear) {
       const end = new Date(now.getFullYear(), 11, 31);
