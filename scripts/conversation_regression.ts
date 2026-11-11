@@ -2449,6 +2449,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P755 訂正したペットは古いサマリから復活しない', pets755.replyText.includes('猫') && !pets755.replyText.includes('犬'), pets755.replyText.slice(0, 110));
 }
 
+// ---- P756: 数値での比較（本人×教わった語、片方だけ、未知の相手） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem756: any[] = []; const hist756: any[] = []; let st756: any = undefined;
+  const run756 = async (t: string) => {
+    mem756 = conversationFactIntakeService.intakeFromUserText(t, mem756).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem756, recentMessages: hist756.slice(-8), conversationState: st756 } as any);
+    st756 = r.nextConversationState;
+    hist756.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run756('ミナモは体重が30キロくらいの動物だよ');
+  await run756('僕の体重は60キロだよ');
+  const cmp756 = await run756('僕とミナモ、どっちが重い？');
+  check('P756 本人と教わった語を数値で比べる', cmp756.replyText.includes('僕の方が重い') && cmp756.replyText.includes('60キロ') && cmp756.replyText.includes('30キロ'), cmp756.replyText.slice(0, 130));
+  const unknown756 = await run756('ミナモとヌマカゲ、どっちが大きい？');
+  check('P756 未知の相手とは比べられないと正直に言う', unknown756.replyText.includes('ヌマカゲ') && unknown756.replyText.includes('知らない'), unknown756.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

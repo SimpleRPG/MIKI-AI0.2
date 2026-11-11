@@ -461,7 +461,7 @@ export class ConversationCoreService {
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
-      const glossCompare = this.glossComparisonAnswer(prompt);
+      const glossCompare = this.glossComparisonAnswer(prompt, memories);
       if (glossCompare && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_comparison_answer', this.applyPersonaVoice(glossCompare), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -2981,7 +2981,7 @@ export class ConversationCoreService {
    * 比較なら「材料が足りない」と会話の形で答える（下流の作業
    * 書式に落とさない）。
    */
-  private glossComparisonAnswer(prompt: string): string | undefined {
+  private glossComparisonAnswer(prompt: string, memories: any[] = []): string | undefined {
     if (!/(?:どっちが|どちらが)/.test(prompt)) return undefined;
     const dims: Array<{ re: RegExp; label: string; adj: string; plus: RegExp; minus: RegExp; plusText: string; minusText: string }> = [
       { re: /大き|小さ/, label: '大きさ', adj: '大きい', plus: /大き|でか/, minus: /小さ|小柄/, plusText: '大きい', minusText: '小さい' },
@@ -2992,6 +2992,101 @@ export class ConversationCoreService {
     if (!dim) return undefined;
     let tokens: string[] = [];
     try { tokens = utteranceFeatureService.analyze(prompt).contentTokens || []; } catch { return undefined; }
+    // P756: 数値で比べる経路（重さ・大きさ）。手がかり語の対比
+    // （P732）より先に、事実と説明に埋まっている実測値を比べる。
+    // 相手は教わった語でなくてもよい（「僕とミナモ、どっちが
+    // 重い？」——僕の体重は事実の側にある）。
+    if ((dim.label === '重さ' || dim.label === '大きさ') && Array.isArray(memories)) {
+      const measureOf = (text: string): { value: number; disp: string } | undefined => {
+        if (!text) return undefined;
+        const pats: Array<{ re: RegExp; f: (n: number) => number }> = dim.label === '重さ'
+          ? [
+              { re: /(\d+(?:\.\d+)?)\s*(?:トン)(?:くらい|ほど)?/, f: (n) => n * 1000 },
+              { re: /(\d+(?:\.\d+)?)\s*(?:キログラム|キロ|kg)(?:くらい|ほど)?/i, f: (n) => n },
+              { re: /(\d+(?:\.\d+)?)\s*(?:グラム|g)(?:くらい|ほど)?/i, f: (n) => n / 1000 },
+            ]
+          : [
+              { re: /(\d+(?:\.\d+)?)\s*(?:メートル|m)(?:くらい|ほど)?/i, f: (n) => n * 100 },
+              { re: /(\d+(?:\.\d+)?)\s*(?:センチメートル|センチ|cm)(?:くらい|ほど)?/i, f: (n) => n },
+            ];
+        for (const p of pats) {
+          const m = String(text).match(p.re);
+          if (m) return { value: p.f(parseFloat(m[1])), disp: m[0] };
+        }
+        return undefined;
+      };
+      const measureFor = (name: string): { value: number; disp: string } | undefined => {
+        const isSelf = name === '僕';
+        for (const m of memories) {
+          if (!m || m.active === false || m.replacedBy) continue;
+          const e = String(m.factEntity || '');
+          const hit = isSelf ? /^(?:僕|私|俺|わたし)$/.test(e) : e === name;
+          if (!hit) continue;
+          const r = measureOf(String(m.factValue || '')) || measureOf(String(m.content || ''));
+          if (r) return r;
+        }
+        if (!isSelf) {
+          try {
+            const entry = japaneseDictionaryService.lookup(name).find((x: any) => x.gloss);
+            if (entry) return measureOf(String(entry.gloss));
+          } catch { /* 補助判定 */ }
+        }
+        return undefined;
+      };
+      const knownName = (name: string): boolean => {
+        if (name === '僕') return true;
+        if (/^(?:体重|重さ|大きさ|体長|全長|長さ|寿命|身長|どっち|どちら)$/.test(name)) return false;
+        try { if (japaneseDictionaryService.lookup(name).some((x: any) => x.gloss)) return true; } catch { /* 補助判定 */ }
+        return memories.some((m: any) => m && String(m.factEntity || '') === name);
+      };
+      const spots: Array<{ name: string; at: number }> = [];
+      const selfM = prompt.match(/(?:僕|私|俺|わたし)/);
+      if (selfM) spots.push({ name: '僕', at: prompt.indexOf(selfM[0]) });
+      for (const t of tokens) {
+        if (!t) continue;
+        const at = prompt.indexOf(t);
+        if (at >= 0) spots.push({ name: t, at });
+      }
+      for (const m of memories) {
+        const e = String(m?.factEntity || '');
+        if (e && e.length >= 2 && !/^(?:僕|私|俺|わたし)$/.test(e)) {
+          const at = prompt.indexOf(e);
+          if (at >= 0) spots.push({ name: e, at });
+        }
+      }
+      spots.sort((x, y) => x.at - y.at);
+      const numEnts: Array<{ name: string; meas?: { value: number; disp: string } }> = [];
+      for (const s of spots) {
+        if (numEnts.some((e) => e.name === s.name) || !knownName(s.name)) continue;
+        numEnts.push({ name: s.name, meas: measureFor(s.name) });
+        if (numEnts.length >= 2) break;
+      }
+      // P756: 片方は知っているが、もう片方がそもそも未知の相手の
+      // ときは、内部の「対象を特定できません」に落とさず、正直に
+      // 知らないと言う。
+      if (numEnts.length === 1) {
+        const unknownSpot = spots.find((s) => s.name !== '僕' && !knownName(s.name)
+          && s.name.length >= 2
+          && !/^(?:どっち|どちら|重い|大きい|小さい|軽い|体重|重さ|大きさ|体長|全長|長さ)$/.test(s.name)
+          && /^[一-龠ァ-ヶ]/.test(s.name));
+        if (unknownSpot) {
+          return `「${unknownSpot.name}」のことはまだ知らないので、${dim.label}は比べられないです。`;
+        }
+      }
+      if (numEnts.length >= 2) {
+        const [x, y] = numEnts;
+        if (x.meas && y.meas) {
+          if (x.meas.value === y.meas.value) return `「${x.name}」は${x.meas.disp}、「${y.name}」は${y.meas.disp}なので、${dim.label}は同じくらいです。`;
+          const w = x.meas.value > y.meas.value ? x : y;
+          return `「${x.name}」は${x.meas.disp}、「${y.name}」は${y.meas.disp}なので、${w.name}の方が${dim.adj}です。`;
+        }
+        if (x.meas || y.meas) {
+          const k = x.meas ? x : y;
+          const u = x.meas ? y : x;
+          return `${dim.label}比べは、まだ材料が足りないです。「${k.name}」は${k.meas!.disp}と聞いているけど、「${u.name}」の${dim.label}は知らないです。`;
+        }
+      }
+    }
     const entities: Array<{ name: string; gloss: string; taught: boolean }> = [];
     for (const t of tokens) {
       if (!t || t.length < 2 || entities.some((e) => e.name === t)) continue;
