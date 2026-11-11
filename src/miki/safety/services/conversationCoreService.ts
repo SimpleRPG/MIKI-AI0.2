@@ -470,6 +470,19 @@ export class ConversationCoreService {
       if (superlative && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_superlative_answer', this.applyPersonaVoice(superlative), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P739: 「最初に教えたのって何だっけ？」——教示記録の
+      // 順序から答える（「最初」が未知語として調査に落ちない）。
+      const taughtOrder = this.taughtOrderAnswer(prompt);
+      if (taughtOrder && !multiPart) {
+        return this.buildResult('RESOLVED', 'taught_order_answer', this.applyPersonaVoice(taughtOrder), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P740: 「動物だっけ？それとも鳥だっけ？」——二択の思い出し
+      // 質問に、手持ちの分類から答える。二択は構造上マルチ
+      // パート扱いになるため、multiPart でも受ける。
+      const eitherOr = this.eitherOrRecallAnswer(prompt);
+      if (eitherOr) {
+        return this.buildResult('RESOLVED', 'either_or_recall_answer', this.applyPersonaVoice(eitherOr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P604: 食事の迷いは、一緒に考える形で受ける。
       const dinner = this.dinnerMusingAnswer(prompt);
       if (dinner) {
@@ -3031,6 +3044,61 @@ export class ConversationCoreService {
   }
 
   /**
+   * P739: 「最初に教えたのって何だっけ？」「最後に教えたのは？」
+   * に、個人辞書の教示記録の順序（登録順）から答える。
+   */
+  private taughtOrderAnswer(prompt: string): string | undefined {
+    if (!/(?:教えた|教えてくれた|教えてあげた)/.test(prompt)) return undefined;
+    const first = /(?:最初に|はじめに|一番初め|一番最初)/.test(prompt);
+    const last = !first && /(?:最後に)/.test(prompt);
+    if (!first && !last) return undefined;
+    try {
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'));
+      if (entries.length === 0) return undefined;
+      const pick = String((first ? entries[0] : entries[entries.length - 1]).surface);
+      return first ? `最初に教わったのは、「${pick}」です。` : `最後に教わったのは、「${pick}」です。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P740: 「クオッカって動物だっけ？それとも鳥だっけ？」の
+   * 二択の思い出し質問に、対象の分類（関係・説明文）から答える。
+   * どちらにも根拠が無ければ扱わない。
+   */
+  private eitherOrRecallAnswer(prompt: string): string | undefined {
+    if (!/(?:だっけ|だったっけ|だったかな)/.test(prompt)) return undefined;
+    if (!/それとも/.test(prompt)) return undefined;
+    try {
+      const parts = prompt.split(/それとも/);
+      if (parts.length !== 2) return undefined;
+      const genericSet = new Set(['動物', '鳥', '魚', '虫', '植物', '獣', '哺乳類', '爬虫類', '両生類', '昆虫', '食べ物', '飲み物']);
+      const targets = new Set(worldModelGraphService.relations().filter((r) => r.type === 'IS_A').map((r) => r.to));
+      const isOption = (t: string) => genericSet.has(t) || targets.has(t);
+      const f1 = utteranceFeatureService.analyze(parts[0]);
+      const entity = f1.contentTokens.find((t) => {
+        try { return !isOption(t) && (japaneseDictionaryService.lookup(t).some((e: any) => e.gloss) || worldModelGraphService.relationsOf(t).length > 0); } catch { return false; }
+      });
+      if (!entity) return undefined;
+      const optA = [...f1.contentTokens].reverse().find((t) => t !== entity && isOption(t));
+      const f2 = utteranceFeatureService.analyze(parts[1]);
+      const optB = f2.contentTokens.find((t) => isOption(t));
+      if (!optA || !optB || optA === optB) return undefined;
+      const isA = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity && r.type === 'IS_A');
+      const gloss = japaneseDictionaryService.lookup(entity).map((e: any) => String(e.gloss || '')).join(' ');
+      const matchA = isA.some((r) => r.to === optA) || gloss.includes(optA);
+      const matchB = isA.some((r) => r.to === optB) || gloss.includes(optB);
+      if (matchA === matchB) return undefined;
+      const winner = matchA ? optA : optB;
+      const winnerRels = isA.filter((r) => r.to === winner);
+      if (winnerRels.length > 0 && winnerRels.every((r) => r.provisional)) {
+        return `教わった説明では、「${entity}」は${winner}の仲間だと思います。`;
+      }
+      return `「${entity}」は、${winner}だよ。`;
+    } catch { return undefined; }
+  }
+
+  /**
    * P616: 知っている物への属性の質問（どこで捕まえられる？/何に使うの？）は、
    * 世界モデルの関係で答える。関係があればそれを使い、無ければ
    * 知っている範囲を添えて正直に言い、UNKNOWN_RELATION の gap として
@@ -3257,8 +3325,12 @@ export class ConversationCoreService {
     if (confirmMatch && /[？?]/.test(prompt) && !/^(?:何|なに|どの|どう|いつ|どこ|だれ|誰)/.test(confirmMatch[2].trim())) {
       const entity = known.find((t) => prompt.startsWith(t) || prompt.includes(`${t}って`) || prompt.includes(`${t}は`));
       if (!entity) return undefined;
-      const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか|よね|でしょ)/.test(t) && !/^(?:じゃ|ない|仲間|なかま|種類|一種)$/.test(t)).slice(-1)[0];
+      const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか|よね|でしょ)/.test(t) && !/^(?:じゃ|ない|仲間|なかま|種類|一種)$/.test(t) && !/^[性化用型感力]$/.test(t)).slice(-1)[0];
       if (!candidate || candidate === entity) return undefined;
+      // P738: 候補が性質の語（夜行・肉食・温厚など）の時は、分類の
+      // 関係では肯定も否定もできない。「性じゃなくて」のような
+      // 崩れや、根拠のない同意をしないよう、ここでは扱わない。
+      const candidateIsProperty = /^(?:肉食|草食|雑食|夜行|昼行|温厚|凶暴|臆病|活発|おとなしい|大人しい|人懐っこい)$/.test(candidate);
       const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
       const targets = relations.map((r) => r.to);
       // P729: 否定の確認（「〜じゃないよね？」）は、相手の見立てが
@@ -3269,6 +3341,7 @@ export class ConversationCoreService {
         const candRels = relations.filter((r) => r.to === candidate);
         if (candRels.some((r) => !r.provisional)) return `いえ、「${entity}」は${candidate}だよ。`;
         if (candRels.length > 0) return `教わった説明では、「${entity}」は${candidate}の仲間みたいだよ。`;
+        if (candidateIsProperty) return undefined;
         const isAAll = relations.filter((r) => r.type === 'IS_A');
         if (isAAll.some((r) => !r.provisional)) return `うん、${candidate}じゃなくて、「${entity}」は${isAAll.filter((r) => !r.provisional).map((r) => r.to).join('・')}の一種だよ。`;
         if (isAAll.length > 0) return `うん、${candidate}じゃないよ。教わった説明では、「${entity}」は${isAAll.map((r) => r.to).join('・')}の仲間だと思います。`;
@@ -3292,6 +3365,7 @@ export class ConversationCoreService {
           .find((c: any) => String(c.statement || '').includes(candidate));
         if (verifiedHit) return `はい、そのとおりです。${String((verifiedHit as any).statement).slice(0, 90)}`;
       } catch { /* 知識照合は補助経路 */ }
+      if (candidateIsProperty) return undefined;
       const isARelations = relations.filter((r) => r.type === 'IS_A');
       const isA = isARelations.map((r) => r.to);
       const usedFor = relations.filter((r) => r.type === 'USED_FOR' && !r.provisional).map((r) => r.to);

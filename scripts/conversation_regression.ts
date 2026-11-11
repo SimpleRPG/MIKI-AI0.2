@@ -2245,6 +2245,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P736 忘却は他の語に波及しない', still736.replyText.includes('ヒョウカゲ') && still736.replyText.includes('獣'), still736.replyText.slice(0, 130));
 }
 
+// ---- 性質の確認・教えた順序・二択の思い出し（P738-P740） ----
+{
+  const { conversationFactIntakeService: intake738 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { japaneseDictionaryService: dict738 } = await import('../src/miki/research/services/japaneseDictionaryService');
+  let mem738: any[] = []; const hist738: any[] = []; let st738: any = undefined;
+  const run738 = async (q: string) => {
+    mem738 = intake738.intakeFromUserText(q, mem738).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem738, recentMessages: hist738.slice(-8), conversationState: st738 } as any);
+    st738 = r.nextConversationState;
+    hist738.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run738('セツカゲは山に住む小さい鳥だよ');
+  await run738('ミネカゲは山に住む大きな鳥だよ');
+  const prop738 = await run738('セツカゲって夜行性なの？');
+  check('P738 性質の確認に分類で正さない', !prop738.replyText.includes('じゃなくて') && !prop738.replyText.includes('性'), prop738.replyText.slice(0, 130));
+  const propNeg738 = await run738('セツカゲって肉食じゃないよね？');
+  check('P738 性質の否定確認に根拠なく同意しない', !propNeg738.replyText.includes('肉食じゃないよ'), propNeg738.replyText.slice(0, 130));
+  const taughtEntries738 = dict738.listPersonal().filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'));
+  const first738 = await run738('僕が最初に教えたのって何だっけ？');
+  check('P739 最初に教えた語を順序から答える', first738.replyText.includes('最初に教わったのは') && first738.replyText.includes(String(taughtEntries738[0].surface)), first738.replyText.slice(0, 130));
+  const last738 = await run738('最後に教えたのは何だっけ？');
+  check('P739 最後に教えた語を順序から答える', last738.replyText.includes('最後に教わったのは') && last738.replyText.includes('ミネカゲ'), last738.replyText.slice(0, 130));
+  const either738 = await run738('セツカゲって鳥だっけ？それとも魚だっけ？');
+  check('P740 二択の思い出しは分類から答える', either738.replyText.includes('セツカゲ') && either738.replyText.includes('鳥'), either738.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
