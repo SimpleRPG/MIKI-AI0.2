@@ -2741,6 +2741,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P781 誕生日までの日数を数える', bday780.replyText.includes('3月5日') && bday780.replyText.includes(`あと${exp780}日`), bday780.replyText.slice(0, 130));
 }
 
+// ---- P782: 予定が無い時期は正直に無いと答える ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem782: any[] = []; const hist782: any[] = []; let st782: any = undefined;
+  const run782 = async (t: string) => {
+    mem782 = conversationFactIntakeService.intakeFromUserText(t, mem782).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem782, recentMessages: hist782.slice(-8), conversationState: st782 } as any);
+    st782 = r.nextConversationState;
+    hist782.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run782('来週は旅行の予定があるよ');
+  const none782 = await run782('今週の予定はある？');
+  check('P782 予定の無い時期は正直に無いと答える', none782.replyText.includes('今週の予定は、まだ聞いていないです'), none782.replyText.slice(0, 130));
+  const hers782 = await run782('みきの明日の予定は？');
+  check('P782 彼女自身の予定の質問は従来どおり', !hers782.replyText.includes('まだ聞いていない'), hers782.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

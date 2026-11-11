@@ -3718,7 +3718,11 @@ export class ConversationCoreService {
       if (hits.length === 0) {
         // P774: 明示の日付で聞かれたら、その日の予定が無いことを
         // こちらで答える（彼女自身の予定の話に流さない）。
+        // P782: 時期の語で聞かれた場合も同じ。関係のない記憶を
+        // 引いて曖昧に答えるより、無いことを正直に言う。ただし
+        // 彼女自身の予定を聞く形（みきの／あなたの）は対象外。
         if (exMatch) return `${when}の予定は、まだ聞いていないです。`;
+        if (!/(?:みき|あなた|君|きみ)/.test(prompt)) return `${when}の予定は、まだ聞いていないです。`;
         return undefined;
       }
       const texts = [...new Set(hits.map((p) => p.text))].slice(-3);
