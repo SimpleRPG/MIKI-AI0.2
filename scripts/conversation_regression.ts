@@ -2963,6 +2963,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P795 閾値未満を数える', under795.replyText.includes('1人です') && under795.replyText.includes('妹'), under795.replyText.slice(0, 130));
 }
 
+// ---- P796: メモの内容検索と人の事実のまとめ ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem796: any[] = []; const hist796: any[] = []; let st796: any = undefined;
+  const run796 = async (t: string) => {
+    mem796 = conversationFactIntakeService.intakeFromUserText(t, mem796).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem796, recentMessages: hist796.slice(-8), conversationState: st796 } as any);
+    st796 = r.nextConversationState;
+    hist796.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run796('青汁を買うってメモして');
+  const memoFind796 = await run796('青汁のメモある？');
+  check('P796 メモを内容で探せる', memoFind796.replyText.includes('青汁を買う'), memoFind796.replyText.slice(0, 130));
+  await run796('妹の年齢は20歳だよ');
+  await run796('妹の身長は155センチだよ');
+  const sum796 = await run796('妹について教えて');
+  check('P796 人の事実をまとめて話す', sum796.replyText.includes('年齢は20歳') && sum796.replyText.includes('身長は155センチ'), sum796.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

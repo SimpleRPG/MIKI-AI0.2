@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4155,
-    "resolvedRelativeImportCandidateCount": 4139,
+    "relativeImportCandidateCount": 4156,
+    "resolvedRelativeImportCandidateCount": 4140,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 269172,
-      "lines": 2979,
-      "sha256": "7d6c8f2d22f45b369a738e38999f59d4fa167168b5f8d4528944458adcfb2fb4",
+      "bytes": 270479,
+      "lines": 2999,
+      "sha256": "10bb6b3907a5b3c214a16d74c179ba002d86dab54f469dbcb838b95f71235643",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2618,10 +2618,16 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 2968,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
         }
       ],
-      "relativeImportCandidateCount": 151,
-      "resolvedRelativeImportCount": 151,
+      "relativeImportCandidateCount": 152,
+      "resolvedRelativeImportCount": 152,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -28202,9 +28208,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 421555,
-      "lines": 6222,
-      "sha256": "91bec223eca237ea807e6a3b0d8da431fdd246d80179db35ff61bb74eac9d9ad",
+      "bytes": 424419,
+      "lines": 6280,
+      "sha256": "1e264ed5e61a4558724bf5e01f0623ca9fc2ab1abf3e584de3a87a0fc7e6060d",
       "relativeImportCandidates": [
         {
           "line": 1,

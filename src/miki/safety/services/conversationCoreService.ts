@@ -701,6 +701,10 @@ export class ConversationCoreService {
       } catch { /* 辞書の手前答えは補助 */ }
       // P730: 「Xについて教えて」——知っている語なら手持ちの知識で
       // 答える。知らない語は従来どおり調査側に回す。
+      const personSummary = this.personSummaryAnswer(prompt, memories);
+      if (personSummary) {
+        return this.buildResult('RESOLVED', 'person_summary_answer', this.applyPersonaVoice(personSummary), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const tellAbout = this.tellAboutAnswer(prompt);
       if (tellAbout && !multiPart) {
         return this.buildResult('RESOLVED', 'tell_about_answer', this.applyPersonaVoice(tellAbout), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -5072,6 +5076,45 @@ export class ConversationCoreService {
     return undefined;
   }
 
+  /**
+   * P796: 「妹について教えて」——人の事実をまとめて話す
+   * （語の深掘りはP730、人の事実はここ）。
+   */
+  private personSummaryAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/(?:について教えて|のこと教えて|について話して)/.test(prompt)) return undefined;
+    const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    const entities = new Set<string>();
+    for (const mm of memories || []) {
+      if (!mm || mm.active === false || mm.replacedBy) continue;
+      const e = String(mm.factEntity || '');
+      if (e) entities.add(e);
+    }
+    let target: string | undefined;
+    for (const e of entities) {
+      if (prompt.includes(e)) { target = e; break; }
+    }
+    if (!target && /(?:僕|私|俺|わたし|あたし)/.test(prompt)) {
+      target = [...entities].find((e) => selfSet.has(e));
+    }
+    if (!target) return undefined;
+    const parts: string[] = [];
+    const seen = new Set<string>();
+    for (const mm of memories || []) {
+      if (!mm || mm.active === false || mm.replacedBy) continue;
+      if (String(mm.factEntity || '') !== target) continue;
+      const attr = String(mm.factAttribute || '');
+      const val = String(mm.factValue || '');
+      if (!val) continue;
+      const part = attr ? `${attr}は${val}` : val;
+      if (seen.has(part)) continue;
+      seen.add(part);
+      parts.push(part);
+    }
+    if (parts.length === 0) return undefined;
+    const disp = selfSet.has(target) ? 'あなた' : target;
+    return `${disp}については、${parts.slice(0, 5).join('、')}と聞いています。`;
+  }
+
   private tellAboutAnswer(prompt: string): string | undefined {
     if (!/(?:について|のこと)/.test(prompt)) return undefined;
     // P730: 「もっと／詳しく」の深掘り形だけをここで受ける。素の
@@ -5894,6 +5937,21 @@ export class ConversationCoreService {
       if (n === 0) return '今は特に覚えていることはないですよ。';
       userMemoService.clear();
       return '分かりました、忘れておきますね。';
+    }
+    // P796: 「牛乳のメモある？」——内容で探す形。
+    // 青汁のように1字ずつに割れる語もあるので、語の照合と
+    // 助詞等を落とした文字列の照合の両方で探す。
+    if (/(?:メモ|覚えたこと)/.test(p) && /[？?]/.test(p)) {
+      try {
+        const words = utteranceFeatureService.analyze(p).contentTokens
+          .filter((w: string) => w.length >= 2 && !/^(?:メモ|覚えたこと)$/.test(w));
+        const probeText = p.replace(/メモ|覚えたこと|ある|の|[？?]/g, '').trim();
+        const hits = userMemoService.list().filter((m) =>
+          words.some((w) => m.text.includes(w)) || (probeText.length >= 2 && m.text.includes(probeText)));
+        if (hits.length > 0) {
+          return `ありますよ。${hits.map((m) => `「${m.text}」`).join('と')}です。`;
+        }
+      } catch { /* 通常の読み返しへ */ }
     }
     // P789: 件数を聞く形。
     if (/(?:メモ|覚えたこと)/.test(p) && /(?:何個|いくつ|何件|何つ)/.test(p) && /[？?]/.test(p)) {
