@@ -510,6 +510,10 @@ export class ConversationCoreService {
       }
       // P647: 「〈語〉覚えた？」——特定の語についての自分の状態を
       // 答える（P624/P633 の語単位版）。
+      const provenance = this.knowledgeProvenanceAnswer(prompt, state, recentMessages);
+      if (provenance && !multiPart) {
+        return this.buildResult('RESOLVED', 'knowledge_provenance_answer', this.applyPersonaVoice(provenance), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const termKnowledge = this.termKnowledgeAnswer(prompt);
       if (termKnowledge) {
         return this.buildResult('RESOLVED', 'term_knowledge_answer', this.applyPersonaVoice(termKnowledge), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3481,11 +3485,35 @@ export class ConversationCoreService {
    */
   private adjectiveOpinionAnswer(prompt: string): string | undefined {
     if (!/(?:と思う|と思わない)[？?。\s]*$/.test(prompt.trim())) return undefined;
-    if (!/(かわいい|すごい|面白い|おもしろい|かっこいい|強い|速い|大きい|難しい|珍しい|美味しい|おいしい)/.test(prompt)) return undefined;
+    if (!/(かわいい|可愛い|すごい|凄い|面白い|おもしろい|かっこいい|強い|速い|大きい|難しい|珍しい|美味しい|おいしい)/.test(prompt)) return undefined;
     try {
       const features = utteranceFeatureService.analyze(prompt);
       return this.opinionAnswer(prompt, features.contentTokens);
     } catch { return undefined; }
+  }
+
+  /**
+   * P723: 「なんでクオッカのこと知ってるの？」——知識の出所を聞か
+   * れたら、教わったものは「教えてもらったから」と答える。従来は
+   * 「なんで」が未知語として扱われ、「『なんで』はまだ知らないで
+   * す」になっていた。個人辞書の user-taught の印で判定する。
+   */
+  private knowledgeProvenanceAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
+    if (!/(?:なんで|どうして|なぜ)/.test(prompt)) return undefined;
+    if (!/(?:知ってる|知っている|知ってた|覚えてる|覚えている|知った|覚えた)/.test(prompt)) return undefined;
+    const taught = (term: string): boolean => {
+      try {
+        return japaneseDictionaryService.listPersonal().some((e: any) => e.surface === term && Array.isArray(e.semanticIds) && e.semanticIds.some((s: string) => String(s).includes('user-taught')));
+      } catch { return false; }
+    };
+    try {
+      const features = utteranceFeatureService.analyze(prompt);
+      const inPrompt = features.contentTokens.find((t) => t.length >= 2 && taught(t));
+      if (inPrompt) return `「${inPrompt}」は、あなたに教えてもらったから知っているんです。`;
+    } catch { /* 補助経路 */ }
+    const recent = this.recentTopicCandidates(state, recentMessages).find((t) => taught(t));
+    if (recent) return `「${recent}」は、あなたに教えてもらったから知っているんです。`;
+    return undefined;
   }
 
   /**
@@ -4075,7 +4103,7 @@ export class ConversationCoreService {
     // P650: 「クオッカってかわいいと思う？」——評価の形容詞つきの
     // 意見質問も意見を求める形。形容詞は締めの文でそのまま返す。
     const opinionAdjective = /(?:と思う|と思わない)[？?。\s]*$/.test(prompt.trim())
-      ? prompt.match(/(かわいい|すごい|面白い|おもしろい|かっこいい|強い|速い|大きい|難しい|珍しい|美味しい|おいしい)/)?.[1]
+      ? prompt.match(/(かわいい|可愛い|すごい|凄い|面白い|おもしろい|かっこいい|強い|速い|大きい|難しい|珍しい|美味しい|おいしい)/)?.[1]
       : undefined;
     if (!/(?:どう思う|どう感じる|好きですか|おすすめ|べき|ほうがいい|方がいい|した方が|したほうが)/.test(prompt) && !opinionAdjective) return undefined;
     // P601: 相手自身への意見（「僕のことどう思う？」）は、知識の

@@ -2049,6 +2049,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P722 曜日名が崩れない', !wd722.some((w) => r722a.replyText.includes(`${w}曜は`)) || true, '');
 }
 
+// ---- 知識の出所と、漢字表記の評価形容詞（P723） ----
+{
+  const { conversationFactIntakeService: intake723 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem723: any[] = []; const hist723: any[] = []; let st723: any = undefined;
+  const run723 = async (q: string) => {
+    mem723 = intake723.intakeFromUserText(q, mem723).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem723, recentMessages: hist723.slice(-8), conversationState: st723 } as any);
+    st723 = r.nextConversationState;
+    hist723.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run723('ユキカゲは北の山に住む白い動物だよ');
+  const prov723 = await run723('なんでユキカゲのこと知ってるの？');
+  check('P723 知識の出所は教わったこととして答える', prov723.replyText.includes('教えてもらった'), prov723.replyText.slice(0, 130));
+  const op723 = await run723('ユキカゲって可愛いと思う？');
+  check('P723 漢字表記の可愛いでも意見を返す', op723.replyText.includes('可愛いと思います'), op723.replyText.slice(0, 130));
+  const why723 = await run723('なんでそう思うの？');
+  check('P723 意見の理由を記録から答える', why723.replyText.includes('ユキカゲ'), why723.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
