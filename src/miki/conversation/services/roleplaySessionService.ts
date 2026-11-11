@@ -202,6 +202,11 @@ export class RoleplaySessionService {
   // 印（開始の挨拶・終了の締めを、そのターンの返答にするため）。
   private pendingTransition: { type: 'started' | 'ended'; roleName: string; summary?: string; sourceText: string; at: number } | null = null;
 
+  /** P712: 遷移の印があるかだけを見る（消さない）。 */
+  public hasPendingTransition(): boolean {
+    return !!this.pendingTransition && Date.now() - this.pendingTransition.at <= 30_000;
+  }
+
   /** P595: 直近の開始・終了を取り出す（見たら消える。30秒を過ぎたら無効）。 */
   public takeTransition(): { type: 'started' | 'ended'; roleName: string; summary?: string; sourceText: string } | undefined {
     const t = this.pendingTransition;
@@ -327,7 +332,9 @@ export class RoleplaySessionService {
       // P547: 「<役名>になって」は文末か依頼の形に限る（「〜になってから」
       // のような通常文を役の開始と誤認しないため）。
       source.match(/(.{1,20}?)(?:になって)(?:話して|演じて|ほしい|ください|お願い)?[。．!！]?$/) ??
-      source.match(/なりチャ[:：]\s*(.{1,20})/);
+      source.match(/なりチャ[:：]\s*(.{1,20})/) ??
+      // P712: 「<役名>の役をやって」「<役名>を演じて」。
+      source.match(/(.{1,20}?)(?:の役をやって|の役やって|を演じて)/);
     if (startMatch) {
       const name = normalizeName(startMatch[1].replace(/^(じゃあ|では|それじゃあ)/, ''));
       if (!name) return undefined;
@@ -335,6 +342,22 @@ export class RoleplaySessionService {
       this.startSession(role, personaId);
       this.pendingTransition = { type: 'started', roleName: role.name, sourceText: source, at: Date.now() };
       return 'started';
+    }
+    // P712: 「なりチャしよう。僕は旅人で、みきは森の宿屋の主人ね」の
+    // ように、開始の宣言と両方の役の指定が同じ文に来る形。彼女の役は
+    // 「みきはX」か「Xの役」、相手の役は「僕はY」で拾う。
+    if (/なりチャ(?:しよう|したい|やろう|やる|始め|はじめ)|なりきり(?:しよう|したい|やろう)/.test(source)) {
+      const herRaw = source.match(/(?:みき|ミキ|あなた|君)は(.{1,20}?)(?:で|、|。|ね|の役|役|！|!|$)/)?.[1]
+        || source.match(/(.{1,20}?)の役(?:で|を|、|。|$)/)?.[1];
+      const userRaw = source.match(/(?:僕|私|俺)は(.{1,16}?)(?:で|、|。|ね|！|!|$)/)?.[1];
+      const name = herRaw ? normalizeName(herRaw.replace(/^(じゃあ|では|それじゃあ)/, '')) : '';
+      if (name) {
+        const userRole = userRaw ? normalizeName(userRaw) : '';
+        const role = this.findRole(name) ?? this.saveRole({ name, stance: '', world: '', toneHint: '', userRole });
+        this.startSession(role, personaId);
+        this.pendingTransition = { type: 'started', roleName: role.name, sourceText: source, at: Date.now() };
+        return 'started';
+      }
     }
     return undefined;
   }

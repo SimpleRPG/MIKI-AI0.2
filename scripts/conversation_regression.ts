@@ -1887,6 +1887,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P711 別の文の痛みは残る', trail711.isPainText('笑った。でも頭が痛い'), '');
 }
 
+// ---- なりチャの開始形と外での終了（P712） ----
+{
+  const { conversationFactIntakeService: intake712 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { roleplaySessionService: rp712 } = await import('../src/miki/conversation/services/roleplaySessionService');
+  if (rp712.isActive()) rp712.endSession();
+  intake712.intakeFromUserText('なりチャしよう。僕は旅人で、みきは森の宿屋の主人ね', []);
+  const start712 = await conversationCoreService.execute({ prompt: 'なりチャしよう。僕は旅人で、みきは森の宿屋の主人ね' } as any);
+  check('P712 両方の役の指定でなりチャが始まる', rp712.isActive() && start712.replyText.includes('森の宿屋の主人'), start712.replyText.slice(0, 120));
+  intake712.intakeFromUserText('なりチャ終わり', []);
+  await conversationCoreService.execute({ prompt: 'なりチャ終わり' } as any);
+  check('P712 終わりでセッションが閉じる', !rp712.isActive(), '');
+  const idle712 = await conversationCoreService.execute({ prompt: 'なりチャ終わり' } as any);
+  check('P712 入っていない時の終わりは正直に返す', idle712.replyText.includes('なりチャ中じゃない'), idle712.replyText.slice(0, 120));
+  const invite712 = await conversationCoreService.execute({ prompt: 'なりチャしよう' } as any);
+  check('P712 役なしの誘いには役を聞く', invite712.replyText.includes('何の役'), invite712.replyText.slice(0, 120));
+  if (rp712.isActive()) rp712.endSession();
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

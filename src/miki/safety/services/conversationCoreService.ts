@@ -545,6 +545,19 @@ export class ConversationCoreService {
       if (performance) {
         return this.buildResult('RESOLVED', 'performance_request_answer', this.applyPersonaVoice(performance), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P712: なりチャの誘い（役の指定なし）と、入っていない時の
+      // 終了の言葉。遷移の印があるターン（開始・終了が受理された
+      // 発話）は後段の遷移処理に譲る。
+      try {
+        if (!roleplaySessionService.isActive() && !roleplaySessionService.hasPendingTransition()) {
+          if (/なりチャ(?:しよう|したい|やろう|やる)|なりきり(?:しよう|したい)/.test(prompt) && prompt.length <= 24) {
+            return this.buildResult('RESOLVED', 'roleplay_invite_answer', this.applyPersonaVoice('いいよ、なりチャしよう。私は何の役をすればいい？ あなたの役もあれば教えてね。'), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+          }
+          if (/なりチャ(?:終わり|おわり|終了|おしまい)|なりきり(?:終わり|終了)/.test(prompt) && prompt.length <= 16) {
+            return this.buildResult('RESOLVED', 'roleplay_idle_end_answer', this.applyPersonaVoice('今はなりチャ中じゃないよ。始めたい時は、役を教えてね。'), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+          }
+        }
+      } catch { /* なりチャの受け口は補助 */ }
       const support = this.supportRequestAnswer(prompt);
       if (support) {
         return this.buildResult('RESOLVED', 'support_request_answer', this.applyPersonaVoice(support), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
