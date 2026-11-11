@@ -2663,6 +2663,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P774 予定の無い日は無いと答える', none774.replyText.includes('まだ聞いていない'), none774.replyText.slice(0, 130));
 }
 
+// ---- P775-P776: 過去の予定／これからの予定の一覧 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService: storage776 } = await import('../src/services/storageService');
+  let mem776: any[] = []; const hist776: any[] = []; let st776: any = undefined;
+  const run776 = async (t: string) => {
+    mem776 = conversationFactIntakeService.intakeFromUserText(t, mem776).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem776, recentMessages: hist776.slice(-8), conversationState: st776 } as any);
+    st776 = r.nextConversationState;
+    hist776.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run776('明日は歯医者の予定があるよ');
+  await run776('金曜日に美容院の予定があるよ');
+  const up776 = await run776('これからの予定、全部教えて');
+  check('P776 これからの予定を日付順に一覧する', up776.replyText.includes('これからの予定は') && up776.replyText.includes('歯医者') && up776.replyText.includes('美容院'), up776.replyText.slice(0, 200));
+  const key776 = 'miki_user_plans_v1';
+  const plans776 = JSON.parse(storage776.getItem(key776) || '[]');
+  const yd = new Date(Date.now() - 86400000);
+  const yKey = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, '0')}-${String(yd.getDate()).padStart(2, '0')}`;
+  plans776.push({ when: '明日', text: '昨日は眼科の予定があったよ', at: Date.now() - 86400000, date: yKey });
+  storage776.setItem(key776, JSON.stringify(plans776));
+  const past776 = await run776('昨日の予定は何だったっけ？');
+  check('P775 昨日の予定も日付で引いて答える', past776.replyText.includes('眼科'), past776.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

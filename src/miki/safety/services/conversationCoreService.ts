@@ -420,6 +420,10 @@ export class ConversationCoreService {
       if (planRecallEarly) {
         return this.buildResult('RESOLVED', 'plan_recall_answer', this.applyPersonaVoice(planRecallEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const upcomingPlans = multiPart ? undefined : this.upcomingPlansAnswer(prompt);
+      if (upcomingPlans) {
+        return this.buildResult('RESOLVED', 'upcoming_plans_answer', this.applyPersonaVoice(upcomingPlans), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const clockAnswer = multiPart ? undefined : this.clockCalendarAnswer(prompt);
       if (clockAnswer) {
         return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3674,7 +3678,7 @@ export class ConversationCoreService {
       ? `${Number(exMatch[1])}月${Number(exMatch[2])}日`
       : wdMatch
         ? (wdMatch[1] === '来週の' ? `来週の${wdMatch[2]}曜日` : `${wdMatch[2]}曜日`)
-        : prompt.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+        : prompt.match(/(明後日|明日|あした|今日|今夜|一昨日|昨日|今週|来週|再来週|週末|今度)/)?.[1];
     if (!whenRaw) return undefined;
     const when = whenRaw === 'あした' ? '明日' : whenRaw;
     try {
@@ -3682,9 +3686,10 @@ export class ConversationCoreService {
       const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
       // P772: 控えは日付に錨づけされている。「明日」と言って控えた
       // 予定は、当日には「今日の予定」として聞き返せる。
-      const offset = when === '今日' || when === '今夜' ? 0 : when === '明日' ? 1 : when === '明後日' ? 2 : -1;
+      // P775: 過去（昨日・一昨日）の予定も日付で引ける。
+      const offset = when === '今日' || when === '今夜' ? 0 : when === '明日' ? 1 : when === '明後日' ? 2 : when === '昨日' ? -1 : when === '一昨日' ? -2 : Number.NaN;
       let targetDate: string | undefined;
-      if (offset >= 0) {
+      if (!Number.isNaN(offset)) {
         const d = new Date(Date.now() + offset * 86400000);
         targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       } else if (exMatch) {
@@ -3710,6 +3715,34 @@ export class ConversationCoreService {
       }
       const texts = [...new Set(hits.map((p) => p.text))].slice(-3);
       return `${when}の予定は、${texts.map((t) => `「${t}」`).join('と')}、と話していましたよ。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P776: 「これからの予定、全部教えて」——日付の付いた控えを
+   * 日付順に並べて答える。過去の分は出さない。
+   */
+  private upcomingPlansAnswer(prompt: string): string | undefined {
+    if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
+    if (!/(?:全部|一覧|これから|今後|先の|まとめて)/.test(prompt)) return undefined;
+    if (!/[？?]/.test(prompt) && !/(?:教えて|見せて|何)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const upcoming = plans
+        .filter((p) => p.date && p.date >= todayKey)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (upcoming.length === 0) return undefined;
+      const label = (dk: string) => {
+        const [y, mo, da] = dk.split('-').map(Number);
+        const wd = '日月火水木金土'[new Date(y, mo - 1, da).getDay()];
+        return `${mo}月${da}日（${wd}）`;
+      };
+      const items = upcoming.slice(0, 6).map((p) => `${label(String(p.date))}「${p.text}」`);
+      const tail = upcoming.length > 6 ? '、ほかにもあります' : '';
+      return `これからの予定は、${items.join('、')}です${tail}。`;
     } catch { return undefined; }
   }
 
