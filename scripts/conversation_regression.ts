@@ -1840,6 +1840,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P707 教わった語は辞書から答える', def707.replyText.includes('鳥') && !def707.replyText.includes('スコープ') && !def707.replyText.includes('Verifier'), def707.replyText.slice(0, 140));
 }
 
+// ---- 訂正で事実が更新される（P708） ----
+{
+  const { conversationFactIntakeService: intake708 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem708: any[] = [];
+  mem708 = intake708.intakeFromUserText('僕は犬を飼ってるよ', mem708).updatedMemories;
+  mem708 = intake708.intakeFromUserText('ごめん、犬じゃなくて猫だった', mem708).updatedMemories;
+  const pet708 = await conversationCoreService.execute({ prompt: '僕が飼ってるの何だっけ？', memories: mem708 } as any);
+  check('P708 訂正したペットが想起に反映される', pet708.replyText.includes('「猫」'), pet708.replyText.slice(0, 140));
+  let mem708b: any[] = [];
+  mem708b = intake708.intakeFromUserText('猫の名前はモチだよ', mem708b).updatedMemories;
+  mem708b = intake708.intakeFromUserText('モチじゃなくてムギだった', mem708b).updatedMemories;
+  const name708 = await conversationCoreService.execute({ prompt: '猫の名前なんだっけ？', memories: mem708b } as any);
+  check('P708 訂正した名前が想起に反映される', name708.replyText.includes('ムギ') && !name708.replyText.includes('「モチ」だよ'), name708.replyText.slice(0, 140));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

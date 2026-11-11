@@ -433,14 +433,18 @@ export class ConversationFactIntakeService {
    * 発言文から事実候補と訂正対象を抽出する（純粋関数）。
    * invalidations は「AじゃなくてB」の A 部分で、既存事実の無効化に使う。
    */
-  public extractUserFacts(text: string): { facts: ExtractedFact[]; invalidations: string[] } {
+  public extractUserFacts(text: string): { facts: ExtractedFact[]; invalidations: string[]; correctionPair?: { wrong: string; right: string } } {
     const invalidations: string[] = [];
     let working = text.trim();
     let pendingCorrection: { entity: string; attribute?: string } | null = null;
+    let correctionPair: { wrong: string; right: string } | undefined;
 
     const correction = working.match(/(?:^|[、。]\s*)(.{1,30}?)(?:じゃなくて|ではなく(?:て)?)[、,]?(.+)$/);
     if (correction) {
-      const wrong = correction[1].trim();
+      // P708: 「ごめん、犬じゃなくて猫だった」では、誤り側の切り出しに
+      // 「ごめん、」まで含まれて無効化が一致しなかった。区切りの
+      // 後ろ側だけを誤りとする。
+      const wrong = (correction[1].split(/[、。]/).pop() || correction[1]).trim();
       const wrongFact = wrong ? extractFromSentence(wrong) : null;
       if (wrongFact?.value) {
         // 無効化は値で照合する（旧事実の factValue / content と一致させる）
@@ -452,6 +456,14 @@ export class ConversationFactIntakeService {
         invalidations.push(wrong);
       }
       working = correction[2].trim();
+      // P708: 訂正ペア（誤り→正しい値）を記録する。誤り側が裸の値
+      // （「犬じゃなくて猫」）だと通常の抽出では新事実が作れないため、
+      // 取り込み側で旧事実の枠に正しい値を差し込む材料にする。
+      const rightSentence = splitSentences(working)[0] || '';
+      const right = normalizeValue(rightSentence.replace(/^(?:それは|値は)/, ''));
+      if (wrong && right && right.length <= 20 && right !== wrong) {
+        correctionPair = { wrong, right };
+      }
     }
 
     const facts: ExtractedFact[] = [];
@@ -492,7 +504,7 @@ export class ConversationFactIntakeService {
         });
       }
     }
-    return { facts, invalidations };
+    return { facts, invalidations, correctionPair };
   }
 
   /**
@@ -662,7 +674,7 @@ export class ConversationFactIntakeService {
     try {
       this.observeUserKnowledgeSignals(text);
     } catch { /* best-effort */ }
-    const { facts, invalidations } = this.extractUserFacts(text);
+    const { facts, invalidations, correctionPair } = this.extractUserFacts(text);
     const now = Date.now();
     const updated: MemoryItem[] = existingMemories.map((m) => ({ ...m }));
     const added: MemoryItem[] = [];
@@ -671,6 +683,33 @@ export class ConversationFactIntakeService {
 
     const isUserFact = (m: MemoryItem) =>
       m.source === 'user_statement' && m.active !== false && !m.replacedBy;
+
+    // P708: 訂正ペア（「犬じゃなくて猫だった」）で、正しい側が裸の
+    // 値しかない場合は通常の抽出で新事実が作れない。無効化される
+    // 旧事実の枠（対象・属性・文）を借りて、値だけを差し替えた
+    // 事実を合成する。これが無いと、訂正の受け答えだけが
+    // 「覚え直します」と言って想起は古いままになっていた。
+    if (correctionPair && !facts.some((f) => f.value && f.value.includes(correctionPair.right))) {
+      const target = updated.find(
+        (m) => isUserFact(m) && m.factValue != null
+          && (String(m.factValue).includes(correctionPair.wrong) || String(m.content || '').includes(correctionPair.wrong))
+      );
+      if (target) {
+        const newValue = String(target.factValue).split(correctionPair.wrong).join(correctionPair.right);
+        const newStatement = String(target.content || '').includes(correctionPair.wrong)
+          ? String(target.content).split(correctionPair.wrong).join(correctionPair.right)
+          : `${target.factEntity || ''}は${newValue}`;
+        facts.push({
+          kind: 'attribute',
+          category: 'user_fact',
+          entity: target.factEntity,
+          attribute: target.factAttribute,
+          value: newValue,
+          statement: newStatement,
+          summary: newStatement,
+        });
+      }
+    }
 
     // 明示訂正: 一致する既存事実を無効化する
     for (const wrong of invalidations) {

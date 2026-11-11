@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4078,
-    "resolvedRelativeImportCandidateCount": 4062,
+    "relativeImportCandidateCount": 4079,
+    "resolvedRelativeImportCandidateCount": 4063,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 179544,
-      "lines": 1856,
-      "sha256": "15d83e9ee78c0a1db798852daec3128436df95ea3410f7531ae78d4177308f8d",
+      "bytes": 180794,
+      "lines": 1871,
+      "sha256": "092c4515c660e9cc13b120ef66518216a2eb1913d530ca84211d497a575a8bb5",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2192,10 +2192,16 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 1845,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
         }
       ],
-      "relativeImportCandidateCount": 80,
-      "resolvedRelativeImportCount": 80,
+      "relativeImportCandidateCount": 81,
+      "resolvedRelativeImportCount": 81,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -10890,9 +10896,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationFactIntakeService.ts",
-      "bytes": 41093,
-      "lines": 773,
-      "sha256": "721b21c207c4b992b1e32c73bdc2ca5fae3197659de5ec8fc819798f2e148072",
+      "bytes": 43503,
+      "lines": 812,
+      "sha256": "5c4601414e92082e9645c65ebf3ba89c60dad8f0fd5f85a1eb7dc2d41da3bef9",
       "relativeImportCandidates": [
         {
           "line": 1,
