@@ -1,4 +1,5 @@
 import { unifiedWebResearchService } from './unifiedWebResearchService';
+import { linkFollowService } from './linkFollowService';
 import { autonomousSearchService } from './autonomousSearchService';
 import type { SearchLane } from './unifiedWebResearchService';
 import { knowledgeGapService, KnowledgeGap } from '../../unknown/services/knowledgeGapService';
@@ -711,6 +712,9 @@ export class ResearchService {
       let roundsCompleted = 0;
       let previousEvidenceFingerprint = '';
       let previousEvidenceIds: string[] = [];
+      // P803: リンク巡回の予算（1調査あたり成功3件まで）と既辿り URL。
+      let followReadsUsed = 0;
+      const followedUrls = new Set<string>();
       let previousIndependentClusters: string[] = [];
 
       let recommendedRevisionQuery: string | undefined;
@@ -840,6 +844,33 @@ export class ResearchService {
         const readResults = await unifiedWebResearchService.readSearchResultPages(passQuery, orderResultsForReading(results, queryPlan.status === "READY" ? queryPlan.queries[pass] : {}), {
           maxPages: maxPagesPerPass,
         });
+        // P803: リンク巡回。読んだページのアンカーが調査対象を含む
+        // リンクを、その場で追加の読み対象にする。答えが1リンク先に
+        // ある型の調査で、検索し直さずに前へ進むための運転。
+        // 予算は1調査あたり成功3件まで（読みは直列で時間を使うため）。
+        if (followReadsUsed < 3) {
+          const followTerms = [
+            String(gap.identity?.target || ''),
+            ...(queryPlan.status === 'READY' ? (queryPlan.subject?.unknownTerms || []) : []),
+            ...String(baseQuery || '').split(/[\s:：]+/).filter((w: string) => w.length >= 2).slice(0, 2),
+          ];
+          const followExclude = new Set<string>([
+            ...readResults.map((p) => p.url),
+            ...followedUrls,
+            ...((sourceExclusion as any)?.excludedUrls || []),
+          ]);
+          const follows = linkFollowService.selectFollowLinks(readResults as any, followTerms, followExclude, Math.min(2, 3 - followReadsUsed));
+          if (follows.length > 0) {
+            const followRead = await unifiedWebResearchService.readSearchResultPages(passQuery, follows.map((f) => ({ title: f.title || f.url, snippet: '', source: 'link-follow', url: f.url })) as any, { maxPages: follows.length });
+            let followedOk = 0;
+            for (const fp of followRead) {
+              followedUrls.add(fp.url);
+              if (fp.success && fp.text.trim()) { readResults.push(fp); followedOk++; }
+            }
+            followReadsUsed += followedOk;
+            systemLogger.info('SELF_IMPROVEMENT', `🔗 [リンク巡回] 「${passQuery}」で ${follows.length} 件のリンクを辿り、${followedOk} 件を読んだ`);
+          }
+        }
         const isCounterEvidencePass =
           queryPlan.status === 'READY' &&
           queryPlan.queries[pass]?.intentType === 'COUNTEREVIDENCE';

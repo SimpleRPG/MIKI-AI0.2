@@ -1574,6 +1574,7 @@ export class AutonomousSearchService {
     text: string;
     url: string;
     error?: string;
+    links?: Array<{ href: string; text: string }>;
   }>> {
     const maxPages = Math.max(1, Math.min(3, options?.maxPages ?? 2));
     const readStartedAt = Date.now();
@@ -1609,7 +1610,7 @@ export class AutonomousSearchService {
       .slice(0, maxPages);
 
     // Native WebView rejects overlapping calls; serialize page reads while preserving input order.
-    const outputs: Array<{ result: T; success: boolean; text: string; url: string; error?: string }> = [];
+    const outputs: Array<{ result: T; success: boolean; text: string; url: string; error?: string; links?: Array<{ href: string; text: string }> }> = [];
     for (const result of readable) {
       try {
         const page = await this.fetchRenderedPage(result.url!, {
@@ -1626,6 +1627,7 @@ export class AutonomousSearchService {
           text: page.text || '',
           url: page.url || result.url!,
           error: page.error,
+          links: page.links,
         });
       } catch (error) {
         this.failedPageUrls.set(result.url!, Date.now());
@@ -2104,6 +2106,7 @@ export class AutonomousSearchService {
     length: number;
     patternsCount: number;
     error?: string;
+    links?: Array<{ href: string; text: string }>;
   }> {
     systemLogger.info('SELF_IMPROVEMENT', `🌐 [HeadlessWebView] ページ取得開始: ${url}`);
     const result = await nativeWorkManagerService.fetchRenderedPage(url, options);
@@ -2163,6 +2166,7 @@ export class AutonomousSearchService {
       url,
       length: result.length,
       patternsCount,
+      links: result.links,
     };
   }
 }

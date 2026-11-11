@@ -3098,6 +3098,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P802 名前の「逃げ場がない」は肯定の形で答える', bow802.replyText.includes('メイン武器は「逃げ場がない」だよ'), bow802.replyText.slice(0, 150));
 }
 
+// ---- P803: リンク巡回の抽出と選択規則（オフライン検証） ----
+{
+  const { extractLinksFromHtml } = await import('../src/miki/execution/services/nativeWorkManagerService');
+  const { linkFollowService } = await import('../src/miki/research/services/linkFollowService');
+  const html803 = '<a href="/mokoron.html">モコロンについて</a><a href="https://example.com/x.pdf">資料</a><a href="#top">上へ</a><a href="https://example.com/login">ログイン</a>';
+  const links803 = extractLinksFromHtml(html803, 'https://example.jp/index.html');
+  check('P803 リンク抽出は相対URLを解決しフラグメントを除く', links803.length === 3 && links803[0].href === 'https://example.jp/mokoron.html', JSON.stringify(links803));
+  const follows803 = linkFollowService.selectFollowLinks(
+    [{ url: 'https://example.jp/index.html', links: links803 }],
+    ['モコロン'], new Set<string>(), 2);
+  check('P803 巡回選択は対象語のアンカーだけを選ぶ', follows803.length === 1 && follows803[0].url === 'https://example.jp/mokoron.html', JSON.stringify(follows803));
+  const excluded803 = linkFollowService.selectFollowLinks(
+    [{ url: 'https://example.jp/index.html', links: links803 }],
+    ['モコロン'], new Set(['https://example.jp/mokoron.html']), 2);
+  check('P803 既読URLは辿らない', excluded803.length === 0, JSON.stringify(excluded803));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
