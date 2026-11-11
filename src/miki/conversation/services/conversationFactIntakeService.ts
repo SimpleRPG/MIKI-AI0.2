@@ -567,6 +567,33 @@ export class ConversationFactIntakeService {
   }
 
   /**
+   * P717: 「XはVだよ／です」の形の事実は、X の説明としても学ぶ。
+   * 条件: 属性なしの素の文、X が辞書に無い語、V が説明らしい長さ。
+   * 既に意味のある語は上書きしない（教示済み・辞書・Web学習を守る）。
+   */
+  private learnTermFromPlainStatement(text: string): void {
+    if (/[？?]/.test(text)) return;
+    const { facts } = this.extractUserFacts(text);
+    for (const fact of facts) {
+      const term = String(fact.entity || '').trim();
+      const gloss = String(fact.value || '').trim();
+      if (!term || !gloss || fact.attribute) continue;
+      if (term.length < 2 || term.length > 12) continue;
+      if (/^(僕|私|俺|わたし|あなた|君|名前|今日|昨日|明日|これ|それ|あれ|ここ|そこ|天気|時間)$/.test(term)) continue;
+      if (/[はがをにへともや、。！？!?「」『』\s]/.test(term)) continue;
+      if (gloss.length < 4 || gloss.length > 60) continue;
+      if (/^(知らない|わからない|分からない)/.test(gloss)) continue;
+      if (!intakeMeaningGuardService.check(String(fact.statement || text)).ok) continue;
+      const existing = japaneseDictionaryService.lookup(term);
+      if (existing.find((e) => e.gloss)) continue;
+      japaneseDictionaryService.addPersonal(term, { gloss, semanticIds: ['learned:user-taught'] });
+      try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
+      try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
+      systemLogger.info('CHAT', `📖 [意味学習] ユーザーの説明文から「${term}」の意味を学びました: ${gloss}`);
+    }
+  }
+
+  /**
    * P567: 聞き返した語への答えを取り込む。彼女が「〜って、どんな
    * ものですか？」と聞いた直後の発言は、その語の説明として読む
    * （P518 の定型でなくてもよい）。保留は一回限りで消費する:
@@ -678,6 +705,12 @@ export class ConversationFactIntakeService {
     // 個人辞書に登録する。失敗しても事実取り込み自体は止めない。
     try {
       this.learnTermFromUserExplanation(text);
+    } catch { /* best-effort */ }
+    // P717: 「Xは〜だよ」の普通の教え方も、その語の説明として学ぶ
+    // （従来は「Xって、〜のこと」の定型だけが対象で、最も自然な
+    // 教え方では語彙にならず、直後に聞き返しが起きていた）。
+    try {
+      this.learnTermFromPlainStatement(text);
     } catch { /* best-effort */ }
     // P567: 直前に聞き返した語（P565）への答えは、説明の定型で
     // なくても意味として取り込む。失敗しても取り込みは止めない。

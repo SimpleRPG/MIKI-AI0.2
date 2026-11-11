@@ -2841,6 +2841,22 @@ export class ConversationCoreService {
         if (claim) return String((claim as any).statement).slice(0, 120);
       }
     } catch { /* 補助経路 */ }
+    // P717: 検証済みの知識が無くても、教わった説明（個人辞書の
+    // gloss）に属性の手がかりが含まれていれば、出典を添えて答える
+    // （教わった内容を使わずに「まだ知らない」と言うのは、学んだ
+    // ことを使えていないのと同じため）。
+    try {
+      const glossKeys: Record<string, string[]> = {
+        '生息地': ['生息', '住ん', '住む', '棲ん', '棲む'],
+        '場所': ['生息', '住ん', '住む', '棲ん', '棲む'],
+        '使い道': ['使わ', '使え', '用い', '役立'],
+      };
+      const gk = glossKeys[attrLabel];
+      if (gk) {
+        const gloss = japaneseDictionaryService.lookup(entity).map((e: any) => String(e.gloss || '')).find((g) => gk.some((k) => g.includes(k)));
+        if (gloss) return `教わった説明では、「${entity}」は${gloss}、と聞いています。`;
+      }
+    } catch { /* 補助経路 */ }
     const known: string[] = [];
     const isA = relations.filter((r) => r.type === 'IS_A');
     if (isA.length > 0) known.push(`${isA.map((r) => r.to).join('・')}の一種`);

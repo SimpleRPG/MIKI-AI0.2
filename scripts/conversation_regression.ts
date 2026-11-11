@@ -1965,6 +1965,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 }
 
+// ---- 普通の教え方が語彙になり、属性の質問で使える（P717） ----
+{
+  const { conversationFactIntakeService: intake717 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { japaneseDictionaryService: dict717 } = await import('../src/miki/research/services/japaneseDictionaryService');
+  intake717.intakeFromUserText('クオッカはオーストラリアに住む小さい動物だよ', []);
+  check('P717 「Xは〜だよ」が語彙として学ばれる', dict717.lookup('クオッカ').some((e: any) => String(e.gloss || '').includes('オーストラリアに住む')), JSON.stringify(dict717.lookup('クオッカ').map((e: any) => e.gloss)));
+  const hab717 = await conversationCoreService.execute({ prompt: 'クオッカってどこに住んでるの？' } as any);
+  check('P717 教わった説明から生息地に答える', hab717.replyText.includes('オーストラリア'), hab717.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
