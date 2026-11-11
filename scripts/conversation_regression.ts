@@ -3019,6 +3019,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P798 自分の誕生日は従来どおり', self798.replyText.includes('あなたの誕生日（3月5日）'), self798.replyText.slice(0, 130));
 }
 
+// ---- P799: 否定の事実を肯定で答えない ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem799: any[] = []; const hist799: any[] = []; let st799: any = undefined;
+  const run799 = async (t: string) => {
+    mem799 = conversationFactIntakeService.intakeFromUserText(t, mem799).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem799, recentMessages: hist799.slice(-8), conversationState: st799 } as any);
+    st799 = r.nextConversationState;
+    hist799.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run799('僕は犬を飼ってないよ');
+  const negPet799 = await run799('僕って犬飼ってる？');
+  check('P799 飼ってない犬を肯定しない', negPet799.replyText.includes('飼っていないと話していました'), negPet799.replyText.slice(0, 150));
+  await run799('僕は車を持ってないよ');
+  const negCar799 = await run799('僕って車持ってる？');
+  check('P799 持ってない車も原文で答える', negCar799.replyText.includes('車を持ってない'), negCar799.replyText.slice(0, 150));
+  await run799('僕は泳げないよ');
+  const negSwim799 = await run799('僕って泳げる？');
+  check('P799 泳げないも原文で答える', negSwim799.replyText.includes('泳げない'), negSwim799.replyText.slice(0, 150));
+  await run799('僕は猫を飼ってるよ');
+  const posPet799 = await run799('僕が飼ってる動物なんだっけ？');
+  check('P799 肯定のペット想起は従来どおり', posPet799.replyText.includes('猫'), posPet799.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

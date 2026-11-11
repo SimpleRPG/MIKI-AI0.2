@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4158,
-    "resolvedRelativeImportCandidateCount": 4142,
+    "relativeImportCandidateCount": 4159,
+    "resolvedRelativeImportCandidateCount": 4143,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 272855,
-      "lines": 3035,
-      "sha256": "dc9385356d67bbae89dca4f65604cdf911c9d4d5c2185195995aae04774da2df",
+      "bytes": 274599,
+      "lines": 3060,
+      "sha256": "7852b101c2cfdef758d724b2591a984467f8c392d58c20137f5d69cf778cdc68",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2636,10 +2636,16 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 3024,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
         }
       ],
-      "relativeImportCandidateCount": 154,
-      "resolvedRelativeImportCount": 154,
+      "relativeImportCandidateCount": 155,
+      "resolvedRelativeImportCount": 155,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -12088,9 +12094,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationUserFactRecallService.ts",
-      "bytes": 17409,
-      "lines": 349,
-      "sha256": "be65d753596cfb0cc8767240648fb43b7d610e43e8b6304f5382c8e04649e3ab",
+      "bytes": 20441,
+      "lines": 406,
+      "sha256": "5f61c185024b260631a0c281337c78c03935963c99a2f907ea79d1c5d55c0676",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,

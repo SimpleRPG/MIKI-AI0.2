@@ -153,6 +153,19 @@ function collectCandidates(memories: any[], stateSummaries?: string[]): UserFact
   return candidates;
 }
 
+/**
+ * P799: 否定の事実か（「犬を飼ってない」「泳げない」）。否定の
+ * 事実は肯定の形で答えると、言ってもいないことを言ったことに
+ * なる（「飼ってる？」に「犬だよ」と答える事故）。否定の候補は
+ * 原文のまま引用して答える。
+ */
+function isNegativeFact(c: UserFactCandidate): boolean {
+  const v = String(c.value || '').trim();
+  const s = String(c.summary || '').trim();
+  const tail = /(?:ない|いない|じゃない|ではない|できない|分からない|わからない)(?:よ|ね|です|ます)?$/;
+  return tail.test(v) || tail.test(s) || /(?:飼ってない|持ってない|飼っていない|持っていない)/.test(v);
+}
+
 function matchesKey(key: string, c: UserFactCandidate): boolean {
   const { entity, attribute } = c;
   if (attribute && attribute !== '数値') {
@@ -177,8 +190,10 @@ function topicLabelOf(c: UserFactCandidate): string {
 
 function buildMatch(chosen: UserFactCandidate): UserFactRecallMatch {
   const topicLabel = topicLabelOf(chosen);
-  const answerText =
-    chosen.value && chosen.value !== chosen.entity
+  // P799: 否定の事実は肯定の形に直さず、原文のまま引く。
+  const answerText = isNegativeFact(chosen)
+    ? `前に「${chosen.summary}」と話していましたよ。`
+    : chosen.value && chosen.value !== chosen.entity
       ? `あなたが言っていた${topicLabel}は「${chosen.value}」だよ。`
       : `あなたが話していたのは「${chosen.summary}」だよ。`;
   return { candidate: chosen, topicLabel, answerText, reasonLabel: chosen.reasonLabel };
@@ -220,6 +235,7 @@ export class ConversationUserFactRecallService {
       // 「猫を2匹飼ってる」の形で、匹数の分だけ正規表現を広げる。
       if (/何(?:匹|頭|羽)/.test(prompt)) {
         for (const c of candidates) {
+          if (isNegativeFact(c)) continue;
           const cm = String(c.value || c.summary || '').match(/(.+?)を(\d+)\s*(匹|頭|羽)/);
           if (cm) {
             return {
@@ -233,6 +249,9 @@ export class ConversationUserFactRecallService {
       }
       const pets: string[] = [];
       for (const c of candidates) {
+        // P799: 「犬を飼ってない」の値も「飼って」に一致して
+        // しまうため、否定の候補はペットとして数えない。
+        if (isNegativeFact(c)) continue;
         const m = String(c.value || c.summary || '').match(/(.+?)を(?:\d+\s*(?:匹|頭|羽))?\s*飼って/);
         if (m && m[1] && !pets.includes(m[1])) pets.push(m[1]);
       }
@@ -243,6 +262,19 @@ export class ConversationUserFactRecallService {
           answerText: `前に言っていた飼っている動物は「${pets.slice(0, 3).join('」と「')}」だよ。`,
           reasonLabel: candidates[0].reasonLabel,
         };
+      }
+      // P799: 否定だけがある場合は、飼っていないことを答える。
+      for (const c of candidates) {
+        if (!isNegativeFact(c)) continue;
+        const nm = String(c.value || c.summary || '').match(/(.+?)を.*飼って(?:ない|いない)/);
+        if (nm && nm[1]) {
+          return {
+            candidate: c,
+            topicLabel: '飼っている動物',
+            answerText: `「${nm[1]}」は飼っていないと話していましたよ。`,
+            reasonLabel: c.reasonLabel,
+          };
+        }
       }
     }
     if (/(?:好きなもの|好きなこと|好物|好み|趣味)/.test(prompt) && !/(?:みき|ビービー|あなた|君)の/.test(prompt)) {
@@ -257,6 +289,31 @@ export class ConversationUserFactRecallService {
           answerText: `前に言っていた好きなものは「${values.join('」と「')}」だよ。`,
           reasonLabel: prefs[0].reasonLabel,
         };
+      }
+    }
+
+    // P799: 本人への yes/no の聞き返し（「僕って車持ってる？」
+    // 「僕って泳げる？」）。属性なしの事実はキーが作れず従来は
+    // 素通りしていた。値の語幹（否定を落とした形）と発話の
+    // 重なりで引き、答えは原文の引用にする（肯定・否定どちらの
+    // 事実でも、言ったままの形で返すため）。
+    if (/[？?]/.test(prompt) && /(?:僕|私|俺|わたし|あたし)/.test(prompt) && prompt.length <= 24) {
+      const norm799 = (s: string) => s.replace(/[をはがにへてっ？?。]/g, '');
+      const np799 = norm799(prompt);
+      for (const c of candidates) {
+        if (c.attribute) continue;
+        if (c.entity && !FIRST_PERSON.has(c.entity)) continue;
+        const core = String(c.value || '').replace(/(?:ない|いない|じゃない|ではない)(?:よ|ね)?$/, '').trim();
+        if (core.length < 2) continue;
+        const nc = norm799(core);
+        if (nc.length >= 2 && np799.includes(nc.slice(0, Math.min(nc.length, 4)))) {
+          return {
+            candidate: c,
+            topicLabel: topicLabelOf(c),
+            answerText: `前に「${c.summary}」と話していましたよ。`,
+            reasonLabel: c.reasonLabel,
+          };
+        }
       }
     }
 
