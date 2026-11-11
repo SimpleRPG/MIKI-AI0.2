@@ -2498,6 +2498,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P759 閾値を超えるものが無ければ無いと言う', thrNone757.replyText.includes('いない'), thrNone757.replyText.slice(0, 130));
 }
 
+// ---- P760: 寿命も物差しで比べる ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem760: any[] = []; const hist760: any[] = []; let st760: any = undefined;
+  const run760 = async (t: string) => {
+    mem760 = conversationFactIntakeService.intakeFromUserText(t, mem760).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem760, recentMessages: hist760.slice(-8), conversationState: st760 } as any);
+    st760 = r.nextConversationState;
+    hist760.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run760('ナガモは寿命が15年くらいの動物だよ');
+  await run760('ミジカモは寿命が3年の動物だよ');
+  const lifeCmp760 = await run760('ナガモとミジカモ、どっちが長生き？');
+  check('P760 寿命を数値で比べる', lifeCmp760.replyText.includes('ナガモの方が長生き') && lifeCmp760.replyText.includes('15年'), lifeCmp760.replyText.slice(0, 130));
+  const lifeTop760 = await run760('教えた動物の中で一番長生きなのは？');
+  check('P760 一番長生きも実測値で決める', lifeTop760.replyText.includes('ナガモ'), lifeTop760.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

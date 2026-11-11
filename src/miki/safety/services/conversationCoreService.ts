@@ -2999,6 +2999,7 @@ export class ConversationCoreService {
       { re: /大き|小さ/, label: '大きさ', adj: '大きい', plus: /大き|でか/, minus: /小さ|小柄/, plusText: '大きい', minusText: '小さい' },
       { re: /重/, label: '重さ', adj: '重い', plus: /重/, minus: /軽/, plusText: '重い', minusText: '軽い' },
       { re: /速|早/, label: '速さ', adj: '速い', plus: /速|俊敏/, minus: /遅|のろ/, plusText: '速い', minusText: '遅い' },
+      { re: /長生き|寿命/, label: '寿命', adj: '長生き', plus: /長生き|長寿/, minus: /短命/, plusText: '長生き', minusText: '短命' },
     ];
     const dim = dims.find((d) => d.re.test(prompt));
     if (!dim) return undefined;
@@ -3008,8 +3009,8 @@ export class ConversationCoreService {
     // （P732）より先に、事実と説明に埋まっている実測値を比べる。
     // 相手は教わった語でなくてもよい（「僕とミナモ、どっちが
     // 重い？」——僕の体重は事実の側にある）。
-    if ((dim.label === '重さ' || dim.label === '大きさ') && Array.isArray(memories)) {
-      const measureOf = (text: string): { value: number; disp: string } | undefined => this.measureFromText(text, dim.label as '重さ' | '大きさ');
+    if ((dim.label === '重さ' || dim.label === '大きさ' || dim.label === '寿命') && Array.isArray(memories)) {
+      const measureOf = (text: string): { value: number; disp: string } | undefined => this.measureFromText(text, dim.label as '重さ' | '大きさ' | '寿命');
       const measureFor = (name: string): { value: number; disp: string } | undefined => {
         const isSelf = name === '僕';
         for (const m of memories) {
@@ -3180,8 +3181,13 @@ export class ConversationCoreService {
    * 抜き出す共有ヘルパー。単位は基準単位（キロ／センチ）に
    * そろえた数値と、表示用の原文断片を返す。
    */
-  private measureFromText(text: string, label: '重さ' | '大きさ'): { value: number; disp: string } | undefined {
+  private measureFromText(text: string, label: '重さ' | '大きさ' | '寿命'): { value: number; disp: string } | undefined {
     if (!text) return undefined;
+    // P760: 寿命も物差しに加える（単位は年）。
+    if (label === '寿命') {
+      const m = String(text).match(/(\d+(?:\.\d+)?)\s*(?:年|歳)(?:くらい|ほど)?/);
+      return m ? { value: parseFloat(m[1]), disp: m[0] } : undefined;
+    }
     const pats: Array<{ re: RegExp; f: (n: number) => number }> = label === '重さ'
       ? [
           { re: /(\d+(?:\.\d+)?)\s*(?:トン)(?:くらい|ほど)?/, f: (n) => n * 1000 },
@@ -3208,6 +3214,7 @@ export class ConversationCoreService {
       { re: /軽い/, label: '軽い', plus: /重/, minus: /軽/, want: -1 },
       { re: /速い|早い/, label: '速い', plus: /速|俊敏/, minus: /遅|のろ/, want: 1 },
       { re: /遅い/, label: '遅い', plus: /速|俊敏/, minus: /遅|のろ/, want: -1 },
+      { re: /長生き/, label: '長生き', plus: /長生き|長寿/, minus: /短命/, want: 1 },
     ];
     const dim = dims.find((d) => d.re.test(prompt));
     if (!dim) return undefined;
@@ -3221,7 +3228,7 @@ export class ConversationCoreService {
       // P757: 重さ・大きさは、手がかり語より先に実測値で一番を
       // 決める（P756の比較と同じ物差し）。数値が1件だけなら、
       // 一番とは言い切らず、その旨を正直に言う。
-      const measureLabel = dim.label === '重い' || dim.label === '軽い' ? '重さ' : dim.label === '大きい' || dim.label === '小さい' ? '大きさ' : undefined;
+      const measureLabel = dim.label === '重い' || dim.label === '軽い' ? '重さ' : dim.label === '大きい' || dim.label === '小さい' ? '大きさ' : dim.label === '長生き' ? '寿命' : undefined;
       if (measureLabel) {
         const measured = entries
           .map((e: any) => ({ name: String(e.surface), meas: this.measureFromText(String(e.gloss), measureLabel) }))
@@ -3260,11 +3267,12 @@ export class ConversationCoreService {
     const rankM = prompt.match(/([1-9]|[一二三四五])番目/);
     const rankingForm = /(?:並べて|順に|順番)/.test(prompt);
     if (!rankM && !rankingForm) return undefined;
-    const dimSpec: Array<{ re: RegExp; measureLabel: '重さ' | '大きさ'; adj: string; asc: boolean }> = [
+    const dimSpec: Array<{ re: RegExp; measureLabel: '重さ' | '大きさ' | '寿命'; adj: string; asc: boolean }> = [
       { re: /重い/, measureLabel: '重さ', adj: '重い', asc: false },
       { re: /軽い/, measureLabel: '重さ', adj: '軽い', asc: true },
       { re: /大きい/, measureLabel: '大きさ', adj: '大きい', asc: false },
       { re: /小さい/, measureLabel: '大きさ', adj: '小さい', asc: true },
+      { re: /長生き/, measureLabel: '寿命', adj: '長生き', asc: false },
     ];
     const dim = dimSpec.find((d) => d.re.test(prompt));
     if (!dim) return undefined;
