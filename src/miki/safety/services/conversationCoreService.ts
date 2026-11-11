@@ -247,6 +247,11 @@ export class ConversationCoreService {
         : [],
     );
     const dialogueAct = interpretation.dialogueAct;
+    // P707: 話題質問の保留は「見たら必ず消す」のが原則だが、消費が
+    // 後段にしか無く、手前の受け口で早期リターンすると保留が残って
+    // 次の発話を答えとして食べてしまう。消費はここで一度だけ行い、
+    // 結果を後段へ引き継ぐ。
+    const answeredPendingEarly = this.consumePendingTopicQuestion(prompt);
     const vocabulary = (interpretation as any).vocabulary || (interpretation.semantic as any)?.vocabulary || conversationUnknownVocabularyService.assess(prompt, { allowResearch: true });
     const unknownTerms = Array.isArray(vocabulary?.unknowns)
       ? vocabulary.unknowns.map((item: any) => String(item.term || '')).filter(Boolean).slice(0, 3)
@@ -447,6 +452,17 @@ export class ConversationCoreService {
       if (termKnowledge) {
         return this.buildResult('RESOLVED', 'term_knowledge_answer', this.applyPersonaVoice(termKnowledge), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P707: 教わって辞書にある語の定義質問（Xって何？）は、調査の
+      // 未検証提示より手前で辞書から答える。検索が通る環境では、
+      // 辞書の答えがWebの断片と内部の理由文に負けていた（P579の
+      // 回帰が環境で揺れた実欠け）。
+      try {
+        const dictFeatures = utteranceFeatureService.analyze(prompt);
+        const dictEarly = this.dictionaryAnswerForQuestion(prompt, dictFeatures.contentTokens);
+        if (dictEarly) {
+          return this.buildResult('RESOLVED', 'dictionary_answer', this.applyPersonaVoice(dictEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
+      } catch { /* 辞書の手前答えは補助 */ }
       // P650: 形容つきの意見質問は、知識照合より先に意見として答える
       // （Claim がそのまま返ると「どう思う」に答えたことにならない）。
       const adjOpinion = this.adjectiveOpinionAnswer(prompt);
@@ -476,6 +492,11 @@ export class ConversationCoreService {
       }
       // P679: 気持ちの頼み（応援して・慰めて等）は、気持ちで受ける。
       // ここで受けないと汎用の作業了承や断片の反響に化ける。
+      // P706: 芸と話し方の依頼は、その場でやる／正直に範囲を言う。
+      const performance = this.performanceRequestAnswer(prompt);
+      if (performance) {
+        return this.buildResult('RESOLVED', 'performance_request_answer', this.applyPersonaVoice(performance), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const support = this.supportRequestAnswer(prompt);
       if (support) {
         return this.buildResult('RESOLVED', 'support_request_answer', this.applyPersonaVoice(support), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -938,7 +959,7 @@ export class ConversationCoreService {
     let pendingUnknownQuestion: { topic: string; question: string } | undefined;
     // P574: 直前の話題質問への答えとして来た発言かどうか。
     // P586: 保留レコード自体も受け取り、答えへの続きの質問に使う。
-    const answeredPending = this.consumePendingTopicQuestion(prompt);
+    const answeredPending = answeredPendingEarly;
     const answeredTopicQuestion = Boolean(answeredPending);
     // P586: 答えへの続きの質問（合成の後段で足す）。
     let followUpAppend: { question: string; terms: string[] } | undefined;
@@ -2997,6 +3018,45 @@ export class ConversationCoreService {
    * P679: 気持ちの頼み（応援・励まし・慰め・褒め・笑わせて）への受け口。
    * 作業の了承ではなく、気持ちとして返す。
    */
+  /**
+   * P706: 芸の依頼（冗談・早口言葉・踊る・絵）と、話し方の依頼
+   * （英語で・関西弁で・敬語やめて）。空の了承（「はい、いいですよ」
+   * だけで何も起きない）や語の聞き返しになっていた。できる芸は
+   * その場でやり、できないことは正直に範囲を言う。
+   */
+  private performanceRequestAnswer(prompt: string): string | undefined {
+    const p = String(prompt || '').trim();
+    if (p.length > 16) return undefined;
+    if (/(?:冗談|じょうだん|ギャグ|ダジャレ|だじゃれ)/.test(p) && /(?:言って|聞かせて|やって|して|ある|一つ|ひとつ)/.test(p)) {
+      return this.pickFixedReply('fx_joke_tell', [
+        'じゃあ一つ。布団が吹っ飛んだ！…ダジャレしか出てきませんでした。',
+        '一つだけ。パンダの好物は、パンだ！…すみません、ダジャレです。',
+      ]);
+    }
+    if (/早口言葉/.test(p) && /(?:言って|やって|聞かせて|して)/.test(p)) {
+      return this.pickFixedReply('fx_tongue_twister', [
+        '生麦生米生卵。…文字だと噛まないのがずるいですね。',
+        '隣の客はよく柿食う客だ。…文字なので噛みませんでした。',
+      ]);
+    }
+    if (/^(?:踊って|踊ってみて|ダンスして)/.test(p)) {
+      return '踊れないんですけど、気持ちだけはノリノリです。音楽に合わせて揺れているつもりでいますね。';
+    }
+    if (/(?:絵|イラスト)(?:を)?(?:描いて|書いて|かいて)/.test(p)) {
+      return 'ごめんなさい、ここでは絵を出すことができないんです。言葉でよければ、描いてほしいものを聞かせてください。';
+    }
+    if (/(?:英語|中国語|韓国語)で(?:話して|答えて|言って)/.test(p)) {
+      return 'ごめんなさい、その言葉で話すのはまだできないんです。日本語でなら精一杯答えますね。';
+    }
+    if (/関西弁で(?:話して|答えて|言って)/.test(p)) {
+      return '関西弁はまだうまく話せないんです。今の話し方でよければ、付き合ってくださいね。';
+    }
+    if (/敬語(?:を)?(?:やめて|なしで|抜きで)|タメ口で/.test(p)) {
+      return 'ありがとう。でも今の話し方は私の素の話し方なんです。このままでもいいですか？';
+    }
+    return undefined;
+  }
+
   private supportRequestAnswer(prompt: string): string | undefined {
     const p = String(prompt || '');
     if (/応援して|応援ちょうだい|応援してほしい/.test(p)) {

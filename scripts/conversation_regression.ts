@@ -1816,6 +1816,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P705 「私のことどう思う？」は関係で答える', op705.replyText.includes('相方') || op705.replyText.includes('楽しい') || op705.replyText.includes('頼もしい'), op705.replyText.slice(0, 120));
 }
 
+// ---- 芸と話し方の依頼（P706） ----
+{
+  const joke706 = await conversationCoreService.execute({ prompt: '冗談言って' } as any);
+  check('P706 冗談の依頼には実際に冗談を言う', joke706.replyText.includes('吹っ飛んだ') || joke706.replyText.includes('パンだ'), joke706.replyText.slice(0, 100));
+  const tongue706 = await conversationCoreService.execute({ prompt: '早口言葉言って' } as any);
+  check('P706 早口言葉の依頼には実際に言う', tongue706.replyText.includes('生麦') || tongue706.replyText.includes('柿食う'), tongue706.replyText.slice(0, 100));
+  const dance706 = await conversationCoreService.execute({ prompt: '踊って' } as any);
+  check('P706 踊ってには正直に答える', dance706.replyText.includes('踊れない'), dance706.replyText.slice(0, 100));
+  const draw706 = await conversationCoreService.execute({ prompt: '絵描いて' } as any);
+  check('P706 絵の依頼には正直に範囲を言う', draw706.replyText.includes('できない'), draw706.replyText.slice(0, 100));
+  const eng706 = await conversationCoreService.execute({ prompt: '英語で話して' } as any);
+  check('P706 英語で話してには正直に答える', eng706.replyText.includes('できない') && !eng706.replyText.includes('どんなものですか'), eng706.replyText.slice(0, 100));
+  const style706 = await conversationCoreService.execute({ prompt: '敬語やめて' } as any);
+  check('P706 敬語やめては聞き返しでなく受ける', style706.replyText.includes('素の話し方') && !style706.replyText.includes('どんなものですか'), style706.replyText.slice(0, 100));
+}
+
+// ---- 教わった語の定義質問は辞書が先（P707） ----
+{
+  const { conversationFactIntakeService: intake707 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  intake707.intakeFromUserText('ツバメって、鳥のことだよ', []);
+  const def707 = await conversationCoreService.execute({ prompt: 'ツバメって何？' } as any);
+  check('P707 教わった語は辞書から答える', def707.replyText.includes('鳥') && !def707.replyText.includes('スコープ') && !def707.replyText.includes('Verifier'), def707.replyText.slice(0, 140));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

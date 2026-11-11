@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4077,
-    "resolvedRelativeImportCandidateCount": 4061,
+    "relativeImportCandidateCount": 4078,
+    "resolvedRelativeImportCandidateCount": 4062,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 177287,
-      "lines": 1832,
-      "sha256": "1e2f3b5a308f2486e004472b048213ad418beb61a60b1077fe032b76c4ec895b",
+      "bytes": 179544,
+      "lines": 1856,
+      "sha256": "15d83e9ee78c0a1db798852daec3128436df95ea3410f7531ae78d4177308f8d",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2186,10 +2186,16 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 1837,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
         }
       ],
-      "relativeImportCandidateCount": 79,
-      "resolvedRelativeImportCount": 79,
+      "relativeImportCandidateCount": 80,
+      "resolvedRelativeImportCount": 80,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27734,9 +27740,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 285291,
-      "lines": 4143,
-      "sha256": "65ad3b9480165f815b6b8a6d8199c810864e6db016b33db029c1c39909aebdc2",
+      "bytes": 289310,
+      "lines": 4203,
+      "sha256": "b442011597b1eccbf7b6776e1d7bbfcace06c0c0ffb098ddff74b3261aebd121",
       "relativeImportCandidates": [
         {
           "line": 1,
