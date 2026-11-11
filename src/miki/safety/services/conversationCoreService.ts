@@ -3343,8 +3343,9 @@ export class ConversationCoreService {
    */
   private measureDifferenceAnswer(prompt: string): string | undefined {
     if (!/(?:差|違い)/.test(prompt)) return undefined;
-    if (!/(?:何キロ|何センチ|どれくらい|どのくらい|何グラム)/.test(prompt)) return undefined;
-    const label: '重さ' | '大きさ' = /(?:センチ|メートル)/.test(prompt) ? '大きさ' : '重さ';
+    if (!/(?:何キロ|何センチ|どれくらい|どのくらい|何グラム|何年)/.test(prompt)) return undefined;
+    // P770: 寿命の差（何年）も同じ物差しで引ける。
+    const label: '重さ' | '大きさ' | '寿命' = /(?:寿命|何年)/.test(prompt) ? '寿命' : /(?:センチ|メートル)/.test(prompt) ? '大きさ' : '重さ';
     let tokens: string[] = [];
     try { tokens = utteranceFeatureService.analyze(prompt).contentTokens || []; } catch { return undefined; }
     const ents: Array<{ name: string; meas: { value: number; disp: string } }> = [];
@@ -3360,7 +3361,7 @@ export class ConversationCoreService {
     if (ents.length < 2) return undefined;
     const [a, b] = ents;
     const diff = Math.abs(a.meas.value - b.meas.value);
-    const unit = label === '重さ' ? 'キロ' : 'センチ';
+    const unit = label === '寿命' ? '年' : label === '重さ' ? 'キロ' : 'センチ';
     const diffText = label === '重さ' && diff < 1 ? `${Math.round(diff * 1000)}グラム` : `${Number.isInteger(diff) ? diff : Math.round(diff * 10) / 10}${unit}`;
     return `「${a.name}」は${a.meas.disp}、「${b.name}」は${b.meas.disp}なので、差は${diffText}です。`;
   }
@@ -3371,7 +3372,36 @@ export class ConversationCoreService {
    */
   private measureThresholdAnswer(prompt: string): string | undefined {
     const thrM = prompt.match(/(\d+(?:\.\d+)?)\s*(トン|キログラム|キロ|グラム|センチメートル|センチ|メートル|kg|cm|m)/i);
-    if (!thrM) return undefined;
+    if (!thrM) {
+      // P769: 「アカモより重い鳥はいる？」——数値ではなく、知って
+      // いるものの実測値を基準にする相対しきい値。
+      const relM = prompt.match(/([一-龠ァ-ヶー]{2,10}?)より(重い|軽い|大きい|小さい|長生き)/);
+      if (!relM) return undefined;
+      if (!/(?:いる|ある|いない|教えて)/.test(prompt) && !/[？?]/.test(prompt)) return undefined;
+      const base = relM[1].replace(/^(?:教えた|その|この)/, '');
+      const adj = relM[2];
+      const label: '重さ' | '大きさ' | '寿命' = adj === '長生き' ? '寿命' : (adj === '重い' || adj === '軽い') ? '重さ' : '大きさ';
+      const greater = adj === '重い' || adj === '大きい' || adj === '長生き';
+      try {
+        const entries = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss);
+        const baseEntry = entries.find((e: any) => String(e.surface) === base);
+        if (!baseEntry) return undefined;
+        const baseMeas = this.measureFromText(String(baseEntry.gloss), label);
+        if (!baseMeas) return undefined;
+        const categoryMatch = prompt.match(/(生き物|動物|鳥|魚|虫|植物|食べ物|飲み物)/);
+        const cat = categoryMatch ? (categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1]) : '';
+        const hits = entries
+          .filter((e: any) => String(e.surface) !== base)
+          .filter((e: any) => !cat || this.taughtScopeMatch(e, cat))
+          .map((e: any) => ({ name: String(e.surface), meas: this.measureFromText(String(e.gloss), label) }))
+          .filter((x) => x.meas && (greater ? x.meas!.value > baseMeas.value : x.meas!.value < baseMeas.value));
+        if (hits.length === 0) return `今知っている中では、「${base}」より${adj}ものはいないです。`;
+        const names = hits.slice(0, 4).map((x) => `「${x.name}」（${x.meas!.disp}）`).join('、');
+        // P771: 数を聞かれたら数から答える。
+        if (/(?:何種類|何匹|何個|いくつ)/.test(prompt)) return `${hits.length}種類います。${names}です。`;
+        return `います。${names}です。`;
+      } catch { return undefined; }
+    }
     const dirM = prompt.match(/(?:より|超える|以上|以下|未満)/);
     if (!dirM) return undefined;
     const unit = thrM[2];
@@ -3398,6 +3428,7 @@ export class ConversationCoreService {
       const adjWord = label === '重さ' ? (greater ? '重い' : '軽い') : (greater ? '大きい' : '小さい');
       if (hits.length === 0) return `今知っている中では、${thr.disp}より${adjWord}ものはいないです。`;
       const names = hits.slice(0, 4).map((x) => `「${x.name}」（${x.meas!.disp}）`).join('、');
+      if (/(?:何種類|何匹|何個|いくつ)/.test(prompt)) return `${hits.length}種類います。${names}です。`;
       return `います。${names}です。`;
     } catch { return undefined; }
   }

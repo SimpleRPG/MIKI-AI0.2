@@ -2587,6 +2587,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P768 変更後の予定だけが残る', plan766.replyText.includes('美容院') && !plan766.replyText.includes('歯医者'), plan766.replyText.slice(0, 150));
 }
 
+// ---- P769-P771: 相対しきい値／寿命の差／条件つきの数 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem769: any[] = []; const hist769: any[] = []; let st769: any = undefined;
+  const run769 = async (t: string) => {
+    mem769 = conversationFactIntakeService.intakeFromUserText(t, mem769).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem769, recentMessages: hist769.slice(-8), conversationState: st769 } as any);
+    st769 = r.nextConversationState;
+    hist769.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run769('アカモは体重30キロの鳥だよ');
+  await run769('アオモは体重5キロの鳥だよ');
+  await run769('クロモは体重80キロの鳥だよ');
+  const rel769 = await run769('アカモより重い鳥はいる？');
+  check('P769 基準のものより重いものを挙げる', rel769.replyText.includes('クロモ') && !rel769.replyText.includes('アオモ'), rel769.replyText.slice(0, 130));
+  const cnt769 = await run769('アカモより重い鳥は何種類？');
+  check('P771 条件に合う数を数える', cnt769.replyText.includes('種類います') && cnt769.replyText.includes('クロモ'), cnt769.replyText.slice(0, 130));
+  await run769('ナガモは寿命15年の鳥だよ');
+  await run769('ミジカモは寿命3年の鳥だよ');
+  const diff769 = await run769('ナガモとミジカモ、寿命の差は何年？');
+  check('P770 寿命の差を計算する', diff769.replyText.includes('差は12年'), diff769.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
