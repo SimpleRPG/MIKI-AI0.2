@@ -2857,6 +2857,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P788 軽い方も比べられる', light788.replyText.includes('妹の方が軽い'), light788.replyText.slice(0, 130));
 }
 
+// ---- P789-P791: メモの件数／覚えた量の何個形／月の予定 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem789: any[] = []; const hist789: any[] = []; let st789: any = undefined;
+  const run789 = async (t: string) => {
+    mem789 = conversationFactIntakeService.intakeFromUserText(t, mem789).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem789, recentMessages: hist789.slice(-8), conversationState: st789 } as any);
+    st789 = r.nextConversationState;
+    hist789.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run789('牛乳を買うってメモして');
+  const memoCount789 = await run789('メモ、何個ある？');
+  check('P789 メモの件数を答える', /メモは\d+件あります/.test(memoCount789.replyText), memoCount789.replyText.slice(0, 130));
+  const vol789 = await run789('覚えた言葉、何個ある？');
+  check('P790 覚えた量を何個の形でも答える', /言葉は\d+語/.test(vol789.replyText), vol789.replyText.slice(0, 150));
+  const nxt789 = new Date(); nxt789.setMonth(nxt789.getMonth() + 1); nxt789.setDate(15);
+  await run789(`${nxt789.getMonth() + 1}月15日に月次テストの予定があるよ`);
+  const month789 = await run789('来月の予定は？');
+  check('P791 来月の予定を月で切って答える', month789.replyText.includes('来月の予定は') && month789.replyText.includes('15日'), month789.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

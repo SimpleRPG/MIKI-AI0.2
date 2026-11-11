@@ -428,6 +428,10 @@ export class ConversationCoreService {
       if (nextBdayAge) {
         return this.buildResult('RESOLVED', 'next_birthday_age_answer', this.applyPersonaVoice(nextBdayAge), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const monthPlans = multiPart ? undefined : this.monthPlansAnswer(prompt);
+      if (monthPlans) {
+        return this.buildResult('RESOLVED', 'month_plans_answer', this.applyPersonaVoice(monthPlans), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const planCountdown = multiPart ? undefined : this.planCountdownAnswer(prompt, memories);
       if (planCountdown) {
         return this.buildResult('RESOLVED', 'plan_countdown_answer', this.applyPersonaVoice(planCountdown), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3988,6 +3992,35 @@ export class ConversationCoreService {
   }
 
   /**
+   * P791: 「今月の予定は？」「来月の予定は？」——月で範囲を切って
+   * 日付順に並べる。無ければ正直に無いと言う。
+   */
+  private monthPlansAnswer(prompt: string): string | undefined {
+    const mm = prompt.match(/(今月|来月|先月)/);
+    if (!mm) return undefined;
+    if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
+    if (!/[？?]/.test(prompt) && !/(?:何|教えて|ある)/.test(prompt)) return undefined;
+    if (/(?:みき|あなた|君|きみ)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
+      const now = new Date();
+      const shift = mm[1] === '来月' ? 1 : mm[1] === '先月' ? -1 : 0;
+      const target = new Date(now.getFullYear(), now.getMonth() + shift, 1);
+      const prefix = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-`;
+      const hits = plans.filter((p) => p.date && p.date.startsWith(prefix))
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (hits.length === 0) return `${mm[1]}の予定は、まだ聞いていないです。`;
+      const items = hits.slice(0, 6).map((p) => {
+        const [y, mo, da] = String(p.date).split('-').map(Number);
+        const wd = '日月火水木金土'[new Date(y, mo - 1, da).getDay()];
+        return `${mo}月${da}日（${wd}）「${p.text}」`;
+      });
+      return `${mm[1]}の予定は、${items.join('、')}です。`;
+    } catch { return undefined; }
+  }
+
+  /**
    * P739: 「最初に教えたのって何だっけ？」「最後に教えたのは？」
    * に、個人辞書の教示記録の順序（登録順）から答える。
    */
@@ -4908,6 +4941,10 @@ export class ConversationCoreService {
   }
 
   private termKnowledgeAnswer(prompt: string, state?: any, recentMessages?: any[]): string | undefined {
+    // P790: 「覚えた言葉、何個ある？」は量の質問。「言葉」が語と
+    // して拾われて量の受け口（learningVolume）に届かなかった。
+    if (/(?:覚えた|学んだ|覚えている|知っている)/.test(prompt)
+      && /(?:何個|何種類|いくつ|何件|どのくらい|どれくらい)/.test(prompt)) return undefined;
     // P685: 「僕のこと覚えてる？」は語彙の確認ではなく関係の質問。
     // 「こと」が語として拾われて誤爆していたので、相手自身への
     // 言及はここでは扱わない（関係の受け口が答える）。
@@ -5691,6 +5728,12 @@ export class ConversationCoreService {
       if (n === 0) return '今は特に覚えていることはないですよ。';
       userMemoService.clear();
       return '分かりました、忘れておきますね。';
+    }
+    // P789: 件数を聞く形。
+    if (/(?:メモ|覚えたこと)/.test(p) && /(?:何個|いくつ|何件|何つ)/.test(p) && /[？?]/.test(p)) {
+      const n = userMemoService.count();
+      if (n === 0) return '今はメモはないです。';
+      return `メモは${n}件あります。`;
     }
     // 読み返す。
     // P779: 「何かあったっけ？」は「だっけ」を含まない（あったっけ）。
