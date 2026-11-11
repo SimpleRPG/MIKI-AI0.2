@@ -477,6 +477,10 @@ export class ConversationCoreService {
       if (superlative && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_superlative_answer', this.applyPersonaVoice(superlative), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const ranking = this.taughtRankingAnswer(prompt);
+      if (ranking && !multiPart) {
+        return this.buildResult('RESOLVED', 'taught_ranking_answer', this.applyPersonaVoice(ranking), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P739: 「最初に教えたのって何だっけ？」——教示記録の
       // 順序から答える（「最初」が未知語として調査に落ちない）。
       const taughtOrder = this.taughtOrderAnswer(prompt);
@@ -3236,6 +3240,53 @@ export class ConversationCoreService {
       if (winners.length > 1) return `一番${dim.label}ものは、${winners.map((w) => w.name).join('と')}が同じくらいだと思います。`;
       const srcNote = winners[0].taught ? '教わった説明の中では' : '覚えている説明の中では';
       return `${srcNote}、「${winners[0].name}」が一番${dim.label}と思います。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P758: 「教えた動物を重い順に並べて」「2番目に重いのは？」——
+   * 実測値（P757の物差し）で並べ替えと順位に答える。数値の無い
+   * ものは除いた旨を添える。
+   */
+  private taughtRankingAnswer(prompt: string): string | undefined {
+    const rankM = prompt.match(/([1-9]|[一二三四五])番目/);
+    const rankingForm = /(?:並べて|順に|順番)/.test(prompt);
+    if (!rankM && !rankingForm) return undefined;
+    const dimSpec: Array<{ re: RegExp; measureLabel: '重さ' | '大きさ'; adj: string; asc: boolean }> = [
+      { re: /重い/, measureLabel: '重さ', adj: '重い', asc: false },
+      { re: /軽い/, measureLabel: '重さ', adj: '軽い', asc: true },
+      { re: /大きい/, measureLabel: '大きさ', adj: '大きい', asc: false },
+      { re: /小さい/, measureLabel: '大きさ', adj: '小さい', asc: true },
+    ];
+    const dim = dimSpec.find((d) => d.re.test(prompt));
+    if (!dim) return undefined;
+    try {
+      const categoryMatch = prompt.match(/(生き物|動物|鳥|魚|虫|植物|食べ物|飲み物)/);
+      const cat = categoryMatch ? (categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1]) : '';
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss)
+        .filter((e: any) => !cat || this.taughtScopeMatch(e, cat));
+      if (entries.length === 0) return undefined;
+      const measured = entries
+        .map((e: any) => ({ name: String(e.surface), meas: this.measureFromText(String(e.gloss), dim.measureLabel) }))
+        .filter((x) => x.meas)
+        .sort((a, b) => (dim.asc ? a.meas!.value - b.meas!.value : b.meas!.value - a.meas!.value));
+      const unmeasured = entries.length - measured.length;
+      const tail = unmeasured > 0 ? `（${dim.measureLabel}の数値が分からないものは除いています）` : '';
+      if (rankM) {
+        const rankMap: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5 };
+        const rank = rankMap[rankM[1]] ?? parseInt(rankM[1], 10);
+        if (measured.length < rank) {
+          return measured.length === 0
+            ? `${dim.measureLabel}の数値が分かるものがまだ無いので、順位は付けられないです。`
+            : `${dim.measureLabel}の数値が分かっているのは${measured.length}つだけなので、${rank}番目はまだ分からないです。`;
+        }
+        const pick = measured[rank - 1];
+        return `${rank}番目に${dim.adj}のは「${pick.name}」です（${pick.meas!.disp}）。${tail}`;
+      }
+      if (measured.length < 2) return undefined;
+      const items = measured.map((x) => `「${x.name}」（${x.meas!.disp}）`).join('、');
+      return `${dim.adj}順だと、${items}です。${tail}`;
     } catch { return undefined; }
   }
 

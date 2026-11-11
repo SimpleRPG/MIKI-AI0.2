@@ -2486,6 +2486,10 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P757 一番重いは実測値で決める', heavy757.replyText.includes('オオモ') && heavy757.replyText.includes('80キロ'), heavy757.replyText.slice(0, 130));
   const light757 = await run757('教えた動物の中で一番軽いのは？');
   check('P757 一番軽いも実測値で決める', light757.replyText.includes('カワモ') && light757.replyText.includes('5キロ'), light757.replyText.slice(0, 130));
+  const rank757 = await run757('教えた動物を重い順に並べて');
+  check('P758 重い順に並べる', rank757.replyText.indexOf('オオモ') >= 0 && rank757.replyText.indexOf('オオモ') < rank757.replyText.indexOf('ミナモ') && rank757.replyText.indexOf('ミナモ') < rank757.replyText.indexOf('カワモ'), rank757.replyText.slice(0, 150));
+  const second757 = await run757('2番目に重いのは？');
+  check('P758 2番目に重いものに答える', second757.replyText.includes('ミナモ'), second757.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----
