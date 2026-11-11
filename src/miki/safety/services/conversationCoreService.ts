@@ -608,6 +608,13 @@ export class ConversationCoreService {
       if (learningVolume) {
         return this.buildResult('RESOLVED', 'learning_volume_answer', this.applyPersonaVoice(learningVolume), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P747: 「Xの説明、もう一度言って」「さっき何て説明したっけ？」——
+      // 対象の指定がある繰り返し・引用は、直前の発言の復唱ではなく
+      // その説明そのもので答える（P654より先に受ける）。
+      const glossRecall = this.taughtGlossRecallAnswer(prompt);
+      if (glossRecall && !multiPart) {
+        return this.buildResult('RESOLVED', 'taught_gloss_recall_answer', this.applyPersonaVoice(glossRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P654: 「さっき何て言った？」「もう一回言って」——直前の自分の
       // 発言を引いて答える。ここで受けないと「答えられない」や
       // 汎用の作業了承に化ける。
@@ -3025,7 +3032,7 @@ export class ConversationCoreService {
    */
   private taughtListAnswer(prompt: string): string | undefined {
     if (!/(?:教えた|教えてくれた|教えてあげた)/.test(prompt)) return undefined;
-    if (!/(?:全部|全て|一覧|言って|挙げて|何を|何が|どんな)/.test(prompt) && !/(?:今まで|これまで)/.test(prompt)) return undefined;
+    if (!/(?:全部|全て|一覧|言って|挙げて|何を|何が|どんな|何種類|何個|何匹|いくつ)/.test(prompt) && !/(?:今まで|これまで)/.test(prompt)) return undefined;
     try {
       const entries = japaneseDictionaryService.listPersonal()
         .filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'));
@@ -3041,16 +3048,20 @@ export class ConversationCoreService {
       // 登録（「〜っていうの」等）は除いて並べる。古い登録から
       // 並べると、件数の上限で最近の話題が落ちてしまう。
       const seenNames = new Set<string>();
-      const names: string[] = [];
+      const allNames: string[] = [];
       for (const e of [...scoped].reverse()) {
         const name = String((e as any).surface || '');
         if (!name || seenNames.has(name)) continue;
         if (/(?:っていうの|というの|のこと)$/.test(name)) continue;
         seenNames.add(name);
-        names.push(name);
-        if (names.length >= 12) break;
+        allNames.push(name);
       }
-      const tail = scoped.length > names.length ? 'など' : '';
+      const names = allNames.slice(0, 12);
+      const tail = allNames.length > names.length ? 'など' : '';
+      // P748: 「何種類教えた？」には数も答える。
+      if (/(?:何種類|何個|何匹|いくつ)/.test(prompt)) {
+        return `あなたに教わったのは、全部で${allNames.length}種類です。${names.join('と')}${tail}です。`;
+      }
       return `あなたに教わったのは、${names.join('と')}${tail}です。`;
     } catch { return undefined; }
   }
@@ -3187,6 +3198,31 @@ export class ConversationCoreService {
       const r = paraphraseService.restate(sentence, { style: 'plain' });
       if (r.changed && r.check.ok) return `言い直すと、こうなります。${r.text}`;
       return `今の私の語彙では、この説明はこの言い方が一番正確なんです。${sentence}`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P747: 「Xの説明、もう一度言って」「Xって、さっき何て説明
+   * したっけ？」——対象の指定がある繰り返し・引用の依頼に、
+   * その語の説明そのもので答える。直前の自分の発言の復唱
+   * （P654）に化けると、聞かれた中身と違うものを繰り返して
+   * しまうため、こちらを先に受ける。
+   */
+  private taughtGlossRecallAnswer(prompt: string): string | undefined {
+    const repeatForm = /(?:もう一度|もう一回|もう１回)/.test(prompt) && /(?:説明|意味)/.test(prompt);
+    const quoteForm = /(?:何て|なんて|何と|どう).{0,4}説明した/.test(prompt) || /説明したっけ/.test(prompt);
+    if (!repeatForm && !quoteForm) return undefined;
+    try {
+      const f = utteranceFeatureService.analyze(prompt);
+      const target = f.contentTokens.find((t) => japaneseDictionaryService.lookup(t).some((e: any) => e.gloss));
+      if (!target) return undefined;
+      const entry: any = japaneseDictionaryService.lookup(target).find((e: any) => e.gloss);
+      const gloss = String(entry?.gloss || '');
+      if (!gloss) return undefined;
+      const taught = Array.isArray(entry?.semanticIds) && entry.semanticIds.includes('learned:user-taught');
+      return taught
+        ? `「${target}」の説明は、あなたに教わった「${gloss}」です。`
+        : `「${target}」の説明は、「${gloss}」です。`;
     } catch { return undefined; }
   }
 

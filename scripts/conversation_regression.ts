@@ -2381,6 +2381,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P745 違いは説明の手がかりで答える', diff744.replyText.includes('大きさが違います') && diff744.replyText.includes('ユアカゲ'), diff744.replyText.slice(0, 130));
   const para744 = await run744('アメカゲのこと、別の言い方で言い直して');
   check('P746 言い直しの依頼には言い換えか正直な限界で答える', para744.replyText.includes('言い直すと') || para744.replyText.includes('一番正確'), para744.replyText.slice(0, 130));
+  const repeat744 = await run744('アメカゲの説明、もう一度言って');
+  check('P747 説明の繰り返しは説明そのもので答える', repeat744.replyText.includes('雨の森に住む小さい獣'), repeat744.replyText.slice(0, 130));
+  const quote744 = await run744('アメカゲって、さっき何て説明したっけ？');
+  check('P747 説明の引用は説明そのもので答える', quote744.replyText.includes('雨の森に住む小さい獣') && !quote744.replyText.includes('http'), quote744.replyText.slice(0, 130));
+  const count744 = await run744('今まで何種類教えた？');
+  check('P748 教えた数には数で答える', count744.replyText.includes('全部で') && count744.replyText.includes('種類です'), count744.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----
