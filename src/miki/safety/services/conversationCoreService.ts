@@ -3671,8 +3671,16 @@ export class ConversationCoreService {
     const when = whenRaw === 'あした' ? '明日' : whenRaw;
     try {
       const raw = storageService.getItem('miki_user_plans_v1');
-      const plans: Array<{ when: string; text: string }> = raw ? JSON.parse(raw) : [];
-      const hits = plans.filter((p) => p.when === when);
+      const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
+      // P772: 控えは日付に錨づけされている。「明日」と言って控えた
+      // 予定は、当日には「今日の予定」として聞き返せる。
+      const offset = when === '今日' || when === '今夜' ? 0 : when === '明日' ? 1 : when === '明後日' ? 2 : -1;
+      let targetDate: string | undefined;
+      if (offset >= 0) {
+        const d = new Date(Date.now() + offset * 86400000);
+        targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      }
+      const hits = plans.filter((p) => (p.date && targetDate ? p.date === targetDate : p.when === when));
       if (hits.length === 0) return undefined;
       const texts = [...new Set(hits.map((p) => p.text))].slice(-3);
       return `${when}の予定は、${texts.map((t) => `「${t}」`).join('と')}、と話していましたよ。`;

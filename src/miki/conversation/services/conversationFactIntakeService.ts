@@ -815,6 +815,22 @@ export class ConversationFactIntakeService {
    * 分ける。会話側の planRecallAnswer が「明日の予定は？」に
    * この控えから答える。
    */
+  /** P772: 時期の語を実際の日付に解決する（今日/明日/明後日のみ）。 */
+  private planDateFor(when: string): string | undefined {
+    const offset = when === '今日' || when === '今夜' ? 0 : when === '明日' ? 1 : when === '明後日' ? 2 : -1;
+    if (offset < 0) return undefined;
+    const d = new Date(Date.now() + offset * 86400000);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+  }
+
+  /** P772: 控えが「その日」に当たるか（日付持ちは日付で、無ければ時期の語で）。 */
+  private planInScope(p: { when: string; date?: string }, when: string | undefined, targetDate: string | undefined): boolean {
+    if (p.date && targetDate) return p.date === targetDate;
+    return !when || p.when === when;
+  }
+
   private recordUserPlanIfAny(text: string): void {
     try {
       const t = String(text || '').trim();
@@ -829,10 +845,10 @@ export class ConversationFactIntakeService {
       const when = whenRaw === 'あした' ? '明日' : whenRaw;
       const key = 'miki_user_plans_v1';
       const raw = storageService.getItem(key);
-      const plans: Array<{ when: string; text: string; at: number }> = raw ? JSON.parse(raw) : [];
+      const plans: Array<{ when: string; text: string; at: number; date?: string }> = raw ? JSON.parse(raw) : [];
       const cleanText = t.replace(/。$/, '').slice(0, 80);
       if (plans.some((p) => p.when === when && p.text === cleanText)) return;
-      plans.push({ when, text: cleanText, at: Date.now() });
+      plans.push({ when, text: cleanText, at: Date.now(), date: this.planDateFor(when) });
       storageService.setItem(key, JSON.stringify(plans.slice(-20)));
     } catch { /* 予定の控えは補助経路 */ }
   }
@@ -857,8 +873,9 @@ export class ConversationFactIntakeService {
       const tokens = utteranceFeatureService.analyze(t).contentTokens
         .filter((w) => w.length >= 2 && !/^(?:キャンセル|中止|取り消し|予定|予約|約束|明日|今日|今夜|今週|来週|週末|今度|明後日)$/.test(w));
       if (tokens.length === 0) return;
+      const targetDate = when ? this.planDateFor(when) : undefined;
       const kept = plans.filter((p) => {
-        if (when && p.when !== when) return true;
+        if (!this.planInScope(p as any, when, targetDate)) return true;
         return !tokens.some((w) => p.text.includes(w));
       });
       if (kept.length !== plans.length) storageService.setItem(key, JSON.stringify(kept));
@@ -888,11 +905,12 @@ export class ConversationFactIntakeService {
       if (!rightText) return;
       const key = 'miki_user_plans_v1';
       const raw = storageService.getItem(key);
-      const plans: Array<{ when: string; text: string; at: number }> = raw ? JSON.parse(raw) : [];
-      const kept = plans.filter((p) => !(p.when === when && wrongTokens.some((w) => p.text.includes(w))));
+      const plans: Array<{ when: string; text: string; at: number; date?: string }> = raw ? JSON.parse(raw) : [];
+      const targetDate = this.planDateFor(when);
+      const kept = plans.filter((p) => !(this.planInScope(p, when, targetDate) && wrongTokens.some((w) => p.text.includes(w))));
       const newText = `${rightText}の予定`;
       if (!kept.some((p) => p.when === when && p.text === newText)) {
-        kept.push({ when, text: newText, at: Date.now() });
+        kept.push({ when, text: newText, at: Date.now(), date: targetDate });
       }
       storageService.setItem(key, JSON.stringify(kept.slice(-20)));
     } catch { /* 予定の変更は補助経路 */ }

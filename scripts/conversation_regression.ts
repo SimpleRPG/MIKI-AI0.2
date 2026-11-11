@@ -2611,6 +2611,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P770 寿命の差を計算する', diff769.replyText.includes('差は12年'), diff769.replyText.slice(0, 130));
 }
 
+// ---- P772: 予定は日付に錨づけされる ----
+{
+  const { storageService: storage772 } = await import('../src/services/storageService');
+  const key772 = 'miki_user_plans_v1';
+  const plans772 = JSON.parse(storage772.getItem(key772) || '[]');
+  const d772 = new Date();
+  const today772 = `${d772.getFullYear()}-${String(d772.getMonth() + 1).padStart(2, '0')}-${String(d772.getDate()).padStart(2, '0')}`;
+  plans772.push({ when: '明日', text: '明日は眼科の予定があるよ', at: Date.now() - 86400000, date: today772 });
+  storage772.setItem(key772, JSON.stringify(plans772));
+  const todayRecall772: any = await conversationCoreService.execute({ prompt: '今日の予定は何だっけ？' } as any);
+  check('P772 明日と言って控えた予定を当日は今日の予定として答える', todayRecall772.replyText.includes('眼科'), todayRecall772.replyText.slice(0, 150));
+  const tomorrowRecall772: any = await conversationCoreService.execute({ prompt: '明日の予定は何だっけ？' } as any);
+  check('P772 過ぎた予定は明日の側には出ない', !tomorrowRecall772.replyText.includes('眼科'), tomorrowRecall772.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
