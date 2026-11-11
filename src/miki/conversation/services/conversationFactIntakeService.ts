@@ -514,6 +514,49 @@ export class ConversationFactIntakeService {
         if (ent) invalidations.push(`${ent}の${bareNeg[2].trim()}は${val}`);
         continue;
       }
+      // P804: 名前の否定（「僕の名前はタロウじゃない」）も、名前の
+      // 値として「タロウじゃない」を登録してしまう事故の元。
+      // 事実を作らず、否定された名前の無効化として扱う。
+      const nameNeg = sentence.match(/^(?:(.{1,24}?)の)?名前は(.{1,30}?)(?:じゃない|ではない|じゃありません|ではありません)(?:よ|ね)?[。！!]?$/);
+      if (nameNeg) {
+        const ent = cleanEntity(nameNeg[1] || '僕');
+        if (ent) invalidations.push(`${ent}の名前は${nameNeg[2].trim()}`);
+        continue;
+      }
+      // P804: 複合形「名前はAじゃないよ、Bだよ」は、否定側を無効化し、
+      // 肯定側だけを通常の名前取り込みに回す（全体を1つの値として
+      // 登録してしまう事故を防ぐ）。
+      const nameNegCompound = sentence.match(/^(?:(.{1,24}?)の)?名前は(.{1,30}?)(?:じゃない|ではない)(?:よ|ね)?[、,](.+?)(?:だよ|です)?$/);
+      if (nameNegCompound) {
+        const ent = cleanEntity(nameNegCompound[1] || '僕');
+        if (ent) invalidations.push(`${ent}の名前は${nameNegCompound[2].trim()}`);
+        const affirmedFact = extractFromSentence(`${ent}の名前は${nameNegCompound[3].trim()}`, contextEntity);
+        if (affirmedFact && intakeMeaningGuardService.check(sentence).ok) {
+          facts.push(affirmedFact);
+          if (affirmedFact.entity && affirmedFact.entity !== '名前' && !FIRST_PERSON.has(affirmedFact.entity)) contextEntity = affirmedFact.entity;
+        }
+        continue;
+      }
+      // P804: 一般の属性でも同じ形を処理する。「XのYはAじゃない」は
+      // 無効化のみ、「XのYはAじゃないよ、Bだよ」は否定側を無効化して
+      // 肯定側だけを取り込む（値を「Aじゃないよ、B」にしない）。
+      const attrNeg = sentence.match(/^(.{1,24}?)の(.{1,16}?)は(.{1,30}?)(?:じゃない|ではない|じゃありません|ではありません)(?:よ|ね)?[。！!]?$/);
+      if (attrNeg && attrNeg[2].trim() !== '名前') {
+        const ent = cleanEntity(attrNeg[1]);
+        if (ent) invalidations.push(`${ent}の${attrNeg[2].trim()}は${attrNeg[3].trim()}`);
+        continue;
+      }
+      const attrNegCompound = sentence.match(/^(.{1,24}?)の(.{1,16}?)は(.{1,30}?)(?:じゃない|ではない)(?:よ|ね)?[、,](.+?)(?:だよ|です)?$/);
+      if (attrNegCompound && attrNegCompound[2].trim() !== '名前') {
+        const ent = cleanEntity(attrNegCompound[1]);
+        if (ent) invalidations.push(`${ent}の${attrNegCompound[2].trim()}は${attrNegCompound[3].trim()}`);
+        const affirmedFact = extractFromSentence(`${ent}の${attrNegCompound[2].trim()}は${attrNegCompound[4].trim()}だ`, contextEntity);
+        if (affirmedFact && intakeMeaningGuardService.check(sentence).ok) {
+          facts.push(affirmedFact);
+          if (affirmedFact.entity && affirmedFact.entity !== '名前' && !FIRST_PERSON.has(affirmedFact.entity)) contextEntity = affirmedFact.entity;
+        }
+        continue;
+      }
       const fact = extractFromSentence(sentence, contextEntity);
       if (fact) {
         // P546: 仮定・引用・伝聞・冗談の文から拾えた形でも、本人の

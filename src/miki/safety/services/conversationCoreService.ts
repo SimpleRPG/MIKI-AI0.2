@@ -895,7 +895,9 @@ export class ConversationCoreService {
       }
       // P692/P696: 保持済みの相手の名前（呼び名）。名前の想起と、
       // 「何て呼ぶ？」の両方が同じ引き方を使う。
-      const knownUserName = (memories || []).find((mm: any) => mm && mm.factValue &&
+      const knownUserName = (memories || []).find((mm: any) => mm && mm.factValue && mm.active !== false && !mm.replacedBy &&
+        // P804: 否定の形（「タロウじゃない」）は名前として扱わない。
+        !/(?:じゃない|ではない)$/.test(String(mm.factValue).trim()) &&
         (mm.factAttribute === '名前・呼び名' ||
           (mm.factAttribute === '名前' && /^(?:僕|私|俺|おれ|名前|ユーザー)$/.test(String(mm.factEntity || '')))))?.factValue;
       // P696: 「僕のこと何て呼ぶ？」は、彼女が相手をどう呼ぶかの
@@ -909,7 +911,10 @@ export class ConversationCoreService {
       }
       // P608: 相手の名前を聞かれて、保持済みの事実に無いときは、
       // 汎用の「答えられない」でなく、まだ教わっていないと正直に言う。
-      if (/(?:僕|私|俺|わたし)の名前|名前.*(?:知ってる|覚えてる|覚えている)/.test(prompt)) {
+      // P804: 名前の否定文（「僕の名前はタロウじゃない」）は名前の
+      // 想起質問ではない。知っている体で「タロウじゃない」を
+      // 名前として確認する受けを止める。
+      if (/(?:僕|私|俺|わたし)の名前|名前.*(?:知ってる|覚えてる|覚えている)/.test(prompt) && !/名前は?.{1,30}?(?:じゃない|ではない)/.test(prompt)) {
         // P692: 名前を教える文（「僕の名前は○○だよ」）は質問では
         // ない。教わった直後に「まだ聞いていません」と返さない。
         const isTeaching = /(?:名前|呼び名)は?.+?(?:だよ|です|って呼んで)/.test(prompt) && !/[？?]/.test(prompt);

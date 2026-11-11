@@ -3115,6 +3115,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P803 既読URLは辿らない', excluded803.length === 0, JSON.stringify(excluded803));
 }
 
+// ---- P804: 名前・属性の否定は事実として登録しない ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem804: any[] = []; const hist804: any[] = []; let st804: any = undefined;
+  const run804 = async (t: string) => {
+    mem804 = conversationFactIntakeService.intakeFromUserText(t, mem804).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem804, recentMessages: hist804.slice(-8), conversationState: st804 } as any);
+    st804 = r.nextConversationState;
+    hist804.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run804('僕の名前はタロウじゃないよ');
+  const noName804 = await run804('僕の名前って何だっけ？');
+  check('P804 名前の否定だけでは名前を覚えたことにならない', noName804.replyText.includes('まだ名前を教えてもらっていません') || noName804.replyText.includes('まだ聞いていません'), noName804.replyText.slice(0, 120));
+  await run804('僕の名前はジロウだよ');
+  await run804('僕の名前はジロウじゃないよ、サブロウだよ');
+  const name804 = await run804('僕の名前って何だっけ？');
+  check('P804 名前の複合否定は肯定側だけを覚える', name804.replyText.includes('名前は「サブロウ」だよ'), name804.replyText.slice(0, 150));
+  await run804('僕のメイン武器は弓だよ');
+  await run804('僕のメイン武器は弓じゃないよ、剣だよ');
+  const weapon804 = await run804('僕のメイン武器って何だっけ？');
+  check('P804 属性の複合否定は肯定側だけを覚える', weapon804.replyText.includes('メイン武器は「剣」だよ'), weapon804.replyText.slice(0, 150));
+  await run804('僕のメイン武器は剣じゃないよ');
+  const denied804 = await run804('僕のメイン武器って何だっけ？');
+  check('P804 属性の単独否定で肯定しなくなる', !denied804.replyText.includes('メイン武器は「剣」だよ'), denied804.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
