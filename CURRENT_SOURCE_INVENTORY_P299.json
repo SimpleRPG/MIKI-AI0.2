@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4079,
-    "resolvedRelativeImportCandidateCount": 4063,
+    "relativeImportCandidateCount": 4080,
+    "resolvedRelativeImportCandidateCount": 4064,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 181466,
-      "lines": 1879,
-      "sha256": "d4c4c43fd6865d7ddf7e83a84935c9a9c1c6cefb7b2e8f244b7874ce41dee0af",
+      "bytes": 182328,
+      "lines": 1895,
+      "sha256": "42e361fdedda2029f04e016af9b521c427f8f3cd1834494e72e7563fae88ca36",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -11414,9 +11414,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationStateService.ts",
-      "bytes": 61383,
-      "lines": 1253,
-      "sha256": "c7400de8fbedeefbe31089de8f82e78e6f8e3ebc458c0597915116f0b94a0967",
+      "bytes": 64698,
+      "lines": 1309,
+      "sha256": "f452ffac6fee9fb44797a5f8cc2e7c4d627d9101fe157a7a1610b268c0216d45",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -11455,37 +11455,37 @@
           "resolvedPath": "src/miki/memory/services/utteranceFeatureService.ts"
         },
         {
-          "line": 516,
+          "line": 7,
+          "specifier": "../../research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
+        },
+        {
+          "line": 517,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 524,
+          "line": 525,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 535,
+          "line": 536,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 549,
+          "line": 550,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 561,
-          "specifier": "../../../types",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/types.ts"
-        },
-        {
-          "line": 583,
+          "line": 562,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
@@ -11497,44 +11497,50 @@
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 595,
+          "line": 585,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 610,
+          "line": 596,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 619,
+          "line": 611,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 663,
+          "line": 620,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 721,
+          "line": 664,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         },
         {
-          "line": 721,
+          "line": 722,
+          "specifier": "../../../types",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/types.ts"
+        },
+        {
+          "line": 722,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         }
       ],
-      "relativeImportCandidateCount": 19,
-      "resolvedRelativeImportCount": 19,
+      "relativeImportCandidateCount": 20,
+      "resolvedRelativeImportCount": 20,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27746,9 +27752,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 290291,
-      "lines": 4211,
-      "sha256": "62d412605000467aa368b0180f80f6aeff4dc551db71ff038c4474db0e74d580",
+      "bytes": 294509,
+      "lines": 4279,
+      "sha256": "1cf950d7c0740e7fe38973c6e76915fb0742d07486374d2707f4caab1315037d",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -4,6 +4,7 @@ import { anaphoraHistoryStack } from '../../../autonomous_modules/anaphora_histo
 import { resolveAnaphoraPure } from '../../../autonomous_modules/anaphora_resolver_sample';
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
+import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 
 /**
  * 作業指示書 v6 優先度9: 会話状態JSON指示 (超軽量版)
@@ -1091,8 +1092,11 @@ export function resolveAnaphora(
   const topicList = state.currentTopic ? [state.currentTopic] : [];
 
   // 時系列順: 現在トピック -> 確定事実 -> 直近エンティティ (末尾が最新)
+  // P710: 候補は「対象の名前」でなければならない。文まるごと
+  // （「モコロンって知ってる？」のような質問文が話題として記録
+  // されたもの）が混ざると、候補が複数に膨れて一意に解けなくなる。
   const ordered = [...topicList, ...factsSlice, ...recentSlice]
-    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0 && item.length <= 20 && !/[？?！!]/.test(item));
 
   // 重複排除: 最新の出現順 (末尾) を優先保持
   const seen = new Set<string>();
@@ -1117,6 +1121,58 @@ export function resolveAnaphora(
   // 自律モジュール resolveAnaphoraPure を用いた純粋関数解決
   const pureResult = resolveAnaphoraPure(p, pool);
   if (pureResult.detectedExpression && pureResult.confidence !== 'unresolved') {
+    // P710: 曖昧になった場合、名詞らしい候補だけに絞って再試行する。
+    // 直近の対象には動詞（「食べる」）なども混ざり、それだけで
+    // 一意に解けなくなることがあった。辞書で名詞系と分かる候補と、
+    // 辞書に無い名前らしい候補（未学習の固有名など）を残す。
+    if (pureResult.confidence === 'ambiguous') {
+      try {
+        const reduced = pool.filter((item) => {
+          if (item.length < 2) return false;
+          try {
+            const entries = japaneseDictionaryService.lookup(item);
+            if (!entries || entries.length === 0) {
+              // 辞書に無い候補: ひらがなを含み動詞の終止形で終わる
+              // もの（「食べる」）は名前ではないので外す。カタカナ
+              // 語や漢字語の名前は残す。
+              return !(/[ぁ-ん]/.test(item) && /[るうくぐすつぬぶむ]$/.test(item));
+            }
+            // 品詞が名詞系・不明（UNKNOWN）のエントリがあれば残す。
+            // 動詞・形容詞だけのエントリしか無い場合に限って外す
+            // （個人辞書の登録は品詞が UNKNOWN になることがある）。
+            const poses = entries.map((e: any) => String(e?.pos || ''));
+            if (poses.some((p) => ['NOUN', 'PROPER_NOUN', 'TECHNICAL', 'UNKNOWN'].includes(p))) return true;
+            return !poses.some((p) => ['VERB', 'ADJECTIVE', 'ADVERB'].includes(p));
+          } catch { return true; }
+        });
+        if (reduced.length >= 1 && reduced.length < pool.length) {
+          const retry = resolveAnaphoraPure(p, reduced);
+          if (retry.detectedExpression && retry.confidence === 'unique') {
+            return {
+              detectedExpression: retry.detectedExpression,
+              resolved: retry.resolved,
+              candidates: retry.candidates,
+              confidence: retry.confidence,
+            };
+          }
+        }
+        // P710: 名詞らしい候補が複数残る場合、「それ・これ・あれ」は
+        // 一番最近の対象を指すのが普通なので、最新の候補で解く
+        // （「どっち」等の選択の照応は対象外）。
+        if (reduced.length >= 1 && (expr === 'それ' || expr === 'これ' || expr === 'あれ')) {
+          const latest = reduced[reduced.length - 1];
+          const retry = resolveAnaphoraPure(p, [latest]);
+          if (retry.detectedExpression && retry.confidence === 'unique') {
+            return {
+              detectedExpression: retry.detectedExpression,
+              resolved: retry.resolved,
+              candidates: pureResult.candidates,
+              confidence: retry.confidence,
+            };
+          }
+        }
+      } catch { /* 絞り込みは補助 */ }
+    }
     return {
       detectedExpression: pureResult.detectedExpression,
       resolved: pureResult.resolved,

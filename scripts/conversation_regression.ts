@@ -1863,6 +1863,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P709 ゲームのおすすめはゲームに絞る', game709.replyText.includes('ゲーム') && !game709.replyText.includes('の続きなんて'), game709.replyText.slice(0, 120));
 }
 
+// ---- 照応（それ）が直前の対象に結びつく（P710） ----
+{
+  let st710: any = undefined;
+  const step710 = async (q: string) => {
+    const r: any = await conversationCoreService.execute({ prompt: q, conversationState: st710 } as any);
+    st710 = r.nextConversationState || st710;
+    return r;
+  };
+  await step710('モコロンって知ってる？');
+  const food710 = await step710('それって何食べるの？');
+
+  check('P710 それは何の断片でもなくモコロンの話になる', !food710.replyText.includes('何食') && food710.replyText.includes('モコロン'), food710.replyText.slice(0, 120));
+  const home710 = await step710('それってどこに住んでるの？');
+  check('P710 それがモコロンとして答えられる', home710.replyText.includes('「モコロン」'), home710.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

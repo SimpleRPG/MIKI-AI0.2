@@ -165,8 +165,8 @@ export class ConversationCoreService {
     userFactIntake?: UserFactIntakeSummary;
   }): Promise<ConversationCoreResult> {
     const started = performance.now();
-    const prompt = params.prompt.trim().replace(/\s+/g, ' ');
-    const state = params.conversationState || defaultConversationState();
+    let prompt = params.prompt.trim().replace(/\s+/g, ' ');
+    let state = params.conversationState || defaultConversationState();
     const memories = params.memories || [];
     const recentMessages = params.recentMessages || [];
     const stages: Record<string, number> = {};
@@ -252,10 +252,58 @@ export class ConversationCoreService {
     // 次の発話を答えとして食べてしまう。消費はここで一度だけ行い、
     // 結果を後段へ引き継ぐ。
     const answeredPendingEarly = this.consumePendingTopicQuestion(prompt);
+    // P710: 会話状態（話題・直近の対象）は、その発話がどの受け口で
+    // 答えられても進める。手前の受け口の早期リターンは状態を素通し
+    // していたため、「モコロンって知ってる？」の直後の「それって…」
+    // が何も掴めず、断片（何食）が調査対象になっていた。進め方は
+    // 後段の nextState と同じ規則（話題は空の時だけ差し替え、対象は
+    // 新しいものを後ろに足して上限10件）。
+    try {
+      const turnTopic = this.extractTopic(prompt);
+      state = {
+        ...state,
+        currentTopic: state.currentTopic || turnTopic,
+        recentEntities: Array.from(new Set([
+          ...(state.recentEntities || []),
+          // P710: 対象候補は2文字以上の内容語だけ（語幹の断片や
+          // 文まるごとは入れない。照応の候補プールを汚すため）。
+          ...this.entityTokenCandidates(japaneseAnalysis.contentTokens),
+          ...(interpretation.anaphora?.resolved ? [interpretation.anaphora.resolved] : []),
+        ].filter(Boolean))).slice(-10),
+        updatedAt: Date.now(),
+      };
+    } catch { /* 状態の前進は補助 */ }
     const vocabulary = (interpretation as any).vocabulary || (interpretation.semantic as any)?.vocabulary || conversationUnknownVocabularyService.assess(prompt, { allowResearch: true });
-    const unknownTerms = Array.isArray(vocabulary?.unknowns)
+    let unknownTerms = Array.isArray(vocabulary?.unknowns)
       ? vocabulary.unknowns.map((item: any) => String(item.term || '')).filter(Boolean).slice(0, 3)
       : [];
+    // P710: 照応が一意に解けた場合（それ→モコロン）、文頭の指示語を
+    // 実体に置き換えてから後段に渡す。解けた対象が状態に記録される
+    // だけで使われていなかったため、「それって何食べるの？」が
+    // 断片「何食」の調査になっていた。置き換えたら未知語も数え直す。
+    try {
+      const ana = interpretation.anaphora;
+      if (ana?.resolved && ana?.confidence === 'unique' && ana?.detectedExpression) {
+        const re = new RegExp(`^${ana.detectedExpression}(って|は|の|が|を|も|に|って何)`);
+        if (re.test(prompt)) {
+          prompt = prompt.replace(re, `${ana.resolved}$1`);
+          const reassessed: any = conversationUnknownVocabularyService.assess(prompt, { allowResearch: true } as any);
+          if (Array.isArray(reassessed?.unknowns)) {
+            unknownTerms = reassessed.unknowns.map((item: any) => String(item.term || '')).filter(Boolean).slice(0, 3);
+          }
+        }
+      }
+    } catch { /* 照応の置き換えは補助 */ }
+    // P710: 「何+漢字1字」が動詞の語幹の断片である場合は未知語から
+    // 外す（「何食べる」の漢字連続「何食」が語として切り出される）。
+    // 後ろに動詞の活用語尾が続く場合だけを断片とみなし、「何者だ」
+    // のような本物の語（後ろは助詞・助動詞）は残す。
+    unknownTerms = unknownTerms.filter((t) => {
+      if (!/^何[一-龠]$/.test(t)) return true;
+      const idx = prompt.indexOf(t);
+      const next = idx >= 0 ? prompt.charAt(idx + t.length) : '';
+      return !/[べるくむうつぬぐす]/.test(next);
+    });
     // P579: 未知語は「今の発話に出ている語」だけを対象にする。解釈側が
     // 会話状態から持ち越した語で調査が暴走するのを防ぐ（過去の話題の
     // 語で検索してしまう事故があった）。
@@ -707,7 +755,7 @@ export class ConversationCoreService {
       stage,
       topLevelGoal: state.topLevelGoal,
       currentTopic: state.currentTopic || this.extractTopic(prompt),
-      recentEntities: Array.from(new Set([...(state.recentEntities || []), ...japaneseAnalysis.contentTokens.slice(-4), ...(anaphora.resolved ? [anaphora.resolved] : []), this.extractTopic(prompt)])).filter(Boolean).slice(-10),
+      recentEntities: Array.from(new Set([...(state.recentEntities || []), ...this.entityTokenCandidates(japaneseAnalysis.contentTokens), ...(anaphora.resolved ? [anaphora.resolved] : [])])).filter(Boolean).slice(-10),
       updatedAt: Date.now(),
       lastCandidateClaimId: teachingResult.detected && teachingResult.candidateClaim ? teachingResult.candidateClaim.claim_id : state.lastCandidateClaimId,
     };
@@ -2182,6 +2230,22 @@ export class ConversationCoreService {
   }
 
   /**
+   * P710: 会話状態の「直近の対象」に記録してよい内容語を選ぶ。
+   * 指示語そのもの、1文字の断片、他の2語を繋いだだけの切り出し
+   * （「何食べる」=何+食べる）が混ざると、照応の候補プールが
+   * 汚れて「それ」が一意に解けなくなる。
+   */
+  private entityTokenCandidates(tokens: string[]): string[] {
+    const list = (tokens || []).filter((t) => typeof t === 'string');
+    return list.filter((t) => {
+      if (t.length < 2) return false;
+      if (/^(それ|これ|あれ|どれ|ここ|そこ|あそこ|どっち|どちら|もの|こと|ため)$/.test(t)) return false;
+      if (list.some((a) => a !== t && list.some((b) => b !== t && b !== a && a + b === t))) return false;
+      return true;
+    }).slice(-4);
+  }
+
+  /**
    * P521: その発話が「雑談として受けるべき日常の発話」かどうか。
    * 質問・依頼・調査が要る発話は雑談に倒さない（そちらは従来の
    * 経路で扱う）。
@@ -3650,7 +3714,11 @@ export class ConversationCoreService {
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const parts: string[] = [];
     // 挨拶や状態の言葉は「話題」として数えない。
-    const isJunkTopic = (t: string) => !t || t.length < 2 || /おはよう|こんにちは|こんばんは|おやすみ|ただいま|起きた|ありがとう|ごめん|疲れた|眠い|お腹|喉/.test(t);
+    const isJunkTopic = (t: string) => !t || t.length < 2 || /おはよう|こんにちは|こんばんは|おやすみ|ただいま|起きた|ありがとう|ごめん|疲れた|眠い|お腹|喉/.test(t)
+      // P710: 振り返りの質問文自身の断片（「今日何の話をしたっけ？」の
+      // 今日・とした・とっけ）は話題ではない。状態がその発話でも
+      // 進むようになったため、質問自身が答えに混ざるようになった。
+      || /^(?:今日|昨日|とっけ|だっけ|とした|してた|何の話|したっけ|した|っけ|もの|こと)$/.test(t);
     try {
       let topics = conversationOpenTopicService.listPending().filter((r) => r.openedDay === today).map((r) => r.topic).filter((t) => !isJunkTopic(t));
       // 開いた話題は短期の台帳（最大3件・消費される）なので、残って
