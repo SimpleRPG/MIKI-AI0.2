@@ -2496,6 +2496,10 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P759 閾値より重いものを挙げる', thr757.replyText.includes('オオモ') && !thr757.replyText.includes('カワモ'), thr757.replyText.slice(0, 130));
   const thrNone757 = await run757('100キロより重い動物はいる？');
   check('P759 閾値を超えるものが無ければ無いと言う', thrNone757.replyText.includes('いない'), thrNone757.replyText.slice(0, 130));
+  const avg757 = await run757('教えた動物の平均の重さは？');
+  check('P761 平均の重さを計算する', avg757.replyText.includes('38.3キロ'), avg757.replyText.slice(0, 130));
+  const sum757 = await run757('教えた動物全部合わせると何キロ？');
+  check('P761 合計の重さを計算する', sum757.replyText.includes('115キロ'), sum757.replyText.slice(0, 130));
 }
 
 // ---- P760: 寿命も物差しで比べる ----
@@ -2515,6 +2519,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P760 寿命を数値で比べる', lifeCmp760.replyText.includes('ナガモの方が長生き') && lifeCmp760.replyText.includes('15年'), lifeCmp760.replyText.slice(0, 130));
   const lifeTop760 = await run760('教えた動物の中で一番長生きなのは？');
   check('P760 一番長生きも実測値で決める', lifeTop760.replyText.includes('ナガモ'), lifeTop760.replyText.slice(0, 130));
+}
+
+// ---- P762: 住む場所で絞って挙げる ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem762: any[] = []; const hist762: any[] = []; let st762: any = undefined;
+  const run762 = async (t: string) => {
+    mem762 = conversationFactIntakeService.intakeFromUserText(t, mem762).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem762, recentMessages: hist762.slice(-8), conversationState: st762 } as any);
+    st762 = r.nextConversationState;
+    hist762.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run762('ヒナモはタスマニアに住む小さい動物だよ');
+  await run762('フナモは北海道に住む動物だよ');
+  const hab762 = await run762('タスマニアに住む動物はいる？');
+  check('P762 住む場所で絞って挙げる', hab762.replyText.includes('ヒナモ') && !hab762.replyText.includes('フナモ'), hab762.replyText.slice(0, 130));
+  const habNone762 = await run762('アフリカに住む動物はいる？');
+  check('P762 その場所のものが無ければ無いと言う', habNone762.replyText.includes('いない'), habNone762.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----

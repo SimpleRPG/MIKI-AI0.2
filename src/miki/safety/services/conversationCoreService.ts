@@ -489,6 +489,14 @@ export class ConversationCoreService {
       if (measThr && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_threshold_answer', this.applyPersonaVoice(measThr), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const measAgg = this.measureAggregateAnswer(prompt);
+      if (measAgg && !multiPart) {
+        return this.buildResult('RESOLVED', 'measure_aggregate_answer', this.applyPersonaVoice(measAgg), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const habitatList = this.glossHabitatListAnswer(prompt);
+      if (habitatList && !multiPart) {
+        return this.buildResult('RESOLVED', 'gloss_habitat_list_answer', this.applyPersonaVoice(habitatList), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P739: 「最初に教えたのって何だっけ？」——教示記録の
       // 順序から答える（「最初」が未知語として調査に落ちない）。
       const taughtOrder = this.taughtOrderAnswer(prompt);
@@ -3136,6 +3144,9 @@ export class ConversationCoreService {
    * その範囲に絞る（説明文か仮の分類に分類語を含むもの）。
    */
   private taughtListAnswer(prompt: string): string | undefined {
+    // P761: 「全部合わせると何キロ？」は合計の計算であって一覧では
+    // ない。「全部」が両方のゲートに掛かるため、計算の形を除く。
+    if (/(?:合わせると|合計)/.test(prompt)) return undefined;
     if (!/(?:教えた|教えてくれた|教えてあげた)/.test(prompt)) return undefined;
     if (!/(?:全部|全て|一覧|言って|挙げて|何を|何が|どんな|何種類|何個|何匹|いくつ)/.test(prompt) && !/(?:今まで|これまで)/.test(prompt)) return undefined;
     try {
@@ -3368,6 +3379,58 @@ export class ConversationCoreService {
       if (hits.length === 0) return `今知っている中では、${thr.disp}より${adjWord}ものはいないです。`;
       const names = hits.slice(0, 4).map((x) => `「${x.name}」（${x.meas!.disp}）`).join('、');
       return `います。${names}です。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P761: 「教えた動物の平均の重さは？」「全部合わせると何キロ？」
+   * ——実測値の合計と平均。数値の無いものは対象外と添える。
+   */
+  private measureAggregateAnswer(prompt: string): string | undefined {
+    const isAvg = /(?:平均)/.test(prompt);
+    const isSum = /(?:全部合わせ|合計|ぜんぶ合わせ)/.test(prompt);
+    if (!isAvg && !isSum) return undefined;
+    const label: '重さ' | '大きさ' | '寿命' | undefined = /(?:重さ|体重|キロ|グラム|トン)/.test(prompt) ? '重さ'
+      : /(?:大きさ|長さ|センチ|メートル)/.test(prompt) ? '大きさ'
+      : /(?:寿命|長生き|年)/.test(prompt) ? '寿命' : undefined;
+    if (!label) return undefined;
+    try {
+      const categoryMatch = prompt.match(/(生き物|動物|鳥|魚|虫|植物|食べ物|飲み物)/);
+      const cat = categoryMatch ? (categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1]) : '';
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss)
+        .filter((e: any) => !cat || this.taughtScopeMatch(e, cat));
+      const measured = entries
+        .map((e: any) => this.measureFromText(String(e.gloss), label))
+        .filter((x): x is { value: number; disp: string } => Boolean(x));
+      if (measured.length < 2) return undefined;
+      const sum = measured.reduce((acc, x) => acc + x.value, 0);
+      const unit = label === '重さ' ? 'キロ' : label === '大きさ' ? 'センチ' : '年';
+      const fmt = (n: number): string => `${Number.isInteger(n) ? n : Math.round(n * 10) / 10}${unit}`;
+      const scopeNote = `${label}が分かっている${measured.length}つで`;
+      const tail = entries.length > measured.length ? `（${label}の分からないものは除いています）` : '';
+      if (isAvg) return `${scopeNote}平均すると、約${fmt(sum / measured.length)}です。${tail}`;
+      return `${scopeNote}全部合わせると${fmt(sum)}です。${tail}`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P762: 「オーストラリアに住む動物はいる？」——教わった説明の
+   * 中の場所で絞って挙げる。説明文が材料なので、場所が増えても
+   * 同じ受け口で効く。
+   */
+  private glossHabitatListAnswer(prompt: string): string | undefined {
+    const m = prompt.match(/([一-龠ァ-ヶー]{2,})に住む/);
+    if (!m) return undefined;
+    if (!/(?:いる|ある|いない|いますか|教えて|何)/.test(prompt) && !/[？?]/.test(prompt)) return undefined;
+    const place = m[1].replace(/^(?:の|に)/, '');
+    if (!place || place.length < 2) return undefined;
+    try {
+      const entries = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss);
+      const hits = entries.filter((e: any) => String(e.gloss).includes(place)).map((e: any) => String(e.surface));
+      const uniq = [...new Set(hits)].slice(0, 6);
+      if (uniq.length === 0) return `今知っている中では、${place}に住むものはいないです。`;
+      return `います。${uniq.map((n) => `「${n}」`).join('と')}が${place}に住むと聞いています。`;
     } catch { return undefined; }
   }
 
