@@ -532,6 +532,12 @@ export class ConversationCoreService {
       if (memoEarly) {
         return this.buildResult('RESOLVED', 'memo_request_answer', this.applyPersonaVoice(memoEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P736: 「Xのことは忘れて」——取り込み側で忘却が済んでいたら
+      // その旨を答える（定義の読み上げにしない）。
+      const forget = this.forgetTermAnswer(prompt);
+      if (forget && !multiPart) {
+        return this.buildResult('RESOLVED', 'forget_term_answer', this.applyPersonaVoice(forget), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P647: 「〈語〉覚えた？」——特定の語についての自分の状態を
       // 答える（P624/P633 の語単位版）。
       const provenance = this.knowledgeProvenanceAnswer(prompt, state, recentMessages);
@@ -3094,6 +3100,21 @@ export class ConversationCoreService {
       });
     } catch { return undefined; }
     if (!entity) return undefined;
+    // P737: 「その動物って〜？」の「その＋総称」は、直近に話した
+    // 具体的な相手を指す。総称が対象に拾われたら、その分類に
+    // 属する直近の話題を対象に取り直す。
+    if (/^(?:動物|植物|もの|場所|人|食べ物|飲み物|鳥|魚|虫|花|木|獣)$/.test(entity) && new RegExp(`^(?:その|あの|この)${entity}`).test(prompt.trim())) {
+      try {
+        const cand = this.recentTopicCandidates(state, recentMessages).find((c) => {
+          if (c === entity) return false;
+          try {
+            const g = japaneseDictionaryService.lookup(c).find((e: any) => e.gloss)?.gloss || '';
+            return String(g).includes(entity) || worldModelGraphService.relationsOf(c).some((r) => r.from === c && r.type === 'IS_A' && r.to === entity);
+          } catch { return false; }
+        });
+        if (cand) entity = cand;
+      } catch { /* 話題の解決は補助経路 */ }
+    }
     const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
     const usedFor = relations.filter((r) => r.type === 'USED_FOR');
     if (isUse && usedFor.length > 0) {
@@ -3745,6 +3766,19 @@ export class ConversationCoreService {
    * こと）と P633（分からないこと）の、語単位の自己点検。
    * 知らない語は、その場で意味学習の欠けに積んで循環を始める。
    */
+  private forgetTermAnswer(prompt: string): string | undefined {
+    if (/[？?]/.test(prompt)) return undefined;
+    if (!/(?:忘れて|消して|削除して)/.test(prompt)) return undefined;
+    try {
+      const rec = JSON.parse(storageService.getItem('miki_recently_forgotten_v1') || 'null');
+      if (rec && typeof rec.term === 'string' && Date.now() - Number(rec.at || 0) <= 60_000 && prompt.includes(rec.term)) {
+        storageService.removeItem('miki_recently_forgotten_v1');
+        return `分かりました、「${rec.term}」のことは忘れますね。`;
+      }
+    } catch { /* 補助判定 */ }
+    return undefined;
+  }
+
   private tellAboutAnswer(prompt: string): string | undefined {
     if (!/(?:について|のこと)/.test(prompt)) return undefined;
     // P730: 「もっと／詳しく」の深掘り形だけをここで受ける。素の

@@ -948,6 +948,10 @@ export class ConversationFactIntakeService {
     // 直って gloss が古いままだと、彼女は訂正済みの内容を言い続け
     // る（「小さい」と訂正された後も「小さい動物」と答える）。
     try { this.refreshTaughtGlossAfterCorrection(updated, isUserFact); } catch { /* 補助経路 */ }
+    // P736: 「Xのことは忘れて」——教わった語を忘れる依頼は、辞書・
+    // 知識・関係・事実の全部から外す（定義を読み上げるだけに
+    // ならないように）。
+    try { this.forgetTaughtTermFromRequest(text, updated); } catch { /* 補助経路 */ }
 
     return { added, updatedMemories: updated, replaced, invalidated };
   }
@@ -1024,10 +1028,55 @@ export class ConversationFactIntakeService {
       // 新しい説明から分類を分解し直す（Claim 登録は重複で抑えられる）。
       try { this.decomposeTaughtGloss(entity, newGloss, `${entity}は${newGloss}`); } catch { /* 補助経路 */ }
     } else {
-      for (const old of olds) {
-        try { worldModelGraphService.detachClaimFromRelations(old.claim_id); } catch { /* 補助経路 */ }
-        try { claimDatabaseService.setVerificationStatus(old.claim_id, 'SUPERSEDED' as any, '教わった説明が撤回されたため'); } catch { /* 補助経路 */ }
+      this.retireTaughtKnowledge(entity);
+    }
+  }
+
+  /**
+   * P736: 教わった語の知識（Claim）を引退させ、その Claim を出典
+   * とする仮の関係を外す。訂正で説明が消えた場合（P728）と、
+   * 忘れる依頼の共通処理。
+   */
+  private retireTaughtKnowledge(term: string): void {
+    const olds = claimDatabaseService.getAllClaims().filter((c: any) =>
+      String(c.origin_source_id || '') === 'user_conversation_teaching'
+      && String(c.statement || '').startsWith(`${term}は`)
+      && !(c as any).superseded_by
+      && c.status !== 'SUPERSEDED');
+    for (const old of olds) {
+      try { worldModelGraphService.detachClaimFromRelations(old.claim_id); } catch { /* 補助経路 */ }
+      try { claimDatabaseService.setVerificationStatus(old.claim_id, 'SUPERSEDED' as any, '教わった説明の知識を引退'); } catch { /* 補助経路 */ }
+    }
+  }
+
+  /**
+   * P736: 「Xのことは忘れて／消して」という依頼を受けたら、
+   * 教わった語を辞書から外し、知識と関係を引退させ、その語の
+   * 事実も無効化する。会話側の受け答えのために印を残す。
+   * 対象は本人が教えた語だけ（他の忘却の言い方には触れない）。
+   */
+  private forgetTaughtTermFromRequest(text: string, updated: MemoryItem[]): void {
+    const t = String(text || '');
+    if (/[？?]/.test(t)) return;
+    const verbMatch = t.match(/(?:忘れて|消して|削除して)/);
+    if (!verbMatch || verbMatch.index === undefined) return;
+    const taught = japaneseDictionaryService.listPersonal().filter((e: any) => Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'));
+    for (const entry of taught) {
+      const term = String(entry.surface || '');
+      if (!term) continue;
+      const at = t.indexOf(term);
+      if (at < 0 || at > verbMatch.index) continue;
+      japaneseDictionaryService.removePersonal(term);
+      this.retireTaughtKnowledge(term);
+      for (const m of updated) {
+        if (String((m as any).factEntity || '') === term && m.active !== false) {
+          (m as any).active = false;
+          (m as any).invalidatedByUser = true;
+        }
       }
+      try { storageService.setItem('miki_recently_forgotten_v1', JSON.stringify({ term, at: Date.now() })); } catch { /* 補助経路 */ }
+      systemLogger.info('CHAT', `🗑 [意味学習] 依頼により「${term}」を忘れました`);
+      return;
     }
   }
 }

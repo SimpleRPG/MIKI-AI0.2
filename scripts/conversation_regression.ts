@@ -2221,6 +2221,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P734 分類の当てずっぽうは候補の語で正す', guess734.replyText.includes('カンガルーじゃなくて') && guess734.replyText.includes('動物の仲間'), guess734.replyText.slice(0, 130));
 }
 
+// ---- 忘れる依頼と「その＋総称」の照応（P736/P737） ----
+{
+  const { conversationFactIntakeService: intake736 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { japaneseDictionaryService: dict736 } = await import('../src/miki/research/services/japaneseDictionaryService');
+  const { worldModelGraphService: wm736 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  let mem736: any[] = []; const hist736: any[] = []; let st736: any = undefined;
+  const run736 = async (q: string) => {
+    mem736 = intake736.intakeFromUserText(q, mem736).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem736, recentMessages: hist736.slice(-8), conversationState: st736 } as any);
+    st736 = r.nextConversationState;
+    hist736.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run736('ユキカゲは雪山に住む白い獣だよ');
+  await run736('ヒョウカゲは雪山に住む大きな獣だよ');
+  const sono736 = await run736('その獣って何食べるの？');
+  check('P737 その＋総称は直近の具体的な相手を指す', sono736.replyText.includes('ヒョウカゲ') && sono736.replyText.includes('食べ物はまだ知らない'), sono736.replyText.slice(0, 130));
+  const forget736 = await run736('ユキカゲのことは忘れて');
+  check('P736 忘れる依頼には忘れる旨を答える', forget736.replyText.includes('忘れます'), forget736.replyText.slice(0, 130));
+  check('P736 忘れた語は辞書と関係から消える', dict736.lookup('ユキカゲ').every((e: any) => !e.gloss) && wm736.relationsOf('ユキカゲ').length === 0, JSON.stringify(dict736.lookup('ユキカゲ')));
+  const still736 = await run736('ヒョウカゲって何の仲間だっけ？');
+  check('P736 忘却は他の語に波及しない', still736.replyText.includes('ヒョウカゲ') && still736.replyText.includes('獣'), still736.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
