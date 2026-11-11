@@ -67,6 +67,16 @@ class UserMemoService {
     this.save([]);
     return n;
   }
+
+  /** P780: 指定の語を含むメモだけを消す。消したメモを返す。 */
+  public removeMatching(words: string[]): UserMemo[] {
+    const items = this.load();
+    const removed = items.filter((m) => words.some((w) => w && m.text.includes(w)));
+    if (removed.length > 0) {
+      this.save(items.filter((m) => !removed.includes(m)));
+    }
+    return removed;
+  }
 }
 
 export const userMemoService = UserMemoService.getInstance();

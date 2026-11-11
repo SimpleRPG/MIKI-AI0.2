@@ -2714,6 +2714,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P779 メモを読み返せる', memoR777.replyText.includes('牛乳を買う'), memoR777.replyText.slice(0, 130));
 }
 
+// ---- P780-P781: 個別メモの削除／誕生日までの日数 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem780: any[] = []; const hist780: any[] = []; let st780: any = undefined;
+  const run780 = async (t: string) => {
+    mem780 = conversationFactIntakeService.intakeFromUserText(t, mem780).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem780, recentMessages: hist780.slice(-8), conversationState: st780 } as any);
+    st780 = r.nextConversationState;
+    hist780.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run780('牛乳を買うってメモして');
+  await run780('卵も買うってメモして');
+  const del780 = await run780('牛乳のメモ消して');
+  check('P780 個別のメモだけを消す', del780.replyText.includes('牛乳を買う') && del780.replyText.includes('消しました'), del780.replyText.slice(0, 130));
+  const list780 = await run780('メモ、何かあったっけ？');
+  check('P780 消したメモは読み返しに出ず、他は残る', !list780.replyText.includes('牛乳') && list780.replyText.includes('卵も買う'), list780.replyText.slice(0, 130));
+  await run780('僕の誕生日は3月5日だよ');
+  const now780 = new Date();
+  const today780 = new Date(now780.getFullYear(), now780.getMonth(), now780.getDate());
+  let cand780 = new Date(now780.getFullYear(), 2, 5);
+  if (cand780.getTime() < today780.getTime()) cand780 = new Date(now780.getFullYear() + 1, 2, 5);
+  const exp780 = Math.round((cand780.getTime() - today780.getTime()) / 86400000);
+  const bday780 = await run780('誕生日まであと何日？');
+  check('P781 誕生日までの日数を数える', bday780.replyText.includes('3月5日') && bday780.replyText.includes(`あと${exp780}日`), bday780.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

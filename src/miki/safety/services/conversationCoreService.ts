@@ -424,7 +424,7 @@ export class ConversationCoreService {
       if (upcomingPlans) {
         return this.buildResult('RESOLVED', 'upcoming_plans_answer', this.applyPersonaVoice(upcomingPlans), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const planCountdown = multiPart ? undefined : this.planCountdownAnswer(prompt);
+      const planCountdown = multiPart ? undefined : this.planCountdownAnswer(prompt, memories);
       if (planCountdown) {
         return this.buildResult('RESOLVED', 'plan_countdown_answer', this.applyPersonaVoice(planCountdown), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -3757,8 +3757,26 @@ export class ConversationCoreService {
   /**
    * P777: 「結婚式まであと何日？」——日付の付いた控えから数える。
    */
-  private planCountdownAnswer(prompt: string): string | undefined {
+  private planCountdownAnswer(prompt: string, memories: any[] = []): string | undefined {
     if (!/(?:あと何日|まで何日|何日後|までどのくらい)/.test(prompt)) return undefined;
+    // P781: 誕生日は予定台帳ではなく本人の事実にある。月日を取り
+    // 出して、次の誕生日までの日数を数える。
+    if (/(?:誕生日)/.test(prompt)) {
+      try {
+        const fact = (memories || []).find((m: any) => m && m.active !== false && !m.replacedBy
+          && String(m.factAttribute || '') === '誕生日' && String(m.factValue || ''));
+        const dm = fact ? String(fact.factValue).match(/(\d{1,2})月(\d{1,2})日/) : null;
+        if (dm) {
+          const now = new Date();
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          let cand = new Date(now.getFullYear(), Number(dm[1]) - 1, Number(dm[2]));
+          if (cand.getTime() < today.getTime()) cand = new Date(now.getFullYear() + 1, Number(dm[1]) - 1, Number(dm[2]));
+          const days = Math.round((cand.getTime() - today.getTime()) / 86400000);
+          if (days === 0) return 'あなたの誕生日は今日です。おめでとうございます。';
+          return `あなたの誕生日（${Number(dm[1])}月${Number(dm[2])}日）まで、あと${days}日です。`;
+        }
+      } catch { /* 予定の数え方へ */ }
+    }
     try {
       const raw = storageService.getItem('miki_user_plans_v1');
       const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
@@ -5485,6 +5503,18 @@ export class ConversationCoreService {
    */
   private memoRequestAnswer(prompt: string): string | undefined {
     const p = String(prompt || '');
+    // P780: 「牛乳のメモ消して」——個別のメモの削除。内容の語で
+    // 照合して、該当だけを消す（全部消しとは分ける）。
+    if (/(?:メモ|覚えたこと)/.test(p) && /(?:消して|削除|忘れて)/.test(p) && !/[？?]/.test(p)) {
+      try {
+        const words = utteranceFeatureService.analyze(p).contentTokens
+          .filter((w: string) => w.length >= 2 && !/^(?:メモ|消し|削除|忘れ)$/.test(w));
+        const removed = userMemoService.removeMatching(words);
+        if (removed.length > 0) {
+          return `分かりました、${removed.map((m) => `「${m.text}」`).join('と')}のメモは消しました。`;
+        }
+      } catch { /* 通常の忘却の形へ */ }
+    }
     // 忘れる（何も覚えていないときは、その旨を正直に）。
     if (/^(?:もう)?忘れて(?:いい|ください|ちょうだい|くれる)?[。！!？?よね]*$/.test(p.trim())
       || /(?:覚えた|メモした)こと.*忘れて/.test(p)) {
