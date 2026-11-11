@@ -2387,6 +2387,13 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P747 説明の引用は説明そのもので答える', quote744.replyText.includes('雨の森に住む小さい獣') && !quote744.replyText.includes('http'), quote744.replyText.slice(0, 130));
   const count744 = await run744('今まで何種類教えた？');
   check('P748 教えた数には数で答える', count744.replyText.includes('全部で') && count744.replyText.includes('種類です'), count744.replyText.slice(0, 130));
+  const pair744 = await run744('アメカゲとユアカゲ、どっちが先に教えた？');
+  check('P749 二つの教えた順を答える', pair744.replyText.includes('先に教わったのは「アメカゲ」') && !pair744.replyText.includes('骨子'), pair744.replyText.slice(0, 130));
+  const pairLater744 = await run744('アメカゲとユアカゲ、どっちが後で教えた？');
+  check('P749 後の方を聞かれたら後で答える', pairLater744.replyText.includes('後に教わったのは「ユアカゲ」'), pairLater744.replyText.slice(0, 130));
+  await run744('僕の誕生日は3月5日だよ');
+  const bday744 = await run744('僕の誕生日っていつだっけ？');
+  check('P749 誕生日は日付のまま覚えて答える', bday744.replyText.includes('3月5日'), bday744.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----

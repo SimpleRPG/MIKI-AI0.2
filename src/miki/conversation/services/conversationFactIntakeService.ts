@@ -317,6 +317,20 @@ function extractFromSentence(rawSentence: string, contextEntity?: string): Extra
     }
   }
 
+  // P749: 日付の値（3月5日・2020年1月2日など）は、数値属性より
+  // 先に丸ごと取る。数値パスだと「3」だけが値になって日付が
+  // 壊れる（誕生日が「3」として記録されていた）。
+  m = sentence.match(/^(.{1,24}?)の([^のはがをにへ]{1,12}?)は\s*(\d{4}年\d{1,2}月\d{1,2}日|\d{1,2}月\d{1,2}日|\d{1,2}月|\d{1,2}日)(?:だ|です|だった|でした|だよ|ですよ)?$/);
+  if (m) {
+    const entity = cleanEntity(m[1]);
+    const attribute = m[2].trim();
+    const value = m[3];
+    if (entity && attribute) {
+      const statement = `${entity}の${attribute}は${value}`;
+      return { kind: 'attribute', category: 'user_fact', entity, attribute, value, statement, summary: statement };
+    }
+  }
+
   // 数値属性: Xの属性は数値 / Xは数値
   m = sentence.match(/^(.{1,24}?)の([^のはがをにへ]{1,12}?)は\s*([0-9][0-9,]*\.?[0-9]*)\s*(%|％|万|円|個|人|匹|点)?/);
   if (m) {

@@ -476,6 +476,12 @@ export class ConversationCoreService {
       if (taughtOrder && !multiPart) {
         return this.buildResult('RESOLVED', 'taught_order_answer', this.applyPersonaVoice(taughtOrder), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P749: 「XとY、どっちが先に教えた？」——二つの教わった
+      // 語の前後を、登録順で答える。
+      const pairOrder = this.taughtPairOrderAnswer(prompt);
+      if (pairOrder && !multiPart) {
+        return this.buildResult('RESOLVED', 'taught_pair_order_answer', this.applyPersonaVoice(pairOrder), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P740: 「動物だっけ？それとも鳥だっけ？」——二択の思い出し
       // 質問に、手持ちの分類から答える。二択は構造上マルチ
       // パート扱いになるため、multiPart でも受ける。
@@ -3223,6 +3229,29 @@ export class ConversationCoreService {
       return taught
         ? `「${target}」の説明は、あなたに教わった「${gloss}」です。`
         : `「${target}」の説明は、「${gloss}」です。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P749: 「クオッカとワラルー、どっちが先に教えた？」——二つの
+   * 教わった語の前後を、個人辞書の登録順で答える。どちらが
+   * 先か・後かで聞き方に合わせる。
+   */
+  private taughtPairOrderAnswer(prompt: string): string | undefined {
+    if (!/(?:どっちが|どちらが)/.test(prompt) || !/(?:教えた|教えてくれた)/.test(prompt)) return undefined;
+    const earlier = /(?:先に|前に|はじめに)/.test(prompt);
+    const later = /(?:後で|あとで|後から|最後に)/.test(prompt);
+    if (!earlier && !later) return undefined;
+    try {
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'));
+      const named = entries.filter((e: any) => prompt.includes(String(e.surface || '')));
+      const uniq: string[] = [];
+      for (const e of named) { const s = String((e as any).surface || ''); if (s && !uniq.includes(s)) uniq.push(s); }
+      if (uniq.length < 2) return undefined;
+      const [first, second] = uniq;
+      if (earlier) return `先に教わったのは「${first}」です。その次が「${second}」です。`;
+      return `後に教わったのは「${second}」です。その前が「${first}」です。`;
     } catch { return undefined; }
   }
 
