@@ -525,6 +525,10 @@ export class ConversationCoreService {
       if (ranking && !multiPart) {
         return this.buildResult('RESOLVED', 'taught_ranking_answer', this.applyPersonaVoice(ranking), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const factDiff = this.factDifferenceAnswer(prompt, memories);
+      if (factDiff) {
+        return this.buildResult('RESOLVED', 'fact_difference_answer', this.applyPersonaVoice(factDiff), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const measDiff = this.measureDifferenceAnswer(prompt);
       if (measDiff && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_difference_answer', this.applyPersonaVoice(measDiff), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3419,6 +3423,45 @@ export class ConversationCoreService {
    * P759: 「オオモとカワモ、何キロ差がある？」——二つの実測値の
    * 差を計算して答える（P743の属性想起は片方の値しか言えなかった）。
    */
+  /**
+   * P792: 「僕と妹、何歳違う？」「身長何センチ違う？」——人の
+   * 属性の事実同士の差。説明文の差（P759）とは別に事実を見る。
+   */
+  private factDifferenceAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/(?:違う|差)/.test(prompt)) return undefined;
+    let attr = ''; let label: '重さ' | '大きさ' | '年齢' = '年齢'; let unit = '歳';
+    if (/何歳|歳の差|年齢/.test(prompt)) { attr = '年齢'; label = '年齢'; unit = '歳'; }
+    else if (/身長/.test(prompt)) { attr = '身長'; label = '大きさ'; unit = 'センチ'; }
+    else if (/体重/.test(prompt)) { attr = '体重'; label = '重さ'; unit = 'キロ'; }
+    else return undefined;
+    const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    const valueOf = (name: string): number | undefined => {
+      const targets = selfSet.has(name) ? [...selfSet] : [name];
+      const fact = (memories || []).find((mm: any) => mm && mm.active !== false && !mm.replacedBy
+        && String(mm.factAttribute || '') === attr && targets.includes(String(mm.factEntity || ''))
+        && /\d/.test(String(mm.factValue || '')));
+      if (!fact) return undefined;
+      if (label === '年齢') {
+        const n = Number(String(fact.factValue).match(/(\d+(?:\.\d+)?)/)?.[1]);
+        return Number.isFinite(n) ? n : undefined;
+      }
+      return this.measureFromText(String(fact.factValue), label)?.value;
+    };
+    const tokens = utteranceFeatureService.analyze(prompt).contentTokens
+      .filter((w: string) => w.length >= 1 && !/^(?:何歳|何|違う|差|身長|体重|年齢)$/.test(w));
+    const found: Array<{ name: string; v: number }> = [];
+    for (const t of tokens) {
+      const v = valueOf(t);
+      if (v !== undefined && !found.some((f) => f.name === t)) found.push({ name: t, v });
+      if (found.length >= 2) break;
+    }
+    if (found.length < 2) return undefined;
+    const diff = Math.abs(found[0].v - found[1].v);
+    const diffDisp = Number.isInteger(diff) ? String(diff) : String(Math.round(diff * 10) / 10);
+    if (diff === 0) return `${found[0].name}と${found[1].name}は、${attr}は同じです。`;
+    return `${found[0].name}と${found[1].name}は、${diffDisp}${unit}違います。`;
+  }
+
   private measureDifferenceAnswer(prompt: string): string | undefined {
     if (!/(?:差|違い)/.test(prompt)) return undefined;
     if (!/(?:何キロ|何センチ|どれくらい|どのくらい|何グラム|何年)/.test(prompt)) return undefined;

@@ -2879,6 +2879,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P791 来月の予定を月で切って答える', month789.replyText.includes('来月の予定は') && month789.replyText.includes('15日'), month789.replyText.slice(0, 150));
 }
 
+// ---- P792: 人の属性の事実同士の差 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem792: any[] = []; const hist792: any[] = []; let st792: any = undefined;
+  const run792 = async (t: string) => {
+    mem792 = conversationFactIntakeService.intakeFromUserText(t, mem792).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem792, recentMessages: hist792.slice(-8), conversationState: st792 } as any);
+    st792 = r.nextConversationState;
+    hist792.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run792('僕の年齢は25歳だよ');
+  await run792('妹の年齢は20歳だよ');
+  const ageDiff792 = await run792('僕と妹、何歳違う？');
+  check('P792 年齢の差を答える', ageDiff792.replyText.includes('5歳違います'), ageDiff792.replyText.slice(0, 130));
+  await run792('僕の身長は170センチだよ');
+  await run792('妹の身長は155センチだよ');
+  const heightDiff792 = await run792('僕と妹、身長何センチ違う？');
+  check('P792 身長の差を答える', heightDiff792.replyText.includes('15センチ違います'), heightDiff792.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
