@@ -166,6 +166,18 @@ function isNegativeFact(c: UserFactCandidate): boolean {
   return tail.test(v) || tail.test(s) || /(?:飼ってない|持ってない|飼っていない|持っていない)/.test(v);
 }
 
+/**
+ * P802: buildMatch 用の厳しめの否定判定。「逃げ場がない」の
+ * ような名詞句の名前（〜がない）は否定文ではないので、述語の
+ * 否定（〜てない／じゃない／泳げない等）だけを否定として扱う。
+ */
+function isNegativeStatement(c: UserFactCandidate): boolean {
+  const v = String(c.value || '').trim();
+  if (/(?:てない|ていない|ってない|じゃない|ではない|できない|分からない|わからない)(?:よ|ね|です|ます)?$/.test(v)) return true;
+  if (/[がは]ない$/.test(v)) return false;
+  return /^[一-龠ァ-ヶー]{2,5}ない$/.test(v);
+}
+
 function matchesKey(key: string, c: UserFactCandidate): boolean {
   const { entity, attribute } = c;
   if (attribute && attribute !== '数値') {
@@ -191,7 +203,8 @@ function topicLabelOf(c: UserFactCandidate): string {
 function buildMatch(chosen: UserFactCandidate): UserFactRecallMatch {
   const topicLabel = topicLabelOf(chosen);
   // P799: 否定の事実は肯定の形に直さず、原文のまま引く。
-  const answerText = isNegativeFact(chosen)
+  // P802: 判定は述語の否定だけに絞る（名前の「〜がない」を守る）。
+  const answerText = isNegativeStatement(chosen)
     ? `前に「${chosen.summary}」と話していましたよ。`
     : chosen.value && chosen.value !== chosen.entity
       ? `あなたが言っていた${topicLabel}は「${chosen.value}」だよ。`

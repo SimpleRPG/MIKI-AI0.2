@@ -3082,6 +3082,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P801 裸の形でも肯定に答える', aff801.replyText.includes('獣の仲間'), aff801.replyText.slice(0, 150));
 }
 
+// ---- P802: 名詞句の名前（〜がない）は否定文として扱わない ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem802: any[] = []; const hist802: any[] = []; let st802: any = undefined;
+  const run802 = async (t: string) => {
+    mem802 = conversationFactIntakeService.intakeFromUserText(t, mem802).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem802, recentMessages: hist802.slice(-8), conversationState: st802 } as any);
+    st802 = r.nextConversationState;
+    hist802.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run802('僕のメイン武器は逃げ場がないだよ');
+  const bow802 = await run802('僕のメイン武器って何だっけ？');
+  check('P802 名前の「逃げ場がない」は肯定の形で答える', bow802.replyText.includes('メイン武器は「逃げ場がない」だよ'), bow802.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
