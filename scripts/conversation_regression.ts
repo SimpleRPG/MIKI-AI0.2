@@ -2983,6 +2983,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P796 人の事実をまとめて話す', sum796.replyText.includes('年齢は20歳') && sum796.replyText.includes('身長は155センチ'), sum796.replyText.slice(0, 150));
 }
 
+// ---- P797: 週で区切った予定の一覧 ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const keyOf797 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today797 = new Date();
+  const far797 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const rawPlans797 = storageService.getItem('miki_user_plans_v1');
+  const plans797 = rawPlans797 ? JSON.parse(rawPlans797) : [];
+  plans797.push(
+    { when: '今日', text: '週内テストの予定', at: Date.now(), date: keyOf797(today797) },
+    { when: '来月', text: '遠方テストの予定', at: Date.now(), date: keyOf797(far797) },
+  );
+  storageService.setItem('miki_user_plans_v1', JSON.stringify(plans797));
+  const week797: any = await conversationCoreService.execute({ prompt: '今週の予定を全部教えて' } as any);
+  check('P797 今週の一覧は週内だけ', week797.replyText.includes('週内テストの予定') && !week797.replyText.includes('遠方テストの予定'), week797.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

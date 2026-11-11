@@ -420,6 +420,10 @@ export class ConversationCoreService {
       if (planRecallEarly) {
         return this.buildResult('RESOLVED', 'plan_recall_answer', this.applyPersonaVoice(planRecallEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const weekPlans = multiPart ? undefined : this.weekPlansAnswer(prompt);
+      if (weekPlans) {
+        return this.buildResult('RESOLVED', 'week_plans_answer', this.applyPersonaVoice(weekPlans), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const upcomingPlans = multiPart ? undefined : this.upcomingPlansAnswer(prompt);
       if (upcomingPlans) {
         return this.buildResult('RESOLVED', 'upcoming_plans_answer', this.applyPersonaVoice(upcomingPlans), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -4020,6 +4024,42 @@ export class ConversationCoreService {
    * P776: 「これからの予定、全部教えて」——日付の付いた控えを
    * 日付順に並べて答える。過去の分は出さない。
    */
+  /**
+   * P797: 「今週の予定を全部教えて」「来週の予定は？」——週で区切った
+   * 一覧。今週は今日から日曜まで、来週は月曜から日曜まで。
+   * 一覧（P776）が全部の未来を出すのに対して、こちらは週の範囲。
+   */
+  private weekPlansAnswer(prompt: string): string | undefined {
+    const wk = /(今週|来週)/.exec(prompt)?.[1];
+    if (!wk) return undefined;
+    if (!/予定|予約|約束/.test(prompt)) return undefined;
+    if (!(/[？?]/.test(prompt) || /教えて|ある/.test(prompt))) return undefined;
+    if (/(?:みき|あなた|君|きみ)の/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans = raw ? JSON.parse(raw) as Array<{ when: string; text: string; date?: string }> : [];
+      const now = new Date();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const dow = now.getDay(); // 0=日曜
+      const thisSunday = todayStart + ((7 - dow) % 7) * dayMs;
+      const from = wk === '今週' ? todayStart : thisSunday + dayMs;
+      const to = wk === '今週' ? thisSunday : thisSunday + 7 * dayMs;
+      const inRange = plans.filter((p) => {
+        if (!p.date) return false;
+        const t = new Date(`${p.date}T12:00:00`).getTime();
+        return t >= from && t <= to + dayMs - 1;
+      }).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+      if (inRange.length === 0) return `${wk}の予定は、まだ聞いていないです。`;
+      const wd = ['日', '月', '火', '水', '木', '金', '土'];
+      const items = inRange.slice(0, 6).map((p) => {
+        const d = new Date(`${p.date}T12:00:00`);
+        return `${d.getMonth() + 1}月${d.getDate()}日（${wd[d.getDay()]}）「${p.text}」`;
+      });
+      return `${wk}の予定は、${items.join('、')}です。`;
+    } catch { return undefined; }
+  }
+
   private upcomingPlansAnswer(prompt: string): string | undefined {
     if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
     if (!/(?:全部|一覧|これから|今後|先の|まとめて)/.test(prompt)) return undefined;
