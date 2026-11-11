@@ -1782,6 +1782,40 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P703 転職は祝って受ける', job703.replyText.includes('おめでとう'), job703.replyText.slice(0, 80));
 }
 
+// ---- 義務の短縮形・極性の取り違え修理（P704） ----
+{
+  const must704 = await conversationCoreService.execute({ prompt: '起きなきゃ' } as any);
+  check('P704 「起きなきゃ」は義務として労う', (must704.replyText.includes('無理しないで') || must704.replyText.includes('応援')) && !must704.replyText.includes('起きの話'), must704.replyText.slice(0, 80));
+  const do704 = await conversationCoreService.execute({ prompt: 'やらなきゃ' } as any);
+  check('P704 「やらなきゃ」は義務として労う', !do704.replyText.includes('やら、'), do704.replyText.slice(0, 80));
+  const sleep704 = await conversationCoreService.execute({ prompt: 'そろそろ寝よっかな' } as any);
+  check('P704 「寝よっかな」は就寝として受ける', sleep704.replyText.includes('おやすみなさい'), sleep704.replyText.slice(0, 80));
+  const later704 = await conversationCoreService.execute({ prompt: 'また後でね' } as any);
+  check('P704 「また後でね」は見送って受ける', later704.replyText.includes('待っています'), later704.replyText.slice(0, 80));
+  const indiff704 = await conversationCoreService.execute({ prompt: 'どうでもいい' } as any);
+  check('P704 単独の「どうでもいい」は軽く受ける', indiff704.replyText.includes('無理に決めなくても'), indiff704.replyText.slice(0, 80));
+  const joy704 = await conversationCoreService.execute({ prompt: 'うれしすぎて泣きそう' } as any);
+  check('P704 嬉し泣きは喜びとして受ける', joy704.replyText.includes('嬉しい涙'), joy704.replyText.slice(0, 80));
+  const laugh704 = await conversationCoreService.execute({ prompt: '笑いすぎてお腹痛い' } as any);
+  check('P704 笑いすぎの痛みは一緒に笑って受ける', laugh704.replyText.includes('笑ったんですか') && !laugh704.replyText.includes('無理しないでくださいね'), laugh704.replyText.slice(0, 80));
+  const mend704 = await conversationCoreService.execute({ prompt: 'めんどくさい' } as any);
+  check('P704 「めんどくさい」は共感で受ける', mend704.replyText.includes('分かります'), mend704.replyText.slice(0, 80));
+  const betsu704 = await conversationCoreService.execute({ prompt: 'べつに' } as any);
+  check('P704 「べつに」は軽く受ける', betsu704.replyText.includes('無理に言わなくて'), betsu704.replyText.slice(0, 80));
+  const maji704 = await conversationCoreService.execute({ prompt: 'まじで？' } as any);
+  check('P704 「まじで？」は驚きとして受ける', maji704.replyText.includes('本当ですよ'), maji704.replyText.slice(0, 80));
+  const sleepy704 = await conversationCoreService.execute({ prompt: 'ねむすぎる' } as any);
+  check('P704 「ねむすぎる」は眠気として労う', sleepy704.replyText.includes('休ん') || sleepy704.replyText.includes('眠'), sleepy704.replyText.slice(0, 80));
+}
+
+// ---- 様子聞きと相手への意見は調査に先行されない（P705） ----
+{
+  const how705 = await conversationCoreService.execute({ prompt: '最近どう？' } as any);
+  check('P705 「最近どう？」は自分の状態で答える', (how705.replyText.includes('元気') || how705.replyText.includes('調子')) && !how705.replyText.includes('スコープ'), how705.replyText.slice(0, 120));
+  const op705 = await conversationCoreService.execute({ prompt: '私のことどう思う？' } as any);
+  check('P705 「私のことどう思う？」は関係で答える', op705.replyText.includes('相方') || op705.replyText.includes('楽しい') || op705.replyText.includes('頼もしい'), op705.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

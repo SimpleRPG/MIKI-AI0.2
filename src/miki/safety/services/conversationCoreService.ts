@@ -500,6 +500,17 @@ export class ConversationCoreService {
 
       // P681: 社交の声かけ（久しぶり・はじめまして・よろしく・
       // 元気出して）は、社交として返す。了承形や反響に化けていた。
+      // P705: 彼女の様子聞き（最近どう？）と相手自身への意見
+      // （僕のことどう思う？）は、調査の未検証提示に先行されると
+      // Webの断片が返ってしまう（「最近」で番組情報が一致した）。
+      // どちらも門の狭い自分の話なので、手前で受ける。
+      const selfStatusEarly = this.selfStatusAnswer(prompt);
+      if (selfStatusEarly) {
+        return this.buildResult('RESOLVED', 'self_status_answer', this.applyPersonaVoice(selfStatusEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      if (/(?:僕|私|おれ|オレ|自分)のこと/.test(prompt) && /(?:どう思う|どう感じる)/.test(prompt)) {
+        return this.buildResult('RESOLVED', 'user_opinion_answer', this.applyPersonaVoice(this.relationshipOpinionAnswer()), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const social = this.socialWarmthAnswer(prompt);
       if (social) {
         return this.buildResult('RESOLVED', 'social_warmth_answer', this.applyPersonaVoice(social), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -1247,7 +1258,9 @@ export class ConversationCoreService {
       const fallthroughLoneliness = userStateTrailService.isLonelinessText(prompt);
       const fallthroughThirst = userStateTrailService.isThirstText(prompt);
       // P591: 痛みも状態として受ける。
-      const fallthroughPain = userStateTrailService.isPainText(prompt);
+      // P704: 「笑いすぎてお腹痛い」の痛みは笑いの文脈。痛みの
+      // 心配でなく、笑いの受け止め（受け皿側）で受ける。
+      const fallthroughPain = userStateTrailService.isPainText(prompt) && !/笑/.test(prompt);
       // P572: 別れ・出発・帰宅の挨拶（宣言文で来た場合）。
       // P603: 「また明日」と寝る宣言も締めに数える。
       const fallthroughClosing = /おやすみ|行ってきます|いってきます|行ってくる|いってくる|ただいま|じゃあね|じゃね|またね|また明日|バイバイ|さようなら|さよなら/.test(prompt)
@@ -1331,6 +1344,21 @@ export class ConversationCoreService {
           // P698: 帰る旨の宣言（「そろそろ帰る」）は、話題の反響で
           // なく見送りで受ける。
           reactionBase = ffx('fx_going_home', ['分かりました。気をつけて帰ってくださいね。', 'お疲れさまでした。帰り道、気をつけてくださいね。'], ['わかった。気をつけて帰ってね！', 'おつかれさま！気をつけてね。']);
+        } else if (/笑/.test(prompt) && /痛/.test(prompt)) {
+          // P704: 笑いすぎての痛みは、心配でなく一緒に笑って受ける。
+          reactionBase = 'そんなに笑ったんですか！何があったのか気になります。';
+        } else if (/寝(?:よっかな|ようかな|よかな|ようか)/.test(prompt)) {
+          // P704: 「そろそろ寝よっかな」は迷いの形の就寝宣言。
+          reactionBase = 'そうですね、そろそろ寝ましょうか。おやすみなさい、いい夢が見られますように。';
+        } else if (/また後でね|後でまた来るね|また来るね|後でまたね/.test(prompt)) {
+          // P704: 一時的に離れる挨拶は見送って受ける。
+          reactionBase = '分かりました、待っていますね。また後で。';
+        } else if (prompt.trim().length <= 10 && /^(?:もう)?(?:めんどくさい|面倒くさい|めんどい)(?:なあ|ね)?[。！!]*$/.test(prompt.trim())) {
+          // P704: 「めんどくさい」の一言は共感で受ける。
+          reactionBase = '分かります、その気持ち。今日は少しでも楽にいきましょう。';
+        } else if (/^べつに[。！!]?$/.test(prompt.trim())) {
+          // P704: 「べつに」の素っ気なさは、追及せず軽く受ける。
+          reactionBase = 'そっか、無理に言わなくて大丈夫ですよ。';
         } else if (/引っ越し|引越し/.test(prompt)) {
           // P703: 引っ越しの報告は労いと関心で受ける。
           reactionBase = '引っ越しですか。荷造りとか大変ですね、新しい場所は楽しみですか？';
@@ -1366,7 +1394,7 @@ export class ConversationCoreService {
         } else if (prompt.trim().length <= 9 && /^(?:もう)?知らない[。！!]?$/.test(prompt.trim())) {
           // P701: 「もう知らない」の拗ねは、謝って受ける。
           reactionBase = ffx('fx_sulk', ['ごめんなさい、怒らせちゃいましたか。機嫌を直してもらえると嬉しいです。', 'え、ごめんなさい。仲直りしてくださいね。'], ['ごめん、怒らせちゃった？機嫌直してね。', 'え、ごめんね。仲直りしてね。']);
-        } else if (prompt.trim().length <= 14 && /(?:しなきゃ|しなくちゃ|しないと(?:ダメ|だめ|いけない)?)[。！!？?ねよ]*$/.test(prompt.trim())) {
+        } else if (prompt.trim().length <= 14 && /(?:なきゃ|なくちゃ|しないと(?:ダメ|だめ|いけない)?)[。！!？?ねよ]*$/.test(prompt.trim())) {
           // P701: 義務のつぶやき（「明日早起きしなきゃ」）は、労って
           // 受ける（短い文に絞り、途中の文は巻き込まない）。
           reactionBase = ffx('fx_obligation', ['大変ですね。無理しないでくださいね。', 'そうですか、頑張ってくださいね。応援しています。'], ['大変だね。無理しないでね。', 'がんばってね。応援してるよ。']);
@@ -1379,6 +1407,11 @@ export class ConversationCoreService {
         } else if (/消えたい|死にたい|いなくなりたい|生まれてこなければ/.test(prompt)) {
           // P598: 強い苦しさの言葉は、汎用の相槌で流さず、まず受け止める。
           reactionBase = ffx('fx_distress', ['話してくれてありがとう。とてもつらい気持ちなんですね。私はここにいますよ。よかったら、少し話を聞かせてください。', 'それはとてもつらいですね。一人で抱え込まないでください。私はそばにいます。しんどさが続くときは、専門の相談先にも頼ってくださいね。'], ['話してくれてありがと。つらいんだね。私はここにいるよ。よかったら話を聞かせて。', 'つらいね。一人で抱え込まないでね。そばにいるよ。']);
+        } else if (prompt.trim().length <= 8 && /^どうでもいい(?:よ|ね)?[。！!]?$/.test(prompt.trim())) {
+          // P704: 単独の「どうでもいい」は絶望の投げやりではなく、
+          // 関心の薄い一言。重く受けず、軽く返す（長い絶望形は下の
+          // giveup が従来どおり受ける）。
+          reactionBase = 'そうですか、まあ無理に決めなくても大丈夫ですよ。';
         } else if (/どうでもいい|全部.*(?:嫌|ダメ|だめ)|もう.*(?:どうでも|ダメだ|だめだ)/.test(prompt)) {
           // P598: 投げやりな気持ちも、主題の反響でなく受ける。
           reactionBase = ffx('fx_giveup', ['そんな日もありますよ。今日はもう無理しなくていいです。ゆっくりしましょう。', '大丈夫、今日は休む日にしてしまいましょう。また明日考えましょう。'], ['そんな日もあるよ。今日はもう無理しないで、ゆっくりしよ。', '大丈夫、今日はお休みの日にしちゃお。また明日考えよ。']);
@@ -1407,6 +1440,10 @@ export class ConversationCoreService {
         } else if (/嫌なこと|嫌な事|ムカつ|むかつ|イライラ|腹が立つ|腹立つ/.test(prompt)) {
           // P613: 愚痴の続きは、寄り添って聞く形で受ける。
           reactionBase = ffx('fx_venting', ['それは嫌な思いをしましたね。よかったら聞かせてください。', '大変でしたね。無理に消化しなくて大丈夫ですよ。'], ['それは嫌な思いしたね。よかったら聞かせて。', '大変だったね。無理しなくて大丈夫だよ。']);
+        } else if (/(?:嬉し|うれし|幸せ|感動)/.test(prompt) && /(?:泣きそう|泣きたい|涙)/.test(prompt)) {
+          // P704: 嬉しさの涙は、悲しみでなく喜びとして受ける
+          // （「うれしすぎて泣きそう」に慰めが返っていた）。
+          reactionBase = '嬉しい涙ですね！よかったですね。';
         } else if (/泣きたい|泣きそう|悲しくて|涙.*出/.test(prompt)) {
           // P593: 泣きたい気持ちは、汎用の相槌で流さない。
           reactionBase = ffx('fx_sad', ['無理しなくて大丈夫ですよ。私はそばにいます。', 'つらいですね。話したくなったら聞きますよ。'], ['無理しなくて大丈夫だよ。そばにいるよ。', 'つらいね。話したくなったら聞くよ。']);
@@ -3077,6 +3114,11 @@ export class ConversationCoreService {
     if (/^(?:元気出して|元気出しな|元気を出して)(?:ね)?$/.test(p)) {
       return 'ありがとうございます、元気出します！声をかけてもらえて、もう少し頑張れそうです。';
     }
+    // P704: 驚きの聞き返し（まじで？・うそ？）は、質問として
+    // 答えられませんにせず、驚きとして受ける。
+    if (/^(?:まじで|マジで|まじ|マジ|うそ|ほんと|本当|本当に|うそでしょ)[？?]*$/.test(String(prompt || '').trim())) {
+      return '本当ですよ。びっくりしましたか？';
+    }
     // P698: 呼びかけだけの発話は、呼びかけとして受ける（「ねえねえ」
     // が反響に、「見て見て」が作業の了承になっていた）。
     if (/^(?:ねえ|ねぇ)+$/.test(p) || /^あのね$/.test(p)) {
@@ -3637,6 +3679,14 @@ export class ConversationCoreService {
   }
 
   /** P591: 彼女自身の様子を聞く雑談（最近どう？／調子どう？）への答え。 */
+  /** P601/P705: 相手自身への意見は関係で答える（共通の受け口）。 */
+  private relationshipOpinionAnswer(): string {
+    return this.notedOpinion('あなた', 'relationship', '', this.pickFixedReply('fx_user_opinion', [
+      'いつも色々な話をしてくれる、大事な相方だと思っています。これからも一緒に色々作っていきたいです。',
+      '話していると楽しいですよ。私にとっては、一緒に考えてくれる頼もしい相手です。',
+    ]));
+  }
+
   private selfStatusAnswer(prompt: string): string | undefined {
     // P694: 彼女自身の状態を直接聞く質問（眠くない？等）にも、
     // 自分の在り方で答える（未検証の受け流しになっていた）。
@@ -3673,10 +3723,7 @@ export class ConversationCoreService {
     // P601: 相手自身への意見（「僕のことどう思う？」）は、知識の
     // 材料ではなく、関係そのもので答える。
     if (/(?:僕|私|おれ|オレ|自分)のこと/.test(prompt)) {
-      return this.notedOpinion('あなた', 'relationship', '', this.pickFixedReply('fx_user_opinion', [
-        'いつも色々な話をしてくれる、大事な相方だと思っています。これからも一緒に色々作っていきたいです。',
-        '話していると楽しいですよ。私にとっては、一緒に考えてくれる頼もしい相手です。',
-      ]));
+      return this.relationshipOpinionAnswer();
     }
     const topic = this.pickReactionTopic(prompt, contentTokens);
     if (!topic) return undefined;
