@@ -436,6 +436,10 @@ export class ConversationCoreService {
       if (planCount) {
         return this.buildResult('RESOLVED', 'plan_count_answer', this.applyPersonaVoice(planCount), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const planWhen = multiPart ? undefined : this.planWhenAnswer(prompt);
+      if (planWhen) {
+        return this.buildResult('RESOLVED', 'plan_when_answer', this.applyPersonaVoice(planWhen), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const clockAnswer = multiPart ? undefined : this.clockCalendarAnswer(prompt);
       if (clockAnswer) {
         return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3877,6 +3881,38 @@ export class ConversationCoreService {
       const [y, mo, da] = String(p.date).split('-').map(Number);
       const wd = '日月火水木金土'[new Date(y, mo - 1, da).getDay()];
       return `次の予定は、${mo}月${da}日（${wd}）の「${p.text}」です。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P785: 「美容院はいつだっけ？」——内容から予定を引き当てて
+   * 日付で答える（時期→内容の planRecall の逆向き）。
+   */
+  private planWhenAnswer(prompt: string): string | undefined {
+    if (!/(?:いつ|何日|何曜日)/.test(prompt)) return undefined;
+    if (!/[？?]/.test(prompt) && !/(?:だっけ|教えて)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
+      if (plans.length === 0) return undefined;
+      const tokens = utteranceFeatureService.analyze(prompt).contentTokens
+        .filter((w: string) => w.length >= 2 && !/^(?:いつ|何日|何曜日|予定|だっけ)$/.test(w));
+      if (tokens.length === 0) return undefined;
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const sorted = [...plans].sort((a, b) => {
+        const au = a.date && a.date >= todayKey ? 0 : 1;
+        const bu = b.date && b.date >= todayKey ? 0 : 1;
+        return au - bu || String(a.date || '').localeCompare(String(b.date || ''));
+      });
+      const hit = sorted.find((p) => tokens.some((w) => p.text.includes(w)));
+      if (!hit) return undefined;
+      if (hit.date) {
+        const [y, mo, da] = hit.date.split('-').map(Number);
+        const wd = '日月火水木金土'[new Date(y, mo - 1, da).getDay()];
+        return `「${hit.text}」は、${mo}月${da}日（${wd}）です。`;
+      }
+      return `「${hit.text}」は、${hit.when}の予定です。`;
     } catch { return undefined; }
   }
 

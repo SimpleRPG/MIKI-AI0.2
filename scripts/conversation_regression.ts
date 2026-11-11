@@ -2779,6 +2779,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P784 予定の件数を答える', /予定は\d+件あります/.test(count783.replyText), count783.replyText.slice(0, 130));
 }
 
+// ---- P785: 内容から予定の日付を引く ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem785: any[] = []; const hist785: any[] = []; let st785: any = undefined;
+  const run785 = async (t: string) => {
+    mem785 = conversationFactIntakeService.intakeFromUserText(t, mem785).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem785, recentMessages: hist785.slice(-8), conversationState: st785 } as any);
+    st785 = r.nextConversationState;
+    hist785.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run785('金曜日に美容院の予定があるよ');
+  const when785 = await run785('美容院はいつだっけ？');
+  check('P785 内容から予定の日付を答える', when785.replyText.includes('美容院') && /（.）です/.test(when785.replyText), when785.replyText.slice(0, 130));
+  await run785('12月3日に結婚式の予定があるよ');
+  const day785 = await run785('結婚式は何日だっけ？');
+  check('P785 明示日付の予定も内容から引ける', day785.replyText.includes('12月3日'), day785.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
