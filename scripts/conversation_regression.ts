@@ -2202,6 +2202,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P732 手がかりが片方だけなら足りないと言う', cmpPartial731.replyText.includes('材料が足りない') || cmpPartial731.replyText.includes('比べ'), cmpPartial731.replyText.slice(0, 130));
 }
 
+// ---- 教わった一覧と最上級（P734/P735） ----
+{
+  const { conversationFactIntakeService: intake734 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem734: any[] = []; const hist734: any[] = []; let st734: any = undefined;
+  const run734 = async (q: string) => {
+    mem734 = intake734.intakeFromUserText(q, mem734).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem734, recentMessages: hist734.slice(-8), conversationState: st734 } as any);
+    st734 = r.nextConversationState;
+    hist734.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const list734 = await run734('今まで僕が教えた生き物、全部言ってみて');
+  check('P734 教わった生き物の一覧を答える', list734.replyText.includes('教わったのは') && list734.replyText.includes('クオッカ') && list734.replyText.includes('ワラルー'), list734.replyText.slice(0, 160));
+  const sup734 = await run734('教えた動物の中で一番大きいのは？');
+  check('P735 一番大きいのは説明の手がかりで答える', sup734.replyText.includes('ワラルー') && sup734.replyText.includes('一番大きい'), sup734.replyText.slice(0, 130));
+  const guess734 = await run734('クオッカってカンガルーの仲間なの？');
+  check('P734 分類の当てずっぽうは候補の語で正す', guess734.replyText.includes('カンガルーじゃなくて') && guess734.replyText.includes('動物の仲間'), guess734.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

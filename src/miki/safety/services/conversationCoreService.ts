@@ -458,6 +458,18 @@ export class ConversationCoreService {
       if (glossCompare && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_comparison_answer', this.applyPersonaVoice(glossCompare), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P734: 「今まで教えた生き物、全部言ってみて」——教わった
+      // 語彙の一覧を、個人辞書の教示記録から答える。
+      const taughtList = this.taughtListAnswer(prompt);
+      if (taughtList && !multiPart) {
+        return this.buildResult('RESOLVED', 'taught_list_answer', this.applyPersonaVoice(taughtList), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P735: 「教えた動物の中で一番大きいのは？」——説明文の
+      // 手がかりで最上級に答える。
+      const superlative = this.glossSuperlativeAnswer(prompt);
+      if (superlative && !multiPart) {
+        return this.buildResult('RESOLVED', 'gloss_superlative_answer', this.applyPersonaVoice(superlative), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P604: 食事の迷いは、一緒に考える形で受ける。
       const dinner = this.dinnerMusingAnswer(prompt);
       if (dinner) {
@@ -2948,6 +2960,71 @@ export class ConversationCoreService {
   }
 
   /**
+   * P734: 「今まで僕が教えた生き物、全部言ってみて」に、個人辞書
+   * の教示記録（user-taught）から一覧で答える。分類の語があれば
+   * その範囲に絞る（説明文か仮の分類に分類語を含むもの）。
+   */
+  private taughtListAnswer(prompt: string): string | undefined {
+    if (!/(?:教えた|教えてくれた|教えてあげた)/.test(prompt)) return undefined;
+    if (!/(?:全部|全て|一覧|言って|挙げて|何を|何が|どんな)/.test(prompt) && !/(?:今まで|これまで)/.test(prompt)) return undefined;
+    try {
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'));
+      if (entries.length === 0) return 'まだ何も教わっていないと思います。';
+      const categoryMatch = prompt.match(/(生き物|動物|鳥|魚|虫|植物|食べ物|飲み物|場所|乗り物|道具)/);
+      let scoped = entries;
+      if (categoryMatch) {
+        const cat = categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1];
+        scoped = entries.filter((e: any) => String(e.gloss).includes(cat)
+          || worldModelGraphService.relationsOf(String(e.surface)).some((r) => r.from === e.surface && r.type === 'IS_A' && r.to === cat));
+        if (scoped.length === 0) return `${categoryMatch[1]}で教わったものは、まだ無いです。`;
+      }
+      const names = scoped.map((e: any) => String(e.surface)).slice(0, 8);
+      const tail = scoped.length > names.length ? 'など' : '';
+      return `あなたに教わったのは、${names.join('と')}${tail}です。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P735: 「教えた動物の中で一番大きいのは？」に、個人辞書の
+   * 説明文の手がかり（大きい・小さい等）で最上級に答える。
+   * 手がかりが同点・皆無なら決められないと正直に言う。
+   */
+  private glossSuperlativeAnswer(prompt: string): string | undefined {
+    if (!/(?:一番|いちばん|最も|もっとも)/.test(prompt)) return undefined;
+    const dims: Array<{ re: RegExp; label: string; plus: RegExp; minus: RegExp; want: 1 | -1 }> = [
+      { re: /大きい/, label: '大きい', plus: /大き|でか/, minus: /小さ|小柄/, want: 1 },
+      { re: /小さい/, label: '小さい', plus: /大き|でか/, minus: /小さ|小柄/, want: -1 },
+      { re: /重い/, label: '重い', plus: /重/, minus: /軽/, want: 1 },
+      { re: /軽い/, label: '軽い', plus: /重/, minus: /軽/, want: -1 },
+      { re: /速い|早い/, label: '速い', plus: /速|俊敏/, minus: /遅|のろ/, want: 1 },
+      { re: /遅い/, label: '遅い', plus: /速|俊敏/, minus: /遅|のろ/, want: -1 },
+    ];
+    const dim = dims.find((d) => d.re.test(prompt));
+    if (!dim) return undefined;
+    try {
+      const categoryMatch = prompt.match(/(生き物|動物|鳥|魚|虫|植物|食べ物|飲み物)/);
+      const cat = categoryMatch ? (categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1]) : '';
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss)
+        .filter((e: any) => !cat || String(e.gloss).includes(cat)
+          || worldModelGraphService.relationsOf(String(e.surface)).some((r) => r.from === e.surface && r.type === 'IS_A' && r.to === cat));
+      if (entries.length === 0) return undefined;
+      const scored = entries.map((e: any) => {
+        const g = String(e.gloss);
+        const cue = dim.plus.test(g) ? 1 : dim.minus.test(g) ? -1 : 0;
+        return { name: String(e.surface), cue: cue * dim.want, taught: Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught') };
+      }).filter((s) => s.cue !== 0);
+      if (scored.length === 0) return `${dim.label}ものの手がかりが説明に無くて、一番は決められないです。`;
+      const top = Math.max(...scored.map((s) => s.cue));
+      const winners = scored.filter((s) => s.cue === top);
+      if (winners.length > 1) return `一番${dim.label}ものは、${winners.map((w) => w.name).join('と')}が同じくらいだと思います。`;
+      const srcNote = winners[0].taught ? '教わった説明の中では' : '覚えている説明の中では';
+      return `${srcNote}、「${winners[0].name}」が一番${dim.label}と思います。`;
+    } catch { return undefined; }
+  }
+
+  /**
    * P616: 知っている物への属性の質問（どこで捕まえられる？/何に使うの？）は、
    * 世界モデルの関係で答える。関係があればそれを使い、無ければ
    * 知っている範囲を添えて正直に言い、UNKNOWN_RELATION の gap として
@@ -3159,7 +3236,7 @@ export class ConversationCoreService {
     if (confirmMatch && /[？?]/.test(prompt) && !/^(?:何|なに|どの|どう|いつ|どこ|だれ|誰)/.test(confirmMatch[2].trim())) {
       const entity = known.find((t) => prompt.startsWith(t) || prompt.includes(`${t}って`) || prompt.includes(`${t}は`));
       if (!entity) return undefined;
-      const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか|よね|でしょ)/.test(t) && !/^(?:じゃ|ない)$/.test(t)).slice(-1)[0];
+      const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか|よね|でしょ)/.test(t) && !/^(?:じゃ|ない|仲間|なかま|種類|一種)$/.test(t)).slice(-1)[0];
       if (!candidate || candidate === entity) return undefined;
       const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
       const targets = relations.map((r) => r.to);
