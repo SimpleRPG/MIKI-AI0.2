@@ -604,15 +604,24 @@ export class ConversationFactIntakeService {
       if (term.length < 2 || term.length > 12) continue;
       if (/^(僕|私|俺|わたし|あなた|君|名前|今日|昨日|明日|これ|それ|あれ|ここ|そこ|天気|時間)$/.test(term)) continue;
       if (/[はがをにへともや、。！？!?「」『』\s]/.test(term)) continue;
-      if (gloss.length < 4 || gloss.length > 60) continue;
+      if (gloss.length > 60) continue;
+      // P755: 「ワラルーは鳥だよ」のような分類だけの教示は、値が
+      // 短くて通常の条件（4文字以上）で落ちていた。分類語その
+      // ものなら、辞書の説明は「〜の一種」の形にして覚え、
+      // 分解には元の分類語を渡す（末尾の分類として拾える）。
+      let dictionaryGloss = gloss;
+      if (gloss.length < 4) {
+        if (!/^(?:動物|鳥|魚|虫|植物|獣|哺乳類|爬虫類|両生類|昆虫|食べ物|飲み物|乗り物|道具|場所|人間|人|花|木|草|犬|猫)$/.test(gloss)) continue;
+        dictionaryGloss = `${gloss}の一種`;
+      }
       if (/^(知らない|わからない|分からない)/.test(gloss)) continue;
       if (!intakeMeaningGuardService.check(String(fact.statement || text)).ok) continue;
       const existing = japaneseDictionaryService.lookup(term);
       if (existing.find((e) => e.gloss)) continue;
-      japaneseDictionaryService.addPersonal(term, { gloss, semanticIds: ['learned:user-taught'] });
+      japaneseDictionaryService.addPersonal(term, { gloss: dictionaryGloss, semanticIds: ['learned:user-taught'] });
       try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
-      try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
-      systemLogger.info('CHAT', `📖 [意味学習] ユーザーの説明文から「${term}」の意味を学びました: ${gloss}`);
+      try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss: dictionaryGloss, at: Date.now() })); } catch { /* 補助経路 */ }
+      systemLogger.info('CHAT', `📖 [意味学習] ユーザーの説明文から「${term}」の意味を学びました: ${dictionaryGloss}`);
       // P726: 説明を分解して、さらに知識を増やす（下のメソッド）。
       try { this.decomposeTaughtGloss(term, gloss, String(fact.statement || `${term}は${gloss}`)); } catch { /* 分解は補助経路 */ }
     }
@@ -918,10 +927,20 @@ export class ConversationFactIntakeService {
           && (String(m.factValue).includes(correctionPair.wrong) || String(m.content || '').includes(correctionPair.wrong))
       );
       if (target) {
-        const newValue = String(target.factValue).split(correctionPair.wrong).join(correctionPair.right);
-        const newStatement = String(target.content || '').includes(correctionPair.wrong)
+        let newValue = String(target.factValue).split(correctionPair.wrong).join(correctionPair.right);
+        // P755: 文の形の訂正（「ワラルーは鳥じゃなくて動物だよ」）では
+        // 間違い（wrong）が文全体で、値はその末尾に埋まっている。
+        // 値の中では置換できないので、値そのものを差し替える。
+        // （従来は値が古いまま残り、文だけが「動物」に化けていた。）
+        if (newValue === String(target.factValue) && correctionPair.wrong.endsWith(String(target.factValue))) {
+          newValue = correctionPair.right;
+        }
+        let newStatement = String(target.content || '').includes(correctionPair.wrong)
           ? String(target.content).split(correctionPair.wrong).join(correctionPair.right)
           : `${target.factEntity || ''}は${newValue}`;
+        if (newStatement === correctionPair.right && target.factEntity) {
+          newStatement = `${target.factEntity}は${newValue}`;
+        }
         facts.push({
           kind: 'attribute',
           category: 'user_fact',

@@ -122,10 +122,30 @@ function collectCandidates(memories: any[], stateSummaries?: string[]): UserFact
   }
   fromMemories.sort((a, b) => b.ts - a.ts);
   const candidates = fromMemories.map((x) => x.cand);
+  // P755: 状態サマリは過去のターンの写しで、訂正で無効化された
+  // 事実の写しが残り続ける（「犬じゃなくて猫」と直しても、犬の
+  // サマリから犬が想起に復活していた）。死んだ事実の文と重なる
+  // サマリ候補は、候補に入れない。
+  const normText = (t: unknown): string => String(t || '').replace(/[。．.\s、,]/g, '');
+  const deadTexts = new Set<string>();
+  for (const m of memories || []) {
+    if (m?.source === 'user_statement' && (m?.active === false || m?.replacedBy)) {
+      for (const t of [m.content, m.summary, (m as any).factSummary]) {
+        const n = normText(t);
+        if (n) deadTexts.add(n);
+      }
+    }
+  }
   const seen = new Set(candidates.map((c) => c.summary));
   for (const s of stateSummaries || []) {
     const cand = candidateFromSummary(String(s));
     if (cand && !seen.has(cand.summary)) {
+      const n = normText(cand.summary);
+      let dead = false;
+      for (const d of deadTexts) {
+        if (n && (n === d || n.includes(d) || d.includes(n))) { dead = true; break; }
+      }
+      if (dead) continue;
       candidates.push(cand);
       seen.add(cand.summary);
     }

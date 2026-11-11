@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4128,
-    "resolvedRelativeImportCandidateCount": 4112,
+    "relativeImportCandidateCount": 4130,
+    "resolvedRelativeImportCandidateCount": 4114,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 229824,
-      "lines": 2439,
-      "sha256": "6e7cbeb322cb36c981a7c6f1b80e71b75d14931d55b578c0c21b04e7f1bc8902",
+      "bytes": 231890,
+      "lines": 2465,
+      "sha256": "b90a6e5686a88fa1a4a66691d72a35f968585055dd38132df610399208bca075",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2456,10 +2456,22 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 2428,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 2429,
+          "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
         }
       ],
-      "relativeImportCandidateCount": 124,
-      "resolvedRelativeImportCount": 124,
+      "relativeImportCandidateCount": 126,
+      "resolvedRelativeImportCount": 126,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -11154,9 +11166,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationFactIntakeService.ts",
-      "bytes": 64838,
-      "lines": 1169,
-      "sha256": "5cb238ecf7907a539118784bd0389391ea8760b16d44a60ab9160664a78d0720",
+      "bytes": 66209,
+      "lines": 1188,
+      "sha256": "d127bb235424e7d19aace8128b2d47ebc3e8031a46b6abf28993b77f4cbb2ad1",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -11908,9 +11920,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationUserFactRecallService.ts",
-      "bytes": 16458,
-      "lines": 329,
-      "sha256": "5b86c344d782a1fa6f70e6fd4d0b269f3d32ae22189a24c9cc6cf3f99cf84beb",
+      "bytes": 17409,
+      "lines": 349,
+      "sha256": "be65d753596cfb0cc8767240648fb43b7d610e43e8b6304f5382c8e04649e3ab",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,

@@ -2423,6 +2423,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P754 数量の断片を主題にしない', !fragment744.replyText.includes('匹飼'), fragment744.replyText.slice(0, 130));
 }
 
+// ---- P755: 分類だけの教示と、文の形の訂正、古いサマリの復活防止 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { worldModelGraphService } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  let mem755: any[] = []; const hist755: any[] = []; let st755: any = undefined;
+  const run755 = async (t: string) => {
+    mem755 = conversationFactIntakeService.intakeFromUserText(t, mem755).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem755, recentMessages: hist755.slice(-8), conversationState: st755 } as any);
+    st755 = r.nextConversationState;
+    hist755.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run755('ツノカゲは鳥だよ');
+  const rels755a = worldModelGraphService.relationsOf('ツノカゲ').filter((r: any) => r.type === 'IS_A').map((r: any) => r.to);
+  check('P755 分類だけの教示でも語と仮関係が付く', rels755a.includes('鳥'), JSON.stringify(rels755a));
+  await run755('違う、ツノカゲは鳥じゃなくて動物だよ');
+  const rels755b = worldModelGraphService.relationsOf('ツノカゲ').filter((r: any) => r.type === 'IS_A').map((r: any) => r.to);
+  check('P755 文の形の訂正で関係が差し替わる', rels755b.includes('動物') && !rels755b.includes('鳥'), JSON.stringify(rels755b));
+  const kind755 = await run755('ツノカゲって何の仲間？');
+  check('P755 訂正後の分類で答える', kind755.replyText.includes('動物'), kind755.replyText.slice(0, 110));
+  await run755('僕は犬を飼ってるよ');
+  await run755('ごめん、犬じゃなくて猫だった');
+  const pets755 = await run755('僕が飼ってる動物なんだっけ？');
+  check('P755 訂正したペットは古いサマリから復活しない', pets755.replyText.includes('猫') && !pets755.replyText.includes('犬'), pets755.replyText.slice(0, 110));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
