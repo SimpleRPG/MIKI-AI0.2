@@ -3092,10 +3092,12 @@ export class ConversationCoreService {
   private glossComparisonAnswer(prompt: string, memories: any[] = []): string | undefined {
     if (!/(?:どっちが|どちらが)/.test(prompt)) return undefined;
     const dims: Array<{ re: RegExp; label: string; adj: string; plus: RegExp; minus: RegExp; plusText: string; minusText: string }> = [
+      // P788: 「背が高い／低い」は大きさの次元で、実測値は身長の事実。
+      { re: /背が高|背が低/, label: '大きさ', adj: '背が高い', plus: /高/, minus: /低/, plusText: '背が高い', minusText: '背が低い' },
       { re: /大き|小さ/, label: '大きさ', adj: '大きい', plus: /大き|でか/, minus: /小さ|小柄/, plusText: '大きい', minusText: '小さい' },
-      { re: /重/, label: '重さ', adj: '重い', plus: /重/, minus: /軽/, plusText: '重い', minusText: '軽い' },
-      { re: /速|早/, label: '速さ', adj: '速い', plus: /速|俊敏/, minus: /遅|のろ/, plusText: '速い', minusText: '遅い' },
-      { re: /長生き|寿命/, label: '寿命', adj: '長生き', plus: /長生き|長寿/, minus: /短命/, plusText: '長生き', minusText: '短命' },
+      { re: /重|軽/, label: '重さ', adj: '重い', plus: /重/, minus: /軽/, plusText: '重い', minusText: '軽い' },
+      { re: /速|早|遅/, label: '速さ', adj: '速い', plus: /速|俊敏/, minus: /遅|のろ/, plusText: '速い', minusText: '遅い' },
+      { re: /長生き|寿命|短命/, label: '寿命', adj: '長生き', plus: /長生き|長寿/, minus: /短命/, plusText: '長生き', minusText: '短命' },
     ];
     const dim = dims.find((d) => d.re.test(prompt));
     if (!dim) return undefined;
@@ -3169,8 +3171,12 @@ export class ConversationCoreService {
         const [x, y] = numEnts;
         if (x.meas && y.meas) {
           if (x.meas.value === y.meas.value) return `「${x.name}」は${x.meas.disp}、「${y.name}」は${y.meas.disp}なので、${dim.label}は同じくらいです。`;
-          const w = x.meas.value > y.meas.value ? x : y;
-          return `「${x.name}」は${x.meas.disp}、「${y.name}」は${y.meas.disp}なので、${w.name}の方が${dim.adj}です。`;
+          // P788: 聞かれた向き（小さい方／軽い方／背が低い方）で答える。
+          const askedMinus = dim.minus.test(prompt) && !dim.plus.test(prompt);
+          const w = askedMinus
+            ? (x.meas.value < y.meas.value ? x : y)
+            : (x.meas.value > y.meas.value ? x : y);
+          return `「${x.name}」は${x.meas.disp}、「${y.name}」は${y.meas.disp}なので、${w.name}の方が${askedMinus ? dim.minusText : dim.plusText}です。`;
         }
         if (x.meas || y.meas) {
           const k = x.meas ? x : y;

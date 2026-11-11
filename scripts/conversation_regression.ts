@@ -2834,6 +2834,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P787 年下も比べる', younger787.replyText.includes('妹の方が年下'), younger787.replyText.slice(0, 130));
 }
 
+// ---- P788: 背の高さ比べと、聞かれた向きでの比較 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem788: any[] = []; const hist788: any[] = []; let st788: any = undefined;
+  const run788 = async (t: string) => {
+    mem788 = conversationFactIntakeService.intakeFromUserText(t, mem788).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem788, recentMessages: hist788.slice(-8), conversationState: st788 } as any);
+    st788 = r.nextConversationState;
+    hist788.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run788('僕の身長は170センチだよ');
+  await run788('妹の身長は155センチだよ');
+  const tall788 = await run788('僕と妹、どっちが背が高い？');
+  check('P788 背が高い方を比べる', tall788.replyText.includes('僕の方が背が高い'), tall788.replyText.slice(0, 130));
+  const short788 = await run788('僕と妹、どっちが背が低い？');
+  check('P788 背が低い方も聞かれた向きで答える', short788.replyText.includes('妹の方が背が低い'), short788.replyText.slice(0, 130));
+  await run788('僕の体重は60キロだよ');
+  await run788('妹の体重は48キロだよ');
+  const light788 = await run788('僕と妹、どっちが軽い？');
+  check('P788 軽い方も比べられる', light788.replyText.includes('妹の方が軽い'), light788.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
