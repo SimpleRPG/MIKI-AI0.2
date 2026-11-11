@@ -2645,6 +2645,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P773 来週の曜日の予定も区別して答える', mon773.replyText.includes('会議'), mon773.replyText.slice(0, 150));
 }
 
+// ---- P774: 明示の日付の予定 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem774: any[] = []; const hist774: any[] = []; let st774: any = undefined;
+  const run774 = async (t: string) => {
+    mem774 = conversationFactIntakeService.intakeFromUserText(t, mem774).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem774, recentMessages: hist774.slice(-8), conversationState: st774 } as any);
+    st774 = r.nextConversationState;
+    hist774.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run774('12月3日に結婚式の予定があるよ');
+  const dec774 = await run774('12月3日の予定は何だっけ？');
+  check('P774 明示の日付の予定を控えて答える', dec774.replyText.includes('結婚式'), dec774.replyText.slice(0, 150));
+  const none774 = await run774('12月4日の予定は何だっけ？');
+  check('P774 予定の無い日は無いと答える', none774.replyText.includes('まだ聞いていない'), none774.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -3667,10 +3667,14 @@ export class ConversationCoreService {
     if (!/[？?]/.test(prompt) && !/(?:だっけ|何)/.test(prompt)) return undefined;
     if (!/(?:だっけ|何|ある|あって|教えて)/.test(prompt)) return undefined;
     // P773: 曜日の予定も聞き返せる（取り込み側と同じ解決規則）。
-    const wdMatch = prompt.match(/(来週の|今週の)?(月|火|水|木|金|土|日)曜日/);
-    const whenRaw = wdMatch
-      ? (wdMatch[1] === '来週の' ? `来週の${wdMatch[2]}曜日` : `${wdMatch[2]}曜日`)
-      : prompt.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+    // P774: 明示の日付（12月3日）を最優先する。
+    const exMatch = prompt.match(/(\d{1,2})月(\d{1,2})日/);
+    const wdMatch = !exMatch ? prompt.match(/(来週の|今週の)?(月|火|水|木|金|土|日)曜日/) : null;
+    const whenRaw = exMatch
+      ? `${Number(exMatch[1])}月${Number(exMatch[2])}日`
+      : wdMatch
+        ? (wdMatch[1] === '来週の' ? `来週の${wdMatch[2]}曜日` : `${wdMatch[2]}曜日`)
+        : prompt.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
     if (!whenRaw) return undefined;
     const when = whenRaw === 'あした' ? '明日' : whenRaw;
     try {
@@ -3683,6 +3687,12 @@ export class ConversationCoreService {
       if (offset >= 0) {
         const d = new Date(Date.now() + offset * 86400000);
         targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      } else if (exMatch) {
+        const fmtD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const nowD = new Date();
+        let cand = new Date(nowD.getFullYear(), Number(exMatch[1]) - 1, Number(exMatch[2]));
+        if (fmtD(cand) < fmtD(nowD)) cand = new Date(nowD.getFullYear() + 1, Number(exMatch[1]) - 1, Number(exMatch[2]));
+        targetDate = fmtD(cand);
       } else if (wdMatch) {
         const target = '日月火水木金土'.indexOf(wdMatch[2]);
         const now = new Date();
@@ -3692,7 +3702,12 @@ export class ConversationCoreService {
         targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       }
       const hits = plans.filter((p) => (p.date && targetDate ? p.date === targetDate : p.when === when));
-      if (hits.length === 0) return undefined;
+      if (hits.length === 0) {
+        // P774: 明示の日付で聞かれたら、その日の予定が無いことを
+        // こちらで答える（彼女自身の予定の話に流さない）。
+        if (exMatch) return `${when}の予定は、まだ聞いていないです。`;
+        return undefined;
+      }
       const texts = [...new Set(hits.map((p) => p.text))].slice(-3);
       return `${when}の予定は、${texts.map((t) => `「${t}」`).join('と')}、と話していましたよ。`;
     } catch { return undefined; }

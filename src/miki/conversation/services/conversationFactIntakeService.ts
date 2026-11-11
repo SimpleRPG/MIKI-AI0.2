@@ -464,7 +464,7 @@ export class ConversationFactIntakeService {
     // 変えた」）は事実の訂正ではない。予定台帳側で処理するので、
     // ここでは訂正として読まない。
     const isPlanChange = /(?:予定|予約|約束)/.test(working) && /(?:変えた|変更)/.test(working)
-      && /(?:明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度|(?:来週の|今週の)?[月火水木金土日]曜日)/.test(working);
+      && /(?:明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度|(?:来週の|今週の)?[月火水木金土日]曜日|\d{1,2}月\d{1,2}日)/.test(working);
     const correction = isPlanChange ? null : working.match(/(?:^|[、。]\s*)(.{1,30}?)(?:じゃなくて|ではなく(?:て)?)[、,]?(.+)$/);
     if (correction) {
       // P708: 「ごめん、犬じゃなくて猫だった」では、誤り側の切り出しに
@@ -815,8 +815,21 @@ export class ConversationFactIntakeService {
    * 分ける。会話側の planRecallAnswer が「明日の予定は？」に
    * この控えから答える。
    */
+  /** P774: 「12月3日」のような明示の日付を解決する（過ぎていれば来年）。 */
+  private planExplicitDate(when: string): string | undefined {
+    const m = when.match(/^(\d{1,2})月(\d{1,2})日$/);
+    if (!m) return undefined;
+    const now = new Date();
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    let cand = new Date(now.getFullYear(), Number(m[1]) - 1, Number(m[2]));
+    if (fmt(cand) < fmt(now)) cand = new Date(now.getFullYear() + 1, Number(m[1]) - 1, Number(m[2]));
+    return fmt(cand);
+  }
+
   /** P772: 時期の語を実際の日付に解決する（今日/明日/明後日のみ）。 */
   private planDateFor(when: string): string | undefined {
+    const explicit = this.planExplicitDate(when);
+    if (explicit) return explicit;
     // P773: 曜日も日付に解決する（直近のその曜日、来週指定は+7）。
     const wd = when.match(/^(来週の)?(月|火|水|木|金|土|日)曜日$/);
     if (wd) {
@@ -839,6 +852,9 @@ export class ConversationFactIntakeService {
 
   /** P773: 発話から時期の語を取り出す（曜日を優先）。 */
   private planWhenOf(t: string): string | undefined {
+    // P774: 明示の日付（12月3日）があればそれを最優先する。
+    const ex = t.match(/(\d{1,2})月(\d{1,2})日/);
+    if (ex) return `${Number(ex[1])}月${Number(ex[2])}日`;
     const wd = t.match(/(来週の|今週の)?(月|火|水|木|金|土|日)曜日/);
     if (wd) return wd[1] === '来週の' ? `来週の${wd[2]}曜日` : `${wd[2]}曜日`;
     const raw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
