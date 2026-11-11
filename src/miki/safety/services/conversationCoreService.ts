@@ -735,7 +735,7 @@ export class ConversationCoreService {
       if (retell) {
         return this.buildResult('RESOLVED', 'recent_topic_retell_answer', this.applyPersonaVoice(retell), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const recap = multiPart ? undefined : this.conversationRecapAnswer(prompt, state);
+      const recap = multiPart ? undefined : this.conversationRecapAnswer(prompt, state, recentMessages);
       if (recap) {
         return this.buildResult('RESOLVED', 'conversation_recap_answer', this.applyPersonaVoice(recap), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -3940,11 +3940,13 @@ export class ConversationCoreService {
     return undefined;
   }
 
-  private conversationRecapAnswer(prompt: string, state?: any): string | undefined {
+  private conversationRecapAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
     // P660: 「さっきの話」だけでは振り返りの合図にしない（「さっきの
     // 話だけど、続きを聞いて」は続きの宣言で、振り返りの質問では
     // ない）。さっき形は、質問の言葉（何・だっけ）を伴う時だけ拾う。
-    if (!/(?:何|なに)の話(?:を)?(?:した|してた|していた)|今日(?:は|に)?(?:何|なに)の話|さっき(?:の)?話(?:は|って)?(?:何|なに|なんだった|だっけ)/.test(prompt)) return undefined;
+    // P725: 「他には何か話した？」も振り返りの続きとして受ける。
+    const isOtherFollowup = /他に/.test(prompt) && /話/.test(prompt);
+    if (!/(?:何|なに)の話(?:を)?(?:した|してた|していた)|今日(?:は|に)?(?:何|なに)の話|さっき(?:の)?話(?:は|って)?(?:何|なに|なんだった|だっけ)/.test(prompt) && !isOtherFollowup) return undefined;
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const parts: string[] = [];
@@ -3961,7 +3963,30 @@ export class ConversationCoreService {
       if (topics.length === 0 && Array.isArray(state?.recentEntities)) {
         topics = (state.recentEntities as string[]).filter((t) => !isJunkTopic(t)).slice(-3);
       }
-      if (topics.length > 0) parts.push(`今日は、${[...new Set(topics)].slice(0, 4).join('と')}の話をしましたね`);
+      // P725: 話題の台帳は教わった話題を全部は拾わない（最初の話題
+      // だけ残ることがあった）。辞書・関係で裏付けられる直近の話題
+      // 候補（P719）で補い、振り返りは話した話題を全部挙げる。
+      try {
+        for (const c of this.recentTopicCandidates(state, recentMessages)) {
+          if (!isJunkTopic(c) && !topics.includes(c)) topics.push(c);
+        }
+      } catch { /* 補完は補助 */ }
+      topics = [...new Set(topics)];
+      // P725: 「他には？」には、直前の自分の振り返りで既に挙げた
+      // 話題を除いた残りを答える。残りが無ければ、その旨を答える。
+      if (isOtherFollowup) {
+        // 既に挙げた話題は、これまでの自分の振り返りの返答すべて
+        // から集める（直前の返答だけ見ると、2回目の「他には？」で
+        // 同じ話題をもう一度挙げてしまう）。
+        const saidTexts = recentMessages
+          .filter((m: any) => m.role === 'assistant')
+          .map((m: any) => String(m.content || m.text || ''))
+          .filter((t) => t.includes('の話をしました'));
+        const rest = topics.filter((t) => !saidTexts.some((s) => s.includes(t)));
+        if (rest.length > 0) return `他には、${rest.slice(0, 4).join('と')}の話をしました。`;
+        return '他は特に話していないです。';
+      }
+      if (topics.length > 0) parts.push(`今日は、${topics.slice(0, 4).join('と')}の話をしましたね`);
       const works = projectNotebookService.listWorkStates().filter((w) => new Date(w.updatedAt).toDateString() === now.toDateString());
       for (const w of works.slice(0, 2)) {
         if (w.current) parts.push(`${w.project}では今、「${w.current}」を作っています`);

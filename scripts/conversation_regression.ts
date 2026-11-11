@@ -2091,6 +2091,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P724 思い出しは訂正後の説明で答える', recall724.replyText.includes('中くらいの大きさ') && !recall724.replyText.includes('小さい動物'), recall724.replyText.slice(0, 130));
 }
 
+// ---- 振り返りの完全性と「他には？」（P725） ----
+{
+  const { conversationFactIntakeService: intake725 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem725: any[] = []; const hist725: any[] = []; let st725: any = undefined;
+  const run725 = async (q: string) => {
+    mem725 = intake725.intakeFromUserText(q, mem725).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem725, recentMessages: hist725.slice(-8), conversationState: st725 } as any);
+    st725 = r.nextConversationState;
+    hist725.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run725('クオッカはオーストラリアに住む小さい動物だよ');
+  await run725('モコロンは綿毛が取れるパルだよ');
+  const recap725 = await run725('さっき何の話してたっけ？');
+  check('P725 振り返りは話した話題を全部挙げる', recap725.replyText.includes('クオッカ') && recap725.replyText.includes('モコロン'), recap725.replyText.slice(0, 130));
+  const other725 = await run725('他には何か話した？');
+  check('P725 他には、には残りか無い旨を答える', other725.replyText.includes('他は特に') || (other725.replyText.includes('他には') && !other725.replyText.includes('クオッカとモコロン')), other725.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
