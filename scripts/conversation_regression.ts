@@ -2468,6 +2468,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P756 未知の相手とは比べられないと正直に言う', unknown756.replyText.includes('ヌマカゲ') && unknown756.replyText.includes('知らない'), unknown756.replyText.slice(0, 130));
 }
 
+// ---- P757: 一番も実測値で決める ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem757: any[] = []; const hist757: any[] = []; let st757: any = undefined;
+  const run757 = async (t: string) => {
+    mem757 = conversationFactIntakeService.intakeFromUserText(t, mem757).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem757, recentMessages: hist757.slice(-8), conversationState: st757 } as any);
+    st757 = r.nextConversationState;
+    hist757.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run757('ミナモは体重が30キロくらいの動物だよ');
+  await run757('カワモは体重が5キロの小さい動物だよ');
+  await run757('オオモは体重が80キロの大きい動物だよ');
+  const heavy757 = await run757('教えた動物の中で一番重いのは？');
+  check('P757 一番重いは実測値で決める', heavy757.replyText.includes('オオモ') && heavy757.replyText.includes('80キロ'), heavy757.replyText.slice(0, 130));
+  const light757 = await run757('教えた動物の中で一番軽いのは？');
+  check('P757 一番軽いも実測値で決める', light757.replyText.includes('カワモ') && light757.replyText.includes('5キロ'), light757.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

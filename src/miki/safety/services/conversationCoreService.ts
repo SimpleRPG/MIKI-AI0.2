@@ -2997,24 +2997,7 @@ export class ConversationCoreService {
     // 相手は教わった語でなくてもよい（「僕とミナモ、どっちが
     // 重い？」——僕の体重は事実の側にある）。
     if ((dim.label === '重さ' || dim.label === '大きさ') && Array.isArray(memories)) {
-      const measureOf = (text: string): { value: number; disp: string } | undefined => {
-        if (!text) return undefined;
-        const pats: Array<{ re: RegExp; f: (n: number) => number }> = dim.label === '重さ'
-          ? [
-              { re: /(\d+(?:\.\d+)?)\s*(?:トン)(?:くらい|ほど)?/, f: (n) => n * 1000 },
-              { re: /(\d+(?:\.\d+)?)\s*(?:キログラム|キロ|kg)(?:くらい|ほど)?/i, f: (n) => n },
-              { re: /(\d+(?:\.\d+)?)\s*(?:グラム|g)(?:くらい|ほど)?/i, f: (n) => n / 1000 },
-            ]
-          : [
-              { re: /(\d+(?:\.\d+)?)\s*(?:メートル|m)(?:くらい|ほど)?/i, f: (n) => n * 100 },
-              { re: /(\d+(?:\.\d+)?)\s*(?:センチメートル|センチ|cm)(?:くらい|ほど)?/i, f: (n) => n },
-            ];
-        for (const p of pats) {
-          const m = String(text).match(p.re);
-          if (m) return { value: p.f(parseFloat(m[1])), disp: m[0] };
-        }
-        return undefined;
-      };
+      const measureOf = (text: string): { value: number; disp: string } | undefined => this.measureFromText(text, dim.label as '重さ' | '大きさ');
       const measureFor = (name: string): { value: number; disp: string } | undefined => {
         const isSelf = name === '僕';
         for (const m of memories) {
@@ -3180,6 +3163,30 @@ export class ConversationCoreService {
    * 説明文の手がかり（大きい・小さい等）で最上級に答える。
    * 手がかりが同点・皆無なら決められないと正直に言う。
    */
+  /**
+   * P757: テキスト（説明・事実の値）から重さ・大きさの実測値を
+   * 抜き出す共有ヘルパー。単位は基準単位（キロ／センチ）に
+   * そろえた数値と、表示用の原文断片を返す。
+   */
+  private measureFromText(text: string, label: '重さ' | '大きさ'): { value: number; disp: string } | undefined {
+    if (!text) return undefined;
+    const pats: Array<{ re: RegExp; f: (n: number) => number }> = label === '重さ'
+      ? [
+          { re: /(\d+(?:\.\d+)?)\s*(?:トン)(?:くらい|ほど)?/, f: (n) => n * 1000 },
+          { re: /(\d+(?:\.\d+)?)\s*(?:キログラム|キロ|kg)(?:くらい|ほど)?/i, f: (n) => n },
+          { re: /(\d+(?:\.\d+)?)\s*(?:グラム|g)(?:くらい|ほど)?/i, f: (n) => n / 1000 },
+        ]
+      : [
+          { re: /(\d+(?:\.\d+)?)\s*(?:メートル|m)(?:くらい|ほど)?/i, f: (n) => n * 100 },
+          { re: /(\d+(?:\.\d+)?)\s*(?:センチメートル|センチ|cm)(?:くらい|ほど)?/i, f: (n) => n },
+        ];
+    for (const p of pats) {
+      const m = String(text).match(p.re);
+      if (m) return { value: p.f(parseFloat(m[1])), disp: m[0] };
+    }
+    return undefined;
+  }
+
   private glossSuperlativeAnswer(prompt: string): string | undefined {
     if (!/(?:一番|いちばん|最も|もっとも)/.test(prompt)) return undefined;
     const dims: Array<{ re: RegExp; label: string; plus: RegExp; minus: RegExp; want: 1 | -1 }> = [
@@ -3199,6 +3206,25 @@ export class ConversationCoreService {
         .filter((e: any) => e.gloss)
         .filter((e: any) => !cat || this.taughtScopeMatch(e, cat));
       if (entries.length === 0) return undefined;
+      // P757: 重さ・大きさは、手がかり語より先に実測値で一番を
+      // 決める（P756の比較と同じ物差し）。数値が1件だけなら、
+      // 一番とは言い切らず、その旨を正直に言う。
+      const measureLabel = dim.label === '重い' || dim.label === '軽い' ? '重さ' : dim.label === '大きい' || dim.label === '小さい' ? '大きさ' : undefined;
+      if (measureLabel) {
+        const measured = entries
+          .map((e: any) => ({ name: String(e.surface), meas: this.measureFromText(String(e.gloss), measureLabel) }))
+          .filter((x) => x.meas);
+        if (measured.length >= 2) {
+          const vals = measured.map((x) => x.meas!.value);
+          const best = dim.want === 1 ? Math.max(...vals) : Math.min(...vals);
+          const tops = measured.filter((x) => x.meas!.value === best);
+          if (tops.length > 1) return `一番${dim.label}ものは、${tops.map((t) => `「${t.name}」（${t.meas!.disp}）`).join('と')}が同じくらいです。`;
+          return `教わった説明の中では、「${tops[0].name}」が一番${dim.label}です（${tops[0].meas!.disp}）。`;
+        }
+        if (measured.length === 1) {
+          return `${measureLabel}の数値が分かっているのは「${measured[0].name}」（${measured[0].meas!.disp}）だけなので、一番${dim.label}ものはまだ決められないです。`;
+        }
+      }
       const scored = entries.map((e: any) => {
         const g = String(e.gloss);
         const cue = dim.plus.test(g) ? 1 : dim.minus.test(g) ? -1 : 0;
