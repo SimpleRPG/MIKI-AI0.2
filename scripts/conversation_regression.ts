@@ -3064,6 +3064,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P800 否定で既存事実が消えて肯定で答えない', !after800.replyText.includes('「170センチ」だよ'), after800.replyText.slice(0, 150));
 }
 
+// ---- P801: 裸の確認の質問（「Xって鳥？」）にも関係で答える ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem801: any[] = []; const hist801: any[] = []; let st801: any = undefined;
+  const run801 = async (t: string) => {
+    mem801 = conversationFactIntakeService.intakeFromUserText(t, mem801).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem801, recentMessages: hist801.slice(-8), conversationState: st801 } as any);
+    st801 = r.nextConversationState;
+    hist801.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run801('タソカゲは鳥じゃないよ、獣だよ');
+  const den801 = await run801('タソカゲって鳥？');
+  check('P801 裸の形でも否定を正す', den801.replyText.includes('鳥じゃなくて') && den801.replyText.includes('獣'), den801.replyText.slice(0, 150));
+  const aff801 = await run801('タソカゲって獣？');
+  check('P801 裸の形でも肯定に答える', aff801.replyText.includes('獣の仲間'), aff801.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

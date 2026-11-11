@@ -4549,7 +4549,15 @@ export class ConversationCoreService {
       } catch { return undefined; }
     }
     // 確認の質問：Xは Y じゃないの？/なの？ に、関係と照らして答える。
-    const confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*(?:じゃないよね|じゃないの|じゃないですか|ではないよね|ではないの|なの|ですか|なのですか|の)[？?]?$/);
+    let confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*(?:じゃないよね|じゃないの|じゃないですか|ではないよね|ではないの|なの|ですか|なのですか|の)[？?]?$/);
+    // P801: 「ホシカゲって獣？」のような裸の形（なの・ですか無し）
+    // も確認の質問。ただし候補が関係先か説明文に出る語の時だけ
+    // 扱う（「可愛い？」のような意見の質問は従来経路に残す）。
+    let bareConfirmForm = false;
+    if (!confirmMatch) {
+      confirmMatch = prompt.match(/(.+?)(?:って|は)\s*(.+?)\s*[？?]$/);
+      bareConfirmForm = !!confirmMatch;
+    }
     // P644: 疑問詞で始まる中身（「何を食べるの？」等）は確認ではなく
     // 属性の質問。確認として扱うと、無関係な知識で「じゃなくて」と
     // 正す崩れになるため、ここでは扱わない。
@@ -4571,6 +4579,14 @@ export class ConversationCoreService {
           if (stem.test(gloss743)) return `はい、教わった説明では「${entity}」は${candidate}そうです。`;
         } catch { /* 補助判定 */ }
         return undefined;
+      }
+      // P801: 裸の形では、候補が関係先か説明文の語の時だけ答える。
+      if (bareConfirmForm) {
+        try {
+          const relTos = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity).map((r) => r.to);
+          const glossText = japaneseDictionaryService.lookup(entity).map((e: any) => String(e.gloss || '')).join(' ');
+          if (!relTos.includes(candidate) && !glossText.includes(candidate)) return undefined;
+        } catch { return undefined; }
       }
       const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
       const targets = relations.map((r) => r.to);
