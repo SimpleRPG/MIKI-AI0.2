@@ -18,7 +18,11 @@ class CompositionalRealizationService{
   const comparison:string[]=[];if(context.comparison){const c=context.comparison;comparison.push(sentence(`${c.leftLabel}は${c.leftPoints.join('、')}`));comparison.push(sentence(`${c.rightLabel}は${c.rightPoints.join('、')}`));if(c.verdict)comparison.push(sentence(c.verdict));decisions.push('SYMMETRIC_COMPARISON');}
   const exceptionClauses=exceptions.map((x,i)=>sentence(`${i===0?'ただし':'加えて'}、${x}`));if(exceptionClauses.length>1)decisions.push('EXCEPTIONS_PRIORITY_SORTED');
   const actionClauses=actions.map(x=>sentence(`次に${x}`));let clauses=[...comparison,...core,...exceptionClauses,...actionClauses];
-  if(target){let seen=false;clauses=clauses.map((x,i)=>{if(!x.includes(target))return x;if(!seen){seen=true;return x;}decisions.push('REPEATED_TARGET_OMITTED');return x.replaceAll(target,i===0?target:'その対象');});}
+  // P702: 「あなたが話していた内容: …」は相手の発言の逐語引用。
+  // 引用の中の語を「その対象」に書き換えると、言ってもいない文を
+  // 引用したことになるため、引用の節は置換の対象からも出現の
+  // 数え上げからも外す（引用は逐語のままが原則）。
+  if(target){let seen=false;clauses=clauses.map((x,i)=>{if(x.includes('あなたが話していた内容'))return x;if(!x.includes(target))return x;if(!seen){seen=true;return x;}decisions.push('REPEATED_TARGET_OMITTED');return x.replaceAll(target,i===0?target:'その対象');});}
   const temperature=context.temperature||'NEUTRAL';if(clauses.length){if(temperature==='WARM'){clauses[0]=`確認したところ、${clauses[0]}`;decisions.push('WARM_TONE');}else if(temperature==='COOL'){clauses[0]=clauses[0].replace(/します。$/,'します。');decisions.push('COOL_TONE');}}
   if(!clauses.length)return{surfaceText:'回答に必要な内容を確定できませんでした。',mode:'TEMPLATE_FALLBACK',clauses:[],paragraphs:[],fallbackReason:'EMPTY_IR',decisions};
   const limit=Math.max(1,context.paragraphSentenceLimit||3);const paragraphs:string[]=[];for(let i=0;i<clauses.length;i+=limit)paragraphs.push(clauses.slice(i,i+limit).join('\n'));if(paragraphs.length>1)decisions.push('PARAGRAPH_PLANNED');

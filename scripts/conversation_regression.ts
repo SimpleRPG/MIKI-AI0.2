@@ -1748,6 +1748,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P701 義務のつぶやきは労って受ける', must.replyText.includes('無理しないで') || must.replyText.includes('応援'), must.replyText.slice(0, 80));
 }
 
+// ---- 想起の根拠引用は逐語のまま（P702） ----
+{
+  const { conversationFactIntakeService: intake702 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem702: any[] = [];
+  const iq702 = intake702.intakeFromUserText('猫の名前はモチだよ、忘れないでね', mem702);
+  mem702 = iq702.updatedMemories;
+  const recall702 = await conversationCoreService.execute({ prompt: '猫の名前なんだっけ？', memories: mem702 } as any);
+  check('P702 根拠の引用が書き換えられない', !recall702.replyText.includes('その対象はモチ') && recall702.replyText.includes('モチ'), recall702.replyText.slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

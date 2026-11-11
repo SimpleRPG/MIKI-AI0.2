@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1803,
     "sourceFileCount": 1356,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1267,
-    "relativeImportCandidateCount": 4076,
-    "resolvedRelativeImportCandidateCount": 4060,
+    "relativeImportCandidateCount": 4077,
+    "resolvedRelativeImportCandidateCount": 4061,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 170242,
-      "lines": 1764,
-      "sha256": "016d2db3d04f0533723dfc0f20596839e0284d2650de72fddee51b89dfa5f595",
+      "bytes": 170935,
+      "lines": 1774,
+      "sha256": "0aff90d7405d29702e43dc14e694f931737dd934b8550f695e3eb5d20e5e366b",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2180,10 +2180,16 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 1753,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
         }
       ],
-      "relativeImportCandidateCount": 78,
-      "resolvedRelativeImportCount": 78,
+      "relativeImportCandidateCount": 79,
+      "resolvedRelativeImportCount": 79,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -10585,9 +10591,9 @@
     },
     {
       "path": "src/miki/conversation/services/compositionalRealizationService.ts",
-      "bytes": 4440,
-      "lines": 28,
-      "sha256": "d021ec46031470ff8b098aee17db935b1e3ea004e539f0ef28581d994ffe28b2",
+      "bytes": 4853,
+      "lines": 32,
+      "sha256": "af5ec4c2a6762310feda85f1bde3807cea22a8c0616eab115a24f5bd76eaaf71",
       "relativeImportCandidates": [
         {
           "line": 1,
