@@ -4381,10 +4381,22 @@ export class ConversationCoreService {
    */
   private decisionRecallAnswer(prompt: string, contentTokens: string[]): string | undefined {
     if (!/(?:決めた|決め事|決まった|仕様)/.test(prompt)) return undefined;
-    if (!/(?:覚えて|何だっけ|なんだっけ|何だった|なんだっけ|思い出)/.test(prompt)) return undefined;
+    if (!/(?:覚えて|何だっけ|なんだっけ|何だった|なんだっけ|思い出|決めたっけ|決まったっけ)/.test(prompt)) return undefined;
     try {
       const keys = (contentTokens || []).filter((t) => (t.length >= 2 || /[一-龠ァ-ヶ]/.test(t)) && !/^(決めた|決め事|決まった|仕様|さっき|覚えて|何だっけ)$/.test(t));
       const decisions = projectNotebookService.listDecisions();
+      // P741: プロジェクト名で聞かれたら（「このゲームの仕様、
+      // 何か決めたっけ？」）、そのプロジェクトの最新の決め事を
+      // 答える。本文のキーワード一致だけだと、決め事の文に
+      // プロジェクト名が含まれない場合に取りこぼしていた。
+      const namedProject = (contentTokens || []).map((t) => projectNotebookService.findProject(t)).find((p) => !!p);
+      if (namedProject) {
+        const scoped = decisions.filter((d) => d.project === namedProject);
+        if (scoped.length > 0) {
+          const latest = scoped[scoped.length - 1];
+          return `覚えています。${namedProject}の決め事で、「${latest.text.slice(0, 90)}」と決めています。`;
+        }
+      }
       // 新しい決め事から探す（「さっき決めた」は直近の決定のはず）。
       const hit = [...decisions].reverse().find((d) => keys.some((k) => d.text.includes(k)));
       if (hit) return `覚えています。${hit.project}の決め事で、「${hit.text.slice(0, 90)}」と決めています。`;

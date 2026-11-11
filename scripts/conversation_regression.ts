@@ -2272,6 +2272,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P740 二択の思い出しは分類から答える', either738.replyText.includes('セツカゲ') && either738.replyText.includes('鳥'), either738.replyText.slice(0, 130));
 }
 
+// ---- なりチャの自然な終わり方・無名プロジェクト（P741） ----
+{
+  const { conversationFactIntakeService: intake741 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { projectNotebookService: nb741 } = await import('../src/miki/memory/services/projectNotebookService');
+  let mem741: any[] = []; const hist741: any[] = []; let st741: any = undefined;
+  const run741 = async (q: string) => {
+    mem741 = intake741.intakeFromUserText(q, mem741).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem741, recentMessages: hist741.slice(-8), conversationState: st741 } as any);
+    st741 = r.nextConversationState;
+    hist741.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run741('なりチャしよう。みきは森の宿屋の主人、僕は旅人ね');
+  const end741 = await run741('やっぱり終わりにしよう');
+  check('P741 役名なしの終わり方でなりチャが終わる', end741.replyText.includes('おしまい') || end741.replyText.includes('お疲れ'), end741.replyText.slice(0, 130));
+  await run741('新しいゲーム作りたいんだけど');
+  check('P741 助詞なしの開始宣言でプロジェクトが立つ', nb741.listProjects().includes('ゲーム') && nb741.currentProject() === 'ゲーム', JSON.stringify(nb741.listProjects()));
+  await run741('鍵は専用の保管庫に入れる仕様にしよう');
+  const recall741 = await run741('このゲームの仕様、何か決めたっけ？');
+  check('P741 無名プロジェクトの決め事を思い出せる', recall741.replyText.includes('覚えています') && recall741.replyText.includes('鍵は専用の保管庫'), recall741.replyText.slice(0, 150));
+  await run741('ケーキ作りたいな');
+  check('P741 日常の作りたいはプロジェクトにならない', !nb741.listProjects().includes('ケーキ'), JSON.stringify(nb741.listProjects()));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

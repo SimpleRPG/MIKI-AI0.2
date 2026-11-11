@@ -308,7 +308,18 @@ export class RoleplaySessionService {
       }
       return undefined;
     }
-    if (/役を(?:やめる|やめたい|やめよう|やめます)|(?:普通|元)に(?:戻って|もどって)/.test(source)) {
+    // P741: 「やっぱり終わりにしよう」のような、役名を言わない
+    // 終わり方も拾う。短い発話（メタな指示らしい形）は即終了、
+    // 長い文は役の中の台詞にも出うるので弱い信号として扱う。
+    if (/(?:終わりに(?:しよう|する|したい)|おしまいに(?:しよう|する)|もう終わりに)/.test(source) && source.trim().length <= 20) {
+      if (this.isActive()) {
+        const ended = this.endSession();
+        this.pendingTransition = { type: 'ended', roleName: ended?.roleName || '', summary: ended?.summary, sourceText: source, at: Date.now() };
+        return 'ended';
+      }
+      return undefined;
+    }
+    if (/役を(?:やめる|やめたい|やめよう|やめます)|(?:普通|元)に(?:戻って|もどって)|(?:終わりに(?:しよう|する|したい)|おしまいに(?:しよう|する))/.test(source)) {
       const session = this.loadSession();
       if (!session) return undefined;
       const beats = session.sceneBeats || 0;
