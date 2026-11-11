@@ -2798,6 +2798,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P785 明示日付の予定も内容から引ける', day785.replyText.includes('12月3日'), day785.replyText.slice(0, 130));
 }
 
+// ---- P786: 次の誕生日で何歳になるか ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem786: any[] = []; const hist786: any[] = []; let st786: any = undefined;
+  const run786 = async (t: string) => {
+    mem786 = conversationFactIntakeService.intakeFromUserText(t, mem786).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem786, recentMessages: hist786.slice(-8), conversationState: st786 } as any);
+    st786 = r.nextConversationState;
+    hist786.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run786('僕の年齢は25歳だよ');
+  await run786('僕の誕生日は3月5日だよ');
+  const age786 = await run786('次の誕生日で何歳になる？');
+  check('P786 次の誕生日の年齢を答える', age786.replyText.includes('3月5日') && age786.replyText.includes('26歳'), age786.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

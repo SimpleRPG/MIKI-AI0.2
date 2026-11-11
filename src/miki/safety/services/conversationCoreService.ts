@@ -424,6 +424,10 @@ export class ConversationCoreService {
       if (upcomingPlans) {
         return this.buildResult('RESOLVED', 'upcoming_plans_answer', this.applyPersonaVoice(upcomingPlans), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      const nextBdayAge = multiPart ? undefined : this.nextBirthdayAgeAnswer(prompt, memories);
+      if (nextBdayAge) {
+        return this.buildResult('RESOLVED', 'next_birthday_age_answer', this.applyPersonaVoice(nextBdayAge), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const planCountdown = multiPart ? undefined : this.planCountdownAnswer(prompt, memories);
       if (planCountdown) {
         return this.buildResult('RESOLVED', 'plan_countdown_answer', this.applyPersonaVoice(planCountdown), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3817,6 +3821,27 @@ export class ConversationCoreService {
       const items = upcoming.slice(0, 6).map((p) => `${label(String(p.date))}「${p.text}」`);
       const tail = upcoming.length > 6 ? '、ほかにもあります' : '';
       return `これからの予定は、${items.join('、')}です${tail}。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P786: 「次の誕生日で何歳になる？」——今の年齢の事実から+1で、
+   * 誕生日の月日が分かれば添えて答える。
+   */
+  private nextBirthdayAgeAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/(?:次の誕生日|来年の誕生日|今度の誕生日|誕生日.*何歳)/.test(prompt)) return undefined;
+    if (!/何歳/.test(prompt)) return undefined;
+    try {
+      const ageFact = (memories || []).find((m: any) => m && m.active !== false && !m.replacedBy
+        && String(m.factAttribute || '') === '年齢' && /\d/.test(String(m.factValue || '')));
+      if (!ageFact) return undefined;
+      const age = Number(String(ageFact.factValue).match(/(\d+)/)?.[1]);
+      if (!Number.isFinite(age)) return undefined;
+      const bdayFact = (memories || []).find((m: any) => m && m.active !== false && !m.replacedBy
+        && String(m.factAttribute || '') === '誕生日' && String(m.factValue || ''));
+      const dm = bdayFact ? String(bdayFact.factValue).match(/(\d{1,2})月(\d{1,2})日/) : null;
+      if (dm) return `次の誕生日（${Number(dm[1])}月${Number(dm[2])}日）で${age + 1}歳になります。`;
+      return `次の誕生日で${age + 1}歳になります。`;
     } catch { return undefined; }
   }
 
