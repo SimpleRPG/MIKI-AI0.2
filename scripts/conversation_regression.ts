@@ -2417,6 +2417,10 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   await run744('やっぱり明日の歯医者はキャンセルしたよ');
   const planAfterCancel744 = await run744('明日の予定って何だっけ？');
   check('P753 キャンセルした予定は答えず、残りは答える', !planAfterCancel744.replyText.includes('歯医者') && planAfterCancel744.replyText.includes('ご飯'), planAfterCancel744.replyText.slice(0, 130));
+  const planTime744 = await run744('明日の予定、何時からだっけ？');
+  check('P754 予定の時刻の聞き返しは現在時刻で答えない', planTime744.replyText.includes('ご飯') && !planTime744.replyText.includes('今は'), planTime744.replyText.slice(0, 130));
+  const fragment744 = await run744('僕は猫を2匹飼ってるよ');
+  check('P754 数量の断片を主題にしない', !fragment744.replyText.includes('匹飼'), fragment744.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----

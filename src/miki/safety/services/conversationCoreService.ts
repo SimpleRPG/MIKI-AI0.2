@@ -401,6 +401,13 @@ export class ConversationCoreService {
       if (selfAnswer) {
         return this.buildResult('RESOLVED', 'self_question_answer', selfAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P754: 「明日の予定、何時からだっけ？」は現在時刻の質問では
+      // なく予定の聞き返し。時計の即答より先に予定の控えを見る
+      // （控えに無い時は従来どおり時計が受ける）。
+      const planRecallEarly = multiPart ? undefined : this.planRecallAnswer(prompt);
+      if (planRecallEarly) {
+        return this.buildResult('RESOLVED', 'plan_recall_answer', this.applyPersonaVoice(planRecallEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const clockAnswer = multiPart ? undefined : this.clockCalendarAnswer(prompt);
       if (clockAnswer) {
         return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -534,14 +541,8 @@ export class ConversationCoreService {
       if (recentLearning) {
         return this.buildResult('RESOLVED', 'recent_learning_answer', this.applyPersonaVoice(recentLearning), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      // P752: 「明日の予定って何だっけ？」——話してくれた予定の
-      // 控えから答える（彼女自身の予定の受け口P614より先に、
-      // 本人が話した予定を優先する）。
-      const planRecall = this.planRecallAnswer(prompt);
-      if (planRecall && !multiPart) {
-        return this.buildResult('RESOLVED', 'plan_recall_answer', this.applyPersonaVoice(planRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
-      }
       // P614: 彼女の能力・予定への質問は、自分の現状から答える。
+      // （予定の聞き返しは P754 で時計より前に受けている。）
       const ability = this.abilityQuestionAnswer(prompt);
       if (ability) {
         return this.buildResult('RESOLVED', 'ability_question_answer', this.applyPersonaVoice(ability), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3273,7 +3274,7 @@ export class ConversationCoreService {
     // 予定を話す文そのもの（「〜予約があるんだ」）は聞き返しでは
     // ない。疑問の形の時だけ受ける。
     if (!/[？?]/.test(prompt) && !/(?:だっけ|何)/.test(prompt)) return undefined;
-    if (!/(?:何だっけ|何だった|なんだっけ|ある|あって|教えて|何か)/.test(prompt)) return undefined;
+    if (!/(?:だっけ|何|ある|あって|教えて)/.test(prompt)) return undefined;
     const whenRaw = prompt.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
     if (!whenRaw) return undefined;
     const when = whenRaw === 'あした' ? '明日' : whenRaw;
@@ -5121,7 +5122,13 @@ export class ConversationCoreService {
     // P716: 自分たちの名前（みき／ビービー）は呼びかけであって
     // 主題ではない（「おはよう、ビービー」が「ビービーの話だね」に
     // なっていた）。
-    const candidates = (contentTokens || []).filter((t) => t.length >= 2 && t !== 'ビービー' && t !== 'みき' && !stop.test(t) && !isBackchannelText(t) && !verbFragment.test(t) && !numericUnit(t));
+    // P754: 助数詞で始まる候補（「2匹飼ってる」の「匹飼」）は数量の
+    // 断片。辞書にある語（人間・時間など）は主題になりうるので残す。
+    const counterStart = (t: string): boolean => {
+      if (!/^[匹頭羽個本枚台冊件回分秒日月年歳才円]/.test(t)) return false;
+      try { return japaneseDictionaryService.lookup(t).length === 0; } catch { return false; }
+    };
+    const candidates = (contentTokens || []).filter((t) => t.length >= 2 && t !== 'ビービー' && t !== 'みき' && !stop.test(t) && !isBackchannelText(t) && !counterStart(t) && !verbFragment.test(t) && !numericUnit(t));
     // 断片らしさを採点する: 活用の語幹・複合語の途中・「〜たい」の
     // 形は主題にしない。助詞や文頭の後ろにある語を優先する。
     const score = (t: string): number => {
@@ -5137,6 +5144,9 @@ export class ConversationCoreService {
       if (/^[ァ-ヶー]/.test(after)) return -1;
       const before = i > 0 ? prompt[i - 1] : '';
       if (before && /[ぁ-ん]/.test(before)) return -1;
+      // P754: 数字の直後の候補（「15時に」の「時に」）は、時刻・
+      // 数量の断片であって主題ではない。
+      if (before && /[0-9０-９]/.test(before)) return -1;
       if (before && /[はがをにのへとや、。・「」\s]/.test(before)) return 2;
       return 1;
     };
