@@ -522,7 +522,7 @@ export class ConversationCoreService {
         return this.buildResult('RESOLVED', 'recipe_askback_answer', this.applyPersonaVoice(recipeAsk), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P616: 知っている物への属性の質問は、世界モデルの関係で答える。
-      const attribute = this.attributeQuestionAnswer(prompt, state, recentMessages);
+      const attribute = this.attributeQuestionAnswer(prompt, state, recentMessages, memories);
       if (attribute) {
         return this.buildResult('RESOLVED', 'attribute_question_answer', this.applyPersonaVoice(attribute), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -3137,7 +3137,7 @@ export class ConversationCoreService {
    * 知っている範囲を添えて正直に言い、UNKNOWN_RELATION の gap として
    * 背景調査に積む（定義だけ返す／答えられない、で終わらせない）。
    */
-  private attributeQuestionAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
+  private attributeQuestionAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = [], memories: any[] = []): string | undefined {
     // P622: 関係の種類ごとの属性（PART_OF / CAUSES / ENABLES）も、
     // 世界モデルの関係で答えられる範囲を広げる。
     const specific = this.specificRelationAnswer(prompt);
@@ -3187,6 +3187,13 @@ export class ConversationCoreService {
     // P724: 食性の質問も属性として受ける。ここで受けないと定義の
     // 説明文が「何食べるの？」への答えとして出てしまっていた。
     else if (/(?:何を食べ|何食べ|何を食|何が餌|餌は何|食べ物は何)/.test(prompt)) attrLabel = '食べ物';
+    // P743: 数値で聞かれる属性（重さ・大きさ・寿命）も受ける。
+    // 答えは教わった事実と説明文の中の数値から引く（下の処理）。
+    // 教示文（「体重が5キロだよ」）まで質問と誤認しないよう、
+    // 質問の形の時だけ受ける。
+    else if (/(?:何キロ|何グラム|重さ|体重)/.test(prompt) && /(?:[？?]|何キロ|何グラム|だっけ)/.test(prompt)) attrLabel = '重さ';
+    else if (/(?:何センチ|何メートル|体長|全長|長さ|大きさ)/.test(prompt) && /(?:[？?]|何センチ|何メートル|だっけ)/.test(prompt)) attrLabel = '大きさ';
+    else if (/(?:寿命|何年生き|何歳まで生き)/.test(prompt) && /(?:[？?]|何年|だっけ)/.test(prompt)) attrLabel = '寿命';
     else if (/(?:どうやって|どうすれば|どのように)/.test(prompt)) attrLabel = 'やり方';
     if (!attrLabel) return undefined;
     let entity: string | undefined;
@@ -3216,6 +3223,27 @@ export class ConversationCoreService {
         if (cand) entity = cand;
       } catch { /* 話題の解決は補助経路 */ }
     }
+    // P743: 重さ・大きさ・寿命は、教わった事実（訂正が効く側）と
+    // 説明文の中の数値で答える。「5キロじゃなくて4キロ」と
+    // 訂正されたら、答えも4キロになる。
+    if (attrLabel === '重さ' || attrLabel === '大きさ' || attrLabel === '寿命') {
+      const unitRe: Record<string, RegExp> = {
+        '重さ': /(\d+(?:\.\d+)?\s*(?:キログラム|キロ|グラム|トン|kg|g)(?:くらい|ほど)?)/,
+        '大きさ': /(\d+(?:\.\d+)?\s*(?:センチメートル|センチ|メートル|cm|m)(?:くらい|ほど)?)/,
+        '寿命': /(\d+(?:\.\d+)?\s*(?:年|歳)(?:くらい|ほど)?)/,
+      };
+      const re = unitRe[attrLabel];
+      try {
+        for (const m of (memories || [])) {
+          if (String((m as any).factEntity || '') !== entity || (m as any).active === false) continue;
+          const hit = String((m as any).factValue || (m as any).content || '').match(re);
+          if (hit) return `教わった話では、「${entity}」は${hit[1]}だそうです。`;
+        }
+        const gloss = japaneseDictionaryService.lookup(entity).map((e: any) => String(e.gloss || '')).join(' ');
+        const gHit = gloss.match(re);
+        if (gHit) return `教わった説明では、「${entity}」は${gHit[1]}だそうです。`;
+      } catch { /* 数値の読み取りは補助経路 */ }
+    }
     const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
     const usedFor = relations.filter((r) => r.type === 'USED_FOR');
     if (isUse && usedFor.length > 0) {
@@ -3232,6 +3260,9 @@ export class ConversationCoreService {
         '場所': ['生息', '住ん', '棲ん'],
         '使い道': ['使わ', '使え', '用い', '役立'],
         '食べ物': ['食べ', '食'],
+        '重さ': ['重', 'キロ', 'グラム', '体重'],
+        '大きさ': ['大き', '小さ', 'センチ', 'メートル', '体長'],
+        '寿命': ['寿命', '生き', '年'],
       };
       const keys = keywords[attrLabel];
       if (keys) {
@@ -3249,6 +3280,9 @@ export class ConversationCoreService {
         '場所': ['生息', '住ん', '住む', '棲ん', '棲む'],
         '使い道': ['使わ', '使え', '用い', '役立'],
         '食べ物': ['食べ', '食', '餌', '草食', '肉食'],
+        '重さ': ['キロ', 'グラム', '重', '体重'],
+        '大きさ': ['大き', '小さ', 'センチ', 'メートル', '体長'],
+        '寿命': ['寿命', '年', '歳', '生き'],
       };
       const gk = glossKeys[attrLabel];
       if (gk) {
@@ -3355,7 +3389,7 @@ export class ConversationCoreService {
     // P644: 疑問詞で始まる中身（「何を食べるの？」等）は確認ではなく
     // 属性の質問。確認として扱うと、無関係な知識で「じゃなくて」と
     // 正す崩れになるため、ここでは扱わない。
-    if (confirmMatch && /[？?]/.test(prompt) && !/^(?:何|なに|どの|どう|いつ|どこ|だれ|誰)/.test(confirmMatch[2].trim())) {
+    if (confirmMatch && /[？?]/.test(prompt) && !/^(?:何|なに|どの|どう|いつ|どこ|だれ|誰)/.test(confirmMatch[2].trim()) && !/(?:なんで|どうして|なぜ)/.test(prompt)) {
       const entity = known.find((t) => prompt.startsWith(t) || prompt.includes(`${t}って`) || prompt.includes(`${t}は`));
       if (!entity) return undefined;
       const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか|よね|でしょ)/.test(t) && !/^(?:じゃ|ない|仲間|なかま|種類|一種)$/.test(t) && !/^[性化用型感力]$/.test(t)).slice(-1)[0];
@@ -3364,6 +3398,16 @@ export class ConversationCoreService {
       // 関係では肯定も否定もできない。「性じゃなくて」のような
       // 崩れや、根拠のない同意をしないよう、ここでは扱わない。
       const candidateIsProperty = /^(?:肉食|草食|雑食|夜行|昼行|温厚|凶暴|臆病|活発|おとなしい|大人しい|人懐っこい)$/.test(candidate);
+      // P743: 大きさの形容詞（大きい・小さい）が候補の時は、
+      // 説明文に手がかりがあれば肯定し、無ければ正さずに引く。
+      if (candidate === '大きい' || candidate === '小さい') {
+        try {
+          const gloss743 = japaneseDictionaryService.lookup(entity).map((e: any) => String(e.gloss || '')).join(' ');
+          const stem = candidate === '大きい' ? /大き|でか/ : /小さ|小柄/;
+          if (stem.test(gloss743)) return `はい、教わった説明では「${entity}」は${candidate}そうです。`;
+        } catch { /* 補助判定 */ }
+        return undefined;
+      }
       const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
       const targets = relations.map((r) => r.to);
       // P729: 否定の確認（「〜じゃないよね？」）は、相手の見立てが

@@ -888,10 +888,12 @@ check('P616 場所は知らない範囲を添えて正直に答える', attrPlac
 {
   const { storageService } = await import('../src/services/storageService');
   storageService.setItem('miki_unanswered_questions_v1', '[]');
-  await conversationCoreService.execute({ prompt: 'クオッカの寿命はどのくらい？' } as any);
-  await conversationCoreService.execute({ prompt: 'クオッカの寿命はどのくらい？' } as any);
+  // P743: 寿命は知識（Claim）から答えられるようになったため、
+  // 台帳の検証には本当に答えられない質問（握力）を使う。
+  await conversationCoreService.execute({ prompt: 'クオッカの握力はどのくらい？' } as any);
+  await conversationCoreService.execute({ prompt: 'クオッカの握力はどのくらい？' } as any);
   const ledger = JSON.parse(storageService.getItem('miki_unanswered_questions_v1') || '[]') as Array<{ question: string }>;
-  check('P617 答えられなかった質問が台帳に残る（重複なし）', ledger.filter((e) => e.question.includes('クオッカの寿命')).length === 1, JSON.stringify(ledger).slice(0, 160));
+  check('P617 答えられなかった質問が台帳に残る（重複なし）', ledger.filter((e) => e.question.includes('クオッカの握力')).length === 1, JSON.stringify(ledger).slice(0, 160));
 }
 
 // ---- 分類・確認・類似の質問（P618） ----
@@ -2326,6 +2328,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   const resume742 = await run742('前回のなりチャの続きしよう');
   check('P742 前回のなりチャを再開できる', resume742.replyText.includes('星の港の案内人') && rp742.isActive(), resume742.replyText.slice(0, 140));
   await run742('なりチャ終わり');
+}
+
+// ---- 数値の属性・理由の質問・大きさの確認（P743） ----
+{
+  const { conversationFactIntakeService: intake743 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem743: any[] = []; const hist743: any[] = []; let st743: any = undefined;
+  const run743 = async (q: string) => {
+    mem743 = intake743.intakeFromUserText(q, mem743).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem743, recentMessages: hist743.slice(-8), conversationState: st743 } as any);
+    st743 = r.nextConversationState;
+    hist743.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run743('カゼカゲは高原に住む小さい鳥だよ');
+  await run743('オオカゲは高原に住む大きな鳥だよ');
+  const why743 = await run743('なんでオオカゲは大きいの？');
+  check('P743 理由の質問を分類で正さない', !why743.replyText.includes('じゃなくて'), why743.replyText.slice(0, 130));
+  const big743 = await run743('オオカゲって大きいの？');
+  check('P743 大きさの確認は説明の手がかりで肯定する', big743.replyText.includes('大きいそうです'), big743.replyText.slice(0, 130));
+  const teach743 = await run743('カゼカゲは体重が5キロくらいだよ');
+  check('P743 数値の教示は質問と誤認しない', !teach743.replyText.includes('だそうです'), teach743.replyText.slice(0, 130));
+  const ask743 = await run743('カゼカゲって何キロくらい？');
+  check('P743 教わった重さを答える', ask743.replyText.includes('5キロ'), ask743.replyText.slice(0, 130));
+  await run743('ごめん、5キロじゃなくて4キロだった');
+  const ask2743 = await run743('カゼカゲって何キロくらいだっけ？');
+  check('P743 訂正した重さで答える', ask2743.replyText.includes('4キロ') && !ask2743.replyText.includes('5キロ'), ask2743.replyText.slice(0, 130));
+  const none743 = await run743('オオカゲって何キロくらい？');
+  check('P743 知らない重さは正直に言う', none743.replyText.includes('重さはまだ知らない'), none743.replyText.slice(0, 130));
 }
 
 // ---- 結果 ----
