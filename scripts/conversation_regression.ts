@@ -1758,6 +1758,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P702 根拠の引用が書き換えられない', !recall702.replyText.includes('その対象はモチ') && recall702.replyText.includes('モチ'), recall702.replyText.slice(0, 200));
 }
 
+// ---- 食事の挨拶・気遣い・評価の間投詞・節目（P703） ----
+{
+  const meal703 = await conversationCoreService.execute({ prompt: 'いただきます' } as any);
+  check('P703 いただきますは食事の挨拶として受ける', meal703.replyText.includes('召し上がって'), meal703.replyText.slice(0, 80));
+  const cheers703 = await conversationCoreService.execute({ prompt: '乾杯' } as any);
+  check('P703 乾杯は一緒に乾杯する', cheers703.replyText.includes('かんぱーい'), cheers703.replyText.slice(0, 80));
+  const cheer703 = await conversationCoreService.execute({ prompt: 'がんばってね' } as any);
+  check('P703 「がんばってね」は応援として受け取る', cheer703.replyText.includes('がんばります') && !cheer703.replyText.includes('がん、'), cheer703.replyText.slice(0, 80));
+  const care703 = await conversationCoreService.execute({ prompt: '無理しないでね' } as any);
+  check('P703 「無理しないでね」は気遣いとして受け取る', care703.replyText.includes('無理しないようにします'), care703.replyText.slice(0, 80));
+  const yoroshiku703 = await conversationCoreService.execute({ prompt: 'よろしく頼むね' } as any);
+  check('P703 「よろしく頼むね」は挨拶として返す', yoroshiku703.replyText.includes('よろしくお願いします'), yoroshiku703.replyText.slice(0, 80));
+  const pity703 = await conversationCoreService.execute({ prompt: 'かわいそう' } as any);
+  check('P703 「かわいそう」は共感で受ける', pity703.replyText.includes('かわいそうですね'), pity703.replyText.slice(0, 80));
+  const resign703 = await conversationCoreService.execute({ prompt: 'しょうがないね' } as any);
+  check('P703 「しょうがないね」は共感で受ける', resign703.replyText.includes('しょうがないですね') && !resign703.replyText.includes('しょう、'), resign703.replyText.slice(0, 80));
+  const move703 = await conversationCoreService.execute({ prompt: '引っ越しする' } as any);
+  check('P703 引っ越しは労いで受ける', move703.replyText.includes('大変ですね'), move703.replyText.slice(0, 80));
+  const diet703 = await conversationCoreService.execute({ prompt: '今日からダイエットする' } as any);
+  check('P703 決意の宣言は応援で受ける', diet703.replyText.includes('応援しています'), diet703.replyText.slice(0, 80));
+  const job703 = await conversationCoreService.execute({ prompt: '転職した' } as any);
+  check('P703 転職は祝って受ける', job703.replyText.includes('おめでとう'), job703.replyText.slice(0, 80));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
