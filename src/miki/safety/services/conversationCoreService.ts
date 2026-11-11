@@ -713,6 +713,14 @@ export class ConversationCoreService {
           return this.buildResult('RESOLVED', 'name_unknown_answer', this.applyPersonaVoice(nameUnknown), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
         }
       }
+      const recentName = multiPart ? undefined : this.recentTopicNameAnswer(prompt, state, recentMessages);
+      if (recentName) {
+        return this.buildResult('RESOLVED', 'recent_topic_name_answer', this.applyPersonaVoice(recentName), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const retell = multiPart ? undefined : this.recentTopicRetellAnswer(prompt, state, recentMessages);
+      if (retell) {
+        return this.buildResult('RESOLVED', 'recent_topic_retell_answer', this.applyPersonaVoice(retell), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const recap = multiPart ? undefined : this.conversationRecapAnswer(prompt, state);
       if (recap) {
         return this.buildResult('RESOLVED', 'conversation_recap_answer', this.applyPersonaVoice(recap), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3354,6 +3362,9 @@ export class ConversationCoreService {
   }
 
   private ownLastUtteranceAnswer(prompt: string, recentMessages: ChatMessage[]): string | undefined {
+    // P719: 「（話題）の話、もう一回教えて」は発言の反復ではなく
+    // 話題の再説明の依頼。反復の受け口では扱わない。
+    if (/の話[、,]?\s*(?:もう一回|もう一度)/.test(prompt)) return undefined;
     const asksRepeat = /(?:もう一回|もう一度)(?:言って|教えて|お願い)/.test(prompt)
       || /(?:聞き取れなかった|聞き逃した)/.test(prompt);
     const asksRecall = /(?:さっき|今)(?:僕|私|おれ|俺|自分)?(?:は|の)?(?:何て|なんて|何を|なにを)?(?:言った|言ってた|言いました)/.test(prompt);
@@ -3745,6 +3756,87 @@ export class ConversationCoreService {
   }
 
   /** P597: 「今日何の話をしたっけ？」に、開いた話題と作業状態から答える（P212 と同じ材料）。 */
+  /**
+   * P719: 「さっきの動物の名前、なんだっけ？」——直近の話題の名前の
+   * 聞き返しには、会話状態の直近の実体から答える。カテゴリの言葉
+   * （動物・鳥など）があれば、そのカテゴリに合う実体を優先する。
+   * 本人や相手の名前の聞き返しは、それぞれの想起側の領分。
+   */
+  /**
+   * P719: 直近の話題の候補。会話状態の実体記録は文まるごとや断片が
+   * 混ざることがあるため、辞書・関係で裏付けられる語だけに絞る。
+   * 直近のユーザー発話の内容語も同じ基準で拾い、新しい順に並べる。
+   */
+  private recentTopicCandidates(state?: any, recentMessages: ChatMessage[] = []): string[] {
+    const valid = (t: unknown): t is string => {
+      if (typeof t !== 'string' || t.length < 2 || t.length > 12) return false;
+      if (/[、。！？!?\s]/.test(t)) return false;
+      try {
+        return japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0;
+      } catch { return false; }
+    };
+    const pool: string[] = [];
+    for (const m of [...recentMessages].reverse()) {
+      if ((m as any).role !== 'user') continue;
+      const text = String((m as any).content || (m as any).text || '');
+      if (!text) continue;
+      try {
+        for (const t of utteranceFeatureService.analyze(text).contentTokens) {
+          if (valid(t) && !pool.includes(t)) pool.push(t);
+        }
+      } catch { /* 補助経路 */ }
+      if (pool.length >= 6) break;
+    }
+    const entities: string[] = Array.isArray(state?.recentEntities) ? state.recentEntities : [];
+    for (const t of [...entities].reverse()) {
+      if (valid(t) && !pool.includes(t)) pool.push(t);
+    }
+    if (valid(state?.currentTopic) && !pool.includes(state.currentTopic)) pool.unshift(state.currentTopic);
+    return pool;
+  }
+
+  private recentTopicNameAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
+    if (/(?:僕|私|俺|わたし|あなた|君)の名前/.test(prompt)) return undefined;
+    if (!/(?:さっき|今の|その|あの|この)/.test(prompt)) return undefined;
+    if (!/(?:名前|なんていう|何だっけ|なんだっけ|何だった|なんだった)/.test(prompt)) return undefined;
+    const pool = this.recentTopicCandidates(state, recentMessages);
+    if (pool.length === 0) return undefined;
+    const category = prompt.match(/(動物|鳥|魚|虫|花|木|植物|食べ物|飲み物|場所|お店|店|車|本|映画|ゲーム)/)?.[1];
+    let pick = pool[0];
+    if (category) {
+      const matched = pool.find((t) => {
+        try {
+          const gloss = japaneseDictionaryService.lookup(t).map((e: any) => String(e.gloss || '')).join(' ');
+          const isA = worldModelGraphService.relationsOf(t).filter((r) => r.from === t && r.type === 'IS_A').map((r) => r.to);
+          return gloss.includes(category) || isA.some((x) => x.includes(category));
+        } catch { return false; }
+      });
+      if (matched) pick = matched;
+    }
+    return `さっき話していたのは「${pick}」だよ。`;
+  }
+
+  /**
+   * P719: 「今の動物の話、もう一回教えて」——直近の話題の再説明は、
+   * 知っている内容（教わった説明・検証済みの知識）をもう一度語る。
+   * ここで受けないと調査側が話題と関係ない Web の断片を持ってくる。
+   */
+  private recentTopicRetellAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
+    if (!/(?:もう一回|もう一度|また)/.test(prompt)) return undefined;
+    if (!/(?:教えて|話して|聞かせて)/.test(prompt)) return undefined;
+    if (!/(?:さっき|今の|その|あの|この)/.test(prompt)) return undefined;
+    const pool = this.recentTopicCandidates(state, recentMessages);
+    for (const t of pool) {
+      try {
+        const gloss = japaneseDictionaryService.lookup(t).find((e: any) => e.gloss)?.gloss;
+        if (gloss) return `「${t}」の話だね。${String(gloss).slice(0, 80)}、という話でした。`;
+        const claim = claimDatabaseService.getAllClaims().find((c: any) => (c.status === 'SUPPORTED' || c.status === 'DEVICE_VERIFIED') && String(c.statement || '').includes(t));
+        if (claim) return `「${t}」の話だね。${String((claim as any).statement).slice(0, 110)}`;
+      } catch { /* 補助経路 */ }
+    }
+    return undefined;
+  }
+
   private conversationRecapAnswer(prompt: string, state?: any): string | undefined {
     // P660: 「さっきの話」だけでは振り返りの合図にしない（「さっきの
     // 話だけど、続きを聞いて」は続きの宣言で、振り返りの質問では

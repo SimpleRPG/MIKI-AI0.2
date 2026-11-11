@@ -1987,6 +1987,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P718 形容詞の語幹を主題にしない', !adj718.replyText.includes('可愛、') && !adj718.replyText.includes('可愛の話'), adj718.replyText.slice(0, 110));
 }
 
+// ---- 直近の話題の名前の聞き返しと再説明（P719） ----
+{
+  const { conversationFactIntakeService: intake719 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem719: any[] = []; const hist719: any[] = []; let st719: any = undefined;
+  const run719 = async (q: string) => {
+    mem719 = intake719.intakeFromUserText(q, mem719).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: q, memories: mem719, recentMessages: hist719.slice(-8), conversationState: st719 } as any);
+    st719 = r.nextConversationState;
+    hist719.push({ role: 'user', content: q }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run719('ホシカゲは南の島に住む小さい動物だよ');
+  const name719 = await run719('さっきの動物の名前、なんだっけ？');
+  check('P719 直近の話題の名前を答える', name719.replyText.includes('ホシカゲ'), name719.replyText.slice(0, 110));
+  const retell719 = await run719('今の動物の話、もう一回教えて');
+  check('P719 話題の再説明は知っている内容で語る', retell719.replyText.includes('ホシカゲ') && retell719.replyText.includes('南の島'), retell719.replyText.slice(0, 130));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
