@@ -2022,6 +2022,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P720 複合語の名指しをしない', !cls720.replyText.includes('動物、何科') && !cls720.replyText.includes('何科、動物'), cls720.replyText.slice(0, 130));
 }
 
+// ---- 教わった直後の聞き返し抑制（P721） ----
+{
+  const { conversationFactIntakeService: intake721 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem721: any[] = [];
+  const teach721 = 'ツキカゲはオーストラリアに住む小さい動物だよ';
+  mem721 = intake721.intakeFromUserText(teach721, mem721).updatedMemories;
+  const r721: any = await conversationCoreService.execute({ prompt: teach721, memories: mem721 } as any);
+  check('P721 教わったターンは覚えた報告だけで終える', r721.replyText.includes('覚えました') && !r721.replyText.includes('どんなものですか'), r721.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

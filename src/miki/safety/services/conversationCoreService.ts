@@ -2535,6 +2535,15 @@ export class ConversationCoreService {
   private probeUnknownWord(prompt: string, unknownTerms: string[]): { topic: string; question: string } | undefined {
     try {
       if (roleplaySessionService.isActive()) return undefined;
+      // P721: この発話自体が「教える」発話で、ちょうど語を学んだ
+      // 直後のターンでは、その説明文の中の別の語をその場で聞き返さ
+      // ない（「クオッカはオーストラリアに住む動物だよ」に「覚えま
+      // した！」と「オーストラリアって何？」が重なると、聞いて
+      // いないように見える）。聞き返し自体は別の機会に回す。
+      try {
+        const taught = JSON.parse(storageService.getItem('miki_recently_taught_v1') || 'null');
+        if (taught && typeof taught.term === 'string' && Date.now() - Number(taught.at || 0) <= 60_000 && prompt.includes(taught.term)) return undefined;
+      } catch { /* 補助判定 */ }
       // P579: プロジェクトとして知っている語（EFR 等）は、辞書に
       // 無くても「知らない語」として聞き返さない。
       // P581: 活用の語幹（「頑張」+「る」等）も聞き返さない。
@@ -2589,7 +2598,12 @@ export class ConversationCoreService {
       // 返したら記録は消費する（同じ教え直しには新しい記録が要る）。
       const glossHead = rec.gloss.slice(0, Math.min(6, rec.gloss.length));
       if (!prompt.includes(glossHead)) return undefined;
-      storageService.removeItem('miki_recently_taught_v1');
+      // P721: 記録は消さず「返答済み」の印だけ付ける。同じターンの
+      // 後段（知らない語の聞き返しの抑制）が「いま教わったばかり」
+      // の判定に使うため。印があれば二度は返さない（P718の消費と
+      // 同じ意味）。
+      if ((rec as any).ackAt) return undefined;
+      try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ ...rec, ackAt: Date.now() })); } catch { /* 補助経路 */ }
       return `「${rec.term}」、覚えました！${rec.gloss}ということですね。教えてくれてありがとうございます。`;
     } catch { return undefined; }
   }
