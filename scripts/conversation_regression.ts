@@ -3479,6 +3479,44 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P819 だっけ形の外れた確認を正す', cf819b.replyText.includes('鳥じゃなくて'), cf819b.replyText.slice(0, 150));
 }
 
+// ---- P820: 人の事実の真ん中／税込・税抜き計算／産物自体の使い道／予定の明示日ずらしと内容なし取り消し ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService } = await import('../src/services/storageService');
+  let mem820: any[] = []; const hist820: any[] = []; let st820: any = undefined;
+  const run820 = async (t: string) => {
+    mem820 = conversationFactIntakeService.intakeFromUserText(t, mem820).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem820, recentMessages: hist820.slice(-8), conversationState: st820 } as any);
+    st820 = r.nextConversationState;
+    hist820.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run820('僕の年齢は30歳だよ');
+  await run820('相方の年齢は28歳だよ');
+  await run820('友達の年齢は25歳だよ');
+  const fm820 = await run820('3人の年齢の真ん中は？');
+  check('P820 人の事実の真ん中を答える', fm820.replyText.includes('「相方」です（28歳）'), fm820.replyText.slice(0, 150));
+  const tax820 = await run820('税込1080円の税抜き価格は？');
+  check('P820 税込から税抜きを計算する', tax820.replyText.includes('982円'), tax820.replyText.slice(0, 150));
+  const tax820b = await run820('1000円の消費税10%込みはいくら？');
+  check('P820 税抜きから税込を計算する', tax820b.replyText.includes('1100円'), tax820b.replyText.slice(0, 150));
+  await run820('ユキゲモドキは白い毛が取れる獣だよ');
+  const pu820 = await run820('ユキゲモドキの毛は何に使うの？');
+  check('P820 産物自体の使い道は未学習と分けて答える', pu820.replyText.includes('毛自体の使い道はまだ知らない'), pu820.replyText.slice(0, 150));
+  const fmt820 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const tomorrow820 = new Date(Date.now() + 86400000);
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([{ when: '明日', text: '明日、ハミガキ820の予定があるよ', at: Date.now(), date: fmt820(tomorrow820) }]));
+  let cand820 = new Date(tomorrow820.getFullYear(), tomorrow820.getMonth(), 20);
+  if (cand820.getTime() <= tomorrow820.getTime()) cand820 = new Date(tomorrow820.getFullYear(), tomorrow820.getMonth() + 1, 20);
+  const mv820 = await run820('明日の予定、20日にずらして');
+  const plans820 = JSON.parse(storageService.getItem('miki_user_plans_v1') || '[]');
+  check('P820 予定を明示の日付へずらす', mv820.replyText.includes(`${cand820.getMonth() + 1}月20日にずらしておきました`) && plans820.length === 1 && plans820[0].date === fmt820(cand820), `${mv820.replyText.slice(0, 80)} / ${JSON.stringify(plans820)}`);
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([{ when: '明日', text: '明日、ハミガキ820の予定があるよ', at: Date.now(), date: fmt820(tomorrow820) }]));
+  await run820('明日の予定、やっぱり無しにして');
+  const plans820b = JSON.parse(storageService.getItem('miki_user_plans_v1') || '[]');
+  check('P820 内容を指さない取り消しで範囲ごと消える', !plans820b.some((p: any) => String(p.text).includes('ハミガキ820')), JSON.stringify(plans820b));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

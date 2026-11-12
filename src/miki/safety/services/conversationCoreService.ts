@@ -576,6 +576,11 @@ export class ConversationCoreService {
       if (factAgg) {
         return this.buildResult('RESOLVED', 'fact_aggregate_answer', this.applyPersonaVoice(factAgg), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P820: 人の事実の真ん中も、その場で答える。
+      const factMedian = this.factMedianAnswer(prompt, memories);
+      if (factMedian) {
+        return this.buildResult('RESOLVED', 'fact_median_answer', this.applyPersonaVoice(factMedian), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const measAgg = this.measureAggregateAnswer(prompt);
       if (measAgg && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_aggregate_answer', this.applyPersonaVoice(measAgg), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3069,6 +3074,18 @@ export class ConversationCoreService {
     // P675: 割合（%）と消費税も決定的に計算できる。
     const tax = p.match(/^(\d+(?:\.\d+)?)\s*円?の消費税\s*(\d+(?:\.\d+)?)\s*(?:%|％|パーセント)(?:は|って)?(?:いくら)?$/);
     if (tax) return `${tax[1]}円の消費税（${tax[2]}%）は${format(Number(tax[1]) * Number(tax[2]) / 100)}円です。`;
+    // P820: 税込から税抜き／税抜きから税込も、その場で計算する
+    // （従来は答えられず、調査にも落ちていた）。
+    const taxOut = p.match(/税込\s*(\d+(?:\.\d+)?)\s*円の(?:税抜き|本体)(?:価格)?(?:は|って)?(?:いくら)?/);
+    if (taxOut) {
+      const rate = /(?:軽減|食品|8\s*(?:%|％))/.test(p) ? 8 : 10;
+      const base = Math.round(Number(taxOut[1]) / (1 + rate / 100));
+      return `税込${taxOut[1]}円の税抜き価格は、消費税${rate}%として${base}円です。`;
+    }
+    const taxIn = p.match(/^(\d+(?:\.\d+)?)\s*円の消費税\s*(\d+(?:\.\d+)?)\s*(?:%|％|パーセント)?\s*(?:込み|込)(?:は|って)?(?:いくら)?/);
+    if (taxIn) return `${taxIn[1]}円の消費税（${taxIn[2]}%）込みは${format(Number(taxIn[1]) * (1 + Number(taxIn[2]) / 100))}円です。`;
+    const taxInDef = p.match(/^(\d+(?:\.\d+)?)\s*円の消費税込み(?:は|って)?(?:いくら)?/);
+    if (taxInDef) return `${taxInDef[1]}円の消費税（10%）込みは${format(Number(taxInDef[1]) * 1.1)}円です。`;
     const percent = p.match(/^(\d+(?:\.\d+)?)\s*の\s*(\d+(?:\.\d+)?)\s*(?:%|％|パーセント)(?:は|って)?$/);
     if (percent) return `${percent[1]}の${percent[2]}%は${format(Number(percent[1]) * Number(percent[2]) / 100)}です。`;
     const times = p.match(/^(\d+(?:\.\d+)?)\s*の\s*(\d+(?:\.\d+)?)\s*倍(?:は|って)?$/);
@@ -3971,6 +3988,21 @@ export class ConversationCoreService {
     return `平均${got.attr}は約${disp}${got.unit}です（${got.rows.length}人分）。`;
   }
 
+  /** P820: 「3人の年齢の真ん中は？」——人の事実でも真ん中を答える。 */
+  private factMedianAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/(?:真ん中|中央)/.test(prompt)) return undefined;
+    const got = this.factAttributeValues(prompt, memories);
+    if (!got) return undefined;
+    const rows = [...got.rows].sort((a, b) => a.v - b.v);
+    const mid = Math.floor(rows.length / 2);
+    if (rows.length % 2 === 1) {
+      const pick = rows[mid];
+      return `${got.attr}の真ん中は「${pick.name}」です（${pick.disp}）。`;
+    }
+    const lo = rows[mid - 1]; const hi = rows[mid];
+    return `${got.attr}の真ん中は「${lo.name}」（${lo.disp}）と「${hi.name}」（${hi.disp}）の間です。`;
+  }
+
   private measureAggregateAnswer(prompt: string): string | undefined {
     const isAvg = /(?:平均)/.test(prompt);
     const isSum = /(?:全部合わせ|合計|ぜんぶ合わせ)/.test(prompt);
@@ -4681,6 +4713,17 @@ export class ConversationCoreService {
     const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
     const usedFor = relations.filter((r) => r.type === 'USED_FOR');
     if (isUse && usedFor.length > 0) {
+      // P820: 「Xの毛は何に使う？」は産物そのものの使い道を聞いて
+      // いる。本体の使い道として循環させず、取れることと、産物
+      // 自体の使い道はまだ知らないことを分けて答える。
+      const subIdx = prompt.indexOf(`${entity}の`);
+      if (subIdx >= 0) {
+        const rest = prompt.slice(subIdx + entity.length + 1);
+        const sub = rest.split(/[はがを、,？?]/)[0]?.trim();
+        if (sub && usedFor.some((r) => r.to === sub)) {
+          return `「${entity}」から取れるのは${sub}ですが、${sub}自体の使い道はまだ知らないです。`;
+        }
+      }
       // P818: 産物の出所を聞く形には、取れるもので言い直して答える。
       if (productFrom) return `「${entity}」から取れるのは、${usedFor.map((r) => r.to).join('や')}です。`;
       return `「${entity}」は、${usedFor.map((r) => r.to).join('や')}に使われます。`;

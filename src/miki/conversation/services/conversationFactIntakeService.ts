@@ -978,6 +978,9 @@ export class ConversationFactIntakeService {
       // P816: 日付ずらしの文そのものは控えに残さない（付け替えは
       // moveUserPlanIfAny が行う）。
       if (/(?:予定|予約|約束)/.test(t) && /(?:ずらして|ずらす|移して|移す|延期)/.test(t)) return;
+      // P820: 取り消しの文そのものも控えに残さない（従来は
+      // 「やっぱり無しにして」が新しい予定として控えられていた）。
+      if (/(?:予定|予約|約束)/.test(t) && /(?:無しにして|なしにして|やめにして|取り消して|キャンセル|中止|取り消し|やめた)/.test(t)) return;
       // P768: 予定の変更文そのものは控えに残さない（変更後の
       // 内容だけが changeUserPlanIfAny で控えられる）。
       if (/(?:じゃなくて|ではなく)/.test(t) && /(?:変えた|変更)/.test(t)) return;
@@ -1004,7 +1007,7 @@ export class ConversationFactIntakeService {
     try {
       const t = String(text || '').trim();
       if (!t || /[？?]/.test(t)) return;
-      if (!/(?:キャンセル|中止|取り消し|取り消した|やめた|無くなった|なくなった|無しになった|なしになった)/.test(t)) return;
+      if (!/(?:キャンセル|中止|取り消し|取り消した|やめた|無くなった|なくなった|無しになった|なしになった|無しにして|なしにして|やめにして|取り消して|キャンセルして)/.test(t)) return;
       const key = 'miki_user_plans_v1';
       const raw = storageService.getItem(key);
       if (!raw) return;
@@ -1014,8 +1017,17 @@ export class ConversationFactIntakeService {
       const when = whenRaw;
       const tokens = utteranceFeatureService.analyze(t).contentTokens
         .filter((w) => w.length >= 2 && !/^(?:キャンセル|中止|取り消し|予定|予約|約束|明日|今日|今夜|今週|来週|週末|今度|明後日)$/.test(w));
-      if (tokens.length === 0) return;
       const targetDate = when ? this.planDateFor(when) : undefined;
+      // P820: 「明日の予定、やっぱり無しにして」のように内容を
+      // 指さない取り消しは、時期の範囲ごと取り消す（従来は内容の
+      // 語が無いと何も消えなかった）。
+      const contentTokens = tokens.filter((w) => !/^(?:やっぱり|無し|なし|全部|ぜんぶ|にし|して|した)$/.test(w));
+      if (contentTokens.length === 0) {
+        if (!when) return;
+        const keptAll = plans.filter((p) => !this.planInScope(p as any, when, targetDate));
+        if (keptAll.length !== plans.length) storageService.setItem(key, JSON.stringify(keptAll));
+        return;
+      }
       const kept = plans.filter((p) => {
         if (!this.planInScope(p as any, when, targetDate)) return true;
         return !tokens.some((w) => p.text.includes(w));
@@ -1035,7 +1047,7 @@ export class ConversationFactIntakeService {
       const t = String(text || '').trim();
       if (!t || /[？?]/.test(t)) return;
       if (!/(?:予定|予約|約束)/.test(t)) return;
-      const mv = t.match(/(明後日|明々後日|明日|あした|今日|今夜)?の?(?:予定|予約|約束)(?:を|、|,)?\s*(明後日|明々後日|明日|今日|[日月火水木金土]曜日)に(?:ずらして|ずらす|移して|移す|延期して|延期する)/);
+      const mv = t.match(/(明後日|明々後日|明日|あした|今日|今夜)?の?(?:予定|予約|約束)(?:を|、|,)?\s*(明後日|明々後日|明日|今日|[日月火水木金土]曜日|\d{1,2}月\d{1,2}日|\d{1,2}日)に(?:ずらして|ずらす|移して|移す|延期して|延期する)/);
       if (!mv) return;
       const fromWhen = mv[1] ? (mv[1] === 'あした' ? '明日' : mv[1]) : '';
       const toWhen = mv[2];
@@ -1051,8 +1063,12 @@ export class ConversationFactIntakeService {
       }
       // P819: 曜日へのずらしは、ずらす元の日の次のその曜日へ
       // （同じ曜日なら翌週）。相対日のずらしは従来どおり。
+      // P820: 明示の日付（20日／12月3日）へのずらしも受ける。
+      // 元の日より前には戻さず、過ぎていれば翌月・翌年に送る。
       let toDate: string | undefined;
+      let toLabel = toWhen;
       const wdTo = toWhen.match(/^([日月火水木金土])曜日$/);
+      const dateTo = toWhen.match(/^(?:(\d{1,2})月)?(\d{1,2})日$/);
       if (wdTo) {
         if (!fromDate) return;
         const base = new Date(`${fromDate}T00:00:00`);
@@ -1062,6 +1078,19 @@ export class ConversationFactIntakeService {
         const mm = String(nd.getMonth() + 1).padStart(2, '0');
         const dd = String(nd.getDate()).padStart(2, '0');
         toDate = `${nd.getFullYear()}-${mm}-${dd}`;
+      } else if (dateTo) {
+        if (!fromDate) return;
+        const base = new Date(`${fromDate}T00:00:00`);
+        const dd = Number(dateTo[2]);
+        const mm = dateTo[1] ? Number(dateTo[1]) - 1 : base.getMonth();
+        let cand = new Date(base.getFullYear(), mm, dd);
+        if (cand.getTime() <= base.getTime()) {
+          cand = dateTo[1] ? new Date(base.getFullYear() + 1, mm, dd) : new Date(base.getFullYear(), base.getMonth() + 1, dd);
+        }
+        const cmm = String(cand.getMonth() + 1).padStart(2, '0');
+        const cdd = String(cand.getDate()).padStart(2, '0');
+        toDate = `${cand.getFullYear()}-${cmm}-${cdd}`;
+        toLabel = `${cand.getMonth() + 1}月${cand.getDate()}日`;
       } else {
         toDate = this.planDateFor(toWhen);
       }
@@ -1069,11 +1098,11 @@ export class ConversationFactIntakeService {
       let moved = 0;
       if (fromDate) {
         for (const p of plans) {
-          if (p.date === fromDate) { p.when = toWhen; p.date = toDate; p.at = Date.now(); moved++; }
+          if (p.date === fromDate) { p.when = toLabel; p.date = toDate; p.at = Date.now(); moved++; }
         }
       }
       if (moved > 0) storageService.setItem(key, JSON.stringify(plans.slice(-20)));
-      storageService.setItem('miki_recently_moved_plan_v1', JSON.stringify({ from: fromWhen, to: toWhen, moved, at: Date.now() }));
+      storageService.setItem('miki_recently_moved_plan_v1', JSON.stringify({ from: fromWhen, to: toLabel, moved, at: Date.now() }));
     } catch { /* 予定のずらしは補助経路 */ }
   }
 
