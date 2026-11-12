@@ -3302,6 +3302,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P813 人数だけの差の質問に2人で答える', diff813.replyText.includes('2歳違い'), diff813.replyText.slice(0, 150));
 }
 
+// ---- P814: 属性の語と記録済みの相手は意味を聞き返さない ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem814: any[] = []; const hist814: any[] = []; let st814: any = undefined;
+  const run814 = async (t: string) => {
+    mem814 = conversationFactIntakeService.intakeFromUserText(t, mem814).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem814, recentMessages: hist814.slice(-8), conversationState: st814 } as any);
+    st814 = r.nextConversationState;
+    hist814.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const age814 = await run814('僕の年齢は30歳だよ');
+  check('P814 年齢は聞き返さない', !age814.replyText.includes('「年齢」って'), age814.replyText.slice(0, 150));
+  const partner814 = await run814('相方の年齢は28歳だよ');
+  check('P814 記録済みの相方は聞き返さない', !partner814.replyText.includes('「相方」って'), partner814.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

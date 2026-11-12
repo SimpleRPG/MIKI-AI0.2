@@ -1492,7 +1492,7 @@ export class ConversationCoreService {
           }
         }
       }
-      if (!isPhatic) pendingUnknownQuestion = this.probeUnknownWord(prompt, unknownTerms);
+      if (!isPhatic) pendingUnknownQuestion = this.probeUnknownWord(prompt, unknownTerms, memories);
       casualConclusion = this.applyPersonaVoice(casualConclusion);
 
       const strategyResult = conversationStrategyService.selectConversationStrategy({
@@ -1849,7 +1849,7 @@ export class ConversationCoreService {
       // P565: 雑談の宣言文に出た知らない語は、その場でも一度だけ
       // 聞き返す（P498 の背景学習とは別に、会話の中でも学ぶ入口）。
       // 候補だけ用意し、実際に足すのは合成の後段（P525 と同じ場所）。
-      if (!fallthroughPhatic) pendingUnknownQuestion = this.probeUnknownWord(prompt, unknownTerms);
+      if (!fallthroughPhatic) pendingUnknownQuestion = this.probeUnknownWord(prompt, unknownTerms, memories);
       // P611: 今回の受け止めを記録する（次の発話が訂正なら外れ台帳へ）。
       if (lastReceptionCategory) {
         try {
@@ -2738,7 +2738,7 @@ export class ConversationCoreService {
    * 聞かない（台帳で管理）。なりチャ中は役を壊すので聞かない。
    * 実際に足したときだけ markUnknownAsked で台帳に残す。
    */
-  private probeUnknownWord(prompt: string, unknownTerms: string[]): { topic: string; question: string } | undefined {
+  private probeUnknownWord(prompt: string, unknownTerms: string[], memories: any[] = []): { topic: string; question: string } | undefined {
     try {
       if (roleplaySessionService.isActive()) return undefined;
       // P721: この発話自体が「教える」発話で、ちょうど語を学んだ
@@ -2755,6 +2755,12 @@ export class ConversationCoreService {
       // P581: 活用の語幹（「頑張」+「る」等）も聞き返さない。
       const topic = (unknownTerms || []).find((t) => {
         if (t.length < 2 || !prompt.includes(t) || projectNotebookService.findProject(t)) return false;
+        // P814: 事実の属性として使われた語（「相方の年齢は…」の
+        // 年齢）と、事実を記録済みの相手（相方など）は、意味を
+        // 聞き返す対象ではない。属性の語は辞書に無くても構造で
+        // 分かるし、相手は記録がある時点で「知っている」。
+        if (prompt.includes(`の${t}は`) || prompt.includes(`の${t}って`)) return false;
+        if ((memories || []).some((mm: any) => mm && mm.active !== false && !mm.replacedBy && String(mm.factEntity || '') === t)) return false;
         // P604: 時間の語で始まる複合（「明日早起」等）は予定の断片で、
         // 語の意味を聞く対象ではない。
         if (/^(?:今日|明日|昨日|朝|昼|夕方|夜|今朝|今夜|週末|今週|来週|最近|今度|この頃)/.test(t)) return false;
