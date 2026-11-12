@@ -3319,6 +3319,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P814 記録済みの相方は聞き返さない', !partner814.replyText.includes('「相方」って'), partner814.replyText.slice(0, 150));
 }
 
+// ---- P815: 月の末日と「今日からN日後」の日付 ----
+{
+  const now815 = new Date();
+  const nextLast815 = new Date(now815.getFullYear(), now815.getMonth() + 2, 0).getDate();
+  const nextMonth815 = new Date(now815.getFullYear(), now815.getMonth() + 1, 1).getMonth() + 1;
+  const len815: any = await conversationCoreService.execute({ prompt: '来月は何日まで？', memories: [] } as any);
+  check('P815 来月の末日を答える', len815.replyText.includes(`${nextMonth815}月は${nextLast815}日まで`), len815.replyText.slice(0, 120));
+  const d100815 = new Date(now815.getFullYear(), now815.getMonth(), now815.getDate() + 100);
+  const off815: any = await conversationCoreService.execute({ prompt: '今日から100日後は何月何日？', memories: [] } as any);
+  check('P815 今日から100日後の日付を答える', off815.replyText.includes(`${d100815.getMonth() + 1}月${d100815.getDate()}日`), off815.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -2887,6 +2887,19 @@ export class ConversationCoreService {
         ? `${dateMatch[1]}は${d.getMonth() + 1}月${d.getDate()}日でした。`
         : `${dateMatch[1]}は${d.getMonth() + 1}月${d.getDate()}日です。`;
     }
+    // P815: N日後の形が同居する時は、素の「何月何日」より先に
+    // ずらした日付を答える（従来は「今日は〜」だけ返っていた）。
+    const earlyOffset = prompt.match(/(\d+)\s*(日|週間|か月|ヶ月|ヵ月)(後|前)/);
+    if (earlyOffset && /今日から|今日を/.test(prompt)) {
+      const n = Number(earlyOffset[1]);
+      const unit = earlyOffset[2];
+      const sign = earlyOffset[3] === '後' ? 1 : -1;
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (unit === '日') d.setDate(d.getDate() + sign * n);
+      else if (unit === '週間') d.setDate(d.getDate() + sign * n * 7);
+      else d.setMonth(d.getMonth() + sign * n);
+      return `今日から${n}${unit}${earlyOffset[3]}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`;
+    }
     if (/今日の日付|何月何日/.test(prompt)) {
       return `今日は${now.getMonth() + 1}月${now.getDate()}日です。`;
     }
@@ -2956,6 +2969,20 @@ export class ConversationCoreService {
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       const days = Math.round((end.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
       return days <= 0 ? '今月は今日で終わりです。' : `今月はあと${days}日です。`;
+    }
+    // P815: 「来月は何日まで？」「2月は何日ある？」は、その月の
+    // 末日を答える（従来は「来月」を知らない語として流れていた）。
+    const monthLenMatch = prompt.match(/(今月|来月|再来月|先月|(\d{1,2})月)(?:は|って)?(?:何日まで|何日ある|何日間)/);
+    if (monthLenMatch) {
+      let y = now.getFullYear();
+      let m = now.getMonth();
+      if (monthLenMatch[1] === '来月') m += 1;
+      else if (monthLenMatch[1] === '再来月') m += 2;
+      else if (monthLenMatch[1] === '先月') m -= 1;
+      else if (monthLenMatch[2]) { m = Number(monthLenMatch[2]) - 1; if (m < now.getMonth()) y += 1; }
+      const norm = new Date(y, m, 1);
+      const last = new Date(norm.getFullYear(), norm.getMonth() + 1, 0).getDate();
+      return `${norm.getMonth() + 1}月は${last}日までです。`;
     }
     return undefined;
   }
