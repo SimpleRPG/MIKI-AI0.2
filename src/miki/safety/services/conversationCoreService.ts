@@ -3143,6 +3143,27 @@ export class ConversationCoreService {
       if (now.getMonth() < bm - 1 || (now.getMonth() === bm - 1 && now.getDate() < bd)) age--;
       return `${by}年${bm}月${bd}日生まれの人は今${age}歳です。`;
     }
+    // P828: 元号と干支は、年から決定的に決まる（調査に落とさない）。
+    const eraNow = prompt.match(/(?:今は|今年は)?令和何年/);
+    if (eraNow && now.getFullYear() >= 2019) {
+      return `今は令和${now.getFullYear() - 2018}年です。`;
+    }
+    const eraConv = prompt.match(/(\d{4})年は(令和|平成|昭和)何年/);
+    if (eraConv) {
+      const y = Number(eraConv[1]); const era = eraConv[2];
+      if (era === '令和' && y >= 2019) return `${y}年は令和${y - 2018}年です。`;
+      if (era === '平成' && y >= 1989 && y <= 2019) return `${y}年は平成${y - 1988}年です。`;
+      if (era === '昭和' && y >= 1926 && y <= 1989) return `${y}年は昭和${y - 1925}年です。`;
+      return undefined;
+    }
+    if (/干支/.test(prompt)) {
+      const eto = (y: number) => '子丑寅卯辰巳午未申酉戌亥'[(((y - 4) % 12) + 12) % 12];
+      const bornY = prompt.match(/(\d{4})年(?:生まれ|生)/);
+      if (bornY) return `${bornY[1]}年生まれの干支は${eto(Number(bornY[1]))}です。`;
+      if (/来年/.test(prompt)) return `来年の干支は${eto(now.getFullYear() + 1)}です。`;
+      if (/去年|昨年/.test(prompt)) return `去年の干支は${eto(now.getFullYear() - 1)}です。`;
+      return `今年の干支は${eto(now.getFullYear())}です。`;
+    }
     const monthLenMatch = prompt.match(/(今月|来月|再来月|先月|(\d{1,2})月)(?:は|って)?(?:何日まで|何日ある|何日間)/);
     if (monthLenMatch) {
       let y = now.getFullYear();

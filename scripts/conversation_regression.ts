@@ -3707,6 +3707,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P827 分を時間と分に分けて答える', st827b.replyText.includes('2時間30分です'), st827b.replyText.slice(0, 120));
 }
 
+// ---- P828: 元号と干支 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem828: any[] = []; const hist828: any[] = []; let st828: any = undefined;
+  const run828 = async (t: string) => {
+    mem828 = conversationFactIntakeService.intakeFromUserText(t, mem828).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem828, recentMessages: hist828.slice(-8), conversationState: st828 } as any);
+    st828 = r.nextConversationState;
+    hist828.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const now828 = new Date();
+  const era828 = await run828('今は令和何年？');
+  check('P828 今の元号年を答える', era828.replyText.includes(`令和${now828.getFullYear() - 2018}年です`), era828.replyText.slice(0, 120));
+  const eto828 = '子丑寅卯辰巳午未申酉戌亥'[(((now828.getFullYear() - 4) % 12) + 12) % 12];
+  const et828 = await run828('今年の干支は？');
+  check('P828 今年の干支を答える', et828.replyText.includes(`干支は${eto828}です`), et828.replyText.slice(0, 120));
+  const bn828 = await run828('僕は1995年生まれだけど干支は？');
+  check('P828 生まれ年の干支を答える', bn828.replyText.includes('干支は亥です'), bn828.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
