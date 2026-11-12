@@ -3370,6 +3370,42 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P816 ずらした元の日は無いと正直に言う', gone816.replyText.includes('まだ聞いていないです'), gone816.replyText.slice(0, 150));
 }
 
+// ---- P817: 人の事実の合計・歳だけの閾値人数・向きつき差／来年の今日・今度の曜日・月末まで ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem817: any[] = []; const hist817: any[] = []; let st817: any = undefined;
+  const run817 = async (t: string) => {
+    mem817 = conversationFactIntakeService.intakeFromUserText(t, mem817).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem817, recentMessages: hist817.slice(-8), conversationState: st817 } as any);
+    st817 = r.nextConversationState;
+    hist817.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run817('僕の年齢は30歳だよ');
+  await run817('相方の年齢は28歳だよ');
+  await run817('友達の年齢は25歳だよ');
+  const sum817 = await run817('3人の年齢を合わせると何歳？');
+  check('P817 人の年齢の合計を答える', sum817.replyText.includes('合わせると83歳'), sum817.replyText.slice(0, 150));
+  const cnt817 = await run817('30歳以上は何人いる？');
+  check('P817 歳だけの閾値でも人数を答える', cnt817.replyText.includes('1人です'), cnt817.replyText.slice(0, 150));
+  const dir817 = await run817('相方は僕より何歳若い？');
+  check('P817 向きつきの差を答える', dir817.replyText.includes('より2歳若い'), dir817.replyText.slice(0, 150));
+  const rev817 = await run817('僕は相方より何歳若い？');
+  check('P817 向きが逆なら正して答える', rev817.replyText.includes('若くはなくて'), rev817.replyText.slice(0, 150));
+  const now817 = new Date();
+  const yt817 = new Date(now817.getFullYear() + 1, now817.getMonth(), now817.getDate());
+  const year817: any = await conversationCoreService.execute({ prompt: '来年の今日は何月何日？', memories: [] } as any);
+  check('P817 来年の今日を答える', year817.replyText.includes(`${yt817.getFullYear()}年${yt817.getMonth() + 1}月${yt817.getDate()}日`), year817.replyText.slice(0, 120));
+  const delta817 = (0 - now817.getDay() + 7) % 7;
+  const sun817 = new Date(now817.getFullYear(), now817.getMonth(), now817.getDate() + delta817);
+  const next817: any = await conversationCoreService.execute({ prompt: '今度の日曜日は何日？', memories: [] } as any);
+  check('P817 今度の日曜日を答える', next817.replyText.includes(`${sun817.getMonth() + 1}月${sun817.getDate()}日`), next817.replyText.slice(0, 120));
+  const last817 = new Date(now817.getFullYear(), now817.getMonth() + 1, 0).getDate();
+  const remain817 = last817 - now817.getDate();
+  const monthEnd817: any = await conversationCoreService.execute({ prompt: '月末まであと何日？', memories: [] } as any);
+  check('P817 月末までの日数を答える', remain817 === 0 ? monthEnd817.replyText.includes('今日が月末') : monthEnd817.replyText.includes(`あと${remain817}日`), monthEnd817.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

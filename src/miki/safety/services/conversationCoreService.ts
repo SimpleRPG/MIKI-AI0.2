@@ -2906,6 +2906,17 @@ export class ConversationCoreService {
       else d.setMonth(d.getMonth() + sign * n);
       return `今日から${n}${unit}${earlyOffset[3]}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`;
     }
+    // P817: 「来年の今日は何月何日？」は来年の同じ月日を答える
+    // （素の「何月何日」に呑まれて今日の日付だけ返っていた）。
+    // うるう日の年はその月の末日に寄せる。
+    const yearToday = prompt.match(/(来年|再来年|去年|一昨年)の今日/);
+    if (yearToday) {
+      const dy = yearToday[1] === '来年' ? 1 : yearToday[1] === '再来年' ? 2 : yearToday[1] === '去年' ? -1 : -2;
+      const ty = now.getFullYear() + dy;
+      let d = new Date(ty, now.getMonth(), now.getDate());
+      if (d.getMonth() !== now.getMonth()) d = new Date(ty, now.getMonth() + 1, 0);
+      return `${yearToday[1]}の今日は${ty}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）${dy < 0 ? 'でした' : 'です'}。`;
+    }
     if (/今日の日付|何月何日/.test(prompt)) {
       return `今日は${now.getMonth() + 1}月${now.getDate()}日です。`;
     }
@@ -2953,6 +2964,19 @@ export class ConversationCoreService {
       d.setDate(d.getDate() + delta + 7 * weeks);
       return `${weekMatch[1]}の${weekMatch[2]}曜日は${d.getMonth() + 1}月${d.getDate()}日です。`;
     }
+    // P817: 「今度の日曜日は何日？」は直近のその曜日の日付を答える
+    // （「今度」を知らない語として流れていた）。今日がその曜日なら
+    // 今日を指す。
+    const nextWd = prompt.match(/今度の([日月火水木金土])曜/);
+    if (nextWd && /(?:何日|いつ|何曜日|[？?])/.test(prompt)) {
+      const target = weekdays.indexOf(nextWd[1]);
+      const delta = (target - now.getDay() + 7) % 7;
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      d.setDate(d.getDate() + delta);
+      return delta === 0
+        ? `今度の${nextWd[1]}曜日は今日、${d.getMonth() + 1}月${d.getDate()}日です。`
+        : `今度の${nextWd[1]}曜日は${d.getMonth() + 1}月${d.getDate()}日です。`;
+    }
     // P722: 「あと何日で12月？」は、その月の1日までの日数を数える。
     const untilMonth = prompt.match(/あと何日で(\d{1,2})月/);
     if (untilMonth) {
@@ -2971,10 +2995,22 @@ export class ConversationCoreService {
       const days = Math.round((end.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
       return days <= 0 ? '今年は今日で終わりです。' : `今年はあと${days}日です。`;
     }
+    // P817: 「月末まであと何日？」は今月の末日までの日数を数える。
+    if (/あと何日/.test(prompt) && /(?:月末|今月末)/.test(prompt)) {
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const days = Math.round((end.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+      return days <= 0 ? '今日が月末です。' : `月末まであと${days}日です。`;
+    }
     if (/あと何日/.test(prompt) && /今月/.test(prompt)) {
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       const days = Math.round((end.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
       return days <= 0 ? '今月は今日で終わりです。' : `今月はあと${days}日です。`;
+    }
+    // P817: 「今年はあと何週間ある？」は日数と週数で答える。
+    if (/あと何週間/.test(prompt) && /今年/.test(prompt)) {
+      const end = new Date(now.getFullYear(), 11, 31);
+      const days = Math.round((end.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000);
+      return `今年はあと${days}日、約${Math.floor(days / 7)}週間です。`;
     }
     // P815: 「来月は何日まで？」「2月は何日ある？」は、その月の
     // 末日を答える（従来は「来月」を知らない語として流れていた）。
@@ -3533,7 +3569,10 @@ export class ConversationCoreService {
    * 属性の事実同士の差。説明文の差（P759）とは別に事実を見る。
    */
   private factDifferenceAnswer(prompt: string, memories: any[] = []): string | undefined {
-    if (!/(?:違う|差)/.test(prompt)) return undefined;
+    // P817: 「相方は僕より何歳若い？」のような向きつきの差も受ける
+    // （「違う・差」が無いと彼女自身の年齢の受け答えに流れていた）。
+    const directedAge = /より/.test(prompt) && /何歳/.test(prompt) && /(?:若い|年上|年下)/.test(prompt);
+    if (!/(?:違う|差)/.test(prompt) && !directedAge) return undefined;
     let attr = ''; let label: '重さ' | '大きさ' | '年齢' = '年齢'; let unit = '歳';
     if (/何歳|歳の差|年齢/.test(prompt)) { attr = '年齢'; label = '年齢'; unit = '歳'; }
     else if (/身長/.test(prompt)) { attr = '身長'; label = '大きさ'; unit = 'センチ'; }
@@ -3582,6 +3621,20 @@ export class ConversationCoreService {
     if (found.length < 2) return undefined;
     const diff = Math.abs(found[0].v - found[1].v);
     const diffDisp = Number.isInteger(diff) ? String(diff) : String(Math.round(diff * 10) / 10);
+    // P817: 向きつきの答え。向きが事実と逆の時は、正して答える。
+    if (directedAge) {
+      const a = found[0]; const b = found[1];
+      if (diff === 0) return `${a.name}と${b.name}は、同じ年齢です。`;
+      const aYounger = a.v < b.v;
+      if (/(?:若い|年下)/.test(prompt)) {
+        return aYounger
+          ? `${a.name}は${b.name}より${diffDisp}${unit}若いです。`
+          : `${a.name}は${b.name}より若くはなくて、${diffDisp}${unit}年上です。`;
+      }
+      return aYounger
+        ? `${a.name}は${b.name}より年上ではなくて、${diffDisp}${unit}年下です。`
+        : `${a.name}は${b.name}より${diffDisp}${unit}年上です。`;
+    }
     if (diff === 0) return `${found[0].name}と${found[1].name}は、${attr}は同じです。`;
     return `${found[0].name}と${found[1].name}は、${diffDisp}${unit}違います。`;
   }
@@ -3761,6 +3814,9 @@ export class ConversationCoreService {
     let attr = ''; let label: '重さ' | '大きさ' | '年齢' = '年齢'; let unit = '歳'; let minus = false; let cueLabel = '';
     if (/背が高|身長/.test(prompt)) { attr = '身長'; label = '大きさ'; unit = 'センチ'; cueLabel = '背が高い'; if (/背が低/.test(prompt)) { minus = true; cueLabel = '背が低い'; } }
     else if (/年上|年下|年齢/.test(prompt)) { attr = '年齢'; label = '年齢'; unit = '歳'; cueLabel = '年上'; if (/年下/.test(prompt)) { minus = true; cueLabel = '年下'; } }
+    // P817: 「30歳以上は何人？」のように単位の「歳」だけで年齢を
+    // 指す形も、年齢の事実で受ける（従来は属性が取れずに流れていた）。
+    else if (/歳/.test(prompt)) { attr = '年齢'; label = '年齢'; unit = '歳'; cueLabel = '年上'; }
     else if (/重|軽|体重/.test(prompt)) { attr = '体重'; label = '重さ'; unit = 'キロ'; cueLabel = '重い'; if (/軽/.test(prompt) && !/重/.test(prompt)) { minus = true; cueLabel = '軽い'; } }
     else return undefined;
     const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
@@ -3794,9 +3850,18 @@ export class ConversationCoreService {
 
   /** P794: 「みんなの平均身長は？」——人の事実で平均する。 */
   private factAggregateAnswer(prompt: string, memories: any[] = []): string | undefined {
-    if (!/平均/.test(prompt)) return undefined;
+    // P817: 合計（「3人の年齢を合わせると何歳？」）も人の事実で
+    // 数える。平均だけだったため、彼女自身の年齢の受け答えに
+    // 流れていた。
+    const isSum = /(?:合わせると|合計|全部合わせ|ぜんぶ合わせ)/.test(prompt);
+    if (!/平均/.test(prompt) && !isSum) return undefined;
     const got = this.factAttributeValues(prompt, memories);
     if (!got) return undefined;
+    if (isSum) {
+      const sum = got.rows.reduce((s, r) => s + r.v, 0);
+      const sumDisp = Number.isInteger(sum) ? String(sum) : String(Math.round(sum * 10) / 10);
+      return `${got.rows.length}人の${got.attr}を合わせると${sumDisp}${got.unit}です。`;
+    }
     const avg = got.rows.reduce((s, r) => s + r.v, 0) / got.rows.length;
     const disp = Number.isInteger(avg) ? String(avg) : String(Math.round(avg * 10) / 10);
     return `平均${got.attr}は約${disp}${got.unit}です（${got.rows.length}人分）。`;
