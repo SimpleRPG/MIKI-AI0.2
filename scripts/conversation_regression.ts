@@ -3846,6 +3846,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P833 「で、」始まりの聞き返しも事実で答える', f833.replyText.includes('181センチ'), f833.replyText.slice(0, 150));
 }
 
+// ---- P834: 対が省略された続きの比較 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem834: any[] = []; const hist834: any[] = []; let st834: any = undefined;
+  const run834 = async (t: string) => {
+    mem834 = conversationFactIntakeService.intakeFromUserText(t, mem834).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem834, recentMessages: hist834.slice(-8), conversationState: st834 } as any);
+    st834 = r.nextConversationState;
+    hist834.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run834('タムモドキは重さ4キロの鳥だよ');
+  await run834('ネムモドキは重さ9キロの鳥だよ');
+  const cmp834 = await run834('どっちが重い？');
+  check('P834 省略された比較は直近の2つで比べる', cmp834.replyText.includes('ネムモドキ') && cmp834.replyText.includes('重い'), cmp834.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -556,7 +556,7 @@ export class ConversationCoreService {
       if (factAgeCompare) {
         return this.buildResult('RESOLVED', 'fact_age_comparison_answer', this.applyPersonaVoice(factAgeCompare), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const glossCompare = this.glossComparisonAnswer(prompt, memories);
+      const glossCompare = this.glossComparisonAnswer(prompt, memories, state, recentMessages);
       if (glossCompare && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_comparison_answer', this.applyPersonaVoice(glossCompare), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -3445,7 +3445,7 @@ export class ConversationCoreService {
     return `${older.label}の方が年上です（${a.label}は${a.age}歳、${b.label}は${b.age}歳）。`;
   }
 
-  private glossComparisonAnswer(prompt: string, memories: any[] = []): string | undefined {
+  private glossComparisonAnswer(prompt: string, memories: any[] = [], state?: any, recentMessages: ChatMessage[] = []): string | undefined {
     if (!/(?:どっちが|どちらが)/.test(prompt)) return undefined;
     const dims: Array<{ re: RegExp; label: string; adj: string; plus: RegExp; minus: RegExp; plusText: string; minusText: string }> = [
       // P788: 「背が高い／低い」は大きさの次元で、実測値は身長の事実。
@@ -3510,6 +3510,18 @@ export class ConversationCoreService {
         if (numEnts.some((e) => e.name === s.name) || !knownName(s.name)) continue;
         numEnts.push({ name: s.name, meas: measureFor(s.name) });
         if (numEnts.length >= 2) break;
+      }
+      // P834: 対が省略された続きの比較（「どっちが重い？」）は、
+      // 直近に話した2つを相手にする。
+      if (numEnts.length < 2) {
+        try {
+          for (const cand of this.recentTopicCandidates(state, recentMessages)) {
+            if (numEnts.length >= 2) break;
+            if (!cand || numEnts.some((e) => e.name === cand) || !knownName(cand)) continue;
+            const meas = measureFor(cand);
+            if (meas) numEnts.push({ name: cand, meas });
+          }
+        } catch { /* 補助経路 */ }
       }
       // P756: 片方は知っているが、もう片方がそもそも未知の相手の
       // ときは、内部の「対象を特定できません」に落とさず、正直に
