@@ -588,7 +588,7 @@ export class ConversationCoreService {
       if (factDiff) {
         return this.buildResult('RESOLVED', 'fact_difference_answer', this.applyPersonaVoice(factDiff), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const measDiff = this.measureDifferenceAnswer(prompt);
+      const measDiff = this.measureDifferenceAnswer(prompt, state, recentMessages);
       if (measDiff && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_difference_answer', this.applyPersonaVoice(measDiff), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -3975,7 +3975,7 @@ export class ConversationCoreService {
     return `${found[0].name}と${found[1].name}は、${diffDisp}${unit}違います。`;
   }
 
-  private measureDifferenceAnswer(prompt: string): string | undefined {
+  private measureDifferenceAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
     if (!/(?:差|違い)/.test(prompt)) return undefined;
     if (!/(?:何キロ|何センチ|どれくらい|どのくらい|何グラム|何年)/.test(prompt)) return undefined;
     // P770: 寿命の差（何年）も同じ物差しで引ける。
@@ -3992,7 +3992,34 @@ export class ConversationCoreService {
       if (meas) ents.push({ name: t, meas });
       if (ents.length >= 2) break;
     }
-    if (ents.length < 2) return undefined;
+    if (ents.length < 2) {
+      // P835: 対と次元が省略された続きの差の質問（「差はどれくらい？」）
+      // は、直近に話した2つと、両方に実測値がある次元で受ける。
+      try {
+        const cands = this.recentTopicCandidates(state, recentMessages);
+        const labels: Array<'重さ' | '大きさ' | '寿命'> = [label, '重さ', '大きさ', '寿命'];
+        for (const lab of labels) {
+          const pair: Array<{ name: string; meas: { value: number; disp: string } }> = [];
+          for (const c of cands) {
+            if (!c || pair.some((e) => e.name === c)) continue;
+            let gloss = '';
+            try { gloss = String(japaneseDictionaryService.lookup(c).find((e: any) => e.gloss)?.gloss || ''); } catch { /* 補助判定 */ }
+            if (!gloss) continue;
+            const meas = this.measureFromText(gloss, lab);
+            if (meas) pair.push({ name: c, meas });
+            if (pair.length >= 2) break;
+          }
+          if (pair.length >= 2) {
+            const [a, b] = pair;
+            const diff = Math.abs(a.meas.value - b.meas.value);
+            const unit = lab === '寿命' ? '年' : lab === '重さ' ? 'キロ' : 'センチ';
+            const diffText = lab === '重さ' && diff < 1 ? `${Math.round(diff * 1000)}グラム` : `${Number.isInteger(diff) ? diff : Math.round(diff * 10) / 10}${unit}`;
+            return `「${a.name}」は${a.meas.disp}、「${b.name}」は${b.meas.disp}なので、差は${diffText}です。`;
+          }
+        }
+      } catch { /* 補助経路 */ }
+      return undefined;
+    }
     const [a, b] = ents;
     const diff = Math.abs(a.meas.value - b.meas.value);
     const unit = label === '寿命' ? '年' : label === '重さ' ? 'キロ' : 'センチ';

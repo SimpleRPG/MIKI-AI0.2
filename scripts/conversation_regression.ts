@@ -3863,6 +3863,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P834 省略された比較は直近の2つで比べる', cmp834.replyText.includes('ネムモドキ') && cmp834.replyText.includes('重い'), cmp834.replyText.slice(0, 150));
 }
 
+// ---- P835: 対と次元が省略された続きの差の質問 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem835: any[] = []; const hist835: any[] = []; let st835: any = undefined;
+  const run835 = async (t: string) => {
+    mem835 = conversationFactIntakeService.intakeFromUserText(t, mem835).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem835, recentMessages: hist835.slice(-8), conversationState: st835 } as any);
+    st835 = r.nextConversationState;
+    hist835.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run835('サミモドキは重さ3キロの鳥だよ');
+  await run835('ユミモドキは重さ10キロの鳥だよ');
+  await run835('サミモドキとユミモドキ、どっちが重い？');
+  const df835 = await run835('差はどれくらい？');
+  check('P835 省略された差の質問は直近の2つで答える', df835.replyText.includes('差は7キロ'), df835.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
