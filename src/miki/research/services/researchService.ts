@@ -3,6 +3,7 @@ import { linkFollowService } from './linkFollowService';
 import { autonomousSearchService } from './autonomousSearchService';
 import type { SearchLane } from './unifiedWebResearchService';
 import { knowledgeGapService, KnowledgeGap } from '../../unknown/services/knowledgeGapService';
+import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
 import { evidenceService, EvidenceRecord } from '../../memory/services/evidenceService';
 import { researchStrategyService, ResearchRoute } from './researchStrategyService';
 import { cognitiveEvidenceIntegrationService } from '../../selfAwareness/services/cognitiveEvidenceIntegrationService';
@@ -520,6 +521,13 @@ export class ResearchService {
     knowledgeGapService.buildResolutionPlan(gap);
     knowledgeGapService.advanceResolutionPlan(gap.id, 'COLLECT_EVIDENCE', 'RESEARCH');
     knowledgeGapService.markResearching(gap.id);
+    // P844: 調べる前に「今の自分の信念なら答えはこうなるはず」と
+    // いう予測を残す。結果との照合は日次統合（settleAll）で行い、
+    // 外れた予測が学習の材料になる。信念が無い対象は予測なし。
+    try {
+      const gapTarget = (gap.identity?.target || '').trim();
+      if (gapTarget) predictionLedgerService.predictForTarget(gapTarget, gap.id);
+    } catch { /* 予測は補助経路 */ }
     const startedAt = Date.now();
     const baseQuery = typeof options?.query === 'string' && options.query.trim().length > 0
       ? options.query.trim()

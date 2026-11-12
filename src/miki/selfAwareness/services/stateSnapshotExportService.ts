@@ -4,6 +4,7 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { associationGraphService } from '../../memory/services/associationGraphService';
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
+import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { worldModelGraphService } from './worldModelGraphService';
 import { knowledgeSelfInspectionService } from './knowledgeSelfInspectionService';
@@ -153,6 +154,10 @@ class StateSnapshotExportService {
             step: g.resolutionPlan?.steps?.find((s) => s.status !== 'DONE')?.label || '',
           }));
         } catch { return []; }
+      })(),
+      // P844: 予測の照合状況（立てた予測がどれだけ当たったか）。
+      predictions: (() => {
+        try { return predictionLedgerService.stats(); } catch { return { open: 0, confirmed: 0, refuted: 0, lastRefutedTarget: '' }; }
       })(),
       // P752: 話してくれた予定の控えも、状態の一部として見えるように。
       plans: (() => {

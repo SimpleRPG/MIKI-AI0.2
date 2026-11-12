@@ -4040,6 +4040,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P843 1日だけの話題は蒸留されない', !pending843.some((t) => t.topic === '単発チェックY' || t.topic === '単発チェックZ'), JSON.stringify(pending843).slice(0, 200));
 }
 
+// ---- P844: 予測ループ（信念を予測として残し、結果と照合する） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { worldModelGraphService } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { predictionLedgerService } = await import('../src/miki/memory/services/predictionLedgerService');
+  const { stateSnapshotExportService } = await import('../src/miki/selfAwareness/services/stateSnapshotExportService');
+  storageService.setItem('miki_predictions_v1', JSON.stringify([]));
+  worldModelGraphService.addRelation({ fromName: '予測チェックX', toName: '生き物', type: 'IS_A', provisional: true, confidence: 0.3 });
+  const pred844 = predictionLedgerService.predictForTarget('予測チェックX');
+  check('P844 信念から予測が立つ', Boolean(pred844 && pred844.to === '生き物' && pred844.outcome === 'OPEN'), JSON.stringify(pred844 || {}).slice(0, 160));
+  const s0 = predictionLedgerService.settleAll();
+  check('P844 仮の関係だけでは照合しない', s0.confirmed === 0 && s0.refuted === 0, JSON.stringify(s0));
+  worldModelGraphService.addRelation({ fromName: '予測チェックX', toName: '動物', type: 'IS_A', provisional: false, confidence: 0.9 });
+  const s1 = predictionLedgerService.settleAll();
+  check('P844 分類が違えば外れとして記録される', s1.refuted === 1 && predictionLedgerService.stats().lastRefutedTarget === '予測チェックX', JSON.stringify(s1));
+  check('P844 信念が無ければ予測は立たない', predictionLedgerService.predictForTarget('予測チェックZ') === undefined, '');
+  stateSnapshotExportService.exportNow();
+  const saved844 = JSON.parse(storageService.getItem('miki_state_snapshot_v1') || '{}');
+  const snap844 = JSON.parse(saved844.json || '{}');
+  check('P844 スナップショットに予測の照合状況が出る', Boolean(snap844.predictions && snap844.predictions.refuted >= 1), JSON.stringify(snap844.predictions || {}).slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

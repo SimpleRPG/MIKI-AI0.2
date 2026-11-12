@@ -3,6 +3,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { worldModelGraphService } from './worldModelGraphService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
+import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
 
 /**
  * P542: 統合パス（寝ている間の整理）。成長ループから1日1回まで
@@ -31,7 +32,7 @@ const SHARED_RELATION_PHRASE: Record<string, (to: string) => string> = {
 };
 
 class KnowledgeConsolidationService {
-  public runIfDue(now = Date.now()): { relationsAdded: number; schemas: number; distilled: number } | undefined {
+  public runIfDue(now = Date.now()): { relationsAdded: number; schemas: number; distilled: number; predictions: { confirmed: number; refuted: number } } | undefined {
     let last = 0;
     try { last = parseInt(storageService.getItem(LAST_RUN_KEY) || '0', 10) || 0; } catch { /* 読めなければ今回回す */ }
     if (now - last < DAY_MS) return undefined;
@@ -44,8 +45,10 @@ class KnowledgeConsolidationService {
 
     const schemas = this.extractSchemas();
     const distilled = this.distillEpisodes();
-    systemLogger.info('SELF_IMPROVEMENT', `🌙 [統合] 関係の再抽出で ${relationsAdded} 件を追加し、図式を ${schemas} 件立て、繰り返しの話題を ${distilled} 件蒸留しました`);
-    return { relationsAdded, schemas, distilled };
+    // P844: 立てておいた予測を、育った世界モデルと照合する。
+    const predictions = predictionLedgerService.settleAll(now);
+    systemLogger.info('SELF_IMPROVEMENT', `🌙 [統合] 関係の再抽出で ${relationsAdded} 件を追加し、図式を ${schemas} 件立て、繰り返しの話題を ${distilled} 件蒸留し、予測を ${predictions.confirmed + predictions.refuted} 件照合しました（外れ ${predictions.refuted} 件）`);
+    return { relationsAdded, schemas, distilled, predictions };
   }
 
   /**
