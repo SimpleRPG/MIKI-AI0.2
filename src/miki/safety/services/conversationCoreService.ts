@@ -415,6 +415,15 @@ export class ConversationCoreService {
           : '分かりました、予定を変えておきますね。';
         return this.buildResult('RESOLVED', 'plan_change_received', this.applyPersonaVoice(text), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P830: 日の訂正形（「明日じゃなくて明後日だよ」）は、台帳の
+      // 付け替え結果で返す。汎用の訂正受けが先に「覚え直しますね」
+      // とだけ返していたが、実際に直るのは予定の日付の方。
+      if (dialogueAct === 'CORRECTION' && /^(?:今日|明日|あした|明後日|明々後日|[日月火水木金土]曜日)(?:じゃなくて|じゃなく|ではなく)/.test(prompt)) {
+        const movedAck = this.planMoveAnswer(prompt);
+        if (movedAck) {
+          return this.buildResult('RESOLVED', 'plan_move_answer', this.applyPersonaVoice(movedAck), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
+      }
       if (dialogueAct === 'CORRECTION' && /(?:じゃなくて|ではなく)/.test(prompt)) {
         const cm = prompt.match(/(?:じゃなくて|ではなく)\s*(.{1,20}?)(?:だよ|です|なんだ|。|．|！|!|$)/);
         const corrected = cm?.[1]?.replace(/^(?:それは|これは)/, '').trim();
@@ -4564,8 +4573,11 @@ export class ConversationCoreService {
    * 結果を返す。マーカーが無い（ずらす形でない）場合は素通りする。
    */
   private planMoveAnswer(prompt: string): string | undefined {
-    if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
-    if (!/(?:ずらして|ずらす|移して|移す|延期)/.test(prompt)) return undefined;
+    // P830: 日の訂正形（「明日じゃなくて明後日だよ」）も、ずらしの
+    // 受け答えで受ける（予定・ずらしての語が文に無いため）。
+    const isMoveForm = /(?:予定|予約|約束)/.test(prompt) && /(?:ずらして|ずらす|移して|移す|延期)/.test(prompt);
+    const isDayCorrection = /^(?:今日|明日|あした|明後日|明々後日|[日月火水木金土]曜日)(?:じゃなくて|じゃなく|ではなく)/.test(prompt);
+    if (!isMoveForm && !isDayCorrection) return undefined;
     try {
       const raw = storageService.getItem('miki_recently_moved_plan_v1');
       if (!raw) return undefined;

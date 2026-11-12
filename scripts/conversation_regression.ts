@@ -3756,6 +3756,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P829 年中行事までの日数を数える', diff829 === 0 ? nd829.replyText.includes('今日です') : nd829.replyText.includes(`あと${diff829}日です`), nd829.replyText.slice(0, 120));
 }
 
+// ---- P830: 予定の日の訂正（「明日じゃなくて明後日だよ」） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService } = await import('../src/services/storageService');
+  let mem830: any[] = []; const hist830: any[] = []; let st830: any = undefined;
+  const run830 = async (t: string) => {
+    mem830 = conversationFactIntakeService.intakeFromUserText(t, mem830).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem830, recentMessages: hist830.slice(-8), conversationState: st830 } as any);
+    st830 = r.nextConversationState;
+    hist830.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([]));
+  await run830('明日に歯医者の予定があるよ');
+  const corr830 = await run830('明日じゃなくて明後日だよ');
+  check('P830 日の訂正はずらしの受け答えで返す', corr830.replyText.includes('明後日にずらしておきました'), corr830.replyText.slice(0, 150));
+  const plans830 = JSON.parse(String(storageService.getItem('miki_user_plans_v1') || '[]'));
+  const fmt830 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const dat830 = fmt830(new Date(Date.now() + 2 * 86400000));
+  check('P830 台帳の日付が明後日に付け替わる', plans830.length === 1 && plans830[0].date === dat830, JSON.stringify(plans830).slice(0, 150));
+  const rec830 = await run830('明後日の予定は？');
+  check('P830 ずらした先で予定を引ける', rec830.replyText.includes('歯医者'), rec830.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
