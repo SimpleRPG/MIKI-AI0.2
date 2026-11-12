@@ -3728,6 +3728,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P828 生まれ年の干支を答える', bn828.replyText.includes('干支は亥です'), bn828.replyText.slice(0, 120));
 }
 
+// ---- P829: 季節／うるう年／年中行事までの日数 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem829: any[] = []; const hist829: any[] = []; let st829: any = undefined;
+  const run829 = async (t: string) => {
+    mem829 = conversationFactIntakeService.intakeFromUserText(t, mem829).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem829, recentMessages: hist829.slice(-8), conversationState: st829 } as any);
+    st829 = r.nextConversationState;
+    hist829.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const now829 = new Date();
+  const mo829 = now829.getMonth() + 1;
+  const season829 = mo829 >= 3 && mo829 <= 5 ? '春' : mo829 >= 6 && mo829 <= 8 ? '夏' : mo829 >= 9 && mo829 <= 11 ? '秋' : '冬';
+  const se829 = await run829('今の季節は？');
+  check('P829 今の季節を答える', se829.replyText.includes(`今は${season829}です`), se829.replyText.slice(0, 120));
+  const y829 = now829.getFullYear();
+  const leap829 = (y829 % 4 === 0 && y829 % 100 !== 0) || y829 % 400 === 0;
+  const le829 = await run829('今年はうるう年？');
+  check('P829 うるう年かどうかを答える', le829.replyText.includes(leap829 ? 'うるう年です' : 'うるう年ではありません'), le829.replyText.slice(0, 120));
+  const today0829 = new Date(y829, now829.getMonth(), now829.getDate());
+  let tgt829 = new Date(y829, 11, 25);
+  if (tgt829.getTime() < today0829.getTime()) tgt829 = new Date(y829 + 1, 11, 25);
+  const diff829 = Math.round((tgt829.getTime() - today0829.getTime()) / 86400000);
+  const nd829 = await run829('クリスマスまで何日？');
+  check('P829 年中行事までの日数を数える', diff829 === 0 ? nd829.replyText.includes('今日です') : nd829.replyText.includes(`あと${diff829}日です`), nd829.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

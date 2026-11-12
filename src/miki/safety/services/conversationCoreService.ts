@@ -3164,6 +3164,37 @@ export class ConversationCoreService {
       if (/去年|昨年/.test(prompt)) return `去年の干支は${eto(now.getFullYear() - 1)}です。`;
       return `今年の干支は${eto(now.getFullYear())}です。`;
     }
+    // P829: 季節・うるう年・決まった年中行事までの日数も、月日
+    // から決定的に決まる。
+    if (/季節/.test(prompt) && /(?:今|いま|現在)/.test(prompt)) {
+      const mo = now.getMonth() + 1;
+      const season = mo >= 3 && mo <= 5 ? '春' : mo >= 6 && mo <= 8 ? '夏' : mo >= 9 && mo <= 11 ? '秋' : '冬';
+      return `今は${season}です。`;
+    }
+    if (/うるう年/.test(prompt)) {
+      const ym = prompt.match(/(\d{4})年/);
+      const y = ym ? Number(ym[1]) : now.getFullYear();
+      const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+      return ym ? `${y}年はうるう年${leap ? 'です' : 'ではありません'}。` : `今年（${y}年）はうるう年${leap ? 'です' : 'ではありません'}。`;
+    }
+    const NAMED_DAYS: Array<[RegExp, string, number, number]> = [
+      [/クリスマス/, 'クリスマス', 12, 25],
+      [/お正月|正月|元日/, 'お正月', 1, 1],
+      [/バレンタイン/, 'バレンタインデー', 2, 14],
+      [/ハロウィン/, 'ハロウィン', 10, 31],
+      [/七夕/, '七夕', 7, 7],
+      [/ひな祭り|雛祭り/, 'ひな祭り', 3, 3],
+      [/こどもの日|子供の日/, 'こどもの日', 5, 5],
+    ];
+    for (const [re, label, mm2, dd2] of NAMED_DAYS) {
+      if (re.test(prompt) && /まで(?:あと)?何日/.test(prompt)) {
+        const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        let target = new Date(now.getFullYear(), mm2 - 1, dd2);
+        if (target.getTime() < today0.getTime()) target = new Date(now.getFullYear() + 1, mm2 - 1, dd2);
+        const diff = Math.round((target.getTime() - today0.getTime()) / 86400000);
+        return diff === 0 ? `${label}は今日です。` : `${label}（${mm2}月${dd2}日）まであと${diff}日です。`;
+      }
+    }
     const monthLenMatch = prompt.match(/(今月|来月|再来月|先月|(\d{1,2})月)(?:は|って)?(?:何日まで|何日ある|何日間)/);
     if (monthLenMatch) {
       let y = now.getFullYear();
