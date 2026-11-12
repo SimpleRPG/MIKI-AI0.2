@@ -656,9 +656,25 @@ export class ConversationFactIntakeService {
   private learnTermFromPlainStatement(text: string): void {
     if (/[？?]/.test(text)) return;
     const { facts } = this.extractUserFacts(text);
+    // P805: 「XはAじゃなくてBだよ」は訂正の形で事実抽出から落ちる
+    // （訂正先の事実が無いと丸ごと消える）。Xがまだ未知の語なら、
+    // Bを説明とする通常の教示として拾い直す。
+    const correctionShape = text.match(/^(.{2,12}?)は(.{1,12}?)(?:じゃなくて|ではなく)(.{1,30}?)(?:だよ|です)?[。！!]?$/);
+    if (correctionShape && !facts.some((f) => String(f.entity || '') === correctionShape[1])) {
+      const termCandidate = correctionShape[1].trim();
+      const existingEntry = japaneseDictionaryService.lookup(termCandidate);
+      if (!existingEntry.find((e) => e.gloss)) {
+        facts.push({ entity: termCandidate, value: correctionShape[3].trim(), statement: text } as any);
+      }
+    }
     for (const fact of facts) {
       const term = String(fact.entity || '').trim();
-      const gloss = String(fact.value || '').trim();
+      let gloss = String(fact.value || '').trim();
+      // P805: 「鳥ではない、魚」「鳥じゃないよ、獣」のように否定が
+      // 混ざった値は、肯定側だけを説明にする（否定された分類は
+      // 説明文に残さない）。Claim には元の文が別途残る。
+      const negPrefix = gloss.match(/^(.{1,12}?)(?:じゃない|ではない|じゃなくて|ではなく)(?:よ|ね)?[、,]\s*(.+)$/);
+      if (negPrefix) gloss = negPrefix[2].trim();
       if (!term || !gloss || fact.attribute) continue;
       if (term.length < 2 || term.length > 12) continue;
       if (/^(僕|私|俺|わたし|あなた|君|名前|今日|昨日|明日|これ|それ|あれ|ここ|そこ|天気|時間)$/.test(term)) continue;

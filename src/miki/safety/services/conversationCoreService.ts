@@ -4586,11 +4586,18 @@ export class ConversationCoreService {
         return undefined;
       }
       // P801: 裸の形では、候補が関係先か説明文の語の時だけ答える。
+      // P805: 教わった主張文に出る語も通す（「鳥じゃなくて獣」と
+      // 教わった場合、否定された分類は説明文には残らないが、
+      // 主張文には残っている。それへの確認は関係で正せる）。
       if (bareConfirmForm) {
         try {
           const relTos = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity).map((r) => r.to);
           const glossText = japaneseDictionaryService.lookup(entity).map((e: any) => String(e.gloss || '')).join(' ');
-          if (!relTos.includes(candidate) && !glossText.includes(candidate)) return undefined;
+          const inClaims = claimDatabaseService.getAllClaims().some((c) => {
+            const st = String((c as any).statement || '');
+            return st.includes(entity) && st.includes(candidate);
+          });
+          if (!relTos.includes(candidate) && !glossText.includes(candidate) && !inClaims) return undefined;
         } catch { return undefined; }
       }
       const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);

@@ -3142,6 +3142,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P804 属性の単独否定で肯定しなくなる', !denied804.replyText.includes('メイン武器は「剣」だよ'), denied804.replyText.slice(0, 150));
 }
 
+// ---- P805: 否定まじりの教示は肯定側だけを説明として覚える ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { japaneseDictionaryService } = await import('../src/miki/research/services/japaneseDictionaryService');
+  let mem805: any[] = []; const hist805: any[] = []; let st805: any = undefined;
+  const run805 = async (t: string) => {
+    mem805 = conversationFactIntakeService.intakeFromUserText(t, mem805).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem805, recentMessages: hist805.slice(-8), conversationState: st805 } as any);
+    st805 = r.nextConversationState;
+    hist805.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run805('カゼモドキは鳥じゃなくて獣だよ');
+  const gloss805 = (japaneseDictionaryService.lookup('カゼモドキ') as any[])[0]?.gloss || '';
+  check('P805 じゃなくて形の教示でも未知語を覚える', gloss805 === '獣の一種', gloss805);
+  const confirm805 = await run805('カゼモドキって鳥？');
+  check('P805 否定された分類への確認は関係で正す', confirm805.replyText.includes('鳥じゃなくて') && confirm805.replyText.includes('獣'), confirm805.replyText.slice(0, 150));
+  await run805('ヒメモドキは鳥ではない、魚だよ');
+  const gloss805b = (japaneseDictionaryService.lookup('ヒメモドキ') as any[])[0]?.gloss || '';
+  check('P805 ではない形の説明は肯定側だけになる', gloss805b === '魚の一種', gloss805b);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
