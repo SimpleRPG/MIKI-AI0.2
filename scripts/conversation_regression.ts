@@ -3256,6 +3256,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P810 共通点は共有する分類で答える', common810.replyText.includes('共通点は') && common810.replyText.includes('獣'), common810.replyText.slice(0, 150));
 }
 
+// ---- P811: 状態スナップショットに開いている知識ギャップを含める ----
+{
+  const { knowledgeGapService } = await import('../src/miki/unknown/services/knowledgeGapService');
+  const { stateSnapshotExportService } = await import('../src/miki/selfAwareness/services/stateSnapshotExportService');
+  const { storageService } = await import('../src/services/storageService');
+  knowledgeGapService.detect({ query: 'スナップ対象Xの意味を調べる', reason: '回帰確認', type: 'UNKNOWN_TERM', target: 'スナップ対象X', priority: 100 });
+  stateSnapshotExportService.exportNow();
+  const saved811 = JSON.parse(storageService.getItem('miki_state_snapshot_v1') || '{}');
+  const snap811 = JSON.parse(saved811.json || '{}');
+  const hit811 = Array.isArray(snap811.openGaps) ? snap811.openGaps.find((g: any) => String(g.query || '').includes('スナップ対象')) : undefined;
+  check('P811 スナップショットに開いたギャップが載る', !!hit811 && hit811.type === 'UNKNOWN_TERM' && hit811.status === 'OPEN', JSON.stringify(snap811.openGaps || []).slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -11,6 +11,7 @@ import { reviewReflectionService } from './reviewReflectionService';
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
+import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { userKnowledgeProfileService } from '../../conversation/services/userKnowledgeProfileService';
 
 /**
@@ -131,6 +132,24 @@ class StateSnapshotExportService {
           const items = JSON.parse(storageService.getItem('miki_user_memos_v1') || '[]') as Array<{ text?: string }>;
           return { count: Array.isArray(items) ? items.length : 0, texts: Array.isArray(items) ? items.slice(-3).map((m) => m.text || '') : [] };
         } catch { return { count: 0, texts: [] }; }
+      })(),
+      // P811: 開いている知識ギャップも書き出す。教師側の調査
+      // パイロット（2026-11-12 承認）で、次のログから Web 検索で
+      // 埋められる種別を拾って調べるための材料。route の判定は
+      // 読む側で行うので、ここでは種別までをそのまま出す
+      // （buildResolutionPlan は状態を更新するので書き出しでは
+      // 呼ばない）。
+      openGaps: (() => {
+        try {
+          return knowledgeGapService.listOpen(15).map((g) => ({
+            id: g.id,
+            target: g.identity?.target || '',
+            query: g.query,
+            type: g.type,
+            priority: g.priority,
+            status: g.status,
+          }));
+        } catch { return []; }
       })(),
       // P752: 話してくれた予定の控えも、状態の一部として見えるように。
       plans: (() => {
