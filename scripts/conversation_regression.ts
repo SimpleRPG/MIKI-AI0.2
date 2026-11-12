@@ -3239,6 +3239,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P809 説明に無い部位は正直に知らないと言う', none809.replyText.includes('まだ知らない'), none809.replyText.slice(0, 150));
 }
 
+// ---- P810: 共通点の質問にも共有する分類で答える ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem810: any[] = []; const hist810: any[] = []; let st810: any = undefined;
+  const run810 = async (t: string) => {
+    mem810 = conversationFactIntakeService.intakeFromUserText(t, mem810).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem810, recentMessages: hist810.slice(-8), conversationState: st810 } as any);
+    st810 = r.nextConversationState;
+    hist810.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run810('ヨルモドキは夜に活動する獣だよ');
+  await run810('ヒルモドキは昼に活動する獣だよ');
+  const common810 = await run810('ヨルモドキとヒルモドキの共通点は？');
+  check('P810 共通点は共有する分類で答える', common810.replyText.includes('共通点は') && common810.replyText.includes('獣'), common810.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

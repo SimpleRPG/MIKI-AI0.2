@@ -4550,7 +4550,8 @@ export class ConversationCoreService {
     });
     if (known.length === 0) return undefined;
     // 似ているか：2つの既知の物について、片方の説明にもう片方が出れば手がかりがある。
-    if (/(?:似てる|似ている|そっくり|似てます)/.test(prompt) && known.length >= 2) {
+    // P810: 「共通点は？」も同じ材料（共有する分類・説明の語）で答える。
+    if (/(?:似てる|似ている|そっくり|似てます|共通点|似ているところ|同じところ|似たところ)/.test(prompt) && known.length >= 2) {
       const [a, b] = known;
       try {
         const glossA = japaneseDictionaryService.lookup(a).map((e: any) => String(e.gloss || '')).join(' ');
@@ -4559,7 +4560,11 @@ export class ConversationCoreService {
         if (glossB.includes(a)) return `「${b}」は「${a}のような姿」と覚えているので、姿は似ているようです。`;
         const isAof = (x: string) => worldModelGraphService.relationsOf(x).filter((r) => r.from === x && r.type === 'IS_A').map((r) => r.to);
         const shared = isAof(a).filter((t) => isAof(b).includes(t));
-        if (shared.length > 0) return `どちらも${shared.join('・')}の仲間なので、近いところはあると思います。`;
+        if (shared.length > 0) {
+          if (/(?:共通点|同じところ)/.test(prompt)) return `共通点は、どちらも${shared.join('・')}の仲間なところです。`;
+          return `どちらも${shared.join('・')}の仲間なので、近いところはあると思います。`;
+        }
+        if (/(?:共通点|同じところ)/.test(prompt)) return `「${a}」と「${b}」の共通点は、まだはっきり知らないです。`;
         return `「${a}」と「${b}」が似ているかどうかは、まだはっきり知らないです。`;
       } catch { return undefined; }
     }
