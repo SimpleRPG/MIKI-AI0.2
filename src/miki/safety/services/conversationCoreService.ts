@@ -424,6 +424,14 @@ export class ConversationCoreService {
           return this.buildResult('RESOLVED', 'plan_move_answer', this.applyPersonaVoice(movedAck), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
         }
       }
+      // P831: 予定の内容の訂正も、台帳の差し替え結果で返す
+      // （汎用の訂正受けより先）。
+      if (dialogueAct === 'CORRECTION') {
+        const contentAck = this.planContentCorrectionAnswer(prompt);
+        if (contentAck) {
+          return this.buildResult('RESOLVED', 'plan_content_correction_answer', this.applyPersonaVoice(contentAck), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
+      }
       if (dialogueAct === 'CORRECTION' && /(?:じゃなくて|ではなく)/.test(prompt)) {
         const cm = prompt.match(/(?:じゃなくて|ではなく)\s*(.{1,20}?)(?:だよ|です|なんだ|。|．|！|!|$)/);
         const corrected = cm?.[1]?.replace(/^(?:それは|これは)/, '').trim();
@@ -2941,6 +2949,18 @@ export class ConversationCoreService {
     if (/今(?:は)?何時|何時(?:です)?か|現在時刻|いま何時/.test(prompt)) {
       return `今は${now.getHours()}時${now.getMinutes()}分です。`;
     }
+    // P831: 「今って午前？午後？」「今は夜？」——時刻の帯も即答する。
+    const daypartQ = prompt.match(/(?:今|いま)(?:は|って)?\s*(午前|午後|朝|昼|夕方|夜|深夜)(?:[？?]|ですか|なの)/);
+    if (daypartQ) {
+      const h = now.getHours();
+      const asked = daypartQ[1];
+      if (asked === '午前' || asked === '午後') {
+        const cur = h < 12 ? '午前' : '午後';
+        return asked === cur ? `はい、今は${cur}です。` : `今は${cur}です。`;
+      }
+      const band = h >= 5 && h < 11 ? '朝' : h >= 11 && h < 17 ? '昼' : h >= 17 && h < 19 ? '夕方' : '夜';
+      return asked === band ? `はい、今は${band}です。` : `今は${band}です。`;
+    }
     // P823: 「今から2時間後は何時？」「30分後は何時？」——現在時刻
     // からのずらしも、その場で計算する（従来は調査に落ちていた）。
     const timeOffset = prompt.match(/(?:今から)?\s*(\d+(?:\.\d+)?)\s*(時間|分)\s*(後|前)(?:は|って)?何時/);
@@ -4572,6 +4592,20 @@ export class ConversationCoreService {
    * （moveUserPlanIfAny）が済ませており、ここではマーカーを見て
    * 結果を返す。マーカーが無い（ずらす形でない）場合は素通りする。
    */
+  /** P831: 予定の内容の訂正（台帳の差し替え済み）の受け答え。 */
+  private planContentCorrectionAnswer(prompt: string): string | undefined {
+    if (!/(?:じゃなくて|じゃなく|ではなく)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_recently_corrected_plan_content_v1');
+      if (!raw) return undefined;
+      const mk = JSON.parse(raw);
+      if (!mk || Date.now() - Number(mk.at || 0) > 60000) return undefined;
+      storageService.removeItem('miki_recently_corrected_plan_content_v1');
+      if (Number(mk.fixed || 0) > 0) return `分かりました、予定の「${mk.from}」は「${mk.to}」に直しておきました。`;
+      return undefined;
+    } catch { return undefined; }
+  }
+
   private planMoveAnswer(prompt: string): string | undefined {
     // P830: 日の訂正形（「明日じゃなくて明後日だよ」）も、ずらしの
     // 受け答えで受ける（予定・ずらしての語が文に無いため）。

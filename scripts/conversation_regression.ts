@@ -3780,6 +3780,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P830 ずらした先で予定を引ける', rec830.replyText.includes('歯医者'), rec830.replyText.slice(0, 150));
 }
 
+// ---- P831: 予定の内容の訂正／時刻の帯の質問 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService } = await import('../src/services/storageService');
+  let mem831: any[] = []; const hist831: any[] = []; let st831: any = undefined;
+  const run831 = async (t: string) => {
+    mem831 = conversationFactIntakeService.intakeFromUserText(t, mem831).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem831, recentMessages: hist831.slice(-8), conversationState: st831 } as any);
+    st831 = r.nextConversationState;
+    hist831.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([]));
+  await run831('明日に歯医者の予定があるよ');
+  const cc831 = await run831('歯医者じゃなくて美容院だよ');
+  check('P831 内容の訂正は差し替えの受け答えで返す', cc831.replyText.includes('「美容院」に直しておきました'), cc831.replyText.slice(0, 150));
+  const plans831 = JSON.parse(String(storageService.getItem('miki_user_plans_v1') || '[]'));
+  check('P831 台帳の文が差し替わる', plans831.length === 1 && plans831[0].text.includes('美容院') && !plans831[0].text.includes('歯医者'), JSON.stringify(plans831).slice(0, 150));
+  const h831 = new Date().getHours();
+  const dp831 = await run831('今って午前？午後？');
+  check('P831 午前・午後を答える', dp831.replyText.includes(`今は${h831 < 12 ? '午前' : '午後'}です`), dp831.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

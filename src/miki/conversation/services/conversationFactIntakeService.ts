@@ -1118,6 +1118,35 @@ export class ConversationFactIntakeService {
    * （P708）の形と似ているが、対象は予定台帳であり、事実層には
    * 触らない（呼び出し側で訂正読みを止める）。
    */
+  /** P831: 「歯医者じゃなくて美容院だよ」——予定の内容の訂正は、
+   * 台帳の文そのものを差し替える。従来は訂正の受け答えだけで、
+   * 台帳の文は古いまま残っていた。 */
+  private correctUserPlanContentIfAny(text: string): void {
+    try {
+      const t = String(text || '').trim();
+      if (!t || /[？?]/.test(t)) return;
+      if (/(?:変えた|変更|ずら|移し|延期)/.test(t)) return;
+      const cm = t.match(/^(.{1,14}?)(?:じゃなくて|じゃなく|ではなく)(.{1,14}?)(?:だよ|ですよ|です|だ|。)?$/);
+      if (!cm) return;
+      const wrong = cm[1].replace(/^(?:それは|これは|さっきの|その)/, '').trim();
+      const right = cm[2].trim();
+      if (!wrong || !right || wrong.length < 2) return;
+      // 日の訂正（P830）は、ずらしの経路の担当。
+      const DAY = /^(?:今日|明日|あした|明後日|明々後日|[日月火水木金土]曜日)$/;
+      if (DAY.test(wrong) || DAY.test(right)) return;
+      const key = 'miki_user_plans_v1';
+      const raw = storageService.getItem(key);
+      const plans: Array<{ when: string; text: string; at: number; date?: string }> = raw ? JSON.parse(raw) : [];
+      let fixed = 0;
+      for (const p of plans) {
+        if (p.text.includes(wrong)) { p.text = p.text.split(wrong).join(right); p.at = Date.now(); fixed++; }
+      }
+      if (fixed === 0) return;
+      storageService.setItem(key, JSON.stringify(plans.slice(-20)));
+      storageService.setItem('miki_recently_corrected_plan_content_v1', JSON.stringify({ from: wrong, to: right, fixed, at: Date.now() }));
+    } catch { /* 予定の内容訂正は補助経路 */ }
+  }
+
   private changeUserPlanIfAny(text: string): void {
     try {
       const t = String(text || '').trim();
@@ -1149,6 +1178,9 @@ export class ConversationFactIntakeService {
   public intakeFromUserText(text: string, existingMemories: MemoryItem[]): FactIntakeResult {
     // P816: 予定の日付ずらしは最初に処理する（変更・取り消し・記録より先）。
     this.moveUserPlanIfAny(text);
+    // P831: 予定の内容の訂正（「歯医者じゃなくて美容院だよ」）も、
+    // 台帳側で先に差し替える。
+    this.correctUserPlanContentIfAny(text);
     // P768: 予定の変更は最初に処理する（取り消し・記録より先）。
     this.changeUserPlanIfAny(text);
     // P753: 予定の取り消しは控えから外す（先に処理する）。
