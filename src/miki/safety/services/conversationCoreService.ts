@@ -3419,8 +3419,11 @@ export class ConversationCoreService {
     const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
     const ageOf = (name: string): { label: string; age: number } | undefined => {
       const targets = selfSet.has(name) ? [...selfSet] : [name];
+      // P837: 「僕は30歳だよ」の形は属性なしで保存される。値の単位
+      // （歳）から年齢の事実として読めるものも対象にする。
       const fact = (memories || []).find((mm: any) => mm && mm.active !== false && !mm.replacedBy
-        && String(mm.factAttribute || '') === '年齢' && targets.includes(String(mm.factEntity || ''))
+        && (String(mm.factAttribute || '') === '年齢' || (!mm.factAttribute && /歳|才/.test(String(mm.factValue || ''))))
+        && targets.includes(String(mm.factEntity || ''))
         && /\d/.test(String(mm.factValue || '')));
       if (!fact) return undefined;
       const age = Number(String(fact.factValue).match(/(\d+)/)?.[1]);
@@ -3433,6 +3436,23 @@ export class ConversationCoreService {
       const hit = ageOf(t);
       if (hit && !found.some((f) => f.label === hit.label)) found.push(hit);
       if (found.length >= 2) break;
+    }
+    // P837: 誰も名指されていない続きの比較（「どっちが年上？」）は、
+    // 年齢を知っている人がちょうど2人なら、その2人で比べる。
+    if (found.length === 0) {
+      const holders = new Map<string, { label: string; age: number }>();
+      for (const mm of (memories || [])) {
+        if (!mm || mm.active === false || mm.replacedBy) continue;
+        const fa = String(mm.factAttribute || '');
+        if (fa ? fa !== '年齢' : !/歳|才/.test(String(mm.factValue || ''))) continue;
+        const ent = String(mm.factEntity || '');
+        if (!ent) continue;
+        const key = selfSet.has(ent) ? '僕' : ent;
+        if (holders.has(key)) continue;
+        const hit = ageOf(ent);
+        if (hit) holders.set(key, { label: key, age: hit.age });
+      }
+      if (holders.size === 2) found.push(...holders.values());
     }
     if (found.length < 2) return undefined;
     const [a, b] = found;
@@ -3913,12 +3933,19 @@ export class ConversationCoreService {
     if (/何歳|歳の差|年齢/.test(prompt)) { attr = '年齢'; label = '年齢'; unit = '歳'; }
     else if (/身長/.test(prompt)) { attr = '身長'; label = '大きさ'; unit = 'センチ'; }
     else if (/体重/.test(prompt)) { attr = '体重'; label = '重さ'; unit = 'キロ'; }
+    // P837: 「年の差は？」のように年の字で聞く形も年齢の差として
+    // 受ける（従来は手がかり無しで打ち切っていた）。
+    else if (/年の差/.test(prompt)) { attr = '年齢'; label = '年齢'; unit = '歳'; }
     else return undefined;
     const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    // P837: 属性なしで保存された数値の事実（「僕は30歳だよ」）の
+    // 属性を、値の単位から読むための対応。
+    const unitRe = attr === '年齢' ? /歳|才/ : attr === '身長' ? /センチ|メートル|cm/ : /キロ|kg/;
     const valueOf = (name: string): number | undefined => {
       const targets = selfSet.has(name) ? [...selfSet] : [name];
       const fact = (memories || []).find((mm: any) => mm && mm.active !== false && !mm.replacedBy
-        && String(mm.factAttribute || '') === attr && targets.includes(String(mm.factEntity || ''))
+        && (String(mm.factAttribute || '') === attr || (!mm.factAttribute && unitRe.test(String(mm.factValue || ''))))
+        && targets.includes(String(mm.factEntity || ''))
         && /\d/.test(String(mm.factValue || '')));
       if (!fact) return undefined;
       if (label === '年齢') {
@@ -3937,10 +3964,15 @@ export class ConversationCoreService {
     }
     // P813: 「2人の年齢の差は？」のように人数だけで指す形は、その
     // 属性を持つ人がちょうど2人なら、その2人で差を出す。
-    if (found.length < 2 && /(?:2人|二人|ふたり)/.test(prompt)) {
+    // P837: 誰も名指されていない続きの形（「年の差は？」）も同じ。
+    // 名指しが1人でもある時は、指されていない相手を勝手に
+    // 補わない（別の未知の相手との差かもしれないため）。
+    if (found.length < 2 && (/(?:2人|二人|ふたり)/.test(prompt) || found.length === 0)) {
       const byEntity = new Map<string, number>();
       for (const mm of (memories || [])) {
-        if (!mm || mm.active === false || mm.replacedBy || String(mm.factAttribute || '') !== attr) continue;
+        if (!mm || mm.active === false || mm.replacedBy) continue;
+        const fa = String(mm.factAttribute || '');
+        if (fa ? fa !== attr : !unitRe.test(String(mm.factValue || ''))) continue;
         const ent = String(mm.factEntity || '');
         if (!ent) continue;
         const key = selfSet.has(ent) ? '僕' : ent;

@@ -3902,6 +3902,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P836 省略された比の質問は直近の2つで答える', ratio836.replyText.includes('倍') && (ratio836.replyText.includes('約4倍') || ratio836.replyText.includes('約0.25倍')), ratio836.replyText.slice(0, 150));
 }
 
+// ---- P837: 人の事実の省略形（属性なし数値・名指しなしの比較と差） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem837: any[] = []; const hist837: any[] = []; let st837: any = undefined;
+  const run837 = async (t: string) => {
+    mem837 = conversationFactIntakeService.intakeFromUserText(t, mem837).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem837, recentMessages: hist837.slice(-8), conversationState: st837 } as any);
+    st837 = r.nextConversationState;
+    hist837.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run837('僕は31歳だよ');
+  await run837('相方は29歳だよ');
+  const cmp837 = await run837('どっちが年上？');
+  check('P837 名指しなしの年齢比較は2人で比べる', cmp837.replyText.includes('年上') && cmp837.replyText.includes('31歳'), cmp837.replyText.slice(0, 150));
+  const dif837 = await run837('年の差は？');
+  check('P837 「年の差は？」も2人で答える', dif837.replyText.includes('2歳'), dif837.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
