@@ -3944,6 +3944,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P838 一覧の後の「他には？」は正直に答える', ot838.replyText.includes('他にはいない'), ot838.replyText.slice(0, 150));
 }
 
+// ---- P839: 一覧の後の続きの数え ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem839: any[] = []; const hist839: any[] = []; let st839: any = undefined;
+  const run839 = async (t: string) => {
+    mem839 = conversationFactIntakeService.intakeFromUserText(t, mem839).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem839, recentMessages: hist839.slice(-8), conversationState: st839 } as any);
+    st839 = r.nextConversationState;
+    hist839.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run839('ミオモドキは夜に活動する獣だよ');
+  await run839('ソラモドキは夜に活動する獣だよ');
+  await run839('夜に活動する生き物を教えて');
+  const ct839 = await run839('何種類いる？');
+  check('P839 一覧の後の数えは控えから数える', ct839.replyText.includes('種類です'), ct839.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

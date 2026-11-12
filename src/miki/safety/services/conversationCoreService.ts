@@ -3698,9 +3698,13 @@ export class ConversationCoreService {
   }
 
   /** P838: 一覧の答えの後の「他には？」——控えた一覧を今の知識で
-   * 再計算し、同じなら「他にはいない」と正直に答える。 */
+   * 再計算し、同じなら「他にはいない」と正直に答える。
+   * P839: 続きの数え（「何種類いる？」）も、同じ控えから数える。 */
   private lastListFollowupAnswer(prompt: string): string | undefined {
-    if (!/^(?:他には|他は|あとは|ほかには)[？?。]?$/.test(prompt.trim())) return undefined;
+    const p = prompt.trim();
+    const isOther = /^(?:他には|他は|あとは|ほかには)[？?。]?$/.test(p);
+    const isCount = /^(?:全部で)?(?:何種類|何匹|何個|いくつ)(?:いる|ある)?[？?。]?$/.test(p);
+    if (!isOther && !isCount) return undefined;
     try {
       const raw = storageService.getItem('miki_last_list_answer_v1');
       if (!raw) return undefined;
@@ -3708,6 +3712,12 @@ export class ConversationCoreService {
       if (!stash || Date.now() - Number(stash.at || 0) > 10 * 60000) return undefined;
       const fresh = this.taughtTraitListAnswer(String(stash.prompt || ''));
       if (!fresh) return undefined;
+      if (isCount) {
+        const names = fresh.match(/「[^」]+」/g) || [];
+        if (names.length === 0) return undefined;
+        const counter = /何匹/.test(p) ? '匹' : /何個/.test(p) ? '個' : '種類';
+        return `${names.length}${counter}です。`;
+      }
       if (fresh === stash.text) return '他にはいないです。今知っているのは、それだけです。';
       return fresh;
     } catch { return undefined; }
