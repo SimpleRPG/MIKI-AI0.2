@@ -6160,7 +6160,7 @@ export class ConversationCoreService {
    * から答える。Claim が無い語でも、辞書に意味があれば答えられる。
    */
   private dictionaryAnswerForQuestion(prompt: string, contentTokens: string[]): string | undefined {
-    if (!/(?:とは|って何|ってなに|の意味|何だっけ|なんだっけ|どういう意味|どういうもの)/.test(prompt)
+    if (!/(?:とは|って何|ってなに|の意味|何だっけ|なんだっけ|どういう意味|どういうもの|の特徴|って特徴)/.test(prompt)
       && !/(?:どんな|何の).{0,8}だっけ/.test(prompt)) return undefined;
     for (const term of contentTokens || []) {
       if (!term || term.length < 2 || !prompt.includes(term)) continue;

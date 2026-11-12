@@ -3269,6 +3269,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P811 スナップショットに開いたギャップが載る', !!hit811 && hit811.type === 'UNKNOWN_TERM' && hit811.status === 'OPEN', JSON.stringify(snap811.openGaps || []).slice(0, 200));
 }
 
+// ---- P812: 特徴の質問にも教わった説明で答える ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem812: any[] = []; const hist812: any[] = []; let st812: any = undefined;
+  const run812 = async (t: string) => {
+    mem812 = conversationFactIntakeService.intakeFromUserText(t, mem812).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem812, recentMessages: hist812.slice(-8), conversationState: st812 } as any);
+    st812 = r.nextConversationState;
+    hist812.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run812('ネコモドキは寿命が15年くらいの獣だよ');
+  const feat812 = await run812('ネコモドキの特徴は？');
+  check('P812 特徴の質問に説明で答える', feat812.replyText.includes('寿命が15年くらいの獣'), feat812.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
