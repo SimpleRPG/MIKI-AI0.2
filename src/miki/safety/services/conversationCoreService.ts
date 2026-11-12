@@ -4351,7 +4351,7 @@ export class ConversationCoreService {
       } catch { /* 補助経路 */ }
       return `「${classEntity}」の分類は、まだはっきり知らないです。調べて覚えておきますね。`;
     }
-    if (/(?:どこで|どこに|どこへ|どこから|生息地)/.test(prompt) && /(?:捕まえ|釣れ|採れ|取れ|買え|手に入|見つか|会え|生息|住んで|棲んで|いる|ある)/.test(prompt)) attrLabel = /(?:生息|住んで|棲んで)/.test(prompt) ? '生息地' : '場所';
+    if (/(?:どこで|どこに|どこへ|どこから|生息地)/.test(prompt) && /(?:捕まえ|釣れ|採れ|取れ|買え|手に入|見つか|見られ|見れる|会え|生息|住んで|棲んで|いる|ある)/.test(prompt)) attrLabel = /(?:生息|住んで|棲んで|見られ|見れる)/.test(prompt) ? '生息地' : '場所';
     else if (/(?:何に|なにに|何の(?:ため|役)|なんの(?:ため|役))/.test(prompt) && /(?:使う|使える|役立|利用)/.test(prompt)) { attrLabel = '使い道'; isUse = true; }
     else if (/(?:何から|なにから)/.test(prompt) && /(?:できて|作ら|でき)/.test(prompt)) attrLabel = '材料';
     // P724: 食性の質問も属性として受ける。ここで受けないと定義の
@@ -4511,6 +4511,15 @@ export class ConversationCoreService {
       if (relationType === 'CAUSES') return `「${entity}」は、${targets}を引き起こします。`;
       return `「${entity}」があると、${targets}ができます。`;
     }
+    // P809: 関係が無くても、教わった説明文に聞かれた部位・語が
+    // 含まれていれば、説明文を引いて答える（「背中には何がある
+    // の？」に「中身は知らない」と返す崩れの対策）。
+    try {
+      const feats2 = utteranceFeatureService.analyze(prompt);
+      const glossHit = japaneseDictionaryService.lookup(entity).map((e: any) => String(e.gloss || '')).find((g: string) => g.length > 0
+        && feats2.contentTokens.some((t) => t !== entity && t.length >= 2 && g.includes(t)));
+      if (glossHit) return `教わった説明では、「${entity}」は${glossHit}、と聞いています。`;
+    } catch { /* 補助判定 */ }
     try {
       knowledgeGapService.detect({
         query: `「${entity}」の${label}を調べる`,

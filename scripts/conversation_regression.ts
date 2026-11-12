@@ -3218,6 +3218,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P808 来週の予定は来週の分だけを返す', rai808.replyText.includes('ライシュウノ予定') && !rai808.replyText.includes('サラシュウノ予定'), rai808.replyText.slice(0, 180));
 }
 
+// ---- P809: 居場所の聞き方（見られる）と部位の中身は説明文で答える ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem809: any[] = []; const hist809: any[] = []; let st809: any = undefined;
+  const run809 = async (t: string) => {
+    mem809 = conversationFactIntakeService.intakeFromUserText(t, mem809).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem809, recentMessages: hist809.slice(-8), conversationState: st809 } as any);
+    st809 = r.nextConversationState;
+    hist809.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run809('カワモドキは川の近くに住む獣だよ');
+  const seen809 = await run809('カワモドキってどこで見られる？');
+  check('P809 どこで見られる、に生息の説明で答える', seen809.replyText.includes('川の近くに住む'), seen809.replyText.slice(0, 150));
+  await run809('ハナモドキは背中に花が咲く獣だよ');
+  const part809 = await run809('ハナモドキの背中には何があるの？');
+  check('P809 部位の中身は説明文で答える', part809.replyText.includes('背中に花が咲く'), part809.replyText.slice(0, 150));
+  const none809 = await run809('ハナモドキの尻尾には何があるの？');
+  check('P809 説明に無い部位は正直に知らないと言う', none809.replyText.includes('まだ知らない'), none809.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
