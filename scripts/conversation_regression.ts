@@ -3285,6 +3285,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P812 特徴の質問に説明で答える', feat812.replyText.includes('寿命が15年くらいの獣'), feat812.replyText.slice(0, 150));
 }
 
+// ---- P813: 「2人の年齢の差は？」は属性を持つ2人で差を出す ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem813: any[] = []; const hist813: any[] = []; let st813: any = undefined;
+  const run813 = async (t: string) => {
+    mem813 = conversationFactIntakeService.intakeFromUserText(t, mem813).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem813, recentMessages: hist813.slice(-8), conversationState: st813 } as any);
+    st813 = r.nextConversationState;
+    hist813.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run813('僕の年齢は30歳だよ');
+  await run813('相方の年齢は28歳だよ');
+  const diff813 = await run813('2人の年齢の差は？');
+  check('P813 人数だけの差の質問に2人で答える', diff813.replyText.includes('2歳違い'), diff813.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

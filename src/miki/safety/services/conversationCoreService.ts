@@ -3521,6 +3521,25 @@ export class ConversationCoreService {
       if (v !== undefined && !found.some((f) => f.name === t)) found.push({ name: t, v });
       if (found.length >= 2) break;
     }
+    // P813: 「2人の年齢の差は？」のように人数だけで指す形は、その
+    // 属性を持つ人がちょうど2人なら、その2人で差を出す。
+    if (found.length < 2 && /(?:2人|二人|ふたり)/.test(prompt)) {
+      const byEntity = new Map<string, number>();
+      for (const mm of (memories || [])) {
+        if (!mm || mm.active === false || mm.replacedBy || String(mm.factAttribute || '') !== attr) continue;
+        const ent = String(mm.factEntity || '');
+        if (!ent) continue;
+        const key = selfSet.has(ent) ? '僕' : ent;
+        if (byEntity.has(key)) continue;
+        const v = valueOf(ent);
+        if (v !== undefined) byEntity.set(key, v);
+      }
+      if (byEntity.size === 2) {
+        const rows = [...byEntity.entries()].map(([name, v]) => ({ name, v }));
+        found.length = 0;
+        found.push(rows[0], rows[1]);
+      }
+    }
     if (found.length < 2) return undefined;
     const diff = Math.abs(found[0].v - found[1].v);
     const diffDisp = Number.isInteger(diff) ? String(diff) : String(Math.round(diff * 10) / 10);
