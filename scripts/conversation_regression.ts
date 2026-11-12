@@ -3803,6 +3803,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P831 午前・午後を答える', dp831.replyText.includes(`今は${h831 < 12 ? '午前' : '午後'}です`), dp831.replyText.slice(0, 120));
 }
 
+// ---- P832: 来週・先週の今日／月末の日付と曜日 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem832: any[] = []; const hist832: any[] = []; let st832: any = undefined;
+  const run832 = async (t: string) => {
+    mem832 = conversationFactIntakeService.intakeFromUserText(t, mem832).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem832, recentMessages: hist832.slice(-8), conversationState: st832 } as any);
+    st832 = r.nextConversationState;
+    hist832.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const now832 = new Date();
+  const wds832 = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+  const nextW832 = new Date(now832.getTime() + 7 * 86400000);
+  const ws832 = await run832('来週の今日は何曜日？');
+  check('P832 来週の今日を日付と曜日で答える', ws832.replyText.includes(`${nextW832.getMonth() + 1}月${nextW832.getDate()}日（${wds832[nextW832.getDay()]}）`), ws832.replyText.slice(0, 120));
+  const last832 = new Date(now832.getFullYear(), now832.getMonth() + 2, 0);
+  const me832 = await run832('来月の月末は何曜日？');
+  check('P832 月末の日付と曜日を答える', me832.replyText.includes(`${last832.getMonth() + 1}月${last832.getDate()}日（${wds832[last832.getDay()]}）`), me832.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -2978,6 +2978,13 @@ export class ConversationCoreService {
     // P819: 「来年の今日」「来月の今日」は、素の「今日は何日／何曜日」
     // に呑まれる前に、ずらした日付で答える（うるう日・末日超えは
     // その月の末日に寄せる）。
+    // P832: 「来週の今日」「先週の今日」は週ずらしで答える
+    // （月・年のずらしとは別に、素の曜日即答に落ちていた）。
+    const weekShift = prompt.match(/(来週|先週)の今日/);
+    if (weekShift && /(?:何曜日|何日|いつ|[？?])/.test(prompt)) {
+      const d = new Date(now.getTime() + (weekShift[1] === '来週' ? 7 : -7) * 86400000);
+      return `${weekShift[1]}の今日は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`;
+    }
     const shiftedToday = prompt.match(/(来年|再来年|去年|一昨年|再来月|来月|先月|先々月)の今日/);
     if (shiftedToday) {
       const w = shiftedToday[1];
@@ -3029,6 +3036,14 @@ export class ConversationCoreService {
     }
     if (/(?:今年|ことし)(?:は|って)?何年|今(?:は|って)?何年/.test(prompt)) {
       return `今年は${now.getFullYear()}年です。`;
+    }
+    // P832: 「来月の月末は何曜日？」——月末の日付と曜日を答える
+    // （素の「何曜日」や調査に落ちていた）。
+    const monthEndQ = prompt.match(/(今月|来月|再来月|先月)の月末(?:は|って)?(?:何日|何曜日)?/);
+    if (monthEndQ) {
+      const shift = monthEndQ[1] === '来月' ? 1 : monthEndQ[1] === '再来月' ? 2 : monthEndQ[1] === '先月' ? -1 : 0;
+      const last = new Date(now.getFullYear(), now.getMonth() + shift + 1, 0);
+      return `${monthEndQ[1]}の月末は${last.getMonth() + 1}月${last.getDate()}日（${weekdays[last.getDay()]}曜日）です。`;
     }
     // P825: 明示の日付の曜日は、その日付で答える（素の「何曜日」より先）。
     const dateWeekday = prompt.match(/(\d{1,2})月(\d{1,2})日(?:は|って)何曜日/);
