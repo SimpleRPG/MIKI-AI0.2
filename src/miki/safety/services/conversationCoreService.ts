@@ -623,7 +623,7 @@ export class ConversationCoreService {
         return this.buildResult('RESOLVED', 'fact_age_projection_answer', this.applyPersonaVoice(factProj), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P822: 説明どうしの比と、誕生日からの割り出しも、その場で答える。
-      const glossRatio = this.glossRatioAnswer(prompt);
+      const glossRatio = this.glossRatioAnswer(prompt, state, recentMessages);
       if (glossRatio) {
         return this.buildResult('RESOLVED', 'gloss_ratio_answer', this.applyPersonaVoice(glossRatio), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -631,7 +631,7 @@ export class ConversationCoreService {
       if (bdayDerived) {
         return this.buildResult('RESOLVED', 'birthday_derived_answer', this.applyPersonaVoice(bdayDerived), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const measAgg = this.measureAggregateAnswer(prompt);
+      const measAgg = this.measureAggregateAnswer(prompt, state, recentMessages);
       if (measAgg && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_aggregate_answer', this.applyPersonaVoice(measAgg), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -4296,23 +4296,47 @@ export class ConversationCoreService {
 
   /** P822: 「アオモドキはアカモドキの何倍の重さ？」——教わった
    * 説明の実測値どうしの比を答える。 */
-  private glossRatioAnswer(prompt: string): string | undefined {
+  private glossRatioAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
     if (!/何倍/.test(prompt)) return undefined;
     const dim = /重さ|重い|軽い/.test(prompt) ? '重さ' as const
       : /大きさ|大きい|小さい/.test(prompt) ? '大きさ' as const
       : /寿命|長生き/.test(prompt) ? '寿命' as const : undefined;
-    if (!dim) return undefined;
     try {
       const entries = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss);
-      const named = entries
-        .map((e: any) => ({ name: String(e.surface), i: prompt.indexOf(String(e.surface)), meas: this.measureFromText(String(e.gloss), dim) }))
-        .filter((x) => x.i >= 0 && x.meas)
-        .sort((a, b) => a.i - b.i);
-      if (named.length < 2) return undefined;
-      const [a, b] = named;
-      if (!b.meas!.value) return undefined;
-      const ratio = Math.round((a.meas!.value / b.meas!.value) * 100) / 100;
-      return `「${a.name}」の${dim}は「${b.name}」の約${ratio}倍です。`;
+      if (dim) {
+        const named = entries
+          .map((e: any) => ({ name: String(e.surface), i: prompt.indexOf(String(e.surface)), meas: this.measureFromText(String(e.gloss), dim) }))
+          .filter((x) => x.i >= 0 && x.meas)
+          .sort((a, b) => a.i - b.i);
+        if (named.length >= 2) {
+          const [a, b] = named;
+          if (!b.meas!.value) return undefined;
+          const ratio = Math.round((a.meas!.value / b.meas!.value) * 100) / 100;
+          return `「${a.name}」の${dim}は「${b.name}」の約${ratio}倍です。`;
+        }
+      }
+      // P836: 対と次元が省略された続きの比の質問（「何倍違う？」）は、
+      // 直近に話した2つと、両方に実測値がある次元で受ける。
+      const dims: Array<'重さ' | '大きさ' | '寿命'> = dim ? [dim] : ['重さ', '大きさ', '寿命'];
+      const cands = this.recentTopicCandidates(state, recentMessages);
+      for (const d of dims) {
+        const pair: Array<{ name: string; meas: { value: number; disp: string } }> = [];
+        for (const c of cands) {
+          if (!c || pair.some((e) => e.name === c)) continue;
+          const entry = entries.find((e: any) => String(e.surface) === c);
+          if (!entry) continue;
+          const meas = this.measureFromText(String(entry.gloss), d);
+          if (meas) pair.push({ name: c, meas });
+          if (pair.length >= 2) break;
+        }
+        if (pair.length >= 2) {
+          const [a, b] = pair;
+          if (!b.meas.value) continue;
+          const ratio = Math.round((a.meas.value / b.meas.value) * 100) / 100;
+          return `「${a.name}」の${d}は「${b.name}」の約${ratio}倍です。`;
+        }
+      }
+      return undefined;
     } catch { return undefined; }
   }
 
@@ -4417,16 +4441,50 @@ export class ConversationCoreService {
     return `${got.attr}の真ん中は「${lo.name}」（${lo.disp}）と「${hi.name}」（${hi.disp}）の間です。`;
   }
 
-  private measureAggregateAnswer(prompt: string): string | undefined {
+  private measureAggregateAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
     const isAvg = /(?:平均)/.test(prompt);
     // P826: 「合わせて」形も合計として受ける（人の事実側と対）。
-    const isSum = /(?:全部合わせ|合計|ぜんぶ合わせ|合わせて)/.test(prompt);
+    // P836: 「合わせると」も同じ合計の形として受ける。
+    const isSum = /(?:合わせ|合計)/.test(prompt);
     if (!isAvg && !isSum) return undefined;
-    const label: '重さ' | '大きさ' | '寿命' | undefined = /(?:重さ|体重|キロ|グラム|トン)/.test(prompt) ? '重さ'
+    let label: '重さ' | '大きさ' | '寿命' | undefined = /(?:重さ|体重|キロ|グラム|トン)/.test(prompt) ? '重さ'
       : /(?:大きさ|長さ|センチ|メートル)/.test(prompt) ? '大きさ'
       : /(?:寿命|長生き|年)/.test(prompt) ? '寿命' : undefined;
-    if (!label) return undefined;
     try {
+      const allEntries = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss);
+      const unitOf = (lab: '重さ' | '大きさ' | '寿命'): string => lab === '重さ' ? 'キロ' : lab === '大きさ' ? 'センチ' : '年';
+      const fmtOf = (lab: '重さ' | '大きさ' | '寿命') => (n: number): string => `${Number.isInteger(n) ? n : Math.round(n * 10) / 10}${unitOf(lab)}`;
+      // P836: 名指しされた対があれば、その対だけで集計する
+      // （全体の集計とは分ける）。次元が文に無ければ、対の両方に
+      // 実測値がある次元を使う（「平均は？」の続きの形も受ける）。
+      const pairAnswer = (names: string[]): string | undefined => {
+        const labs: Array<'重さ' | '大きさ' | '寿命'> = label ? [label] : ['重さ', '大きさ', '寿命'];
+        for (const lab of labs) {
+          const ms = names
+            .map((n) => ({ name: n, meas: this.measureFromText(String(allEntries.find((e: any) => String(e.surface) === n)?.gloss || ''), lab) }))
+            .filter((x) => x.meas);
+          if (ms.length >= 2) {
+            const sum = ms.reduce((acc, x) => acc + (x.meas as { value: number }).value, 0);
+            const fmt = fmtOf(lab);
+            if (isAvg) return `「${ms[0].name}」と「${ms[1].name}」の${lab}の平均は約${fmt(sum / ms.length)}です。`;
+            return `「${ms[0].name}」と「${ms[1].name}」を合わせると${fmt(sum)}です。`;
+          }
+        }
+        return undefined;
+      };
+      const namedInPrompt = allEntries.map((e: any) => String(e.surface)).filter((s: string) => s && prompt.includes(s));
+      if (namedInPrompt.length >= 2) {
+        const pa = pairAnswer(namedInPrompt.slice(0, 2));
+        if (pa) return pa;
+      }
+      if (!label) {
+        const cands = this.recentTopicCandidates(state, recentMessages);
+        if (cands.length >= 2) {
+          const pa = pairAnswer(cands.slice(0, 2));
+          if (pa) return pa;
+        }
+        return undefined;
+      }
       const categoryMatch = prompt.match(/(生き物|動物|鳥|魚|虫|植物|食べ物|飲み物)/);
       const cat = categoryMatch ? (categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1]) : '';
       const entries = japaneseDictionaryService.listPersonal()

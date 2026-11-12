@@ -3881,6 +3881,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P835 省略された差の質問は直近の2つで答える', df835.replyText.includes('差は7キロ'), df835.replyText.slice(0, 150));
 }
 
+// ---- P836: 名指しの対の合計／省略された比と平均 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem836: any[] = []; const hist836: any[] = []; let st836: any = undefined;
+  const run836 = async (t: string) => {
+    mem836 = conversationFactIntakeService.intakeFromUserText(t, mem836).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem836, recentMessages: hist836.slice(-8), conversationState: st836 } as any);
+    st836 = r.nextConversationState;
+    hist836.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run836('ヨミモドキは重さ2キロの鳥だよ');
+  await run836('セミモドキは重さ8キロの鳥だよ');
+  const sum836 = await run836('ヨミモドキとセミモドキ、合わせると何キロ？');
+  check('P836 名指しの対の合計を答える', sum836.replyText.includes('合わせると10キロ'), sum836.replyText.slice(0, 150));
+  const avg836 = await run836('平均は？');
+  check('P836 省略された平均の質問も直近の2つで答える', avg836.replyText.includes('平均は約5キロ'), avg836.replyText.slice(0, 150));
+  const ratio836 = await run836('何倍違う？');
+  check('P836 省略された比の質問は直近の2つで答える', ratio836.replyText.includes('倍') && (ratio836.replyText.includes('約4倍') || ratio836.replyText.includes('約0.25倍')), ratio836.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
