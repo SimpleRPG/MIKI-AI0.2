@@ -3606,6 +3606,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P823 週末の予定を土日の日付で引く', wk823.replyText.includes('カイモノ823') && !wk823.replyText.includes('カイギ823'), wk823.replyText.slice(0, 150));
 }
 
+// ---- P824: 範囲つきの予定の件数／複合の事実の聞き返し／単位換算の「って」形 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService } = await import('../src/services/storageService');
+  let mem824: any[] = []; const hist824: any[] = []; let st824: any = undefined;
+  const run824 = async (t: string) => {
+    mem824 = conversationFactIntakeService.intakeFromUserText(t, mem824).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem824, recentMessages: hist824.slice(-8), conversationState: st824 } as any);
+    st824 = r.nextConversationState;
+    hist824.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const fmt824 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now824 = new Date();
+  const tmr824 = new Date(now824.getTime() + 86400000);
+  const dat824 = new Date(now824.getTime() + 2 * 86400000);
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([
+    { when: '明日', text: '明日にハジメ824の予定があるよ', at: Date.now(), date: fmt824(tmr824) },
+    { when: '明後日', text: '明後日にツギ824の予定があるよ', at: Date.now(), date: fmt824(dat824) },
+  ]));
+  const pc824 = await run824('明日の予定は何件？');
+  check('P824 明日の予定の件数を答える', pc824.replyText.includes('明日の予定は1件です'), pc824.replyText.slice(0, 120));
+  const monthCount824 = [tmr824, dat824].filter((d) => d.getFullYear() === now824.getFullYear() && d.getMonth() === now824.getMonth()).length;
+  const pm824 = await run824('今月の予定は全部で何件？');
+  check('P824 今月の予定の件数を答える', pm824.replyText.includes(`今月の予定は${monthCount824}件です`), pm824.replyText.slice(0, 120));
+  await run824('僕の身長は180センチだよ');
+  await run824('僕の体重は70キロだよ');
+  const cf824 = await run824('僕の身長と体重を教えて');
+  check('P824 複合の事実をまとめて答える', cf824.replyText.includes('身長は180センチ') && cf824.replyText.includes('体重は70キロ'), cf824.replyText.slice(0, 150));
+  const uc824 = await run824('身長180センチって何メートル？');
+  check('P824 前置きつきの単位換算を答える', uc824.replyText.includes('180センチは1.8メートルです'), uc824.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -369,10 +369,14 @@ export class ConversationCoreService {
     // 本人の事実の想起より先に受ける。想起が1件の事実に一致して
     // しまい、数えの質問が単品の聞き返しに化けていた。
     const traitCountEarly = roleplaySessionService.isActive() ? undefined : this.taughtTraitCountAnswer(prompt);
+    // P824: 「僕の身長と体重を教えて」のような複合の聞き返しは、
+    // 単品の想起では拾えず調査に落ちていた。2つ以上の属性が
+    // そろって知れている時だけ、まとめて先に答える。
+    const combinedFactEarly = roleplaySessionService.isActive() ? undefined : this.combinedFactRecallAnswer(prompt, memories);
     // P456 (A): 本人が伝えた事実への聞き返しは、未知語の調査橋より先に
     // 保持済みの本人発言由来の事実で照合する。一致したときだけ想起経路へ進み、
     // 一致しなければ従来経路（調査橋・Claim 照合・分からない）に委ねる。
-    const userFactRecall = traitCountEarly ? null : conversationUserFactRecallService.matchRecall(
+    const userFactRecall = (traitCountEarly || combinedFactEarly) ? null : conversationUserFactRecallService.matchRecall(
       prompt,
       memories,
       (state as any).recentUserFactSummaries
@@ -386,6 +390,10 @@ export class ConversationCoreService {
       // 計算済み）。
       if (traitCountEarly) {
         return this.buildResult('RESOLVED', 'taught_trait_count_answer', this.applyPersonaVoice(traitCountEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P824: 複合の事実の聞き返しも、ここで先に返す。
+      if (combinedFactEarly) {
+        return this.buildResult('RESOLVED', 'combined_fact_recall_answer', this.applyPersonaVoice(combinedFactEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P603: 短い別れの挨拶は、そのまま締めとして返す（状態次第で
       // 分析的な合成や時間ガードに逸れることがあった）。
@@ -427,6 +435,13 @@ export class ConversationCoreService {
       const planMoveEarly = multiPart ? undefined : this.planMoveAnswer(prompt);
       if (planMoveEarly) {
         return this.buildResult('RESOLVED', 'plan_move_answer', this.applyPersonaVoice(planMoveEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P824: 件数の質問（「来週の予定は何件？」）は想起より先に
+      // 数える。想起のゲートが「何」を拾ってしまい、範囲とは
+      // 無関係な「まだ聞いていない」に化けていた。
+      const planCountEarly = multiPart ? undefined : this.planCountAnswer(prompt);
+      if (planCountEarly) {
+        return this.buildResult('RESOLVED', 'plan_count_answer', this.applyPersonaVoice(planCountEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P754: 「明日の予定、何時からだっけ？」は現在時刻の質問では
       // なく予定の聞き返し。時計の即答より先に予定の控えを見る
@@ -3161,7 +3176,8 @@ export class ConversationCoreService {
    */
   private unitConversionAnswer(prompt: string): string | undefined {
     const p = String(prompt || '').replace(/[？?。！!]/g, '').trim();
-    const m = p.match(/^(\d+(?:\.\d+)?)\s*(\S+?)は(?:何|いくつ)(\S+?)(?:です)?(?:か)?$/);
+    // P824: 前置き（「身長180センチって」）や「って」の形も受ける。
+    const m = p.match(/^(?:.*?)(\d+(?:\.\d+)?)\s*(\S+?)(?:は|って)(?:何|いくつ)(\S+?)(?:です)?(?:か)?$/);
     if (!m) return undefined;
     const value = Number(m[1]);
     const from = m[2].trim();
@@ -3881,6 +3897,40 @@ export class ConversationCoreService {
       const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const live = plans.filter((p) => !p.date || p.date >= todayKey);
       if (live.length === 0) return '今は予定を聞いていないです。';
+      // P824: 範囲つきの件数（「今週の予定は何件？」）は、その範囲で
+      // 数える。従来は範囲を無視して全体の件数か、想起の「まだ
+      // 聞いていない」に化けていた。
+      const scopeM = prompt.match(/(再来週|来週|今週|週末|来月|今月|明後日|明日|今日)/);
+      if (scopeM) {
+        const scope = scopeM[1];
+        const fmtD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const dayMs = 86400000;
+        const dow = now.getDay();
+        const thisSunday = new Date(now.getTime() + ((7 - dow) % 7) * dayMs);
+        let inScope: (p: { when: string; date?: string }) => boolean;
+        if (scope === '今週') inScope = (p) => p.date ? (p.date >= todayKey && p.date <= fmtD(thisSunday)) : p.when === scope;
+        else if (scope === '来週') inScope = (p) => p.date ? (p.date > fmtD(thisSunday) && p.date <= fmtD(new Date(thisSunday.getTime() + 7 * dayMs))) : p.when === scope;
+        else if (scope === '再来週') inScope = (p) => p.date ? (p.date > fmtD(new Date(thisSunday.getTime() + 7 * dayMs)) && p.date <= fmtD(new Date(thisSunday.getTime() + 14 * dayMs))) : p.when === scope;
+        else if (scope === '週末') {
+          let satDelta = (6 - dow + 7) % 7; if (dow === 0) satDelta = -1;
+          const sat = fmtD(new Date(now.getTime() + satDelta * dayMs));
+          const sun = fmtD(new Date(now.getTime() + (satDelta + 1) * dayMs));
+          inScope = (p) => p.date ? (p.date === sat || p.date === sun) : p.when === scope;
+        }
+        else if (scope === '今月') inScope = (p) => p.date ? p.date.slice(0, 7) === todayKey.slice(0, 7) : p.when === scope;
+        else if (scope === '来月') {
+          const nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          const nmKey = `${nm.getFullYear()}-${String(nm.getMonth() + 1).padStart(2, '0')}`;
+          inScope = (p) => p.date ? p.date.slice(0, 7) === nmKey : p.when === scope;
+        }
+        else {
+          const off = scope === '明日' ? 1 : scope === '明後日' ? 2 : 0;
+          const target = fmtD(new Date(now.getTime() + off * dayMs));
+          inScope = (p) => p.date ? p.date === target : p.when === scope;
+        }
+        const n = live.filter(inScope).length;
+        return `${scope}の予定は${n}件です。`;
+      }
       return `予定は${live.length}件あります。`;
     } catch { return undefined; }
   }
@@ -4032,6 +4082,32 @@ export class ConversationCoreService {
     const avg = got.rows.reduce((s, r) => s + r.v, 0) / got.rows.length;
     const disp = Number.isInteger(avg) ? String(avg) : String(Math.round(avg * 10) / 10);
     return `平均${got.attr}は約${disp}${got.unit}です（${got.rows.length}人分）。`;
+  }
+
+  /** P824: 「僕の身長と体重を教えて」——2つ以上の属性をまとめて
+   * 聞かれたら、知っている分を並べて答える（単品想起は1件しか
+   * 返せず、複合形は調査に落ちていた）。 */
+  private combinedFactRecallAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/(?:教えて|知りたい|聞きたい)/.test(prompt) && !/[？?]/.test(prompt)) return undefined;
+    const ATTR_WORDS: Array<[RegExp, string]> = [[/身長/, '身長'], [/体重/, '体重'], [/年齢/, '年齢'], [/誕生日/, '誕生日']];
+    const attrs = [...new Set(ATTR_WORDS.filter(([re]) => re.test(prompt)).map(([, a]) => a))];
+    if (attrs.length < 2) return undefined;
+    const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    const facts = (memories || []).filter((mm: any) => mm && mm.active !== false && !mm.replacedBy && attrs.includes(String(mm.factAttribute || '')) && String(mm.factEntity || ''));
+    if (facts.length === 0) return undefined;
+    const entities = [...new Set(facts.map((mm: any) => String(mm.factEntity)))];
+    const named = entities.find((e) => prompt.includes(e));
+    const selfEnt = entities.find((e) => selfSet.has(e));
+    const pick = named || selfEnt;
+    if (!pick) return undefined;
+    const found: Array<{ attr: string; value: string }> = [];
+    for (const attr of attrs) {
+      const f = facts.find((mm: any) => String(mm.factEntity) === pick && String(mm.factAttribute) === attr);
+      if (f) found.push({ attr, value: String((f as any).factValue || '') });
+    }
+    if (found.length < 2) return undefined;
+    const dispName = selfSet.has(pick) ? '僕' : pick;
+    return `${dispName}の${found.map((f) => `${f.attr}は${f.value}`).join('、')}です。`;
   }
 
   /** P822: 「アオモドキはアカモドキの何倍の重さ？」——教わった
