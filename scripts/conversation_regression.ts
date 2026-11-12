@@ -3685,6 +3685,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P826 合わせての合計を説明の重さでも答える', /合わせると/.test(gs826.replyText) && /キロ/.test(gs826.replyText), gs826.replyText.slice(0, 150));
 }
 
+// ---- P827: 示された生年月日からの年齢／複合の時間換算 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem827: any[] = []; const hist827: any[] = []; let st827: any = undefined;
+  const run827 = async (t: string) => {
+    mem827 = conversationFactIntakeService.intakeFromUserText(t, mem827).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem827, recentMessages: hist827.slice(-8), conversationState: st827 } as any);
+    st827 = r.nextConversationState;
+    hist827.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const now827 = new Date();
+  let age827 = now827.getFullYear() - 1995;
+  if (now827.getMonth() < 5 || (now827.getMonth() === 5 && now827.getDate() < 15)) age827--;
+  const ba827 = await run827('1995年6月15日生まれの人は今何歳？');
+  check('P827 示された生年月日から年齢を割り出す', ba827.replyText.includes(`今${age827}歳です`), ba827.replyText.slice(0, 120));
+  const ct827 = await run827('2時間30分は何分？');
+  check('P827 複合の時間を分に換算する', ct827.replyText.includes('150分です'), ct827.replyText.slice(0, 120));
+  const st827b = await run827('150分は何時間何分？');
+  check('P827 分を時間と分に分けて答える', st827b.replyText.includes('2時間30分です'), st827b.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

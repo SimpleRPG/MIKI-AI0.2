@@ -3134,6 +3134,15 @@ export class ConversationCoreService {
       const diff = Math.round((target.getTime() - today0.getTime()) / 86400000);
       return diff === 0 ? `${tm}月${td}日は今日です。` : `${tm}月${td}日まであと${diff}日です。`;
     }
+    // P827: 質問の中で生年月日が示されたら（「1995年6月15日
+    // 生まれの人は今何歳？」）、その場で年齢を割り出す。
+    const bornAge = prompt.match(/(\d{4})年(\d{1,2})月(\d{1,2})日生まれ/);
+    if (bornAge && /何歳/.test(prompt)) {
+      const by = Number(bornAge[1]); const bm = Number(bornAge[2]); const bd = Number(bornAge[3]);
+      let age = now.getFullYear() - by;
+      if (now.getMonth() < bm - 1 || (now.getMonth() === bm - 1 && now.getDate() < bd)) age--;
+      return `${by}年${bm}月${bd}日生まれの人は今${age}歳です。`;
+    }
     const monthLenMatch = prompt.match(/(今月|来月|再来月|先月|(\d{1,2})月)(?:は|って)?(?:何日まで|何日ある|何日間)/);
     if (monthLenMatch) {
       let y = now.getFullYear();
@@ -3206,6 +3215,12 @@ export class ConversationCoreService {
    */
   private unitConversionAnswer(prompt: string): string | undefined {
     const p = String(prompt || '').replace(/[？?。！!]/g, '').trim();
+    // P827: 複合の時間（「2時間30分は何分？」「150分は何時間
+    // 何分？」）は、単位どうしの合成として受ける。
+    const compound = p.match(/^(\d+(?:\.\d+)?)時間(\d+(?:\.\d+)?)分は(?:何|いくつ)分(?:です)?(?:か)?$/);
+    if (compound) return `${compound[1]}時間${compound[2]}分は${Number(compound[1]) * 60 + Number(compound[2])}分です。`;
+    const splitForm = p.match(/^(\d+(?:\.\d+)?)分は(?:何|いくつ)時間(?:何|いくつ)分(?:です)?(?:か)?$/);
+    if (splitForm) { const t = Number(splitForm[1]); return `${splitForm[1]}分は${Math.floor(t / 60)}時間${t % 60}分です。`; }
     // P824: 前置き（「身長180センチって」）や「って」の形も受ける。
     const m = p.match(/^(?:.*?)(\d+(?:\.\d+)?)\s*(\S+?)(?:は|って)(?:何|いくつ)(\S+?)(?:です)?(?:か)?$/);
     if (!m) return undefined;
