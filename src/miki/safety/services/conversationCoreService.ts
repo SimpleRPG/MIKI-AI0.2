@@ -580,9 +580,20 @@ export class ConversationCoreService {
       if (measAgg && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_aggregate_answer', this.applyPersonaVoice(measAgg), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P819: 実測値の真ん中（中央）も、その場で答える。
+      const measMedian = this.measureMedianAnswer(prompt);
+      if (measMedian && !multiPart) {
+        return this.buildResult('RESOLVED', 'measure_median_answer', this.applyPersonaVoice(measMedian), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const habitatList = this.glossHabitatListAnswer(prompt);
       if (habitatList && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_habitat_list_answer', this.applyPersonaVoice(habitatList), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P819: 動詞句の性質で絞った一覧は、名詞の性質の一覧より先に
+      // 受ける（句の形は従来どちらにも乗らなかった）。
+      const traitListVp = this.taughtTraitListAnswer(prompt);
+      if (traitListVp && !multiPart) {
+        return this.buildResult('RESOLVED', 'taught_trait_list_answer', this.applyPersonaVoice(traitListVp), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       const traitList = this.glossTraitListAnswer(prompt);
       if (traitList && !multiPart) {
@@ -2887,6 +2898,21 @@ export class ConversationCoreService {
     const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
     const dayOffsets: Record<string, number> = { 今日: 0, 明日: 1, あした: 1, 明後日: 2, 昨日: -1, きのう: -1, 一昨日: -2, おととい: -2 };
     const dayPattern = '(今日|明日|あした|明後日|昨日|きのう|一昨日|おととい)';
+    // P819: 「来年の今日」「来月の今日」は、素の「今日は何日／何曜日」
+    // に呑まれる前に、ずらした日付で答える（うるう日・末日超えは
+    // その月の末日に寄せる）。
+    const shiftedToday = prompt.match(/(来年|再来年|去年|一昨年|再来月|来月|先月|先々月)の今日/);
+    if (shiftedToday) {
+      const w = shiftedToday[1];
+      const dy = w === '来年' ? 1 : w === '再来年' ? 2 : w === '去年' ? -1 : w === '一昨年' ? -2 : 0;
+      const dm = w === '来月' ? 1 : w === '再来月' ? 2 : w === '先月' ? -1 : w === '先々月' ? -2 : 0;
+      const ty = now.getFullYear() + dy;
+      const tm = now.getMonth() + dm;
+      const lastDay = new Date(ty, tm + 1, 0).getDate();
+      const d = new Date(ty, tm, Math.min(now.getDate(), lastDay));
+      const past = dy < 0 || dm < 0;
+      return `${w}の今日は${dy !== 0 ? `${ty}年` : ''}${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）${past ? 'でした' : 'です'}。`;
+    }
     const weekdayMatch = prompt.match(new RegExp(`${dayPattern}(?:は|って)?何曜日`));
     if (weekdayMatch) {
       const d = new Date(now);
@@ -2914,17 +2940,6 @@ export class ConversationCoreService {
       else if (unit === '週間') d.setDate(d.getDate() + sign * n * 7);
       else d.setMonth(d.getMonth() + sign * n);
       return `今日から${n}${unit}${earlyOffset[3]}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`;
-    }
-    // P817: 「来年の今日は何月何日？」は来年の同じ月日を答える
-    // （素の「何月何日」に呑まれて今日の日付だけ返っていた）。
-    // うるう日の年はその月の末日に寄せる。
-    const yearToday = prompt.match(/(来年|再来年|去年|一昨年)の今日/);
-    if (yearToday) {
-      const dy = yearToday[1] === '来年' ? 1 : yearToday[1] === '再来年' ? 2 : yearToday[1] === '去年' ? -1 : -2;
-      const ty = now.getFullYear() + dy;
-      let d = new Date(ty, now.getMonth(), now.getDate());
-      if (d.getMonth() !== now.getMonth()) d = new Date(ty, now.getMonth() + 1, 0);
-      return `${yearToday[1]}の今日は${ty}年${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）${dy < 0 ? 'でした' : 'です'}。`;
     }
     if (/今日の日付|何月何日/.test(prompt)) {
       return `今日は${now.getMonth() + 1}月${now.getDate()}日です。`;
@@ -3358,6 +3373,62 @@ export class ConversationCoreService {
    * の教示記録（user-taught）から一覧で答える。分類の語があれば
    * その範囲に絞る（説明文か仮の分類に分類語を含むもの）。
    */
+  /**
+   * P819: 「重さの真ん中は？」——教わったものの実測値の中央。
+   * 並び順（P758）・合計と平均（P761）はあったが真ん中は無く、
+   * 未知語の保留に落ちていた。偶数個なら真ん中の2つを挙げる。
+   */
+  private measureMedianAnswer(prompt: string): string | undefined {
+    if (!/(?:真ん中|中央)/.test(prompt)) return undefined;
+    const dim = /重さ|重い|軽い/.test(prompt) ? '重さ' as const
+      : /大きさ|大きい|小さい/.test(prompt) ? '大きさ' as const
+      : /寿命|長生き/.test(prompt) ? '寿命' as const : undefined;
+    if (!dim) return undefined;
+    try {
+      const categoryMatch = prompt.match(/(生き物|動物|鳥|魚|虫|植物)/);
+      const cat = categoryMatch ? (categoryMatch[1] === '生き物' ? '動物' : categoryMatch[1]) : '';
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'))
+        .filter((e: any) => !cat || this.taughtScopeMatch(e, cat));
+      const measured = entries
+        .map((e: any) => ({ name: String(e.surface), meas: this.measureFromText(String(e.gloss), dim) }))
+        .filter((x) => x.meas)
+        .sort((a, b) => a.meas!.value - b.meas!.value);
+      if (measured.length === 0) return `${dim}の数値が分かるものがまだ無いので、真ん中は分からないです。`;
+      const mid = Math.floor(measured.length / 2);
+      if (measured.length % 2 === 1) {
+        const pick = measured[mid];
+        return `${dim}の真ん中は「${pick.name}」です（${pick.meas!.disp}）。`;
+      }
+      const lo = measured[mid - 1]; const hi = measured[mid];
+      return `${dim}の真ん中は「${lo.name}」（${lo.meas!.disp}）と「${hi.name}」（${hi.meas!.disp}）の間です。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P819: 「夜に活動する生き物を教えて」——動詞句の性質で絞った
+   * 一覧。性質の一覧（P763）は名詞の性質（夜行性など）だけで、
+   * 句の形は調査の的外れな提示に落ちていた。説明文に句を含む
+   * ものを挙げる（数えは P818）。
+   */
+  private taughtTraitListAnswer(prompt: string): string | undefined {
+    const m = prompt.match(/^(.{2,14}?)(?:の)?(生き物|動物|鳥|魚|虫|植物|獣)(?:を|は|って|が)?(?:教えて|挙げて|知りたい|見せて)/);
+    if (!m) return undefined;
+    const trait = m[1].replace(/^(?:今まで|これまで)?(?:教えた|教えてくれた|教えてもらった|教わった)/, '').trim();
+    if (!trait || trait.length < 2 || /何|より/.test(trait)) return undefined;
+    if (!/(?:する|いる|れる|ある|ない|鳴く|泳ぐ|飛ぶ|光る|咲く)/.test(trait)) return undefined;
+    const cat = m[2] === '生き物' ? '動物' : m[2];
+    try {
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'))
+        .filter((e: any) => this.taughtScopeMatch(e, cat));
+      const hits = entries.filter((e: any) => String(e.gloss).includes(trait));
+      const names = [...new Set(hits.map((e: any) => String(e.surface)))];
+      if (names.length === 0) return `今知っている中では、${trait}ものはいないです。`;
+      return `${trait}${m[2]}は、${names.map((n) => `「${n}」`).join('と')}がいます。`;
+    } catch { return undefined; }
+  }
+
   /**
    * P818: 「夜に活動する獣は何種類？」——性質で絞った数え。
    * 教わった説明文に性質の句を含むものだけを数える（従来は
@@ -4192,7 +4263,13 @@ export class ConversationCoreService {
         const d = new Date(now.getTime() + delta * 86400000);
         targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       }
-      const hits = plans.filter((p) => (p.date && targetDate ? p.date === targetDate : p.when === when));
+      let hits = plans.filter((p) => (p.date && targetDate ? p.date === targetDate : p.when === when));
+      // P819: 曜日で聞かれて、その曜日の日付に合う控えが無い時は、
+      // 同じ曜日のラベルの控えを拾う（曜日にずらした予定は翌週の
+      // 日付になり、日付だけでは引けなかった）。
+      if (hits.length === 0 && wdMatch) {
+        hits = plans.filter((p) => p.when === when || p.when === `来週の${wdMatch[2]}曜日` || p.when === `再来週の${wdMatch[2]}曜日`);
+      }
       if (hits.length === 0) {
         // P774: 明示の日付で聞かれたら、その日の予定が無いことを
         // こちらで答える（彼女自身の予定の話に流さない）。
@@ -4773,7 +4850,12 @@ export class ConversationCoreService {
     if (confirmMatch && /[？?]/.test(prompt) && !/^(?:何|なに|どの|どう|いつ|どこ|だれ|誰)/.test(confirmMatch[2].trim()) && !/(?:なんで|どうして|なぜ)/.test(prompt)) {
       const entity = known.find((t) => prompt.startsWith(t) || prompt.includes(`${t}って`) || prompt.includes(`${t}は`));
       if (!entity) return undefined;
-      const candidate = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか|よね|でしょ)/.test(t) && !/^(?:じゃ|ない|仲間|なかま|種類|一種)$/.test(t) && !/^[性化用型感力]$/.test(t)).slice(-1)[0];
+      // P819: 「〜だっけ？」の思い出し形でも確認として扱えるよう、
+      // だっけ・っけは候補にしない（従来は候補が「っけ」になり、
+      // 照合に失敗して確認そのものが流れていた）。「魚の仲間」の
+      // ように助詞が付いた候補は、末尾の「の」を落として照合する。
+      const candidateToken = features.contentTokens.filter((t) => t !== entity && !/(?:じゃない|なの|ですか|よね|でしょ|だっけ|っけ)/.test(t) && !/^(?:じゃ|ない|仲間|なかま|種類|一種)$/.test(t) && !/^[性化用型感力]$/.test(t)).slice(-1)[0];
+      const candidate = candidateToken ? candidateToken.replace(/の$/, '') : candidateToken;
       if (!candidate || candidate === entity) return undefined;
       // P738: 候補が性質の語（夜行・肉食・温厚など）の時は、分類の
       // 関係では肯定も否定もできない。「性じゃなくて」のような
@@ -4801,7 +4883,13 @@ export class ConversationCoreService {
             const st = String((c as any).statement || '');
             return st.includes(entity) && st.includes(candidate);
           });
-          if (!relTos.includes(candidate) && !glossText.includes(candidate) && !inClaims) return undefined;
+          // P819: 「〜だっけ？」の思い出し形で、分類が分かっている
+          // 物への確認は、候補が外れていても通す（後段で分類から
+          // 正す）。裸の意見の質問（「可愛い？」等）は従来どおり
+          // ここで引く。
+          const isATos = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity && r.type === 'IS_A').map((r) => r.to);
+          const dakkeWithIsA = /だっけ/.test(prompt) && isATos.length > 0;
+          if (!relTos.includes(candidate) && !glossText.includes(candidate) && !inClaims && !dakkeWithIsA) return undefined;
         } catch { return undefined; }
       }
       const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);

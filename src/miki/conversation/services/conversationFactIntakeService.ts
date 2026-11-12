@@ -1035,12 +1035,10 @@ export class ConversationFactIntakeService {
       const t = String(text || '').trim();
       if (!t || /[？?]/.test(t)) return;
       if (!/(?:予定|予約|約束)/.test(t)) return;
-      const mv = t.match(/(明後日|明々後日|明日|あした|今日|今夜)?の?(?:予定|予約|約束)(?:を|、|,)?\s*(明後日|明々後日|明日|今日)に(?:ずらして|ずらす|移して|移す|延期して|延期する)/);
+      const mv = t.match(/(明後日|明々後日|明日|あした|今日|今夜)?の?(?:予定|予約|約束)(?:を|、|,)?\s*(明後日|明々後日|明日|今日|[日月火水木金土]曜日)に(?:ずらして|ずらす|移して|移す|延期して|延期する)/);
       if (!mv) return;
       const fromWhen = mv[1] ? (mv[1] === 'あした' ? '明日' : mv[1]) : '';
       const toWhen = mv[2];
-      const toDate = this.planDateFor(toWhen);
-      if (!toDate) return;
       const key = 'miki_user_plans_v1';
       const raw = storageService.getItem(key);
       const plans: Array<{ when: string; text: string; at: number; date?: string }> = raw ? JSON.parse(raw) : [];
@@ -1051,6 +1049,23 @@ export class ConversationFactIntakeService {
         const dates = [...new Set(plans.map((p) => p.date).filter(Boolean))];
         if (dates.length === 1) fromDate = dates[0] as string;
       }
+      // P819: 曜日へのずらしは、ずらす元の日の次のその曜日へ
+      // （同じ曜日なら翌週）。相対日のずらしは従来どおり。
+      let toDate: string | undefined;
+      const wdTo = toWhen.match(/^([日月火水木金土])曜日$/);
+      if (wdTo) {
+        if (!fromDate) return;
+        const base = new Date(`${fromDate}T00:00:00`);
+        let delta = ('日月火水木金土'.indexOf(wdTo[1]) - base.getDay() + 7) % 7;
+        if (delta === 0) delta = 7;
+        const nd = new Date(base.getTime() + delta * 86400000);
+        const mm = String(nd.getMonth() + 1).padStart(2, '0');
+        const dd = String(nd.getDate()).padStart(2, '0');
+        toDate = `${nd.getFullYear()}-${mm}-${dd}`;
+      } else {
+        toDate = this.planDateFor(toWhen);
+      }
+      if (!toDate) return;
       let moved = 0;
       if (fromDate) {
         for (const p of plans) {

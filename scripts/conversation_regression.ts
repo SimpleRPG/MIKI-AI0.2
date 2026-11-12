@@ -3438,6 +3438,47 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P818 消したメモは読み返しに出ない', left818.replyText.includes('詰め替え洗剤') && !left818.replyText.includes('除菌シート'), left818.replyText.slice(0, 150));
 }
 
+// ---- P819: 真ん中／動詞句の性質の一覧／曜日への予定ずらし／来月・先月の今日／だっけ形の確認 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService } = await import('../src/services/storageService');
+  let mem819: any[] = []; const hist819: any[] = []; let st819: any = undefined;
+  const run819 = async (t: string) => {
+    mem819 = conversationFactIntakeService.intakeFromUserText(t, mem819).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem819, recentMessages: hist819.slice(-8), conversationState: st819 } as any);
+    st819 = r.nextConversationState;
+    hist819.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run819('ミドリモドキは重さ3キロの植物だよ');
+  await run819('オオモドキバナは重さ6キロの植物だよ');
+  await run819('チイモドキバナは重さ12キロの植物だよ');
+  const med819 = await run819('植物の重さの真ん中は？');
+  check('P819 実測値の真ん中を答える', med819.replyText.includes('真ん中は「オオモドキバナ」'), med819.replyText.slice(0, 150));
+  await run819('ヨルビーは夜に活動する獣だよ');
+  await run819('ヒルビーは昼に活動する獣だよ');
+  const tl819 = await run819('夜に活動する生き物を教えて');
+  check('P819 動詞句の性質で絞って挙げる', tl819.replyText.includes('ヨルビー') && !tl819.replyText.includes('ヒルビー'), tl819.replyText.slice(0, 150));
+  // 予定：明日の控えを直接置き、金曜日へずらす（元の日の次の金曜）。
+  const fmt819 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const tomorrow819 = new Date(Date.now() + 86400000);
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([{ when: '明日', text: '明日、ハミガキ819の予定があるよ', at: Date.now(), date: fmt819(tomorrow819) }]));
+  let delta819 = (5 - tomorrow819.getDay() + 7) % 7; if (delta819 === 0) delta819 = 7;
+  const expect819 = fmt819(new Date(tomorrow819.getTime() + delta819 * 86400000));
+  const mv819 = await run819('明日の予定、金曜日にずらして');
+  const plans819 = JSON.parse(storageService.getItem('miki_user_plans_v1') || '[]');
+  check('P819 予定を曜日へずらす', mv819.replyText.includes('金曜日にずらしておきました') && plans819.length === 1 && plans819[0].date === expect819 && plans819[0].when === '金曜日', `${mv819.replyText.slice(0, 80)} / ${JSON.stringify(plans819)}`);
+  const now819 = new Date();
+  const nextM819 = new Date(now819.getFullYear(), now819.getMonth() + 1, Math.min(now819.getDate(), new Date(now819.getFullYear(), now819.getMonth() + 2, 0).getDate()));
+  const cal819 = await run819('来月の今日は何日？');
+  check('P819 来月の今日を答える', cal819.replyText.includes(`${nextM819.getMonth() + 1}月${nextM819.getDate()}日`), cal819.replyText.slice(0, 120));
+  await run819('ウミモドキは魚だよ');
+  const cf819 = await run819('ウミモドキって魚の仲間だっけ？');
+  check('P819 だっけ形の確認に肯定する', cf819.replyText.includes('魚の仲間だと思います'), cf819.replyText.slice(0, 150));
+  const cf819b = await run819('ウミモドキって鳥の仲間だっけ？');
+  check('P819 だっけ形の外れた確認を正す', cf819b.replyText.includes('鳥じゃなくて'), cf819b.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
