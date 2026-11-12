@@ -3962,6 +3962,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P839 一覧の後の数えは控えから数える', ct839.replyText.includes('種類です'), ct839.replyText.slice(0, 120));
 }
 
+// ---- P840: 話題の舞台の共有化（候補生成の移設）とスナップショット輸出 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { topicStageService } = await import('../src/miki/memory/services/topicStageService');
+  const { stateSnapshotExportService } = await import('../src/miki/selfAwareness/services/stateSnapshotExportService');
+  let mem840: any[] = []; const hist840: any[] = []; let st840: any = undefined;
+  const run840 = async (t: string) => {
+    mem840 = conversationFactIntakeService.intakeFromUserText(t, mem840).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem840, recentMessages: hist840.slice(-8), conversationState: st840 } as any);
+    st840 = r.nextConversationState;
+    hist840.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run840('ユキモドキは重さ2キロの鳥だよ');
+  await run840('ハナモドキは重さ5キロの鳥だよ');
+  const cmp840 = await run840('どっちが重い？');
+  check('P840 移設後も省略形の比較が候補で解ける', cmp840.replyText.includes('ハナモドキ'), cmp840.replyText.slice(0, 150));
+  const cands840 = topicStageService.candidates(st840, hist840);
+  check('P840 共有サービスの候補に教えた語が入る', cands840.includes('ユキモドキ') || cands840.includes('ハナモドキ'), JSON.stringify(cands840));
+  const snap840: any = stateSnapshotExportService.build();
+  check('P840 スナップショットに話題の舞台が載る', Boolean(snap840.snapshot.topicStage) && Array.isArray(snap840.snapshot.topicStage.recentEntities) && typeof snap840.snapshot.topicStage.currentTopic === 'string', JSON.stringify(snap840.snapshot.topicStage || null).slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

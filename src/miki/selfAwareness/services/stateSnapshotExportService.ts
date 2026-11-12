@@ -158,6 +158,27 @@ class StateSnapshotExportService {
           return { count: Array.isArray(items) ? items.length : 0, items: Array.isArray(items) ? items.slice(-5).map((p) => ({ when: p.when || '', text: p.text || '' })) : [] };
         } catch { return { count: 0, items: [] }; }
       })(),
+      // P840: 話題の舞台（会話状態の currentTopic / recentEntities /
+      // lastTopic と、保留スロットの有無）も書き出す。これまで
+      // スナップショットに見えていた話題は開いた話題の台帳だけで、
+      // 省略解決に実際に効いている舞台は実機で検証できなかった。
+      topicStage: (() => {
+        try {
+          const st = JSON.parse(storageService.getItem('miki_conversation_state') || 'null');
+          const has = (k: string) => { try { return Boolean(storageService.getItem(k)); } catch { return false; } };
+          return {
+            currentTopic: st?.currentTopic || '',
+            recentEntities: Array.isArray(st?.recentEntities) ? st.recentEntities.slice(-5) : [],
+            lastTopic: st?.lastTopic || '',
+            pendingQuestions: Array.isArray(st?.pendingQuestions) ? st.pendingQuestions.length : 0,
+            pendingSlots: {
+              topicQuestion: has('miki_pending_topic_question_v1'),
+              unknownTerm: has('miki_unknown_pending_v1'),
+              lastList: has('miki_last_list_answer_v1'),
+            },
+          };
+        } catch { return null; }
+      })(),
     };
     return {
       snapshot,

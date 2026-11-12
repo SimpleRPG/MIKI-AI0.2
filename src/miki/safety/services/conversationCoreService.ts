@@ -34,6 +34,7 @@ import { userMemoService } from '../../conversation/services/userMemoService';
 import { quizService } from '../../conversation/services/quizService';
 import { utteranceEventClassifierService } from '../../conversation/services/utteranceEventClassifierService';
 import { utteranceFeatureService, isBackchannelText } from '../../memory/services/utteranceFeatureService';
+import { topicStageService } from '../../memory/services/topicStageService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
@@ -6566,31 +6567,9 @@ export class ConversationCoreService {
    * 直近のユーザー発話の内容語も同じ基準で拾い、新しい順に並べる。
    */
   private recentTopicCandidates(state?: any, recentMessages: ChatMessage[] = []): string[] {
-    const valid = (t: unknown): t is string => {
-      if (typeof t !== 'string' || t.length < 2 || t.length > 12) return false;
-      if (/[、。！？!?\s]/.test(t)) return false;
-      try {
-        return japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0;
-      } catch { return false; }
-    };
-    const pool: string[] = [];
-    for (const m of [...recentMessages].reverse()) {
-      if ((m as any).role !== 'user') continue;
-      const text = String((m as any).content || (m as any).text || '');
-      if (!text) continue;
-      try {
-        for (const t of utteranceFeatureService.analyze(text).contentTokens) {
-          if (valid(t) && !pool.includes(t)) pool.push(t);
-        }
-      } catch { /* 補助経路 */ }
-      if (pool.length >= 6) break;
-    }
-    const entities: string[] = Array.isArray(state?.recentEntities) ? state.recentEntities : [];
-    for (const t of [...entities].reverse()) {
-      if (valid(t) && !pool.includes(t)) pool.push(t);
-    }
-    if (valid(state?.currentTopic) && !pool.includes(state.currentTopic)) pool.unshift(state.currentTopic);
-    return pool;
+    // P840: 候補生成は共有の話題舞台（topicStageService）へ移設。
+    // ここは互換のための薄い委譲だけを残す。
+    return topicStageService.candidates(state, recentMessages as any[]);
   }
 
   private recentTopicNameAnswer(prompt: string, state?: any, recentMessages: ChatMessage[] = []): string | undefined {
