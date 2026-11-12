@@ -3662,6 +3662,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P825 明示の日付の曜日を答える', dw825.replyText.includes(`12月25日は${wd825}曜日です`), dw825.replyText.slice(0, 120));
 }
 
+// ---- P826: 日付から日付までの日数／「合わせて」の合計（事実・説明の両側） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem826: any[] = []; const hist826: any[] = []; let st826: any = undefined;
+  const run826 = async (t: string) => {
+    mem826 = conversationFactIntakeService.intakeFromUserText(t, mem826).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem826, recentMessages: hist826.slice(-8), conversationState: st826 } as any);
+    st826 = r.nextConversationState;
+    hist826.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const dd826 = await run826('11月20日から12月25日まで何日ある？');
+  check('P826 日付から日付までの日数を答える', dd826.replyText.includes('までは35日です'), dd826.replyText.slice(0, 120));
+  await run826('僕の体重は70キロだよ');
+  await run826('相方の体重は55キロだよ');
+  const fs826 = await run826('僕と相方、合わせて何キロ？');
+  check('P826 合わせての合計を人の体重で答える', fs826.replyText.includes('125キロ'), fs826.replyText.slice(0, 150));
+  await run826('ハナモドキは重さ2キロの植物だよ');
+  await run826('ツキモドキは重さ4キロの植物だよ');
+  const gs826 = await run826('植物、合わせて何キロ？');
+  check('P826 合わせての合計を説明の重さでも答える', /合わせると/.test(gs826.replyText) && /キロ/.test(gs826.replyText), gs826.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -3111,6 +3111,18 @@ export class ConversationCoreService {
         ? `${wdCount[1]}はあと${count}回、${wdCount[2]}曜日があります。`
         : `${wdCount[1]}は${wdCount[2]}曜日が${count}回あります。`;
     }
+    // P826: 日付から日付までの日数（「11月20日から12月25日まで
+    // 何日？」）は、2つの日付の差で答える。今日からの残り日数と
+    // 取り違えていた。
+    const dateToDate = prompt.match(/(\d{1,2})月(\d{1,2})日から(\d{1,2})月(\d{1,2})日まで何日/);
+    if (dateToDate) {
+      const y = now.getFullYear();
+      const start = new Date(y, Number(dateToDate[1]) - 1, Number(dateToDate[2]));
+      let end = new Date(y, Number(dateToDate[3]) - 1, Number(dateToDate[4]));
+      if (end.getTime() < start.getTime()) end = new Date(y + 1, Number(dateToDate[3]) - 1, Number(dateToDate[4]));
+      const diff = Math.round((end.getTime() - start.getTime()) / 86400000);
+      return `${dateToDate[1]}月${dateToDate[2]}日から${dateToDate[3]}月${dateToDate[4]}日までは${diff}日です。`;
+    }
     // P825: 明示の日付までの日数と、その日付の曜日も、その場で
     // 数える（従来は調査に落ちていた）。
     const untilDate = prompt.match(/(\d{1,2})月(\d{1,2})日まで(?:あと)?何日/);
@@ -4053,6 +4065,9 @@ export class ConversationCoreService {
     // 指す形も、年齢の事実で受ける（従来は属性が取れずに流れていた）。
     else if (/歳/.test(prompt)) { attr = '年齢'; label = '年齢'; unit = '歳'; cueLabel = '年上'; }
     else if (/重|軽|体重/.test(prompt)) { attr = '体重'; label = '重さ'; unit = 'キロ'; cueLabel = '重い'; if (/軽/.test(prompt) && !/重/.test(prompt)) { minus = true; cueLabel = '軽い'; } }
+    // P826: 「合わせて何キロ？」のように単位だけで指す形は、人の
+    // 体重の事実で受ける（属性の手がかりが単位しか無かった）。
+    else if (/キロ/.test(prompt)) { attr = '体重'; label = '重さ'; unit = 'キロ'; cueLabel = '重い'; }
     else return undefined;
     const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
     const byEntity = new Map<string, { v: number; disp: string }>();
@@ -4088,7 +4103,8 @@ export class ConversationCoreService {
     // P817: 合計（「3人の年齢を合わせると何歳？」）も人の事実で
     // 数える。平均だけだったため、彼女自身の年齢の受け答えに
     // 流れていた。
-    const isSum = /(?:合わせると|合計|全部合わせ|ぜんぶ合わせ)/.test(prompt);
+    // P826: 「合わせて何キロ？」の「合わせて」形も合計として受ける。
+    const isSum = /(?:合わせると|合わせて|合計|全部合わせ|ぜんぶ合わせ)/.test(prompt);
     if (!/平均/.test(prompt) && !isSum) return undefined;
     const got = this.factAttributeValues(prompt, memories);
     if (!got) return undefined;
@@ -4253,7 +4269,8 @@ export class ConversationCoreService {
 
   private measureAggregateAnswer(prompt: string): string | undefined {
     const isAvg = /(?:平均)/.test(prompt);
-    const isSum = /(?:全部合わせ|合計|ぜんぶ合わせ)/.test(prompt);
+    // P826: 「合わせて」形も合計として受ける（人の事実側と対）。
+    const isSum = /(?:全部合わせ|合計|ぜんぶ合わせ|合わせて)/.test(prompt);
     if (!isAvg && !isSum) return undefined;
     const label: '重さ' | '大きさ' | '寿命' | undefined = /(?:重さ|体重|キロ|グラム|トン)/.test(prompt) ? '重さ'
       : /(?:大きさ|長さ|センチ|メートル)/.test(prompt) ? '大きさ'
@@ -4669,6 +4686,9 @@ export class ConversationCoreService {
    * P777: 「結婚式まであと何日？」——日付の付いた控えから数える。
    */
   private planCountdownAnswer(prompt: string, memories: any[] = []): string | undefined {
+    // P826: 「X月Y日から…まで何日」は日付どうしの差の質問で、
+    // 予定までの残り日数ではない（カレンダー側に譲る）。
+    if (/(\d{1,2})月(\d{1,2})日から/.test(prompt)) return undefined;
     if (!/(?:あと何日|まで何日|何日後|までどのくらい)/.test(prompt)) return undefined;
     // P781: 誕生日は予定台帳ではなく本人の事実にある。月日を取り
     // 出して、次の誕生日までの日数を数える。
@@ -4744,6 +4764,9 @@ export class ConversationCoreService {
    * 日付で答える（時期→内容の planRecall の逆向き）。
    */
   private planWhenAnswer(prompt: string): string | undefined {
+    // P826: 「X月Y日から…まで何日」は日付どうしの差の質問で、
+    // 予定の時期の質問ではない（カレンダー側に譲る）。
+    if (/(\d{1,2})月(\d{1,2})日から/.test(prompt)) return undefined;
     if (!/(?:いつ|何日|何曜日)/.test(prompt)) return undefined;
     if (!/[？?]/.test(prompt) && !/(?:だっけ|教えて)/.test(prompt)) return undefined;
     try {
