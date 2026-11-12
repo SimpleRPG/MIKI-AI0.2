@@ -4022,6 +4022,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P842 解決でサブ目標が全部DONEになる', done842.length === 3 && done842.every((s) => s.status === 'DONE'), JSON.stringify(done842).slice(0, 150));
 }
 
+// ---- P843: エピソードの蒸留（繰り返しの話題を開いた話題へ戻す） ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const { knowledgeConsolidationService } = await import('../src/miki/selfAwareness/services/knowledgeConsolidationService');
+  const { conversationOpenTopicService } = await import('../src/miki/conversation/services/conversationOpenTopicService');
+  storageService.setItem('miki_open_topics_v1', JSON.stringify([]));
+  storageService.setItem('miki_consolidation_last_run_v1', '0');
+  storageService.setItem('miki_episodes_v1', JSON.stringify([
+    { day: '2026-11-10', topics: ['蒸留チェックX', '単発チェックY'], summary: 'a' },
+    { day: '2026-11-11', topics: ['蒸留チェックX'], summary: 'b' },
+    { day: '2026-11-12', topics: ['単発チェックZ'], summary: 'c' },
+  ]));
+  const r843 = knowledgeConsolidationService.runIfDue(Date.now());
+  const pending843 = conversationOpenTopicService.listPending();
+  check('P843 複数日に出た話題が蒸留されて戻る', Boolean(r843 && r843.distilled >= 1) && pending843.some((t) => t.topic === '蒸留チェックX' && (t.weight || 0) >= 3), JSON.stringify(pending843).slice(0, 200));
+  check('P843 1日だけの話題は蒸留されない', !pending843.some((t) => t.topic === '単発チェックY' || t.topic === '単発チェックZ'), JSON.stringify(pending843).slice(0, 200));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

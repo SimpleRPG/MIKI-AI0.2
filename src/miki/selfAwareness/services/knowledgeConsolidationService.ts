@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { worldModelGraphService } from './worldModelGraphService';
+import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
 
 /**
  * P542: 統合パス（寝ている間の整理）。成長ループから1日1回まで
@@ -12,6 +13,10 @@ import { worldModelGraphService } from './worldModelGraphService';
  *      関係（種類と相手）まで共有していたら、「共通の型」を
  *      仮の知識（kind=SCHEMA / UNVERIFIED）として立てる。確定は
  *      しない。検証は通常の Claim の流れに任せる。
+ *   3. P843: エピソードの蒸留（相補学習系の「出来事→意味」側）。
+ *      複数の日に繰り返し現れた話題は、その日の出来事ではなく
+ *      「続いている関心」なので、開いた話題へ重み付きで戻し、
+ *      後日の拾い直しに残るようにする。
  */
 
 const LAST_RUN_KEY = 'miki_consolidation_last_run_v1';
@@ -26,7 +31,7 @@ const SHARED_RELATION_PHRASE: Record<string, (to: string) => string> = {
 };
 
 class KnowledgeConsolidationService {
-  public runIfDue(now = Date.now()): { relationsAdded: number; schemas: number } | undefined {
+  public runIfDue(now = Date.now()): { relationsAdded: number; schemas: number; distilled: number } | undefined {
     let last = 0;
     try { last = parseInt(storageService.getItem(LAST_RUN_KEY) || '0', 10) || 0; } catch { /* 読めなければ今回回す */ }
     if (now - last < DAY_MS) return undefined;
@@ -38,8 +43,44 @@ class KnowledgeConsolidationService {
     } catch { /* 抽出できなくても図式の段は試す */ }
 
     const schemas = this.extractSchemas();
-    systemLogger.info('SELF_IMPROVEMENT', `🌙 [統合] 関係の再抽出で ${relationsAdded} 件を追加し、図式を ${schemas} 件立てました`);
-    return { relationsAdded, schemas };
+    const distilled = this.distillEpisodes();
+    systemLogger.info('SELF_IMPROVEMENT', `🌙 [統合] 関係の再抽出で ${relationsAdded} 件を追加し、図式を ${schemas} 件立て、繰り返しの話題を ${distilled} 件蒸留しました`);
+    return { relationsAdded, schemas, distilled };
+  }
+
+  /**
+   * P843: エピソード（miki_episodes_v1）を通読し、2つ以上の異なる
+   * 日に現れた話題を「続いている関心」として開いた話題へ戻す。
+   * 今まさに開いている話題は対象外（蒸留するまでもない）。1回の
+   * 統合で戻すのは最大2件まで。
+   */
+  private distillEpisodes(): number {
+    let distilled = 0;
+    try {
+      const raw = storageService.getItem('miki_episodes_v1');
+      const episodes: Array<{ day?: string; topics?: string[] }> = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(episodes)) return 0;
+      const daysByTopic = new Map<string, Set<string>>();
+      for (const ep of episodes) {
+        if (!ep || typeof ep.day !== 'string' || !Array.isArray(ep.topics)) continue;
+        for (const topic of ep.topics) {
+          if (typeof topic !== 'string' || !topic) continue;
+          const days = daysByTopic.get(topic) || new Set<string>();
+          days.add(ep.day);
+          daysByTopic.set(topic, days);
+        }
+      }
+      const pending = new Set(conversationOpenTopicService.listPending().map((r) => r.topic));
+      const recurring = [...daysByTopic.entries()]
+        .filter(([topic, days]) => days.size >= 2 && !pending.has(topic))
+        .sort((a, b) => b[1].size - a[1].size);
+      for (const [topic] of recurring) {
+        if (distilled >= 2) break;
+        conversationOpenTopicService.record(topic, 3);
+        if (conversationOpenTopicService.listPending().some((r) => r.topic === topic)) distilled++;
+      }
+    } catch { /* 蒸留できなくても統合の他の段は済んでいる */ }
+    return distilled;
   }
 
   private extractSchemas(): number {

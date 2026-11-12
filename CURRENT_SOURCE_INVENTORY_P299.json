@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1805,
     "sourceFileCount": 1358,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1269,
-    "relativeImportCandidateCount": 4228,
-    "resolvedRelativeImportCandidateCount": 4212,
+    "relativeImportCandidateCount": 4232,
+    "resolvedRelativeImportCandidateCount": 4216,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 349166,
-      "lines": 4038,
-      "sha256": "68abd2fcb1fc3ba6743ef3c643521e8f6034bcf0e9203e0019272b802bf5a6b3",
+      "bytes": 350603,
+      "lines": 4056,
+      "sha256": "46a4e9dbb641fbec35a7196f4864e99ca1829891646d077ccbad65b1d3526700",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3014,10 +3014,28 @@
           "specifier": "../src/services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 4027,
+          "specifier": "../src/services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 4028,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeConsolidationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeConsolidationService.ts"
+        },
+        {
+          "line": 4029,
+          "specifier": "../src/miki/conversation/services/conversationOpenTopicService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationOpenTopicService.ts"
         }
       ],
-      "relativeImportCandidateCount": 217,
-      "resolvedRelativeImportCount": 217,
+      "relativeImportCandidateCount": 220,
+      "resolvedRelativeImportCount": 220,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -29846,9 +29864,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeConsolidationService.ts",
-      "bytes": 4477,
-      "lines": 94,
-      "sha256": "38deaaf7bf9d8e87e98d7dd29dd83d22db26d49d70840ed934f4b7f729f04eeb",
+      "bytes": 6698,
+      "lines": 135,
+      "sha256": "f0948026dd2684aec7a3acea4e279cad5686e0a715927211c9e11b3d4d8e9f22",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -29873,10 +29891,16 @@
           "specifier": "./worldModelGraphService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
+        },
+        {
+          "line": 5,
+          "specifier": "../../conversation/services/conversationOpenTopicService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationOpenTopicService.ts"
         }
       ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
+      "relativeImportCandidateCount": 5,
+      "resolvedRelativeImportCount": 5,
       "unresolvedRelativeImportCount": 0
     },
     {
