@@ -3824,6 +3824,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P832 月末の日付と曜日を答える', me832.replyText.includes(`${last832.getMonth() + 1}月${last832.getDate()}日（${wds832[last832.getDay()]}）`), me832.replyText.slice(0, 120));
 }
 
+// ---- P833: 主語省略の続きの質問（直近の話題で受ける） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem833: any[] = []; const hist833: any[] = []; let st833: any = undefined;
+  const run833 = async (t: string) => {
+    mem833 = conversationFactIntakeService.intakeFromUserText(t, mem833).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem833, recentMessages: hist833.slice(-8), conversationState: st833 } as any);
+    st833 = r.nextConversationState;
+    hist833.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run833('ゾルモドキは水辺に住む重さ3キロの鳥だよ');
+  await run833('ゾルモドキって何？');
+  const w833 = await run833('で、重さは？');
+  check('P833 省略した重さの質問は直近の話題で答える', w833.replyText.includes('ゾルモドキ') && w833.replyText.includes('3キロ'), w833.replyText.slice(0, 150));
+  const h833 = await run833('じゃあ住んでる場所は？');
+  check('P833 住んでる場所の質問も直近の話題で答える', h833.replyText.includes('水辺'), h833.replyText.slice(0, 150));
+  await run833('僕の身長は181センチだよ');
+  const f833 = await run833('で、身長は何センチだっけ？');
+  check('P833 「で、」始まりの聞き返しも事実で答える', f833.replyText.includes('181センチ'), f833.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

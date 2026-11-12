@@ -60,7 +60,9 @@ export function looksInterrogative(text: string): boolean {
  */
 function extractRecallKey(prompt: string): string | null {
   let p = prompt.trim().replace(/[？?。！!]\s*$/, '');
-  p = p.replace(/^(?:じゃあ|それじゃあ|ねえ|そういえば|あのさ)[、,]?\s*/, '');
+  // P833: 「で、身長は？」のような接続の前置きも落とす（落とさないと
+  // キーに「で、」が残り、事実と一致しなくなっていた）。
+  p = p.replace(/^(?:じゃあ|それじゃあ|それで|ちなみに|あと|で|ねえ|そういえば|あのさ)[、,]?\s*/, '');
   p = p.replace(/^(?:僕の|私の|おれの|オレの|ぼくの|自分の)/, '');
   let prev = '';
   while (p !== prev && p.length > 0) {

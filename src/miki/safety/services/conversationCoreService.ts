@@ -5074,6 +5074,9 @@ export class ConversationCoreService {
     else if (/(?:何キロ|何グラム|重さ|体重)/.test(prompt) && /(?:[？?]|何キロ|何グラム|だっけ)/.test(prompt)) attrLabel = '重さ';
     else if (/(?:何センチ|何メートル|体長|全長|長さ|大きさ)/.test(prompt) && /(?:[？?]|何センチ|何メートル|だっけ)/.test(prompt)) attrLabel = '大きさ';
     else if (/(?:寿命|何年生き|何歳まで生き)/.test(prompt) && /(?:[？?]|何年|だっけ)/.test(prompt)) attrLabel = '寿命';
+    // P833: 「住んでる場所は？」も生息地の質問として受ける
+    // （「どこ」形でなくても、場所の聞き方として読む）。
+    else if (/(?:住んでる場所|住む場所|棲んでる場所|棲みか|すみか)/.test(prompt)) attrLabel = '生息地';
     else if (/(?:どうやって|どうすれば|どのように)/.test(prompt)) attrLabel = 'やり方';
     // P822: 性別も属性として受ける（説明文のオス・メスで答える）。
     else if (/性別/.test(prompt)) attrLabel = '性別';
@@ -5089,6 +5092,12 @@ export class ConversationCoreService {
         } catch { return false; }
       });
     } catch { return undefined; }
+    // P833: 主語が省略された続きの質問（「で、重さは？」）は、属性の
+    // 語そのものしか対象に拾えない。直近の話題を対象に取り直す。
+    if (!entity || /^(?:重さ|大きさ|寿命|場所|生息地|食べ物|材料|性別)$/.test(entity)) {
+      const recent = this.recentTopicCandidates(state, recentMessages)[0];
+      if (recent && recent !== entity) entity = recent;
+    }
     if (!entity) return undefined;
     // P737: 「その動物って〜？」の「その＋総称」は、直近に話した
     // 具体的な相手を指す。総称が対象に拾われたら、その分類に
