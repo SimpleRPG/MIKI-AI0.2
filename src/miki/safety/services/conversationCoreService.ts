@@ -4035,7 +4035,8 @@ export class ConversationCoreService {
    * 一覧（P776）が全部の未来を出すのに対して、こちらは週の範囲。
    */
   private weekPlansAnswer(prompt: string): string | undefined {
-    const wk = /(今週|来週)/.exec(prompt)?.[1];
+    // P808: 再来週は来週とは別の週（部分文字列で来週に吸われていた）。
+    const wk = /(再来週|今週|来週)/.exec(prompt)?.[1];
     if (!wk) return undefined;
     if (!/予定|予約|約束/.test(prompt)) return undefined;
     if (!(/[？?]/.test(prompt) || /教えて|ある/.test(prompt))) return undefined;
@@ -4048,8 +4049,8 @@ export class ConversationCoreService {
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
       const dow = now.getDay(); // 0=日曜
       const thisSunday = todayStart + ((7 - dow) % 7) * dayMs;
-      const from = wk === '今週' ? todayStart : thisSunday + dayMs;
-      const to = wk === '今週' ? thisSunday : thisSunday + 7 * dayMs;
+      const from = wk === '今週' ? todayStart : wk === '再来週' ? thisSunday + 8 * dayMs : thisSunday + dayMs;
+      const to = wk === '今週' ? thisSunday : wk === '再来週' ? thisSunday + 14 * dayMs : thisSunday + 7 * dayMs;
       const inRange = plans.filter((p) => {
         if (!p.date) return false;
         const t = new Date(`${p.date}T12:00:00`).getTime();

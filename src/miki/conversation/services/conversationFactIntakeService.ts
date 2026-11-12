@@ -918,12 +918,14 @@ export class ConversationFactIntakeService {
     const explicit = this.planExplicitDate(when);
     if (explicit) return explicit;
     // P773: 曜日も日付に解決する（直近のその曜日、来週指定は+7）。
-    const wd = when.match(/^(来週の)?(月|火|水|木|金|土|日)曜日$/);
+    const wd = when.match(/^(再来週の|来週の)?(月|火|水|木|金|土|日)曜日$/);
     if (wd) {
       const target = '日月火水木金土'.indexOf(wd[2]);
       const now = new Date();
       let delta = (target - now.getDay() + 7) % 7;
-      if (wd[1]) delta += 7;
+      // P808: 再来週の曜日は+14、来週の曜日は+7。
+      if (wd[1] === '再来週の') delta += 14;
+      else if (wd[1]) delta += 7;
       const d = new Date(now.getTime() + delta * 86400000);
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
@@ -942,8 +944,8 @@ export class ConversationFactIntakeService {
     // P774: 明示の日付（12月3日）があればそれを最優先する。
     const ex = t.match(/(\d{1,2})月(\d{1,2})日/);
     if (ex) return `${Number(ex[1])}月${Number(ex[2])}日`;
-    const wd = t.match(/(来週の|今週の)?(月|火|水|木|金|土|日)曜日/);
-    if (wd) return wd[1] === '来週の' ? `来週の${wd[2]}曜日` : `${wd[2]}曜日`;
+    const wd = t.match(/(再来週の|来週の|今週の)?(月|火|水|木|金|土|日)曜日/);
+    if (wd) return wd[1] === '再来週の' ? `再来週の${wd[2]}曜日` : wd[1] === '来週の' ? `来週の${wd[2]}曜日` : `${wd[2]}曜日`;
     const raw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
     return raw === 'あした' ? '明日' : raw;
   }

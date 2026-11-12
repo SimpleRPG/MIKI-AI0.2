@@ -3202,6 +3202,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P807 述語の確認は説明文を引いて肯定する', lay807.replyText.includes('卵を産む鳥'), lay807.replyText.slice(0, 150));
 }
 
+// ---- P808: 再来週は来週と別の週として扱う ----
+{
+  const { storageService } = await import('../src/services/storageService');
+  const fmt808 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const base808 = new Date(); base808.setHours(12, 0, 0, 0);
+  const plus808 = (n: number) => { const d = new Date(base808); d.setDate(d.getDate() + n); return d; };
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([
+    { when: '再来週', text: 'サラシュウノ予定', at: Date.now(), date: fmt808(plus808(14)) },
+    { when: '来週', text: 'ライシュウノ予定', at: Date.now(), date: fmt808(plus808(7)) },
+  ]));
+  const sarai808: any = await conversationCoreService.execute({ prompt: '再来週の予定は？', memories: [] } as any);
+  check('P808 再来週の予定は再来週の分だけを返す', sarai808.replyText.includes('再来週の予定は') && sarai808.replyText.includes('サラシュウノ予定') && !sarai808.replyText.includes('ライシュウノ予定'), sarai808.replyText.slice(0, 180));
+  const rai808: any = await conversationCoreService.execute({ prompt: '来週の予定は？', memories: [] } as any);
+  check('P808 来週の予定は来週の分だけを返す', rai808.replyText.includes('ライシュウノ予定') && !rai808.replyText.includes('サラシュウノ予定'), rai808.replyText.slice(0, 180));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
