@@ -261,19 +261,25 @@ export class ConversationUserFactRecallService {
         }
       }
       const pets: string[] = [];
+      let petCandidate: (typeof candidates)[number] | undefined;
       for (const c of candidates) {
         // P799: 「犬を飼ってない」の値も「飼って」に一致して
         // しまうため、否定の候補はペットとして数えない。
         if (isNegativeFact(c)) continue;
         const m = String(c.value || c.summary || '').match(/(.+?)を(?:\d+\s*(?:匹|頭|羽))?\s*飼って/);
-        if (m && m[1] && !pets.includes(m[1])) pets.push(m[1]);
+        if (m && m[1] && !pets.includes(m[1])) {
+          pets.push(m[1]);
+          // P816: 引用（理由）は実際に合った候補に付ける。先頭の
+          // 候補は無関係な事実（職業など）のことがある。
+          if (!petCandidate) petCandidate = c;
+        }
       }
-      if (pets.length > 0) {
+      if (pets.length > 0 && petCandidate) {
         return {
-          candidate: candidates[0],
+          candidate: petCandidate,
           topicLabel: '飼っている動物',
           answerText: `前に言っていた飼っている動物は「${pets.slice(0, 3).join('」と「')}」だよ。`,
-          reasonLabel: candidates[0].reasonLabel,
+          reasonLabel: petCandidate.reasonLabel,
         };
       }
       // P799: 否定だけがある場合は、飼っていないことを答える。

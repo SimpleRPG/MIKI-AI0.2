@@ -3331,6 +3331,45 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P815 今日から100日後の日付を答える', off815.replyText.includes(`${d100815.getMonth() + 1}月${d100815.getDate()}日`), off815.replyText.slice(0, 120));
 }
 
+// ---- P816: 属性なし事実は述語の型が同じ時だけ置換／「Xの予定は？」素形／予定の日付ずらし／飼育想起の引用 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService } = await import('../src/services/storageService');
+  let mem816: any[] = []; const hist816: any[] = []; let st816: any = undefined;
+  const run816 = async (t: string) => {
+    mem816 = conversationFactIntakeService.intakeFromUserText(t, mem816).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem816, recentMessages: hist816.slice(-8), conversationState: st816 } as any);
+    st816 = r.nextConversationState;
+    hist816.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run816('僕は猫を飼ってるよ');
+  await run816('僕は学生だよ');
+  const pet816 = await run816('僕って何を飼ってたっけ？');
+  check('P816 型の違う事実は飼育の事実を消さない', pet816.replyText.includes('飼っている動物は「猫」'), pet816.replyText.slice(0, 150));
+  check('P816 飼育想起の引用は合った事実に付く', pet816.replyText.includes('僕は猫を飼ってる'), pet816.replyText.slice(0, 150));
+  let mem816b: any[] = [];
+  mem816b = conversationFactIntakeService.intakeFromUserText('僕は学生だよ', mem816b).updatedMemories;
+  mem816b = conversationFactIntakeService.intakeFromUserText('僕は会社員だよ', mem816b).updatedMemories;
+  const old816 = mem816b.find((m: any) => m.factValue === '学生');
+  check('P816 名詞の言い直しは従来どおり置換する', !!old816 && !!old816.replacedBy, JSON.stringify(mem816b.map((m: any) => m.factValue)));
+  // 予定：台帳を直接用意して素形の聞き返しと日付ずらしを見る
+  const fmt816 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const tomorrow816 = fmt816(new Date(Date.now() + 86400000));
+  const dayAfter816 = fmt816(new Date(Date.now() + 2 * 86400000));
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([{ when: '明日', text: '歯医者の予定', at: Date.now(), date: tomorrow816 }]));
+  const bare816: any = await conversationCoreService.execute({ prompt: '明日の予定は？', memories: [] } as any);
+  check('P816 「明日の予定は？」の素形を台帳で受ける', bare816.replyText.includes('歯医者'), bare816.replyText.slice(0, 150));
+  const move816 = await run816('明日の予定、明後日にずらして');
+  check('P816 予定ずらしを受け答えする', move816.replyText.includes('明後日にずらしておきました'), move816.replyText.slice(0, 150));
+  const plans816 = JSON.parse(storageService.getItem('miki_user_plans_v1') || '[]');
+  check('P816 ずらした予定だけが台帳に残る', plans816.length === 1 && plans816[0].date === dayAfter816, JSON.stringify(plans816).slice(0, 200));
+  const after816: any = await conversationCoreService.execute({ prompt: '明後日の予定は？', memories: [] } as any);
+  check('P816 ずらし先で予定を聞き返せる', after816.replyText.includes('歯医者'), after816.replyText.slice(0, 150));
+  const gone816: any = await conversationCoreService.execute({ prompt: '明日の予定は？', memories: [] } as any);
+  check('P816 ずらした元の日は無いと正直に言う', gone816.replyText.includes('まだ聞いていないです'), gone816.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

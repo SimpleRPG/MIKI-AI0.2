@@ -413,6 +413,12 @@ export class ConversationCoreService {
       if (selfAnswer) {
         return this.buildResult('RESOLVED', 'self_question_answer', selfAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P816: 予定の日付ずらしは、付け替え済みの結果を受け答えする
+      // （二つの日付を含む文が時間不整合の骨格文に落ちないように）。
+      const planMoveEarly = multiPart ? undefined : this.planMoveAnswer(prompt);
+      if (planMoveEarly) {
+        return this.buildResult('RESOLVED', 'plan_move_answer', this.applyPersonaVoice(planMoveEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P754: 「明日の予定、何時からだっけ？」は現在時刻の質問では
       // なく予定の聞き返し。時計の即答より先に予定の控えを見る
       // （控えに無い時は従来どおり時計が受ける）。
@@ -4019,12 +4025,39 @@ export class ConversationCoreService {
    * 控えが無ければ従来経路に委ねる（「空いています」と勝手に
    * 断定する別の受け口より、まず本人の話した予定を優先する）。
    */
+  /**
+   * P816: 予定の日付ずらしへの受け答え。付け替え自体は取り込み側
+   * （moveUserPlanIfAny）が済ませており、ここではマーカーを見て
+   * 結果を返す。マーカーが無い（ずらす形でない）場合は素通りする。
+   */
+  private planMoveAnswer(prompt: string): string | undefined {
+    if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
+    if (!/(?:ずらして|ずらす|移して|移す|延期)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_recently_moved_plan_v1');
+      if (!raw) return undefined;
+      const mk = JSON.parse(raw);
+      if (!mk || Date.now() - Number(mk.at || 0) > 60000) return undefined;
+      storageService.removeItem('miki_recently_moved_plan_v1');
+      if (Number(mk.moved || 0) > 0) {
+        return mk.from
+          ? `分かりました、${mk.from}の予定を${mk.to}にずらしておきました。`
+          : `分かりました、予定を${mk.to}にずらしておきました。`;
+      }
+      return mk.from
+        ? `${mk.from}の予定は、まだ聞いていないです。ずらすものが無かったです。`
+        : 'ずらせる予定は、まだ聞いていないです。';
+    } catch { return undefined; }
+  }
+
   private planRecallAnswer(prompt: string): string | undefined {
     if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
     // 予定を話す文そのもの（「〜予約があるんだ」）は聞き返しでは
     // ない。疑問の形の時だけ受ける。
     if (!/[？?]/.test(prompt) && !/(?:だっけ|何)/.test(prompt)) return undefined;
-    if (!/(?:だっけ|何|ある|あって|教えて)/.test(prompt)) return undefined;
+    // P816: 「明日の予定は？」のような素の形も聞き返しとして受ける
+    // （内容語が無いために彼女自身の予定の定型へ流れていた）。
+    if (!/(?:だっけ|何|ある|あって|教えて)/.test(prompt) && !/予定(?:は|って)?[？?]\s*$/.test(prompt)) return undefined;
     // P773: 曜日の予定も聞き返せる（取り込み側と同じ解決規則）。
     // P774: 明示の日付（12月3日）を最優先する。
     const exMatch = prompt.match(/(\d{1,2})月(\d{1,2})日/);

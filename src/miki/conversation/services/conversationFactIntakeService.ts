@@ -152,6 +152,20 @@ function factKeyOf(entity?: string, attribute?: string): string | null {
 }
 
 /**
+ * P816: 属性なし事実の「述語の型」。名詞だけの値（学生・会社員）は
+ * 'N'、動詞句の値（猫を飼ってる・東京に住んでる）は動詞の語幹で
+ * 寄せる。型の違う文は別の事実なので、言い直し（置換）の対象に
+ * しない（「猫を飼ってる」の後に「学生だよ」と言っても、飼育の
+ * 事実は消えない）。
+ */
+function attrlessFrameOf(value?: string): string {
+  const v = String(value || '').replace(/(だよ|です|ます|だ|よ|ね)+$/, '');
+  const m = v.match(/([一-龠ァ-ヶー]{1,4}?)(?:って|んで|いて|して|て)(?:いる|いた|る|た)?$/)
+    || v.match(/([一-龠ァ-ヶー]{1,4}?)(?:った|んだ|いた|した|えた|れた)$/);
+  return m ? `V:${m[1]}` : 'N';
+}
+
+/**
  * P457 (E): 同一発言内で「名前」と「カテゴリ」を同じ対象に結びつける後処理。
  * - 値に『…』を含む同格形（「コンパウンドボウ『逃げ場がない』」）は、
  *   カテゴリ部の事実（属性='カテゴリ'）と名前の事実（属性='名前'）に分ける。
@@ -931,7 +945,7 @@ export class ConversationFactIntakeService {
       const dd = String(d.getDate()).padStart(2, '0');
       return `${d.getFullYear()}-${mm}-${dd}`;
     }
-    const offset = when === '今日' || when === '今夜' ? 0 : when === '明日' ? 1 : when === '明後日' ? 2 : -1;
+    const offset = when === '今日' || when === '今夜' ? 0 : when === '明日' ? 1 : when === '明後日' ? 2 : when === '明々後日' ? 3 : -1;
     if (offset < 0) return undefined;
     const d = new Date(Date.now() + offset * 86400000);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -961,6 +975,9 @@ export class ConversationFactIntakeService {
       const t = String(text || '').trim();
       if (!t || /[？?]/.test(t)) return;
       if (/(?:ですか|ますか|でしょうか|教えて|お願い|してほしい)/.test(t)) return;
+      // P816: 日付ずらしの文そのものは控えに残さない（付け替えは
+      // moveUserPlanIfAny が行う）。
+      if (/(?:予定|予約|約束)/.test(t) && /(?:ずらして|ずらす|移して|移す|延期)/.test(t)) return;
       // P768: 予定の変更文そのものは控えに残さない（変更後の
       // 内容だけが changeUserPlanIfAny で控えられる）。
       if (/(?:じゃなくて|ではなく)/.test(t) && /(?:変えた|変更)/.test(t)) return;
@@ -1008,6 +1025,44 @@ export class ConversationFactIntakeService {
   }
 
   /**
+   * P816: 「明日の予定、明後日にずらして」——予定の日付ずらしは、
+   * 控えの日付と時期ラベルを付け替える。ずらす元が書かれていない
+   * 場合は、控えの日付が1種類だけの時にその日付を対象にする。
+   * 結果はマーカーに残し、会話側が受け答えする。
+   */
+  private moveUserPlanIfAny(text: string): void {
+    try {
+      const t = String(text || '').trim();
+      if (!t || /[？?]/.test(t)) return;
+      if (!/(?:予定|予約|約束)/.test(t)) return;
+      const mv = t.match(/(明後日|明々後日|明日|あした|今日|今夜)?の?(?:予定|予約|約束)(?:を|、|,)?\s*(明後日|明々後日|明日|今日)に(?:ずらして|ずらす|移して|移す|延期して|延期する)/);
+      if (!mv) return;
+      const fromWhen = mv[1] ? (mv[1] === 'あした' ? '明日' : mv[1]) : '';
+      const toWhen = mv[2];
+      const toDate = this.planDateFor(toWhen);
+      if (!toDate) return;
+      const key = 'miki_user_plans_v1';
+      const raw = storageService.getItem(key);
+      const plans: Array<{ when: string; text: string; at: number; date?: string }> = raw ? JSON.parse(raw) : [];
+      let fromDate: string | undefined;
+      if (fromWhen) {
+        fromDate = this.planDateFor(fromWhen);
+      } else {
+        const dates = [...new Set(plans.map((p) => p.date).filter(Boolean))];
+        if (dates.length === 1) fromDate = dates[0] as string;
+      }
+      let moved = 0;
+      if (fromDate) {
+        for (const p of plans) {
+          if (p.date === fromDate) { p.when = toWhen; p.date = toDate; p.at = Date.now(); moved++; }
+        }
+      }
+      if (moved > 0) storageService.setItem(key, JSON.stringify(plans.slice(-20)));
+      storageService.setItem('miki_recently_moved_plan_v1', JSON.stringify({ from: fromWhen, to: toWhen, moved, at: Date.now() }));
+    } catch { /* 予定のずらしは補助経路 */ }
+  }
+
+  /**
    * P768: 「明日の予定、歯医者じゃなくて美容院に変えた」——予定の
    * 変更は、古い控えを外して新しい内容で控え直す。事実の訂正
    * （P708）の形と似ているが、対象は予定台帳であり、事実層には
@@ -1042,6 +1097,8 @@ export class ConversationFactIntakeService {
   }
 
   public intakeFromUserText(text: string, existingMemories: MemoryItem[]): FactIntakeResult {
+    // P816: 予定の日付ずらしは最初に処理する（変更・取り消し・記録より先）。
+    this.moveUserPlanIfAny(text);
     // P768: 予定の変更は最初に処理する（取り消し・記録より先）。
     this.changeUserPlanIfAny(text);
     // P753: 予定の取り消しは控えから外す（先に処理する）。
@@ -1201,7 +1258,17 @@ export class ConversationFactIntakeService {
       if (fact.value != null && factKeyOf(fact.entity, fact.attribute)) {
         const key = factKeyOf(fact.entity, fact.attribute);
         const old = updated.find(
-          (m) => isUserFact(m) && m.factValue != null && factKeyOf(m.factEntity, m.factAttribute) === key
+          (m) => {
+            if (!isUserFact(m) || m.factValue == null) return false;
+            if (factKeyOf(m.factEntity, m.factAttribute) !== key) return false;
+            // P816: 属性なし事実同士は、述語の型が一致する時だけ
+            // 言い直しとみなす。型の違う文（飼育と職業など）は
+            // 別の事実として共存させる。
+            if (!fact.attribute && !m.factAttribute) {
+              return attrlessFrameOf(m.factValue) === attrlessFrameOf(fact.value);
+            }
+            return true;
+          }
         );
         if (old) {
           if (old.factValue === fact.value) return;
