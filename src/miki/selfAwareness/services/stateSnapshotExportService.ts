@@ -148,6 +148,9 @@ class StateSnapshotExportService {
             type: g.type,
             priority: g.priority,
             status: g.status,
+            // P842: 解決のサブ目標のうち、今いる段（未完了の先頭）。
+            // 計画が無いギャップでは空。読み取りのみ（計画は作らない）。
+            step: g.resolutionPlan?.steps?.find((s) => s.status !== 'DONE')?.label || '',
           }));
         } catch { return []; }
       })(),

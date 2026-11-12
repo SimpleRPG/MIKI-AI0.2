@@ -4001,6 +4001,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P841 話題ラベルの一本化（呼びかけ除去）', topicStageService.topicFromText('みき、聞いて') === '聞いて', topicStageService.topicFromText('みき、聞いて'));
 }
 
+// ---- P842: ギャップのサブ目標化（解決計画の段と進捗） ----
+{
+  const { knowledgeGapService } = await import('../src/miki/unknown/services/knowledgeGapService');
+  const { stateSnapshotExportService } = await import('../src/miki/selfAwareness/services/stateSnapshotExportService');
+  const { storageService } = await import('../src/services/storageService');
+  const gap842 = knowledgeGapService.detect({ query: 'チェック842対象Xとは何か', type: 'UNKNOWN_TERM', priority: 100, target: 'チェック842対象X' });
+  const plan842 = knowledgeGapService.buildResolutionPlan(gap842.id);
+  check('P842 解決計画にサブ目標が付く', Boolean(plan842?.steps && plan842.steps.length === 3 && plan842.steps.every((s) => s.status === 'TODO')), JSON.stringify(plan842?.steps).slice(0, 150));
+  knowledgeGapService.advanceResolutionPlan(gap842.id, 'VERIFY', 'RESEARCH');
+  const steps842 = knowledgeGapService.getById(gap842.id)?.resolutionPlan?.steps || [];
+  check('P842 段の前進でサブ目標が進む', steps842[0]?.status === 'DONE' && steps842[1]?.status === 'ACTIVE', JSON.stringify(steps842).slice(0, 150));
+  stateSnapshotExportService.exportNow();
+  const saved842 = JSON.parse(storageService.getItem('miki_state_snapshot_v1') || '{}');
+  const snap842 = JSON.parse(saved842.json || '{}');
+  const entry842 = (snap842.openGaps || []).find((g: any) => g.id === gap842.id);
+  check('P842 スナップショットに今の段が出る', entry842?.step === '集めた内容を照合する', JSON.stringify(entry842 || {}).slice(0, 150));
+  knowledgeGapService.markResolved(gap842.id);
+  const done842 = knowledgeGapService.getById(gap842.id)?.resolutionPlan?.steps || [];
+  check('P842 解決でサブ目標が全部DONEになる', done842.length === 3 && done842.every((s) => s.status === 'DONE'), JSON.stringify(done842).slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

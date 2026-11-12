@@ -13,6 +13,12 @@ export type KnowledgeGapType =
 
 export type KnowledgeGapStatus = 'OPEN' | 'RESEARCHING' | 'RESOLVED' | 'BLOCKED';
 
+export interface KnowledgeGapResolutionStep {
+  key: 'collect' | 'verify' | 'intake';
+  label: string;
+  status: 'TODO' | 'ACTIVE' | 'DONE';
+}
+
 export interface KnowledgeGapResolutionPlan {
   planId: string;
   gapId: string;
@@ -23,6 +29,50 @@ export interface KnowledgeGapResolutionPlan {
   researchRoute: 'WEB_SEARCH' | 'EXECUTION_TEST' | 'USER_CLARIFICATION' | 'CORE_REVIEW';
   blackboardAction: 'RESEARCH' | 'EXECUTION_TEST' | 'CLARIFY' | 'BLOCK';
   createdAt: number;
+  /** P842: サブ目標（Soar のインパス→サブ目標分解）。解決を
+   * 「集める→照合する→取り込む」の段に分け、段ごとに進捗を持つ。 */
+  steps?: KnowledgeGapResolutionStep[];
+}
+
+/** P842: 経路ごとのサブ目標の並び。 */
+function stepsForRoute(route: KnowledgeGapResolutionPlan['researchRoute']): KnowledgeGapResolutionStep[] {
+  const labels: Record<KnowledgeGapResolutionPlan['researchRoute'], [string, string, string]> = {
+    WEB_SEARCH: ['出典・証拠を集める', '集めた内容を照合する', '知識として取り込む'],
+    EXECUTION_TEST: ['実行テストで確かめる', '結果を照合する', '結果を取り込む'],
+    USER_CLARIFICATION: ['ユーザーに確認する', '回答を照合する', '回答を知識として取り込む'],
+    CORE_REVIEW: ['索引・グラフを照合する', '証拠と突き合わせる', '結論を取り込む'],
+  };
+  const [collect, verify, intake] = labels[route];
+  return [
+    { key: 'collect', label: collect, status: 'TODO' },
+    { key: 'verify', label: verify, status: 'TODO' },
+    { key: 'intake', label: intake, status: 'TODO' },
+  ];
+}
+
+/** P842: 段（phase）からサブ目標の状態を決める。済んだ段は
+ * 計画を作り直しても DONE のまま引き継ぐ（後退させない）。 */
+function stepsForPhase(
+  steps: KnowledgeGapResolutionStep[],
+  phase: KnowledgeGapResolutionPlan['phase'],
+  resolved: boolean,
+): KnowledgeGapResolutionStep[] {
+  const activeKey: Record<KnowledgeGapResolutionPlan['phase'], KnowledgeGapResolutionStep['key'] | null> = {
+    IDENTIFY: null,
+    COLLECT_EVIDENCE: 'collect',
+    VERIFY: 'verify',
+    RESOLVE: 'intake',
+  };
+  const order: Array<KnowledgeGapResolutionStep['key']> = ['collect', 'verify', 'intake'];
+  const active = activeKey[phase];
+  return steps.map((s) => {
+    if (s.status === 'DONE') return s;
+    if (resolved) return { ...s, status: 'DONE' as const };
+    if (active === null) return { ...s, status: 'TODO' as const };
+    if (order.indexOf(s.key) < order.indexOf(active)) return { ...s, status: 'DONE' as const };
+    if (s.key === active) return { ...s, status: 'ACTIVE' as const };
+    return { ...s, status: 'TODO' as const };
+  });
 }
 
 export interface KnowledgeGapDetectionContext{target?:string;missingContent?:string;conditions?:string[];environment?:string;taskId?:string;capabilityIds?:string[];claimIds?:string[];}
@@ -313,10 +363,16 @@ export class KnowledgeGapService {
         : researchRoute === 'CORE_REVIEW'
           ? ['理解索引・グラフの走査', '因果記録・証拠との照合', 'Verifierによる明示検証']
           : ['独立Evidenceの収集', 'Claim/Evidence照合', 'Verifierによる明示検証'];
+    // P842: サブ目標を持たせる。既存の計画で済んだ段は引き継ぐ。
+    const prevSteps = gap.resolutionPlan?.steps;
+    const baseSteps = stepsForRoute(researchRoute).map((s) =>
+      prevSteps?.some((p) => p.key === s.key && p.status === 'DONE') ? { ...s, status: 'DONE' as const } : s,
+    );
     const plan: KnowledgeGapResolutionPlan = {
       planId: `GAPPLAN-${canonicalSha256Object({ gapId: gap.id, missingConditions, requiredEvidence: gap.requiredEvidence, researchRoute }).slice(0, 20)}`,
       gapId: gap.id,
       phase: 'IDENTIFY',
+      steps: stepsForPhase(baseSteps, 'IDENTIFY', false),
       missingConditions: [...new Set(missingConditions)].slice(0, 12),
       requiredEvidence: [...new Set(gap.requiredEvidence)].slice(0, 12),
       verificationMethods,
@@ -331,7 +387,11 @@ export class KnowledgeGapService {
   public advanceResolutionPlan(id: string, phase: KnowledgeGapResolutionPlan['phase'], blackboardAction?: KnowledgeGapResolutionPlan['blackboardAction']): KnowledgeGap | undefined {
     const gap = this.getById(id);
     if (!gap?.resolutionPlan) return undefined;
-    return this.update(id, { resolutionPlan: { ...gap.resolutionPlan, phase, blackboardAction: blackboardAction || gap.resolutionPlan.blackboardAction } });
+    // P842: 段の前進にサブ目標の状態も追随させる。
+    const steps = gap.resolutionPlan.steps
+      ? stepsForPhase(gap.resolutionPlan.steps, phase, false)
+      : stepsForPhase(stepsForRoute(gap.resolutionPlan.researchRoute), phase, false);
+    return this.update(id, { resolutionPlan: { ...gap.resolutionPlan, phase, steps, blackboardAction: blackboardAction || gap.resolutionPlan.blackboardAction } });
   }
 
   public markResearching(id: string): KnowledgeGap | undefined {
@@ -353,6 +413,17 @@ export class KnowledgeGapService {
   }
 
   public markResolved(id: string): KnowledgeGap | undefined {
+    // P842: 解決時はサブ目標も全部 DONE にして計画を閉じる。
+    const gap = this.getById(id);
+    if (gap?.resolutionPlan?.steps) {
+      this.update(id, {
+        resolutionPlan: {
+          ...gap.resolutionPlan,
+          phase: 'RESOLVE',
+          steps: gap.resolutionPlan.steps.map((s) => ({ ...s, status: 'DONE' as const })),
+        },
+      });
+    }
     return this.update(id, { status: 'RESOLVED' });
   }
 
