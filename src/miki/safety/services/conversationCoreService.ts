@@ -2917,6 +2917,16 @@ export class ConversationCoreService {
     if (/今(?:は)?何時|何時(?:です)?か|現在時刻|いま何時/.test(prompt)) {
       return `今は${now.getHours()}時${now.getMinutes()}分です。`;
     }
+    // P823: 「今から2時間後は何時？」「30分後は何時？」——現在時刻
+    // からのずらしも、その場で計算する（従来は調査に落ちていた）。
+    const timeOffset = prompt.match(/(?:今から)?\s*(\d+(?:\.\d+)?)\s*(時間|分)\s*(後|前)(?:は|って)?何時/);
+    if (timeOffset) {
+      const sign = timeOffset[3] === '後' ? 1 : -1;
+      const minutes = sign * Number(timeOffset[1]) * (timeOffset[2] === '時間' ? 60 : 1);
+      const d = new Date(now.getTime() + minutes * 60000);
+      const dayNote = d.getDate() !== now.getDate() ? (minutes > 0 ? '（翌日）' : '（前日）') : '';
+      return `${timeOffset[1]}${timeOffset[2]}${timeOffset[3]}は${d.getHours()}時${d.getMinutes()}分${sign < 0 ? 'でした' : 'です'}${dayNote}。`;
+    }
     // P597: 明後日・一昨日までと、「何日」の形にも広げた。
     const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
     const dayOffsets: Record<string, number> = { 今日: 0, 明日: 1, あした: 1, 明後日: 2, 昨日: -1, きのう: -1, 一昨日: -2, おととい: -2 };
@@ -4439,7 +4449,21 @@ export class ConversationCoreService {
         const d = new Date(now.getTime() + delta * 86400000);
         targetDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       }
-      let hits = plans.filter((p) => (p.date && targetDate ? p.date === targetDate : p.when === when));
+      // P823: 「週末の予定」は、その週の土日の日付で引く（従来は
+      // 「週末」のラベルの控えしか引けなかった）。
+      let weekendDates: string[] | undefined;
+      if (when === '週末') {
+        const fmtW = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const nowW = new Date();
+        let satDelta = (6 - nowW.getDay() + 7) % 7;
+        if (nowW.getDay() === 0) satDelta = -1;
+        const sat = new Date(nowW.getTime() + satDelta * 86400000);
+        const sun = new Date(sat.getTime() + 86400000);
+        weekendDates = [fmtW(sat), fmtW(sun)];
+      }
+      let hits = plans.filter((p) => weekendDates
+        ? (p.date ? weekendDates.includes(p.date) : p.when === when)
+        : (p.date && targetDate ? p.date === targetDate : p.when === when));
       // P819: 曜日で聞かれて、その曜日の日付に合う控えが無い時は、
       // 同じ曜日のラベルの控えを拾う（曜日にずらした予定は翌週の
       // 日付になり、日付だけでは引けなかった）。

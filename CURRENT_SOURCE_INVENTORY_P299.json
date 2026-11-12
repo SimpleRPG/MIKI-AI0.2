@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1804,
     "sourceFileCount": 1357,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1268,
-    "relativeImportCandidateCount": 4192,
-    "resolvedRelativeImportCandidateCount": 4176,
+    "relativeImportCandidateCount": 4194,
+    "resolvedRelativeImportCandidateCount": 4178,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 316663,
-      "lines": 3594,
-      "sha256": "fb64398f0709e8c13337043b1a51ad9cbbcca3aaecc3fcc145a11072966f9026",
+      "bytes": 318691,
+      "lines": 3622,
+      "sha256": "7fd2043ad1ae5a5e9455d184be4463ae6330139b0ca31c6b20d7c2d3e16724fa",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -2828,10 +2828,22 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 3583,
+          "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 3584,
+          "specifier": "../src/services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
         }
       ],
-      "relativeImportCandidateCount": 186,
-      "resolvedRelativeImportCount": 186,
+      "relativeImportCandidateCount": 188,
+      "resolvedRelativeImportCount": 188,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -28428,9 +28440,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 462294,
-      "lines": 6857,
-      "sha256": "a703b47a9ff24f3c254374445a5ba8ec0f4b7db230eb44a60424b3d485e14288",
+      "bytes": 463889,
+      "lines": 6881,
+      "sha256": "4912590f68cf45c124c8b713a383888ac06c470d1824f88d86a457445aa51739",
       "relativeImportCandidates": [
         {
           "line": 1,

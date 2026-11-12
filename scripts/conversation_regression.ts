@@ -3578,6 +3578,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P822 性別を説明で答える', sx822.replyText.includes('オスの犬'), sx822.replyText.slice(0, 150));
 }
 
+// ---- P823: 時刻のずらし／週末の予定 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService } = await import('../src/services/storageService');
+  let mem823: any[] = []; const hist823: any[] = []; let st823: any = undefined;
+  const run823 = async (t: string) => {
+    mem823 = conversationFactIntakeService.intakeFromUserText(t, mem823).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem823, recentMessages: hist823.slice(-8), conversationState: st823 } as any);
+    st823 = r.nextConversationState;
+    hist823.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const plus2h823 = new Date(Date.now() + 2 * 3600000);
+  const to823 = await run823('今から2時間後は何時？');
+  check('P823 時刻のずらしを計算する', to823.replyText.includes('2時間後は') && to823.replyText.includes(`${plus2h823.getHours()}時`), to823.replyText.slice(0, 120));
+  const fmt823 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now823 = new Date();
+  let satDelta823 = (6 - now823.getDay() + 7) % 7; if (now823.getDay() === 0) satDelta823 = -1;
+  const sat823 = new Date(now823.getTime() + satDelta823 * 86400000);
+  const mon823 = new Date(sat823.getTime() + 2 * 86400000);
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([
+    { when: '土曜日', text: '土曜日にカイモノ823の予定があるよ', at: Date.now(), date: fmt823(sat823) },
+    { when: '月曜日', text: '月曜日にカイギ823の予定があるよ', at: Date.now(), date: fmt823(mon823) },
+  ]));
+  const wk823 = await run823('週末の予定は？');
+  check('P823 週末の予定を土日の日付で引く', wk823.replyText.includes('カイモノ823') && !wk823.replyText.includes('カイギ823'), wk823.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
