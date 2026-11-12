@@ -581,6 +581,15 @@ export class ConversationCoreService {
       if (factMedian) {
         return this.buildResult('RESOLVED', 'fact_median_answer', this.applyPersonaVoice(factMedian), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P821: 人の事実どうしの比と、年齢の見通しも、その場で答える。
+      const factRatio = this.factRatioAnswer(prompt, memories);
+      if (factRatio) {
+        return this.buildResult('RESOLVED', 'fact_ratio_answer', this.applyPersonaVoice(factRatio), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const factProj = this.factAgeProjectionAnswer(prompt, memories);
+      if (factProj) {
+        return this.buildResult('RESOLVED', 'fact_age_projection_answer', this.applyPersonaVoice(factProj), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const measAgg = this.measureAggregateAnswer(prompt);
       if (measAgg && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_aggregate_answer', this.applyPersonaVoice(measAgg), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3988,6 +3997,58 @@ export class ConversationCoreService {
     return `平均${got.attr}は約${disp}${got.unit}です（${got.rows.length}人分）。`;
   }
 
+  /** P821: 「僕の身長は相方の何倍？」——人の事実どうしの比を答える。 */
+  private factRatioAnswer(prompt: string, memories: any[] = []): string | undefined {
+    if (!/何倍/.test(prompt)) return undefined;
+    const got = this.factAttributeValues(prompt, memories);
+    if (!got) return undefined;
+    const named = got.rows
+      .map((r) => ({ r, i: prompt.indexOf(r.name) }))
+      .filter((x) => x.i >= 0)
+      .sort((a, b) => a.i - b.i);
+    if (named.length < 2) return undefined;
+    const [a, b] = [named[0].r, named[1].r];
+    if (!b.v) return undefined;
+    const ratio = Math.round((a.v / b.v) * 100) / 100;
+    return `「${a.name}」の${got.attr}は「${b.name}」の約${ratio}倍です。`;
+  }
+
+  /** P821: 「相方は10年後何歳？」「僕が40歳になるのは何年後？」——
+   * 年齢の事実からの見通しを、その場で計算して答える（従来は
+   * 彼女自身の年齢の受け答えに流れていた）。 */
+  private factAgeProjectionAnswer(prompt: string, memories: any[] = []): string | undefined {
+    const proj = prompt.match(/(\d+)年後(?:は)?何歳/);
+    const until = prompt.match(/(\d+)歳になるのは何年後/);
+    if (!proj && !until) return undefined;
+    const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    const ages = new Map<string, number>();
+    for (const mm of memories || []) {
+      if (!mm || mm.active === false || mm.replacedBy) continue;
+      if (String(mm.factAttribute || '') !== '年齢') continue;
+      const ent = String(mm.factEntity || '');
+      if (!ent) continue;
+      const n = Number(String(mm.factValue || '').match(/(\d+(?:\.\d+)?)/)?.[1]);
+      if (Number.isFinite(n)) ages.set(selfSet.has(ent) ? '僕' : ent, n);
+    }
+    if (ages.size === 0) return undefined;
+    let person: string | undefined; let pos = Infinity;
+    for (const name of ages.keys()) {
+      const i = prompt.indexOf(name);
+      if (i >= 0 && i < pos) { pos = i; person = name; }
+    }
+    if (!person) return undefined;
+    const age = ages.get(person)!;
+    if (proj) {
+      const n = Number(proj[1]);
+      return `${person}は${n}年後、${age + n}歳です。`;
+    }
+    const target = Number(until![1]);
+    const diff = target - age;
+    if (diff > 0) return `${person}が${target}歳になるのは${diff}年後です。`;
+    if (diff === 0) return `${person}は今年${target}歳になる歳です。`;
+    return `${person}が${target}歳だったのは${-diff}年前です。`;
+  }
+
   /** P820: 「3人の年齢の真ん中は？」——人の事実でも真ん中を答える。 */
   private factMedianAnswer(prompt: string, memories: any[] = []): string | undefined {
     if (!/(?:真ん中|中央)/.test(prompt)) return undefined;
@@ -4545,7 +4606,8 @@ export class ConversationCoreService {
   private taughtOrderAnswer(prompt: string): string | undefined {
     if (!/(?:教えた|教えてくれた|教えてあげた)/.test(prompt)) return undefined;
     const first = /(?:最初に|はじめに|一番初め|一番最初)/.test(prompt);
-    const last = !first && /(?:最後に)/.test(prompt);
+    // P821: 「一番最近教えたのは？」も最後に教わった語で答える。
+    const last = !first && /(?:最後に|一番最近|最近教えた|この前教えた)/.test(prompt);
     if (!first && !last) return undefined;
     try {
       const entries = japaneseDictionaryService.listPersonal()

@@ -3517,6 +3517,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P820 内容を指さない取り消しで範囲ごと消える', !plans820b.some((p: any) => String(p.text).includes('ハミガキ820')), JSON.stringify(plans820b));
 }
 
+// ---- P821: 人の事実の比／年齢の見通し／一番最近教えた語 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem821: any[] = []; const hist821: any[] = []; let st821: any = undefined;
+  const run821 = async (t: string) => {
+    mem821 = conversationFactIntakeService.intakeFromUserText(t, mem821).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem821, recentMessages: hist821.slice(-8), conversationState: st821 } as any);
+    st821 = r.nextConversationState;
+    hist821.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run821('僕の身長は180センチだよ');
+  await run821('相方の身長は150センチだよ');
+  const ratio821 = await run821('僕の身長は相方の何倍？');
+  check('P821 人の事実どうしの比を答える', ratio821.replyText.includes('約1.2倍'), ratio821.replyText.slice(0, 150));
+  await run821('僕の年齢は30歳だよ');
+  await run821('相方の年齢は28歳だよ');
+  const proj821 = await run821('相方は10年後何歳？');
+  check('P821 年齢の見通しを答える', proj821.replyText.includes('10年後、38歳'), proj821.replyText.slice(0, 150));
+  const until821 = await run821('僕が40歳になるのは何年後？');
+  check('P821 目標の年齢まで何年かを答える', until821.replyText.includes('10年後です'), until821.replyText.slice(0, 150));
+  await run821('サクラモドキは春に咲く花だよ');
+  const recent821 = await run821('一番最近教えたのは何？');
+  check('P821 一番最近教えた語を答える', recent821.replyText.includes('サクラモドキ'), recent821.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
