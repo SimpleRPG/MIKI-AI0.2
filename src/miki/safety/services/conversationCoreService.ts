@@ -590,6 +590,15 @@ export class ConversationCoreService {
       if (factProj) {
         return this.buildResult('RESOLVED', 'fact_age_projection_answer', this.applyPersonaVoice(factProj), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P822: 説明どうしの比と、誕生日からの割り出しも、その場で答える。
+      const glossRatio = this.glossRatioAnswer(prompt);
+      if (glossRatio) {
+        return this.buildResult('RESOLVED', 'gloss_ratio_answer', this.applyPersonaVoice(glossRatio), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const bdayDerived = this.birthdayDerivedAnswer(prompt, memories);
+      if (bdayDerived) {
+        return this.buildResult('RESOLVED', 'birthday_derived_answer', this.applyPersonaVoice(bdayDerived), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const measAgg = this.measureAggregateAnswer(prompt);
       if (measAgg && !multiPart) {
         return this.buildResult('RESOLVED', 'measure_aggregate_answer', this.applyPersonaVoice(measAgg), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -3052,6 +3061,24 @@ export class ConversationCoreService {
     }
     // P815: 「来月は何日まで？」「2月は何日ある？」は、その月の
     // 末日を答える（従来は「来月」を知らない語として流れていた）。
+    // P822: 「今月あと何回金曜日がある？」——その月のその曜日の
+    // 回数を数える（「あと」は今日より後だけを数える）。
+    const wdCount = prompt.match(/(今月|来月|再来月)(?:は|って)?(?:あと)?何回([日月火水木金土])曜日/);
+    if (wdCount) {
+      const shift = wdCount[1] === '来月' ? 1 : wdCount[1] === '再来月' ? 2 : 0;
+      const target = '日月火水木金土'.indexOf(wdCount[2]);
+      const remainingOnly = shift === 0 && /あと/.test(prompt);
+      const base = new Date(now.getFullYear(), now.getMonth() + shift, 1);
+      let count = 0;
+      for (let d = new Date(base.getFullYear(), base.getMonth(), 1); d.getMonth() === base.getMonth(); d.setDate(d.getDate() + 1)) {
+        if (d.getDay() !== target) continue;
+        if (remainingOnly && d.getDate() <= now.getDate()) continue;
+        count++;
+      }
+      return remainingOnly
+        ? `${wdCount[1]}はあと${count}回、${wdCount[2]}曜日があります。`
+        : `${wdCount[1]}は${wdCount[2]}曜日が${count}回あります。`;
+    }
     const monthLenMatch = prompt.match(/(今月|来月|再来月|先月|(\d{1,2})月)(?:は|って)?(?:何日まで|何日ある|何日間)/);
     if (monthLenMatch) {
       let y = now.getFullYear();
@@ -3997,6 +4024,62 @@ export class ConversationCoreService {
     return `平均${got.attr}は約${disp}${got.unit}です（${got.rows.length}人分）。`;
   }
 
+  /** P822: 「アオモドキはアカモドキの何倍の重さ？」——教わった
+   * 説明の実測値どうしの比を答える。 */
+  private glossRatioAnswer(prompt: string): string | undefined {
+    if (!/何倍/.test(prompt)) return undefined;
+    const dim = /重さ|重い|軽い/.test(prompt) ? '重さ' as const
+      : /大きさ|大きい|小さい/.test(prompt) ? '大きさ' as const
+      : /寿命|長生き/.test(prompt) ? '寿命' as const : undefined;
+    if (!dim) return undefined;
+    try {
+      const entries = japaneseDictionaryService.listPersonal().filter((e: any) => e.gloss);
+      const named = entries
+        .map((e: any) => ({ name: String(e.surface), i: prompt.indexOf(String(e.surface)), meas: this.measureFromText(String(e.gloss), dim) }))
+        .filter((x) => x.i >= 0 && x.meas)
+        .sort((a, b) => a.i - b.i);
+      if (named.length < 2) return undefined;
+      const [a, b] = named;
+      if (!b.meas!.value) return undefined;
+      const ratio = Math.round((a.meas!.value / b.meas!.value) * 100) / 100;
+      return `「${a.name}」の${dim}は「${b.name}」の約${ratio}倍です。`;
+    } catch { return undefined; }
+  }
+
+  /** P822: 誕生日の事実から、今の年齢と生まれてからの日数を
+   * 割り出す（年齢の事実が無くても、誕生日が分かれば答えられる）。 */
+  private birthdayDerivedAnswer(prompt: string, memories: any[] = []): string | undefined {
+    const wantAge = /今何歳|いま何歳|現在何歳|今の年齢|満何歳/.test(prompt);
+    const wantDays = /生まれてから何日|生後何日/.test(prompt);
+    if (!wantAge && !wantDays) return undefined;
+    const selfSet = new Set(['僕', '私', '俺', 'わたし', 'あたし']);
+    let chosen: { name: string; y: number; m: number; d: number } | undefined;
+    let selfFact: { name: string; y: number; m: number; d: number } | undefined;
+    for (const mm of memories || []) {
+      if (!mm || mm.active === false || mm.replacedBy) continue;
+      if (String(mm.factAttribute || '') !== '誕生日') continue;
+      const vm = String(mm.factValue || '').match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+      if (!vm) continue;
+      const ent = String(mm.factEntity || '');
+      if (!ent) continue;
+      const name = selfSet.has(ent) ? '僕' : ent;
+      const rec = { name, y: Number(vm[1]), m: Number(vm[2]), d: Number(vm[3]) };
+      if (prompt.includes(name)) { chosen = rec; break; }
+      if (name === '僕' && !selfFact) selfFact = rec;
+    }
+    const pick = chosen || selfFact;
+    if (!pick) return undefined;
+    const now = new Date();
+    const birth = new Date(pick.y, pick.m - 1, pick.d);
+    if (wantDays) {
+      const days = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - birth.getTime()) / 86400000);
+      return `${pick.name}が生まれてから、今日で${days}日です。`;
+    }
+    let age = now.getFullYear() - pick.y;
+    if (now.getMonth() < pick.m - 1 || (now.getMonth() === pick.m - 1 && now.getDate() < pick.d)) age--;
+    return `${pick.name}は今、${age}歳です。`;
+  }
+
   /** P821: 「僕の身長は相方の何倍？」——人の事実どうしの比を答える。 */
   private factRatioAnswer(prompt: string, memories: any[] = []): string | undefined {
     if (!/何倍/.test(prompt)) return undefined;
@@ -4723,6 +4806,8 @@ export class ConversationCoreService {
     else if (/(?:何センチ|何メートル|体長|全長|長さ|大きさ)/.test(prompt) && /(?:[？?]|何センチ|何メートル|だっけ)/.test(prompt)) attrLabel = '大きさ';
     else if (/(?:寿命|何年生き|何歳まで生き)/.test(prompt) && /(?:[？?]|何年|だっけ)/.test(prompt)) attrLabel = '寿命';
     else if (/(?:どうやって|どうすれば|どのように)/.test(prompt)) attrLabel = 'やり方';
+    // P822: 性別も属性として受ける（説明文のオス・メスで答える）。
+    else if (/性別/.test(prompt)) attrLabel = '性別';
     if (!attrLabel) return undefined;
     let entity: string | undefined;
     try {
@@ -4824,6 +4909,7 @@ export class ConversationCoreService {
         '重さ': ['キロ', 'グラム', '重', '体重'],
         '大きさ': ['大き', '小さ', 'センチ', 'メートル', '体長'],
         '寿命': ['寿命', '年', '歳', '生き'],
+        '性別': ['オス', 'メス', '雄', '雌'],
       };
       const gk = glossKeys[attrLabel];
       if (gk) {

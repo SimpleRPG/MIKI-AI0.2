@@ -3543,6 +3543,41 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P821 一番最近教えた語を答える', recent821.replyText.includes('サクラモドキ'), recent821.replyText.slice(0, 150));
 }
 
+// ---- P822: 説明どうしの比／誕生日からの割り出し／月の曜日の回数／性別の属性 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem822: any[] = []; const hist822: any[] = []; let st822: any = undefined;
+  const run822 = async (t: string) => {
+    mem822 = conversationFactIntakeService.intakeFromUserText(t, mem822).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem822, recentMessages: hist822.slice(-8), conversationState: st822 } as any);
+    st822 = r.nextConversationState;
+    hist822.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run822('ハルモドキは重さ2キロの獣だよ');
+  await run822('ナツモドキは重さ6キロの獣だよ');
+  const gr822 = await run822('ハルモドキはナツモドキの何倍の重さ？');
+  check('P822 説明どうしの比を答える', gr822.replyText.includes('約0.33倍'), gr822.replyText.slice(0, 150));
+  await run822('僕の誕生日は1995年6月15日だよ');
+  const now822 = new Date();
+  const birth822 = new Date(1995, 5, 15);
+  const days822 = Math.floor((new Date(now822.getFullYear(), now822.getMonth(), now822.getDate()).getTime() - birth822.getTime()) / 86400000);
+  let age822 = now822.getFullYear() - 1995;
+  if (now822.getMonth() < 5 || (now822.getMonth() === 5 && now822.getDate() < 15)) age822--;
+  const bd822 = await run822('僕が生まれてから何日経った？');
+  check('P822 生まれてからの日数を答える', bd822.replyText.includes(`${days822}日`), bd822.replyText.slice(0, 150));
+  const ba822 = await run822('僕は今何歳？');
+  check('P822 誕生日から今の年齢を答える', ba822.replyText.includes(`今、${age822}歳`), ba822.replyText.slice(0, 150));
+  const base822 = new Date(now822.getFullYear(), now822.getMonth() + 1, 1);
+  let sat822 = 0;
+  for (let d = new Date(base822.getFullYear(), base822.getMonth(), 1); d.getMonth() === base822.getMonth(); d.setDate(d.getDate() + 1)) { if (d.getDay() === 6) sat822++; }
+  const wc822 = await run822('来月は何回土曜日がある？');
+  check('P822 月の曜日の回数を数える', wc822.replyText.includes(`土曜日が${sat822}回`), wc822.replyText.slice(0, 150));
+  await run822('ポチモドキはオスの犬だよ');
+  const sx822 = await run822('ポチモドキの性別は？');
+  check('P822 性別を説明で答える', sx822.replyText.includes('オスの犬'), sx822.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
