@@ -68,6 +68,14 @@ class UserMemoService {
     return n;
   }
 
+  /** P818: 直近のメモを1件だけ消す。消したメモを返す。 */
+  public removeLast(): UserMemo | undefined {
+    const items = this.load();
+    const last = items.pop();
+    if (last) this.save(items);
+    return last;
+  }
+
   /** P780: 指定の語を含むメモだけを消す。消したメモを返す。 */
   public removeMatching(words: string[]): UserMemo[] {
     const items = this.load();

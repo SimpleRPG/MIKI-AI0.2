@@ -365,10 +365,14 @@ export class ConversationCoreService {
         }
       }
     } catch { /* 台帳は補助経路 */ }
+    // P818: 性質で絞った数え（「夜に活動する獣は何種類？」）は、
+    // 本人の事実の想起より先に受ける。想起が1件の事実に一致して
+    // しまい、数えの質問が単品の聞き返しに化けていた。
+    const traitCountEarly = roleplaySessionService.isActive() ? undefined : this.taughtTraitCountAnswer(prompt);
     // P456 (A): 本人が伝えた事実への聞き返しは、未知語の調査橋より先に
     // 保持済みの本人発言由来の事実で照合する。一致したときだけ想起経路へ進み、
     // 一致しなければ従来経路（調査橋・Claim 照合・分からない）に委ねる。
-    const userFactRecall = conversationUserFactRecallService.matchRecall(
+    const userFactRecall = traitCountEarly ? null : conversationUserFactRecallService.matchRecall(
       prompt,
       memories,
       (state as any).recentUserFactSummaries
@@ -378,6 +382,11 @@ export class ConversationCoreService {
     // 現在時刻から、その場で答える（Web 調査の的外れな結果や
     // 「確認できていない」に倒れていた）。
     if (!roleplaySessionService.isActive() && !userFactRecall) {
+      // P818: 性質で絞った数えは、ここで先に返す（想起より手前で
+      // 計算済み）。
+      if (traitCountEarly) {
+        return this.buildResult('RESOLVED', 'taught_trait_count_answer', this.applyPersonaVoice(traitCountEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P603: 短い別れの挨拶は、そのまま締めとして返す（状態次第で
       // 分析的な合成や時間ガードに逸れることがあった）。
       if (/^(?:じゃあ[、,]?\s*)?(?:じゃあね|じゃね|またね|また明日(?:ね|よ)?|バイバイ|さようなら|さよなら)[！!。]?$/.test(prompt.trim())) {
@@ -3349,6 +3358,30 @@ export class ConversationCoreService {
    * の教示記録（user-taught）から一覧で答える。分類の語があれば
    * その範囲に絞る（説明文か仮の分類に分類語を含むもの）。
    */
+  /**
+   * P818: 「夜に活動する獣は何種類？」——性質で絞った数え。
+   * 教わった説明文に性質の句を含むものだけを数える（従来は
+   * 教えた全体の数や、1件だけの想起で答えていた）。
+   */
+  private taughtTraitCountAnswer(prompt: string): string | undefined {
+    if (!/(?:何種類|何個|何匹|いくつ)/.test(prompt)) return undefined;
+    const m = prompt.match(/^(.{2,14}?)(?:の)?(生き物|動物|鳥|魚|虫|植物|獣)(?:は|って|が)?(?:何種類|何個|何匹|いくつ)/);
+    if (!m) return undefined;
+    const trait = m[1].replace(/^(?:今まで|これまで)?(?:教えた|教えてくれた|教えてもらった|教わった)/, '').trim();
+    // 「Xより重い鳥」は性質ではなく基準つきの数え（P771）なので譲る。
+    if (!trait || trait.length < 2 || /何|より/.test(trait)) return undefined;
+    const cat = m[2] === '生き物' ? '動物' : m[2];
+    try {
+      const entries = japaneseDictionaryService.listPersonal()
+        .filter((e: any) => e.gloss && Array.isArray(e.semanticIds) && e.semanticIds.includes('learned:user-taught'))
+        .filter((e: any) => this.taughtScopeMatch(e, cat));
+      const hits = entries.filter((e: any) => String(e.gloss).includes(trait));
+      const names = [...new Set(hits.map((e: any) => String(e.surface)))];
+      if (names.length === 0) return `${trait}${m[2]}は、まだ教わっていないです。`;
+      return `${trait}${m[2]}は、${names.length}種類です。${names.map((n) => `「${n}」`).join('と')}です。`;
+    } catch { return undefined; }
+  }
+
   private taughtListAnswer(prompt: string): string | undefined {
     // P761: 「全部合わせると何キロ？」は合計の計算であって一覧では
     // ない。「全部」が両方のゲートに掛かるため、計算の形を除く。
@@ -4464,6 +4497,7 @@ export class ConversationCoreService {
     if (specific) return specific;
     let attrLabel: string | undefined;
     let isUse = false;
+    let productFrom = false;
     if (/(?:何の仲間|なにの仲間|なんの仲間|何の一種|分類|何科|何目|何綱|何門|何属)/.test(prompt)) {
       // P618: 分類の質問は IS_A の関係で答える。
       let classEntity: string | undefined;
@@ -4502,6 +4536,9 @@ export class ConversationCoreService {
       return `「${classEntity}」の分類は、まだはっきり知らないです。調べて覚えておきますね。`;
     }
     if (/(?:どこで|どこに|どこへ|どこから|生息地)/.test(prompt) && /(?:捕まえ|釣れ|採れ|取れ|買え|手に入|見つか|見られ|見れる|会え|生息|住んで|棲んで|いる|ある)/.test(prompt)) attrLabel = /(?:生息|住んで|棲んで|見られ|見れる)/.test(prompt) ? '生息地' : '場所';
+    // P818: 「Xからは何が取れる？」「Xは何を取るのに使う？」も
+    // 産物の質問。使い道の関係で、取れるものとして答える。
+    else if (/(?:から(?:は|って)?何が(?:取れる|採れる|獲れる))|(?:何を取るのに使う)/.test(prompt)) { attrLabel = '使い道'; isUse = true; productFrom = true; }
     else if (/(?:何に|なにに|何の(?:ため|役)|なんの(?:ため|役))/.test(prompt) && /(?:使う|使える|役立|利用)/.test(prompt)) { attrLabel = '使い道'; isUse = true; }
     else if (/(?:何から|なにから)/.test(prompt) && /(?:できて|作ら|でき)/.test(prompt)) attrLabel = '材料';
     // P724: 食性の質問も属性として受ける。ここで受けないと定義の
@@ -4567,6 +4604,8 @@ export class ConversationCoreService {
     const relations = worldModelGraphService.relationsOf(entity).filter((r) => r.from === entity);
     const usedFor = relations.filter((r) => r.type === 'USED_FOR');
     if (isUse && usedFor.length > 0) {
+      // P818: 産物の出所を聞く形には、取れるもので言い直して答える。
+      if (productFrom) return `「${entity}」から取れるのは、${usedFor.map((r) => r.to).join('や')}です。`;
       return `「${entity}」は、${usedFor.map((r) => r.to).join('や')}に使われます。`;
     }
     // P643: 関係で答えられない属性でも、検証済みの知識（Claim）に
@@ -6172,6 +6211,13 @@ export class ConversationCoreService {
     // 照合して、該当だけを消す（全部消しとは分ける）。
     if (/(?:メモ|覚えたこと)/.test(p) && /(?:消して|削除|忘れて)/.test(p) && !/[？?]/.test(p)) {
       try {
+        // P818: 「さっきのメモ消して」は直近の1件を消す。内容の語が
+        // 無いため、従来は了承だけして実際には消えていなかった。
+        if (/(?:さっき|最後|直近)のメモ/.test(p)) {
+          const last = userMemoService.removeLast();
+          if (last) return `分かりました、さっきのメモ「${last.text}」は消しました。`;
+          return '消せるメモは無いです。';
+        }
         const words = utteranceFeatureService.analyze(p).contentTokens
           .filter((w: string) => w.length >= 2 && !/^(?:メモ|消し|削除|忘れ)$/.test(w));
         const removed = userMemoService.removeMatching(words);
@@ -6225,7 +6271,9 @@ export class ConversationCoreService {
         .replace(/(?:^|、|,)\s*(?:ねえ|あのさ|あのね)?\s*/, '')
         .replace(/(?:の)?(?:こと|って)[、,]?\s*(?:覚えておいて|覚えてて|覚えといて|メモして(?:おいて)?|メモしといて|メモっておいて|メモっといて)[。！!？?]*$/, '')
         .replace(/(?:覚えておいて|覚えてて|覚えといて|メモして(?:おいて)?|メモしといて|メモっておいて|メモっといて)[。！!？?]*$/, '')
-        .trim();
+        .trim()
+        // P818: 「洗剤をメモして」の助詞は内容に残さない。
+        .replace(/(?:を|も)$/, '');
       if (!content || content === p.trim()) return '分かりました。何を覚えておけばいいですか？';
       userMemoService.add(content);
       return `分かりました、「${content}」ですね。覚えておきました。`;

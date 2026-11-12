@@ -3406,6 +3406,38 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P817 月末までの日数を答える', remain817 === 0 ? monthEnd817.replyText.includes('今日が月末') : monthEnd817.replyText.includes(`あと${remain817}日`), monthEnd817.replyText.slice(0, 120));
 }
 
+// ---- P818: 性質で絞った数え／用途の聞き方／メモの「さっきの消して」と助詞 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem818: any[] = []; const hist818: any[] = []; let st818: any = undefined;
+  const run818 = async (t: string) => {
+    mem818 = conversationFactIntakeService.intakeFromUserText(t, mem818).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem818, recentMessages: hist818.slice(-8), conversationState: st818 } as any);
+    st818 = r.nextConversationState;
+    hist818.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run818('ミズモドキは白い毛が取れる獣だよ');
+  const from818 = await run818('ミズモドキからは何が取れるの？');
+  check('P818 「Xからは何が取れる」に産物で答える', from818.replyText.includes('から取れるのは、毛です'), from818.replyText.slice(0, 150));
+  const use818 = await run818('ミズモドキは何を取るのに使うの？');
+  check('P818 「何を取るのに使う」にも産物で答える', use818.replyText.includes('から取れるのは、毛です'), use818.replyText.slice(0, 150));
+  await run818('アサドリモドキは朝に鳴く鳥だよ');
+  await run818('アサガメモドキは朝に鳴く獣だよ');
+  await run818('ヨルドリモドキは夜に鳴く鳥だよ');
+  const cnt818 = await run818('朝に鳴く生き物は何種類教えた？');
+  check('P818 性質で絞って数える', cnt818.replyText.includes('2種類'), cnt818.replyText.slice(0, 150));
+  const cnt818b = await run818('朝に鳴く鳥は何種類？');
+  check('P818 性質と分類で絞って数える', cnt818b.replyText.includes('1種類') && cnt818b.replyText.includes('アサドリモドキ'), cnt818b.replyText.slice(0, 150));
+  const memo818 = await run818('詰め替え洗剤をメモして');
+  check('P818 メモの内容に助詞を残さない', memo818.replyText.includes('「詰め替え洗剤」'), memo818.replyText.slice(0, 150));
+  await run818('除菌シートってメモして');
+  const del818 = await run818('さっきのメモ消して');
+  check('P818 さっきのメモを実際に消す', del818.replyText.includes('除菌シート') && del818.replyText.includes('消しました'), del818.replyText.slice(0, 150));
+  const left818 = await run818('メモ何かあったっけ？');
+  check('P818 消したメモは読み返しに出ない', left818.replyText.includes('詰め替え洗剤') && !left818.replyText.includes('除菌シート'), left818.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
