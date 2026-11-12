@@ -3639,6 +3639,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P824 前置きつきの単位換算を答える', uc824.replyText.includes('180センチは1.8メートルです'), uc824.replyText.slice(0, 120));
 }
 
+// ---- P825: 明示の日付までの日数／その日付の曜日 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem825: any[] = []; const hist825: any[] = []; let st825: any = undefined;
+  const run825 = async (t: string) => {
+    mem825 = conversationFactIntakeService.intakeFromUserText(t, mem825).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem825, recentMessages: hist825.slice(-8), conversationState: st825 } as any);
+    st825 = r.nextConversationState;
+    hist825.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const now825 = new Date();
+  const today0825 = new Date(now825.getFullYear(), now825.getMonth(), now825.getDate());
+  let tgt825 = new Date(now825.getFullYear(), 11, 25);
+  if (tgt825.getTime() < today0825.getTime()) tgt825 = new Date(now825.getFullYear() + 1, 11, 25);
+  const diff825 = Math.round((tgt825.getTime() - today0825.getTime()) / 86400000);
+  const ud825 = await run825('12月25日まで何日？');
+  check('P825 明示の日付までの日数を数える', diff825 === 0 ? ud825.replyText.includes('今日です') : ud825.replyText.includes(`あと${diff825}日です`), ud825.replyText.slice(0, 120));
+  const wd825 = '日月火水木金土'[new Date(now825.getFullYear(), 11, 25).getDay()];
+  const dw825 = await run825('12月25日は何曜日？');
+  check('P825 明示の日付の曜日を答える', dw825.replyText.includes(`12月25日は${wd825}曜日です`), dw825.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

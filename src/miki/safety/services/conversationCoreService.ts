@@ -3001,6 +3001,13 @@ export class ConversationCoreService {
     if (/(?:今年|ことし)(?:は|って)?何年|今(?:は|って)?何年/.test(prompt)) {
       return `今年は${now.getFullYear()}年です。`;
     }
+    // P825: 明示の日付の曜日は、その日付で答える（素の「何曜日」より先）。
+    const dateWeekday = prompt.match(/(\d{1,2})月(\d{1,2})日(?:は|って)何曜日/);
+    if (dateWeekday) {
+      const tm = Number(dateWeekday[1]); const td = Number(dateWeekday[2]);
+      const target = new Date(now.getFullYear(), tm - 1, td);
+      return `${tm}月${td}日は${weekdays[target.getDay()]}曜日です。`;
+    }
     if (/何曜日/.test(prompt)) {
       return `今日は${weekdays[now.getDay()]}曜日です。`;
     }
@@ -3103,6 +3110,17 @@ export class ConversationCoreService {
       return remainingOnly
         ? `${wdCount[1]}はあと${count}回、${wdCount[2]}曜日があります。`
         : `${wdCount[1]}は${wdCount[2]}曜日が${count}回あります。`;
+    }
+    // P825: 明示の日付までの日数と、その日付の曜日も、その場で
+    // 数える（従来は調査に落ちていた）。
+    const untilDate = prompt.match(/(\d{1,2})月(\d{1,2})日まで(?:あと)?何日/);
+    if (untilDate) {
+      const tm = Number(untilDate[1]); const td = Number(untilDate[2]);
+      const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let target = new Date(now.getFullYear(), tm - 1, td);
+      if (target.getTime() < today0.getTime()) target = new Date(now.getFullYear() + 1, tm - 1, td);
+      const diff = Math.round((target.getTime() - today0.getTime()) / 86400000);
+      return diff === 0 ? `${tm}月${td}日は今日です。` : `${tm}月${td}日まであと${diff}日です。`;
     }
     const monthLenMatch = prompt.match(/(今月|来月|再来月|先月|(\d{1,2})月)(?:は|って)?(?:何日まで|何日ある|何日間)/);
     if (monthLenMatch) {
