@@ -2562,7 +2562,8 @@ export class ConversationCoreService {
   }
 
   private extractTopic(prompt: string): string {
-    return prompt.replace(/^(ねえ|ちょっと|みき[、,]?)\s*/i, '').slice(0, 80);
+    // P841: 話題ラベルの生成は舞台（topicStageService）に一本化。
+    return topicStageService.topicFromText(prompt);
   }
 
   /**

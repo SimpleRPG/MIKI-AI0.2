@@ -3985,6 +3985,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P840 スナップショットに話題の舞台が載る', Boolean(snap840.snapshot.topicStage) && Array.isArray(snap840.snapshot.topicStage.recentEntities) && typeof snap840.snapshot.topicStage.currentTopic === 'string', JSON.stringify(snap840.snapshot.topicStage || null).slice(0, 150));
 }
 
+// ---- P841: 舞台の統一・第2歩（照応プール＋話題ラベルの一本化） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { resolveAnaphora } = await import('../src/miki/conversation/services/conversationStateService');
+  const { topicStageService } = await import('../src/miki/memory/services/topicStageService');
+  let mem841: any[] = [];
+  mem841 = conversationFactIntakeService.intakeFromUserText('ルミモドキは重さ2キロの獣だよ', mem841).updatedMemories;
+  const emptyState841: any = { recentEntities: [], confirmedFacts: [], currentTopic: undefined };
+  const msgs841 = [{ role: 'user', content: 'ルミモドキは重さ2キロの獣だよ' }];
+  const ana841 = resolveAnaphora('それって鳥？', emptyState841, msgs841);
+  check('P841 照応プールが舞台（発話履歴）から対象を拾う', ana841.resolved === 'ルミモドキ', JSON.stringify(ana841).slice(0, 150));
+  const ana841b = resolveAnaphora('それって鳥？', emptyState841, []);
+  check('P841 履歴なしでは従来どおり未解決', ana841b.resolved === null, JSON.stringify(ana841b).slice(0, 120));
+  check('P841 話題ラベルの一本化（呼びかけ除去）', topicStageService.topicFromText('みき、聞いて') === '聞いて', topicStageService.topicFromText('みき、聞いて'));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

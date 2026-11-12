@@ -7,7 +7,9 @@ import { worldModelGraphService } from '../../selfAwareness/services/worldModelG
  * 認知アーキテクチャ機能対応表 #5 の第1歩。これまで core 私有だった
  * 「直近の話題の候補」の生成（旧 recentTopicCandidates、P719）を
  * 共有層へ移したもの。ロジックは移設時点で従来と同一。
- * 将来は resolveAnaphora の候補プールもここに寄せる。
+ * P841: resolveAnaphora の候補プールもこの舞台から取るようになり、
+ * 発話の素の文字列から話題を作る topicFromText もここに一本化した
+ * （旧 core / nonLlmCore の同名コピー2件を統合）。
  */
 class TopicStageService {
   /** 直近の話題の候補（新しい順）。辞書・関係で裏付けられる語だけ。 */
@@ -42,6 +44,12 @@ class TopicStageService {
   /** 今の話題（候補の先頭）。 */
   current(state?: any, recentMessages: Array<any> = []): string | undefined {
     return this.candidates(state, recentMessages)[0];
+  }
+
+  /** P841: 発話の素の文字列から話題ラベルを作る（旧 extractTopic の
+   * 2コピーを一本化。呼びかけの前置きを落として先頭80文字）。 */
+  topicFromText(prompt: string): string {
+    return String(prompt || '').replace(/^(ねえ|ちょっと|みき[、,]?)\s*/i, '').slice(0, 80);
   }
 }
 

@@ -1,7 +1,7 @@
 import { ConversationState, ConversationStage, ResponseLength, DialogueAct, FeedbackStage, ConversationExplanationAdaptation, ConversationUnderstandingLevel, ConversationGoalStatus } from '../../../types';
 import { systemLogger } from '../../../services/systemLogger';
-import { anaphoraHistoryStack } from '../../../autonomous_modules/anaphora_history_stack';
 import { resolveAnaphoraPure } from '../../../autonomous_modules/anaphora_resolver_sample';
+import { topicStageService } from '../../memory/services/topicStageService';
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
@@ -1070,7 +1070,8 @@ export function selectInformationGainQuestion(candidates: string[]): Information
 
 export function resolveAnaphora(
   prompt: string,
-  state: ConversationState
+  state: ConversationState,
+  recentMessages: Array<any> = []
 ): AnaphoraResolutionResult {
   if (!prompt || typeof prompt !== 'string') {
     return { detectedExpression: null, resolved: null, candidates: [], confidence: 'unresolved' };
@@ -1109,14 +1110,17 @@ export function resolveAnaphora(
     }
   }
 
-  // 自律モジュール anaphoraHistoryStack への同期
+  // P841: 舞台（topicStageService）の候補も同じプールに載せる。
+  // 発話履歴から拾える裏付け済みの名前は、状態側に記録されて
+  // いなくても照応の対象になれる。舞台は新しい順なので、逆順に
+  // 積んで「末尾が最新」のプールの約束に合わせる。
+  // （旧 anaphoraHistoryStack への同期は読み手が無い死蔵のため廃止。）
   try {
-    for (const item of pool) {
-      anaphoraHistoryStack.push(item, 'ENTITY', 1);
+    const stage = topicStageService.candidates(state, recentMessages);
+    for (const item of [...stage].reverse()) {
+      if (!pool.includes(item)) pool.push(item);
     }
-  } catch (e) {
-    console.warn('Failed to sync with anaphoraHistoryStack:', e);
-  }
+  } catch { /* 補助経路 */ }
 
   // 自律モジュール resolveAnaphoraPure を用いた純粋関数解決
   const pureResult = resolveAnaphoraPure(p, pool);

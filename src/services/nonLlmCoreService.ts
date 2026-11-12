@@ -17,6 +17,7 @@ import { unifiedDecisionEngineService } from './unifiedDecisionEngineService';
 import { affectionDynamicsService } from './affectionDynamicsService';
 import { systemLogger } from './systemLogger';
 import { unifiedWebResearchService } from '../miki/research/services/unifiedWebResearchService';
+import { topicStageService } from '../miki/memory/services/topicStageService';
 import { knowledgeGapService } from './knowledgeGapService';
 import { researchService } from './researchService';
 import { verifierService } from '../miki/verification/services/verifierService';
@@ -560,7 +561,8 @@ export class NonLlmCoreService {
   }
 
   private extractTopic(prompt: string): string {
-    return prompt.replace(/^(ねえ|ちょっと|みき[、,]?)\s*/i, '').slice(0, 80);
+    // P841: 話題ラベルの生成は舞台（topicStageService）に一本化。
+    return topicStageService.topicFromText(prompt);
   }
 
   private buildResult(
