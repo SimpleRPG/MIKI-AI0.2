@@ -4634,6 +4634,13 @@ export class ConversationCoreService {
           .find((c: any) => String(c.statement || '').includes(candidate));
         if (verifiedHit) return `はい、そのとおりです。${String((verifiedHit as any).statement).slice(0, 90)}`;
       } catch { /* 知識照合は補助経路 */ }
+      // P807: 教わった説明文が候補の述語を含むなら、分類の正しより
+      // 先に説明文を引いて肯定する（「卵を産むの？」に「産むじゃ
+      // なくて鳥の仲間」と返す崩れの対策。P727 の教わった説明版）。
+      try {
+        const glossHit = japaneseDictionaryService.lookup(entity).map((e: any) => String(e.gloss || '')).find((g: string) => g.length > 0 && g.includes(candidate));
+        if (glossHit) return `うん、教わった説明では「${entity}」は${glossHit}、と聞いています。`;
+      } catch { /* 補助判定 */ }
       if (candidateIsProperty) return undefined;
       const isARelations = relations.filter((r) => r.type === 'IS_A');
       const isA = isARelations.map((r) => r.to);

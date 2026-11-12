@@ -3183,6 +3183,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P806 使い道の質問に産物で答える', use806.replyText.includes('毛'), use806.replyText.slice(0, 120));
 }
 
+// ---- P807: 産卵は産物にせず、述語の確認は説明文で肯定する ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { worldModelGraphService } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  let mem807: any[] = []; const hist807: any[] = []; let st807: any = undefined;
+  const run807 = async (t: string) => {
+    mem807 = conversationFactIntakeService.intakeFromUserText(t, mem807).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem807, recentMessages: hist807.slice(-8), conversationState: st807 } as any);
+    st807 = r.nextConversationState;
+    hist807.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run807('モリモドキは森の中で卵を産む鳥だよ');
+  const rel807 = worldModelGraphService.relationsOf('モリモドキ', 'USED_FOR');
+  check('P807 卵を産むは産物の関係にしない', rel807.length === 0, JSON.stringify(rel807));
+  const lay807 = await run807('モリモドキって卵を産むの？');
+  check('P807 述語の確認は説明文を引いて肯定する', lay807.replyText.includes('卵を産む鳥'), lay807.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

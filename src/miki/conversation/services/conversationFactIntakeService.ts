@@ -764,7 +764,9 @@ export class ConversationFactIntakeService {
     // に説明文の内容で答えられなかった）。産物は句の最後の名詞語。
     try {
       const productMatch = gloss.match(/(.{1,12}?)(?:が|を)(?:取れる|採れる|獲れる|取れます|採れます)/)
-        || gloss.match(/(.{1,12}?)を(?:作る|つくる|生む|産む)/);
+        || gloss.match(/(.{1,12}?)を(?:作る|つくる)/);
+      // 「卵を産む」は産卵であって産物ではないので、生む・産むは
+      // 産物の形に入れない（P806 初版で誤って関係化した）。
       if (productMatch) {
         const phraseTokens = (utteranceFeatureService.analyze(productMatch[1]).contentTokens || [])
           .filter((t: string) => t && t !== term && !/^(こと|もの|ため)$/.test(t));
