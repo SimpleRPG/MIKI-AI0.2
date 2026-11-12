@@ -499,6 +499,12 @@ export class ConversationCoreService {
       if (planWhen) {
         return this.buildResult('RESOLVED', 'plan_when_answer', this.applyPersonaVoice(planWhen), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P838: 続きの「何時から？」は現在時刻ではなく、直前に話した
+      // 予定の開始時刻。時計の即答より先に台帳の時刻を見る。
+      const planTime = multiPart ? undefined : this.planTimeAnswer(prompt);
+      if (planTime) {
+        return this.buildResult('RESOLVED', 'plan_time_answer', this.applyPersonaVoice(planTime), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const clockAnswer = multiPart ? undefined : this.clockCalendarAnswer(prompt);
       if (clockAnswer) {
         return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -643,6 +649,13 @@ export class ConversationCoreService {
       const habitatList = this.glossHabitatListAnswer(prompt);
       if (habitatList && !multiPart) {
         return this.buildResult('RESOLVED', 'gloss_habitat_list_answer', this.applyPersonaVoice(habitatList), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P838: 一覧の後の「他には？」は、直前の一覧と付き合わせて
+      // 正直に答える（一覧の答えを控えておき、増えていなければ
+      // 「他にはいない」と言える）。
+      const listFollowup = multiPart ? undefined : this.lastListFollowupAnswer(prompt);
+      if (listFollowup) {
+        return this.buildResult('RESOLVED', 'last_list_followup_answer', this.applyPersonaVoice(listFollowup), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P819: 動詞句の性質で絞った一覧は、名詞の性質の一覧より先に
       // 受ける（句の形は従来どちらにも乗らなかった）。
@@ -3677,7 +3690,47 @@ export class ConversationCoreService {
       const hits = entries.filter((e: any) => String(e.gloss).includes(trait));
       const names = [...new Set(hits.map((e: any) => String(e.surface)))];
       if (names.length === 0) return `今知っている中では、${trait}ものはいないです。`;
-      return `${trait}${m[2]}は、${names.map((n) => `「${n}」`).join('と')}がいます。`;
+      const text = `${trait}${m[2]}は、${names.map((n) => `「${n}」`).join('と')}がいます。`;
+      // P838: 直後の一覧への「他には？」に備えて控えておく。
+      try { storageService.setItem('miki_last_list_answer_v1', JSON.stringify({ prompt, text, at: Date.now() })); } catch { /* 補助経路 */ }
+      return text;
+    } catch { return undefined; }
+  }
+
+  /** P838: 一覧の答えの後の「他には？」——控えた一覧を今の知識で
+   * 再計算し、同じなら「他にはいない」と正直に答える。 */
+  private lastListFollowupAnswer(prompt: string): string | undefined {
+    if (!/^(?:他には|他は|あとは|ほかには)[？?。]?$/.test(prompt.trim())) return undefined;
+    try {
+      const raw = storageService.getItem('miki_last_list_answer_v1');
+      if (!raw) return undefined;
+      const stash = JSON.parse(raw);
+      if (!stash || Date.now() - Number(stash.at || 0) > 10 * 60000) return undefined;
+      const fresh = this.taughtTraitListAnswer(String(stash.prompt || ''));
+      if (!fresh) return undefined;
+      if (fresh === stash.text) return '他にはいないです。今知っているのは、それだけです。';
+      return fresh;
+    } catch { return undefined; }
+  }
+
+  /** P838: 予定の開始時刻の続きの質問（「何時から？」）。台帳の
+   * 文の中の時刻で答える。 */
+  private planTimeAnswer(prompt: string): string | undefined {
+    if (!/(?:何時から|何時に始まる|何時まで)/.test(prompt)) return undefined;
+    try {
+      const raw = storageService.getItem('miki_user_plans_v1');
+      const plans: Array<{ when: string; text: string; at: number; date?: string }> = raw ? JSON.parse(raw) : [];
+      const timed = plans
+        .map((p) => {
+          const tm = String(p.text || '').match(/(\d{1,2})時(?:(\d{1,2})分)?/);
+          return tm ? { when: p.when, date: p.date || '', time: `${tm[1]}時${tm[2] ? `${tm[2]}分` : ''}` } : null;
+        })
+        .filter((x): x is { when: string; date: string; time: string } => Boolean(x));
+      if (timed.length === 0) return undefined;
+      const whenWord = (prompt.match(/(明後日|明日|今日|今夜)/) || [])[1];
+      const scoped = whenWord ? timed.filter((x) => x.when === whenWord) : timed;
+      const pick = (scoped.length > 0 ? scoped : timed).slice().sort((a, b) => a.date.localeCompare(b.date))[0];
+      return `${pick.when}の予定は${pick.time}からです。`;
     } catch { return undefined; }
   }
 

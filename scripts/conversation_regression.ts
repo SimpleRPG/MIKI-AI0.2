@@ -3921,6 +3921,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P837 「年の差は？」も2人で答える', dif837.replyText.includes('2歳'), dif837.replyText.slice(0, 150));
 }
 
+// ---- P838: 予定の時刻の続きの質問／一覧の後の「他には？」 ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { storageService } = await import('../src/services/storageService');
+  let mem838: any[] = []; const hist838: any[] = []; let st838: any = undefined;
+  const run838 = async (t: string) => {
+    mem838 = conversationFactIntakeService.intakeFromUserText(t, mem838).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem838, recentMessages: hist838.slice(-8), conversationState: st838 } as any);
+    st838 = r.nextConversationState;
+    hist838.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const fmt838 = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([{ when: '明日', text: '明日の15時から会議の予定があるよ', at: Date.now(), date: fmt838(new Date(Date.now() + 86400000)) }]));
+  const pt838 = await run838('何時から？');
+  check('P838 「何時から？」は予定の時刻で答える', pt838.replyText.includes('15時から'), pt838.replyText.slice(0, 150));
+  await run838('ミオモドキは夜に活動する獣だよ');
+  await run838('ソラモドキは夜に活動する獣だよ');
+  await run838('夜に活動する生き物を教えて');
+  const ot838 = await run838('他には？');
+  check('P838 一覧の後の「他には？」は正直に答える', ot838.replyText.includes('他にはいない'), ot838.replyText.slice(0, 150));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
