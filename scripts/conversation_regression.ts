@@ -3164,6 +3164,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P805 ではない形の説明は肯定側だけになる', gloss805b === '魚の一種', gloss805b);
 }
 
+// ---- P806: 教わった説明から産物（USED_FOR）を分解する ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { worldModelGraphService } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  let mem806: any[] = []; const hist806: any[] = []; let st806: any = undefined;
+  const run806 = async (t: string) => {
+    mem806 = conversationFactIntakeService.intakeFromUserText(t, mem806).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem806, recentMessages: hist806.slice(-8), conversationState: st806 } as any);
+    st806 = r.nextConversationState;
+    hist806.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run806('ユキモドキは白い毛が取れる獣だよ');
+  const rel806 = worldModelGraphService.relationsOf('ユキモドキ', 'USED_FOR');
+  check('P806 産物の仮関係ができる', rel806.length === 1 && rel806[0].to === '毛' && rel806[0].provisional === true, JSON.stringify(rel806));
+  const use806 = await run806('ユキモドキって何に使うの？');
+  check('P806 使い道の質問に産物で答える', use806.replyText.includes('毛'), use806.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

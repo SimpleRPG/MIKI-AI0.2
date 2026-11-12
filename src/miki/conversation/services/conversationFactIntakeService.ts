@@ -759,6 +759,21 @@ export class ConversationFactIntakeService {
         worldModelGraphService.addRelation({ fromName: term, toName: category, type: 'IS_A', provisional: true, confidence: 0.3, ...(taughtClaimId ? { sourceClaimId: taughtClaimId } : {}) } as any);
       }
     } catch { /* 関係は補助経路 */ }
+    // P806: 産物の分解。「白い毛が取れる」「実を食べる」等の形から
+    // USED_FOR の仮関係を載せる（従来は IS_A だけで、「何に使うの」
+    // に説明文の内容で答えられなかった）。産物は句の最後の名詞語。
+    try {
+      const productMatch = gloss.match(/(.{1,12}?)(?:が|を)(?:取れる|採れる|獲れる|取れます|採れます)/)
+        || gloss.match(/(.{1,12}?)を(?:作る|つくる|生む|産む)/);
+      if (productMatch) {
+        const phraseTokens = (utteranceFeatureService.analyze(productMatch[1]).contentTokens || [])
+          .filter((t: string) => t && t !== term && !/^(こと|もの|ため)$/.test(t));
+        const product = [...phraseTokens].reverse().find((t: string) => /[一-龠ァ-ヶー]$/.test(t));
+        if (product && product !== term) {
+          worldModelGraphService.addRelation({ fromName: term, toName: product, type: 'USED_FOR', provisional: true, confidence: 0.3, ...(taughtClaimId ? { sourceClaimId: taughtClaimId } : {}) } as any);
+        }
+      }
+    } catch { /* 関係は補助経路 */ }
     // 3. 知らない構成語 → 知識の欠け（背景学習行き）。対象は漢字・
     // カタカナだけの語に限る（動詞・形容詞の語幹は語彙の欠けでは
     // ない）。
