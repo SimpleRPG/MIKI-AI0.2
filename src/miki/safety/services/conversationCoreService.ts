@@ -6342,7 +6342,8 @@ export class ConversationCoreService {
    * 開いた話題から、会話の振り返りに直接答える。
    */
   private episodeRecallAnswer(prompt: string): string | undefined {
-    if (!/(?:何の話|どんな話|何話し|話したっけ|話してた)/.test(prompt)) return undefined;
+    // P848: 「Xの話、いつ〜」の形（間に読点や「いつ」が入る）も受ける。
+    if (!/(?:何の話|どんな話|何話し|話したっけ|話してた|話.{0,8}(?:いつ|前|まえ))/.test(prompt)) return undefined;
     try {
       // P645: 一昨日・〜日前もエピソードで答える。一昨日は「昨日」を
       // 部分文字列として含むため、先に判定しないと昨日の話として
@@ -6360,6 +6361,20 @@ export class ConversationCoreService {
           return `${summary}覚えてますよ。`;
         }
         return `${dayLabel}の話は、まだ記録に残ってないです。`;
+      }
+      // P848: 日付でなく話題で聞かれたら（「Xの話、いつしたっけ？」）、
+      // エピソードを内容で引く（事例ベースの想起）。
+      if (/(?:いつ|前|まえ)/.test(prompt)) {
+        const feats = utteranceFeatureService.analyze(prompt);
+        const terms = (feats.contentTokens || []).filter((t) => t.length >= 2 && !/^(?:話|いつ|前|まえ|した|っけ|何の|どんな)$/.test(t));
+        const hits = episodeMemoryService.episodesMatching(terms);
+        const top = hits[0];
+        if (top) {
+          const dayLabel = top.daysAgo === 1 ? '昨日' : top.daysAgo === 2 ? '一昨日' : `${top.daysAgo}日前`;
+          return `「${top.hits[0]}」の話は、${dayLabel}にもしましたよ。`;
+        }
+        const named = terms.find((t) => japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0);
+        if (named) return `「${named}」の話は、記録には残ってないです。`;
       }
       // 今日の振り返りは既存の要約経路（P597）の領分なので触らない。
     } catch { return undefined; }

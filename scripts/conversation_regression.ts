@@ -4113,6 +4113,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P847 聞き返した語への答えが語彙に入る（保留枠組み経由）', japaneseDictionaryService.has('ケサチェック'), '');
 }
 
+// ---- P848: 事例ベースの想起（エピソードを内容で引く） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { episodeMemoryService } = await import('../src/miki/conversation/services/episodeMemoryService');
+  const { daysAgoKey } = await import('../src/miki/memory/services/dayKeyService');
+  const { storageService } = await import('../src/services/storageService');
+  storageService.setItem('miki_episodes_v1', JSON.stringify([
+    { day: daysAgoKey(2), topics: ['サクラチェック', '川'], summary: '昨日は、サクラチェックの話が中心でした。' },
+    { day: daysAgoKey(1), topics: ['山'], summary: '昨日は、山の話が中心でした。' },
+  ]));
+  const svc848 = episodeMemoryService.episodesMatching(['サクラチェック']);
+  check('P848 エピソードを話題で引ける', svc848.length === 1 && svc848[0].daysAgo === 2, JSON.stringify(svc848).slice(0, 120));
+  let mem848: any[] = [];
+  let st848: any = undefined;
+  const say848 = async (text: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, mem848);
+    mem848 = intake.updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: mem848, conversationState: st848, recentMessages: [] } as any);
+    st848 = r.nextConversationState;
+    return String(r.replyText || '');
+  };
+  await say848('ウミチェックは、海に住む生き物だよ');
+  const hit848 = await say848('サクラチェックの話、いつしたっけ？');
+  check('P848 「Xの話、いつしたっけ？」に内容で答える', hit848.includes('サクラチェック') && hit848.includes('一昨日'), hit848.slice(0, 160));
+  const miss848 = await say848('ウミチェックの話、いつしたっけ？');
+  check('P848 記録に無い話題は正直に答える', miss848.includes('記録には残ってない'), miss848.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

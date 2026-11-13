@@ -72,6 +72,27 @@ class EpisodeMemoryService {
     return out.sort((a, b) => a.day.localeCompare(b.day));
   }
 
+  /**
+   * P848: 内容（話題）でエピソードを引く（事例ベースの想起）。
+   * 日付でしか引けなかったエピソードに、話題の一致で引く経路を
+   * 足す。一致した話題が多い順、同数なら新しい順。今日の分は
+   * 対象外（当日の振り返りは別の経路の領分）。
+   */
+  public episodesMatching(terms: string[]): Array<{ episode: Episode; hits: string[]; daysAgo: number }> {
+    const wanted = (terms || []).filter((t) => t && t.length >= 2);
+    if (wanted.length === 0) return [];
+    const out: Array<{ episode: Episode; hits: string[]; daysAgo: number }> = [];
+    for (const ep of this.loadEpisodes()) {
+      const hits = wanted.filter((t) => (ep.topics || []).some((topic) => topic === t || topic.includes(t) || t.includes(topic)));
+      if (hits.length === 0) continue;
+      let daysAgo = 0;
+      for (let n = 1; n <= 14; n++) { if (daysAgoKey(n) === ep.day) { daysAgo = n; break; } }
+      if (daysAgo === 0) continue;
+      out.push({ episode: ep, hits, daysAgo });
+    }
+    return out.sort((a, b) => b.hits.length - a.hits.length || a.daysAgo - b.daysAgo);
+  }
+
   /** P627: 過去7日分のエピソードを（組めるものは組んで）日付順に返す。 */
   public recentEpisodes(days = 7): Episode[] {
     const out: Episode[] = [];
