@@ -6,6 +6,7 @@ import { lexicalRelationService } from '../../memory/services/lexicalRelationSer
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
+import { sceneBufferService } from '../../memory/services/sceneBufferService';
 import { activationService } from '../../memory/services/activationService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { worldModelGraphService } from './worldModelGraphService';
@@ -173,6 +174,8 @@ class StateSnapshotExportService {
       // lastTopic と、保留スロットの有無）も書き出す。これまで
       // スナップショットに見えていた話題は開いた話題の台帳だけで、
       // 省略解決に実際に効いている舞台は実機で検証できなかった。
+      // P852: 今の場面の束（話題・状態・なりチャの場面を1つに）。
+      scene: (() => { try { return sceneBufferService.current(); } catch { return null; } })(),
       topicStage: (() => {
         try {
           const st = JSON.parse(storageService.getItem('miki_conversation_state') || 'null');

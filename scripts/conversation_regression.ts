@@ -4176,6 +4176,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P850 忘れた語の受け答えが保留枠組み経由で返る', fg850.includes('「ワスチェック」のことは忘れますね'), fg850.slice(0, 160));
 }
 
+
+// ---- 場面の束を共有サービスに（P852） ----
+{
+  const { sceneBufferService } = await import('../src/miki/memory/services/sceneBufferService');
+  const { conversationOpenTopicService } = await import('../src/miki/conversation/services/conversationOpenTopicService');
+  const { dayKeyOf, todayKey, daysAgoKey } = await import('../src/miki/memory/services/dayKeyService');
+  const run852 = async (p: string) => conversationCoreService.execute({ prompt: p } as any);
+  void run852;
+  // 3日前の trail に fatigue を2件置く（その日は他の交通が無い）
+  const day3 = daysAgoKey(3);
+  const base = new Date(`${day3}T12:00:00`).getTime();
+  const prevTrail = storageService.getItem('miki_user_state_trail_v1');
+  const trail = JSON.parse(prevTrail || '[]') as Array<{ signal: string; at: number }>;
+  trail.push({ signal: 'fatigue', at: base }, { signal: 'fatigue', at: base + 3600_000 });
+  storageService.setItem('miki_user_state_trail_v1', JSON.stringify(trail));
+  check('P852 その日の主な状態を束側で計算できる', sceneBufferService.dominantStateFor(day3) === 'fatigue', String(sceneBufferService.dominantStateFor(day3)));
+  conversationOpenTopicService.record('場面チェックX', 3);
+  check('P852 今日の話題が束に入る', sceneBufferService.topicsFor(todayKey()).includes('場面チェックX'), JSON.stringify(sceneBufferService.topicsFor(todayKey())));
+  const scene = sceneBufferService.current();
+  check('P852 今の場面の束が組み立つ', scene.day === todayKey() && Array.isArray(scene.topics) && scene.topics.includes('場面チェックX'), JSON.stringify(scene).slice(0, 160));
+  const { stateSnapshotExportService } = await import('../src/miki/selfAwareness/services/stateSnapshotExportService');
+  stateSnapshotExportService.exportNow();
+  const saved852 = JSON.parse(storageService.getItem('miki_state_snapshot_v1') || 'null');
+  const body852 = saved852 && typeof saved852.json === 'string' ? JSON.parse(saved852.json) : null;
+  check('P852 スナップショットに場面の束が載る', Boolean(body852 && body852.scene && body852.scene.day === todayKey()), body852 && body852.scene ? JSON.stringify(body852.scene).slice(0, 120) : 'no scene');
+  void dayKeyOf;
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
