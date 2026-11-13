@@ -3053,6 +3053,21 @@ export class ConversationCoreService {
       const band = h >= 5 && h < 11 ? '朝' : h >= 11 && h < 17 ? '昼' : h >= 17 && h < 19 ? '夕方' : '夜';
       return asked === band ? `はい、今は${band}です。` : `今は${band}です。`;
     }
+    // P864: 「午前と午後どっち？」——二択の形でも今の帯を答える
+    // （従来は照応の未解決として、内部の判定文が出ていた）。
+    if (/午前と午後(?:は|って)?\s*(?:どっち|どちら)|午前[？?]\s*午後|午後[？?]\s*午前/.test(prompt)) {
+      return `今は${now.getHours() < 12 ? '午前' : '午後'}です。`;
+    }
+    // P864: 「あと何時間で明日になる？」——日付が変わるまでの
+    // 残りを計算して答える（従来は調査に落ちて無関係な検索
+    // 結果を返していた）。
+    const untilTomorrow = prompt.match(/あと何(時間|分)で(?:明日|日付が変わ)/);
+    if (untilTomorrow) {
+      const remainMin = 24 * 60 - (now.getHours() * 60 + now.getMinutes());
+      if (untilTomorrow[1] === '分') return `明日になるまで、あと${remainMin}分です。`;
+      const hh = Math.floor(remainMin / 60); const mm = remainMin % 60;
+      return mm > 0 ? `明日になるまで、あと${hh}時間${mm}分です。` : `明日になるまで、あと${hh}時間です。`;
+    }
     // P823: 「今から2時間後は何時？」「30分後は何時？」——現在時刻
     // からのずらしも、その場で計算する（従来は調査に落ちていた）。
     const timeOffset = prompt.match(/(?:今から)?\s*(\d+(?:\.\d+)?)\s*(時間|分)\s*(後|前)(?:は|って)?何時/);

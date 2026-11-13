@@ -4413,6 +4413,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P863 次のX曜日は今日の曜日と重なれば来週を指す', r3.includes(fmt863(plus863(deltaFri))), r3.slice(0, 100));
 }
 
+
+// ---- 時刻帯の二択と、明日までの残り時間（P864） ----
+{
+  const ask864 = async (t: string) => (await conversationCoreService.execute({ prompt: t } as any) as any).replyText as string;
+  const now864 = new Date();
+  const r1 = await ask864('午前と午後どっち？');
+  check('P864 午前と午後どっちは今の帯で答える', r1 === `今は${now864.getHours() < 12 ? '午前' : '午後'}です。` && !r1.includes('最終判定'), r1.slice(0, 100));
+  const remain864 = 24 * 60 - (now864.getHours() * 60 + now864.getMinutes());
+  const hh864 = Math.floor(remain864 / 60); const mm864 = remain864 % 60;
+  const expected864 = mm864 > 0 ? `あと${hh864}時間${mm864}分です` : `あと${hh864}時間です`;
+  const r2 = await ask864('あと何時間で明日になる？');
+  check('P864 あと何時間で明日は残り時間を計算する', r2.includes(expected864), r2.slice(0, 100));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
