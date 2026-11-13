@@ -1079,6 +1079,16 @@ export function resolveAnaphora(
   }
 
   const p = prompt.trim();
+  // P857: 「どっちも／どちらも」は両方を指す言い方で、単一の対象を
+  // 指す指示語ではない。これを「どっち」と読むと、二択の確認質問や
+  // 内部の判定文が会話に漏れる（「AとB、どっちも気になるな」への
+  // 誤爆）。他に指示表現が無ければ、照応なしとして返す。
+  if (/(?:どっち|どちら)も/.test(p)) {
+    const rest = p.replace(/(?:どっち|どちら)も/g, '');
+    if (!/(?:さっきの|前の方|前のやつ|前の|あれ|それ|これ|どっち|どちら)/.test(rest)) {
+      return { detectedExpression: null, resolved: null, candidates: [], confidence: 'unresolved' };
+    }
+  }
   // 対象表現の検出: 「さっきの」「前の」「あれ」「それ」「これ」「どっち」「どちら」
   const anaphoraRegex = /(さっきの|前の方|前のやつ|前の|あれ|それ|これ|どっち|どちら)/;
   const match = p.match(anaphoraRegex);

@@ -4278,6 +4278,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P856 指示的な発話はスタックを押し上げない', Boolean(ref856b) && (ref856b as any).surface === (ref856 as any).surface, JSON.stringify(ref856b).slice(0, 120));
 }
 
+
+// ---- 「どっちも」のつぶやきと単一指示語の誤読を直す（P857） ----
+{
+  const run857 = async (text: string, mems: any[], st: any) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, mems);
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: intake.updatedMemories, conversationState: st, recentMessages: [] } as any);
+    return { r, mems: intake.updatedMemories, st: r.nextConversationState };
+  };
+  let mems857: any[] = [];
+  let st857: any = undefined;
+  let o = await run857('ハナモドキは、雪原に住む小さな鳥だよ', mems857, st857); mems857 = o.mems; st857 = o.st;
+  o = await run857('ヤマモドキは、山に住む鳥だよ', mems857, st857); mems857 = o.mems; st857 = o.st;
+  o = await run857('ハナモドキとヤマモドキ、どっちも気になるな', mems857, st857); mems857 = o.mems; st857 = o.st;
+  check('P857 「どっちも気になる」は両方への気持ちとして受ける', o.r.replyText.includes('「ハナモドキ」も「ヤマモドキ」も') && o.r.replyText.includes('どっちも気になりますよね'), o.r.replyText.slice(0, 160));
+  check('P857 内部の判定文が漏れない', !o.r.replyText.includes('最終的な判定') && !o.r.replyText.includes('一意に特定できません'), o.r.replyText.slice(0, 120));
+  o = await run857('ハナモドキとヤマモドキ、どっちが大きい？', mems857, st857); mems857 = o.mems; st857 = o.st;
+  check('P857 本物の二択の質問は従来どおり比べる', o.r.replyText.includes('大きさ') || o.r.replyText.includes('比べ'), o.r.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

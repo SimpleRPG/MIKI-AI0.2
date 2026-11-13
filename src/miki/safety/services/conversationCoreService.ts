@@ -908,6 +908,11 @@ export class ConversationCoreService {
       if (consult) {
         return this.buildResult('RESOLVED', 'musing_consult_answer', this.applyPersonaVoice(consult), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P857: 「どっちも〜」のつぶやきは両方への気持ちとして受ける。
+      const both = this.bothMusingAnswer(prompt);
+      if (both) {
+        return this.buildResult('RESOLVED', 'both_musing_answer', this.applyPersonaVoice(both), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P695: 「ちょっと待って」は待機の頼みとして受ける。
       const hold = this.holdRequestAnswer(prompt);
       if (hold) {
@@ -7119,6 +7124,32 @@ export class ConversationCoreService {
    * という断片が調査キューに入っていた）。気分を聞き返して
    * 一緒に考える形で受ける。
    */
+  /**
+   * P857: 「AとB、どっちも気になるな」のような、両方へのつぶやきを
+   * 受ける。単一指示語と誤読されて内部の判定文が漏れていた形。
+   * 質問形（どっちも食べられる？等）と、気持ちの手がかりが無い
+   * ものは対象外。
+   */
+  private bothMusingAnswer(prompt: string): string | undefined {
+    if (!/(?:どっち|どちら)も/.test(prompt)) return undefined;
+    if (/[？?]/.test(prompt) || looksInterrogative(prompt)) return undefined;
+    const cue = prompt.match(/(気になる|大好き|好き|かわいい|面白い|すごい)/)?.[1];
+    if (!cue) return undefined;
+    let names: string[] = [];
+    try {
+      const feats = utteranceFeatureService.analyze(prompt);
+      names = feats.contentTokens.filter((t) => {
+        try { return japaneseDictionaryService.has(t) || worldModelGraphService.relationsOf(t).length > 0; } catch { return false; }
+      });
+    } catch { return undefined; }
+    names = [...new Set(names)].slice(0, 2);
+    if (names.length < 2) return undefined;
+    const [a, b] = names;
+    if (cue === '気になる') return `「${a}」も「${b}」も、どっちも気になりますよね。`;
+    if (cue === '好き' || cue === '大好き') return `「${a}」も「${b}」も、どっちも好きなんですね。`;
+    return `「${a}」も「${b}」も、どっちも${cue}ですよね。`;
+  }
+
   private musingConsultAnswer(prompt: string): string | undefined {
     const p = prompt;
     if (/何(?:を)?(?:食べ|食お|飲も|作ろ)/.test(p) && /(?:よう|よっか|ようか)/.test(p)) {
