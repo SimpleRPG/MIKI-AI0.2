@@ -2419,7 +2419,7 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   const planAfterCancel744 = await run744('明日の予定って何だっけ？');
   check('P753 キャンセルした予定は答えず、残りは答える', !planAfterCancel744.replyText.includes('歯医者') && planAfterCancel744.replyText.includes('ご飯'), planAfterCancel744.replyText.slice(0, 130));
   const planTime744 = await run744('明日の予定、何時からだっけ？');
-  check('P754 予定の時刻の聞き返しは現在時刻で答えない', planTime744.replyText.includes('ご飯') && !planTime744.replyText.includes('今は'), planTime744.replyText.slice(0, 130));
+  check('P754 予定の時刻の聞き返しは現在時刻で答えない', (planTime744.replyText.includes('ご飯') || planTime744.replyText.includes('18時から')) && !planTime744.replyText.includes('今は'), planTime744.replyText.slice(0, 130));
   const fragment744 = await run744('僕は猫を2匹飼ってるよ');
   check('P754 数量の断片を主題にしない', !fragment744.replyText.includes('匹飼'), fragment744.replyText.slice(0, 130));
 }
@@ -4474,6 +4474,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P866 説明にある場所は「いる」と答える', p3.startsWith('はい、') && p3.includes('川にいると聞いています'), p3.slice(0, 140));
   const p4 = await turn866('ホソミチェックって、海にいるの？');
   check('P866 説明に無い場所は正直に知らないと答える', p4.includes('そこまでは知らないです') && !p4.includes('仲間だと思います'), p4.slice(0, 140));
+}
+
+
+// ---- 予定の開始時刻を先に答える／今週末は週末として引く（P867） ----
+{
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([]));
+  let memories867: any[] = [];
+  const turn867 = async (t: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(t, memories867);
+    memories867 = intake.updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: memories867, recentMessages: [] } as any);
+    return r.replyText as string;
+  };
+  await turn867('明日の15時にシカクチェックの予約があるんだ');
+  const t1 = await turn867('明日の予定、何時からだっけ？');
+  check('P867 何時からは時刻で答える', t1.includes('15時から'), t1.slice(0, 140));
+  const t2 = await turn867('明日の予定って何だっけ？');
+  check('P867 素の聞き返しは従来どおり', t2.includes('シカクチェック'), t2.slice(0, 140));
+  await turn867('今週末にカワチェックに行く予定だよ');
+  const plans867 = JSON.parse(storageService.getItem('miki_user_plans_v1') || '[]');
+  check('P867 今週末の予定は週末ラベルで控えられる', plans867.some((p: any) => p.when === '週末' && String(p.text).includes('カワチェック')), JSON.stringify(plans867).slice(0, 160));
+  const t3 = await turn867('今週末の予定は？');
+  check('P867 今週末の聞き返しは週末の控えを返す', t3.includes('カワチェック') && !t3.includes('今週の予定は、まだ聞いていない'), t3.slice(0, 140));
 }
 
 // ---- 結果 ----

@@ -965,7 +965,9 @@ export class ConversationFactIntakeService {
     if (ex) return `${Number(ex[1])}月${Number(ex[2])}日`;
     const wd = t.match(/(再来週の|来週の|今週の)?(月|火|水|木|金|土|日)曜日/);
     if (wd) return wd[1] === '再来週の' ? `再来週の${wd[2]}曜日` : wd[1] === '来週の' ? `来週の${wd[2]}曜日` : `${wd[2]}曜日`;
-    const raw = t.match(/(明後日|明日|あした|今日|今夜|今週|来週|再来週|週末|今度)/)?.[1];
+    const raw0 = t.match(/(明後日|明日|あした|今日|今夜|今週末|今週|来週|再来週|週末|今度)/)?.[1];
+    // P867: 「今週末」は「今週」に呑まれず「週末」として扱う。
+    const raw = raw0 === '今週末' ? '週末' : raw0;
     return raw === 'あした' ? '明日' : raw;
   }
 

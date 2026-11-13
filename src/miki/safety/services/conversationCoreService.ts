@@ -495,6 +495,13 @@ export class ConversationCoreService {
       // P754: 「明日の予定、何時からだっけ？」は現在時刻の質問では
       // なく予定の聞き返し。時計の即答より先に予定の控えを見る
       // （控えに無い時は従来どおり時計が受ける）。
+      // P867: 「明日の予定、何時からだっけ？」は開始時刻の質問。
+      // 予定の聞き返しが先に返ると、時刻入りの文面がそのまま
+      // 返ってしまうため、時刻の答えを先に見る。
+      const planTimeEarly = multiPart ? undefined : this.planTimeAnswer(prompt);
+      if (planTimeEarly) {
+        return this.buildResult('RESOLVED', 'plan_time_answer', this.applyPersonaVoice(planTimeEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       const planRecallEarly = multiPart ? undefined : this.planRecallAnswer(prompt);
       if (planRecallEarly) {
         return this.buildResult('RESOLVED', 'plan_recall_answer', this.applyPersonaVoice(planRecallEarly), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
@@ -4987,9 +4994,9 @@ export class ConversationCoreService {
       ? `${Number(exMatch[1])}月${Number(exMatch[2])}日`
       : wdMatch
         ? (wdMatch[1] === '来週の' ? `来週の${wdMatch[2]}曜日` : `${wdMatch[2]}曜日`)
-        : prompt.match(/(明後日|明日|あした|今日|今夜|一昨日|昨日|今週|来週|再来週|週末|今度)/)?.[1];
+        : prompt.match(/(明後日|明日|あした|今日|今夜|一昨日|昨日|今週末|週末|今週|来週|再来週|今度)/)?.[1];
     if (!whenRaw) return undefined;
-    const when = whenRaw === 'あした' ? '明日' : whenRaw;
+    const when = whenRaw === 'あした' ? '明日' : whenRaw === '今週末' ? '週末' : whenRaw;
     // P866: 週の範囲の「一覧」の要求は weekPlansAnswer の担当。
     // ここが受けると、ラベル一致が無くて「まだ聞いていない」
     // になってしまうため、一覧の形の時だけ譲る（素の週の
