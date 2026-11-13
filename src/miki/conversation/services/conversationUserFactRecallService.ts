@@ -180,6 +180,13 @@ function isNegativeStatement(c: UserFactCandidate): boolean {
   return /^[一-龠ァ-ヶー]{2,5}ない$/.test(v);
 }
 
+// P876: 対象・属性の言い換え（職業＝仕事）。教えたときの言葉と
+// 聞き返すときの言葉がずれても、同じ事実として引けるようにする。
+const RECALL_KEY_SYNONYMS: Record<string, string[]> = {
+  '職業': ['仕事'],
+  '仕事': ['職業'],
+};
+
 function matchesKey(key: string, c: UserFactCandidate): boolean {
   const { entity, attribute } = c;
   if (attribute && attribute !== '数値') {
@@ -361,7 +368,7 @@ export class ConversationUserFactRecallService {
       }
     }
 
-    const matches = candidates.filter((c) => matchesKey(key, c));
+    const matches = candidates.filter((c) => [key, ...(RECALL_KEY_SYNONYMS[key] ?? [])].some((k) => matchesKey(k, c)));
     if (matches.length === 0) return null;
     let chosen = matches[0];
     if (/いくつ/.test(prompt)) {

@@ -4657,6 +4657,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevVStore) storageService.setItem(VSTORE, prevVStore); else storageService.removeItem(VSTORE);
 }
 
+// P876: 対象の言い換え（職業＝仕事）。教えたときと聞き返すときの
+// 言葉がずれても同じ事実を引く（従来は調査の生応答に落ちていた）。
+{
+  let mem876: any[] = [];
+  const run876 = async (p: string) => {
+    const intake: any = conversationFactIntakeService.intakeFromUserText(p, mem876);
+    mem876 = intake.updatedMemories ?? mem876;
+    const r: any = await conversationCoreService.execute({ prompt: p, memories: mem876 } as any);
+    return String(r?.replyText ?? '');
+  };
+  await run876('僕の仕事は会社員だよ');
+  const job876 = await run876('僕の職業は何？');
+  check('P876 職業→仕事の言い換えで引ける', job876.includes('会社員'), job876.slice(0, 60));
+  let mem876b: any[] = [];
+  const run876b = async (p: string) => {
+    const intake: any = conversationFactIntakeService.intakeFromUserText(p, mem876b);
+    mem876b = intake.updatedMemories ?? mem876b;
+    const r: any = await conversationCoreService.execute({ prompt: p, memories: mem876b } as any);
+    return String(r?.replyText ?? '');
+  };
+  await run876b('僕の職業は看護師だよ');
+  const job876b = await run876b('僕の仕事は何だっけ？');
+  check('P876 仕事→職業の逆方向でも引ける', job876b.includes('看護師'), job876b.slice(0, 60));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
