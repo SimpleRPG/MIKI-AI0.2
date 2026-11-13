@@ -4204,6 +4204,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   void dayKeyOf;
 }
 
+
+// ---- 固定返答の使用統計から降格を抽出する（P853） ----
+{
+  const { fixedReplyStatsService } = await import('../src/miki/memory/services/fixedReplyStatsService');
+  const core: any = conversationCoreService as any;
+  const cat = 'fx_check853';
+  const forms = ['形Aです', '形Bです', '形Cです'];
+  const picked = new Set<string>();
+  for (let i = 0; i < 6; i++) picked.add(core.pickFixedReply(cat, forms));
+  const st = fixedReplyStatsService.stats()[cat] || {};
+  const usedTotal = Object.values(st).reduce((a, e) => a + e.used, 0);
+  check('P853 使用が統計に積まれる', usedTotal === 6 && picked.size === 3, JSON.stringify(st).slice(0, 120));
+  // 形B（index 1）に当たり2・使用4以上を仕込み、降格されることを見る
+  const statsAll = fixedReplyStatsService.stats();
+  statsAll[cat] = { '0': { used: 5, strikes: 0 }, '1': { used: 5, strikes: 2 }, '2': { used: 5, strikes: 0 } };
+  storageService.setItem('miki_fixed_reply_stats_v1', JSON.stringify(statsAll));
+  check('P853 当たりの多い形は降格集合に入る', fixedReplyStatsService.demotedIndexes(cat, 3).has(1) && fixedReplyStatsService.demotedIndexes(cat, 3).size === 1, JSON.stringify([...fixedReplyStatsService.demotedIndexes(cat, 3)]));
+  const after = new Set<string>();
+  for (let i = 0; i < 6; i++) after.add(core.pickFixedReply(cat, forms));
+  check('P853 降格した形は回転に出てこない', !after.has('形Bです') && after.has('形Aです') && after.has('形Cです'), JSON.stringify([...after]));
+  // 当たり記録：直近の使用に訂正が続けば、その形に strike が付く
+  const lastRec = JSON.parse(storageService.getItem('miki_last_fixed_reply_v1') || 'null');
+  const lastIdx = String(lastRec && lastRec.index);
+  const before = (fixedReplyStatsService.stats()[cat][lastIdx] || { strikes: 0 }).strikes;
+  const hit = fixedReplyStatsService.recordStrikeIfRecent();
+  check('P853 直近の使用への訂正は当たりになる', hit === true && fixedReplyStatsService.stats()[cat][lastIdx].strikes === before + 1, `hit=${hit} idx=${lastIdx}`);
+  check('P853 当たり記録は消費される', fixedReplyStatsService.recordStrikeIfRecent() === false, '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

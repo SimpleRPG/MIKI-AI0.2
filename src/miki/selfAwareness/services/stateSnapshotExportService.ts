@@ -7,6 +7,7 @@ import { projectNotebookService } from '../../memory/services/projectNotebookSer
 import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
 import { sceneBufferService } from '../../memory/services/sceneBufferService';
+import { fixedReplyStatsService } from '../../memory/services/fixedReplyStatsService';
 import { activationService } from '../../memory/services/activationService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { worldModelGraphService } from './worldModelGraphService';
@@ -174,6 +175,8 @@ class StateSnapshotExportService {
       // lastTopic と、保留スロットの有無）も書き出す。これまで
       // スナップショットに見えていた話題は開いた話題の台帳だけで、
       // 省略解決に実際に効いている舞台は実機で検証できなかった。
+      // P853: 固定返答の使用統計（暗黙層）。訂正の当たりも数える。
+      fixedReplyStats: (() => { try { return fixedReplyStatsService.stats(); } catch { return {}; } })(),
       // P852: 今の場面の束（話題・状態・なりチャの場面を1つに）。
       scene: (() => { try { return sceneBufferService.current(); } catch { return null; } })(),
       topicStage: (() => {

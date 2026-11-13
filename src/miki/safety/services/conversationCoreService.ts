@@ -28,6 +28,7 @@ import { conversationStrategyService } from '../../strategy/services/conversatio
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { storageService } from '../../../services/storageService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
+import { fixedReplyStatsService } from '../../memory/services/fixedReplyStatsService';
 import { activationService } from '../../memory/services/activationService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
@@ -365,6 +366,9 @@ export class ConversationCoreService {
           review.push({ prevPrompt: last.prompt, category: last.category, eventClass: last.eventClass, correction: prompt, at: Date.now() });
           storageService.setItem('miki_reception_review_v1', JSON.stringify(review.slice(-50)));
           storageService.setItem('miki_last_reception_v1', 'null');
+          // P853: 直近に固定返答を使っていたら、その言い回しへの
+          // 「当たり」として使用統計にも残す（降格の材料）。
+          try { fixedReplyStatsService.recordStrikeIfRecent(); } catch { /* 統計は補助 */ }
         }
       }
     } catch { /* 台帳は補助経路 */ }
@@ -2620,11 +2624,19 @@ export class ConversationCoreService {
       const key = 'miki_fixed_reply_usage_v1';
       const usage = JSON.parse(storageService.getItem(key) || '{}') as Record<string, number>;
       const last = usage[category];
-      const index = typeof last === 'number'
+      // P853: 繰り返し訂正が続いた言い回しは回転から外す（暗黙層→明示層）。
+      const demoted = fixedReplyStatsService.demotedIndexes(category, forms.length);
+      const candidates = forms.map((_, i) => i).filter((i) => !demoted.has(i));
+      let index = typeof last === 'number'
         ? (last + 1) % forms.length
         : category.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % forms.length;
+      if (demoted.has(index)) {
+        const pos = candidates.findIndex((c) => c > index);
+        index = pos >= 0 ? candidates[pos] : candidates[0];
+      }
       usage[category] = index;
       storageService.setItem(key, JSON.stringify(usage));
+      fixedReplyStatsService.recordUse(category, index);
       return forms[index];
     } catch { return forms[0]; }
   }
