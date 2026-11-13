@@ -1024,14 +1024,22 @@ export class ConversationFactIntakeService {
       if (contentTokens.length === 0) {
         if (!when) return;
         const keptAll = plans.filter((p) => !this.planInScope(p as any, when, targetDate));
-        if (keptAll.length !== plans.length) storageService.setItem(key, JSON.stringify(keptAll));
+        if (keptAll.length !== plans.length) {
+          storageService.setItem(key, JSON.stringify(keptAll));
+          // P858: 取り消しの受け答え用マーカー（会話側が消費する）。
+          try { pendingSlotService.set('miki_recently_cancelled_plans_v1', { label: when, count: plans.length - keptAll.length }, 60000); } catch { /* 補助経路 */ }
+        }
         return;
       }
       const kept = plans.filter((p) => {
         if (!this.planInScope(p as any, when, targetDate)) return true;
         return !tokens.some((w) => p.text.includes(w));
       });
-      if (kept.length !== plans.length) storageService.setItem(key, JSON.stringify(kept));
+      if (kept.length !== plans.length) {
+        storageService.setItem(key, JSON.stringify(kept));
+        // P858: 内容指定の取り消しも同じマーカーで受ける。
+        try { pendingSlotService.set('miki_recently_cancelled_plans_v1', { label: when || '', count: plans.length - kept.length }, 60000); } catch { /* 補助経路 */ }
+      }
     } catch { /* 予定の取り消しは補助経路 */ }
   }
 

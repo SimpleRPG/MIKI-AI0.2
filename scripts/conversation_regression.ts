@@ -4297,6 +4297,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P857 本物の二択の質問は従来どおり比べる', o.r.replyText.includes('大きさ') || o.r.replyText.includes('比べ'), o.r.replyText.slice(0, 160));
 }
 
+
+// ---- 予定の取り消しに専用の受け答えを付ける（P858） ----
+{
+  const run858 = async (text: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, []);
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: intake.updatedMemories, recentMessages: [] } as any);
+    return r;
+  };
+  const { dayKeyOf } = await import('../src/miki/memory/services/dayKeyService');
+  const tomorrow858 = dayKeyOf(Date.now() + 24 * 3600_000);
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([
+    { when: '明日', text: '買物チェックの予定', at: Date.now(), date: tomorrow858 },
+    { when: '明日', text: '散歩チェックの予定', at: Date.now(), date: tomorrow858 },
+  ]));
+  const c1 = await run858('明日の予定、全部なしにして');
+  check('P858 まとめ取り消しは件数つきで受ける', c1.replyText.includes('明日の予定2件、全部取り消しておきました'), c1.replyText.slice(0, 140));
+  const left858 = JSON.parse(storageService.getItem('miki_user_plans_v1') || '[]');
+  check('P858 台帳からも消えている', left858.filter((p: any) => p.date === tomorrow858).length === 0, JSON.stringify(left858).slice(0, 120));
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([
+    { when: '明日', text: '買物チェックの予定', at: Date.now(), date: tomorrow858 },
+  ]));
+  const c2 = await run858('明日の買物チェックの予定、なしにして');
+  check('P858 内容指定の取り消しも受ける', c2.replyText.includes('明日の予定は取り消しておきました'), c2.replyText.slice(0, 140));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

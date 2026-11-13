@@ -457,6 +457,13 @@ export class ConversationCoreService {
           return this.buildResult('RESOLVED', 'plan_content_correction_answer', this.applyPersonaVoice(contentAck), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
         }
       }
+      // P858: 予定の取り消しも、台帳の取り消し結果で返す。
+      {
+        const cancelAck = this.planCancelAnswer();
+        if (cancelAck) {
+          return this.buildResult('RESOLVED', 'plan_cancel_answer', this.applyPersonaVoice(cancelAck), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        }
+      }
       if (dialogueAct === 'CORRECTION' && /(?:じゃなくて|ではなく)/.test(prompt)) {
         const cm = prompt.match(/(?:じゃなくて|ではなく)\s*(.{1,20}?)(?:だよ|です|なんだ|。|．|！|!|$)/);
         const corrected = cm?.[1]?.replace(/^(?:それは|これは)/, '').trim();
@@ -4867,6 +4874,24 @@ export class ConversationCoreService {
    * 結果を返す。マーカーが無い（ずらす形でない）場合は素通りする。
    */
   /** P831: 予定の内容の訂正（台帳の差し替え済み）の受け答え。 */
+  /**
+   * P858: 予定の取り消しの受け答え。取り消しは台帳側で静かに
+   * 行われていて、返事は汎用の作業了承（＋的外れな聞き返し）に
+   * 化けていた。ずらし・訂正と同じく、実際の取り消し結果で返す。
+   */
+  private planCancelAnswer(): string | undefined {
+    try {
+      const rec = pendingSlotService.consume('miki_recently_cancelled_plans_v1') as { label?: string; count?: number } | undefined;
+      if (!rec || !(Number(rec.count) > 0)) return undefined;
+      const label = String(rec.label || '');
+      const count = Number(rec.count);
+      if (label && count > 1) return `分かりました、${label}の予定${count}件、全部取り消しておきました。`;
+      if (label) return `分かりました、${label}の予定は取り消しておきました。`;
+      if (count > 1) return `分かりました、予定${count}件を取り消しておきました。`;
+      return '分かりました、予定は取り消しておきました。';
+    } catch { return undefined; }
+  }
+
   private planContentCorrectionAnswer(prompt: string): string | undefined {
     if (!/(?:じゃなくて|じゃなく|ではなく)/.test(prompt)) return undefined;
     try {
