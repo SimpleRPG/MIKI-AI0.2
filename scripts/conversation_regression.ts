@@ -4265,6 +4265,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P855 知識状態の分類もメッセージで変わる', classifyConversationKnowledgeState('それは大きい？', state855) === 'MEANING_UNCLEAR' && classifyConversationKnowledgeState('それは大きい？', state855, msgs855) !== 'MEANING_UNCLEAR', classifyConversationKnowledgeState('それは大きい？', state855, msgs855));
 }
 
+
+// ---- P214談話スタックへ通常会話から供給する（P856） ----
+{
+  const { conversationGraphCompletionP214Service } = await import('../src/miki/conversation/services/conversationGraphCompletionP214Service');
+  const run856 = async (p: string) => conversationCoreService.execute({ prompt: p } as any);
+  await run856('スタックチェックXは、山に住む鳥だよ');
+  const ref856 = conversationGraphCompletionP214Service.resolveReference('それは大きい？');
+  check('P856 通常会話の話題が談話スタックに積まれ、指示語で引ける', Boolean(ref856) && (ref856 as any).terms.some((t: string) => t.includes('スタックチェック')), JSON.stringify(ref856).slice(0, 160));
+  await run856('それは大きい？');
+  const ref856b = conversationGraphCompletionP214Service.resolveReference('あれは重い？');
+  check('P856 指示的な発話はスタックを押し上げない', Boolean(ref856b) && (ref856b as any).surface === (ref856 as any).surface, JSON.stringify(ref856b).slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

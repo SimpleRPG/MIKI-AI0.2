@@ -58,6 +58,7 @@ import { reusableComponentFactoryService } from '../../core/services/reusableCom
 import { capabilityReuseService } from '../../capability/services/capabilityReuseService';
 import { failureMemoryService } from '../../memory/services/failureMemoryService';
 import { conversationComponentPipelineService } from '../../conversation/services/conversationComponentPipelineService';
+import { conversationGraphCompletionP214Service } from '../../conversation/services/conversationGraphCompletionP214Service';
 import { japaneseAnalysisService } from '../../research/services/japaneseAnalysisService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { userKnowledgeProfileService } from '../../conversation/services/userKnowledgeProfileService';
@@ -252,6 +253,22 @@ export class ConversationCoreService {
       recentMessages,
     );
     const dialogueAct = interpretation.dialogueAct;
+    // P856: P214 の談話スタックへ、通常会話の話題も供給する。
+    // 今までは P212（自己照会）の経路でしか積まれず、自己照会の
+    // 質問が来た時点でスタックが空・古いことが多かった。積み方は
+    // P212 内部と同じ（内容語＋概念ID、指示的な発話は積まない）。
+    try {
+      if (!roleplaySessionService.isActive()) {
+        const terms = (japaneseAnalysis?.contentTokens || []).filter(Boolean);
+        if (terms.length > 0) {
+          conversationGraphCompletionP214Service.observeTopic(
+            prompt,
+            terms,
+            terms.flatMap((t: string) => japaneseDictionaryService.conceptIdsFor(t)),
+          );
+        }
+      }
+    } catch { /* スタックは補助経路 */ }
     // P707: 話題質問の保留は「見たら必ず消す」のが原則だが、消費が
     // 後段にしか無く、手前の受け口で早期リターンすると保留が残って
     // 次の発話を答えとして食べてしまう。消費はここで一度だけ行い、
