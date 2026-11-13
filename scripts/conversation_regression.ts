@@ -4364,6 +4364,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P860 述語が二重にならない', !p.r.replyText.includes('を飼ってるを飼ってる'), p.r.replyText.slice(0, 160));
 }
 
+
+// ---- 片方を知らない共通点・類似の質問は名前を挙げて知らないと答える（P861） ----
+{
+  const run861 = async (text: string, mems: any[]) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, mems);
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: intake.updatedMemories, recentMessages: [] } as any);
+    return { r, mems: intake.updatedMemories };
+  };
+  let o = await run861('ミズモドキは、川に住む両生類だよ', []);
+  o = await run861('カワモドキは、川に住む両生類だよ', o.mems);
+  o = await run861('ミズモドキとカワモドキの共通点は？', o.mems);
+  check('P861 両方知っている共通点は従来どおり', o.r.replyText.includes('共通点'), o.r.replyText.slice(0, 140));
+  o = await run861('ミズモドキとヒカリモドキの共通点は？', o.mems);
+  check('P861 片方を知らない共通点は名前を挙げて知らないと答える', o.r.replyText.includes('「ヒカリモドキ」のことは、まだ知らないので'), o.r.replyText.slice(0, 160));
+  o = await run861('ヒカリモドキとミズモドキ、似てる？', o.mems);
+  check('P861 片方を知らない類似も同じ', o.r.replyText.includes('「ヒカリモドキ」のことは、まだ知らないので') && o.r.replyText.includes('似ているかは分からない'), o.r.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

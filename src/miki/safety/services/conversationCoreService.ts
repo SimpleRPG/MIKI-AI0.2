@@ -5564,6 +5564,20 @@ export class ConversationCoreService {
       } catch { return false; }
     });
     if (known.length === 0) return undefined;
+    // P861: 片方を知らない共通点・類似の質問は、知らない側の
+    // 名前を挙げて正直に答える。従来は材料不足のまま汎用の
+    // 保留文（「関連しそうな内容は覚えているけれど…」）に落ち、
+    // 知らない物を知っているかのような言い方になっていた。
+    if (/(?:似てる|似ている|そっくり|似てます|共通点|似ているところ|同じところ|似たところ)/.test(prompt) && known.length === 1 && /と/.test(prompt)) {
+      const k = known[0];
+      const stopSim = /^(?:共通点|同じ|ところ|似てる|似ている|似た|そっくり|何|なに|どの|どう)$/;
+      const unknown = features.contentTokens.find((t) => t !== k && t.length >= 2 && !stopSim.test(t) && !k.includes(t) && !t.includes(k)
+        && (prompt.includes(`${k}と${t}`) || prompt.includes(`${t}と${k}`)));
+      if (unknown) {
+        if (/(?:共通点|同じところ|似たところ)/.test(prompt)) return `「${unknown}」のことは、まだ知らないので、「${k}」との共通点は分からないです。`;
+        return `「${unknown}」のことは、まだ知らないので、「${k}」と似ているかは分からないです。`;
+      }
+    }
     // 似ているか：2つの既知の物について、片方の説明にもう片方が出れば手がかりがある。
     // P810: 「共通点は？」も同じ材料（共有する分類・説明の語）で答える。
     if (/(?:似てる|似ている|そっくり|似てます|共通点|似ているところ|同じところ|似たところ)/.test(prompt) && known.length >= 2) {
