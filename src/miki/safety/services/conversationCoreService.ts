@@ -2600,6 +2600,11 @@ export class ConversationCoreService {
 
     systemLogger.info('CHAT', `🧠 [CORE Core/Unified] ${status} / ${reason} / ${totalMs}ms / intent=${dialogueAct}`);
 
+    // P874: 本流の返答は buildResult を通らないため、P865 の
+    // 安全網が効いていなかった（【最終見解】等の見出しが素通り）。
+    // 収束点でも同じ浄化を通す。
+    surface.surfaceText = this.sanitizeReplyText(surface.surfaceText);
+
     return {
       replyText: surface.surfaceText,
       nextConversationState: nextState,
@@ -7576,6 +7581,22 @@ export class ConversationCoreService {
     ], 'short');
   }
 
+  // P874: P865 の浄化を共通メソッド化。本流（buildResult を通らない
+  // 収束点）でも同じ網を掛けるため。
+  private sanitizeReplyText(replyText: string): string {
+    if (/対象を一意に特定できません|対象を自動推測せず保留/.test(replyText)) {
+      const q = replyText.match(/・\s*([^\n]+[？?])/)?.[1]?.trim();
+      return q || 'ごめん、今の情報だけだと決めきれなかったです。もう少し詳しく教えてもらえますか？';
+    }
+    let out = replyText;
+    for (let i = 0; i < 2; i++) {
+      const stripped = out.replace(/^【[^】]{1,12}】\s*\n?/, '');
+      if (stripped === out) break;
+      out = stripped;
+    }
+    return out;
+  }
+
   private buildResult(
     status: ConversationCoreResult['status'],
     reason: string,
@@ -7587,22 +7608,10 @@ export class ConversationCoreService {
     started: number,
     stages: Record<string, number>
   ): ConversationCoreResult {
-    // P865: 内部の判定・作業の骨格文が返答に紛れていたら、
+    // P865/P874: 内部の判定・作業の骨格文が返答に紛れていたら、
     // 中にある確認質問だけを取り出して返す（無ければ汎用の
-    // 聞き返し）。対象は未解決・確認待ちの結果だけ。
-    let safeReplyText = replyText;
-    if (/対象を一意に特定できません|対象を自動推測せず保留/.test(replyText)) {
-      const q = replyText.match(/・\s*([^\n]+[？?])/)?.[1]?.trim();
-      safeReplyText = q || 'ごめん、今の情報だけだと決めきれなかったです。もう少し詳しく教えてもらえますか？';
-    } else {
-      // 見出しだけの漏れ（【確定事項】等）は、見出し行を取り除けば
-      // 本文は自然な文として読める。
-      for (let i = 0; i < 2; i++) {
-        const stripped = safeReplyText.replace(/^【[^】]{1,12}】\s*\n?/, '');
-        if (stripped === safeReplyText) break;
-        safeReplyText = stripped;
-      }
-    }
+    // 聞き返し）。見出しだけの漏れは見出し行を取り除く。
+    const safeReplyText = this.sanitizeReplyText(replyText);
     return {
       replyText: safeReplyText,
       nextConversationState: state,

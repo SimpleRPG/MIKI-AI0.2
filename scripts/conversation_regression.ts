@@ -4424,7 +4424,12 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   const hh864 = Math.floor(remain864 / 60); const mm864 = remain864 % 60;
   const expected864 = mm864 > 0 ? `あと${hh864}時間${mm864}分です` : `あと${hh864}時間です`;
   const r2 = await ask864('あと何時間で明日になる？');
-  check('P864 あと何時間で明日は残り時間を計算する', r2.includes(expected864), r2.slice(0, 100));
+  // 実行をまたいで分が進むと期待値が1分ずれる（時計端の揺れ）。
+  // 実行直後の時刻から作った期待値も許す。
+  const after864 = new Date();
+  const remainA864 = 24 * 60 - (after864.getHours() * 60 + after864.getMinutes());
+  const expectedA864 = (remainA864 % 60) > 0 ? `あと${Math.floor(remainA864 / 60)}時間${remainA864 % 60}分です` : `あと${Math.floor(remainA864 / 60)}時間です`;
+  check('P864 あと何時間で明日は残り時間を計算する', r2.includes(expected864) || r2.includes(expectedA864), r2.slice(0, 100));
 }
 
 
@@ -4609,6 +4614,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   const picked3 = teacherLessonRecallService.findFor('天気の話をしたいです');
   check('P873 無関係な話題では引かない', picked3 === undefined, picked3?.id ?? '(none)');
   if (prevRepo) storageService.setItem(REPO, prevRepo); else storageService.removeItem(REPO);
+}
+
+// P874: 本流の返答は buildResult を通らないため、P865 の安全網が
+// 効かず【最終見解】等の見出しが漏れていた。浄化を共通化し、本流の
+// 収束点にも掛ける。
+{
+  const run874 = async (p: string, memories: any[] = []) => {
+    const r: any = await conversationCoreService.execute({ prompt: p, memories } as any);
+    return String(r?.replyText ?? '');
+  };
+  let mem874: any[] = [];
+  for (const t of ['ユミモドキは重さ5キロの鳥だよ', 'ササモドキは重さ9キロの鳥だよ']) {
+    const intake: any = conversationFactIntakeService.intakeFromUserText(t, mem874);
+    mem874 = intake.updatedMemories ?? mem874;
+    await run874(t, mem874);
+  }
+  const detail = await run874('その話、もう少し詳しく教えて', mem874);
+  check('P874 本流でも見出しが漏れない', !detail.includes('【') && !detail.includes('最終見解'), detail.slice(0, 60));
+  const sanitize = (conversationCoreService as any).sanitizeReplyText as (s: string) => string;
+  check('P874 浄化は見出し行だけを落とす', sanitize('【最終見解】\n本文です。') === '本文です。', sanitize('【最終見解】\n本文です。'));
 }
 
 // ---- 結果 ----
