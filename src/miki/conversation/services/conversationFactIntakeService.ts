@@ -979,7 +979,11 @@ export class ConversationFactIntakeService {
     try {
       const t = String(text || '').trim();
       if (!t || /[？?]/.test(t)) return;
-      if (/(?:ですか|ますか|でしょうか|教えて|お願い|してほしい)/.test(t)) return;
+      // P866: 「教えておくね」は伝える側の文。依頼の「教えて」と
+      // 区別する（従来は教えてを含む文は全部、予定として控え
+      // られなかった）。
+      if (/(?:ですか|ますか|でしょうか|お願い|してほしい)/.test(t)) return;
+      if (/教えて/.test(t) && !/(?:教えておく|教えてあげる|教えておきます|教えてあげます)/.test(t)) return;
       // P816: 日付ずらしの文そのものは控えに残さない（付け替えは
       // moveUserPlanIfAny が行う）。
       if (/(?:予定|予約|約束)/.test(t) && /(?:ずらして|ずらす|移して|移す|延期)/.test(t)) return;

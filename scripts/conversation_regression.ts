@@ -4452,6 +4452,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P865 会話の返答に見出しが付かない', !r865.includes('【') && !r865.includes('最終判定'), r865.slice(0, 140));
 }
 
+
+// ---- 予定の聞き返し（教えて形）・教えておく記録・所在の確認（P866） ----
+{
+  storageService.setItem('miki_user_plans_v1', JSON.stringify([]));
+  let memories866: any[] = [];
+  const turn866 = async (t: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(t, memories866);
+    memories866 = intake.updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: memories866, recentMessages: [] } as any);
+    return r.replyText as string;
+  };
+  await turn866('今日はシカクチェックの予定があるよ');
+  const p1 = await turn866('今日の予定全部教えて');
+  check('P866 今日の予定全部教えては当日の控えを返す', p1.includes('今日の予定は') && p1.includes('シカクチェック'), p1.slice(0, 140));
+  await turn866('明日の予定は教えておくね、カワチェックだよ');
+  const p2 = await turn866('明日の予定は？');
+  check('P866 教えておくねの文も予定として控えられる', p2.includes('カワチェック'), p2.slice(0, 140));
+  await turn866('ホソミチェックは、細い川に住む魚だよ');
+  const p3 = await turn866('ホソミチェックって、川にいるの？');
+  check('P866 説明にある場所は「いる」と答える', p3.startsWith('はい、') && p3.includes('川にいると聞いています'), p3.slice(0, 140));
+  const p4 = await turn866('ホソミチェックって、海にいるの？');
+  check('P866 説明に無い場所は正直に知らないと答える', p4.includes('そこまでは知らないです') && !p4.includes('仲間だと思います'), p4.slice(0, 140));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

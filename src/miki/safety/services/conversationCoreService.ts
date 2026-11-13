@@ -4971,7 +4971,11 @@ export class ConversationCoreService {
     if (!/(?:予定|予約|約束)/.test(prompt)) return undefined;
     // 予定を話す文そのもの（「〜予約があるんだ」）は聞き返しでは
     // ない。疑問の形の時だけ受ける。
-    if (!/[？?]/.test(prompt) && !/(?:だっけ|何)/.test(prompt)) return undefined;
+    // P866: 「今日の予定全部教えて」のように、？も「何」も無い
+    // 「教えて」の形も聞き返しとして受ける（従来は次の条件と
+    // 食い違って、汎用の「これからの予定」に流れていた）。
+    // 「教えておく」は伝える側の文なので除く。
+    if (!/[？?]/.test(prompt) && !/(?:だっけ|何)/.test(prompt) && !(/教えて/.test(prompt) && !/教えておく/.test(prompt))) return undefined;
     // P816: 「明日の予定は？」のような素の形も聞き返しとして受ける
     // （内容語が無いために彼女自身の予定の定型へ流れていた）。
     if (!/(?:だっけ|何|ある|あって|教えて)/.test(prompt) && !/予定(?:は|って)?[？?]\s*$/.test(prompt)) return undefined;
@@ -4986,6 +4990,11 @@ export class ConversationCoreService {
         : prompt.match(/(明後日|明日|あした|今日|今夜|一昨日|昨日|今週|来週|再来週|週末|今度)/)?.[1];
     if (!whenRaw) return undefined;
     const when = whenRaw === 'あした' ? '明日' : whenRaw;
+    // P866: 週の範囲の「一覧」の要求は weekPlansAnswer の担当。
+    // ここが受けると、ラベル一致が無くて「まだ聞いていない」
+    // になってしまうため、一覧の形の時だけ譲る（素の週の
+    // 聞き返し・無し答えは従来どおりここが受ける）。
+    if ((when === '今週' || when === '来週' || when === '再来週') && /(?:全部|全て|一覧)/.test(prompt)) return undefined;
     try {
       const raw = storageService.getItem('miki_user_plans_v1');
       const plans: Array<{ when: string; text: string; date?: string }> = raw ? JSON.parse(raw) : [];
@@ -5607,6 +5616,30 @@ export class ConversationCoreService {
       } catch { return false; }
     });
     if (known.length === 0) return undefined;
+    // P866: 「クオッカって、草原にいるの？」は存在・所在の確認。
+    // 従来は用語の確認（〜の仲間？）に誤読され、「いるじゃなくて、
+    // 〜は類の仲間だと思います」という崩れた否定が返っていた。
+    // 教わった説明に場所が含まれるかで答える。
+    {
+      const pm = prompt.match(/^(.{1,12}?)って[、,]?\s*(.{1,10}?)に(?:いる|住んでる|住んでいる|生息してる|生息している)の[？?]/);
+      if (pm) {
+        const entity = pm[1].trim();
+        const place = pm[2].trim();
+        if (known.includes(entity)) {
+          let gloss = '';
+          try {
+            const entries = japaneseDictionaryService.lookup(entity);
+            gloss = entries.map((e: any) => e.gloss || '').filter(Boolean).join(' ');
+          } catch { /* 辞書なし */ }
+          if (gloss) {
+            return gloss.includes(place)
+              ? `はい、「${entity}」は${place}にいると聞いています。`
+              : `そこまでは知らないです。教わった説明では、「${entity}」は${gloss}、と聞いています。`;
+          }
+        }
+      }
+    }
+
     // P861: 片方を知らない共通点・類似の質問は、知らない側の
     // 名前を挙げて正直に答える。従来は材料不足のまま汎用の
     // 保留文（「関連しそうな内容は覚えているけれど…」）に落ち、
