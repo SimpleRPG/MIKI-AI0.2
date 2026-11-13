@@ -817,13 +817,11 @@ export class ConversationFactIntakeService {
    * 答えでなければ捨て、次の無関係な発言を意味として食わない。
    */
   private learnPendingUnknownTerm(text: string): void {
-    const raw = storageService.getItem('miki_unknown_pending_v1');
-    if (!raw) return;
-    storageService.removeItem('miki_unknown_pending_v1');
-    let pending: { term?: string; askedAt?: number } = {};
-    try { pending = JSON.parse(raw); } catch { return; }
+    // P846/P847: 保留枠組みから消費する（TTL 30分は置く側で設定）。
+    const pending = pendingSlotService.consume<{ term?: string }>('miki_unknown_pending_v1');
+    if (!pending) return;
     const term = String(pending.term || '');
-    if (!term || Date.now() - Number(pending.askedAt || 0) > 30 * 60_000) return;
+    if (!term) return;
     const value = String(text || '').trim();
     if (!value) return;
     if (/[？?]/.test(value) || /ですか|ますか|でしょうか/.test(value)) return;

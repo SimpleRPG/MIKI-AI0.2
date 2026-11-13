@@ -4090,6 +4090,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     && pendingSlotService.consume('miki_probe_slot_846', t846 + 1000) === undefined, '');
 }
 
+// ---- P847: 質問の選択（てこの大きい語から聞き返す） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { japaneseDictionaryService } = await import('../src/miki/research/services/japaneseDictionaryService');
+  const { storageService } = await import('../src/services/storageService');
+  storageService.removeItem('miki_unknown_asked_v1');
+  storageService.removeItem('miki_unknown_pending_v1');
+  let mem847: any[] = [];
+  let st847: any = undefined;
+  const say847 = async (text: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, mem847);
+    mem847 = intake.updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: mem847, conversationState: st847, recentMessages: [] } as any);
+    st847 = r.nextConversationState;
+    return String(r.replyText || '');
+  };
+  await say847('ミナチェックは、ケサチェックの仲間だよ');
+  const ask847 = await say847('今日はユキチェックとケサチェックのことをずっと考えてたんだ');
+  check('P847 聞き返しは、教わった説明に出てくる語を優先する', ask847.includes('「ケサチェック」って、どんなものですか？'), ask847.slice(0, 200));
+  await say847('ケサチェックは、山に住む鳥だよ');
+  check('P847 聞き返した語への答えが語彙に入る（保留枠組み経由）', japaneseDictionaryService.has('ケサチェック'), '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -28,6 +28,7 @@ import { conversationStrategyService } from '../../strategy/services/conversatio
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { storageService } from '../../../services/storageService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
+import { activationService } from '../../memory/services/activationService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { shiritoriService } from '../../conversation/services/shiritoriService';
@@ -2850,7 +2851,11 @@ export class ConversationCoreService {
       // P579: プロジェクトとして知っている語（EFR 等）は、辞書に
       // 無くても「知らない語」として聞き返さない。
       // P581: 活用の語幹（「頑張」+「る」等）も聞き返さない。
-      const topic = (unknownTerms || []).find((t) => {
+      // P847: 候補が複数あるときは「聞くと他の知識がどれだけ
+      // ほどけるか」（能動的推論の質問選択）で選ぶ。最近聞いた
+      // 語は候補から外し、次点の語を聞けるようにする。
+      const askedMap = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
+      const passing = (unknownTerms || []).filter((t) => {
         if (t.length < 2 || !prompt.includes(t) || projectNotebookService.findProject(t)) return false;
         // P814: 事実の属性として使われた語（「相方の年齢は…」の
         // 年齢）と、事実を記録済みの相手（相方など）は、意味を
@@ -2871,12 +2876,39 @@ export class ConversationCoreService {
         // P693: 「ん」も続きとみなす（「電車混」+んでた のような
         // テ形の断片を、新しい語として聞き返さない）。
         return !/[るりれろたてますないだわっむくぐすつぬぶしけかきげせちびみん]/.test(after);
-      });
-      if (!topic) return undefined;
-      const asked = JSON.parse(storageService.getItem('miki_unknown_asked_v1') || '{}') as Record<string, number>;
-      if (Date.now() - (asked[topic] || 0) <= 7 * 24 * 3600_000) return undefined;
+      }).filter((t) => Date.now() - (askedMap[t] || 0) > 7 * 24 * 3600_000);
+      if (passing.length === 0) return undefined;
+      // P847: てこの大きい順。同点は元の順（発話の出現順）を保つ。
+      let topic = passing[0];
+      let best = -1;
+      for (const t of passing) {
+        const s = this.unknownTermLeverage(t);
+        if (s > best) { best = s; topic = t; }
+      }
       return { topic, question: `そういえば、「${topic}」って、どんなものですか？` };
     } catch { return undefined; }
+  }
+
+  /** P847: その語を覚えると、既存の知識がどれだけほどけるか。
+   * 教わった説明の中に出てくる語（意味が分かれば他の説明が
+   * 読めるようになる）と、開いているギャップに出てくる語、
+   * それに活性化（よく出てくる語ほど先に覚える価値がある）。 */
+  private unknownTermLeverage(term: string): number {
+    let score = 0;
+    try {
+      let glossHits = 0;
+      for (const e of japaneseDictionaryService.listPersonal()) {
+        if (e.gloss && e.gloss.includes(term)) { glossHits++; if (glossHits >= 5) break; }
+      }
+      score += glossHits * 2;
+      let gapHits = 0;
+      for (const g of knowledgeGapService.listOpen(200)) {
+        if (g.query && g.query.includes(term)) { gapHits++; if (gapHits >= 5) break; }
+      }
+      score += gapHits;
+      score += Math.min(activationService.score(term), 3);
+    } catch { /* 補助経路 */ }
+    return score;
   }
 
   private markUnknownAsked(topic: string): void {
@@ -2885,7 +2917,8 @@ export class ConversationCoreService {
       asked[topic] = Date.now();
       storageService.setItem('miki_unknown_asked_v1', JSON.stringify(asked));
       // P567: 次の発言を「この語への答え」として読むための保留。
-      storageService.setItem('miki_unknown_pending_v1', JSON.stringify({ term: topic, askedAt: Date.now() }));
+      // P846/P847: 保留枠組みへ（TTL 30分、消費は取り込み側）。
+      pendingSlotService.set('miki_unknown_pending_v1', { term: topic }, 30 * 60000);
     } catch { /* 台帳は補助 */ }
   }
 
