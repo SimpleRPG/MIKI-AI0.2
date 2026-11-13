@@ -1163,8 +1163,10 @@ export class ConversationCoreService {
           certainty: 'UNKNOWN',
           detailLevel: 'BRIEF',
         });
-        const heldSurface = answerContentIrService.generateSurfaceTextFromIR(heldIr, 'UNKNOWN_INVESTIGATION', undefined);
-        return this.buildResult('UNRESOLVED', 'clarification_gate_exhausted', heldSurface.surfaceText, nextState, dialogueAct, 0, [], started, stages);
+        // P865: 報告文の骨格（【最終判定】等）は内部用。利用者に
+        // 出すのは自然な保留の一文だけにする。
+        void heldIr;
+        return this.buildResult('UNRESOLVED', 'clarification_gate_exhausted', 'うーん、今の情報だけだと決めきれないです。もう少し教えてもらえますか？', nextState, dialogueAct, 0, [], started, stages);
       }
       const clarification = selectInformationGainQuestion(anaphora.candidates);
       const ir = answerContentIrService.buildAnswerIR({
@@ -1176,8 +1178,11 @@ export class ConversationCoreService {
         certainty: 'UNKNOWN',
         detailLevel: 'BRIEF',
       });
-      const surface = answerContentIrService.generateSurfaceTextFromIR(ir, 'UNKNOWN_INVESTIGATION', undefined);
-      return this.buildResult('NEEDS_CONFIRMATION', 'anaphora_ambiguous', surface.surfaceText, nextState, dialogueAct, 0, [], started, stages);
+      // P865: IRの報告文（【最終判定】対象を一意に特定できません
+      // 【次に実施すべき作業】…）がそのまま利用者に出ていた。
+      // 確認質問は元々自然な文なので、それ自体を返答にする。
+      void ir;
+      return this.buildResult('NEEDS_CONFIRMATION', 'anaphora_ambiguous', clarification.question || 'どちらのことか、もう少し教えてもらえますか？', nextState, dialogueAct, 0, [], started, stages);
     }
 
     // 2. 潜在意図 + 要求型
@@ -7482,8 +7487,24 @@ export class ConversationCoreService {
     started: number,
     stages: Record<string, number>
   ): ConversationCoreResult {
+    // P865: 内部の判定・作業の骨格文が返答に紛れていたら、
+    // 中にある確認質問だけを取り出して返す（無ければ汎用の
+    // 聞き返し）。対象は未解決・確認待ちの結果だけ。
+    let safeReplyText = replyText;
+    if (/対象を一意に特定できません|対象を自動推測せず保留/.test(replyText)) {
+      const q = replyText.match(/・\s*([^\n]+[？?])/)?.[1]?.trim();
+      safeReplyText = q || 'ごめん、今の情報だけだと決めきれなかったです。もう少し詳しく教えてもらえますか？';
+    } else {
+      // 見出しだけの漏れ（【確定事項】等）は、見出し行を取り除けば
+      // 本文は自然な文として読める。
+      for (let i = 0; i < 2; i++) {
+        const stripped = safeReplyText.replace(/^【[^】]{1,12}】\s*\n?/, '');
+        if (stripped === safeReplyText) break;
+        safeReplyText = stripped;
+      }
+    }
     return {
-      replyText,
+      replyText: safeReplyText,
       nextConversationState: state,
       status,
       reason,

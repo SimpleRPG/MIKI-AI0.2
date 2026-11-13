@@ -4427,6 +4427,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P864 あと何時間で明日は残り時間を計算する', r2.includes(expected864), r2.slice(0, 100));
 }
 
+
+// ---- 内部の判定・見出し文が返答に漏れない（P865） ----
+{
+  const core865: any = conversationCoreService as any;
+  const leak = core865.buildResult('UNRESOLVED', 'check', '【最終判定】\n対象を一意に特定できません。\n\n【次に実施すべき作業】\n・「A」と「B」のどちらを指していますか？', {}, 'X', 0, [], Date.now(), {});
+  check('P865 判定文は確認質問だけに置き換わる', leak.replyText === '「A」と「B」のどちらを指していますか？', leak.replyText.slice(0, 120));
+  const headed = core865.buildResult('RESOLVED', 'check', '【確定事項】\n本文の文です。', {}, 'X', 0, [], Date.now(), {});
+  check('P865 見出しだけの漏れは見出しが落ちる', headed.replyText === '本文の文です。', headed.replyText.slice(0, 120));
+  let memories865: any[] = [];
+  let state865: any = undefined;
+  const msgs865: any[] = [];
+  const turn865 = async (t: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(t, memories865);
+    memories865 = intake.updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: memories865, conversationState: state865, recentMessages: msgs865 } as any);
+    state865 = r.nextConversationState;
+    msgs865.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r.replyText as string;
+  };
+  await turn865('クオッカは、草原に住む有袋類だよ');
+  await turn865('ワラルーは、山に住む有袋類だよ');
+  const r865 = await turn865('クオッカとワラルーって、それは夜行性なの？');
+  check('P865 会話の返答に見出しが付かない', !r865.includes('【') && !r865.includes('最終判定'), r865.slice(0, 140));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
