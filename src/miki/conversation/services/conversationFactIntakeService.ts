@@ -485,7 +485,10 @@ export class ConversationFactIntakeService {
       // P708: 「ごめん、犬じゃなくて猫だった」では、誤り側の切り出しに
       // 「ごめん、」まで含まれて無効化が一致しなかった。区切りの
       // 後ろ側だけを誤りとする。
-      const wrong = (correction[1].split(/[、。]/).pop() || correction[1]).trim();
+      const wrongRaw = (correction[1].split(/[、。]/).pop() || correction[1]).trim();
+      // P860: 「やっぱり犬じゃなくて」のような文頭の言いさしは
+      // 誤り側に糊付けされ、無効化も枠の借用も一致しなかった。
+      const wrong = wrongRaw.replace(/^(?:やっぱり|実は|本当は|間違えた|ごめん)[、,]?\s*/, '');
       const wrongFact = wrong ? extractFromSentence(wrong) : null;
       if (wrongFact?.value) {
         // 無効化は値で照合する（旧事実の factValue / content と一致させる）
@@ -1260,7 +1263,19 @@ export class ConversationFactIntakeService {
           && (String(m.factValue).includes(correctionPair.wrong) || String(m.content || '').includes(correctionPair.wrong))
       );
       if (target) {
-        let newValue = String(target.factValue).split(correctionPair.wrong).join(correctionPair.right);
+        // P860: 正しい側が述語まで含む形（「犬じゃなくて猫を
+        // 飼ってる」→ 誤り「犬」・正しい側「猫を飼ってる」）では、
+        // 単純置換すると述語が二重になる（「猫を飼ってるを
+        // 飼ってる」）。誤りの直後に続く部分を正しい側も末尾に
+        // 持つなら、そこは差し替えずに正しい側で置き換える。
+        const spliceCorrected = (src: string): string => {
+          const idx = src.indexOf(correctionPair.wrong);
+          if (idx < 0) return src.split(correctionPair.wrong).join(correctionPair.right);
+          const tail = src.slice(idx + correctionPair.wrong.length);
+          if (tail && correctionPair.right.endsWith(tail)) return src.slice(0, idx) + correctionPair.right;
+          return src.split(correctionPair.wrong).join(correctionPair.right);
+        };
+        let newValue = spliceCorrected(String(target.factValue));
         // P755: 文の形の訂正（「ワラルーは鳥じゃなくて動物だよ」）では
         // 間違い（wrong）が文全体で、値はその末尾に埋まっている。
         // 値の中では置換できないので、値そのものを差し替える。
@@ -1269,7 +1284,7 @@ export class ConversationFactIntakeService {
           newValue = correctionPair.right;
         }
         let newStatement = String(target.content || '').includes(correctionPair.wrong)
-          ? String(target.content).split(correctionPair.wrong).join(correctionPair.right)
+          ? spliceCorrected(String(target.content))
           : `${target.factEntity || ''}は${newValue}`;
         if (newStatement === correctionPair.right && target.factEntity) {
           newStatement = `${target.factEntity}は${newValue}`;
@@ -1283,6 +1298,21 @@ export class ConversationFactIntakeService {
           statement: newStatement,
           summary: newStatement,
         });
+      } else {
+        // P860: 先行事実が無い自己完結の訂正（「僕は犬じゃなくて
+        // 猫を飼ってたよ」「ワラルーは鳥じゃなくて動物だよ」）では
+        // 借りる枠が無く、正しい側が事実として残らなかった。
+        // 主題部（〜は）＋正しい側で肯定文を組み立て直し、通常の
+        // 抽出に通して学ぶ。
+        const subj = correctionPair.wrong.match(/^(.{1,8}?は)/)?.[1];
+        if (subj && !correctionPair.right.startsWith(subj)) {
+          try {
+            const sub = this.extractUserFacts(`${subj}${correctionPair.right}`);
+            for (const f of sub.facts) {
+              if (f.value && !facts.some((x) => x.value === f.value)) facts.push(f);
+            }
+          } catch { /* 組み立て直しは補助経路 */ }
+        }
       }
     }
 

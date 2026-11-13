@@ -4344,6 +4344,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P859 語そのものの確認は従来どおり', q2.replyText.includes('キオクモドキ') && q2.replyText.includes('川に住む魚'), q2.replyText.slice(0, 160));
 }
 
+
+// ---- 自己完結の訂正と「やっぱり」訂正で正しい側を学ぶ（P860） ----
+{
+  const run860 = async (text: string, mems: any[]) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, mems);
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: intake.updatedMemories, recentMessages: [] } as any);
+    return { r, mems: intake.updatedMemories };
+  };
+  // 先行事実なしの自己完結の訂正
+  let o = await run860('僕は犬じゃなくてウサギモドキを飼ってたよ', []);
+  o = await run860('僕って何か飼ってたっけ？', o.mems);
+  check('P860 自己完結の訂正で正しい側が想起できる', o.r.replyText.includes('ウサギモドキ'), o.r.replyText.slice(0, 160));
+  // 先行事実あり＋「やっぱり」付きの訂正（述語の二重化なし）
+  let p = await run860('僕はイヌモドキを飼ってるよ', []);
+  p = await run860('やっぱりイヌモドキじゃなくてネコモドキを飼ってるよ', p.mems);
+  p = await run860('僕って何か飼ってたっけ？', p.mems);
+  check('P860 「やっぱり」訂正でも正しい側が想起できる', p.r.replyText.includes('ネコモドキ'), p.r.replyText.slice(0, 160));
+  check('P860 述語が二重にならない', !p.r.replyText.includes('を飼ってるを飼ってる'), p.r.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
