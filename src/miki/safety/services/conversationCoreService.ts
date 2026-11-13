@@ -5155,7 +5155,7 @@ export class ConversationCoreService {
   // 設計の話題＋相談・質問の形のときだけ。レッスンは候補・未検証の
   // 知識部品なので、出典と「候補であること」を添えて断定しない。
   private designPrincipleAnswer(prompt: string): string | undefined {
-    if (!/(?:ゲーム|難易度|バランス|手応え|ご褒美|報酬|リトライ|チュートリアル|詰|難しすぎ|簡単すぎ|敵|ボス|ステージ|マップ|武器|操作感|プレイヤー|面白く)/.test(prompt)) return undefined;
+    if (!/(?:ゲーム|難易度|バランス|手応え|ご褒美|報酬|リトライ|チュートリアル|詰|難しすぎ|簡単すぎ|敵|ボス|ステージ|マップ|武器|操作感|プレイヤー|面白く|画面|UI|メニュー|表示)/.test(prompt)) return undefined;
     if (!/(?:どうしたら|どうすれば|どうやって|どう思う|コツ|アドバイス|工夫|改善|良くしたい|よくしたい|でしょうか|？|\?)/.test(prompt)) return undefined;
     const lesson = teacherLessonRecallService.findFor(prompt);
     if (!lesson) return undefined;

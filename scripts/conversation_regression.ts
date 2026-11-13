@@ -4586,6 +4586,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevRepo) storageService.setItem(REPO, prevRepo); else storageService.removeItem(REPO);
 }
 
+// P873: 原則の引き方の精度。実教材112件で実測した誤引き（一般語
+// 「ゲーム」の一致で無関係なレッスンが勝つ／同点が保管順で決まる）を
+// 是正：一般語の除外、直接一致の重み、先頭キーの加点、同点は教材順。
+{
+  const { teacherLessonRecallService } = await import('../src/miki/memory/services/teacherLessonRecallService');
+  const REPO = 'miki_reusable_component_repository_v1';
+  const prevRepo = storageService.getItem(REPO);
+  const seed = (lessons: any[]) => storageService.setItem(REPO, JSON.stringify(lessons.map((lesson) => ({
+    componentType: 'TEACHER_LESSON', componentKind: 'KNOWLEDGE', lifecycleStatus: 'CANDIDATE',
+    packageSubject: 'ゲーム制作の原則（テスト）', lesson,
+  }))));
+  seed([
+    { id: 'TM12-20', title: '数値はボタン1つで実行中のゲームに反映できるようにする', rule: '調整した数値は、ボタン1つで実行中のゲームに反映できるようにする。' },
+    { id: 'TM9-16', title: '難易度は「思ったより下げる」くらいがちょうど良い', rule: '開発者は慣れているので、思ったより下げるくらいでちょうど良い。' },
+    { id: 'TM10-16', title: 'ヒットストップは必ず入れる', rule: 'ヒットストップは、ジャンルを問わず必ず入れる。' },
+  ]);
+  const picked1 = teacherLessonRecallService.findFor('ゲームの難易度が高すぎて詰みそうです。どうしたらいいですか？');
+  check('P873 一般語で無関係なレッスンが勝たない', picked1?.id === 'TM9-16', picked1?.id ?? '(none)');
+  const picked2 = teacherLessonRecallService.findFor('操作がもっさりして手応えがないです。どうしたらいいですか？');
+  check('P873 状況語の橋渡しで引ける', picked2?.id === 'TM10-16', picked2?.id ?? '(none)');
+  const picked3 = teacherLessonRecallService.findFor('天気の話をしたいです');
+  check('P873 無関係な話題では引かない', picked3 === undefined, picked3?.id ?? '(none)');
+  if (prevRepo) storageService.setItem(REPO, prevRepo); else storageService.removeItem(REPO);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
