@@ -3144,9 +3144,9 @@ export class ConversationCoreService {
       const target = new Date(now.getFullYear(), tm - 1, td);
       return `${tm}月${td}日は${weekdays[target.getDay()]}曜日です。`;
     }
-    if (/何曜日/.test(prompt)) {
-      return `今日は${weekdays[now.getDay()]}曜日です。`;
-    }
+    // P863: N日後の曜日は、先にずらした日付で答える。素の
+    // 「何曜日」分岐が手前にあり、「3日後は何曜日？」に今日の
+    // 曜日を返していた。オフセット分岐はここ（素の分岐の前）。
     // P675: N日後・N週間後・Nか月後（と前）の日付も計算して答える。
     const offsetMatch = prompt.match(/(\d+)\s*(日|週間|か月|ヶ月|ヵ月)(後|前)/);
     if (offsetMatch && /(?:何日|いつ|曜日|[？?])/.test(prompt)) {
@@ -3161,6 +3161,9 @@ export class ConversationCoreService {
       return sign > 0
         ? `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`
         : `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）でした。`;
+    }
+    if (/何曜日/.test(prompt)) {
+      return `今日は${weekdays[now.getDay()]}曜日です。`;
     }
     // P722: 「来週の金曜は何日？」は来週のその曜日の日付を計算する
     // （今週の同じ曜日から7日後。再来週は14日後）。「今週の金曜」は
@@ -3191,6 +3194,22 @@ export class ConversationCoreService {
       return delta === 0
         ? `今度の${nextWd[1]}曜日は今日、${d.getMonth() + 1}月${d.getDate()}日です。`
         : `今度の${nextWd[1]}曜日は${d.getMonth() + 1}月${d.getDate()}日です。`;
+    }
+    // P863: 「次の金曜日は何日？」と素の「金曜日は何日？」も
+    // 日付で答える（知らない語として流れていた）。「次の」は
+    // 今日がその曜日なら来週の同じ曜日を指し、素の形は直近
+    // （今日を含む）を指す。
+    const namedWd = prompt.match(/(次の)?([日月火水木金土])曜(?:日)?(?:は|って)?(?:何日|いつ)/);
+    if (namedWd) {
+      const target = weekdays.indexOf(namedWd[2]);
+      let delta = (target - now.getDay() + 7) % 7;
+      if (namedWd[1] && delta === 0) delta = 7;
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      d.setDate(d.getDate() + delta);
+      const label = namedWd[1] ? `次の${namedWd[2]}曜日` : `${namedWd[2]}曜日`;
+      return delta === 0
+        ? `${label}は今日、${d.getMonth() + 1}月${d.getDate()}日です。`
+        : `${label}は${d.getMonth() + 1}月${d.getDate()}日です。`;
     }
     // P722: 「あと何日で12月？」は、その月の1日までの日数を数える。
     const untilMonth = prompt.match(/あと何日で(\d{1,2})月/);

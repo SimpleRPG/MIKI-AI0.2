@@ -4394,6 +4394,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P862 事実の値も clean', fact862 && !String(fact862.factValue).startsWith('、'), String(fact862?.factValue));
 }
 
+
+// ---- カレンダーの3形（N日後の曜日・次のX曜日・素のX曜日）（P863） ----
+{
+  const WD863 = ['日', '月', '火', '水', '木', '金', '土'];
+  const ask863 = async (t: string) => (await conversationCoreService.execute({ prompt: t } as any) as any).replyText as string;
+  const fmt863 = (d: Date) => `${d.getMonth() + 1}月${d.getDate()}日`;
+  const now863 = new Date();
+  const plus863 = (n: number) => { const d = new Date(now863.getFullYear(), now863.getMonth(), now863.getDate()); d.setDate(d.getDate() + n); return d; };
+  const r1 = await ask863('3日後は何曜日？');
+  const e1 = plus863(3);
+  check('P863 N日後は何曜日は、ずらした日付で答える', r1.includes(`${fmt863(e1)}（${WD863[e1.getDay()]}曜日）`), r1.slice(0, 100));
+  let deltaFri = (5 - now863.getDay() + 7) % 7;
+  const r2 = await ask863('金曜日は何日？');
+  check('P863 素のX曜日は何日は直近の日付で答える', r2.includes(fmt863(plus863(deltaFri))), r2.slice(0, 100));
+  if (deltaFri === 0) deltaFri = 7;
+  const r3 = await ask863('次の金曜日は何日？');
+  check('P863 次のX曜日は今日の曜日と重なれば来週を指す', r3.includes(fmt863(plus863(deltaFri))), r3.slice(0, 100));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
