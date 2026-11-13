@@ -4322,6 +4322,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P858 内容指定の取り消しも受ける', c2.replyText.includes('明日の予定は取り消しておきました'), c2.replyText.slice(0, 140));
 }
 
+
+// ---- 「僕の言ったこと覚えてる？」を記憶の確認として受ける（P859） ----
+{
+  const msgs859: any[] = [];
+  let mems859: any[] = [];
+  let st859: any = undefined;
+  const run859 = async (text: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, mems859);
+    mems859 = intake.updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: mems859, conversationState: st859, recentMessages: msgs859 } as any);
+    st859 = r.nextConversationState;
+    msgs859.push({ role: 'user', content: text }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run859('キオクモドキは、川に住む魚だよ');
+  const q1 = await run859('僕の言ったこと覚えてる？');
+  check('P859 言ったことの確認は振り返りで受ける', q1.replyText.includes('覚えてますよ') && q1.replyText.includes('キオクモドキ'), q1.replyText.slice(0, 160));
+  check('P859 「こと」を未知語として扱わない', !q1.replyText.includes('「こと」は、まだ知らない'), q1.replyText.slice(0, 120));
+  const q2 = await run859('キオクモドキって覚えてる？');
+  check('P859 語そのものの確認は従来どおり', q2.replyText.includes('キオクモドキ') && q2.replyText.includes('川に住む魚'), q2.replyText.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

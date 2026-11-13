@@ -6285,6 +6285,11 @@ export class ConversationCoreService {
     // 「こと」が語として拾われて誤爆していたので、相手自身への
     // 言及はここでは扱わない（関係の受け口が答える）。
     if (/(?:僕|私|俺|おれ)のこと/.test(prompt)) return undefined;
+    // P859: 「僕の言ったこと覚えてる？」も会話の記憶の確認で、
+    // 語彙の確認ではない（「こと」が語として拾われていた）。
+    // 振り返りの受け口（conversationRecapAnswer）が答える。
+    // 教えた形は下の P730 の分岐が受けるので、ここでは外す。
+    if (/(?:言った|話した)こと/.test(prompt) && /(?:覚えて|おぼえて)/.test(prompt)) return undefined;
     if (!/(?:覚えた|分かった|わかるようになった|分かるようになった|知ってる|知っている|覚えてる|覚えている|忘れた|忘れて)/.test(prompt)) return undefined;
     if (!/[？?]/.test(prompt) && !/か[？。]?$/.test(prompt.trim())) return undefined;
     // P653: 「忘れた？」の聞き方かどうかで、締めの言い方を変える。
@@ -6723,7 +6728,11 @@ export class ConversationCoreService {
     // ない）。さっき形は、質問の言葉（何・だっけ）を伴う時だけ拾う。
     // P725: 「他には何か話した？」も振り返りの続きとして受ける。
     const isOtherFollowup = /他に/.test(prompt) && /話/.test(prompt);
-    if (!/(?:何|なに)の話(?:を)?(?:した|してた|していた)|今日(?:は|に)?(?:何|なに)の話|さっき(?:の)?話(?:は|って)?(?:何|なに|なんだった|だっけ)/.test(prompt) && !isOtherFollowup) return undefined;
+    // P859: 「僕の言ったこと覚えてる？」は記憶の確認。話題の
+    // 振り返りで「覚えてますよ」と受ける（「こと」が未知語として
+    // 処理されて「まだ知らないです」に化けていた）。
+    const isMemoryCheck = /(?:言った|話した|教えた)こと/.test(prompt) && /(?:覚えて|おぼえて)/.test(prompt);
+    if (!/(?:何|なに)の話(?:を)?(?:した|してた|していた)|今日(?:は|に)?(?:何|なに)の話|さっき(?:の)?話(?:は|って)?(?:何|なに|なんだった|だっけ)/.test(prompt) && !isOtherFollowup && !isMemoryCheck) return undefined;
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const parts: string[] = [];
@@ -6769,6 +6778,10 @@ export class ConversationCoreService {
         if (w.current) parts.push(`${w.project}では今、「${w.current}」を作っています`);
       }
     } catch { /* 補助経路 */ }
+    if (isMemoryCheck) {
+      if (parts.length === 0) return '今日は、まだ特に残っていません。これから話したことは、ちゃんと覚えていきますね。';
+      return `覚えてますよ。${parts.join('。')}。`;
+    }
     if (parts.length === 0) return '今日の話は、まだ特に残っていません。これから色々話しましょう。';
     return parts.join('。') + '。';
   }
