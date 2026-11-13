@@ -4141,6 +4141,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P848 記録に無い話題は正直に答える', miss848.includes('記録には残ってない'), miss848.slice(0, 160));
 }
 
+// ---- P849: 確信度の伝播（予測の外れが仮の関係を弱める） ----
+{
+  const { predictionLedgerService } = await import('../src/miki/memory/services/predictionLedgerService');
+  const { worldModelGraphService } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  worldModelGraphService.addRelation({ fromName: '伝播チェックX', toName: '生き物', type: 'IS_A', provisional: true, confidence: 0.3 });
+  const pred849 = predictionLedgerService.predictForTarget('伝播チェックX');
+  check('P849 仮の信念から予測が立つ', !!pred849 && pred849.outcome === 'OPEN', JSON.stringify(pred849 || {}).slice(0, 100));
+  worldModelGraphService.addRelation({ fromName: '伝播チェックX', toName: '動物', type: 'IS_A' });
+  const settled849 = predictionLedgerService.settleAll();
+  const weakened = worldModelGraphService.relationsOf('伝播チェックX').find((r: any) => r.to === '生き物');
+  check('P849 外れた仮説の確信度が下がる', settled849.refuted >= 1 && !!weakened && weakened.confidence < 0.15, JSON.stringify(weakened || {}).slice(0, 120));
+  worldModelGraphService.addRelation({ fromName: '伝播チェックY', toName: '鳥', type: 'IS_A', provisional: true, confidence: 0.5 });
+  const promotedConf = worldModelGraphService.adjustRelationConfidence('伝播チェックY', '鳥', 'IS_A', 0.2);
+  const promoted = worldModelGraphService.relationsOf('伝播チェックY').find((r: any) => r.to === '鳥');
+  check('P849 確信度が閾値を越えた仮の関係は確定へ昇格する', promotedConf !== undefined && promotedConf >= 0.6 && !!promoted && !promoted.provisional, JSON.stringify(promoted || {}).slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

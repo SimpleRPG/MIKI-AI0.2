@@ -96,11 +96,15 @@ class PredictionLedgerService {
           p.settledAt = now;
           confirmed++;
           changed = true;
+          // P849: 的中は、その予測の根拠だった仮の関係を強める。
+          try { worldModelGraphService.adjustRelationConfidence(p.target, p.to, p.type as any, 0.2); } catch { /* 補助 */ }
         } else if (p.type === 'IS_A' && relations.length > 0) {
           p.outcome = 'REFUTED';
           p.settledAt = now;
           refuted++;
           changed = true;
+          // P849: 外れは、外れた仮説（仮の関係）を弱める。
+          try { worldModelGraphService.adjustRelationConfidence(p.target, p.to, p.type as any, -0.2); } catch { /* 補助 */ }
         }
       }
       if (changed) this.save(items);

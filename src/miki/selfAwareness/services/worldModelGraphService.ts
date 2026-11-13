@@ -239,6 +239,23 @@ class WorldModelGraphService {
   }
 
   /**
+   * P849: 予測の的中・外れを、仮の関係の確信度へ伝播させる
+   * （NARS の確信度伝播）。確定した関係は動かさない。仮の関係
+   * だけが上下し、0.6 以上で確定へ昇格する。床（0.05）まで
+   * 下がっても削除はしない（反証の記録として残す）。
+   * 戻り値は調整後の確信度。対象が無い／確定済みなら undefined。
+   */
+  public adjustRelationConfidence(fromName: string, toName: string, type: WorldRelationType, delta: number): number | undefined {
+    const state = this.load();
+    const rel = state.relations.find((r) => r.from === fromName && r.to === toName && r.type === type);
+    if (!rel || !rel.provisional) return undefined;
+    rel.confidence = Math.min(0.95, Math.max(0.05, rel.confidence + delta));
+    if (rel.confidence >= 0.6) rel.provisional = false;
+    this.save();
+    return rel.confidence;
+  }
+
+  /**
    * P728: 出典の Claim が差し替え・撤回されたとき、その Claim を
    * 出典から外す。仮の関係で出典が無くなれば関係自体を取り除く。
    * 確定した関係や、他の出典も持つ関係は残す。

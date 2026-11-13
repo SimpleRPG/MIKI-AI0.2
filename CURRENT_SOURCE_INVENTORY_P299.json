@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1808,
     "sourceFileCount": 1361,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1272,
-    "relativeImportCandidateCount": 4259,
-    "resolvedRelativeImportCandidateCount": 4243,
+    "relativeImportCandidateCount": 4261,
+    "resolvedRelativeImportCandidateCount": 4245,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1709,9 +1709,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 358466,
-      "lines": 4157,
-      "sha256": "27fe873db987f739d8eed9196e0720391fdfe41e97a6f60aee9498f4a030b414",
+      "bytes": 360182,
+      "lines": 4174,
+      "sha256": "9ded88ac5417c6adc0b130f3ec19c24fce0961bd1fa2d4dfd845860e54c79551",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3122,10 +3122,22 @@
           "specifier": "../src/services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 4146,
+          "specifier": "../src/miki/memory/services/predictionLedgerService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/predictionLedgerService.ts"
+        },
+        {
+          "line": 4147,
+          "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
         }
       ],
-      "relativeImportCandidateCount": 235,
-      "resolvedRelativeImportCount": 235,
+      "relativeImportCandidateCount": 237,
+      "resolvedRelativeImportCount": 237,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -26452,9 +26464,9 @@
     },
     {
       "path": "src/miki/memory/services/predictionLedgerService.ts",
-      "bytes": 4913,
-      "lines": 127,
-      "sha256": "3d802c76633d69ce60c3c4fdae40c23e236b189cda245a25d2a4beaf1afa8223",
+      "bytes": 5335,
+      "lines": 131,
+      "sha256": "e39cfcbac1adca645ad9b30e3bf876d67d36f9e70676dbb00e658793fed363e5",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -30671,9 +30683,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/worldModelGraphService.ts",
-      "bytes": 35134,
-      "lines": 792,
-      "sha256": "86d9a35429576225529ac5ae93f69e89fe2dc017dca4cbec10c6a78b3f160c47",
+      "bytes": 36070,
+      "lines": 809,
+      "sha256": "9a15aa8a8954bca0ab28d749e9019559a0fd30f0bef2694eba5e0a7a94e690bc",
       "relativeImportCandidates": [
         {
           "line": 1,
