@@ -4158,6 +4158,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P849 確信度が閾値を越えた仮の関係は確定へ昇格する', promotedConf !== undefined && promotedConf >= 0.6 && !!promoted && !promoted.provisional, JSON.stringify(promoted || {}).slice(0, 120));
 }
 
+// ---- P850: 保留枠組みの移行つづき（忘れた語の控え） ----
+{
+  const { conversationFactIntakeService } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  let mem850: any[] = [];
+  let st850: any = undefined;
+  const say850 = async (text: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, mem850);
+    mem850 = intake.updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: mem850, conversationState: st850, recentMessages: [] } as any);
+    st850 = r.nextConversationState;
+    return String(r.replyText || '');
+  };
+  await say850('ワスチェックは、忘れ物のチェックに使う言葉だよ');
+  const fg850 = await say850('ワスチェックのことは忘れて');
+  check('P850 忘れた語の受け答えが保留枠組み経由で返る', fg850.includes('「ワスチェック」のことは忘れますね'), fg850.slice(0, 160));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -4838,11 +4838,9 @@ export class ConversationCoreService {
   private planContentCorrectionAnswer(prompt: string): string | undefined {
     if (!/(?:じゃなくて|じゃなく|ではなく)/.test(prompt)) return undefined;
     try {
-      const raw = storageService.getItem('miki_recently_corrected_plan_content_v1');
-      if (!raw) return undefined;
-      const mk = JSON.parse(raw);
-      if (!mk || Date.now() - Number(mk.at || 0) > 60000) return undefined;
-      storageService.removeItem('miki_recently_corrected_plan_content_v1');
+      // P846/P850: 保留枠組みから消費して受ける（期限切れは無効）。
+      const mk = pendingSlotService.consume<{ from?: string; to?: string; fixed?: number }>('miki_recently_corrected_plan_content_v1');
+      if (!mk) return undefined;
       if (Number(mk.fixed || 0) > 0) return `分かりました、予定の「${mk.from}」は「${mk.to}」に直しておきました。`;
       return undefined;
     } catch { return undefined; }
@@ -6125,9 +6123,10 @@ export class ConversationCoreService {
     if (/[？?]/.test(prompt)) return undefined;
     if (!/(?:忘れて|消して|削除して)/.test(prompt)) return undefined;
     try {
-      const rec = JSON.parse(storageService.getItem('miki_recently_forgotten_v1') || 'null');
-      if (rec && typeof rec.term === 'string' && Date.now() - Number(rec.at || 0) <= 60_000 && prompt.includes(rec.term)) {
-        storageService.removeItem('miki_recently_forgotten_v1');
+      // P846/P850: 保留枠組みを覗き、語が一致したときだけ消費する。
+      const rec = pendingSlotService.peek<{ term?: string }>('miki_recently_forgotten_v1');
+      if (rec && typeof rec.term === 'string' && prompt.includes(rec.term)) {
+        pendingSlotService.clear('miki_recently_forgotten_v1');
         return `分かりました、「${rec.term}」のことは忘れますね。`;
       }
     } catch { /* 補助判定 */ }
@@ -6138,9 +6137,9 @@ export class ConversationCoreService {
     if (/[？?]/.test(prompt)) return undefined;
     if (!/(?:忘れて|消して)/.test(prompt)) return undefined;
     try {
-      const rec = JSON.parse(storageService.getItem('miki_recently_forgotten_fact_v1') || 'null');
-      if (rec && typeof rec.label === 'string' && rec.label && Date.now() - Number(rec.at || 0) <= 60_000) {
-        storageService.removeItem('miki_recently_forgotten_fact_v1');
+      const rec = pendingSlotService.peek<{ label?: string }>('miki_recently_forgotten_fact_v1');
+      if (rec && typeof rec.label === 'string' && rec.label) {
+        pendingSlotService.clear('miki_recently_forgotten_fact_v1');
         return `分かりました、その話は忘れますね。`;
       }
     } catch { /* 補助判定 */ }

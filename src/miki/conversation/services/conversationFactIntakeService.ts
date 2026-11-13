@@ -1143,7 +1143,7 @@ export class ConversationFactIntakeService {
       }
       if (fixed === 0) return;
       storageService.setItem(key, JSON.stringify(plans.slice(-20)));
-      storageService.setItem('miki_recently_corrected_plan_content_v1', JSON.stringify({ from: wrong, to: right, fixed, at: Date.now() }));
+      pendingSlotService.set('miki_recently_corrected_plan_content_v1', { from: wrong, to: right, fixed }, 60000);
     } catch { /* 予定の内容訂正は補助経路 */ }
   }
 
@@ -1516,7 +1516,7 @@ export class ConversationFactIntakeService {
           (m as any).invalidatedByUser = true;
         }
       }
-      try { storageService.setItem('miki_recently_forgotten_v1', JSON.stringify({ term, at: Date.now() })); } catch { /* 補助経路 */ }
+      try { pendingSlotService.set('miki_recently_forgotten_v1', { term }, 60000); } catch { /* 補助経路 */ }
       systemLogger.info('CHAT', `🗑 [意味学習] 依頼により「${term}」を忘れました`);
       return;
     }
@@ -1552,7 +1552,7 @@ export class ConversationFactIntakeService {
       rec.active = false;
       rec.invalidatedByUser = true;
       const label = String(rec.factSummary || rec.content || rec.factValue || '').slice(0, 30);
-      try { storageService.setItem('miki_recently_forgotten_fact_v1', JSON.stringify({ label, at: Date.now() })); } catch { /* 補助経路 */ }
+      try { pendingSlotService.set('miki_recently_forgotten_fact_v1', { label }, 60000); } catch { /* 補助経路 */ }
       systemLogger.info('CHAT', `🗑 [事実忘却] 依頼により事実を無効化: ${label}`);
     }
   }
