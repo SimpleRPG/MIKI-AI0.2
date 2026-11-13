@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1810,
     "sourceFileCount": 1363,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1274,
-    "relativeImportCandidateCount": 4280,
-    "resolvedRelativeImportCandidateCount": 4264,
+    "relativeImportCandidateCount": 4285,
+    "resolvedRelativeImportCandidateCount": 4269,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 365665,
-      "lines": 4249,
-      "sha256": "d7db4a3b64bcfe4230205a9d51f6232052d9edbab3b6bc421409457ba84a7c89",
+      "bytes": 367296,
+      "lines": 4267,
+      "sha256": "c4af3231aa7dc372c0a5e278b501b6aee9904ffa548d462e5498de99ac5ef23f",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3182,10 +3182,34 @@
           "specifier": "../src/miki/memory/services/fixedReplyStatsService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/fixedReplyStatsService.ts"
+        },
+        {
+          "line": 4239,
+          "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
+        },
+        {
+          "line": 4240,
+          "specifier": "../src/miki/memory/services/predictionLedgerService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/predictionLedgerService.ts"
+        },
+        {
+          "line": 4241,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeConsolidationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeConsolidationService.ts"
+        },
+        {
+          "line": 4242,
+          "specifier": "../src/miki/unknown/services/knowledgeGapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
         }
       ],
-      "relativeImportCandidateCount": 244,
-      "resolvedRelativeImportCount": 244,
+      "relativeImportCandidateCount": 248,
+      "resolvedRelativeImportCount": 248,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -26529,9 +26553,9 @@
     },
     {
       "path": "src/miki/memory/services/predictionLedgerService.ts",
-      "bytes": 5335,
-      "lines": 131,
-      "sha256": "e39cfcbac1adca645ad9b30e3bf876d67d36f9e70676dbb00e658793fed363e5",
+      "bytes": 5499,
+      "lines": 133,
+      "sha256": "ca4ecf9e670be6a991613143b852f4d81518bf86e2e17b5085cf920a37910e20",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -30171,9 +30195,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeConsolidationService.ts",
-      "bytes": 7114,
-      "lines": 138,
-      "sha256": "abb2e5db5a0e42ff956d0d6402646cf8cf254d7bda9841ee075a318479c99a13",
+      "bytes": 7957,
+      "lines": 154,
+      "sha256": "908cc677e37d5d7398e40c37e3f96d2a8052e0d0e5ca50c0d3d5854f8a722b34",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -30210,10 +30234,16 @@
           "specifier": "../../memory/services/predictionLedgerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/predictionLedgerService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "../../unknown/services/knowledgeGapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {

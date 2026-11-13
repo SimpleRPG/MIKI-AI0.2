@@ -81,9 +81,10 @@ class PredictionLedgerService {
    *   確定していたら REFUTED（予測が外れた）。
    * それ以外はまだ OPEN のまま。
    */
-  public settleAll(now = Date.now()): { confirmed: number; refuted: number } {
+  public settleAll(now = Date.now()): { confirmed: number; refuted: number; refutedTargets: string[] } {
     let confirmed = 0;
     let refuted = 0;
+    const refutedTargets: string[] = [];
     try {
       const items = this.load();
       let changed = false;
@@ -102,6 +103,7 @@ class PredictionLedgerService {
           p.outcome = 'REFUTED';
           p.settledAt = now;
           refuted++;
+          if (!refutedTargets.includes(p.target)) refutedTargets.push(p.target);
           changed = true;
           // P849: 外れは、外れた仮説（仮の関係）を弱める。
           try { worldModelGraphService.adjustRelationConfidence(p.target, p.to, p.type as any, -0.2); } catch { /* 補助 */ }
@@ -109,7 +111,7 @@ class PredictionLedgerService {
       }
       if (changed) this.save(items);
     } catch { /* 照合できなくても他の処理は止めない */ }
-    return { confirmed, refuted };
+    return { confirmed, refuted, refutedTargets };
   }
 
   public list(): PredictionRecord[] {

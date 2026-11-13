@@ -4233,6 +4233,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P853 当たり記録は消費される', fixedReplyStatsService.recordStrikeIfRecent() === false, '');
 }
 
+
+// ---- 外れた予測を再学習のギャップへ戻す（P854） ----
+{
+  const { worldModelGraphService: wm854 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { predictionLedgerService: pl854 } = await import('../src/miki/memory/services/predictionLedgerService');
+  const { knowledgeConsolidationService: kc854 } = await import('../src/miki/selfAwareness/services/knowledgeConsolidationService');
+  const { knowledgeGapService: kg854 } = await import('../src/miki/unknown/services/knowledgeGapService');
+  wm854.addRelation({ fromName: '再学習チェックX', toName: '生き物', type: 'IS_A', provisional: true, confidence: 0.3 });
+  const pred854 = pl854.predictForTarget('再学習チェックX');
+  check('P854 予測が立つ', Boolean(pred854) && pred854!.outcome === 'OPEN', JSON.stringify(pred854).slice(0, 120));
+  wm854.addRelation({ fromName: '再学習チェックX', toName: '動物', type: 'IS_A', provisional: false, confidence: 0.9 });
+  storageService.removeItem('miki_consolidation_last_run_v1');
+  const r854 = kc854.runIfDue();
+  check('P854 統合で予測が外れ、再学習ギャップが開く', Boolean(r854) && r854!.predictions.refuted >= 1 && r854!.relearnGaps >= 1, JSON.stringify(r854).slice(0, 200));
+  const gaps854 = kg854.listOpen(500).filter((g: any) => String(g.identity?.target || '').toLowerCase() === '再学習チェックx'.toLowerCase());
+  check('P854 再学習ギャップが対象を指している', gaps854.length >= 1 && gaps854.some((g: any) => g.type === 'UNKNOWN_RELATION'), JSON.stringify(gaps854.map((g: any) => g.type)));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
