@@ -4560,6 +4560,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P871 読点つきの素の比較も答える', q5.replyText.includes('5の方が大きい'), q5.replyText.slice(0, 120));
 }
 
+// P872: ゲーム設計の相談で、教わった原則（教師レッスン）を観点として引く。
+// レッスン部品が無い状態では引かず、部品を投入すると出典つきで引く。
+{
+  const run872 = async (p: string) => {
+    const r: any = await conversationCoreService.execute({ prompt: p } as any);
+    return String(r?.replyText ?? '');
+  };
+  const REPO = 'miki_reusable_component_repository_v1';
+  const prevRepo = storageService.getItem(REPO);
+  try { storageService.removeItem(REPO); } catch { /* noop */ }
+  const noLesson = await run872('ゲームで死んだあとのリトライが遅くて困ってます。どうしたらいいですか？');
+  check('P872 レッスンが無ければ原則を引かない', !noLesson.includes('原則に、こういうのがあります'), noLesson.slice(0, 60));
+  storageService.setItem(REPO, JSON.stringify([{
+    componentType: 'TEACHER_LESSON', componentKind: 'KNOWLEDGE', lifecycleStatus: 'CANDIDATE',
+    packageSubject: 'ゲーム制作の原則（1）',
+    lesson: { id: 'TM9-18', title: 'リトライは迅速に（再開の速さが効く）',
+      rule: 'リトライは迅速にする。やられてから操作が戻るまでの間に、熱は急速に冷める。ペナルティの重さより再開の速さが効く。' },
+  }]));
+  const withLesson = await run872('ゲームで死んだあとのリトライが遅くて困ってます。どうしたらいいですか？');
+  check('P872 設計相談で原則を引く', withLesson.includes('リトライは迅速に') && withLesson.includes('原則'), withLesson.slice(0, 80));
+  check('P872 候補であることを明示する', withLesson.includes('候補として教わった知識'), withLesson.slice(0, 80));
+  const statement = await run872('ゲームで死んだあとのリトライが遅いです');
+  check('P872 相談の形でなければ引かない', !statement.includes('原則に、こういうのがあります'), statement.slice(0, 60));
+  if (prevRepo) storageService.setItem(REPO, prevRepo); else storageService.removeItem(REPO);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

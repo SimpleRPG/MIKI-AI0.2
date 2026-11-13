@@ -28,6 +28,7 @@ import { conversationStrategyService } from '../../strategy/services/conversatio
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { storageService } from '../../../services/storageService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
+import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
 import { fixedReplyStatsService } from '../../memory/services/fixedReplyStatsService';
 import { activationService } from '../../memory/services/activationService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
@@ -550,6 +551,13 @@ export class ConversationCoreService {
         // （予定の時刻の答え等は通していたのに、ここだけ素通り
         // だった）。
         return this.buildResult('RESOLVED', 'clock_calendar_answer', this.applyPersonaVoice(clockAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P872: ゲーム設計の相談では、教わった原則（教師レッスン）を
+      // 観点として引く。知識として「持つ」だけだった教材に、使う
+      // 受け口を付ける第一歩。候補の知識であることは明示する。
+      const principleAnswer = multiPart ? undefined : this.designPrincipleAnswer(prompt);
+      if (principleAnswer) {
+        return this.buildResult('RESOLVED', 'design_principle_answer', this.applyPersonaVoice(principleAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P592: 評価軸の無い日常の二択も、ここで会話として受ける
       // （後段の照応・判断・保持の各ゲートが、雑談の二択を次々に
@@ -5141,6 +5149,19 @@ export class ConversationCoreService {
       });
       return `${wk}の予定は、${items.join('、')}です。`;
     } catch { return undefined; }
+  }
+
+  // P872: ゲーム設計の相談で、教師レッスン（原則）を観点として出す。
+  // 設計の話題＋相談・質問の形のときだけ。レッスンは候補・未検証の
+  // 知識部品なので、出典と「候補であること」を添えて断定しない。
+  private designPrincipleAnswer(prompt: string): string | undefined {
+    if (!/(?:ゲーム|難易度|バランス|手応え|ご褒美|報酬|リトライ|チュートリアル|詰|難しすぎ|簡単すぎ|敵|ボス|ステージ|マップ|武器|操作感|プレイヤー|面白く)/.test(prompt)) return undefined;
+    if (!/(?:どうしたら|どうすれば|どうやって|どう思う|コツ|アドバイス|工夫|改善|良くしたい|よくしたい|でしょうか|？|\?)/.test(prompt)) return undefined;
+    const lesson = teacherLessonRecallService.findFor(prompt);
+    if (!lesson) return undefined;
+    const firstSentence = lesson.rule.split('。')[0];
+    const ruleText = firstSentence.length > 110 ? `${firstSentence.slice(0, 107)}…` : `${firstSentence}。`;
+    return `教わったゲーム作りの原則に、こういうのがあります。「${lesson.title}」${ruleText}まだ候補として教わった知識ですけど、観点としてどうでしょう。`;
   }
 
   private upcomingPlansAnswer(prompt: string): string | undefined {
