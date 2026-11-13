@@ -29,6 +29,7 @@ import { adaptExplanationDetailLevel } from '../../conversation/services/convers
 import { storageService } from '../../../services/storageService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
 import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
+import { videoTranscriptService } from '../../research/services/videoTranscriptService';
 import { fixedReplyStatsService } from '../../memory/services/fixedReplyStatsService';
 import { activationService } from '../../memory/services/activationService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
@@ -558,6 +559,16 @@ export class ConversationCoreService {
       const principleAnswer = multiPart ? undefined : this.designPrincipleAnswer(prompt);
       if (principleAnswer) {
         return this.buildResult('RESOLVED', 'design_principle_answer', this.applyPersonaVoice(principleAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P875: 動画URL＋学習の意図があれば、字幕を読んで学ぶ。
+      // 学んだ動画の内容への質問にも、読んだ本文から答える。
+      const videoLearn = multiPart ? undefined : await this.videoLearnAnswer(prompt);
+      if (videoLearn) {
+        return this.buildResult('RESOLVED', 'video_learn_answer', this.applyPersonaVoice(videoLearn), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      const videoRecall = multiPart ? undefined : this.videoRecallAnswer(prompt);
+      if (videoRecall) {
+        return this.buildResult('RESOLVED', 'video_recall_answer', this.applyPersonaVoice(videoRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P592: 評価軸の無い日常の二択も、ここで会話として受ける
       // （後段の照応・判断・保持の各ゲートが、雑談の二択を次々に
@@ -5167,6 +5178,38 @@ export class ConversationCoreService {
     const firstSentence = lesson.rule.split('。')[0];
     const ruleText = firstSentence.length > 110 ? `${firstSentence.slice(0, 107)}…` : `${firstSentence}。`;
     return `教わったゲーム作りの原則に、こういうのがあります。「${lesson.title}」${ruleText}まだ候補として教わった知識ですけど、観点としてどうでしょう。`;
+  }
+
+  // P875: 動画URLと学習の意図を受けて、字幕を読んで学ぶ。
+  // 取れなかった理由は正直に返す（字幕なし動画は学べない）。
+  private async videoLearnAnswer(prompt: string): Promise<string | undefined> {
+    const urlMatch = prompt.match(/https?:\/\/[^\s]+/);
+    if (!urlMatch) return undefined;
+    const url = urlMatch[0];
+    if (!videoTranscriptService.extractVideoId(url)) return undefined;
+    if (!/(?:見て|観て|学ん|覚えて|内容|要約|チェック)/.test(prompt)) return undefined;
+    try {
+      const r = await videoTranscriptService.learnFromUrl(url);
+      if (r.ok) return `動画「${r.title}」の字幕を読んで学びました。内容について聞いてもらえれば、読んだ範囲で答えます。`;
+      return `動画を見に行ったんですけど、${r.reason ?? 'うまく読めませんでした'}ので、今回は学べませんでした。`;
+    } catch { return undefined; }
+  }
+
+  // P875: 学んだ動画の内容への質問に、保存した字幕本文から答える。
+  private videoRecallAnswer(prompt: string): string | undefined {
+    if (!/(?:動画|ビデオ)/.test(prompt)) return undefined;
+    if (!/(?:何て|何を|どう|内容|言って|話して)/.test(prompt)) return undefined;
+    try {
+      const latest = videoTranscriptService.latest();
+      if (!latest) return undefined;
+      const cleaned = prompt.replace(/(?:動画|ビデオ|について|何て|何を|どう|言って|話して|ましたか|だった)/g, ' ');
+      const tokens = cleaned.split(/[\s、。？?のにはがをでた]+/).map((s) => s.trim()).filter((s) => s.length >= 2);
+      for (const tok of tokens) {
+        const hit = videoTranscriptService.searchInLearned(tok);
+        if (hit) return `動画「${hit.title}」では、こう話していました。${hit.excerpt}`;
+      }
+      return `動画「${latest.title}」を読んだ範囲だと、冒頭はこうでした。${latest.text.slice(0, 140)}…`;
+    } catch { return undefined; }
   }
 
   private upcomingPlansAnswer(prompt: string): string | undefined {

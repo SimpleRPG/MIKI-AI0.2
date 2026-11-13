@@ -4636,6 +4636,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P874 浄化は見出し行だけを落とす', sanitize('【最終見解】\n本文です。') === '本文です。', sanitize('【最終見解】\n本文です。'));
 }
 
+// P875: 動画から学ぶ受け口。字幕を読んで保存し、内容への質問に
+// 読んだ本文から答える。字幕の無い動画は正直に失敗を返す。
+{
+  const { videoTranscriptService } = await import('../src/miki/research/services/videoTranscriptService');
+  const VSTORE = 'miki_video_learnings_v1';
+  const prevVStore = storageService.getItem(VSTORE);
+  const WATCH875 = '<html><head><title>ヒットストップ入門 - YouTube</title></head><body><script>{"captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=abc123XYZ&lang=ja","name":{"simpleText":"日本語"},"vssId":"a.ja","languageCode":"ja","kind":"asr"}]}</script></body></html>';
+  const XML875 = '<?xml version="1.0"?><transcript><text start="0" dur="3">今日はヒットストップについて話します</text><text start="3" dur="3">攻撃が当たった瞬間に時間を止める演出です</text></transcript>';
+  const run875 = async (p: string) => String(((await conversationCoreService.execute({ prompt: p } as any)) as any)?.replyText ?? '');
+  videoTranscriptService.setFetchForTest(async (url: string) => (url.includes('timedtext') ? XML875 : WATCH875));
+  const learned875 = await run875('この動画見て学んで https://youtu.be/abc123XYZ');
+  check('P875 動画の字幕を読んで学ぶ', learned875.includes('ヒットストップ入門') && learned875.includes('学びました'), learned875.slice(0, 60));
+  const recall875 = await run875('動画でヒットストップについて何て言ってた？');
+  check('P875 学んだ内容を本文から答える', recall875.includes('時間を止める演出'), recall875.slice(0, 80));
+  videoTranscriptService.setFetchForTest(async () => '<html><head><title>字幕なし動画 - YouTube</title></head><body></body></html>');
+  const noSub875 = await run875('この動画見て学んで https://youtu.be/zzz999ZZZ');
+  check('P875 字幕が無い動画は正直に失敗を返す', noSub875.includes('学べませんでした'), noSub875.slice(0, 60));
+  videoTranscriptService.setFetchForTest(null);
+  if (prevVStore) storageService.setItem(VSTORE, prevVStore); else storageService.removeItem(VSTORE);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
