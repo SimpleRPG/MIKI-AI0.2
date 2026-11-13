@@ -546,7 +546,10 @@ export class ConversationCoreService {
       }
       const clockAnswer = multiPart ? undefined : this.clockCalendarAnswer(prompt);
       if (clockAnswer) {
-        return this.buildResult('RESOLVED', 'clock_calendar_answer', clockAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+        // P868: 時計・カレンダーの答えにも人格の口調を通す
+        // （予定の時刻の答え等は通していたのに、ここだけ素通り
+        // だった）。
+        return this.buildResult('RESOLVED', 'clock_calendar_answer', this.applyPersonaVoice(clockAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P592: 評価軸の無い日常の二択も、ここで会話として受ける
       // （後段の照応・判断・保持の各ゲートが、雑談の二択を次々に

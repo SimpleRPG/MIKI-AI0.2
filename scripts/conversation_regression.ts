@@ -4499,6 +4499,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P867 今週末の聞き返しは週末の控えを返す', t3.includes('カワチェック') && !t3.includes('今週の予定は、まだ聞いていない'), t3.slice(0, 140));
 }
 
+
+// ---- ビービーの声: ます形の文末と時計カレンダーの口調（P868） ----
+{
+  const { paraphraseService } = await import('../src/miki/memory/services/paraphraseService');
+  const v1 = paraphraseService.applyCasualVoice('「ホソミチェック」は川にいると聞いています。');
+  check('P868 聞いていますは聞いてるよになる', v1.text.includes('聞いてるよ'), v1.text.slice(0, 120));
+  const v2 = paraphraseService.applyCasualVoice('予定はありません。');
+  check('P868 否定のます形には触らない', v2.text === '予定はありません。', v2.text.slice(0, 120));
+  const { personaProfileService } = await import('../src/miki/conversation/services/personaProfileService');
+  (globalThis as any).window = { dispatchEvent: () => true, addEventListener: () => {}, removeEventListener: () => {} };
+  personaProfileService.switchProfile('persona-bibi');
+  const rb: any = await conversationCoreService.execute({ prompt: '次の金曜日は何日？' } as any);
+  personaProfileService.switchProfile('persona-default');
+  check('P868 ビービーではカレンダーの答えも口調が寄る', rb.replyText.includes('だよ') && !rb.replyText.includes('日です'), rb.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

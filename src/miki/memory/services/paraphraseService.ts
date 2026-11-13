@@ -151,6 +151,14 @@ function casualizeEndings(text: string, forVoice = false): string {
   out = out.split('何ですか？').join('何なの？');
   out = out.split('ですね、').join('だね、');
   out = out.split('ですね。').join('だね。');
+  // P868: ます形の文末も口調に寄せる（「聞いています」「住んで
+  // います」が丁寧なまま残っていた）。否定形（いません・
+  // ありません）には触らない。
+  out = out.split('ています。').join('てるよ。');
+  out = out.split('ています！').join('てるよ！');
+  out = out.split('います。').join('いるよ。');
+  out = out.split('あります。').join('あるよ。');
+  out = out.split('なります。').join('なるよ。');
   out = out.split('です。').join('だよ。');
   out = out.split('だろう。').join('だろうね。');
   if (out.endsWith('である')) out = `${out.slice(0, -3)}だよ`;
@@ -158,6 +166,10 @@ function casualizeEndings(text: string, forVoice = false): string {
   else if (out.endsWith('たいです')) out = `${out.slice(0, -4)}たいな`;
   else if (out.endsWith('しいです')) out = `${out.slice(0, -2)}よ`;
   else if (out.endsWith('ないです')) out = `${out.slice(0, -4)}ないよ`;
+  else if (out.endsWith('ています')) out = `${out.slice(0, -4)}てるよ`;
+  else if (out.endsWith('あります')) out = `${out.slice(0, -4)}あるよ`;
+  else if (out.endsWith('なります')) out = `${out.slice(0, -4)}なるよ`;
+  else if (out.endsWith('います')) out = `${out.slice(0, -3)}いるよ`;
   else if (out.endsWith('ですよ')) out = `${out.slice(0, -3)}だよ`;
   else if (out.endsWith('ですね')) out = `${out.slice(0, -3)}だね`;
   else if (out.endsWith('です')) out = `${out.slice(0, -2)}だよ`;
