@@ -107,8 +107,8 @@ async function main() {
   await turn('T20 明日の迷い', '明日の予定は特にないかな');
 
   // ---- 夜の続き：彼女の質問への答えと、小さな依頼（P586/P588） ----
-  const { storageService } = await import('../src/services/storageService');
-  storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+  const { pendingSlotService } = await import('../src/miki/memory/services/pendingSlotService');
+  pendingSlotService.set('miki_pending_topic_question_v1', { terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }, 30 * 60000);
   const t20a = await turn('T20A 質問への答え', 'モコロンは綿毛が取れる、羊みたいなパルだよ');
   check('T20A 答えを受けて、続きを1つ聞く', (t20a.includes('そっか') || t20a.includes('なるほど')) && t20a.includes('？') && !t20a.includes('いつごろから知っていますか'), t20a.slice(0, 160));
   check('T20A 質問は1ターンに1つまで', (t20a.match(/[？?]/g) || []).length === 1, t20a.slice(0, 200));

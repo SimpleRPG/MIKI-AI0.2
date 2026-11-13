@@ -2422,12 +2422,12 @@ export class ConversationCoreService {
     if (followUpAppend && !surface.surfaceText.includes(followUpAppend.question.slice(0, 12)) && !roleplaySessionService.isActive()) {
       surface.surfaceText += `\n\n${followUpAppend.question}`;
       try {
-        storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({
+        pendingSlotService.set('miki_pending_topic_question_v1', {
           terms: followUpAppend.terms,
           question: followUpAppend.question,
           at: Date.now(),
           depth: 1,
-        }));
+        }, 30 * 60000);
       } catch { /* 保留は補助 */ }
     }
     // P574: 話題の質問が実際に表に出たら、次の発言を「その答え」
@@ -2435,11 +2435,11 @@ export class ConversationCoreService {
     const topicQuestion = (ir as any).topic_question as string | undefined;
     if (topicQuestion && surface.surfaceText.includes(topicQuestion) && !roleplaySessionService.isActive() && !followUpAppend) {
       try {
-        storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({
+        pendingSlotService.set('miki_pending_topic_question_v1', {
           terms: [nextState.currentTopic, ...(japaneseAnalysis?.contentTokens || [])].filter(Boolean).slice(0, 6),
           question: topicQuestion,
           at: Date.now(),
-        }));
+        }, 30 * 60000);
       } catch { /* 保留は補助 */ }
     }
     // P544: 相手が「知らない」と言っていた語が答えに出てきたら、
@@ -2790,11 +2790,9 @@ export class ConversationCoreService {
    */
   private consumePendingTopicQuestion(prompt: string): { terms?: string[]; question?: string; depth?: number } | undefined {
     try {
-      const raw = storageService.getItem('miki_pending_topic_question_v1');
-      if (!raw) return undefined;
-      storageService.removeItem('miki_pending_topic_question_v1');
-      const pending = JSON.parse(raw) as { terms?: string[]; question?: string; depth?: number; at?: number };
-      if (Date.now() - Number(pending.at || 0) > 30 * 60_000) return undefined;
+      // P846/P851: 保留枠組みから消費する（TTL 30分は置く側）。
+      const pending = pendingSlotService.consume<{ terms?: string[]; question?: string; depth?: number; at?: number }>('miki_pending_topic_question_v1');
+      if (!pending) return undefined;
       if (looksInterrogative(prompt)) return undefined;
       if (/^(?:おはよう|おやすみ|こんにちは|こんばんは|ただいま|行ってきます|いってきます|じゃあね|ありがとう|ごめん)/.test(prompt.trim())) return undefined;
       // P588: 依頼の形で来た発言は、短くても質問への答えではない
@@ -2845,7 +2843,7 @@ export class ConversationCoreService {
       // した！」と「オーストラリアって何？」が重なると、聞いて
       // いないように見える）。聞き返し自体は別の機会に回す。
       try {
-        const taught = JSON.parse(storageService.getItem('miki_recently_taught_v1') || 'null');
+        const taught = pendingSlotService.peek<{ term?: string; at?: number }>('miki_recently_taught_v1');
         if (taught && typeof taught.term === 'string' && Date.now() - Number(taught.at || 0) <= 60_000 && prompt.includes(taught.term)) return undefined;
       } catch { /* 補助判定 */ }
       // P579: プロジェクトとして知っている語（EFR 等）は、辞書に
@@ -2928,9 +2926,8 @@ export class ConversationCoreService {
    */
   private taughtTermAcknowledgement(prompt: string): string | undefined {
     try {
-      const raw = storageService.getItem('miki_recently_taught_v1');
-      if (!raw) return undefined;
-      const rec = JSON.parse(raw) as { term?: string; gloss?: string; at?: number };
+      const rec = pendingSlotService.peek<{ term?: string; gloss?: string; at?: number; ackAt?: number }>('miki_recently_taught_v1');
+      if (!rec) return undefined;
       if (!rec.term || !rec.gloss) return undefined;
       if (Date.now() - Number(rec.at || 0) > 10 * 60_000) return undefined;
       if (!prompt.includes(rec.term)) return undefined;
@@ -2945,7 +2942,7 @@ export class ConversationCoreService {
       // の判定に使うため。印があれば二度は返さない（P718の消費と
       // 同じ意味）。
       if ((rec as any).ackAt) return undefined;
-      try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ ...rec, ackAt: Date.now() })); } catch { /* 補助経路 */ }
+      try { pendingSlotService.set('miki_recently_taught_v1', { ...rec, ackAt: Date.now() }, 10 * 60000); } catch { /* 補助経路 */ }
       return `「${rec.term}」、覚えました！${rec.gloss}ということですね。教えてくれてありがとうございます。`;
     } catch { return undefined; }
   }
@@ -6922,7 +6919,7 @@ export class ConversationCoreService {
    */
   private notedOpinion(topic: string, basisType: string, basisText: string, reply: string): string {
     try {
-      storageService.setItem('miki_last_opinion_v1', JSON.stringify({ topic, basisType, basisText, at: Date.now() }));
+      pendingSlotService.set('miki_last_opinion_v1', { topic, basisType, basisText, at: Date.now() }, 30 * 60000);
     } catch { /* 記録は補助 */ }
     return reply;
   }
@@ -7109,7 +7106,7 @@ export class ConversationCoreService {
     if (!/(?:なんで|どうして)/.test(prompt)) return undefined;
     if (!/(?:そう思う|そうなの|そう言った|そうなる|理由|なんで[？?]?$|どうして[？?]?$)/.test(prompt.trim())) return undefined;
     let record: { topic?: string; basisType?: string; basisText?: string; at?: number } | undefined;
-    try { record = JSON.parse(storageService.getItem('miki_last_opinion_v1') || 'null') || undefined; } catch { record = undefined; }
+    try { record = pendingSlotService.peek<{ topic?: string; basisType?: string; basisText?: string; at?: number }>('miki_last_opinion_v1'); } catch { record = undefined; }
     if (!record || !record.at || Date.now() - record.at > 30 * 60 * 1000) return undefined;
     const head = record.topic && record.topic !== 'あなた' ? `「${record.topic}」の話ですね。` : 'さっきの話ですね。';
     if (record.basisType === 'knowledge' && record.basisText) {

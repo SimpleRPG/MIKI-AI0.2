@@ -5,6 +5,7 @@ import { associationGraphService } from '../../memory/services/associationGraphS
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
+import { pendingSlotService } from '../../memory/services/pendingSlotService';
 import { activationService } from '../../memory/services/activationService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { worldModelGraphService } from './worldModelGraphService';
@@ -127,7 +128,8 @@ class StateSnapshotExportService {
           shiritoriLastResult: read('miki_shiritori_last_result_v1'),
         };
       })(),
-      lastOpinion: (() => { try { return JSON.parse(storageService.getItem('miki_last_opinion_v1') || 'null'); } catch { return null; } })(),
+      // P851: 意見の控えは保留枠組み（封筒）に入ったので、中身を出す。
+      lastOpinion: (() => { try { return pendingSlotService.peek('miki_last_opinion_v1') ?? null; } catch { return null; } })(),
       // P699: 「覚えておいて」のメモも、状態の一部として見えるように。
       memos: (() => {
         try {

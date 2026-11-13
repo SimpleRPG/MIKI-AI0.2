@@ -14,6 +14,7 @@ import { surfaceGrammarAndStyleService } from './surfaceGrammarAndStyleService';
 import { surfaceVariationService } from './surfaceVariationService';
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
 import { storageService } from '../../../services/storageService';
+import { pendingSlotService } from '../../memory/services/pendingSlotService';
 
 const MULTI_AXIS_PERSONA_STORAGE_KEY = 'miki_multi_axis_persona_v1';
 
@@ -306,7 +307,7 @@ export class AnswerContentIrService {
       let taughtGloss = '';
       let taughtTerm = '';
       try {
-        const taught = JSON.parse(storageService.getItem('miki_recently_taught_v1') || 'null');
+        const taught = pendingSlotService.peek<{ term?: string; gloss?: string; at?: number }>('miki_recently_taught_v1');
         if (taught && Date.now() - Number(taught.at || 0) <= 60_000) {
           taughtTerm = String(taught.term || '');
           taughtGloss = String(taught.gloss || '');

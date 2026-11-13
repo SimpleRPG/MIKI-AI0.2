@@ -656,7 +656,7 @@ export class ConversationFactIntakeService {
       // P544: 教えた語は「相手が知っている言葉」として記録する。
       try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
       // P567: 直近に教わった記録（会話側の「覚えました」の材料）。
-      try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
+      try { pendingSlotService.set('miki_recently_taught_v1', { term, gloss, at: Date.now() }, 10 * 60000); } catch { /* 補助経路 */ }
       systemLogger.info('CHAT', `📖 [意味学習] ユーザーから「${term}」の意味を教わりました: ${gloss}`);
       // P727: 定型の教わり経路でも説明を分解する（P726と共通の分解）。
       try { this.decomposeTaughtGloss(term, gloss, `${term}は${gloss}`); } catch { /* 分解は補助経路 */ }
@@ -710,7 +710,7 @@ export class ConversationFactIntakeService {
       if (existing.find((e) => e.gloss)) continue;
       japaneseDictionaryService.addPersonal(term, { gloss: dictionaryGloss, semanticIds: ['learned:user-taught'] });
       try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
-      try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss: dictionaryGloss, at: Date.now() })); } catch { /* 補助経路 */ }
+      try { pendingSlotService.set('miki_recently_taught_v1', { term, gloss: dictionaryGloss, at: Date.now() }, 10 * 60000); } catch { /* 補助経路 */ }
       systemLogger.info('CHAT', `📖 [意味学習] ユーザーの説明文から「${term}」の意味を学びました: ${dictionaryGloss}`);
       // P726: 説明を分解して、さらに知識を増やす（下のメソッド）。
       try { this.decomposeTaughtGloss(term, gloss, String(fact.statement || `${term}は${gloss}`)); } catch { /* 分解は補助経路 */ }
@@ -857,7 +857,7 @@ export class ConversationFactIntakeService {
     if (existing.find((e) => e.gloss)) return;
     japaneseDictionaryService.addPersonal(term, { gloss, semanticIds: ['learned:user-taught'] });
     try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
-    try { storageService.setItem('miki_recently_taught_v1', JSON.stringify({ term, gloss, at: Date.now() })); } catch { /* 補助経路 */ }
+    try { pendingSlotService.set('miki_recently_taught_v1', { term, gloss, at: Date.now() }, 10 * 60000); } catch { /* 補助経路 */ }
     systemLogger.info('CHAT', `📖 [意味学習] 聞き返した「${term}」の意味を教わりました: ${gloss}`);
     // P727: 聞き返しへの答えの経路でも説明を分解する（P726と共通）。
     try { this.decomposeTaughtGloss(term, gloss, `${term}は${gloss}`); } catch { /* 分解は補助経路 */ }

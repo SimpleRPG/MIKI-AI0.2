@@ -21,6 +21,7 @@ const { worldModelGraphService} = await import('../src/miki/selfAwareness/servic
 const { claimDatabaseService} = await import('../src/miki/memory/services/claimDatabaseService');
 const { paragraphCompositionService} = await import('../src/miki/conversation/services/paragraphCompositionService');
 const { conversationCoreService} = await import('../src/miki/safety/services/conversationCoreService');
+const { pendingSlotService } = await import('../src/miki/memory/services/pendingSlotService');
 const { answerContentIrService} = await import('../src/miki/conversation/services/answerContentIrService');
 const { surfaceVariationGrowthService} = await import('../src/miki/conversation/services/surfaceVariationGrowthService');
 const { conversationFactIntakeService} = await import('../src/miki/conversation/services/conversationFactIntakeService');
@@ -450,10 +451,10 @@ const agree = await conversationCoreService.execute({ prompt: 'そうだね' } a
 check('P573 短い同意は相槌で受ける', !String((agree as any).replyText || '').includes('そうだの話'), String((agree as any).replyText || '').slice(0, 120));
 
 // ---- 話題質問への答えを答えとして受ける（P574） ----
-storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+pendingSlotService.set('miki_pending_topic_question_v1', { terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }, 30 * 60000);
 const topicAnswer = await conversationCoreService.execute({ prompt: '綿毛が取れるんだよ' } as any);
 check('P574 質問への短い答えは答えとして受ける', String((topicAnswer as any).replyText || '').includes('そっか') || String((topicAnswer as any).replyText || '').includes('なるほど'), String((topicAnswer as any).replyText || '').slice(0, 160));
-storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+pendingSlotService.set('miki_pending_topic_question_v1', { terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }, 30 * 60000);
 const notAnswer = await conversationCoreService.execute({ prompt: 'モコロンって何？' } as any);
 check('P574 質問で来たら答えとして扱わない', !String((notAnswer as any).replyText || '').includes('教えてくれてありがとう'), String((notAnswer as any).replyText || '').slice(0, 160));
 
@@ -504,10 +505,10 @@ check('P579 短い説明も意味として覚える', japaneseDictionaryService.
 const dictReply = await conversationCoreService.execute({ prompt: 'ツバメって何？' } as any);
 check('P579 教わった語の質問に辞書から答える', dictReply.replyText.includes('鳥'), dictReply.replyText.slice(0, 160));
 check('P579 知識の回答に定型末尾が付かない', !dictReply.replyText.includes('誠心誠意') && !dictReply.replyText.includes('理由は'), dictReply.replyText.slice(0, 160));
-storageService.setItem('miki_unknown_pending_v1', JSON.stringify({ term: 'ホニャララ2', askedAt: Date.now() }));
+pendingSlotService.set('miki_unknown_pending_v1', { term: 'ホニャララ2' }, 30 * 60000);
 conversationFactIntakeService.intakeFromUserText('ホニャララ2かわいいよね', []);
 check('P579 感想は意味として取り込まない', !japaneseDictionaryService.has('ホニャララ2'));
-storageService.setItem('miki_unknown_pending_v1', JSON.stringify({ term: 'ホニャララ3', askedAt: Date.now() }));
+pendingSlotService.set('miki_unknown_pending_v1', { term: 'ホニャララ3' }, 30 * 60000);
 conversationFactIntakeService.intakeFromUserText('ホニャララ3は山に住む鳥だよ', []);
 check('P579 聞き返しへの説明は取り込む', japaneseDictionaryService.has('ホニャララ3'));
 const fragReply = await conversationCoreService.execute({ prompt: '猫に触りたいな' } as any);
@@ -567,10 +568,10 @@ const teachReply = await conversationCoreService.execute({ prompt: 'モコロン
 check('P585 「教えて」に知識で答える', teachReply.replyText.includes('モコロン') && (teachReply.replyText.includes('パル') || teachReply.replyText.includes('綿毛')), teachReply.replyText.slice(0, 160));
 
 // ---- 答えへの続きの質問は1段まで（P586） ----
-storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+pendingSlotService.set('miki_pending_topic_question_v1', { terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }, 30 * 60000);
 const followAnswer = await conversationCoreService.execute({ prompt: 'モコロンは綿毛が取れる、羊みたいなパルだよ' } as any);
 check('P586 答えには受け止め＋続きの質問が付く', (followAnswer.replyText.includes('そっか') || followAnswer.replyText.includes('なるほど')) && followAnswer.replyText.includes('？') && !followAnswer.replyText.includes('いつごろから知っていますか'), followAnswer.replyText.slice(0, 200));
-const followPending = JSON.parse(storageService.getItem('miki_pending_topic_question_v1') || 'null');
+const followPending = pendingSlotService.peek<any>('miki_pending_topic_question_v1');
 check('P586 続きの質問は深さ1の保留として残る', Boolean(followPending) && followPending.depth === 1, JSON.stringify(followPending).slice(0, 160));
 check('P586 深さ1では続きを作らない', (conversationCoreService as any).buildFollowUpQuestion({ terms: ['モコロン'], question: 'モコロンの綿毛は、どう使いますか？', depth: 1 }, 'モコロンは綿毛が取れる、羊みたいなパルだよ', ['モコロン', '綿毛']) === undefined);
 check('P586 短い答えには続きを聞かない', (conversationCoreService as any).buildFollowUpQuestion({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', depth: 0 }, 'うん', ['うん']) === undefined);
@@ -594,7 +595,7 @@ check('P588 「待ってて」が断片の反響にならない', !waitReply.rep
 personaProfileService.switchProfile('persona-bibi');
 const bibiSing = await conversationCoreService.execute({ prompt: '歌って' } as any);
 check('P589 ビービーの依頼の引き受けはタメ口', (bibiSing.replyText.includes('まかせて') || bibiSing.replyText.includes('やってみるね') || bibiSing.replyText.includes('いいよ')) && !bibiSing.replyText.includes('分かりました'), bibiSing.replyText.slice(0, 120));
-storageService.setItem('miki_pending_topic_question_v1', JSON.stringify({ terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }));
+pendingSlotService.set('miki_pending_topic_question_v1', { terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }, 30 * 60000);
 const bibiAnswerAck = await conversationCoreService.execute({ prompt: 'モコロンは綿毛が取れる、羊みたいなパルだよ' } as any);
 check('P589 ビービーの答えの受け止めはタメ口', (bibiAnswerAck.replyText.includes('ありがと') || bibiAnswerAck.replyText.includes('なんだ')) && !bibiAnswerAck.replyText.includes('そういうことなんですね'), bibiAnswerAck.replyText.slice(0, 160));
 personaProfileService.switchProfile('persona-default');

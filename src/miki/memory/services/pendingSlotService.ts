@@ -30,7 +30,12 @@ class PendingSlotService {
       const raw = storageService.getItem(key);
       if (!raw) return undefined;
       const env = JSON.parse(raw) as Envelope<T>;
-      if (!env || typeof env.at !== 'number' || typeof env.ttl !== 'number' || !('v' in env)) return undefined;
+      if (!env || typeof env.at !== 'number' || typeof env.ttl !== 'number' || !('v' in env)) {
+        // P851: 封筒でない残骸（移行前の保存形など）は、居座って
+        // 後続を塞がないよう読みのついでに掃除する。
+        try { storageService.removeItem(key); } catch { /* ついで掃除 */ }
+        return undefined;
+      }
       if (now - env.at > env.ttl) {
         try { storageService.removeItem(key); } catch { /* ついで掃除 */ }
         return undefined;
