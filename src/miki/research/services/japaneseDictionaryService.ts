@@ -126,7 +126,14 @@ class JapaneseDictionaryService {
   public addPersonal(surface: string, options: Partial<Omit<JapaneseDictionaryEntry, 'surface'|'normalized'|'source'|'priority'>> = {}): JapaneseDictionaryEntry | undefined {
     const clean = surface.trim();
     if (!clean) return undefined;
-    const entry: JapaneseDictionaryEntry = { surface: clean, normalized: normalize(clean), lemma: options.lemma || clean, reading: options.reading, pos: options.pos || 'UNKNOWN', semanticIds: options.semanticIds, gloss: options.gloss, aliases: options.aliases, source: 'PERSONAL', priority: 100 };
+    // P862: 説明文の入口整形。「Xは、〜」の形で教わると、説明の
+    // 先頭に読点が残ったまま保存され、受け答えや引用のたびに
+    // 「！、草原に…」「は「、草原に…」」と崩れて出ていた。
+    // 先頭の句読点・末尾の句点だけを落とす（中身は触らない）。
+    const cleanGloss = typeof options.gloss === 'string'
+      ? options.gloss.trim().replace(/^[、。，・：:；;！!？?「『（(\s]+/u, '').replace(/。\s*$/u, '').trim() || undefined
+      : options.gloss;
+    const entry: JapaneseDictionaryEntry = { surface: clean, normalized: normalize(clean), lemma: options.lemma || clean, reading: options.reading, pos: options.pos || 'UNKNOWN', semanticIds: options.semanticIds, gloss: cleanGloss, aliases: options.aliases, source: 'PERSONAL', priority: 100 };
     // P497: 再登録は「最近使った」として末尾へ移す。保存は末尾
     // 5000件の切り出しのため、初回登録順のままだと、よく使う語が
     // 古い一回きりの語に押し出されて再起動で消える。

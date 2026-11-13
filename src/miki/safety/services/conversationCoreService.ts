@@ -2973,11 +2973,15 @@ export class ConversationCoreService {
       if (!rec.term || !rec.gloss) return undefined;
       if (Date.now() - Number(rec.at || 0) > 10 * 60_000) return undefined;
       if (!prompt.includes(rec.term)) return undefined;
+      // P862: 記録側の説明に先頭の読点が残っていることがある
+      // （「Xは、〜」で教わった形）。読み側でも整えてから使う。
+      const gloss = String(rec.gloss).replace(/^[、。，・：:；;！!？?\s]+/u, '').replace(/。\s*$/u, '');
+      if (!gloss) return undefined;
       // P718: 「覚えました」を返すのは、教えている最中の発話だけ。
       // 説明（gloss）の冒頭が発話に含まれている時だけにし、言及した
       // だけの発話（「昨日クオッカの動画見たよ」）では繰り返さない。
       // 返したら記録は消費する（同じ教え直しには新しい記録が要る）。
-      const glossHead = rec.gloss.slice(0, Math.min(6, rec.gloss.length));
+      const glossHead = gloss.slice(0, Math.min(6, gloss.length));
       if (!prompt.includes(glossHead)) return undefined;
       // P721: 記録は消さず「返答済み」の印だけ付ける。同じターンの
       // 後段（知らない語の聞き返しの抑制）が「いま教わったばかり」
@@ -2985,7 +2989,7 @@ export class ConversationCoreService {
       // 同じ意味）。
       if ((rec as any).ackAt) return undefined;
       try { pendingSlotService.set('miki_recently_taught_v1', { ...rec, ackAt: Date.now() }, 10 * 60000); } catch { /* 補助経路 */ }
-      return `「${rec.term}」、覚えました！${rec.gloss}ということですね。教えてくれてありがとうございます。`;
+      return `「${rec.term}」、覚えました！${gloss}ということですね。教えてくれてありがとうございます。`;
     } catch { return undefined; }
   }
 

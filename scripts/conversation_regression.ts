@@ -4382,6 +4382,18 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P861 片方を知らない類似も同じ', o.r.replyText.includes('「ヒカリモドキ」のことは、まだ知らないので') && o.r.replyText.includes('似ているかは分からない'), o.r.replyText.slice(0, 160));
 }
 
+
+// ---- 教わった語の説明文の先頭の読点を落とす（P862） ----
+{
+  const intake = conversationFactIntakeService.intakeFromUserText('ヨルヒカリモドキは、夜に光る虫だよ', []);
+  const r: any = await conversationCoreService.execute({ prompt: 'ヨルヒカリモドキは、夜に光る虫だよ', memories: intake.updatedMemories, recentMessages: [] } as any);
+  check('P862 受け答えに読点が残らない', !r.replyText.includes('！、') && r.replyText.includes('夜に光る虫ということですね'), r.replyText.slice(0, 140));
+  const gloss862 = japaneseDictionaryService.lookup('ヨルヒカリモドキ').map((e: any) => e.gloss).filter(Boolean)[0];
+  check('P862 保存される説明も clean', gloss862 === '夜に光る虫', String(gloss862));
+  const fact862 = intake.updatedMemories.find((m: any) => m.source === 'user_statement' && m.factValue);
+  check('P862 事実の値も clean', fact862 && !String(fact862.factValue).startsWith('、'), String(fact862?.factValue));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

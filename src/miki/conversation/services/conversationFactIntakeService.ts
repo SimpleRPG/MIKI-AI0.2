@@ -577,6 +577,9 @@ export class ConversationFactIntakeService {
       }
       const fact = extractFromSentence(sentence, contextEntity);
       if (fact) {
+        // P862: 「Xは、〜」の形では値の先頭に読点が残る。値として
+        // 引用されるたびに「「、〜」」と崩れるため、入口で落とす。
+        if (fact.value) fact.value = String(fact.value).replace(/^[、。，・\s]+/u, '');
         // P546: 仮定・引用・伝聞・冗談の文から拾えた形でも、本人の
         // 確定した事実としては取り込まない（共有層の意味チェック）。
         if (!intakeMeaningGuardService.check(sentence).ok) continue;
