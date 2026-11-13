@@ -27,6 +27,7 @@ import { conversationUserFactRecallService, looksInterrogative, UserFactIntakeSu
 import { conversationStrategyService } from '../../strategy/services/conversationStrategyService';
 import { adaptExplanationDetailLevel } from '../../conversation/services/conversationStateService';
 import { storageService } from '../../../services/storageService';
+import { pendingSlotService } from '../../memory/services/pendingSlotService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { shiritoriService } from '../../conversation/services/shiritoriService';
@@ -3694,7 +3695,8 @@ export class ConversationCoreService {
       if (names.length === 0) return `今知っている中では、${trait}ものはいないです。`;
       const text = `${trait}${m[2]}は、${names.map((n) => `「${n}」`).join('と')}がいます。`;
       // P838: 直後の一覧への「他には？」に備えて控えておく。
-      try { storageService.setItem('miki_last_list_answer_v1', JSON.stringify({ prompt, text, at: Date.now() })); } catch { /* 補助経路 */ }
+      // P846: 控えは共通の保留枠組みへ（TTL 10分、消費せず覗く）。
+      pendingSlotService.set('miki_last_list_answer_v1', { prompt, text }, 10 * 60000);
       return text;
     } catch { return undefined; }
   }
@@ -3708,10 +3710,8 @@ export class ConversationCoreService {
     const isCount = /^(?:全部で)?(?:何種類|何匹|何個|いくつ)(?:いる|ある)?[？?。]?$/.test(p);
     if (!isOther && !isCount) return undefined;
     try {
-      const raw = storageService.getItem('miki_last_list_answer_v1');
-      if (!raw) return undefined;
-      const stash = JSON.parse(raw);
-      if (!stash || Date.now() - Number(stash.at || 0) > 10 * 60000) return undefined;
+      const stash = pendingSlotService.peek<{ prompt?: string; text?: string }>('miki_last_list_answer_v1');
+      if (!stash) return undefined;
       const fresh = this.taughtTraitListAnswer(String(stash.prompt || ''));
       if (!fresh) return undefined;
       if (isCount) {
@@ -4822,11 +4822,9 @@ export class ConversationCoreService {
     const isDayCorrection = /^(?:今日|明日|あした|明後日|明々後日|[日月火水木金土]曜日)(?:じゃなくて|じゃなく|ではなく)/.test(prompt);
     if (!isMoveForm && !isDayCorrection) return undefined;
     try {
-      const raw = storageService.getItem('miki_recently_moved_plan_v1');
-      if (!raw) return undefined;
-      const mk = JSON.parse(raw);
-      if (!mk || Date.now() - Number(mk.at || 0) > 60000) return undefined;
-      storageService.removeItem('miki_recently_moved_plan_v1');
+      // P846: 保留枠組みから消費して受ける（期限切れは無効）。
+      const mk = pendingSlotService.consume<{ from?: string; to?: string; moved?: number }>('miki_recently_moved_plan_v1');
+      if (!mk) return undefined;
       if (Number(mk.moved || 0) > 0) {
         return mk.from
           ? `分かりました、${mk.from}の予定を${mk.to}にずらしておきました。`

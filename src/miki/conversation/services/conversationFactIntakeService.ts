@@ -14,6 +14,7 @@ import { knowledgeGapService } from '../../unknown/services/knowledgeGapService'
 import { utteranceFeatureService } from '../../memory/services/utteranceFeatureService';
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
+import { pendingSlotService } from '../../memory/services/pendingSlotService';
 
 /**
  * P452: 会話の理解の土台 ― ユーザー発言からの事実取り込み。
@@ -1108,7 +1109,8 @@ export class ConversationFactIntakeService {
         }
       }
       if (moved > 0) storageService.setItem(key, JSON.stringify(plans.slice(-20)));
-      storageService.setItem('miki_recently_moved_plan_v1', JSON.stringify({ from: fromWhen, to: toLabel, moved, at: Date.now() }));
+      // P846: 控えは共通の保留枠組みへ（TTL 60秒、消費は core 側）。
+      pendingSlotService.set('miki_recently_moved_plan_v1', { from: fromWhen, to: toLabel, moved }, 60000);
     } catch { /* 予定のずらしは補助経路 */ }
   }
 

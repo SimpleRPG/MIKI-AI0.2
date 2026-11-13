@@ -4077,6 +4077,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P845 活性化は時間で冷める', later845 < score845, `${score845} -> ${later845}`);
 }
 
+// ---- P846: 保留枠組みの共通土台（置く・覗く・消費する・期限） ----
+{
+  const { pendingSlotService } = await import('../src/miki/memory/services/pendingSlotService');
+  const t846 = 1_700_000_000_000;
+  pendingSlotService.set('miki_probe_slot_846', { a: 1 }, 60000, t846);
+  check('P846 控えを覗ける（消費しない）', pendingSlotService.peek<{ a: number }>('miki_probe_slot_846', t846 + 1000)?.a === 1
+    && pendingSlotService.peek<{ a: number }>('miki_probe_slot_846', t846 + 2000)?.a === 1, '');
+  check('P846 期限切れは無効', pendingSlotService.peek('miki_probe_slot_846', t846 + 61000) === undefined, '');
+  pendingSlotService.set('miki_probe_slot_846', { a: 2 }, 60000, t846);
+  check('P846 消費は1回だけ', pendingSlotService.consume<{ a: number }>('miki_probe_slot_846', t846 + 1000)?.a === 2
+    && pendingSlotService.consume('miki_probe_slot_846', t846 + 1000) === undefined, '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
