@@ -249,6 +249,7 @@ export class ConversationCoreService {
       imageObservationText
         ? [{ turnId: `image-observation-${params.messageId || 'current'}`, text: imageObservationText, entities: [] }]
         : [],
+      recentMessages,
     );
     const dialogueAct = interpretation.dialogueAct;
     // P707: 話題質問の保留は「見たら必ず消す」のが原則だが、消費が
@@ -1156,7 +1157,7 @@ export class ConversationCoreService {
     const compiled = requestTypeCompilerService.compile(prompt, nextState);
     const implementationSelection = implementationSelectionService.select(compiled);
     stages.request = Math.round(performance.now() - t);
-    nextState.topLevelGoal=compiled.goal; nextState.lastPrompt=prompt; nextState.lastDialogueAct=dialogueAct; nextState.lastTopic=nextState.currentTopic; const continuousGoalState=updateConversationGoalProgress(nextState,prompt,state); const conversationConsistency=evaluateConversationConsistency(prompt,continuousGoalState,state,params.messageId); nextState=conversationConsistency.repairedState; nextState.conversationCompleteness=assessConversationCompleteness(nextState); nextState.knowledgeState=classifyConversationKnowledgeState(prompt,nextState); nextState.temporalContext=buildConversationTemporalContext(prompt,nextState,state); if(conversationConsistency.turnDependency && /(?:違う|それじゃない|ではなく|じゃない)/i.test(prompt)) nextState.correctionScope=inferConversationCorrectionScope(prompt).scope; if(previousTurnEvaluation.conversationOutcome) nextState.conversationOutcome=previousTurnEvaluation.conversationOutcome;
+    nextState.topLevelGoal=compiled.goal; nextState.lastPrompt=prompt; nextState.lastDialogueAct=dialogueAct; nextState.lastTopic=nextState.currentTopic; const continuousGoalState=updateConversationGoalProgress(nextState,prompt,state); const conversationConsistency=evaluateConversationConsistency(prompt,continuousGoalState,state,params.messageId,recentMessages); nextState=conversationConsistency.repairedState; nextState.conversationCompleteness=assessConversationCompleteness(nextState); nextState.knowledgeState=classifyConversationKnowledgeState(prompt,nextState,recentMessages); nextState.temporalContext=buildConversationTemporalContext(prompt,nextState,state); if(conversationConsistency.turnDependency && /(?:違う|それじゃない|ではなく|じゃない)/i.test(prompt)) nextState.correctionScope=inferConversationCorrectionScope(prompt).scope; if(previousTurnEvaluation.conversationOutcome) nextState.conversationOutcome=previousTurnEvaluation.conversationOutcome;
 
     // 2.5 決定論的能力・計画パイプライン。
     // 検証済み能力パッチは「保存された教材」ではなく、現在の要求に
@@ -2461,7 +2462,7 @@ export class ConversationCoreService {
         break;
       }
     } catch { /* 説明添えは補助経路 */ }
-    const temporalGuard = verifyConversationEntityTimeStateConsistency(prompt, surface.surfaceText, nextState);
+    const temporalGuard = verifyConversationEntityTimeStateConsistency(prompt, surface.surfaceText, nextState, undefined, recentMessages);
     usedComponents.push(`conversation.temporal_state_consistency:${temporalGuard.passed ? 'PASS' : 'BLOCK'}`);
     if (!temporalGuard.passed) {
       status = 'UNRESOLVED';

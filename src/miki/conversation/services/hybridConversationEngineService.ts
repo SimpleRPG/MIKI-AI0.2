@@ -28,11 +28,11 @@ export interface ConversationInterpretation {
 
 /** 第92/94章: 会話を意味処理と表層生成へ分解し、既知領域ではLLMを呼ばない。 */
 export class HybridConversationEngineService {
-  interpret(input: string, state: ConversationState, semanticHistory: ConversationSemanticContext[] = []): ConversationInterpretation {
+  interpret(input: string, state: ConversationState, semanticHistory: ConversationSemanticContext[] = [], recentMessages: Array<any> = []): ConversationInterpretation {
     const text = input.trim();
     const dialogueAct = classifyDialogueAct(text);
     const stage = inferConversationStage(text, state.stage);
-    const anaphora = resolveAnaphora(text, state);
+    const anaphora = resolveAnaphora(text, state, recentMessages);
     const analysis = conversationComponentPipelineService.analyzeSync(text).analysis;
     let skeleton: AnswerSkeletonType = 'GENERAL_ANSWER';
     if (dialogueAct === 'CORRECTION') skeleton = 'CORRECTION';

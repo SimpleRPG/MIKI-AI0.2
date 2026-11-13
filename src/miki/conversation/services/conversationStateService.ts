@@ -522,8 +522,8 @@ export function inferConversationCorrectionScope(userPrompt:string):{scope:impor
  if (/(?:この会話|このチャット|ここでは)/i.test(text)) return {scope:'CONVERSATION',confidence:'medium'};
  return {scope:'TURN_ONLY',confidence:'medium'};
 }
-export function classifyConversationKnowledgeState(userPrompt:string,state:ConversationState):import('../../../types').ConversationKnowledgeState{
- const text=String(userPrompt||'').trim(); const anaphora=resolveAnaphora(text,state); const hasReference=/(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(text);
+export function classifyConversationKnowledgeState(userPrompt:string,state:ConversationState,recentMessages:Array<any>=[]):import('../../../types').ConversationKnowledgeState{
+ const text=String(userPrompt||'').trim(); const anaphora=resolveAnaphora(text,state,recentMessages); const hasReference=/(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(text);
  if(hasReference&&(anaphora.confidence==='ambiguous'||anaphora.confidence==='unresolved')) return 'MEANING_UNCLEAR';
  switch(state.unresolvedState){case 'CAPABILITY_MISSING':return 'UNDERSTOOD_CAPABILITY_MISSING';case 'PERMISSION_DENIED':return 'UNDERSTOOD_PERMISSION_DENIED';case 'EXECUTION_FAILED':return 'EXECUTED_UNVERIFIED';case 'INSUFFICIENT_EVIDENCE':case 'UNKNOWN':case 'WAITING_EXTERNAL':return 'UNDERSTOOD_KNOWLEDGE_MISSING';case 'PENDING_USER_INPUT':return 'MEANING_UNCLEAR';}
  if(state.lastResultStatus==='RESOLVED'&&state.lastFalsificationPassed===true) return 'UNDERSTOOD_AND_KNOWN';
@@ -661,6 +661,7 @@ export function verifyConversationEntityTimeStateConsistency(
   answerText: string,
   state: ConversationState,
   nowMs = Date.now(),
+  recentMessages: Array<any> = [],
 ): import('../../../types').ConversationTemporalConsistencyReport {
   const promptNorm = normalizeConversationTemporalReferences(userPrompt, nowMs);
   const answerNorm = normalizeConversationTemporalReferences(answerText, nowMs);
@@ -700,7 +701,7 @@ export function verifyConversationEntityTimeStateConsistency(
   // 照応の曖昧さだけで回答全体を差し止めない（「それは笑う」のような
   // 雑談の照応は、時間・状態の主張とは無関係）。アンカーがある場合に
   // 限り、参照対象の曖昧さを衝突として扱う。
-  const anaphora = resolveAnaphora(userPrompt, state);
+  const anaphora = resolveAnaphora(userPrompt, state, recentMessages);
   const promptHasAnaphora = /(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(userPrompt);
   const hasTemporalOrStateAnchors = promptDates.length > 0 || promptStates.length > 0 || answerDates.length > 0 || answerStates.length > 0;
   if (promptHasAnaphora && anaphora.confidence === 'ambiguous' && hasTemporalOrStateAnchors) {
@@ -720,8 +721,8 @@ export function verifyConversationEntityTimeStateConsistency(
 }
 
 export interface ConversationConsistencyReport{needsRepair:boolean;unresolvedState?:import('../../../types').ConversationUnresolvedState;reason?:string;turnDependency:import('../../../types').ConversationTurnDependency;repairedState:ConversationState;}
-export function evaluateConversationConsistency(userPrompt:string,state:ConversationState,previousState:ConversationState|null,taskId?:string):ConversationConsistencyReport{
- const text=String(userPrompt||'').trim(); const anaphora=resolveAnaphora(text,state); const correction=/(?:違う|それじゃない|ではなく|じゃない|間違|誤解|勘違い)/i.test(text); const referenceMentioned=/(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(text); const clarificationNeeded=anaphora.confidence==='ambiguous'||(anaphora.confidence==='unresolved'&&referenceMentioned);
+export function evaluateConversationConsistency(userPrompt:string,state:ConversationState,previousState:ConversationState|null,taskId?:string,recentMessages:Array<any>=[]):ConversationConsistencyReport{
+ const text=String(userPrompt||'').trim(); const anaphora=resolveAnaphora(text,state,recentMessages); const correction=/(?:違う|それじゃない|ではなく|じゃない|間違|誤解|勘違い)/i.test(text); const referenceMentioned=/(?:これ|それ|あれ|さっき|前の|どっち|どちら)/.test(text); const clarificationNeeded=anaphora.confidence==='ambiguous'||(anaphora.confidence==='unresolved'&&referenceMentioned);
  const unresolvedState: any=state.lastResultStatus==='NEEDS_CONFIRMATION'?'PENDING_USER_INPUT':state.lastResultStatus==='UNRESOLVED'?'UNKNOWN':undefined;
  const dependency={turnKey:`TURN-${canonicalSha256({prompt:text,goal:state.goalProgress?.activeGoalId||previousState?.goalProgress?.activeGoalId||'',revision:state.goalProgress?.revision||0}).slice(0,20)}`,dependsOnGoalId:state.goalProgress?.activeGoalId||previousState?.goalProgress?.activeGoalId,dependsOnEntity:anaphora.resolved||state.currentTopic||undefined,dependsOnTaskId:taskId,dependsOnClaimIds:state.lastCandidateClaimId?[state.lastCandidateClaimId]:[],dependsOnMemoryIds:[],referenceConfidence:anaphora.confidence};
  const needsRepair=correction||clarificationNeeded; const reason=correction?'USER_CORRECTION_REQUIRES_DIALOGUE_REPAIR':clarificationNeeded?'REFERENCE_AMBIGUOUS_REQUIRES_RESOLUTION':undefined;

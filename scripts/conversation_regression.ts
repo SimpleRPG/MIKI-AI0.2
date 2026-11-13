@@ -4251,6 +4251,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P854 再学習ギャップが対象を指している', gaps854.length >= 1 && gaps854.some((g: any) => g.type === 'UNKNOWN_RELATION'), JSON.stringify(gaps854.map((g: any) => g.type)));
 }
 
+
+// ---- 照応解決へ直近メッセージを通す（P855） ----
+{
+  const { hybridConversationEngineService } = await import('../src/miki/conversation/services/hybridConversationEngineService');
+  const { classifyConversationKnowledgeState } = await import('../src/miki/conversation/services/conversationStateService');
+  const state855: any = { conversationId: 'check855', stage: 'GREETING', recentEntities: [], currentTopic: '', lastTopic: '' };
+  const msgs855 = [{ role: 'user', content: 'クオッカは大きいよ' }];
+  const noMsg = hybridConversationEngineService.interpret('それは大きい？', state855, []);
+  check('P855 メッセージ無しでは照応は解けない', noMsg.anaphora.resolved === null, JSON.stringify(noMsg.anaphora).slice(0, 120));
+  const withMsg = hybridConversationEngineService.interpret('それは大きい？', state855, [], msgs855);
+  check('P855 直近メッセージから照応が解ける', withMsg.anaphora.resolved === 'クオッカ' && withMsg.anaphora.confidence === 'unique', JSON.stringify(withMsg.anaphora).slice(0, 120));
+  check('P855 知識状態の分類もメッセージで変わる', classifyConversationKnowledgeState('それは大きい？', state855) === 'MEANING_UNCLEAR' && classifyConversationKnowledgeState('それは大きい？', state855, msgs855) !== 'MEANING_UNCLEAR', classifyConversationKnowledgeState('それは大きい？', state855, msgs855));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
