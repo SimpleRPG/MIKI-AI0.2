@@ -4529,6 +4529,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P869 2日半は60時間', d4.replyText.includes('60時間'), d4.replyText.slice(0, 120));
 }
 
+
+// ---- ずらした日付の質問は今日の日付に化けない（P870） ----
+{
+  const run870 = async (t: string) => conversationCoreService.execute({ prompt: t } as any) as any;
+  const fmt = (d: Date) => `${d.getMonth() + 1}月${d.getDate()}日`;
+  const plus21 = new Date(); plus21.setDate(plus21.getDate() + 21);
+  const w3 = await run870('3週間後は何月何日？');
+  check('P870 3週間後の日付を答える', w3.replyText.includes(fmt(plus21)) && !w3.replyText.startsWith('今日は'), w3.replyText.slice(0, 120));
+  const minus100 = new Date(); minus100.setDate(minus100.getDate() - 100);
+  const b100 = await run870('100日前は何月何日？');
+  check('P870 100日前の日付を答える', b100.replyText.includes(fmt(minus100)) && b100.replyText.includes('でした'), b100.replyText.slice(0, 120));
+  const today870 = await run870('今日は何月何日？');
+  check('P870 素の今日の日付は従来どおり', today870.replyText.includes(fmt(new Date())), today870.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

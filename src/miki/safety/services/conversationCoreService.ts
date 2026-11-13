@@ -3147,6 +3147,26 @@ export class ConversationCoreService {
       else d.setMonth(d.getMonth() + sign * n);
       return `今日から${n}${unit}${earlyOffset[3]}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`;
     }
+    // P675: N日後・N週間後・Nか月後（と前）の日付も計算して答える。
+    // P863: 素の「何曜日」分岐より前に置く（「3日後は何曜日？」に
+    // 今日の曜日を返していた）。
+    // P870: 素の「何月何日」分岐よりも前に動かした。「3週間後は
+    // 何月何日？」「100日前は何月何日？」が「今日は〜」に化けて
+    // いた（「今日から」と言った時だけ先行分岐が効いていた）。
+    const offsetMatch = prompt.match(/(\d+)\s*(日|週間|か月|ヶ月|ヵ月)(後|前)/);
+    if (offsetMatch && /(?:何日|いつ|曜日|[？?])/.test(prompt)) {
+      const n = Number(offsetMatch[1]);
+      const unit = offsetMatch[2];
+      const sign = offsetMatch[3] === '後' ? 1 : -1;
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (unit === '日') d.setDate(d.getDate() + sign * n);
+      else if (unit === '週間') d.setDate(d.getDate() + sign * n * 7);
+      else d.setMonth(d.getMonth() + sign * n);
+      const label = `${n}${unit}${offsetMatch[3]}`;
+      return sign > 0
+        ? `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`
+        : `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）でした。`;
+    }
     if (/今日の日付|何月何日/.test(prompt)) {
       return `今日は${now.getMonth() + 1}月${now.getDate()}日です。`;
     }
@@ -3173,24 +3193,6 @@ export class ConversationCoreService {
       const tm = Number(dateWeekday[1]); const td = Number(dateWeekday[2]);
       const target = new Date(now.getFullYear(), tm - 1, td);
       return `${tm}月${td}日は${weekdays[target.getDay()]}曜日です。`;
-    }
-    // P863: N日後の曜日は、先にずらした日付で答える。素の
-    // 「何曜日」分岐が手前にあり、「3日後は何曜日？」に今日の
-    // 曜日を返していた。オフセット分岐はここ（素の分岐の前）。
-    // P675: N日後・N週間後・Nか月後（と前）の日付も計算して答える。
-    const offsetMatch = prompt.match(/(\d+)\s*(日|週間|か月|ヶ月|ヵ月)(後|前)/);
-    if (offsetMatch && /(?:何日|いつ|曜日|[？?])/.test(prompt)) {
-      const n = Number(offsetMatch[1]);
-      const unit = offsetMatch[2];
-      const sign = offsetMatch[3] === '後' ? 1 : -1;
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      if (unit === '日') d.setDate(d.getDate() + sign * n);
-      else if (unit === '週間') d.setDate(d.getDate() + sign * n * 7);
-      else d.setMonth(d.getMonth() + sign * n);
-      const label = `${n}${unit}${offsetMatch[3]}`;
-      return sign > 0
-        ? `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）です。`
-        : `${label}は${d.getMonth() + 1}月${d.getDate()}日（${weekdays[d.getDay()]}曜日）でした。`;
     }
     if (/何曜日/.test(prompt)) {
       return `今日は${weekdays[now.getDay()]}曜日です。`;
