@@ -4544,6 +4544,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P870 素の今日の日付は従来どおり', today870.replyText.includes(fmt(new Date())), today870.replyText.slice(0, 120));
 }
 
+
+// ---- 単位つきの量の比較（P871） ----
+{
+  const run871 = async (t: string) => conversationCoreService.execute({ prompt: t } as any) as any;
+  const q1 = await run871('50センチと1メートル、どっちが長い？');
+  check('P871 単位をまたいで比べる', q1.replyText.includes('1メートルの方が長い'), q1.replyText.slice(0, 120));
+  const q2 = await run871('3キロと3000グラム、どっちが重い？');
+  check('P871 等しい量は同じと答える', q2.replyText.includes('同じ'), q2.replyText.slice(0, 120));
+  const q3 = await run871('1時間と90分、どっちが長い？');
+  check('P871 時間の単位も比べる', q3.replyText.includes('90分の方が長い'), q3.replyText.slice(0, 120));
+  const q4 = await run871('500円と1000円、どっちが安い？');
+  check('P871 同じ単位で安い方を答える', q4.replyText.includes('500円の方が安い'), q4.replyText.slice(0, 120));
+  const q5 = await run871('5と3、どっちが大きい？');
+  check('P871 読点つきの素の比較も答える', q5.replyText.includes('5の方が大きい'), q5.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

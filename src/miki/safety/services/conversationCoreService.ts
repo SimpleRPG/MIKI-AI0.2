@@ -3498,7 +3498,29 @@ export class ConversationCoreService {
    */
   private comparisonAndCountAnswer(prompt: string): string | undefined {
     const p = String(prompt || '').trim();
-    const cmp = p.match(/^(\d+(?:\.\d+)?)\s*と\s*(\d+(?:\.\d+)?)\s*(?:は|って)?\s*どっちが\s*(大きい|多い|小さい|少ない)/);
+    // P871: 単位つきの量どうしの比較（「50センチと1メートル、
+    // どっちが長い？」）。従来は単位をまたぐ換算ができず、対象
+    // 特定の聞き返しになっていた。同じ単位ならそのまま、違う
+    // 単位なら換算して比べる（キロは長さ・重さ両用に試す）。
+    const qc = p.match(/^(\d+(?:\.\d+)?)\s*([^\d\sと、,]{1,6})と\s*(\d+(?:\.\d+)?)\s*([^\d\sと、,]{1,6})\s*(?:、|,)?\s*(?:どっち|どちら)が\s*(大きい|小さい|長い|短い|重い|軽い|多い|少ない|高い|安い|早い|遅い)/);
+    if (qc) {
+      const v1 = Number(qc[1]); const u1 = qc[2]; const v2 = Number(qc[3]); const u2 = qc[4]; const adj = qc[5];
+      let b: number | null = null;
+      if (u1 === u2) b = v2;
+      else {
+        b = unitConversionService.convert(v2, u2, u1);
+        if (b === null && u2 === 'キロ') b = unitConversionService.convert(v2, 'キログラム', u1) ?? unitConversionService.convert(v2, 'キロメートル', u1);
+        if (b === null && u1 === 'キロ') b = unitConversionService.convert(v2, u2, 'キログラム') ?? unitConversionService.convert(v2, u2, 'キロメートル');
+      }
+      if (b !== null) {
+        const label1 = `${qc[1]}${u1}`; const label2 = `${qc[3]}${u2}`;
+        if (Math.abs(v1 - b) < 1e-9) return `${label1}と${label2}は同じです。`;
+        const largerWins = ['大きい', '長い', '重い', '多い', '高い', '早い'].includes(adj);
+        const winner = largerWins ? (v1 > b ? label1 : label2) : (v1 < b ? label1 : label2);
+        return `${winner}の方が${adj}です。`;
+      }
+    }
+    const cmp = p.match(/^(\d+(?:\.\d+)?)\s*と\s*(\d+(?:\.\d+)?)\s*(?:、|,)?\s*(?:は|って)?\s*どっちが\s*(大きい|多い|小さい|少ない)/);
     if (cmp) {
       const a = Number(cmp[1]);
       const b = Number(cmp[2]);
