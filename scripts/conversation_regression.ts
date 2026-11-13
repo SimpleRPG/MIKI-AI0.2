@@ -4515,6 +4515,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P868 ビービーではカレンダーの答えも口調が寄る', rb.replyText.includes('だよ') && !rb.replyText.includes('日です'), rb.replyText.slice(0, 120));
 }
 
+
+// ---- 割引の計算と「時間半」の換算（P869） ----
+{
+  const run869 = async (t: string) => conversationCoreService.execute({ prompt: t } as any) as any;
+  const d1 = await run869('1500円の3割引はいくら？');
+  check('P869 割引を計算する', d1.replyText.includes('1050円'), d1.replyText.slice(0, 120));
+  const d2 = await run869('2000円の20%オフはいくら？');
+  check('P869 %オフを計算する', d2.replyText.includes('1600円'), d2.replyText.slice(0, 120));
+  const d3 = await run869('1時間半は何分？');
+  check('P869 1時間半は90分', d3.replyText.includes('90分'), d3.replyText.slice(0, 120));
+  const d4 = await run869('2日半は何時間？');
+  check('P869 2日半は60時間', d4.replyText.includes('60時間'), d4.replyText.slice(0, 120));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

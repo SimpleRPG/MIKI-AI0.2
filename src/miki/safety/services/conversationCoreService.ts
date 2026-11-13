@@ -3423,6 +3423,12 @@ export class ConversationCoreService {
     if (taxIn) return `${taxIn[1]}円の消費税（${taxIn[2]}%）込みは${format(Number(taxIn[1]) * (1 + Number(taxIn[2]) / 100))}円です。`;
     const taxInDef = p.match(/^(\d+(?:\.\d+)?)\s*円の消費税込み(?:は|って)?(?:いくら)?/);
     if (taxInDef) return `${taxInDef[1]}円の消費税（10%）込みは${format(Number(taxInDef[1]) * 1.1)}円です。`;
+    // P869: 割引もその場で計算する（3割引＝残り7割の価格。
+    // %オフ／%引きも同形）。従来は答えられず調査に落ちていた。
+    const wari = p.match(/^(\d+(?:\.\d+)?)\s*円の\s*(\d+(?:\.\d+)?)\s*割引(?:は|って)?(?:いくら)?/);
+    if (wari) return `${wari[1]}円の${wari[2]}割引は${format(Math.round(Number(wari[1]) * (10 - Number(wari[2])) / 10))}円です。`;
+    const off = p.match(/^(\d+(?:\.\d+)?)\s*円の\s*(\d+(?:\.\d+)?)\s*(?:%|％|パーセント)\s*(?:オフ|引き|引)(?:は|って)?(?:いくら)?/);
+    if (off) return `${off[1]}円の${off[2]}%オフは${format(Math.round(Number(off[1]) * (1 - Number(off[2]) / 100)))}円です。`;
     const percent = p.match(/^(\d+(?:\.\d+)?)\s*の\s*(\d+(?:\.\d+)?)\s*(?:%|％|パーセント)(?:は|って)?$/);
     if (percent) return `${percent[1]}の${percent[2]}%は${format(Number(percent[1]) * Number(percent[2]) / 100)}です。`;
     const times = p.match(/^(\d+(?:\.\d+)?)\s*の\s*(\d+(?:\.\d+)?)\s*倍(?:は|って)?$/);
@@ -3456,6 +3462,12 @@ export class ConversationCoreService {
     // 何分？」）は、単位どうしの合成として受ける。
     const compound = p.match(/^(\d+(?:\.\d+)?)時間(\d+(?:\.\d+)?)分は(?:何|いくつ)分(?:です)?(?:か)?$/);
     if (compound) return `${compound[1]}時間${compound[2]}分は${Number(compound[1]) * 60 + Number(compound[2])}分です。`;
+    // P869: 「1時間半」のような口語の半も受ける（従来は
+    // 「時間半」を未知語として扱っていた）。
+    const halfTime = p.match(/^(\d+(?:\.\d+)?)時間半は(?:何|いくつ)分(?:です)?(?:か)?$/);
+    if (halfTime) return `${halfTime[1]}時間半は${Number(halfTime[1]) * 60 + 30}分です。`;
+    const halfDay = p.match(/^(\d+(?:\.\d+)?)日半は(?:何|いくつ)時間(?:です)?(?:か)?$/);
+    if (halfDay) return `${halfDay[1]}日半は${Number(halfDay[1]) * 24 + 12}時間です。`;
     const splitForm = p.match(/^(\d+(?:\.\d+)?)分は(?:何|いくつ)時間(?:何|いくつ)分(?:です)?(?:か)?$/);
     if (splitForm) { const t = Number(splitForm[1]); return `${splitForm[1]}分は${Math.floor(t / 60)}時間${t % 60}分です。`; }
     // P824: 前置き（「身長180センチって」）や「って」の形も受ける。
