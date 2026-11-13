@@ -107,6 +107,7 @@ async function main() {
   await turn('T20 明日の迷い', '明日の予定は特にないかな');
 
   // ---- 夜の続き：彼女の質問への答えと、小さな依頼（P586/P588） ----
+  const { storageService } = await import('../src/services/storageService');
   const { pendingSlotService } = await import('../src/miki/memory/services/pendingSlotService');
   pendingSlotService.set('miki_pending_topic_question_v1', { terms: ['モコロン'], question: 'モコロンは、いつごろから知っていますか？', at: Date.now() }, 30 * 60000);
   const t20a = await turn('T20A 質問への答え', 'モコロンは綿毛が取れる、羊みたいなパルだよ');

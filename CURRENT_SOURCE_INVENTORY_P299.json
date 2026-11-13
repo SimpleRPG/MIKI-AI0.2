@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1808,
     "sourceFileCount": 1361,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1272,
-    "relativeImportCandidateCount": 4265,
-    "resolvedRelativeImportCandidateCount": 4249,
+    "relativeImportCandidateCount": 4266,
+    "resolvedRelativeImportCandidateCount": 4250,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1632,9 +1632,9 @@
     },
     {
       "path": "scripts/conversation_day_simulation.ts",
-      "bytes": 15884,
-      "lines": 205,
-      "sha256": "9eef795956882dce6d5b8d8edaf4b1b67a61f43464293073a3839079c64b4170",
+      "bytes": 15961,
+      "lines": 206,
+      "sha256": "56597c3dd91fed9f06f145f8bf9dfc91ef4301f288148c41385161cf9c6b7b62",
       "relativeImportCandidates": [
         {
           "line": 23,
@@ -1686,25 +1686,31 @@
         },
         {
           "line": 110,
+          "specifier": "../src/services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 111,
           "specifier": "../src/miki/memory/services/pendingSlotService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/pendingSlotService.ts"
         },
         {
-          "line": 166,
+          "line": 167,
           "specifier": "../src/miki/memory/services/dayKeyService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/dayKeyService.ts"
         },
         {
-          "line": 178,
+          "line": 179,
           "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
         }
       ],
-      "relativeImportCandidateCount": 11,
-      "resolvedRelativeImportCount": 11,
+      "relativeImportCandidateCount": 12,
+      "resolvedRelativeImportCount": 12,
       "unresolvedRelativeImportCount": 0
     },
     {
