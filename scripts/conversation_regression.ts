@@ -4062,6 +4062,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P844 スナップショットに予測の照合状況が出る', Boolean(snap844.predictions && snap844.predictions.refuted >= 1), JSON.stringify(snap844.predictions || {}).slice(0, 120));
 }
 
+// ---- P845: 活性化スコア（教わった語が舞台に残り、時間で冷める） ----
+{
+  const { japaneseDictionaryService } = await import('../src/miki/research/services/japaneseDictionaryService');
+  const { activationService } = await import('../src/miki/memory/services/activationService');
+  const { topicStageService } = await import('../src/miki/memory/services/topicStageService');
+  japaneseDictionaryService.addPersonal('活性チェックX', { gloss: '活性化の確認用の語', semanticIds: ['learned:user-taught'] });
+  const score845 = activationService.score('活性チェックX');
+  check('P845 教わった語に活性化が付く', score845 > 0, String(score845));
+  check('P845 活性化の台帳に載る', activationService.top(50).some((x) => x.term === '活性チェックX'), JSON.stringify(activationService.top(3)).slice(0, 160));
+  const pool845 = topicStageService.candidates(undefined, []);
+  check('P845 活性化は舞台プールの直近性の契約を壊さない', !pool845.includes('活性チェックX'), JSON.stringify(pool845).slice(0, 200));
+  const later845 = activationService.score('活性チェックX', Date.now() + 14 * 24 * 3600_000);
+  check('P845 活性化は時間で冷める', later845 < score845, `${score845} -> ${later845}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

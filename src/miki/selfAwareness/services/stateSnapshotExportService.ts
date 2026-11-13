@@ -5,6 +5,7 @@ import { associationGraphService } from '../../memory/services/associationGraphS
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
+import { activationService } from '../../memory/services/activationService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { worldModelGraphService } from './worldModelGraphService';
 import { knowledgeSelfInspectionService } from './knowledgeSelfInspectionService';
@@ -184,6 +185,8 @@ class StateSnapshotExportService {
               unknownTerm: has('miki_unknown_pending_v1'),
               lastList: has('miki_last_list_answer_v1'),
             },
+            // P845: 活性化の高い語（思い出しやすさの上位）。
+            activationTop: activationService.top(3).map((x) => x.term),
           };
         } catch { return null; }
       })(),

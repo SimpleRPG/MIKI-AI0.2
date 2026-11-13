@@ -38,6 +38,11 @@ class TopicStageService {
       if (valid(t) && !pool.includes(t)) pool.push(t);
     }
     if (valid(state?.currentTopic) && !pool.includes(state.currentTopic)) pool.unshift(state.currentTopic);
+    // P845: 活性化（activationService）はこのプールには混ぜない。
+    // プールは「直近に言及された順」という契約で、照応・省略の
+    // 消費側が強く依存している。熱い語を末尾に足す案は回帰で
+    // 実際に誤解決を起こした（P710/P720/P841）。活性化の消費先は
+    // 直近性が意味を持たない選択の場面に限って別途入れる。
     return pool;
   }
 

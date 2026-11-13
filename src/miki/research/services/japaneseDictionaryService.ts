@@ -1,5 +1,6 @@
 import { semanticDictionaryGraphP209Service } from '../../core/services/semanticDictionaryGraphP209Service';
 import { storageService } from '../../../services/storageService';
+import { activationService } from '../../memory/services/activationService';
 import { systemLogger } from '../../../services/systemLogger';
 
 /**
@@ -131,6 +132,8 @@ class JapaneseDictionaryService {
     // 古い一回きりの語に押し出されて再起動で消える。
     this.personal.delete(entry.normalized);
     this.personal.set(entry.normalized, entry); this.savePersonal();
+    // P845: 教わった語は活性化台帳にも熱を入れる（思い出しやすさ）。
+    try { activationService.tick(clean); } catch { /* 補助経路 */ }
     return entry;
   }
 
