@@ -16,6 +16,11 @@
  *   解析して使う。
  */
 
+// P880: 言い換えの橋渡しは語彙関係サービス（種＋教師供給の同義対）に
+// 一本化する。個別の対表をここに持つと、教師が教材で足した同義対が
+// 聞き返しに届かなかった。
+import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
+
 export interface UserFactCandidate {
   entity?: string;
   attribute?: string;
@@ -180,12 +185,8 @@ function isNegativeStatement(c: UserFactCandidate): boolean {
   return /^[一-龠ァ-ヶー]{2,5}ない$/.test(v);
 }
 
-// P876: 対象・属性の言い換え（職業＝仕事）。教えたときの言葉と
-// 聞き返すときの言葉がずれても、同じ事実として引けるようにする。
-const RECALL_KEY_SYNONYMS: Record<string, string[]> = {
-  '職業': ['仕事'],
-  '仕事': ['職業'],
-};
+// P876→P880: 対象・属性の言い換えは lexicalRelationService の
+// 同義対（種の 職業＝仕事、教師が教材で足した対も含む）で橋渡しする。
 
 function matchesKey(key: string, c: UserFactCandidate): boolean {
   const { entity, attribute } = c;
@@ -368,7 +369,7 @@ export class ConversationUserFactRecallService {
       }
     }
 
-    const matches = candidates.filter((c) => [key, ...(RECALL_KEY_SYNONYMS[key] ?? [])].some((k) => matchesKey(k, c)));
+    const matches = candidates.filter((c) => [key, ...lexicalRelationService.synonymsOf(key)].some((k) => matchesKey(k, c)));
     if (matches.length === 0) return null;
     let chosen = matches[0];
     if (/いくつ/.test(prompt)) {

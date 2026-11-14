@@ -4764,6 +4764,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevRcpt879) storageService.setItem(RCPT879, prevRcpt879); else storageService.removeItem(RCPT879);
 }
 
+// P880: 事実の聞き返しの言い換えを語彙関係サービスに一本化。
+// 教師が後から足した同義対でも橋渡しできる（P876の対表の一般化）。
+{
+  const { lexicalRelationService } = await import('../src/miki/memory/services/lexicalRelationService');
+  lexicalRelationService.addRelation('勤務先', '職場', 'SYNONYM', 'teacher');
+  let memories880: any[] = [];
+  const say880 = async (t: string) => {
+    const intake: any = conversationFactIntakeService.intakeFromUserText(t, memories880);
+    memories880 = intake?.updatedMemories ?? memories880;
+    const res: any = await conversationCoreService.execute({ prompt: t, memories: memories880 } as any);
+    return String(res?.replyText ?? '');
+  };
+  await say880('僕の勤務先は青空商事だよ');
+  const ask880 = await say880('僕の職場はどこ？');
+  check('P880 教師が足した同義対で聞き返せる', ask880.includes('青空商事'), ask880.slice(0, 60));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
