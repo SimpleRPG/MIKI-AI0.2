@@ -4852,6 +4852,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 }
 
+// P884: 巨大値の書き込み間引き（実機の重さ対策）。通常フラッシュでは
+// 2MB以上の値は最大30秒に1回だけ書く。強制時は全部書く。
+{
+  const { partitionGiantFlushKeys, GIANT_VALUE_CHARS } = await import('../src/services/storageService');
+  const sizes884 = [{ key: 'small', chars: 100 }, { key: 'giant', chars: GIANT_VALUE_CHARS + 1 }];
+  const now884 = 1_000_000;
+  const deferred884 = partitionGiantFlushKeys(sizes884, now884, now884 - 5000, false);
+  check('P884 通常フラッシュでは巨大値を間引く', deferred884.write.join(',') === 'small' && deferred884.defer.join(',') === 'giant', JSON.stringify(deferred884));
+  const due884 = partitionGiantFlushKeys(sizes884, now884, now884 - 60_000, false);
+  check('P884 間隔が空けば巨大値も書く', due884.write.length === 2 && due884.defer.length === 0, JSON.stringify(due884));
+  const forced884 = partitionGiantFlushKeys(sizes884, now884, now884, true);
+  check('P884 強制フラッシュは全部書く', forced884.write.length === 2 && forced884.defer.length === 0, JSON.stringify(forced884));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

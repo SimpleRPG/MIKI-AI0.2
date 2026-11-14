@@ -30,10 +30,38 @@ import type { MemoryItem, MemoryType, MemoryDestination } from '../types';
  * memory persistence (raw, structural, semantic, episodic, procedural, meta, working)
  * with approved state, source reference, and metadata.
  */
+/**
+ * P884: 巨大値の書き込み間引き。実機ログ（2026-11-15）で、約45MB級の
+ * 台帳や約102MBの自己コード同期状態が、数秒おきの通常フラッシュで
+ * 何度も全量書き直され、1回12〜16秒のフリーズになっていた。
+ * 巨大値（2MB以上）は通常フラッシュでは最大30秒に1回だけ書き、
+ * 強制フラッシュ（背景化・終了・flushNow）では必ず全部書く。
+ */
+export const GIANT_VALUE_CHARS = 2 * 1024 * 1024;
+export const GIANT_FLUSH_MIN_INTERVAL_MS = 30 * 1000;
+
+export function partitionGiantFlushKeys(
+  sizes: Array<{ key: string; chars: number }>,
+  now: number,
+  lastGiantFlushAt: number,
+  force: boolean,
+): { write: string[]; defer: string[] } {
+  const write: string[] = [];
+  const defer: string[] = [];
+  const giantDue = force || now - lastGiantFlushAt >= GIANT_FLUSH_MIN_INTERVAL_MS;
+  for (const { key, chars } of sizes) {
+    if (!giantDue && chars >= GIANT_VALUE_CHARS) defer.push(key);
+    else write.push(key);
+  }
+  return { write, defer };
+}
+
 class StorageService {
   private cache = new Map<string, string>();
   private dirtyKeys = new Set<string>();
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private giantFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastGiantFlushAt = 0;
   private lastDiagnosticFlushAt = new Map<string, number>();
   private lastDeferredFlushDiagnosticAt = 0;
   private backend: 'sqlite' | 'indexeddb' | 'memory' = 'memory';
@@ -63,12 +91,12 @@ class StorageService {
     try {
       if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
         document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'hidden') void this.flush();
+          if (document.visibilityState === 'hidden') void this.flush(true);
         });
       }
       if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
         window.addEventListener('pagehide', () => {
-          void this.flush();
+          void this.flush(true);
         });
       }
     } catch { /* ライフサイクル連動はベストエフォート */ }
@@ -362,7 +390,16 @@ class StorageService {
     }
   }
 
-  private async flush(): Promise<void> {
+  private scheduleGiantFlush(): void {
+    if (this.giantFlushTimer) return;
+    const waitMs = Math.max(0, this.lastGiantFlushAt + GIANT_FLUSH_MIN_INTERVAL_MS - Date.now()) + 50;
+    this.giantFlushTimer = setTimeout(() => {
+      this.giantFlushTimer = null;
+      this.flush().catch((e) => console.warn('storageService: giant flush failed', e));
+    }, waitMs);
+  }
+
+  private async flush(force = false): Promise<void> {
     if (this.dirtyKeys.size === 0) return;
     const persistentBackendReady =
       (this.backend === 'sqlite' && Boolean(this.sqlite)) ||
@@ -380,9 +417,24 @@ class StorageService {
       // 未永続の値を保存済みとして扱わない。
       return;
     }
-    const keys = Array.from(this.dirtyKeys);
+    const allKeys = Array.from(this.dirtyKeys);
     this.dirtyKeys.clear();
     const flushStartedAt = Date.now();
+    // P884: partition giant values out of ordinary flushes (see
+    // partitionGiantFlushKeys). Deferred giants stay dirty and are
+    // written by the giant timer, or by any forced flush.
+    const { write: keys, defer: deferredGiants } = partitionGiantFlushKeys(
+      allKeys.map((key) => ({ key, chars: this.cache.get(key)?.length ?? 0 })),
+      flushStartedAt,
+      this.lastGiantFlushAt,
+      force,
+    );
+    if (deferredGiants.length > 0) {
+      deferredGiants.forEach((k) => this.dirtyKeys.add(k));
+      this.scheduleGiantFlush();
+    }
+    const wroteGiant = keys.some((key) => (this.cache.get(key)?.length ?? 0) >= GIANT_VALUE_CHARS);
+    if (keys.length === 0) return;
     let totalValueChars = 0;
     let maxValueChars = 0;
     const keyClasses = [...new Set(keys.map((key) => this.diagnosticKeyClass(key)))].sort();
@@ -494,6 +546,7 @@ class StorageService {
           tx.onerror = () => reject(tx.error);
         });
       }
+      if (wroteGiant) this.lastGiantFlushAt = Date.now();
       // backend === 'memory': nothing to persist beyond the in-memory cache.
       if (traceFlush) {
         this.emitFlushDiagnostic('COMPLETE', {
@@ -565,7 +618,7 @@ class StorageService {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
     }
-    await this.flush();
+    await this.flush(true);
   }
 
   public getBackendName(): 'sqlite' | 'indexeddb' | 'memory' {
