@@ -4682,6 +4682,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P876 仕事→職業の逆方向でも引ける', job876b.includes('看護師'), job876b.slice(0, 60));
 }
 
+// P877: 役のプリセット。「恋人」は最初から立場・口調の寄せが入った
+// 定義で始まる（合成側が読む味付けが効く）。ビービーには適用しない。
+{
+  const { roleplaySessionService } = await import('../src/miki/conversation/services/roleplaySessionService');
+  const started877 = roleplaySessionService.handleUserText('恋人として話して', 'persona-default');
+  const role877: any = roleplaySessionService.getActiveRole();
+  check('P877 恋人のプリセットで始まる', started877 === 'started' && !!role877 && String(role877.stance).includes('恋人') && String(role877.toneHint).includes('具体的に褒める'), JSON.stringify(role877?.stance ?? ''));
+  roleplaySessionService.handleUserText('なりチャ終わり', 'persona-default');
+  roleplaySessionService.handleUserText('彼女として話して', 'persona-bibi');
+  const role877b: any = roleplaySessionService.getActiveRole();
+  check('P877 ビービーにはプリセットを適用しない', !!role877b && role877b.stance === '' && role877b.toneHint === '', JSON.stringify(role877b?.stance ?? ''));
+  roleplaySessionService.handleUserText('なりチャ終わり', 'persona-bibi');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

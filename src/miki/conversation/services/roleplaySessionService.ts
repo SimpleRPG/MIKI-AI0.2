@@ -50,6 +50,26 @@ export interface RoleplaySession {
 const ROLES_KEY = 'miki_roleplay_roles_v1';
 const SESSION_KEY = 'miki_roleplay_session_v1';
 
+// P877: 組み込みの役プリセット。会話から作った役は名前だけで
+// 立場・口調の寄せが空になり、役の味付け（合成側が読む
+// toneHint/stance）が効かなかった。よく使う役は、最初から
+// 中身の入った定義で始められるようにする。対象は成人の
+// 人格のみ（ビービーでは使わない前提は教材側と同じ）。
+const BUILTIN_ROLE_PRESETS: Record<string, Omit<RoleDefinition, 'roleId' | 'createdAt' | 'name'>> = {
+  '恋人': {
+    stance: 'きりあの恋人。対等な関係で、甘えと本音の両方がある',
+    world: '現代の日常。二人で過ごす何気ない時間',
+    toneHint: '親しい口調で、呼びかけは名前で。具体的に褒める。他愛ない話にちゃんと乗る。甘えは頼られている合図として受け止める。すれ違いはその日のうちにほどく',
+    userRole: '恋人',
+  },
+  '彼女': {
+    stance: 'きりあの恋人（彼女）。対等な関係で、甘えと本音の両方がある',
+    world: '現代の日常。二人で過ごす何気ない時間',
+    toneHint: '親しい口調で、呼びかけは名前で。具体的に褒める。他愛ない話にちゃんと乗る。甘えは頼られている合図として受け止める。すれ違いはその日のうちにほどく',
+    userRole: '恋人（彼氏）',
+  },
+};
+
 const normalizeName = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
 export class RoleplaySessionService {
@@ -149,6 +169,18 @@ export class RoleplaySessionService {
     roles.push(role);
     this.persistRoles();
     return role;
+  }
+
+  // P877: 保存済みの役を探し、無ければプリセット→素の定義の順で作る。
+  // プリセットは成人の人格専用（ビービーには適用しない）。
+  public findOrCreateRole(name: string, userRole = '', usePreset = true): RoleDefinition {
+    const existing = this.findRole(name);
+    if (existing) return existing;
+    const preset = usePreset ? BUILTIN_ROLE_PRESETS[name] : undefined;
+    if (preset) {
+      return this.saveRole({ name, stance: preset.stance, world: preset.world, toneHint: preset.toneHint, userRole: userRole || preset.userRole });
+    }
+    return this.saveRole({ name, stance: '', world: '', toneHint: '', userRole });
   }
 
   public getSession(): RoleplaySession | null {
@@ -385,7 +417,7 @@ export class RoleplaySessionService {
     if (startMatch) {
       const name = normalizeName(startMatch[1].replace(/^(じゃあ|では|それじゃあ)/, ''));
       if (!name) return undefined;
-      const role = this.findRole(name) ?? this.saveRole({ name, stance: '', world: '', toneHint: '', userRole: '' });
+      const role = this.findOrCreateRole(name, '', personaId !== 'persona-bibi');
       this.startSession(role, personaId);
       this.pendingTransition = { type: 'started', roleName: role.name, sourceText: source, at: Date.now() };
       return 'started';
@@ -400,7 +432,7 @@ export class RoleplaySessionService {
       const name = herRaw ? normalizeName(herRaw.replace(/^(じゃあ|では|それじゃあ)/, '')) : '';
       if (name) {
         const userRole = userRaw ? normalizeName(userRaw) : '';
-        const role = this.findRole(name) ?? this.saveRole({ name, stance: '', world: '', toneHint: '', userRole });
+        const role = this.findOrCreateRole(name, userRole, personaId !== 'persona-bibi');
         this.startSession(role, personaId);
         this.pendingTransition = { type: 'started', roleName: role.name, sourceText: source, at: Date.now() };
         return 'started';
