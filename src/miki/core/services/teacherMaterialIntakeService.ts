@@ -78,6 +78,8 @@ export interface TeacherMaterialIntakeRecord {
   definitionPatternCount?: number;
   // P495: このパッケージで登録された語彙ルールの件数。
   lexicalRelationCount?: number;
+  // P878: このパッケージで登録された会話例の件数。
+  exampleCount?: number;
   componentIds: string[];
   references: TeacherMaterialReferenceRecord[];
   receivedAt: number;
@@ -346,9 +348,68 @@ class TeacherMaterialIntakeService {
         lexicalRelationCount++;
       }
     }
+    // P878: 会話例の供給（任意）。「こういうやり取りがいい」という
+    // 会話例を、場面と発話の型に分解して部品化する。レッスンとは
+    // 独立に受け付け、不正な例は理由を添えてスキップする。
+    const rawExamples = Array.isArray((manifest as any).examples)
+      ? (manifest as any).examples as unknown[]
+      : [];
+    interface DialogueExample { id: string; title: string; scene: string; turns: Array<{ speaker: 'みき' | '相手'; text: string }> }
+    interface DialoguePattern { herLineCount: number; acts: string[]; opening: string; closing: string }
+    const ACT_TAGS: Array<[RegExp, string]> = [
+      [/ごめん|すまん|悪かった/, '謝る'],
+      [/ありがとう|ありがと/, '感謝'],
+      [/すごい|えらい|頑張った|がんばった/, '褒める'],
+      [/おつかれ|お疲れ/, '労う'],
+      [/大丈夫/, '受け止める'],
+      [/どうした|何かあった|話して|聞かせて/, '聞く'],
+      [/好き|大事|大切/, '気持ちを伝える'],
+      [/おはよう|おやすみ|ただいま|おかえり|いってらっしゃい|気をつけて/, '日常のひと声'],
+    ];
+    const dialogueExamples: Array<{ example: DialogueExample; pattern: DialoguePattern }> = [];
+    const exampleNotes: string[] = [];
+    for (const item of rawExamples.slice(0, 30)) {
+      const e = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : {};
+      const id = typeof e.id === 'string' ? e.id.trim() : '';
+      const title = typeof e.title === 'string' ? e.title.trim() : '';
+      const scene = typeof e.scene === 'string' ? e.scene.trim() : '';
+      const rawTurns = Array.isArray(e.turns) ? e.turns : [];
+      const turns: DialogueExample['turns'] = [];
+      let turnsOk = rawTurns.length >= 2 && rawTurns.length <= 40;
+      for (const t of rawTurns) {
+        const tt = t && typeof t === 'object' && !Array.isArray(t) ? t as Record<string, unknown> : {};
+        const text = typeof tt.text === 'string' ? tt.text.trim() : '';
+        if (!text || text.length > 200) { turnsOk = false; break; }
+        turns.push({ speaker: tt.speaker === 'みき' ? 'みき' : '相手', text });
+      }
+      if (!id || !title || !scene || !turnsOk) {
+        exampleNotes.push(`会話例 ${id || '(id無し)'}: 形式が不正です（id/title/scene と 2〜40 件の発話が必要です）`);
+        continue;
+      }
+      const herLines = turns.filter((t) => t.speaker === 'みき').map((t) => t.text);
+      if (herLines.length === 0) {
+        exampleNotes.push(`会話例 ${id}: みき側の発話がありません`);
+        continue;
+      }
+      const acts: string[] = [];
+      for (const line of herLines) {
+        for (const [re, tag] of ACT_TAGS) {
+          if (re.test(line) && !acts.includes(tag)) acts.push(tag);
+        }
+      }
+      dialogueExamples.push({
+        example: { id, title, scene, turns },
+        pattern: {
+          herLineCount: herLines.length,
+          acts,
+          opening: herLines[0],
+          closing: herLines[herLines.length - 1],
+        },
+      });
+    }
     const rawLessons = manifest.lessons;
-    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0 && lexicalRelationCount === 0) {
-      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形・語彙ルール）を入れてください。', ['lessons が空配列または未設定で、有効な定義形・語彙ルールもありません', ...patternNotes, ...relationNotes], identifiedCtx);
+    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0 && lexicalRelationCount === 0 && dialogueExamples.length === 0) {
+      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形・語彙ルール・会話例）を入れてください。', ['lessons が空配列または未設定で、有効な定義形・語彙ルール・会話例もありません', ...patternNotes, ...relationNotes, ...exampleNotes], identifiedCtx);
     }
     const lessons: TeacherLesson[] = [];
     for (const item of Array.isArray(rawLessons) ? rawLessons : []) {
@@ -418,6 +479,55 @@ class TeacherMaterialIntakeService {
       componentIds.push(component.componentId);
     }
 
+    // P878: 会話例を部品（候補・未検証）として登録。会話そのものと、
+    // 型に分解した要約（pattern）を一緒に持つ。
+    for (const { example, pattern } of dialogueExamples) {
+      const body = {
+        componentKind: 'KNOWLEDGE' as const,
+        componentType: 'DIALOGUE_EXAMPLE',
+        purpose: `Dialogue example ${example.id}: ${example.title}`,
+        interfaceContract: {
+          input: 'situation (scene) in conversation',
+          output: 'interaction pattern: how her lines flow in the scene',
+        },
+        inputs: ['scene', 'partner lines'],
+        outputs: ['patterned response flow'],
+        prerequisites: [],
+        dependencies: ['teacher-material-intake'],
+        appliesWhen: [example.scene],
+        doesNotApplyWhen: ['example not yet verified'],
+        sourceEpisodeIds: [],
+        sourceLearningArtifactIds: [],
+        environmentFingerprint: 'unknown',
+        lifecycleStatus: 'CANDIDATE' as const,
+        usageCount: 0,
+        successCount: 0,
+        failureCount: 0,
+        claimIds: [],
+        evidenceRefs: [],
+        sourceUrls: [],
+        sourceArtifactIds: [],
+        verificationStatus: 'UNVERIFIED' as const,
+        contradictionRefs: [],
+        freshnessPolicy: 'REVALIDATE_ON_ENVIRONMENT_CHANGE',
+        example,
+        pattern,
+        teacherName,
+        packageSubject: subject,
+        intakePackageSha256: packageSha256,
+      };
+      const canonicalSha256 = canonicalSha256Object(body);
+      const component = {
+        ...body,
+        componentId: `RC-KNOWLEDGE-EXAMPLE-${canonicalSha256.slice(0, 18)}`,
+        canonicalSha256,
+        createdAt: receivedAt,
+        updatedAt: receivedAt,
+      } as unknown as KnowledgeComponentArtifact;
+      reusableComponentFactoryService.storeCandidates([component]);
+      componentIds.push(component.componentId);
+    }
+
     // ---- 参照画像を保管（観察の材料） ----
     const references: TeacherMaterialReferenceRecord[] = [];
     for (const image of imageFiles) {
@@ -452,14 +562,15 @@ class TeacherMaterialIntakeService {
       lessonCount: lessons.length,
       definitionPatternCount,
       lexicalRelationCount,
+      exampleCount: dialogueExamples.length,
       componentIds,
       references,
       receivedAt,
     };
     this.ledger.set(intakeId, record);
     this.save();
-    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount} relations=${lexicalRelationCount}`, { subject });
-    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件、語彙ルール ${lexicalRelationCount} 件）。`, reasons: [...patternNotes, ...relationNotes], record: { ...record } };
+    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount} relations=${lexicalRelationCount} examples=${dialogueExamples.length}`, { subject });
+    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件、語彙ルール ${lexicalRelationCount} 件、会話例 ${dialogueExamples.length} 件）。`, reasons: [...patternNotes, ...relationNotes, ...exampleNotes], record: { ...record } };
   }
 }
 

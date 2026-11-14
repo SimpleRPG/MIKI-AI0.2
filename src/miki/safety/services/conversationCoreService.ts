@@ -30,6 +30,7 @@ import { storageService } from '../../../services/storageService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
 import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
 import { videoTranscriptService } from '../../research/services/videoTranscriptService';
+import { dialogueExampleRecallService } from '../../memory/services/dialogueExampleRecallService';
 import { fixedReplyStatsService } from '../../memory/services/fixedReplyStatsService';
 import { activationService } from '../../memory/services/activationService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
@@ -559,6 +560,11 @@ export class ConversationCoreService {
       const principleAnswer = multiPart ? undefined : this.designPrincipleAnswer(prompt);
       if (principleAnswer) {
         return this.buildResult('RESOLVED', 'design_principle_answer', this.applyPersonaVoice(principleAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P878: 関係性の相談では、教わった会話例をお手本として引く。
+      const exampleAnswer = multiPart ? undefined : this.relationshipConsultAnswer(prompt);
+      if (exampleAnswer) {
+        return this.buildResult('RESOLVED', 'dialogue_example_answer', this.applyPersonaVoice(exampleAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P875: 動画URL＋学習の意図があれば、字幕を読んで学ぶ。
       // 学んだ動画の内容への質問にも、読んだ本文から答える。
@@ -5178,6 +5184,18 @@ export class ConversationCoreService {
     const firstSentence = lesson.rule.split('。')[0];
     const ruleText = firstSentence.length > 110 ? `${firstSentence.slice(0, 107)}…` : `${firstSentence}。`;
     return `教わったゲーム作りの原則に、こういうのがあります。「${lesson.title}」${ruleText}まだ候補として教わった知識ですけど、観点としてどうでしょう。`;
+  }
+
+  // P878: 関係性の相談で、教師から教わった会話例をお手本として出す。
+  // 会話例は候補・未検証の部品なので、お手本であることを明示する。
+  private relationshipConsultAnswer(prompt: string): string | undefined {
+    if (!/(?:恋人|彼女|彼氏|夫婦|妻|夫|パートナー|旦那|奥さん|相方)/.test(prompt)) return undefined;
+    if (!/(?:どうしたら|どうすれば|どう声|どう返|どう言えば|どう言ったら|コツ|仲直り|声かけ)/.test(prompt)) return undefined;
+    const ex = dialogueExampleRecallService.findFor(prompt);
+    if (!ex) return undefined;
+    const acts = ex.pattern.acts.slice(0, 3).join('、');
+    const flow = acts ? `流れは「${acts}」で進んでいました。` : '';
+    return `お手本として教わったやり取りに、似た場面があります。「${ex.title}」だと、彼女側はまず「${ex.pattern.opening}」と受けていました。${flow}まだ候補として教わったお手本ですけど、参考にどうでしょう。`;
   }
 
   // P875: 動画URLと学習の意図を受けて、字幕を読んで学ぶ。

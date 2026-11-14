@@ -4696,6 +4696,41 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   roleplaySessionService.handleUserText('なりチャ終わり', 'persona-bibi');
 }
 
+// P878: 会話例の取り込み口。教師教材の任意チャンネル examples で
+// 会話例を受け付け、型に分解して部品化する。関係性の相談では
+// お手本として引く。
+{
+  const JSZip878 = (await import('jszip')).default;
+  const { teacherMaterialIntakeService } = await import('../src/miki/core/services/teacherMaterialIntakeService');
+  const { dialogueExampleRecallService } = await import('../src/miki/memory/services/dialogueExampleRecallService');
+  const REPO878 = 'miki_reusable_component_repository_v1';
+  const prevRepo878 = storageService.getItem(REPO878);
+  const manifest878 = {
+    formatVersion: 1, packageType: 'TEACHER_MATERIAL', teacher: { name: 'Claude', role: '教師' },
+    subject: '会話例テスト', version: 'T1', lessons: [],
+    examples: [{
+      id: 'EX-T1', title: '拗ねたときの声かけ', scene: '相手が拗ねたとき',
+      turns: [
+        { speaker: '相手', text: 'もういいよ、放っておいて' },
+        { speaker: 'みき', text: 'うん、今はそっとしておくね。近くにはいるよ' },
+        { speaker: '相手', text: '……さっきの言い方、傷ついた' },
+        { speaker: 'みき', text: 'ごめん、言い方がきつかったね。教えてくれてありがとう' },
+      ],
+    }],
+  };
+  const zip878 = new JSZip878();
+  zip878.file('teacher_material.json', JSON.stringify(manifest878));
+  zip878.file('INSTRUCTIONS.md', '# test');
+  const bytes878 = await zip878.generateAsync({ type: 'uint8array' });
+  const intake878: any = await teacherMaterialIntakeService.receivePackage({ fileName: 'ex.zip', bytes: bytes878 });
+  check('P878 会話例だけのパッケージを受け付ける', intake878?.ok === true && String(intake878?.message ?? '').includes('会話例 1 件'), String(intake878?.message ?? '').slice(0, 60));
+  const found878 = dialogueExampleRecallService.listExamples().find((e: any) => e.id === 'EX-T1');
+  check('P878 型に分解されて登録される', !!found878 && found878.pattern.acts.includes('謝る') && found878.pattern.opening.includes('そっとしておく'), JSON.stringify(found878?.pattern ?? {}));
+  const consult878: any = await conversationCoreService.execute({ prompt: '彼女が拗ねちゃった。どう声かければいい？' } as any);
+  check('P878 相談でお手本を引く', String(consult878?.replyText ?? '').includes('拗ねたときの声かけ'), String(consult878?.replyText ?? '').slice(0, 60));
+  if (prevRepo878) storageService.setItem(REPO878, prevRepo878); else storageService.removeItem(REPO878);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
