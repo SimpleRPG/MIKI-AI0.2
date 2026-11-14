@@ -126,4 +126,31 @@ export const teacherLessonRecallService = {
     }
     return bestScore >= 4 || bestCount >= 2 ? best : undefined;
   },
+
+  // P881: 候補を順位つきで全部返す。直前に出した原則と別のものを
+  // 出したい（引用の回転）ときに使う。並びは findFor と同じ基準。
+  findRanked(text: string): TeacherLessonView[] {
+    const lessons = readLessons();
+    if (lessons.length === 0) return [];
+    const expanded = expandText(text);
+    const scored: Array<{ lesson: TeacherLessonView; score: number; count: number; order: [number, number] }> = [];
+    for (const lesson of lessons) {
+      const keys = titleKeys(lesson.title);
+      let score = 0;
+      let count = 0;
+      keys.forEach((key, idx) => {
+        if (!expanded.includes(key)) return;
+        count += 1;
+        score += key.length * (text.includes(key) ? 2 : 1);
+        if (idx === 0) score += 2;
+      });
+      if (score >= 4 || count >= 2) scored.push({ lesson, score, count, order: idOrder(lesson.id) });
+    }
+    scored.sort((a, b) =>
+      b.score - a.score ||
+      b.count - a.count ||
+      a.order[0] - b.order[0] ||
+      a.order[1] - b.order[1]);
+    return scored.map((s) => s.lesson);
+  },
 };

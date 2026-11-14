@@ -4781,6 +4781,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P880 教師が足した同義対で聞き返せる', ask880.includes('青空商事'), ask880.slice(0, 60));
 }
 
+// P881: 同じ相談が続いたら、原則・会話例の引用が次点に回る
+// （同じ引用の連投を避ける）。
+{
+  const JSZip881 = (await import('jszip')).default;
+  const { teacherMaterialIntakeService } = await import('../src/miki/core/services/teacherMaterialIntakeService');
+  const REPO881 = 'miki_reusable_component_repository_v1';
+  const prevRepo881 = storageService.getItem(REPO881);
+  const manifest881 = {
+    formatVersion: 1, packageType: 'TEACHER_MATERIAL', teacher: { name: 'Claude', role: '教師' },
+    subject: '回転テスト', version: 'T1',
+    lessons: [
+      { id: 'TM-R1', title: '難易度は詰んだら救済する', rule: '詰んだら救済の仕組みを用意する。', reason: 'r', howToJudge: 'h', example: 'e', antiPattern: 'a' },
+      { id: 'TM-R2', title: '難易度の救済は早めに出す', rule: '救済は詰まる前に見せる。', reason: 'r', howToJudge: 'h', example: 'e', antiPattern: 'a' },
+    ],
+    examples: [
+      { id: 'EX-R1', title: '拗ねたときの声かけ', scene: '相手が拗ねたとき', turns: [{ speaker: '相手', text: 'もういいよ' }, { speaker: 'みき', text: 'ごめん、近くにいるよ' }] },
+      { id: 'EX-R2', title: '拗ねた相手への寄り添い', scene: '相手が拗ねたときの寄り添い', turns: [{ speaker: '相手', text: 'ふん' }, { speaker: 'みき', text: '大丈夫、話したくなったら聞くよ' }] },
+    ],
+  };
+  const zip881 = new JSZip881();
+  zip881.file('teacher_material.json', JSON.stringify(manifest881));
+  const bytes881 = await zip881.generateAsync({ type: 'uint8array' });
+  await teacherMaterialIntakeService.receivePackage({ fileName: 't.zip', bytes: bytes881 });
+  const ask881 = async (t: string) => String((await conversationCoreService.execute({ prompt: t } as any))?.replyText ?? '');
+  const l1 = await ask881('ゲームの難易度で詰んだらどうしたらいい？');
+  const l2 = await ask881('ゲームの難易度で詰んだらどうしたらいい？');
+  check('P881 原則の引用が回る', l1.includes('「') && l2.includes('「') && l1 !== l2, `${l1.slice(0, 30)} / ${l2.slice(0, 30)}`);
+  const e1 = await ask881('彼女が拗ねちゃった。どう声かければいい？');
+  const e2 = await ask881('彼女が拗ねちゃった。どう声かければいい？');
+  check('P881 会話例の引用が回る', e1.includes('拗ねた') && e2.includes('拗ねた') && e1 !== e2, `${e1.slice(0, 30)} / ${e2.slice(0, 30)}`);
+  if (prevRepo881) storageService.setItem(REPO881, prevRepo881); else storageService.removeItem(REPO881);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

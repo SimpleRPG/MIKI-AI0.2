@@ -5179,8 +5179,13 @@ export class ConversationCoreService {
   // P879: 会話で引いた知識部品（原則・会話例）に使用記録を付ける。
   // 「使われた」という事実だけを数え、成否は付けない（PENDING）。
   // これが貯まると、どの教材が実際に役に立っているかが見える。
-  private recordComponentCitation(componentId: string, taskId: string): void {
+  // P881: 直前に引いた部品も控え、同じ相談が続いたら次点の候補を
+  // 出せるようにする（同じ引用の連投を避ける）。
+  private recordComponentCitation(componentId: string, taskId: string, slotKey?: string): void {
     if (!componentId) return;
+    if (slotKey) {
+      try { pendingSlotService.set(slotKey, { componentId }, 30 * 60000); } catch { /* 補助経路 */ }
+    }
     try {
       reusableComponentFactoryService.recordUsage({
         componentIds: [componentId],
@@ -5193,13 +5198,25 @@ export class ConversationCoreService {
     } catch { /* 使用記録は補助経路 */ }
   }
 
+  // P881: 候補リストから、直前に出したものと違うものを優先して選ぶ。
+  private pickCitation<T extends { componentId: string }>(ranked: T[], slotKey: string): T | undefined {
+    if (ranked.length === 0) return undefined;
+    let lastId = '';
+    try {
+      const last = pendingSlotService.peek(slotKey) as { componentId?: string } | undefined;
+      lastId = typeof last?.componentId === 'string' ? last.componentId : '';
+    } catch { /* 読めなければ先頭を使う */ }
+    if (lastId && ranked[0].componentId === lastId && ranked.length > 1) return ranked[1];
+    return ranked[0];
+  }
+
   private designPrincipleAnswer(prompt: string): string | undefined {
     if (!/(?:ゲーム|難易度|バランス|手応え|ご褒美|報酬|リトライ|チュートリアル|詰|難しすぎ|簡単すぎ|敵|ボス|ステージ|マップ|武器|操作感|プレイヤー|面白く|画面|UI|メニュー|表示)/.test(prompt)) return undefined;
     if (!/(?:どうしたら|どうすれば|どうやって|どう思う|コツ|アドバイス|工夫|改善|良くしたい|よくしたい|でしょうか|？|\?)/.test(prompt)) return undefined;
-    const lesson = teacherLessonRecallService.findFor(prompt);
+    const lesson = this.pickCitation(teacherLessonRecallService.findRanked(prompt), 'miki_last_cited_lesson_v1');
     if (!lesson) return undefined;
     // P879: 引いた原則に使用記録を付ける（結果は未確定なので PENDING）。
-    this.recordComponentCitation(lesson.componentId, 'design-principle-consult');
+    this.recordComponentCitation(lesson.componentId, 'design-principle-consult', 'miki_last_cited_lesson_v1');
     const firstSentence = lesson.rule.split('。')[0];
     const ruleText = firstSentence.length > 110 ? `${firstSentence.slice(0, 107)}…` : `${firstSentence}。`;
     return `教わったゲーム作りの原則に、こういうのがあります。「${lesson.title}」${ruleText}まだ候補として教わった知識ですけど、観点としてどうでしょう。`;
@@ -5210,10 +5227,10 @@ export class ConversationCoreService {
   private relationshipConsultAnswer(prompt: string): string | undefined {
     if (!/(?:恋人|彼女|彼氏|夫婦|妻|夫|パートナー|旦那|奥さん|相方)/.test(prompt)) return undefined;
     if (!/(?:どうしたら|どうすれば|どう声|どう返|どう言えば|どう言ったら|コツ|仲直り|声かけ)/.test(prompt)) return undefined;
-    const ex = dialogueExampleRecallService.findFor(prompt);
+    const ex = this.pickCitation(dialogueExampleRecallService.findRanked(prompt), 'miki_last_cited_example_v1');
     if (!ex) return undefined;
     // P879: 引いた会話例に使用記録を付ける（結果は未確定なので PENDING）。
-    this.recordComponentCitation(ex.componentId, 'dialogue-example-consult');
+    this.recordComponentCitation(ex.componentId, 'dialogue-example-consult', 'miki_last_cited_example_v1');
     const acts = ex.pattern.acts.slice(0, 3).join('、');
     const flow = acts ? `流れは「${acts}」で進んでいました。` : '';
     return `お手本として教わったやり取りに、似た場面があります。「${ex.title}」だと、彼女側はまず「${ex.pattern.opening}」と受けていました。${flow}まだ候補として教わったお手本ですけど、参考にどうでしょう。`;

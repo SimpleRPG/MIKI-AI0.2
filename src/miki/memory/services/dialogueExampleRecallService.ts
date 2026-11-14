@@ -103,4 +103,21 @@ export const dialogueExampleRecallService = {
     }
     return bestScore >= 3 ? best : undefined;
   },
+
+  // P881: 候補を順位つきで全部返す（引用の回転用）。
+  findRanked(text: string): DialogueExampleView[] {
+    const examples = readExamples();
+    if (examples.length === 0) return [];
+    const expanded = expandText(text);
+    const scored: Array<{ example: DialogueExampleView; score: number }> = [];
+    for (const example of examples) {
+      let score = 0;
+      for (const key of keysOf(example)) {
+        if (expanded.includes(key)) score += key.length;
+      }
+      if (score >= 3) scored.push({ example, score });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.example);
+  },
 };
