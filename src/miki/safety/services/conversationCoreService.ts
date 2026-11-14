@@ -607,6 +607,11 @@ export class ConversationCoreService {
       if (arithmetic) {
         return this.buildResult('RESOLVED', 'arithmetic_answer', arithmetic, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P882: ゲームの数字（確率・期待値・バフ計算）も決定的に答える。
+      const gameMath = this.gameMathAnswer(prompt);
+      if (gameMath) {
+        return this.buildResult('RESOLVED', 'game_math_answer', gameMath, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P676: 単位の換算（1時間は何分？）も、共有の換算表で即答する。
       const unitAnswer = this.unitConversionAnswer(prompt);
       if (unitAnswer) {
@@ -3431,6 +3436,76 @@ export class ConversationCoreService {
    * P597: 簡単な計算は、その場で正確に答える（決定的に計算できる
    * ことは、彼女の強み）。二項演算と「Nの半分」「NのM倍」だけ。
    */
+  // P882: ゲームの数字の計算（確率と期待値）。ドロップ率や会心の
+  // 期待値のような、ゲームの話題で日常的に出る計算を決定的に返す。
+  private gameMathAnswer(prompt: string): string | undefined {
+    const N = '(\\d+(?:\\.\\d+)?)';
+    const pctText = (v: number): string => {
+      const p = Math.round(v * 1000) / 10;
+      return `${Number.isInteger(p) ? p : p}%`;
+    };
+    const numText = (v: number): string => String(Math.round(v * 100) / 100);
+    // 必要確率: 「N回やって Q% 以上当てるには、1回の確率は何%」
+    let m = prompt.match(new RegExp(`${N}\\s*回.{0,14}?${N}\\s*%.{0,16}?確率(?:は|って)?何\\s*%`));
+    if (m) {
+      const trials = parseFloat(m[1]);
+      const q = parseFloat(m[2]) / 100;
+      if (trials >= 1 && q > 0 && q < 1) {
+        const p = 1 - Math.pow(1 - q, 1 / trials);
+        return `${m[1]}回で${m[2]}%以上の確率で当てるには、1回の確率が約${pctText(p)}必要です。`;
+      }
+    }
+    // 必要回数: 「確率 P% で Q% 以上当たるには何回」
+    m = prompt.match(new RegExp(`確率\\s*${N}\\s*%.{0,14}?${N}\\s*%.{0,12}?何回`));
+    if (m) {
+      const p = parseFloat(m[1]) / 100;
+      const q = parseFloat(m[2]) / 100;
+      if (p > 0 && p < 1 && q > 0 && q < 1) {
+        const trials = Math.ceil(Math.log(1 - q) / Math.log(1 - p));
+        return `確率${m[1]}%なら、${trials}回やれば${m[2]}%以上の確率で当たります。`;
+      }
+    }
+    // 少なくとも1回: 「確率 P% を N回 やると、少なくとも1回当たる確率」
+    m = prompt.match(new RegExp(`(?:確率|ドロップ率|排出率)?\\s*${N}\\s*%.{0,20}?${N}\\s*回.{0,20}?(?:少なくとも\\s*1回|1回は|一回)`));
+    if (!m) m = prompt.match(new RegExp(`${N}\\s*%.{0,10}?${N}\\s*回.{0,16}?(?:確率|出る|当たる)`));
+    if (m && /(?:少なくとも|1回は|一回|出る確率|当たる確率|何\\s*%)/.test(prompt)) {
+      const p = parseFloat(m[1]) / 100;
+      const trials = parseFloat(m[2]);
+      if (p > 0 && p <= 1 && trials >= 1) {
+        const atLeastOne = 1 - Math.pow(1 - p, trials);
+        return `確率${m[1]}%を${m[2]}回やると、少なくとも1回当たる確率は約${pctText(atLeastOne)}です。`;
+      }
+    }
+    // 期待値: 「確率 P% なら、平均何回で出る」
+    m = prompt.match(new RegExp(`(?:確率|ドロップ率|排出率)\\s*${N}\\s*%.{0,18}?(?:平均|期待|何回)`));
+    if (m) {
+      const p = parseFloat(m[1]) / 100;
+      if (p > 0 && p <= 1) {
+        return `確率${m[1]}%なら、平均では約${numText(1 / p)}回に1回出ます。`;
+      }
+    }
+    // 会心の期待値: 「会心率 C% で会心ダメージ D倍 なら、平均は何倍」
+    m = prompt.match(new RegExp(`会心率\\s*${N}\\s*%.{0,14}?会心ダメージ(?:が|は)?\\s*${N}\\s*倍`));
+    if (m) {
+      const c = parseFloat(m[1]) / 100;
+      const d = parseFloat(m[2]);
+      if (c >= 0 && c <= 1 && d >= 1) {
+        return `会心率${m[1]}%で会心ダメージ${m[2]}倍なら、平均ダメージは基礎の約${numText(1 + c * (d - 1))}倍です。`;
+      }
+    }
+    // バフ後のダメージ: 「基礎 B に M% 上乗せしたら」
+    m = prompt.match(new RegExp(`${N}\\s*(?:に|へ)\\s*${N}\\s*%\\s*(?:の)?\\s*(?:MOD|モッド|バフ|強化|増加|上乗せ)`));
+    if (!m) m = prompt.match(new RegExp(`基礎(?:ダメージ)?\\s*${N}.{0,10}?${N}\\s*%`));
+    if (m) {
+      const base = parseFloat(m[1]);
+      const up = parseFloat(m[2]) / 100;
+      if (base > 0 && up > 0) {
+        return `${m[1]}に${m[2]}%上乗せすると、約${numText(base * (1 + up))}になります。`;
+      }
+    }
+    return undefined;
+  }
+
   private arithmeticAnswer(prompt: string): string | undefined {
     const p = String(prompt || '').replace(/[？?。]/g, '').trim();
     const format = (n: number): string => {

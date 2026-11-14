@@ -4814,6 +4814,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevRepo881) storageService.setItem(REPO881, prevRepo881); else storageService.removeItem(REPO881);
 }
 
+// P882: ゲームの数字の計算（確率・期待値・バフ）。ドロップ率や
+// 会心の期待値を決定的に返す。
+{
+  const ask882 = async (t: string) => String((await conversationCoreService.execute({ prompt: t } as any))?.replyText ?? '');
+  const a882 = await ask882('ドロップ率2%のアイテムって、50回やれば少なくとも1回は出る確率は何%？');
+  check('P882 少なくとも1回の確率', a882.includes('63.6%'), a882.slice(0, 60));
+  const b882 = await ask882('ドロップ率5%なら、平均何回で出る？');
+  check('P882 期待値（平均の回数）', b882.includes('20回'), b882.slice(0, 60));
+  const c882 = await ask882('会心率25%で会心ダメージが2倍なら、平均ダメージは基礎の何倍？');
+  check('P882 会心の期待値', c882.includes('1.25倍'), c882.slice(0, 60));
+  const d882 = await ask882('基礎ダメージ26に165%のMODを付けたら、ダメージはいくつになる？');
+  check('P882 バフ後のダメージ', d882.includes('68.9'), d882.slice(0, 60));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
