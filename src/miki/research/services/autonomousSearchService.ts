@@ -1395,15 +1395,31 @@ export class AutonomousSearchService {
 
     // P883: ゲームWiki直行レーン。ゲームの話題は一般検索より
     // そのゲームのWikiの方が濃くて速い。Wikiは大抵 MediaWiki で
-    // 検索APIが共通なので、登録したWikiには直接聞く。クエリに
-    // ゲーム名が含まれないときは発射しない。無料・鍵なし。
+    // 検索APIが共通なので、登録したWikiには直接聞く。無料・鍵なし。
+    // P887: 正式名称でなくても当てる。略称・呼び名（ワンヒュ等）も
+    // 登録し、さらに直近2時間にそのゲームの話題が出ていれば、
+    // 名前を含まない続きの質問でもゲームらしい語があれば発射する。
     const attemptGameWiki = async (): Promise<ProviderSearchOutput | null> => {
-      const registry: Array<{ match: RegExp; label: string; apiKey: string; api: string; pageBase: string }> = [
-        { match: /warframe|ウォーフレーム/i, label: 'Warframe Wiki', apiKey: 'miki_gamewiki_warframe_api_url', api: 'https://wiki.warframe.com/api.php', pageBase: 'https://wiki.warframe.com/w/' },
-        { match: /once\s*human|ワンス\s?ヒューマン/i, label: 'Once Human Wiki', apiKey: 'miki_gamewiki_oncehuman_api_url', api: 'https://once-human.fandom.com/api.php', pageBase: 'https://once-human.fandom.com/wiki/' },
-        { match: /delta\s*force|デルタフォース/i, label: 'Delta Force Wiki', apiKey: 'miki_gamewiki_deltaforce_api_url', api: 'https://deltaforce.fandom.com/api.php', pageBase: 'https://deltaforce.fandom.com/wiki/' },
+      const registry: Array<{ id: string; match: RegExp; label: string; apiKey: string; api: string; pageBase: string }> = [
+        { id: 'warframe', match: /warframe|ウォーフレーム|ウォーフ|\bWF\b/i, label: 'Warframe Wiki', apiKey: 'miki_gamewiki_warframe_api_url', api: 'https://wiki.warframe.com/api.php', pageBase: 'https://wiki.warframe.com/w/' },
+        { id: 'oncehuman', match: /once\s*human|ワンス[・\s]?ヒューマン|ワンヒュ/i, label: 'Once Human Wiki', apiKey: 'miki_gamewiki_oncehuman_api_url', api: 'https://once-human.fandom.com/api.php', pageBase: 'https://once-human.fandom.com/wiki/' },
+        { id: 'deltaforce', match: /delta\s*force|デルタフォース|デルタ/i, label: 'Delta Force Wiki', apiKey: 'miki_gamewiki_deltaforce_api_url', api: 'https://deltaforce.fandom.com/api.php', pageBase: 'https://deltaforce.fandom.com/wiki/' },
       ];
-      const target = registry.find((entry) => entry.match.test(safeQuery));
+      const GAME_TOPIC_KEY = 'miki_recent_game_topic_v1';
+      const GAME_TOPIC_TTL_MS = 2 * 60 * 60 * 1000;
+      const GAMEISH = /ダメージ|ドロップ|確率|武器|防具|MOD|モッド|ビルド|素材|レシピ|ボス|弱点|耐性|入手|厳選|リベン|アビリティ|スキル|レベル|経験値|デビエーション|キットガン|フレーム|ミッション|レイド|攻略|ステータス|会心|クリティカル|弾薬|マガジン|リロード|射程|連射|装備|強化|改造|クラフト|設計図|出現|スポーン|エイム|リコイル/i;
+      let target = registry.find((entry) => entry.match.test(safeQuery));
+      if (target) {
+        try { storageService.setItem(GAME_TOPIC_KEY, JSON.stringify({ id: target.id, at: Date.now() })); } catch { /* 記録できなくても検索は続ける */ }
+      } else {
+        try {
+          const saved = JSON.parse(String(storageService.getItem(GAME_TOPIC_KEY) || 'null'));
+          if (saved && typeof saved.id === 'string' && Date.now() - Number(saved.at || 0) < GAME_TOPIC_TTL_MS && GAMEISH.test(safeQuery)) {
+            target = registry.find((entry) => entry.id === saved.id);
+            if (target) systemLogger.info('SELF_IMPROVEMENT', `🔍 [GameWiki] 文脈発射: ${target.label}（直近のゲーム話題から）`);
+          }
+        } catch { /* 文脈が読めなければ通常どおり未発射 */ }
+      }
       if (!target) {
         markProvider('gamewiki', 'SKIPPED', '登録済みゲームの質問ではないため未発射');
         return null;
@@ -1415,7 +1431,7 @@ export class AutonomousSearchService {
         url.searchParams.set('list', 'search');
         // Wiki自体がゲーム専用なので、クエリからゲーム名を外して
         // 題目そのもので引く（一般ページに埋もれさせない）。
-        const wikiQuery = safeQuery.replace(target.match, ' ').replace(/\s+/g, ' ').trim() || safeQuery;
+        const wikiQuery = safeQuery.replace(new RegExp(target.match.source, 'gi'), ' ').replace(/\s+/g, ' ').trim() || safeQuery;
         url.searchParams.set('srsearch', wikiQuery);
         url.searchParams.set('srlimit', String(maxResults));
         url.searchParams.set('format', 'json');

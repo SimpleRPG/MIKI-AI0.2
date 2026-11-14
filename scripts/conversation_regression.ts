@@ -4882,6 +4882,41 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 }
 
+// P887: ゲームWikiレーンの当て方。正式名称でなく略称・呼び名でも
+// 当て、直近のゲーム話題があれば名前なしの続きの質問でも発射する。
+{
+  const http887 = await import('node:http');
+  const { autonomousSearchService: search887 } = await import('../src/miki/research/services/autonomousSearchService');
+  let lastSrsearch887 = '';
+  const server887 = http887.createServer((req: any, res: any) => {
+    try { lastSrsearch887 = new URL(String(req.url), 'http://127.0.0.1').searchParams.get('srsearch') || ''; } catch { lastSrsearch887 = ''; }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ query: { search: [{ title: 'StubHit', snippet: 'スタブの検索結果。' }] } }));
+  });
+  await new Promise<void>((resolve) => server887.listen(0, '127.0.0.1', resolve));
+  const port887 = (server887.address() as any).port;
+  const keys887 = ['miki_gamewiki_warframe_api_url', 'miki_gamewiki_oncehuman_api_url', 'miki_gamewiki_deltaforce_api_url'];
+  const prev887 = keys887.map((k) => storageService.getItem(k));
+  const prevTopic887 = storageService.getItem('miki_recent_game_topic_v1');
+  keys887.forEach((k) => storageService.setItem(k, `http://127.0.0.1:${port887}/api.php`));
+  try {
+    const alias887: any = await search887.executeSearch('ワンヒュの熊のデビエーションの入手方法は？', { maxResults: 2 } as any);
+    check('P887 略称ワンヒュでOnce Human Wikiに当たる', alias887?.providerStatuses?.gamewiki?.status === 'SUCCEEDED' && !lastSrsearch887.includes('ワンヒュ') && lastSrsearch887.includes('デビエーション'), `${JSON.stringify(alias887?.providerStatuses?.gamewiki ?? {})} sr=${lastSrsearch887}`);
+    const delta887: any = await search887.executeSearch('デルタの武器ダメージ一覧', { maxResults: 2 } as any);
+    check('P887 デルタでDelta Force Wikiに当たる', delta887?.providerStatuses?.gamewiki?.status === 'SUCCEEDED', JSON.stringify(delta887?.providerStatuses?.gamewiki ?? {}));
+    const named887: any = await search887.executeSearch('Vermisplicer Warframe の性能', { maxResults: 2 } as any);
+    check('P887 正式名でも従来どおり当たる', named887?.providerStatuses?.gamewiki?.status === 'SUCCEEDED', JSON.stringify(named887?.providerStatuses?.gamewiki ?? {}));
+    const follow887: any = await search887.executeSearch('そのキットガンの基礎ダメージは？', { maxResults: 2 } as any);
+    check('P887 名前なしの続きでも文脈で発射する', follow887?.providerStatuses?.gamewiki?.status === 'SUCCEEDED' && lastSrsearch887.includes('キットガン'), `${JSON.stringify(follow887?.providerStatuses?.gamewiki ?? {})} sr=${lastSrsearch887}`);
+    const off887: any = await search887.executeSearch('江戸時代の参勤交代の仕組み', { maxResults: 2 } as any);
+    check('P887 ゲームらしくない質問では文脈発射しない', off887?.providerStatuses?.gamewiki?.status === 'SKIPPED', JSON.stringify(off887?.providerStatuses?.gamewiki ?? {}));
+  } finally {
+    keys887.forEach((k, i) => { if (prev887[i]) storageService.setItem(k, prev887[i]); else storageService.removeItem(k); });
+    if (prevTopic887) storageService.setItem('miki_recent_game_topic_v1', prevTopic887); else storageService.removeItem('miki_recent_game_topic_v1');
+    server887.close();
+  }
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
