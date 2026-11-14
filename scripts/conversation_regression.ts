@@ -4828,6 +4828,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P882 バフ後のダメージ', d882.includes('68.9'), d882.slice(0, 60));
 }
 
+// P883: ゲームWiki直行レーン。登録ゲームの質問では、そのゲームの
+// Wiki（MediaWiki API）を直接引く。ローカルのスタブで検証する。
+{
+  const http883 = await import('node:http');
+  const { autonomousSearchService } = await import('../src/miki/research/services/autonomousSearchService');
+  const server883 = http883.createServer((req: any, res: any) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ query: { search: [{ title: 'Vermisplicer', snippet: 'Vermisplicerは<span class="searchmatch">キットガン</span>のバレルである。' }] } }));
+  });
+  await new Promise<void>((resolve) => server883.listen(0, '127.0.0.1', resolve));
+  const port883 = (server883.address() as any).port;
+  const prevWikiUrl883 = storageService.getItem('miki_gamewiki_warframe_api_url');
+  storageService.setItem('miki_gamewiki_warframe_api_url', `http://127.0.0.1:${port883}/api.php`);
+  try {
+    const hit883: any = await autonomousSearchService.executeSearch('Vermisplicer Warframe', { maxResults: 2 } as any);
+    check('P883 ゲームWikiが成功して結果が混ざる', hit883?.providerStatuses?.gamewiki?.status === 'SUCCEEDED' && (hit883?.results ?? []).some((x: any) => x.title === 'Vermisplicer'), JSON.stringify(hit883?.providerStatuses?.gamewiki ?? {}));
+    const miss883: any = await autonomousSearchService.executeSearch('量子力学の基礎', { maxResults: 2 } as any);
+    check('P883 対象外の質問では発射しない', miss883?.providerStatuses?.gamewiki?.status === 'SKIPPED', JSON.stringify(miss883?.providerStatuses?.gamewiki ?? {}));
+  } finally {
+    if (prevWikiUrl883) storageService.setItem('miki_gamewiki_warframe_api_url', prevWikiUrl883); else storageService.removeItem('miki_gamewiki_warframe_api_url');
+    server883.close();
+  }
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

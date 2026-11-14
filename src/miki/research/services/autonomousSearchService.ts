@@ -42,7 +42,7 @@ export interface AutonomousSearchStats {
   lastSearchAt?:number;
 }
 
-export type SearchProviderName = 'searxng' | 'wikipedia' | 'openalex' | 'marginalia';
+export type SearchProviderName = 'searxng' | 'wikipedia' | 'openalex' | 'marginalia' | 'gamewiki';
 
 export type SearchProviderExecutionStatus =
   | 'SUCCEEDED'
@@ -494,7 +494,7 @@ export function mergeSearchResults(
   preferredProvider: 'auto' | SearchProviderName = 'auto',
   maxResults = 4,
 ): WebSearchResultItem[] {
-  const preferredOrder: SearchProviderName[] = ['searxng', 'wikipedia', 'openalex', 'marginalia'];
+  const preferredOrder: SearchProviderName[] = ['searxng', 'gamewiki', 'wikipedia', 'openalex', 'marginalia'];
 
   const rank = new Map(preferredOrder.map((provider, index) => [provider, index]));
   const successfulProviderCount = outputs.filter((output) => output.results.length > 0).length;
@@ -557,6 +557,7 @@ function createProviderStatuses(): Record<SearchProviderName, SearchProviderStat
     wikipedia: { provider: 'wikipedia', status: 'FAILED', error: 'NOT_RUN' },
     openalex: { provider: 'openalex', status: 'FAILED', error: 'NOT_RUN' },
     marginalia: { provider: 'marginalia', status: 'FAILED', error: 'NOT_RUN' },
+    gamewiki: { provider: 'gamewiki', status: 'FAILED', error: 'NOT_RUN' },
   };
 }
 
@@ -995,6 +996,7 @@ export class AutonomousSearchService {
           wikipedia: { provider: 'wikipedia', status: 'SKIPPED' },
           openalex: { provider: 'openalex', status: 'SKIPPED' },
           marginalia: { provider: 'marginalia', status: 'SKIPPED' },
+          gamewiki: { provider: 'gamewiki', status: 'SKIPPED' },
         },
       };
       this.cache.set(cacheKey, { data: mockOutput, timestamp: Date.now() });
@@ -1391,6 +1393,70 @@ export class AutonomousSearchService {
       }
     };
 
+    // P883: ゲームWiki直行レーン。ゲームの話題は一般検索より
+    // そのゲームのWikiの方が濃くて速い。Wikiは大抵 MediaWiki で
+    // 検索APIが共通なので、登録したWikiには直接聞く。クエリに
+    // ゲーム名が含まれないときは発射しない。無料・鍵なし。
+    const attemptGameWiki = async (): Promise<ProviderSearchOutput | null> => {
+      const registry: Array<{ match: RegExp; label: string; apiKey: string; api: string; pageBase: string }> = [
+        { match: /warframe|ウォーフレーム/i, label: 'Warframe Wiki', apiKey: 'miki_gamewiki_warframe_api_url', api: 'https://wiki.warframe.com/api.php', pageBase: 'https://wiki.warframe.com/w/' },
+        { match: /once\s*human|ワンス\s?ヒューマン/i, label: 'Once Human Wiki', apiKey: 'miki_gamewiki_oncehuman_api_url', api: 'https://once-human.fandom.com/api.php', pageBase: 'https://once-human.fandom.com/wiki/' },
+        { match: /delta\s*force|デルタフォース/i, label: 'Delta Force Wiki', apiKey: 'miki_gamewiki_deltaforce_api_url', api: 'https://deltaforce.fandom.com/api.php', pageBase: 'https://deltaforce.fandom.com/wiki/' },
+      ];
+      const target = registry.find((entry) => entry.match.test(safeQuery));
+      if (!target) {
+        markProvider('gamewiki', 'SKIPPED', '登録済みゲームの質問ではないため未発射');
+        return null;
+      }
+      try {
+        const apiUrl = readSupplementalApiUrl(target.apiKey, target.api);
+        const url = new URL(apiUrl);
+        url.searchParams.set('action', 'query');
+        url.searchParams.set('list', 'search');
+        // Wiki自体がゲーム専用なので、クエリからゲーム名を外して
+        // 題目そのもので引く（一般ページに埋もれさせない）。
+        const wikiQuery = safeQuery.replace(target.match, ' ').replace(/\s+/g, ' ').trim() || safeQuery;
+        url.searchParams.set('srsearch', wikiQuery);
+        url.searchParams.set('srlimit', String(maxResults));
+        url.searchParams.set('format', 'json');
+        url.searchParams.set('origin', '*');
+        const res = await fetch(url.toString(), {
+          signal: AbortSignal.timeout(SUPPLEMENTAL_PROVIDER_TIMEOUT_MS),
+          headers: { 'User-Agent': SUPPLEMENTAL_USER_AGENT, Accept: 'application/json' },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const hits = Array.isArray(data?.query?.search) ? data.query.search : [];
+        const flatItems = hits
+          .filter((hit: any) => hit && typeof hit.title === 'string' && hit.title)
+          .slice(0, maxResults)
+          .map((hit: any) => ({
+            title: String(hit.title),
+            snippet: String(hit.snippet || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 400),
+            url: `${target.pageBase}${encodeURIComponent(String(hit.title).replace(/\s+/g, '_'))}`,
+            source: target.label,
+          }));
+        if (flatItems.length === 0) {
+          markProvider('gamewiki', 'EMPTY');
+          return null;
+        }
+        const results: WebSearchResultItem[] = flatItems.map((item: any) => {
+          const canonicalUrl = canonicalizeSearchUrl(item.url);
+          const identity = deriveSourceIdentity('gamewiki', item, canonicalUrl);
+          return { ...item, sourceId: identity.sourceId, independenceClusterId: identity.independenceClusterId };
+        });
+        applyContentIndependenceClusters(results);
+        markProvider('gamewiki', 'SUCCEEDED');
+        systemLogger.info('SELF_IMPROVEMENT', `🔍 [GameWiki] 検索成功: ${target.label} ${results.length}件`);
+        return { provider: 'gamewiki', results };
+      } catch (error: any) {
+        const reason = error?.name === 'TimeoutError' ? 'タイムアウト' : error?.message || String(error);
+        markProvider('gamewiki', 'FAILED', reason);
+        systemLogger.info('SELF_IMPROVEMENT', `ℹ️ [GameWiki] 探索経路失敗: ${reason}`);
+        return null;
+      }
+    };
+
     /*
      * P348: 探索経路はSearXNG単一に統一した（Wikipedia／DuckDuckGoへの直接取得は廃止）。
      * P416: ユーザーの方針訂正（2026-11-04：使わないのは「お金がかかる外部」であって
@@ -1405,6 +1471,7 @@ export class AutonomousSearchService {
      */
     const lane: SearchLane = options?.lane === 'foreground' ? 'foreground' : 'background';
     const wikipediaPromise = attemptWikipedia();
+    const gameWikiPromise = attemptGameWiki();
     const openAlexParallelPromise =
       options?.officialSourceIntent === true ? attemptOpenAlex() : null;
 
@@ -1457,6 +1524,7 @@ export class AutonomousSearchService {
     }
 
     const wikipediaOutput = await wikipediaPromise;
+    const gameWikiOutput = await gameWikiPromise;
     let openAlexOutput: ProviderSearchOutput | null = null;
     if (openAlexParallelPromise) {
       openAlexOutput = await openAlexParallelPromise;
@@ -1471,12 +1539,13 @@ export class AutonomousSearchService {
     // Wikipedia and OpenAlex together produced nothing; in every
     // other case it stays unfired (shared-key rate-limit care).
     let marginaliaOutput: ProviderSearchOutput | null = null;
-    if (!searxngRun.output && !wikipediaOutput && !openAlexOutput) {
+    if (!searxngRun.output && !wikipediaOutput && !openAlexOutput && !gameWikiOutput) {
       marginaliaOutput = await attemptMarginalia();
     } else {
       markProvider('marginalia', 'SKIPPED', '他の経路が結果を返したため未発射（共有キーのレート制限への配慮）');
     }
     const supplementOutputs: ProviderSearchOutput[] = [];
+    if (gameWikiOutput) supplementOutputs.push(gameWikiOutput);
     if (wikipediaOutput) supplementOutputs.push(wikipediaOutput);
     if (openAlexOutput) supplementOutputs.push(openAlexOutput);
     if (marginaliaOutput) supplementOutputs.push(marginaliaOutput);
@@ -1488,16 +1557,16 @@ export class AutonomousSearchService {
     ];
 
     const mergedResults = mergeSearchResults(outputs, preferred, maxResults);
-    const successfulProviders = (['searxng', 'wikipedia', 'openalex', 'marginalia'] as SearchProviderName[]).filter(
+    const successfulProviders = (['searxng', 'gamewiki', 'wikipedia', 'openalex', 'marginalia'] as SearchProviderName[]).filter(
       (provider) => providerStatuses[provider].status === 'SUCCEEDED',
     );
 
     const providerLabel = (provider: SearchProviderName): string =>
-      provider === 'searxng' ? 'SearXNG' : provider === 'wikipedia' ? 'Wikipedia' : provider === 'marginalia' ? 'Marginalia' : 'OpenAlex';
+      provider === 'searxng' ? 'SearXNG' : provider === 'wikipedia' ? 'Wikipedia' : provider === 'marginalia' ? 'Marginalia' : provider === 'gamewiki' ? 'GameWiki' : 'OpenAlex';
     // P436: 冷却中の検索で補助が拾ったかどうかが要約に残らないため、
     // 各Providerの状態の内訳を要約に載せる。冷却そのものを減らす
     // 変更（発射間隔の延長など）は行わない。
-    const providerSummary = (['searxng', 'wikipedia', 'openalex', 'marginalia'] as SearchProviderName[])
+    const providerSummary = (['searxng', 'gamewiki', 'wikipedia', 'openalex', 'marginalia'] as SearchProviderName[])
       .map((provider) => {
         const record = providerStatuses[provider];
         return `${providerLabel(provider)}:${record.status}${record.error ? `（${record.error}）` : ''}`;
