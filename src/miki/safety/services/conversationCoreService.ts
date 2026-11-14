@@ -5176,11 +5176,30 @@ export class ConversationCoreService {
   // P872: ゲーム設計の相談で、教師レッスン（原則）を観点として出す。
   // 設計の話題＋相談・質問の形のときだけ。レッスンは候補・未検証の
   // 知識部品なので、出典と「候補であること」を添えて断定しない。
+  // P879: 会話で引いた知識部品（原則・会話例）に使用記録を付ける。
+  // 「使われた」という事実だけを数え、成否は付けない（PENDING）。
+  // これが貯まると、どの教材が実際に役に立っているかが見える。
+  private recordComponentCitation(componentId: string, taskId: string): void {
+    if (!componentId) return;
+    try {
+      reusableComponentFactoryService.recordUsage({
+        componentIds: [componentId],
+        taskId,
+        selectionMode: 'REUSE_AS_IS',
+        validationResult: 'NOT_RUN',
+        outcome: 'PENDING',
+        coreDecisionId: 'conversationCoreService',
+      });
+    } catch { /* 使用記録は補助経路 */ }
+  }
+
   private designPrincipleAnswer(prompt: string): string | undefined {
     if (!/(?:ゲーム|難易度|バランス|手応え|ご褒美|報酬|リトライ|チュートリアル|詰|難しすぎ|簡単すぎ|敵|ボス|ステージ|マップ|武器|操作感|プレイヤー|面白く|画面|UI|メニュー|表示)/.test(prompt)) return undefined;
     if (!/(?:どうしたら|どうすれば|どうやって|どう思う|コツ|アドバイス|工夫|改善|良くしたい|よくしたい|でしょうか|？|\?)/.test(prompt)) return undefined;
     const lesson = teacherLessonRecallService.findFor(prompt);
     if (!lesson) return undefined;
+    // P879: 引いた原則に使用記録を付ける（結果は未確定なので PENDING）。
+    this.recordComponentCitation(lesson.componentId, 'design-principle-consult');
     const firstSentence = lesson.rule.split('。')[0];
     const ruleText = firstSentence.length > 110 ? `${firstSentence.slice(0, 107)}…` : `${firstSentence}。`;
     return `教わったゲーム作りの原則に、こういうのがあります。「${lesson.title}」${ruleText}まだ候補として教わった知識ですけど、観点としてどうでしょう。`;
@@ -5193,6 +5212,8 @@ export class ConversationCoreService {
     if (!/(?:どうしたら|どうすれば|どう声|どう返|どう言えば|どう言ったら|コツ|仲直り|声かけ)/.test(prompt)) return undefined;
     const ex = dialogueExampleRecallService.findFor(prompt);
     if (!ex) return undefined;
+    // P879: 引いた会話例に使用記録を付ける（結果は未確定なので PENDING）。
+    this.recordComponentCitation(ex.componentId, 'dialogue-example-consult');
     const acts = ex.pattern.acts.slice(0, 3).join('、');
     const flow = acts ? `流れは「${acts}」で進んでいました。` : '';
     return `お手本として教わったやり取りに、似た場面があります。「${ex.title}」だと、彼女側はまず「${ex.pattern.opening}」と受けていました。${flow}まだ候補として教わったお手本ですけど、参考にどうでしょう。`;

@@ -4731,6 +4731,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevRepo878) storageService.setItem(REPO878, prevRepo878); else storageService.removeItem(REPO878);
 }
 
+// P879: 会話で引いた原則・会話例に使用記録が付く（usageCount と
+// 領収書）。成否は付けず「使われた」事実だけを数える。
+{
+  const JSZip879 = (await import('jszip')).default;
+  const { teacherMaterialIntakeService } = await import('../src/miki/core/services/teacherMaterialIntakeService');
+  const REPO879 = 'miki_reusable_component_repository_v1';
+  const RCPT879 = 'miki_component_usage_receipts_v1';
+  const prevRepo879 = storageService.getItem(REPO879);
+  const prevRcpt879 = storageService.getItem(RCPT879);
+  const manifest879 = {
+    formatVersion: 1, packageType: 'TEACHER_MATERIAL', teacher: { name: 'Claude', role: '教師' },
+    subject: '使用記録テスト', version: 'T1',
+    lessons: [{ id: 'TM-T9', title: '難易度は詰んだら救済する', rule: '詰んだら救済の仕組みを用意する。', reason: 'r', howToJudge: 'h', example: 'e', antiPattern: 'a' }],
+    examples: [{ id: 'EX-T9', title: '拗ねたときの声かけ', scene: '相手が拗ねたとき', turns: [
+      { speaker: '相手', text: 'もういいよ' }, { speaker: 'みき', text: 'ごめん、近くにいるよ' },
+    ] }],
+  };
+  const zip879 = new JSZip879();
+  zip879.file('teacher_material.json', JSON.stringify(manifest879));
+  const bytes879 = await zip879.generateAsync({ type: 'uint8array' });
+  await teacherMaterialIntakeService.receivePackage({ fileName: 't.zip', bytes: bytes879 });
+  await conversationCoreService.execute({ prompt: 'ゲームの難易度で詰んだらどうしたらいい？' } as any);
+  await conversationCoreService.execute({ prompt: '彼女が拗ねちゃった。どう声かければいい？' } as any);
+  const items879 = JSON.parse(storageService.getItem(REPO879) || '[]');
+  const lessonUsage879 = items879.find((i: any) => i.componentType === 'TEACHER_LESSON' && String(i.purpose).includes('TM-T9'))?.usageCount;
+  const exampleUsage879 = items879.find((i: any) => i.componentType === 'DIALOGUE_EXAMPLE' && String(i.purpose).includes('EX-T9'))?.usageCount;
+  check('P879 引いた原則と会話例に使用記録が付く', lessonUsage879 === 1 && exampleUsage879 === 1, `lesson=${lessonUsage879} example=${exampleUsage879}`);
+  const receipts879 = JSON.parse(storageService.getItem(RCPT879) || '[]');
+  check('P879 使用の領収書が残る', receipts879.some((x: any) => x.taskId === 'design-principle-consult') && receipts879.some((x: any) => x.taskId === 'dialogue-example-consult'), '');
+  if (prevRepo879) storageService.setItem(REPO879, prevRepo879); else storageService.removeItem(REPO879);
+  if (prevRcpt879) storageService.setItem(RCPT879, prevRcpt879); else storageService.removeItem(RCPT879);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

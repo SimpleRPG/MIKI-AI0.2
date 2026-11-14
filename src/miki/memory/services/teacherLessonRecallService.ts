@@ -13,6 +13,8 @@ export interface TeacherLessonView {
   title: string;
   rule: string;
   subject: string;
+  // P879: 使用記録を付けるための部品ID。
+  componentId: string;
 }
 
 function readLessons(): TeacherLessonView[] {
@@ -31,6 +33,7 @@ function readLessons(): TeacherLessonView[] {
         title: lesson.title,
         rule: lesson.rule,
         subject: typeof (item as any).packageSubject === 'string' ? (item as any).packageSubject : '',
+        componentId: typeof (item as any).componentId === 'string' ? (item as any).componentId : '',
       });
     }
     return out;

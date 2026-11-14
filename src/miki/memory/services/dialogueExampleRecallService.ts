@@ -13,6 +13,8 @@ export interface DialogueExampleView {
   turns: Array<{ speaker: string; text: string }>;
   pattern: { herLineCount: number; acts: string[]; opening: string; closing: string };
   subject: string;
+  // P879: 使用記録を付けるための部品ID。
+  componentId: string;
 }
 
 function readExamples(): DialogueExampleView[] {
@@ -39,6 +41,7 @@ function readExamples(): DialogueExampleView[] {
           closing: typeof pat?.closing === 'string' ? pat.closing : '',
         },
         subject: typeof (item as any).packageSubject === 'string' ? (item as any).packageSubject : '',
+        componentId: typeof (item as any).componentId === 'string' ? (item as any).componentId : '',
       });
     }
     return out;
