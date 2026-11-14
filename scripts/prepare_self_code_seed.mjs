@@ -9,7 +9,12 @@ const outputDir = path.join(root, 'public');
 const outputFile = path.join(outputDir, 'self-code-seed.zip');
 
 const excludedPrefixes = ['.git/', 'node_modules/', 'dist/', 'android/.gradle/', 'android/app/build/'];
-const isIncluded = file => !excludedPrefixes.some(prefix => file.startsWith(prefix)) && file !== 'public/self-code-seed.zip';
+// P886: 過去版の関係台帳（SOURCE_FILE_RELATION_LEDGER_P*.json、
+// 20ファイルで約90MB）は生成物の履歴であり、端末の自己コード空間
+// には不要。seed が約95MBに膨らみ、実機で適用17秒＋巨大な保存に
+// なっていた主因。リポジトリには残し、seed からだけ外す。
+const excludedFilePatterns = [/^SOURCE_FILE_RELATION_LEDGER_P\d+\.json$/];
+const isIncluded = file => !excludedPrefixes.some(prefix => file.startsWith(prefix)) && file !== 'public/self-code-seed.zip' && !excludedFilePatterns.some(pattern => pattern.test(file));
 const hasGitRepository = fs.existsSync(path.join(root, '.git'));
 let commitSha = 'ARCHIVE_WITHOUT_GIT_METADATA';
 let files = [];

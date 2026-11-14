@@ -3463,9 +3463,9 @@
     },
     {
       "path": "scripts/prepare_self_code_seed.mjs",
-      "bytes": 4876,
-      "lines": 171,
-      "sha256": "0cdbee2daa1c78d2f08bbf688a2ce7ec95d3874c6cb33f0af52da63163a81ddb",
+      "bytes": 5355,
+      "lines": 176,
+      "sha256": "d1c95c8c42357c9caf7652598ff9286a6a8f7bbb852c99335ec302448d879c04",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
