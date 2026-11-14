@@ -135,6 +135,13 @@ class StorageService {
     }
     if (this.dirtyKeys.size) this.scheduleFlush();
     await this.migrateFromLegacyLocalStorage();
+    // P885: 起動時にストレージの内訳（大きいキーの名前とサイズ）を
+    // 1回だけ診断へ出す。次回の実機ログで巨大台帳を特定するため。
+    this.emitFlushDiagnostic('INVENTORY', {
+      backend: this.backend,
+      keyCount: this.cache.size,
+      largestKeys: this.describeLargestKeys(8),
+    });
   }
 
   private chunkRowKey(key: string, generation: string, part: number): string {
@@ -449,6 +456,11 @@ class StorageService {
       totalValueChars,
       maxValueChars,
       keyClasses: keyClasses.join('|') || 'NONE',
+      // P885: このフラッシュで書く一番大きいキー（名前つき・上位3件）
+      largestKeys: keys
+        .map((key) => ({ key, chars: this.cache.get(key)?.length ?? 0 }))
+        .sort((a, b) => b.chars - a.chars)
+        .slice(0, 3),
     };
     const traceFlush = this.shouldTraceFlush(keyClasses, totalValueChars, maxValueChars, keys.length);
     if (traceFlush) this.emitFlushDiagnostic('BEGIN', diagnosticMetrics);
@@ -623,6 +635,18 @@ class StorageService {
 
   public getBackendName(): 'sqlite' | 'indexeddb' | 'memory' {
     return this.backend;
+  }
+
+  /**
+   * P885: どのキーが大きいかを名前つきで返す（診断用）。実機ログの
+   * フラッシュ診断はクラス集計だけで、約45MB級の値がどの台帳か
+   * 特定できなかった。キー名は内部識別子のみで、値そのものは出さない。
+   */
+  public describeLargestKeys(limit = 8): Array<{ key: string; chars: number }> {
+    return [...this.cache.entries()]
+      .map(([key, value]) => ({ key, chars: value.length }))
+      .sort((a, b) => b.chars - a.chars)
+      .slice(0, Math.max(1, limit));
   }
 
   // --- 7-Tier Hierarchical Memory Dedicated Methods ---

@@ -4866,6 +4866,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P884 強制フラッシュは全部書く', forced884.write.length === 2 && forced884.defer.length === 0, JSON.stringify(forced884));
 }
 
+// P885: ストレージ診断が大きいキーを名前つきで出せる（巨大台帳の特定用）。
+{
+  const { storageService: storage885 } = await import('../src/services/storageService');
+  storage885.setItem('miki_p885_small', 'x'.repeat(10));
+  storage885.setItem('miki_p885_large', 'y'.repeat(5000));
+  try {
+    const top885 = storage885.describeLargestKeys(100);
+    const mine885 = top885.find((e) => e.key === 'miki_p885_large');
+    const sorted885 = top885.every((e, i) => i === 0 || top885[i - 1].chars >= e.chars);
+    check('P885 大きいキーが名前つきで返る', Boolean(mine885) && mine885!.chars === 5000 && sorted885, JSON.stringify(mine885 ?? {}));
+  } finally {
+    storage885.removeItem('miki_p885_small');
+    storage885.removeItem('miki_p885_large');
+  }
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
