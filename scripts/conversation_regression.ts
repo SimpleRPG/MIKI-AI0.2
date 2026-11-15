@@ -4968,6 +4968,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevV889) storageService.setItem(VSTORE889, prevV889); else storageService.removeItem(VSTORE889);
 }
 
+// P890: 字幕が無い動画は、端末ローカルの音声認識サービスへ回す。
+// サービス応答があれば文字起こしとして同じ土俵（見出し・要約）で学ぶ。
+{
+  const { videoTranscriptService: vts890 } = await import('../src/miki/research/services/videoTranscriptService');
+  const VSTORE890 = 'miki_video_learnings_v1';
+  const prevV890 = storageService.getItem(VSTORE890);
+  const WATCH890 = '<html><head><title>ゾルバン実況 - YouTube</title></head><body><script>var ytInitialPlayerResponse = {};</script></body></html>';
+  const ASR890 = JSON.stringify({ title: 'ゾルバン実況', text: 'ゾルバンは牧場で暮らす生き物です。ゾルバンの羊毛は柔らかくて、牧場の収入源になっています。ゾルバンは羊毛を落とすので、牧場では羊毛を集めます。' });
+  const run890 = async (p: string) => String(((await conversationCoreService.execute({ prompt: p } as any)) as any)?.replyText ?? '');
+  vts890.setFetchForTest(async () => WATCH890);
+  (vts890 as any).setAsrFetchForTest(async () => ASR890);
+  const learn890 = await run890('この動画見て学んで https://youtu.be/p890videoC');
+  check('P890 字幕なし→音声認識で学び、その旨を伝える', learn890.includes('文字起こし') && learn890.includes('ゾルバン'), learn890.slice(0, 90));
+  const latest890: any = vts890.latest();
+  check('P890 ASR経由でも見出しと要約が付く', latest890?.via === 'asr' && (latest890?.topics ?? []).includes('ゾルバン') && (latest890?.summary ?? []).join('').includes('収入源'), `${latest890?.via}/${JSON.stringify(latest890?.topics ?? [])}`);
+  (vts890 as any).setAsrFetchForTest(null);
+  vts890.setFetchForTest(null);
+  if (prevV890) storageService.setItem(VSTORE890, prevV890); else storageService.removeItem(VSTORE890);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

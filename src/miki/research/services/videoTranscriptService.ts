@@ -10,6 +10,12 @@ import { storageService } from '../../../services/storageService';
 const STORE_KEY = 'miki_video_learnings_v1';
 const MAX_VIDEOS = 10;
 const MAX_TEXT = 20000;
+// P890: 字幕が無い動画のための音声認識サービス（端末ローカル）。
+// きりあの Termux で whisper.cpp サービスが起動している間だけ届く。
+// 届かなければ今まで通り「字幕なし」で正直に失敗する（既定値＝localhost）。
+const ASR_URL_KEY = 'miki_asr_service_url_v1';
+const ASR_DEFAULT_URL = 'http://127.0.0.1:8899/transcribe';
+const ASR_TIMEOUT_MS = 240000;
 
 export interface VideoLearning {
   videoId: string;
@@ -21,6 +27,8 @@ export interface VideoLearning {
   topics?: string[];
   // P889: 抽出型要約（要点文を最大3つ、元の順序で）。
   summary?: string[];
+  // P890: 学びの経路。字幕か、音声認識（端末ローカルのASRサービス）か。
+  via?: 'captions' | 'asr';
 }
 
 const TOPIC_STOP = new Set(['動画', '今回', '自分', '相手', '人間', '時間', '全部', '本当', '以上', '以下', '感じ', '部分', '状態', '場合', '結果', '方法', '必要', '可能', '最初', '最後', '最近', '現在', '今日', '明日', '昨日', 'もの', 'こと', 'ため', 'よう', 'チャンネル', 'コメント', 'お願い', '登録', '高評価']);
@@ -162,6 +170,38 @@ function parseTimedText(body: string): string {
   return lines.join(' ');
 }
 
+// P890: 字幕が無いときに、端末ローカルの音声認識サービスへ回す。
+// サービスが起動していなければ接続自体が失敗して null（＝従来動作）。
+let asrFetchOverride: ((url: string, body: string) => Promise<string>) | null = null;
+
+async function postAsr(endpoint: string, body: string): Promise<string> {
+  if (asrFetchOverride) return asrFetchOverride(endpoint, body);
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  });
+  if (!res.ok) throw new Error(`asr http ${res.status}`);
+  return res.text();
+}
+
+async function tryAsr(url: string): Promise<{ text: string; title?: string } | null> {
+  try {
+    const endpoint = storageService.getItem(ASR_URL_KEY)?.trim() || ASR_DEFAULT_URL;
+    const timeout = new Promise<never>((_, reject) => {
+      const t = setTimeout(() => reject(new Error('asr timeout')), ASR_TIMEOUT_MS);
+      (t as any)?.unref?.();
+    });
+    const raw = await Promise.race([postAsr(endpoint, JSON.stringify({ url })), timeout]);
+    const parsed = JSON.parse(raw) as { text?: string; title?: string };
+    const text = String(parsed.text ?? '').replace(/\s+/g, ' ').trim();
+    if (text.length < 10) return null;
+    return { text, title: parsed.title ? String(parsed.title) : undefined };
+  } catch {
+    return null;
+  }
+}
+
 export const videoTranscriptService = {
   extractVideoId(url: string): string | undefined {
     const m = url.match(/(?:watch\?v=|youtu\.be\/|shorts\/|live\/)([\w-]{6,})/);
@@ -173,11 +213,16 @@ export const videoTranscriptService = {
     fetchOverride = fn;
   },
 
+  // P890: テスト用にASR送信関数を差し替え。
+  setAsrFetchForTest(fn: ((url: string, body: string) => Promise<string>) | null): void {
+    asrFetchOverride = fn;
+  },
+
   listLearned(): VideoLearning[] {
     return readStore();
   },
 
-  async learnFromUrl(url: string): Promise<{ ok: boolean; title?: string; reason?: string; topics?: string[] }> {
+  async learnFromUrl(url: string): Promise<{ ok: boolean; title?: string; reason?: string; topics?: string[]; via?: 'captions' | 'asr' }> {
     const videoId = this.extractVideoId(url);
     if (!videoId) return { ok: false, reason: 'URLから動画を特定できませんでした' };
     let html: string;
@@ -188,8 +233,23 @@ export const videoTranscriptService = {
     }
     const title = (html.match(/<title>([^<]+)<\/title>/)?.[1] ?? '')
       .replace(/\s*-\s*YouTube\s*$/, '').trim() || '（タイトル不明）';
+    // 保存処理は字幕・音声認識で共通（見出し抽出・要約まで同じ土俵）。
+    const storeAndReturn = (rawText: string, finalTitle: string, via: 'captions' | 'asr') => {
+      const storedText = rawText.slice(0, MAX_TEXT);
+      const topics = extractTopics(storedText);
+      const summary = summarizeText(storedText, topics);
+      const list = readStore().filter((v) => v.videoId !== videoId);
+      list.push({ videoId, title: decodeEntities(finalTitle), url, at: Date.now(), text: storedText, topics, summary, via });
+      writeStore(list);
+      return { ok: true, title: decodeEntities(finalTitle), topics, via } as const;
+    };
     const track = chooseTrack(parseCaptionTracks(html));
-    if (!track) return { ok: false, reason: '字幕が見つかりませんでした' };
+    if (!track) {
+      // P890: 字幕が無い → 端末ローカルの音声認識へ（起動していれば）。
+      const asr = await tryAsr(url);
+      if (asr) return storeAndReturn(asr.text, asr.title || title, 'asr');
+      return { ok: false, reason: '字幕が見つかりませんでした' };
+    }
     let body: string;
     try {
       body = await fetchText(`${track.baseUrl}&fmt=json3`);
@@ -203,14 +263,13 @@ export const videoTranscriptService = {
         text = parseTimedText(body);
       } catch { /* 下で判定 */ }
     }
-    if (!text) return { ok: false, reason: '字幕の中身を読めませんでした' };
-    const storedText = text.slice(0, MAX_TEXT);
-    const topics = extractTopics(storedText);
-    const summary = summarizeText(storedText, topics);
-    const list = readStore().filter((v) => v.videoId !== videoId);
-    list.push({ videoId, title: decodeEntities(title), url, at: Date.now(), text: storedText, topics, summary });
-    writeStore(list);
-    return { ok: true, title: decodeEntities(title), topics };
+    if (!text) {
+      // P890: 字幕トラックはあるが中身が読めない場合も音声認識を試す。
+      const asr = await tryAsr(url);
+      if (asr) return storeAndReturn(asr.text, asr.title || title, 'asr');
+      return { ok: false, reason: '字幕の中身を読めませんでした' };
+    }
+    return storeAndReturn(text, title, 'captions');
   },
 
   // 学んだ動画の本文から、キーワード周辺の抜粋を返す。

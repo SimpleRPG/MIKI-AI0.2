@@ -5343,7 +5343,9 @@ export class ConversationCoreService {
           }
         } catch { /* 意味学習への接続は補助経路。失敗しても会話は止めない。 */ }
         const topicText = topics.length ? `主に${topics.slice(0, 3).join('・')}の話でした。` : '';
-        return `動画「${r.title}」の字幕を読んで学びました。${topicText}内容について聞いてもらえれば、読んだ範囲で答えます。`;
+        // P890: 音声認識で学んだときは、その旨を正直に伝える。
+        const how = (r as any).via === 'asr' ? '音声を文字起こしして学びました' : '字幕を読んで学びました';
+        return `動画「${r.title}」の${how}。${topicText}内容について聞いてもらえれば、読んだ範囲で答えます。`;
       }
       return `動画を見に行ったんですけど、${r.reason ?? 'うまく読めませんでした'}ので、今回は学べませんでした。`;
     } catch { return undefined; }
