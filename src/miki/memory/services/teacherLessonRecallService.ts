@@ -4,9 +4,7 @@
 // の retrieve() では候補ステータスのため対象外になるので、保管庫を直接
 // 読む。引く側は「候補の知識であること」を出し方で明示する前提。
 // 2026-11-08 の設計原則どおり、共有で持つべき検索は共有層に置く。
-import { storageService } from '../../../services/storageService';
-
-const REPO_KEY = 'miki_reusable_component_repository_v1';
+import { componentRepositoryCacheService } from './componentRepositoryCacheService';
 
 export interface TeacherLessonView {
   id: string;
@@ -19,10 +17,7 @@ export interface TeacherLessonView {
 
 function readLessons(): TeacherLessonView[] {
   try {
-    const raw = storageService.getItem(REPO_KEY);
-    if (!raw) return [];
-    const items = JSON.parse(raw);
-    if (!Array.isArray(items)) return [];
+    const items = componentRepositoryCacheService.readAll();
     const out: TeacherLessonView[] = [];
     for (const item of items) {
       if (!item || item.componentType !== 'TEACHER_LESSON') continue;

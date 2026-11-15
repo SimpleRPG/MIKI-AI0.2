@@ -5030,6 +5030,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevV892) storageService.setItem(VSTORE892, prevV892); else storageService.removeItem(VSTORE892);
 }
 
+// P893: 部品保管庫の読み取りキャッシュ。指紋が同じ間はパース済みを
+// 使い回し、台帳が差し替われば読み直す。
+{
+  const { componentRepositoryCacheService: crc893 } = await import('../src/miki/memory/services/componentRepositoryCacheService');
+  const RKEY893 = 'miki_reusable_component_repository_v1';
+  const prevR893 = storageService.getItem(RKEY893);
+  storageService.setItem(RKEY893, JSON.stringify([{ componentId: 'RC-893-A' }, { componentId: 'RC-893-B' }]));
+  const first893 = crc893.readAll();
+  const second893 = crc893.readAll();
+  check('P893 キャッシュが効く（同じ配列を使い回す）', first893.length === 2 && second893 === first893, `${first893.length}/${second893 === first893}`);
+  storageService.setItem(RKEY893, JSON.stringify([{ componentId: 'RC-893-A' }, { componentId: 'RC-893-B' }, { componentId: 'RC-893-C' }]));
+  const third893 = crc893.readAll();
+  check('P893 台帳が変われば読み直す', third893.length === 3 && third893 !== first893, `${third893.length}`);
+  if (prevR893) storageService.setItem(RKEY893, prevR893); else storageService.removeItem(RKEY893);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

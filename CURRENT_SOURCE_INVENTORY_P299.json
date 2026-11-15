@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1813,
-    "sourceFileCount": 1366,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1277,
-    "relativeImportCandidateCount": 4316,
-    "resolvedRelativeImportCandidateCount": 4300,
+    "trackedPathCountExcludingControlPaths": 1814,
+    "sourceFileCount": 1367,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1278,
+    "relativeImportCandidateCount": 4318,
+    "resolvedRelativeImportCandidateCount": 4302,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 428272,
-      "lines": 5046,
-      "sha256": "6851bb366ef2156021cff7b1cb8252cee93ce8fa5e4bd87a75bc77d0ce5f3685",
+      "bytes": 429433,
+      "lines": 5062,
+      "sha256": "ce4f1b4a1439c76ccdf2f4c27aa8021818814a45d6c491a42c92c4d27aefed88",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3344,10 +3344,16 @@
           "specifier": "../src/miki/research/services/videoTranscriptService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/videoTranscriptService.ts"
+        },
+        {
+          "line": 5036,
+          "specifier": "../src/miki/memory/services/componentRepositoryCacheService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/componentRepositoryCacheService.ts"
         }
       ],
-      "relativeImportCandidateCount": 271,
-      "resolvedRelativeImportCount": 271,
+      "relativeImportCandidateCount": 272,
+      "resolvedRelativeImportCount": 272,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -25998,6 +26004,23 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/memory/services/componentRepositoryCacheService.ts",
+      "bytes": 1251,
+      "lines": 31,
+      "sha256": "988e4e60fb06842998d69a15c2a20a7e0951af9bae00f590d65954ee7034752a",
+      "relativeImportCandidates": [
+        {
+          "line": 7,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/memory/services/dayKeyService.ts",
       "bytes": 1269,
       "lines": 37,
@@ -26009,15 +26032,15 @@
     },
     {
       "path": "src/miki/memory/services/dialogueExampleRecallService.ts",
-      "bytes": 4691,
-      "lines": 123,
-      "sha256": "bd62336c3fe59f70d3bc513d34f9386b9c79f20bdf3ba4e6674a62993310cf2c",
+      "bytes": 4559,
+      "lines": 118,
+      "sha256": "5c3d4d2abf9a3520233ae4f95af0d4923aac9d790918bdf0bc62d336e5643cc0",
       "relativeImportCandidates": [
         {
           "line": 5,
-          "specifier": "../../../services/storageService",
+          "specifier": "./componentRepositoryCacheService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
+          "resolvedPath": "src/miki/memory/services/componentRepositoryCacheService.ts"
         }
       ],
       "relativeImportCandidateCount": 1,
@@ -27010,15 +27033,15 @@
     },
     {
       "path": "src/miki/memory/services/teacherLessonRecallService.ts",
-      "bytes": 6699,
-      "lines": 156,
-      "sha256": "4aff62dea42fe7a85544dd10c6692e8d529708ef818cbc7569d7dff460100cdc",
+      "bytes": 6567,
+      "lines": 151,
+      "sha256": "4a61fe4912911cdfa2cd1260acbc977c9cb9253e28c6579b9eee6827a809a95d",
       "relativeImportCandidates": [
         {
           "line": 7,
-          "specifier": "../../../services/storageService",
+          "specifier": "./componentRepositoryCacheService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/services/storageService.ts"
+          "resolvedPath": "src/miki/memory/services/componentRepositoryCacheService.ts"
         }
       ],
       "relativeImportCandidateCount": 1,

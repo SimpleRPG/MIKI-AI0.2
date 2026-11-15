@@ -2,9 +2,7 @@
 // 教師教材で登録された会話例（componentType='DIALOGUE_EXAMPLE'、
 // 候補・未検証）のうち、話題・場面に合うものを引く。レッスンと
 // 同じく保管庫を直接読む（候補は retrieve() の対象外のため）。
-import { storageService } from '../../../services/storageService';
-
-const REPO_KEY = 'miki_reusable_component_repository_v1';
+import { componentRepositoryCacheService } from './componentRepositoryCacheService';
 
 export interface DialogueExampleView {
   id: string;
@@ -19,10 +17,7 @@ export interface DialogueExampleView {
 
 function readExamples(): DialogueExampleView[] {
   try {
-    const raw = storageService.getItem(REPO_KEY);
-    if (!raw) return [];
-    const items = JSON.parse(raw);
-    if (!Array.isArray(items)) return [];
+    const items = componentRepositoryCacheService.readAll();
     const out: DialogueExampleView[] = [];
     for (const item of items) {
       if (!item || item.componentType !== 'DIALOGUE_EXAMPLE') continue;
