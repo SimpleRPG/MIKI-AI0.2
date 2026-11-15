@@ -208,6 +208,25 @@ export class AndroidNativeRunnerAdapterService {
     }
   }
 
+  // P894: Rust ネイティブコアの健康状態をランタイムログに1回だけ刻む。
+  // 実機で .so が読めているか（available/compatible/apiVersion、ダメなら
+  // reason）を次のログで確定させるための診断。失敗しても起動は止めない。
+  private nativeCoreHealthReported = false;
+  public reportNativeCoreHealthToLog(): void {
+    if (this.nativeCoreHealthReported) return;
+    this.nativeCoreHealthReported = true;
+    void this.nativeCoreHealth()
+      .then((h) => {
+        systemLogger.recordRuntimeDiagnostic('NATIVE_CORE_HEALTH', {
+          available: h.available,
+          compatible: h.compatible,
+          apiVersion: h.apiVersion,
+          reason: h.reason ?? '',
+        });
+      })
+      .catch(() => {});
+  }
+
   public async health(): Promise<{ available: boolean; ready: boolean; runnerId?: string; reason?: string }> {
     if (!Capacitor.isNativePlatform()) return { available: false, ready: false, reason: 'Android Native Platformではありません。' };
     if (!MIKINativeRunner.health) return { available: true, ready: true, runnerId: 'android-native' };

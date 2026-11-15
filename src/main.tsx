@@ -8,6 +8,13 @@ import './index.css';
 void systemLogger.initializeRuntimeLogFile();
 systemLogger.info('SYSTEM','[BOOT] JavaScript entry loaded',{userAgent:typeof navigator==='undefined'?'unknown':navigator.userAgent,buildRevision:String((import.meta as any).env?.VITE_MIKI_BUILD_REVISION||'UNKNOWN')});
 
+// P894: Rust ネイティブコアの健康状態をランタイムログへ（起動後少し待って1回）。
+setTimeout(() => {
+  void import('./miki/execution/services/androidNativeRunnerAdapterService')
+    .then((m) => m.androidNativeRunnerAdapterService.reportNativeCoreHealthToLog())
+    .catch(() => {});
+}, 3000);
+
 // Prevent WebGPU / background abort recoverable notices from triggering parent frame tab shifts
 window.addEventListener('unhandledrejection', (event) => {
   const reason = String(event?.reason?.message || event?.reason || '');

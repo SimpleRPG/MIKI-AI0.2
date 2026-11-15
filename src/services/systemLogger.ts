@@ -38,7 +38,7 @@ const RUNTIME_BREADCRUMB_PROGRESS_STREAM: Record<string, 'RUNTIME_STAGE' | 'DOMA
 };
 
 const RUNTIME_DIAGNOSTIC_EVENTS = new Set([
-  'RUNTIME_MEMORY_SAMPLE', 'STORAGE_FLUSH_CHECKPOINT', 'SELF_CODE_SEED_CHECKPOINT', 'DOMAIN_ROUTER_CHECKPOINT',
+  'RUNTIME_MEMORY_SAMPLE', 'STORAGE_FLUSH_CHECKPOINT', 'SELF_CODE_SEED_CHECKPOINT', 'DOMAIN_ROUTER_CHECKPOINT', 'NATIVE_CORE_HEALTH',
 ]);
 
 const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
@@ -52,6 +52,7 @@ const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
   'totalContentChars', 'maxFileChars', 'historyCount', 'serializedChars', 'serializationElapsedMs',
   'command', 'source', 'target', 'javaUsedKB', 'javaTotalKB', 'javaMaxKB',
   'nativeAllocKB', 'nativeSizeKB', 'pssKB', 'availKB', 'thresholdKB', 'lowMem', 'sampleIndex', 'status',
+  'available', 'compatible', 'apiVersion', 'reason',
 ]);
 
 interface RuntimeBreadcrumb {

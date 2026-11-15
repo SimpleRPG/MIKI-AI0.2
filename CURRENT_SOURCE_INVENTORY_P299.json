@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1814,
     "sourceFileCount": 1367,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1278,
-    "relativeImportCandidateCount": 4318,
-    "resolvedRelativeImportCandidateCount": 4302,
+    "relativeImportCandidateCount": 4320,
+    "resolvedRelativeImportCandidateCount": 4304,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 429433,
-      "lines": 5062,
-      "sha256": "ce4f1b4a1439c76ccdf2f4c27aa8021818814a45d6c491a42c92c4d27aefed88",
+      "bytes": 430072,
+      "lines": 5075,
+      "sha256": "f141a141a529201a4fdd2c7e5bd269f411c0f7dd0b4d58832489905496a12ae2",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3350,10 +3350,16 @@
           "specifier": "../src/miki/memory/services/componentRepositoryCacheService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/componentRepositoryCacheService.ts"
+        },
+        {
+          "line": 5052,
+          "specifier": "../src/miki/execution/services/androidNativeRunnerAdapterService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/androidNativeRunnerAdapterService.ts"
         }
       ],
-      "relativeImportCandidateCount": 272,
-      "resolvedRelativeImportCount": 272,
+      "relativeImportCandidateCount": 273,
+      "resolvedRelativeImportCount": 273,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -9969,9 +9975,9 @@
     },
     {
       "path": "src/main.tsx",
-      "bytes": 5688,
-      "lines": 133,
-      "sha256": "b644e8a27c09eda069249a4e85d892838d46f6f776b58f2799b8443df4a07b67",
+      "bytes": 6016,
+      "lines": 140,
+      "sha256": "1ea2bbb91454174361225622ce13786d3fc1758bf1d83cebf9dba6724f2ef473",
       "relativeImportCandidates": [
         {
           "line": 3,
@@ -9998,26 +10004,32 @@
           "resolvedPath": "src/index.css"
         },
         {
-          "line": 98,
+          "line": 13,
+          "specifier": "./miki/execution/services/androidNativeRunnerAdapterService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/androidNativeRunnerAdapterService.ts"
+        },
+        {
+          "line": 105,
           "specifier": "./App",
           "resolution": "RESOLVED",
           "resolvedPath": "src/App.tsx"
         },
         {
-          "line": 99,
+          "line": 106,
           "specifier": "./components/ErrorBoundary",
           "resolution": "RESOLVED",
           "resolvedPath": "src/components/ErrorBoundary.tsx"
         },
         {
-          "line": 127,
+          "line": 134,
           "specifier": "./services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         }
       ],
-      "relativeImportCandidateCount": 7,
-      "resolvedRelativeImportCount": 7,
+      "relativeImportCandidateCount": 8,
+      "resolvedRelativeImportCount": 8,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -22582,9 +22594,9 @@
     },
     {
       "path": "src/miki/execution/services/androidNativeRunnerAdapterService.ts",
-      "bytes": 22229,
-      "lines": 275,
-      "sha256": "da6b185589bceefda20409e0e723520597c33c1bff2a01278d09e04c5aee9041",
+      "bytes": 23016,
+      "lines": 294,
+      "sha256": "4ad65e936d67070b5d31ffe684d4d1319fa2c37d14083a1e1732cc6768b16533",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -40271,9 +40283,9 @@
     },
     {
       "path": "src/services/systemLogger.ts",
-      "bytes": 44247,
-      "lines": 1087,
-      "sha256": "66d04a151189f7b481874dc37e26a4aa8439f91f327293b8aff8af5913a5e140",
+      "bytes": 44322,
+      "lines": 1088,
+      "sha256": "d64daa7b38712860ab5029b5618841b6733c2b877a3651b37b729922ef89b735",
       "relativeImportCandidates": [
         {
           "line": 1,

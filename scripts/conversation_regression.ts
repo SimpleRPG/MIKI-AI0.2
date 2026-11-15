@@ -5046,6 +5046,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevR893) storageService.setItem(RKEY893, prevR893); else storageService.removeItem(RKEY893);
 }
 
+// P894: ネイティブコア健康診断のログ受け口。サンドボックス（非ネイティブ）
+// では落とさずに終わることだけを確認する（実機の available は実機ログで見る）。
+{
+  const { androidNativeRunnerAdapterService: adapter894 } = await import('../src/miki/execution/services/androidNativeRunnerAdapterService');
+  let ok894 = true;
+  try {
+    adapter894.reportNativeCoreHealthToLog();
+    adapter894.reportNativeCoreHealthToLog();
+    await new Promise((r) => setTimeout(r, 50));
+  } catch { ok894 = false; }
+  check('P894 健康診断の報告が例外なく動く', ok894, '');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
