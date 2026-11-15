@@ -5354,6 +5354,23 @@ export class ConversationCoreService {
   // P875: 学んだ動画の内容への質問に、保存した字幕本文から答える。
   private videoRecallAnswer(prompt: string): string | undefined {
     if (!/(?:動画|ビデオ)/.test(prompt)) return undefined;
+    // P892: 学んだ動画の一覧・本数の求め（内容の想起より前に拾う）。
+    if (/(?:一覧|リスト|何を学|学んだ|見た動画|本数|何本)/.test(prompt)) {
+      try {
+        const list = videoTranscriptService.listLearned();
+        if (/(?:何本|本数)/.test(prompt)) {
+          return list.length
+            ? `今までに${list.length}本の動画を学びました。`
+            : 'まだ動画は学んでいないです。';
+        }
+        if (list.length) {
+          const items = [...list].reverse().slice(0, 5).map((v) => `「${v.title}」`);
+          const tail = list.length > 5 ? `、ほか${list.length - 5}本` : '';
+          return `今までに学んだ動画は、${items.join('、')}${tail}です。`;
+        }
+        return 'まだ動画は学んでいないです。URLを渡してもらえれば見て学びます。';
+      } catch { /* 下の想起に落とす */ }
+    }
     if (!/(?:何て|何を|どう|内容|言って|話して|テーマ|どんな|概要|要約|まとめ)/.test(prompt)) return undefined;
     try {
       const latest = videoTranscriptService.latest();

@@ -5014,6 +5014,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevV891) storageService.setItem(VSTORE891, prevV891); else storageService.removeItem(VSTORE891);
 }
 
+// P892: 学んだ動画の一覧と本数に答える。
+{
+  const VSTORE892 = 'miki_video_learnings_v1';
+  const prevV892 = storageService.getItem(VSTORE892);
+  storageService.setItem(VSTORE892, JSON.stringify([
+    { videoId: 'p892vA', title: 'ゾルバンの観察記録', url: 'https://youtu.be/p892vA', at: 1, text: 'ゾルバンの話。', topics: ['ゾルバン'], summary: [] },
+    { videoId: 'p892vB', title: 'ミナモの観察記録', url: 'https://youtu.be/p892vB', at: 2, text: 'ミナモの話。', topics: ['ミナモ'], summary: [] },
+  ]));
+  const run892 = async (p: string) => String(((await conversationCoreService.execute({ prompt: p } as any)) as any)?.replyText ?? '');
+  const list892 = await run892('今まで学んだ動画の一覧を教えて');
+  check('P892 学んだ動画の一覧が返る', list892.includes('ゾルバンの観察記録') && list892.includes('ミナモの観察記録'), list892.slice(0, 100));
+  const count892 = await run892('動画は何本学んだ？');
+  check('P892 学んだ動画の本数が返る', count892.includes('2本'), count892.slice(0, 60));
+  if (prevV892) storageService.setItem(VSTORE892, prevV892); else storageService.removeItem(VSTORE892);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
