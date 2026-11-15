@@ -5321,7 +5321,30 @@ export class ConversationCoreService {
     if (!/(?:見て|観て|学ん|覚えて|内容|要約|チェック)/.test(prompt)) return undefined;
     try {
       const r = await videoTranscriptService.learnFromUrl(url);
-      if (r.ok) return `動画「${r.title}」の字幕を読んで学びました。内容について聞いてもらえれば、読んだ範囲で答えます。`;
+      if (r.ok) {
+        const topics = r.topics ?? [];
+        // P888: 動画で繰り返し出てきた語のうち、辞書に無いものを
+        // 意味学習のキューへ繋ぐ（最大2件）。学びを動画の保管庫の
+        // 中だけに閉じず、彼女の語彙の成長に接続する。
+        try {
+          let queued = 0;
+          for (const t of topics) {
+            if (queued >= 2) break;
+            if (!japaneseDictionaryService.has(t)) {
+              knowledgeGapService.detect({
+                query: `用語の意味を学ぶ: ${t}`,
+                reason: `動画「${r.title}」で繰り返し出てきた語の意味を学ぶ。`,
+                type: 'UNKNOWN_TERM',
+                target: t,
+                priority: 40,
+              });
+              queued++;
+            }
+          }
+        } catch { /* 意味学習への接続は補助経路。失敗しても会話は止めない。 */ }
+        const topicText = topics.length ? `主に${topics.slice(0, 3).join('・')}の話でした。` : '';
+        return `動画「${r.title}」の字幕を読んで学びました。${topicText}内容について聞いてもらえれば、読んだ範囲で答えます。`;
+      }
       return `動画を見に行ったんですけど、${r.reason ?? 'うまく読めませんでした'}ので、今回は学べませんでした。`;
     } catch { return undefined; }
   }
@@ -5329,7 +5352,7 @@ export class ConversationCoreService {
   // P875: 学んだ動画の内容への質問に、保存した字幕本文から答える。
   private videoRecallAnswer(prompt: string): string | undefined {
     if (!/(?:動画|ビデオ)/.test(prompt)) return undefined;
-    if (!/(?:何て|何を|どう|内容|言って|話して)/.test(prompt)) return undefined;
+    if (!/(?:何て|何を|どう|内容|言って|話して|テーマ|どんな|概要)/.test(prompt)) return undefined;
     try {
       const latest = videoTranscriptService.latest();
       if (!latest) return undefined;
@@ -5339,6 +5362,9 @@ export class ConversationCoreService {
         const hit = videoTranscriptService.searchInLearned(tok);
         if (hit) return `動画「${hit.title}」では、こう話していました。${hit.excerpt}`;
       }
+      // P888: キーワードが本文に無くても、話題の見出しで概要は返せる。
+      const topics = (latest as any).topics as string[] | undefined;
+      if (topics?.length) return `動画「${latest.title}」は、主に${topics.slice(0, 4).join('・')}の話でした。冒頭はこうでした。${latest.text.slice(0, 120)}…`;
       return `動画「${latest.title}」を読んだ範囲だと、冒頭はこうでした。${latest.text.slice(0, 140)}…`;
     } catch { return undefined; }
   }

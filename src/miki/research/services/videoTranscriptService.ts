@@ -17,6 +17,30 @@ export interface VideoLearning {
   url: string;
   at: number;
   text: string;
+  // P888: 字幕で繰り返し出てきた内容語（話題の見出し）。
+  topics?: string[];
+}
+
+const TOPIC_STOP = new Set(['動画', '今回', '自分', '相手', '人間', '時間', '全部', '本当', '以上', '以下', '感じ', '部分', '状態', '場合', '結果', '方法', '必要', '可能', '最初', '最後', '最近', '現在', '今日', '明日', '昨日', 'もの', 'こと', 'ため', 'よう', 'チャンネル', 'コメント', 'お願い', '登録', '高評価']);
+
+// P888: 字幕本文から話題の見出しを決定的に抜く。カタカナ・漢字・
+// 英字の内容語を数え、3回以上出たものを頻度順に最大6件。
+// 学んだ動画を「キーワード一致でしか引けない保管庫」にせず、
+// 会話で概要を返し、知らない語は意味学習へ繋ぐための材料にする。
+function extractTopics(text: string): string[] {
+  const counts = new Map<string, number>();
+  const re = /[ァ-ヶー]{2,}|[一-龯]{2,}|[A-Za-z][A-Za-z0-9]{2,}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const w = m[0];
+    if (TOPIC_STOP.has(w)) continue;
+    counts.set(w, (counts.get(w) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, c]) => c >= 3)
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .slice(0, 6)
+    .map(([w]) => w);
 }
 
 type FetchFn = (url: string) => Promise<string>;
@@ -130,7 +154,7 @@ export const videoTranscriptService = {
     return readStore();
   },
 
-  async learnFromUrl(url: string): Promise<{ ok: boolean; title?: string; reason?: string }> {
+  async learnFromUrl(url: string): Promise<{ ok: boolean; title?: string; reason?: string; topics?: string[] }> {
     const videoId = this.extractVideoId(url);
     if (!videoId) return { ok: false, reason: 'URLから動画を特定できませんでした' };
     let html: string;
@@ -157,10 +181,12 @@ export const videoTranscriptService = {
       } catch { /* 下で判定 */ }
     }
     if (!text) return { ok: false, reason: '字幕の中身を読めませんでした' };
+    const storedText = text.slice(0, MAX_TEXT);
+    const topics = extractTopics(storedText);
     const list = readStore().filter((v) => v.videoId !== videoId);
-    list.push({ videoId, title: decodeEntities(title), url, at: Date.now(), text: text.slice(0, MAX_TEXT) });
+    list.push({ videoId, title: decodeEntities(title), url, at: Date.now(), text: storedText, topics });
     writeStore(list);
-    return { ok: true, title: decodeEntities(title) };
+    return { ok: true, title: decodeEntities(title), topics };
   },
 
   // 学んだ動画の本文から、キーワード周辺の抜粋を返す。

@@ -4917,6 +4917,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 }
 
+// P888: 動画学習の接続。字幕から話題の見出しを抜いて保存し、
+// 学んだ返答と概要の想起に使い、知らない語は意味学習へ繋ぐ。
+{
+  const { videoTranscriptService: vts888 } = await import('../src/miki/research/services/videoTranscriptService');
+  const { knowledgeGapService: gaps888 } = await import('../src/miki/unknown/services/knowledgeGapService');
+  const VSTORE888 = 'miki_video_learnings_v1';
+  const prevV888 = storageService.getItem(VSTORE888);
+  const WATCH888 = '<html><head><title>ゾルバンの観察記録 - YouTube</title></head><body><script>{"captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=p888videoA&lang=ja","name":{"simpleText":"日本語"},"vssId":"a.ja","languageCode":"ja","kind":"asr"}]}</script></body></html>';
+  const XML888 = '<?xml version="1.0"?><transcript>'
+    + '<text start="0" dur="3">ゾルバンは牧場で暮らす生き物です。ゾルバンの羊毛は柔らかいです。</text>'
+    + '<text start="3" dur="3">牧場ではゾルバンが羊毛を落とします。ゾルバンは牧場の人気者です。</text>'
+    + '<text start="6" dur="3">羊毛は牧場の収入源で、ゾルバンの世話が大切です。</text>'
+    + '</transcript>';
+  const run888 = async (p: string) => String(((await conversationCoreService.execute({ prompt: p } as any)) as any)?.replyText ?? '');
+  vts888.setFetchForTest(async (url: string) => (url.includes('timedtext') ? XML888 : WATCH888));
+  const learned888 = await run888('この動画見て学んで https://youtu.be/p888videoA');
+  check('P888 学んだ返答に話題の見出しが出る', learned888.includes('学びました') && learned888.includes('ゾルバン') && learned888.includes('話でした'), learned888.slice(0, 80));
+  const latest888: any = vts888.latest();
+  check('P888 話題の見出しが保存される', Array.isArray(latest888?.topics) && latest888.topics.includes('ゾルバン') && latest888.topics.includes('牧場'), JSON.stringify(latest888?.topics ?? []));
+  const gap888 = gaps888.listOpen(500).some((g: any) => g?.identity?.target === 'ゾルバン' || String(g?.query ?? '').includes('ゾルバン'));
+  check('P888 知らない語が意味学習のキューに繋がる', gap888, '');
+  const theme888 = await run888('動画のテーマは何だった？');
+  check('P888 キーワードが無くても見出しで概要を返す', theme888.includes('主に') && theme888.includes('ゾルバン'), theme888.slice(0, 80));
+  vts888.setFetchForTest(null);
+  if (prevV888) storageService.setItem(VSTORE888, prevV888); else storageService.removeItem(VSTORE888);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
