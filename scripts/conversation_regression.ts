@@ -4944,6 +4944,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevV888) storageService.setItem(VSTORE888, prevV888); else storageService.removeItem(VSTORE888);
 }
 
+// P889: 動画の抽出型要約。学ぶときに要点文を抜いて保存し、
+// 「要約して」には要点文で答える（字幕に無いことは言わない）。
+{
+  const { videoTranscriptService: vts889 } = await import('../src/miki/research/services/videoTranscriptService');
+  const VSTORE889 = 'miki_video_learnings_v1';
+  const prevV889 = storageService.getItem(VSTORE889);
+  const WATCH889 = '<html><head><title>ゾルバンの観察記録2 - YouTube</title></head><body><script>{"captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=p889videoB&lang=ja","name":{"simpleText":"日本語"},"vssId":"a.ja","languageCode":"ja","kind":"asr"}]}</script></body></html>';
+  const XML889 = '<?xml version="1.0"?><transcript>'
+    + '<text start="0" dur="3">ゾルバンは牧場で暮らす生き物です。</text>'
+    + '<text start="3" dur="3">ゾルバンの羊毛は柔らかくて、牧場の収入源になっています。</text>'
+    + '<text start="6" dur="3">今日は天気がいいです。</text>'
+    + '<text start="9" dur="3">ゾルバンは羊毛を落とすので、牧場では羊毛を集めます。</text>'
+    + '</transcript>';
+  const run889 = async (p: string) => String(((await conversationCoreService.execute({ prompt: p } as any)) as any)?.replyText ?? '');
+  vts889.setFetchForTest(async (url: string) => (url.includes('timedtext') ? XML889 : WATCH889));
+  await run889('この動画見て学んで https://youtu.be/p889videoB');
+  const latest889: any = vts889.latest();
+  check('P889 要点文が保存される', Array.isArray(latest889?.summary) && latest889.summary.join('').includes('収入源'), JSON.stringify(latest889?.summary ?? []));
+  const sum889 = await run889('動画の内容を要約して');
+  check('P889 要約の求めに要点文で答える', sum889.includes('要約です') && sum889.includes('収入源') && sum889.includes('ゾルバン'), sum889.slice(0, 100));
+  vts889.setFetchForTest(null);
+  if (prevV889) storageService.setItem(VSTORE889, prevV889); else storageService.removeItem(VSTORE889);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

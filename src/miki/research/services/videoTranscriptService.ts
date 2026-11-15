@@ -19,6 +19,8 @@ export interface VideoLearning {
   text: string;
   // P888: 字幕で繰り返し出てきた内容語（話題の見出し）。
   topics?: string[];
+  // P889: 抽出型要約（要点文を最大3つ、元の順序で）。
+  summary?: string[];
 }
 
 const TOPIC_STOP = new Set(['動画', '今回', '自分', '相手', '人間', '時間', '全部', '本当', '以上', '以下', '感じ', '部分', '状態', '場合', '結果', '方法', '必要', '可能', '最初', '最後', '最近', '現在', '今日', '明日', '昨日', 'もの', 'こと', 'ため', 'よう', 'チャンネル', 'コメント', 'お願い', '登録', '高評価']);
@@ -41,6 +43,27 @@ function extractTopics(text: string): string[] {
     .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
     .slice(0, 6)
     .map(([w]) => w);
+}
+
+// P889: 抽出型要約。文を「話題の見出しへの触れ方＋内容語の濃さ」で
+// 採点し、上位3文を元の順序で返す。生成ではなく抽出なので、
+// 字幕に無いことは言わない。
+function summarizeText(text: string, topics: string[]): string[] {
+  const sentences = text
+    .split(/(?<=[。！？])/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 10 && s.length <= 140);
+  if (sentences.length === 0) return [];
+  const scored = sentences.map((s, i) => {
+    const topicHits = topics.reduce((acc, t) => acc + (s.split(t).length - 1), 0);
+    const words = new Set(s.match(/[ァ-ヶー]{2,}|[一-龯]{2,}|[A-Za-z][A-Za-z0-9]{2,}/g) ?? []);
+    return { s, i, score: topicHits * 3 + Math.min(words.size, 8) };
+  });
+  return scored
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .slice(0, 3)
+    .sort((a, b) => a.i - b.i)
+    .map((x) => x.s);
 }
 
 type FetchFn = (url: string) => Promise<string>;
@@ -183,8 +206,9 @@ export const videoTranscriptService = {
     if (!text) return { ok: false, reason: '字幕の中身を読めませんでした' };
     const storedText = text.slice(0, MAX_TEXT);
     const topics = extractTopics(storedText);
+    const summary = summarizeText(storedText, topics);
     const list = readStore().filter((v) => v.videoId !== videoId);
-    list.push({ videoId, title: decodeEntities(title), url, at: Date.now(), text: storedText, topics });
+    list.push({ videoId, title: decodeEntities(title), url, at: Date.now(), text: storedText, topics, summary });
     writeStore(list);
     return { ok: true, title: decodeEntities(title), topics };
   },

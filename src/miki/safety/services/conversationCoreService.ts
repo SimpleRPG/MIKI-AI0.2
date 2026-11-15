@@ -5352,10 +5352,15 @@ export class ConversationCoreService {
   // P875: 学んだ動画の内容への質問に、保存した字幕本文から答える。
   private videoRecallAnswer(prompt: string): string | undefined {
     if (!/(?:動画|ビデオ)/.test(prompt)) return undefined;
-    if (!/(?:何て|何を|どう|内容|言って|話して|テーマ|どんな|概要)/.test(prompt)) return undefined;
+    if (!/(?:何て|何を|どう|内容|言って|話して|テーマ|どんな|概要|要約|まとめ)/.test(prompt)) return undefined;
     try {
       const latest = videoTranscriptService.latest();
       if (!latest) return undefined;
+      // P889: 要約の求めには、学ぶときに抜いておいた要点文で答える。
+      if (/(?:要約|まとめ)/.test(prompt)) {
+        const summary = (latest as any).summary as string[] | undefined;
+        if (summary?.length) return `動画「${latest.title}」の要約です。${summary.join('')}`;
+      }
       const cleaned = prompt.replace(/(?:動画|ビデオ|について|何て|何を|どう|言って|話して|ましたか|だった)/g, ' ');
       const tokens = cleaned.split(/[\s、。？?のにはがをでた]+/).map((s) => s.trim()).filter((s) => s.length >= 2);
       for (const tok of tokens) {
