@@ -5358,21 +5358,34 @@ export class ConversationCoreService {
     try {
       const latest = videoTranscriptService.latest();
       if (!latest) return undefined;
-      // P889: 要約の求めには、学ぶときに抜いておいた要点文で答える。
-      if (/(?:要約|まとめ)/.test(prompt)) {
-        const summary = (latest as any).summary as string[] | undefined;
-        if (summary?.length) return `動画「${latest.title}」の要約です。${summary.join('')}`;
-      }
       const cleaned = prompt.replace(/(?:動画|ビデオ|について|何て|何を|どう|言って|話して|ましたか|だった)/g, ' ');
       const tokens = cleaned.split(/[\s、。？?のにはがをでた]+/).map((s) => s.trim()).filter((s) => s.length >= 2);
+      // P891: 話題や題名で別の動画が指されていたら、最新ではなく
+      // その動画を対象にする（学んだ動画が1本だけとは限らない）。
+      let target = latest;
+      let bestScore = 0;
+      for (const v of videoTranscriptService.listLearned()) {
+        if (v.videoId === latest.videoId) continue;
+        let score = 0;
+        for (const tok of tokens) {
+          if (v.title.includes(tok)) score += 2;
+          if (((v as any).topics as string[] | undefined)?.includes(tok)) score += 2;
+        }
+        if (score > bestScore) { bestScore = score; target = v; }
+      }
+      // P889: 要約の求めには、学ぶときに抜いておいた要点文で答える。
+      if (/(?:要約|まとめ)/.test(prompt)) {
+        const summary = (target as any).summary as string[] | undefined;
+        if (summary?.length) return `動画「${target.title}」の要約です。${summary.join('')}`;
+      }
       for (const tok of tokens) {
         const hit = videoTranscriptService.searchInLearned(tok);
         if (hit) return `動画「${hit.title}」では、こう話していました。${hit.excerpt}`;
       }
       // P888: キーワードが本文に無くても、話題の見出しで概要は返せる。
-      const topics = (latest as any).topics as string[] | undefined;
-      if (topics?.length) return `動画「${latest.title}」は、主に${topics.slice(0, 4).join('・')}の話でした。冒頭はこうでした。${latest.text.slice(0, 120)}…`;
-      return `動画「${latest.title}」を読んだ範囲だと、冒頭はこうでした。${latest.text.slice(0, 140)}…`;
+      const topics = (target as any).topics as string[] | undefined;
+      if (topics?.length) return `動画「${target.title}」は、主に${topics.slice(0, 4).join('・')}の話でした。冒頭はこうでした。${target.text.slice(0, 120)}…`;
+      return `動画「${target.title}」を読んだ範囲だと、冒頭はこうでした。${target.text.slice(0, 140)}…`;
     } catch { return undefined; }
   }
 

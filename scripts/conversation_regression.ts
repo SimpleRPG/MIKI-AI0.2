@@ -4988,6 +4988,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevV890) storageService.setItem(VSTORE890, prevV890); else storageService.removeItem(VSTORE890);
 }
 
+// P891: 学んだ動画が複数あるとき、話題・題名で指された動画を対象にする
+// （最新だけに答えが寄らないように）。
+{
+  const { videoTranscriptService: vts891 } = await import('../src/miki/research/services/videoTranscriptService');
+  const VSTORE891 = 'miki_video_learnings_v1';
+  const prevV891 = storageService.getItem(VSTORE891);
+  const mk891 = (id: string, title: string, lines: string[]) =>
+    '<html><head><title>' + title + ' - YouTube</title></head><body><script>{"captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=' + id + '&lang=ja","name":{"simpleText":"日本語"},"vssId":"a.ja","languageCode":"ja","kind":"asr"}]}</script></body></html>';
+  const xml891 = (lines: string[]) => '<?xml version="1.0"?><transcript>' + lines.map((t, i) => '<text start="' + i * 3 + '" dur="3">' + t + '</text>').join('') + '</transcript>';
+  const A891 = ['ゾルバンは牧場で暮らす生き物です。', 'ゾルバンの羊毛は柔らかくて、牧場の収入源になっています。', 'ゾルバンは羊毛を落とすので、牧場では羊毛を集めます。'];
+  const B891 = ['ミナモは海で暮らす生き物です。', 'ミナモの鱗は青く光って、海の宝石と呼ばれています。', 'ミナモは鱗を落とすので、海では鱗を集めます。'];
+  const run891 = async (p: string) => String(((await conversationCoreService.execute({ prompt: p } as any)) as any)?.replyText ?? '');
+  vts891.setFetchForTest(async (url: string) => {
+    if (url.includes('timedtext')) return url.includes('p891videoA') ? xml891(A891) : xml891(B891);
+    return url.includes('p891videoA') ? mk891('p891videoA', 'ゾルバンの観察記録', A891) : mk891('p891videoB', 'ミナモの観察記録', B891);
+  });
+  await run891('この動画見て学んで https://youtu.be/p891videoA');
+  await run891('この動画見て学んで https://youtu.be/p891videoB');
+  const sumA891 = await run891('ゾルバンの動画の要約は？');
+  check('P891 指された古い動画の要約が返る', sumA891.includes('ゾルバンの観察記録') && sumA891.includes('収入源') && !sumA891.includes('宝石'), sumA891.slice(0, 100));
+  const themeB891 = await run891('動画のテーマは何だった？');
+  check('P891 無指定なら最新の動画で答える', themeB891.includes('ミナモの観察記録') && themeB891.includes('主に'), themeB891.slice(0, 100));
+  vts891.setFetchForTest(null);
+  if (prevV891) storageService.setItem(VSTORE891, prevV891); else storageService.removeItem(VSTORE891);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
