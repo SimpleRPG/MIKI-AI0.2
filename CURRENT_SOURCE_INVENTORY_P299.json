@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1814,
     "sourceFileCount": 1367,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1278,
-    "relativeImportCandidateCount": 4320,
-    "resolvedRelativeImportCandidateCount": 4304,
+    "relativeImportCandidateCount": 4322,
+    "resolvedRelativeImportCandidateCount": 4306,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 430072,
-      "lines": 5075,
-      "sha256": "f141a141a529201a4fdd2c7e5bd269f411c0f7dd0b4d58832489905496a12ae2",
+      "bytes": 432752,
+      "lines": 5095,
+      "sha256": "59e3bd19fdabb99e62c690cedfe088d552645cea3f0d8575670f2a3f872ec709",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3356,10 +3356,22 @@
           "specifier": "../src/miki/execution/services/androidNativeRunnerAdapterService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/execution/services/androidNativeRunnerAdapterService.ts"
+        },
+        {
+          "line": 5065,
+          "specifier": "../src/miki/memory/services/teacherLessonRecallService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/teacherLessonRecallService.ts"
+        },
+        {
+          "line": 5066,
+          "specifier": "../src/miki/memory/services/dialogueExampleRecallService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/dialogueExampleRecallService.ts"
         }
       ],
-      "relativeImportCandidateCount": 273,
-      "resolvedRelativeImportCount": 273,
+      "relativeImportCandidateCount": 275,
+      "resolvedRelativeImportCount": 275,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -26044,9 +26056,9 @@
     },
     {
       "path": "src/miki/memory/services/dialogueExampleRecallService.ts",
-      "bytes": 4559,
-      "lines": 118,
-      "sha256": "5c3d4d2abf9a3520233ae4f95af0d4923aac9d790918bdf0bc62d336e5643cc0",
+      "bytes": 6108,
+      "lines": 157,
+      "sha256": "710f9eef1f5743244c4a49bbfecc73230146b98c0cd3d0ad33155dcec1a2f376",
       "relativeImportCandidates": [
         {
           "line": 5,
@@ -27045,9 +27057,9 @@
     },
     {
       "path": "src/miki/memory/services/teacherLessonRecallService.ts",
-      "bytes": 6567,
-      "lines": 151,
-      "sha256": "4a61fe4912911cdfa2cd1260acbc977c9cb9253e28c6579b9eee6827a809a95d",
+      "bytes": 8352,
+      "lines": 192,
+      "sha256": "af98b8a53d180cdfd50bfe7f82d68de110738ded666ac386be6863cc02afeeed",
       "relativeImportCandidates": [
         {
           "line": 7,

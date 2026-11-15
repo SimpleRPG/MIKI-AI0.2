@@ -5059,6 +5059,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P894 健康診断の報告が例外なく動く', ok894, '');
 }
 
+// P895: 部品保管庫の逆引き索引。引き結果が全件走査と一致し、無関係な
+// 話題では候補が0に絞られることを確認する。
+{
+  const { teacherLessonRecallService: tl895 } = await import('../src/miki/memory/services/teacherLessonRecallService');
+  const { dialogueExampleRecallService: de895 } = await import('../src/miki/memory/services/dialogueExampleRecallService');
+  const REPO895 = 'miki_reusable_component_repository_v1';
+  const prevRepo895 = storageService.getItem(REPO895);
+  storageService.setItem(REPO895, JSON.stringify([
+    { componentType: 'TEACHER_LESSON', packageSubject: '原則1', lesson: { id: 'TM9-18', title: 'リトライは迅速に（再開の速さが効く）', rule: 'リトライは迅速にする。' } },
+    { componentType: 'TEACHER_LESSON', packageSubject: '原則1', lesson: { id: 'TM9-16', title: '難易度は少しずつ上げる', rule: '難易度は段階的に上げる。' } },
+    { componentType: 'TEACHER_LESSON', packageSubject: '原則1', lesson: { id: 'TM10-01', title: 'ご褒美は早めに渡す', rule: 'ご褒美は達成の直後に渡す。' } },
+    { componentType: 'DIALOGUE_EXAMPLE', packageSubject: '会話例', example: { id: 'EX-01', title: '拗ねたときの声かけ', scene: '相手が拗ねた場面', turns: [{ speaker: '相手', text: 'べつに' }, { speaker: 'みき', text: 'ごめんね' }] }, pattern: { herLineCount: 1, acts: ['謝る'], opening: 'ごめんね', closing: 'ごめんね' } },
+    { componentType: 'DIALOGUE_EXAMPLE', packageSubject: '会話例', example: { id: 'EX-02', title: '疲れて帰ってきた日の労い', scene: '相手が疲れている場面', turns: [{ speaker: '相手', text: 'つかれた' }, { speaker: 'みき', text: 'おつかれさま' }] }, pattern: { herLineCount: 1, acts: ['労う'], opening: 'おつかれさま', closing: 'おつかれさま' } },
+  ]));
+  check('P895 索引経由でも原則の引きが一致する', tl895.findFor('ゲームで死んだあとのリトライが遅くて困ってます')?.id === 'TM9-18', '');
+  check('P895 無関係な話題では候補が0になる', tl895.listLessons().length === 3 && tl895.indexCandidates('江戸時代の参勤交代の仕組み') === 0, `${tl895.indexCandidates('江戸時代の参勤交代の仕組み')}`);
+  check('P895 索引経由でも会話例の引きが一致する', de895.findFor('彼女が拗ねちゃった。どう声をかけたらいい？')?.id === 'EX-01' && de895.indexCandidates('量子力学の不確定性原理') === 0, '');
+  if (prevRepo895) storageService.setItem(REPO895, prevRepo895); else storageService.removeItem(REPO895);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

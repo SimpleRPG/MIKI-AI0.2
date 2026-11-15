@@ -15,16 +15,27 @@ export interface DialogueExampleView {
   componentId: string;
 }
 
-function readExamples(): DialogueExampleView[] {
+// P895: 用語→会話例位置の逆引き索引（レッスン側と同じ形）。台帳の
+// 参照が同じ間は使い回し、想起はキーが現れる候補だけをスコアする。
+interface ExampleStore {
+  itemsRef: unknown;
+  views: DialogueExampleView[];
+  byKey: Map<string, number[]>;
+}
+let exampleStore: ExampleStore | null = null;
+
+function currentExampleStore(): ExampleStore {
+  const items = componentRepositoryCacheService.readAll();
+  if (exampleStore && exampleStore.itemsRef === items) return exampleStore;
+  const views: DialogueExampleView[] = [];
+  const byKey = new Map<string, number[]>();
   try {
-    const items = componentRepositoryCacheService.readAll();
-    const out: DialogueExampleView[] = [];
     for (const item of items) {
       if (!item || item.componentType !== 'DIALOGUE_EXAMPLE') continue;
       const ex = (item as any).example;
       const pat = (item as any).pattern;
       if (!ex || typeof ex.title !== 'string' || typeof ex.scene !== 'string' || !Array.isArray(ex.turns)) continue;
-      out.push({
+      const view: DialogueExampleView = {
         id: typeof ex.id === 'string' ? ex.id : '',
         title: ex.title,
         scene: ex.scene,
@@ -37,12 +48,33 @@ function readExamples(): DialogueExampleView[] {
         },
         subject: typeof (item as any).packageSubject === 'string' ? (item as any).packageSubject : '',
         componentId: typeof (item as any).componentId === 'string' ? (item as any).componentId : '',
-      });
+      };
+      const pos = views.length;
+      views.push(view);
+      for (const key of keysOf(view)) {
+        const arr = byKey.get(key);
+        if (arr) arr.push(pos); else byKey.set(key, [pos]);
+      }
     }
-    return out;
   } catch {
-    return [];
+    exampleStore = { itemsRef: items, views: [], byKey: new Map() };
+    return exampleStore;
   }
+  exampleStore = { itemsRef: items, views, byKey };
+  return exampleStore;
+}
+
+function readExamples(): DialogueExampleView[] {
+  return currentExampleStore().views;
+}
+
+function candidatePositions(store: ExampleStore, expanded: string): number[] {
+  const set = new Set<number>();
+  for (const [key, positions] of store.byKey) {
+    if (!expanded.includes(key)) continue;
+    for (const p of positions) set.add(p);
+  }
+  return [...set].sort((a, b) => a - b);
 }
 
 function keysOf(example: DialogueExampleView): string[] {
@@ -81,12 +113,13 @@ export const dialogueExampleRecallService = {
   // 話題文に最も合う会話例を1件返す。場面・タイトルのキーが話題に
   // 含まれる数を数え、一致が無ければ undefined。
   findFor(text: string): DialogueExampleView | undefined {
-    const examples = readExamples();
-    if (examples.length === 0) return undefined;
+    const store = currentExampleStore();
+    if (store.views.length === 0) return undefined;
     const expanded = expandText(text);
     let best: DialogueExampleView | undefined;
     let bestScore = 0;
-    for (const example of examples) {
+    for (const pos of candidatePositions(store, expanded)) {
+      const example = store.views[pos];
       let score = 0;
       for (const key of keysOf(example)) {
         if (expanded.includes(key)) score += key.length;
@@ -101,11 +134,12 @@ export const dialogueExampleRecallService = {
 
   // P881: 候補を順位つきで全部返す（引用の回転用）。
   findRanked(text: string): DialogueExampleView[] {
-    const examples = readExamples();
-    if (examples.length === 0) return [];
+    const store = currentExampleStore();
+    if (store.views.length === 0) return [];
     const expanded = expandText(text);
     const scored: Array<{ example: DialogueExampleView; score: number }> = [];
-    for (const example of examples) {
+    for (const pos of candidatePositions(store, expanded)) {
+      const example = store.views[pos];
       let score = 0;
       for (const key of keysOf(example)) {
         if (expanded.includes(key)) score += key.length;
@@ -114,5 +148,10 @@ export const dialogueExampleRecallService = {
     }
     scored.sort((a, b) => b.score - a.score);
     return scored.map((s) => s.example);
+  },
+
+  // P895: 索引が選ぶ候補数（診断・検証用）。
+  indexCandidates(text: string): number {
+    return candidatePositions(currentExampleStore(), expandText(text)).length;
   },
 };

@@ -15,26 +15,60 @@ export interface TeacherLessonView {
   componentId: string;
 }
 
-function readLessons(): TeacherLessonView[] {
+// P895: 用語→レッスン位置の逆引き索引。台帳（P893 のパース済み配列）の
+// 参照が同じ間は索引とビューを使い回し、想起は「広げた話題文にキーが
+// 現れる候補」だけをスコアリングする。スコア計算は従来どおりなので、
+// 引き結果は全件走査と一致する（閾値を超えるには最低1キーの一致が
+// 必要なため、索引で落とす候補は必ず不合格側）。
+interface LessonStore {
+  itemsRef: unknown;
+  views: TeacherLessonView[];
+  byKey: Map<string, number[]>;
+}
+let lessonStore: LessonStore | null = null;
+
+function currentLessonStore(): LessonStore {
+  const items = componentRepositoryCacheService.readAll();
+  if (lessonStore && lessonStore.itemsRef === items) return lessonStore;
+  const views: TeacherLessonView[] = [];
+  const byKey = new Map<string, number[]>();
   try {
-    const items = componentRepositoryCacheService.readAll();
-    const out: TeacherLessonView[] = [];
     for (const item of items) {
       if (!item || item.componentType !== 'TEACHER_LESSON') continue;
       const lesson = (item as any).lesson;
       if (!lesson || typeof lesson.title !== 'string' || typeof lesson.rule !== 'string') continue;
-      out.push({
+      const pos = views.length;
+      views.push({
         id: typeof lesson.id === 'string' ? lesson.id : '',
         title: lesson.title,
         rule: lesson.rule,
         subject: typeof (item as any).packageSubject === 'string' ? (item as any).packageSubject : '',
         componentId: typeof (item as any).componentId === 'string' ? (item as any).componentId : '',
       });
+      for (const key of titleKeys(lesson.title)) {
+        const arr = byKey.get(key);
+        if (arr) arr.push(pos); else byKey.set(key, [pos]);
+      }
     }
-    return out;
   } catch {
-    return [];
+    lessonStore = { itemsRef: items, views: [], byKey: new Map() };
+    return lessonStore;
   }
+  lessonStore = { itemsRef: items, views, byKey };
+  return lessonStore;
+}
+
+function readLessons(): TeacherLessonView[] {
+  return currentLessonStore().views;
+}
+
+function candidatePositions(store: LessonStore, expanded: string): number[] {
+  const set = new Set<number>();
+  for (const [key, positions] of store.byKey) {
+    if (!expanded.includes(key)) continue;
+    for (const p of positions) set.add(p);
+  }
+  return [...set].sort((a, b) => a - b);
 }
 
 // タイトルにほぼ必ず出る一般語はキーにしない（「ゲーム」が一致した
@@ -89,14 +123,15 @@ export const teacherLessonRecallService = {
   // - タイトルの先頭キー（その原則の主題）が一致したら +2。
   // - 同点は、一致キーの数が多い方→教材の並びが前（基礎寄り）な方。
   findFor(text: string): TeacherLessonView | undefined {
-    const lessons = readLessons();
-    if (lessons.length === 0) return undefined;
+    const store = currentLessonStore();
+    if (store.views.length === 0) return undefined;
     const expanded = expandText(text);
     let best: TeacherLessonView | undefined;
     let bestScore = 0;
     let bestCount = 0;
     let bestOrder: [number, number] = [999, 999];
-    for (const lesson of lessons) {
+    for (const pos of candidatePositions(store, expanded)) {
+      const lesson = store.views[pos];
       const keys = titleKeys(lesson.title);
       let score = 0;
       let count = 0;
@@ -125,11 +160,12 @@ export const teacherLessonRecallService = {
   // P881: 候補を順位つきで全部返す。直前に出した原則と別のものを
   // 出したい（引用の回転）ときに使う。並びは findFor と同じ基準。
   findRanked(text: string): TeacherLessonView[] {
-    const lessons = readLessons();
-    if (lessons.length === 0) return [];
+    const store = currentLessonStore();
+    if (store.views.length === 0) return [];
     const expanded = expandText(text);
     const scored: Array<{ lesson: TeacherLessonView; score: number; count: number; order: [number, number] }> = [];
-    for (const lesson of lessons) {
+    for (const pos of candidatePositions(store, expanded)) {
+      const lesson = store.views[pos];
       const keys = titleKeys(lesson.title);
       let score = 0;
       let count = 0;
@@ -147,5 +183,10 @@ export const teacherLessonRecallService = {
       a.order[0] - b.order[0] ||
       a.order[1] - b.order[1]);
     return scored.map((s) => s.lesson);
+  },
+
+  // P895: 索引が選ぶ候補数（診断・検証用）。
+  indexCandidates(text: string): number {
+    return candidatePositions(currentLessonStore(), expandText(text)).length;
   },
 };
