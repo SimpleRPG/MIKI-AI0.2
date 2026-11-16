@@ -7,6 +7,8 @@ import { knowledgeConnectivityService } from '../../memory/services/knowledgeCon
 import { worldModelGraphService } from './worldModelGraphService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
+import { dialogueExampleRecallService } from '../../memory/services/dialogueExampleRecallService';
+import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -38,12 +40,16 @@ export interface KnowledgeSelfInspectionRecord {
   openGaps: number;
   parkedGaps: number;
   gapsRaised: number;
+  materiallessCount: number;
+  materiallessSample: string[];
+  dialogueMaterialGapsRaised: number;
   findings: string[];
 }
 
 const STORAGE_KEY = 'miki_knowledge_self_inspection_v1';
 const MAX_RECORDS = 10;
 const GLOSSLESS_GAP_LIMIT = 5;
+const DIALOGUE_MATERIAL_GAP_LIMIT = 3;
 
 class KnowledgeSelfInspectionService {
   public inspect(): KnowledgeSelfInspectionRecord {
@@ -116,6 +122,31 @@ class KnowledgeSelfInspectionService {
       findings.push(`試行上限で休止中の学習待ちが${parked}件ある`);
     }
 
+    // P899: 事実はあるのに話し方の材料が無い話題。知っているのに
+    // 上手く話せない状態を、彼女自身の点検で学習の穴に変える。
+    const materiallessTopics = this.findTopicsWithoutDialogueMaterial(10);
+    const openQueries = new Set(openGaps.map((g) => g.query));
+    let dialogueMaterialGapsRaised = 0;
+    for (const topic of materiallessTopics) {
+      if (dialogueMaterialGapsRaised >= DIALOGUE_MATERIAL_GAP_LIMIT) break;
+      const query = `話し方の材料を学ぶ: ${topic}`;
+      if (openQueries.has(query)) continue;
+      try {
+        knowledgeGapService.detect({
+          query,
+          reason: '自己点検で、事実は知っているのに話し方の材料（会話例・型）が無い話題が分かったため。',
+          type: 'INSUFFICIENT_EVIDENCE',
+          target: topic,
+          missingContent: '会話例や言い回しの型',
+          priority: 35,
+        });
+        dialogueMaterialGapsRaised++;
+      } catch { /* 1件の失敗で点検全体は止めない */ }
+    }
+    if (materiallessTopics.length > 0) {
+      findings.push(`事実はあるのに話し方の材料が無い話題が${materiallessTopics.length}件ある${dialogueMaterialGapsRaised > 0 ? `（${dialogueMaterialGapsRaised}件を学習へ流した）` : ''}`);
+    }
+
     const record: KnowledgeSelfInspectionRecord = {
       inspectedAt: Date.now(),
       personalDictionary: personal.length,
@@ -138,18 +169,51 @@ class KnowledgeSelfInspectionService {
       openGaps: openGaps.length,
       parkedGaps: parked,
       gapsRaised,
+      materiallessCount: materiallessTopics.length,
+      materiallessSample: materiallessTopics.slice(0, 10),
+      dialogueMaterialGapsRaised,
       findings,
     };
 
     this.saveRecord(record);
     systemLogger.info(
       'SELF_IMPROVEMENT',
-      `🩺 [自己点検] 辞書${record.personalDictionary}件（学習${learned}）／言い換え対${record.paraphrasePairs}件／意味待ち${record.glosslessCount}件／関係${record.worldRelations}件（仮${provisional}）／知識${claims}件（孤立${connectivity.orphaned}）／学習待ち${record.openGaps}件（休止${parked}）`,
+      `🩺 [自己点検] 辞書${record.personalDictionary}件（学習${learned}）／言い換え対${record.paraphrasePairs}件／意味待ち${record.glosslessCount}件／関係${record.worldRelations}件（仮${provisional}）／知識${claims}件（孤立${connectivity.orphaned}）／学習待ち${record.openGaps}件（休止${parked}）／材料なし話題${record.materiallessCount}件`,
     );
     for (const finding of findings) {
       systemLogger.info('SELF_IMPROVEMENT', `🩺 [自己点検] 所見: ${finding}`);
     }
     return record;
+  }
+
+  /**
+   * P899: 「事実はあるのに話し方の材料が無い話題」の棚卸し。
+   * 確定した世界の関係を2件以上持つ実体（＝ある程度知っている
+   * 話題）について、会話例と教師レッスンのどちらからも材料が
+   * 引けないものを、関係の多い順に最大 limit 件返す。
+   */
+  public findTopicsWithoutDialogueMaterial(limit = 3): string[] {
+    const relations = worldModelGraphService.relations().filter((r) => !r.provisional);
+    const counts = new Map<string, number>();
+    for (const r of relations) {
+      counts.set(r.from, (counts.get(r.from) ?? 0) + 1);
+      counts.set(r.to, (counts.get(r.to) ?? 0) + 1);
+    }
+    const candidates = [...counts.entries()]
+      .filter(([name, n]) => name.length >= 2 && n >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 1000)
+      .map(([name]) => name);
+    const out: string[] = [];
+    for (const name of candidates) {
+      if (out.length >= limit) break;
+      try {
+        if (dialogueExampleRecallService.findFor(name)) continue;
+        if (teacherLessonRecallService.findFor(name)) continue;
+      } catch { continue; }
+      out.push(name);
+    }
+    return out;
   }
 
   public latest(): KnowledgeSelfInspectionRecord | undefined {

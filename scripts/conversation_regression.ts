@@ -5132,6 +5132,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P898 同点は元の順序を保ち件数以下でも全部返す', all898.map((g: any) => g.capabilityId).join(',') === 'p898-a,p898-b', all898.map((g: any) => g.capabilityId).join(','));
 }
 
+// P899: 自己点検から学習課題を作る。確定した関係を2件以上持つ
+// 話題（テスト鳥）は「事実はあるのに話し方の材料が無い話題」として
+// 拾われ、関係1件の話題（テスト貝）は拾われない。点検を実行すると
+// その話題の学習ギャップが登録されることを確認する。
+{
+  const { worldModelGraphService: wg899 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { knowledgeSelfInspectionService: ksi899 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const { knowledgeGapService: kg899 } = await import('../src/miki/unknown/services/knowledgeGapService');
+  wg899.addRelation({ fromName: 'テスト鳥', toName: '鳥', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+  wg899.addRelation({ fromName: 'テスト鳥', toName: '巣', type: 'PART_OF', provisional: false, confidence: 0.9 } as any);
+  // 関係数で上位に来るよう、別々の関係を多めに種まきする
+  // （共有状態には他のシナリオの実体も多く、順位が埋もれないように）。
+  for (let i = 1; i <= 13; i++) {
+    wg899.addRelation({ fromName: 'テスト鳥', toName: `観察対象${i}`, type: 'USED_FOR', provisional: false, confidence: 0.9 } as any);
+  }
+  wg899.addRelation({ fromName: 'テスト貝', toName: '貝', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+  const topics899 = ksi899.findTopicsWithoutDialogueMaterial(50);
+  check('P899 関係2件以上の材料なし話題が拾われる', topics899.includes('テスト鳥'), topics899.join(',').slice(0, 60));
+  check('P899 関係1件の話題は拾われない', !topics899.includes('テスト貝'), topics899.join(',').slice(0, 60));
+  const rec899 = ksi899.inspect();
+  const gap899 = kg899.listOpen(500).find((g: any) => g.query === '話し方の材料を学ぶ: テスト鳥');
+  check('P899 点検が材料なし話題の学習ギャップを登録する', Boolean(gap899) && rec899.dialogueMaterialGapsRaised >= 1, gap899 ? `${gap899.type}/${gap899.priority}` : 'NONE');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

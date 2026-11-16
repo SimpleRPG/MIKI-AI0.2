@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1814,
     "sourceFileCount": 1367,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1278,
-    "relativeImportCandidateCount": 4325,
-    "resolvedRelativeImportCandidateCount": 4309,
+    "relativeImportCandidateCount": 4330,
+    "resolvedRelativeImportCandidateCount": 4314,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 436862,
-      "lines": 5148,
-      "sha256": "43a00d187e0dd3f97018ae7f907887decb891fbecf677af81cc617df68867305",
+      "bytes": 439014,
+      "lines": 5172,
+      "sha256": "a238d16732fc01174ae7d80167a7dcaf232d367f616a96f9aa4ef152163ed36e",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3386,10 +3386,28 @@
           "specifier": "../src/miki/research/services/autonomousSearchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/autonomousSearchService.ts"
+        },
+        {
+          "line": 5140,
+          "specifier": "../src/miki/selfAwareness/services/worldModelGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/worldModelGraphService.ts"
+        },
+        {
+          "line": 5141,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 5142,
+          "specifier": "../src/miki/unknown/services/knowledgeGapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
         }
       ],
-      "relativeImportCandidateCount": 278,
-      "resolvedRelativeImportCount": 278,
+      "relativeImportCandidateCount": 281,
+      "resolvedRelativeImportCount": 281,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -30556,9 +30574,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 7586,
-      "lines": 178,
-      "sha256": "3006ee2fea87ec6c6179e9358fc2fcb3fa30afbf9a87ca11c38542495d47c446",
+      "bytes": 10678,
+      "lines": 242,
+      "sha256": "90c14d13a6bd62038e13200faec0b4f9013fdb332d062f9875b73a155c37632c",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -30613,10 +30631,22 @@
           "specifier": "../../core/services/reusableComponentFactoryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/reusableComponentFactoryService.ts"
+        },
+        {
+          "line": 10,
+          "specifier": "../../memory/services/dialogueExampleRecallService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/dialogueExampleRecallService.ts"
+        },
+        {
+          "line": 11,
+          "specifier": "../../memory/services/teacherLessonRecallService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/teacherLessonRecallService.ts"
         }
       ],
-      "relativeImportCandidateCount": 9,
-      "resolvedRelativeImportCount": 9,
+      "relativeImportCandidateCount": 11,
+      "resolvedRelativeImportCount": 11,
       "unresolvedRelativeImportCount": 0
     },
     {
