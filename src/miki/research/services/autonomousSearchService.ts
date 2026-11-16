@@ -21,6 +21,7 @@ import { WebMaterialPatternExtractor } from './webMaterialPatternExtractor';
 import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { surfaceVariationGrowthService } from '../../conversation/services/surfaceVariationGrowthService';
 import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
+import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { evidenceService, isSyntheticWebMaterial } from '../../memory/services/evidenceService';
 
@@ -2114,6 +2115,8 @@ export class AutonomousSearchService {
     const investigated: string[] = [];
     const details: string[] = [];
     let learnedCount = 0;
+    // P903: 手続きの塊化のための観測（実際に通った段だけを記録）。
+    const procedureSteps: string[] = ['宿題確認'];
 
     const allHomeworks = workingAgendaService.getHomeworkForAutonomousThought();
     const homeworks = allHomeworks.filter(hw => {
@@ -2130,6 +2133,7 @@ export class AutonomousSearchService {
 
       investigated.push(searchQuery);
       details.push(`宿題「${hw.topic}」について自律Web検索開始: ${searchQuery}`);
+      procedureSteps.push('宿題検索');
 
       const { results, summary, provider } = await this.executeSearch(searchQuery, { maxResults: 3 });
       if (results.length === 0) {
@@ -2141,6 +2145,7 @@ export class AutonomousSearchService {
         triggerType: 'working_agenda',
         verificationStatus: 'UNVERIFIED',
       });
+      procedureSteps.push('学習記録');
 
       if (record.extractedKnowledge.length > 0) {
         learnedCount++;
@@ -2151,6 +2156,7 @@ export class AutonomousSearchService {
     }
 
     if (learnedCount === 0 && !abortSignal?.aborted) {
+      procedureSteps.push('ギャップ確認');
       const allOpenGaps = capabilityGapService.getAllGaps().filter(g => g.status === 'OPEN');
       const openGaps = allOpenGaps.filter(gap => {
         const query = `${gap.capabilityId} ${gap.description || ''}`
@@ -2173,6 +2179,7 @@ export class AutonomousSearchService {
 
           investigated.push(gapQuery);
           details.push(`能力ギャップ「${topGap.capabilityId}」について自律Web検索開始: ${gapQuery}`);
+          procedureSteps.push('ギャップ検索');
 
           const { results, summary } = await this.executeSearch(gapQuery, { maxResults: 3 });
           if (results.length === 0) {
@@ -2182,6 +2189,7 @@ export class AutonomousSearchService {
               triggerType: 'capability_gap',
               verificationStatus: 'UNVERIFIED',
             });
+            procedureSteps.push('学習記録');
             if (record.extractedKnowledge.length > 0) {
               learnedCount++;
               details.push(`能力ギャップ「${topGap.capabilityId}」の調査素材を未検証候補として保存しました。独立検証までOPENを維持します。`);
@@ -2198,6 +2206,9 @@ export class AutonomousSearchService {
     if (investigated.length === 0 && details.length === 0) {
       details.push('未検証の同一クエリは24時間再検索を抑制し、宿題・能力ギャップは未解決状態で維持します。');
     }
+
+    // P903: このサイクルで実際に通った手順を観測として残す。
+    try { procedureChunkingService.observeProcedure('アイドル学習', procedureSteps); } catch { /* 観測は補助経路 */ }
 
     return {
       learnedCount,

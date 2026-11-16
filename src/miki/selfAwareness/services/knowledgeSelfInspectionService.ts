@@ -10,6 +10,7 @@ import { reusableComponentFactoryService } from '../../core/services/reusableCom
 import { dialogueExampleRecallService } from '../../memory/services/dialogueExampleRecallService';
 import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
 import { analogyCandidateService } from './analogyCandidateService';
+import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -45,6 +46,7 @@ export interface KnowledgeSelfInspectionRecord {
   materiallessSample: string[];
   dialogueMaterialGapsRaised: number;
   analogyCandidatesCreated: number;
+  procedureChunksCreated: number;
   findings: string[];
 }
 
@@ -157,6 +159,14 @@ class KnowledgeSelfInspectionService {
       findings.push(`類推で候補関係を${analogyCreated}件作った（予測で検証する）`);
     }
 
+    // P903: 手続きの塊化。観測が溜まっていれば、繰り返し手順を
+    // ワークフロー候補として登録する（点検1回につき最大1件）。
+    let chunksCreated = 0;
+    try { chunksCreated = procedureChunkingService.detectAndChunk(1).length; } catch { /* 補助経路 */ }
+    if (chunksCreated > 0) {
+      findings.push(`繰り返し手順を${chunksCreated}件、塊として登録した`);
+    }
+
     const record: KnowledgeSelfInspectionRecord = {
       inspectedAt: Date.now(),
       personalDictionary: personal.length,
@@ -183,6 +193,7 @@ class KnowledgeSelfInspectionService {
       materiallessSample: materiallessTopics.slice(0, 10),
       dialogueMaterialGapsRaised,
       analogyCandidatesCreated: analogyCreated,
+      procedureChunksCreated: chunksCreated,
       findings,
     };
 

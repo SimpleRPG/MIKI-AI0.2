@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1816,
-    "sourceFileCount": 1369,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1280,
-    "relativeImportCandidateCount": 4347,
-    "resolvedRelativeImportCandidateCount": 4331,
+    "trackedPathCountExcludingControlPaths": 1817,
+    "sourceFileCount": 1370,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1281,
+    "relativeImportCandidateCount": 4354,
+    "resolvedRelativeImportCandidateCount": 4338,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 445600,
-      "lines": 5248,
-      "sha256": "b83b2b4fd10fb3b3762a0cc41b76fd958edcb6cc5bc018f84dbdb2995a48ec90",
+      "bytes": 447153,
+      "lines": 5266,
+      "sha256": "5985321549a167965a6f756f6d36f84bf3a9ed2dc7844c9f91a49e69d72e4fae",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3446,10 +3446,22 @@
           "specifier": "../src/miki/memory/services/predictionLedgerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/predictionLedgerService.ts"
+        },
+        {
+          "line": 5239,
+          "specifier": "../src/miki/execution/services/procedureChunkingService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/procedureChunkingService.ts"
+        },
+        {
+          "line": 5240,
+          "specifier": "../src/miki/execution/services/automationStudioService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/automationStudioService.ts"
         }
       ],
-      "relativeImportCandidateCount": 288,
-      "resolvedRelativeImportCount": 288,
+      "relativeImportCandidateCount": 290,
+      "resolvedRelativeImportCount": 290,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -23399,6 +23411,35 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/execution/services/procedureChunkingService.ts",
+      "bytes": 6142,
+      "lines": 142,
+      "sha256": "10771e1f73d21a32923067ede15878de3be34018b0ad400b753580fa5717755d",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "./automationStudioService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/automationStudioService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/execution/services/remediationExecutionCoordinatorService.ts",
       "bytes": 5783,
       "lines": 113,
@@ -27710,9 +27751,9 @@
     },
     {
       "path": "src/miki/research/services/autonomousSearchService.ts",
-      "bytes": 104607,
-      "lines": 2285,
-      "sha256": "e9143bbca9cb10a09cb6c25f12afca524e66a7c6aa37baf98c989d3a640e7482",
+      "bytes": 105306,
+      "lines": 2296,
+      "sha256": "c9e5735c834b61b6995bbc98f6ec755af7ea39dfd252743104bf438196dd92ce",
       "relativeImportCandidates": [
         {
           "line": 6,
@@ -27824,19 +27865,25 @@
         },
         {
           "line": 24,
+          "specifier": "../../execution/services/procedureChunkingService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/procedureChunkingService.ts"
+        },
+        {
+          "line": 25,
           "specifier": "../../memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         },
         {
-          "line": 25,
+          "line": 26,
           "specifier": "../../memory/services/evidenceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/evidenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 20,
-      "resolvedRelativeImportCount": 20,
+      "relativeImportCandidateCount": 21,
+      "resolvedRelativeImportCount": 21,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -30692,9 +30739,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 11297,
-      "lines": 253,
-      "sha256": "3fb9fdbfa7997e80dfba7524502e7f2f48664b5d34ab54f6056216ca6c07ebb1",
+      "bytes": 11913,
+      "lines": 264,
+      "sha256": "781f5301e526e35a8a6e5913771eee33872c5df9cc23ba29610eb967a2a3f38b",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -30767,10 +30814,16 @@
           "specifier": "./analogyCandidateService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/analogyCandidateService.ts"
+        },
+        {
+          "line": 13,
+          "specifier": "../../execution/services/procedureChunkingService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/procedureChunkingService.ts"
         }
       ],
-      "relativeImportCandidateCount": 12,
-      "resolvedRelativeImportCount": 12,
+      "relativeImportCandidateCount": 13,
+      "resolvedRelativeImportCount": 13,
       "unresolvedRelativeImportCount": 0
     },
     {

@@ -5232,6 +5232,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P902 重複生成しない', !again902.some((c: any) => c.from === '緑空獣' && c.type === 'USED_FOR'), 'deduped');
 }
 
+// P903: 手続きの塊化。同じ手順の並びが3回観測されると、繰り返し
+// 部分列がワークフロー候補として1件登録される。2回では登録され
+// ず、登録済みの手順からは短い塊が切り出され続けないことを確認。
+{
+  const { procedureChunkingService: pc903 } = await import('../src/miki/execution/services/procedureChunkingService');
+  const { automationStudioService: as903 } = await import('../src/miki/execution/services/automationStudioService');
+  const seq903 = ['宿題確認', '宿題検索', '学習記録', '宿題検索', '学習記録'];
+  pc903.observeProcedure('アイドル学習', seq903);
+  pc903.observeProcedure('アイドル学習', seq903);
+  check('P903 2回の観測では塊にならない', pc903.detectAndChunk(1).length === 0, 'below threshold');
+  pc903.observeProcedure('アイドル学習', seq903);
+  const created903 = pc903.detectAndChunk(1);
+  check('P903 3回の観測で繰り返し手順が塊になる', created903.length === 1 && created903[0].actions.join('>') === seq903.join('>'), created903.map((c: any) => c.actions.join('>')).join(',').slice(0, 80));
+  const wf903 = as903.list().find((w: any) => (w.steps || []).map((s: any) => s.action).join('>') === seq903.join('>'));
+  check('P903 塊がワークフロー候補として登録される', Boolean(wf903) && wf903!.stage === 'OBSERVED', wf903 ? wf903.stage : 'NONE');
+  check('P903 塊化済みの手順からは再登録しない', pc903.detectAndChunk(1).length === 0, 'deduped');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
