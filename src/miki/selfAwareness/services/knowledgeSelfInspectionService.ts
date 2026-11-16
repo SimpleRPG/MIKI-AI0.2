@@ -9,6 +9,7 @@ import { knowledgeGapService } from '../../unknown/services/knowledgeGapService'
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
 import { dialogueExampleRecallService } from '../../memory/services/dialogueExampleRecallService';
 import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
+import { analogyCandidateService } from './analogyCandidateService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -43,6 +44,7 @@ export interface KnowledgeSelfInspectionRecord {
   materiallessCount: number;
   materiallessSample: string[];
   dialogueMaterialGapsRaised: number;
+  analogyCandidatesCreated: number;
   findings: string[];
 }
 
@@ -147,6 +149,14 @@ class KnowledgeSelfInspectionService {
       findings.push(`事実はあるのに話し方の材料が無い話題が${materiallessTopics.length}件ある${dialogueMaterialGapsRaised > 0 ? `（${dialogueMaterialGapsRaised}件を学習へ流した）` : ''}`);
     }
 
+    // P902: 類推による候補関係の自己生成。点検のついでに、兄弟が
+    // 持つ関係を持たない兄弟への候補を作り、予測で検証に回す。
+    let analogyCreated = 0;
+    try { analogyCreated = analogyCandidateService.generateCandidates(3).length; } catch { /* 補助経路 */ }
+    if (analogyCreated > 0) {
+      findings.push(`類推で候補関係を${analogyCreated}件作った（予測で検証する）`);
+    }
+
     const record: KnowledgeSelfInspectionRecord = {
       inspectedAt: Date.now(),
       personalDictionary: personal.length,
@@ -172,6 +182,7 @@ class KnowledgeSelfInspectionService {
       materiallessCount: materiallessTopics.length,
       materiallessSample: materiallessTopics.slice(0, 10),
       dialogueMaterialGapsRaised,
+      analogyCandidatesCreated: analogyCreated,
       findings,
     };
 

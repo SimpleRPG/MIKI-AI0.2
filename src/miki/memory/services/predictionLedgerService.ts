@@ -75,6 +75,34 @@ class PredictionLedgerService {
   }
 
   /**
+   * P902: 類推で生成した候補関係そのものを予測として登録する。
+   * predictForTarget は「今一番強い関係」を予測にするため、候補の
+   * 検証には候補の三つ組みをそのまま指す登録口が要る。照合は
+   * settleAll がそのまま担う（確定した同じ関係が来れば CONFIRMED）。
+   */
+  public predictCandidate(target: string, type: string, to: string): PredictionRecord | undefined {
+    const clean = String(target || '').trim();
+    if (!clean || !type || !to) return undefined;
+    try {
+      const items = this.load();
+      const existing = items.find((p) => p.outcome === 'OPEN' && p.target === clean && p.type === type && p.to === to);
+      if (existing) return existing;
+      const record: PredictionRecord = {
+        id: `PRED-${clean}-${type}-${Date.now()}`,
+        target: clean,
+        type,
+        to,
+        provisional: true,
+        createdAt: Date.now(),
+        outcome: 'OPEN',
+      };
+      items.push(record);
+      this.save(items);
+      return record;
+    } catch { return undefined; }
+  }
+
+  /**
    * 未照合の予測を、世界モデルの現在形と照合する。
    * - 同じ向きの確定関係があれば CONFIRMED。
    * - IS_A は1つの対象に1つの分類が基本なので、別の分類が

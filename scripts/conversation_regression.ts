@@ -5210,6 +5210,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P901 分解できない未知語は従来どおり聞き返す', nd901.includes('「ゾルタクス」って、どんなものですか'), nd901.slice(-140));
 }
 
+// P902: 類推からの候補関係の自己生成。確定した分類の兄弟が持つ
+// 関係を、持たない兄弟への候補（PROVISIONAL・確信度0.2）として
+// 生成し、予測台帳に検証待ちとして登録する。重複生成はしない。
+{
+  const { worldModelGraphService: wg902 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { analogyCandidateService: ac902 } = await import('../src/miki/selfAwareness/services/analogyCandidateService');
+  const { predictionLedgerService: pl902 } = await import('../src/miki/memory/services/predictionLedgerService');
+  wg902.addRelation({ fromName: '蒼空獣', toName: '空獣', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+  wg902.addRelation({ fromName: '蒼空獣', toName: '観察', type: 'USED_FOR', provisional: false, confidence: 0.9 } as any);
+  wg902.addRelation({ fromName: '紅空獣', toName: '空獣', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+  wg902.addRelation({ fromName: '緑空獣', toName: '空獣', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+  const created902 = ac902.generateCandidates(50);
+  check('P902 兄弟の関係が候補として生成される', created902.some((c: any) => c.from === '緑空獣' && c.type === 'USED_FOR' && c.to === '観察'), created902.map((c: any) => c.from).join(',').slice(0, 60));
+  check('P902 分類（IS_A）は類推で生成しない', created902.every((c: any) => c.type !== 'IS_A'), 'no IS_A');
+  const rel902 = wg902.relationsOf('緑空獣').find((r: any) => r.type === 'USED_FOR');
+  check('P902 候補は仮の関係として入る', Boolean(rel902) && Boolean(rel902!.provisional) && Number(rel902!.confidence) <= 0.2, rel902 ? `${rel902.provisional}/${rel902.confidence}` : 'NONE');
+  const pred902 = pl902.list().find((p: any) => p.target === '緑空獣' && p.type === 'USED_FOR' && p.to === '観察');
+  check('P902 候補が予測台帳で検証待ちになる', Boolean(pred902) && pred902!.outcome === 'OPEN', pred902 ? pred902.outcome : 'NONE');
+  const again902 = ac902.generateCandidates(50);
+  check('P902 重複生成しない', !again902.some((c: any) => c.from === '緑空獣' && c.type === 'USED_FOR'), 'deduped');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
