@@ -8,6 +8,7 @@ import { personaProfileService } from './personaProfileService';
 import { userKnowledgeProfileService } from './userKnowledgeProfileService';
 import { selfPreferenceService } from '../../selfAwareness/services/selfPreferenceService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
+import { hypothesisGlossService } from './hypothesisGlossService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
@@ -656,7 +657,8 @@ export class ConversationFactIntakeService {
       const existing = japaneseDictionaryService.lookup(term);
       const userTaught = existing.find((e) => e.source === 'PERSONAL' && (e.semanticIds || []).includes('learned:user-taught'));
       const anyGloss = existing.find((e) => e.gloss);
-      if (anyGloss && !userTaught) continue;
+      // P900: 仮の gloss（推測由来だけ）は本物の教わりで置き換える。
+      if (anyGloss && !userTaught && !hypothesisGlossService.hasInferredOnlyGloss(term)) continue;
       if (userTaught && userTaught.gloss === gloss) continue;
       japaneseDictionaryService.addPersonal(term, { gloss, semanticIds: ['learned:user-taught'] });
       // P544: 教えた語は「相手が知っている言葉」として記録する。
@@ -684,7 +686,7 @@ export class ConversationFactIntakeService {
     if (correctionShape && !facts.some((f) => String(f.entity || '') === correctionShape[1])) {
       const termCandidate = correctionShape[1].trim();
       const existingEntry = japaneseDictionaryService.lookup(termCandidate);
-      if (!existingEntry.find((e) => e.gloss)) {
+      if (!existingEntry.find((e) => e.gloss) || hypothesisGlossService.hasInferredOnlyGloss(termCandidate)) {
         facts.push({ entity: termCandidate, value: correctionShape[3].trim(), statement: text } as any);
       }
     }
@@ -713,7 +715,8 @@ export class ConversationFactIntakeService {
       if (/^(知らない|わからない|分からない)/.test(gloss)) continue;
       if (!intakeMeaningGuardService.check(String(fact.statement || text)).ok) continue;
       const existing = japaneseDictionaryService.lookup(term);
-      if (existing.find((e) => e.gloss)) continue;
+      // P900: 推測由来だけの gloss は教わりで置き換える。
+      if (existing.find((e) => e.gloss) && !hypothesisGlossService.hasInferredOnlyGloss(term)) continue;
       japaneseDictionaryService.addPersonal(term, { gloss: dictionaryGloss, semanticIds: ['learned:user-taught'] });
       try { userKnowledgeProfileService.markKnown(term); } catch { /* 記録は補助経路 */ }
       try { pendingSlotService.set('miki_recently_taught_v1', { term, gloss: dictionaryGloss, at: Date.now() }, 10 * 60000); } catch { /* 補助経路 */ }

@@ -5156,6 +5156,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P899 点検が材料なし話題の学習ギャップを登録する', Boolean(gap899) && rec899.dialogueMaterialGapsRaised >= 1, gap899 ? `${gap899.type}/${gap899.priority}` : 'NONE');
 }
 
+// P900: 仮説先行 v1（未知語の仮の意味づけ）。意味の分かる部分へ
+// 完全に分解できる未知語だけ、部分の意味を繋いだ仮 gloss を
+// 推測由来（learned:inferred）として個人辞書に登録する。分解
+// できない語・既知の語では発火しない。本物の教わりが来たら、
+// 仮 gloss は user-taught に置き換わることを確認する。
+{
+  const { japaneseDictionaryService: jd900 } = await import('../src/miki/research/services/japaneseDictionaryService');
+  const { hypothesisGlossService: hg900 } = await import('../src/miki/conversation/services/hypothesisGlossService');
+  jd900.addPersonal('星屑', { gloss: '星のかけら' });
+  jd900.addPersonal('工房', { gloss: 'ものを作る場所' });
+  jd900.addPersonal('蒼天', { gloss: '青い空' });
+  jd900.addPersonal('性', { gloss: '性質' });
+  const h900 = hg900.tryInfer('星屑工房');
+  check('P900 分解できる未知語に仮 gloss が付く', Boolean(h900) && h900!.parts.length === 2, h900 ? h900.gloss : 'NONE');
+  const e900 = jd900.lookup('星屑工房').find((e: any) => e.gloss);
+  check('P900 仮 gloss は推測由来として登録される', Boolean(e900) && (e900!.semanticIds || []).includes('learned:inferred'), e900 ? (e900.semanticIds || []).join(',') : 'NONE');
+  const h900s = hg900.tryInfer('蒼天性');
+  check('P900 接尾の部分は「の」で繋ぐ', h900s?.gloss === '青い空の性質', h900s ? h900s.gloss : 'NONE');
+  check('P900 既知の語・分解できない語では発火しない', !hg900.tryInfer('星屑') && !hg900.tryInfer('星屑謎々'), 'inert');
+  conversationFactIntakeService.intakeFromUserText('星屑工房って、星を見る場所のことだよ', []);
+  const e900b = jd900.lookup('星屑工房').find((e: any) => e.gloss);
+  check('P900 教わったら仮 gloss が本物に置き換わる', Boolean(e900b) && e900b!.gloss === '星を見る場所' && (e900b!.semanticIds || []).includes('learned:user-taught'), e900b ? `${e900b.gloss}|${(e900b.semanticIds || []).join(',')}` : 'NONE');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
