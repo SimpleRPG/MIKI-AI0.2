@@ -5079,6 +5079,41 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevRepo895) storageService.setItem(REPO895, prevRepo895); else storageService.removeItem(REPO895);
 }
 
+// P896: 段落プラン。補足文は得点順ではなく役割の順（事実→例え）に
+// 並ぶことを確認する。例えの方が得点は高い材料構成にする。
+// 主題は専用のテスト獣Cにする：モコロンだと P622 の PART_OF（群れ）
+// など先行シナリオの共有グラフの関係が RELATION として拾われ、
+// 適合3で probe の CLAIM（適合2）を押しのけて選ばれなくなるため。
+{
+  const { paragraphCompositionService: pc896 } = await import('../src/miki/conversation/services/paragraphCompositionService');
+  const { worldModelGraphService: wg896 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  wg896.addRelation({ fromName: 'テスト獣C', toName: 'パル', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+  wg896.addRelation({ fromName: 'テスト獣C', toName: '綿毛', type: 'USED_FOR', provisional: false, confidence: 0.9 } as any);
+  wg896.addRelation({ fromName: '羊', toName: '毛', type: 'USED_FOR', provisional: false, confidence: 0.9 } as any);
+  const USAGE896 = 'miki_paragraph_material_usage_v1';
+  const prevUsage896 = storageService.getItem(USAGE896);
+  storageService.removeItem(USAGE896);
+  const sup896 = pc896.buildSupplements({
+    subjectTerms: ['テスト獣C'],
+    supportingClaims: [{ claim_id: 'probe896', statement: 'テスト獣Cは夜行性で、夜に活動します' }],
+    excludeClaimId: 'probe-best-896',
+    excludeText: 'テスト獣Cはパルの一種です。テスト獣Cは綿毛に使われます。',
+  });
+  check('P896 補足文が事実→例えの順に並ぶ', sup896.length === 2 && sup896[0].includes('夜行性') && sup896[1].includes('似ています'), sup896.join(' / ').slice(0, 60));
+  // P897: 短い名前の実体（C）が先に登録されていても、完全一致する
+  // テスト獣C が主題になること。句の形の話題でも最長一致が勝つ。
+  wg896.addRelation({ fromName: 'C', toName: '記号', type: 'IS_A', provisional: false, confidence: 0.9 } as any);
+  storageService.removeItem(USAGE896);
+  const sup897 = pc896.buildSupplements({
+    subjectTerms: ['テスト獣Cの話', 'テスト獣C'],
+    supportingClaims: [{ claim_id: 'probe897', statement: 'テスト獣Cは夜行性で、夜に活動します' }],
+    excludeClaimId: 'probe-best-897',
+    excludeText: 'テスト獣Cはパルの一種です。テスト獣Cは綿毛に使われます。Cは記号の一種です。',
+  });
+  check('P897 短い名前より完全・最長一致が主題になる', sup897.length === 2 && sup897[0].includes('夜行性') && sup897[1].includes('似ています'), sup897.join(' / ').slice(0, 60));
+  if (prevUsage896) storageService.setItem(USAGE896, prevUsage896); else storageService.removeItem(USAGE896);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -212,11 +212,18 @@ class ParagraphCompositionService {
       picked.push(c);
     }
 
-    this.recordUsage(picked.map((c) => c.key));
+    // P896: 段落プラン。選ばれた材料は、得点順ではなく「役割の順」に
+    // 並べる：構造・定義（RELATION）→事実の詳細（CLAIM）→例え
+    // （ANALOGY）→思い出（ASSOCIATION）。例えが事実より先に来ると
+    // 読み手が宙に浮くため。選択そのものは従来どおり。
+    const ROLE_ORDER: Record<MaterialType, number> = { RELATION: 0, CLAIM: 1, ANALOGY: 2, ASSOCIATION: 3 };
+    const ordered = [...picked].sort((a, b) => ROLE_ORDER[a.type] - ROLE_ORDER[b.type]);
+
+    this.recordUsage(ordered.map((c) => c.key));
     try {
-      systemLogger.info('CHAT', `🧩 [段落合成] 候補 ${candidates.length} 件から ${picked.map((c) => c.type).join('+')} を選んで段落を編みました`);
+      systemLogger.info('CHAT', `🧩 [段落合成] 候補 ${candidates.length} 件から ${ordered.map((c) => c.type).join('+')} を選んで段落を編みました`);
     } catch { /* ログは補助 */ }
-    return picked.map((c) => c.text);
+    return ordered.map((c) => c.text);
   }
 
   private collectRelationAndAnalogy(
@@ -226,12 +233,19 @@ class ParagraphCompositionService {
     const entities = worldModelGraphService.entities();
     const relations = worldModelGraphService.relations().filter((r) => !r.provisional);
     // WorldRelation の from/to は実体の「名前」で保持されている。
-    const matchedNames: string[] = [];
+    // P897: 照合の優先順位（完全一致→長い名前→部分一致）。短い名前
+    // （"C" 等）が長い実体名に食い込んで主題を奪う取り違えを防ぐ。
+    // 部分一致自体は、句の形の話題から実体を拾うために残す。
+    const matched: Array<{ name: string; rank: number }> = [];
     for (const t of terms) {
       for (const e of entities) {
-        if ((t === e.name || t.includes(e.name)) && !matchedNames.includes(e.name)) matchedNames.push(e.name);
+        if (t === e.name) matched.push({ name: e.name, rank: 0 });
+        else if (t.includes(e.name)) matched.push({ name: e.name, rank: 1 });
       }
     }
+    matched.sort((a, b) => a.rank - b.rank || b.name.length - a.name.length);
+    const matchedNames: string[] = [];
+    for (const m of matched) if (!matchedNames.includes(m.name)) matchedNames.push(m.name);
     if (matchedNames.length === 0) return;
 
     const byConfidence = (a: { confidence?: number }, b: { confidence?: number }) => (b.confidence || 0) - (a.confidence || 0);
