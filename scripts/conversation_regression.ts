@@ -5180,6 +5180,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P900 教わったら仮 gloss が本物に置き換わる', Boolean(e900b) && e900b!.gloss === '星を見る場所' && (e900b!.semanticIds || []).includes('learned:user-taught'), e900b ? `${e900b.gloss}|${(e900b.semanticIds || []).join(',')}` : 'NONE');
 }
 
+// P901: 仮説先行の宣言。分解できる未知語が出た文では、聞き返し
+// ではなく仮の意味の宣言が返答に付く。意味を聞く質問では発火
+// せず、分解できない未知語では従来の聞き返しが残ることを確認。
+{
+  const { japaneseDictionaryService: jd901 } = await import('../src/miki/research/services/japaneseDictionaryService');
+  const { storageService: ss901 } = await import('../src/services/storageService');
+  jd901.addPersonal('月影', { gloss: '月の光でできる影' });
+  jd901.addPersonal('工房', { gloss: 'ものを作る場所' });
+  jd901.addPersonal('蒼天', { gloss: '青い空' });
+  ss901.removeItem('miki_unknown_asked_v1');
+  ss901.removeItem('miki_unknown_pending_v1');
+  let mem901: any[] = [];
+  let st901: any = undefined;
+  const say901 = async (text: string) => {
+    const intake = conversationFactIntakeService.intakeFromUserText(text, mem901);
+    mem901 = intake.updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: text, memories: mem901, conversationState: st901, recentMessages: [] } as any);
+    st901 = r.nextConversationState;
+    return String(r.replyText || '');
+  };
+  const stmt901 = await say901('今日は月影工房の前を通ったよ');
+  check('P901 分解できる未知語は宣言して進む', stmt901.includes('「月影工房」は') && stmt901.includes('という意味だと思って進めるね'), stmt901.slice(-140));
+  check('P901 宣言した語は聞き返さない', !stmt901.includes('「月影工房」って、どんなものですか'), stmt901.slice(-140));
+  const ques901 = await say901('蒼天工房って何？');
+  const inferred901 = jd901.lookup('蒼天工房').some((e: any) => (e.semanticIds || []).includes('learned:inferred'));
+  check('P901 意味を聞く質問では推測しない', !ques901.includes('という意味だと思って進めるね') && !inferred901, ques901.slice(0, 100));
+  const nd901 = await say901('昨日ゾルタクスを見たよ');
+  check('P901 分解できない未知語は従来どおり聞き返す', nd901.includes('「ゾルタクス」って、どんなものですか'), nd901.slice(-140));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

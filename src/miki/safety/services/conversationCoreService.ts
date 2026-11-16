@@ -70,6 +70,7 @@ import { selfPreferenceService } from '../../selfAwareness/services/selfPreferen
 import { runtimeConversationCompositionService } from '../../conversation/services/runtimeConversationCompositionService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
 import { paragraphCompositionService } from '../../conversation/services/paragraphCompositionService';
+import { hypothesisGlossService } from '../../conversation/services/hypothesisGlossService';
 import { userStateTrailService } from '../../conversation/services/userStateTrailService';
 import { hybridConversationEngineService } from '../../conversation/services/hybridConversationEngineService';
 import { implementationSelectionService } from '../../strategy/services/implementationSelectionService';
@@ -2492,8 +2493,15 @@ export class ConversationCoreService {
     // P586: 続きの質問を用意したターンでは聞き返しを足さない
     // （質問は1ターンに1つまで。語の学習は P498 の背景 gap が担う）。
     if (pendingUnknownQuestion && !followUpAppend && !surface.surfaceText.includes(pendingUnknownQuestion.question.slice(0, 12))) {
-      surface.surfaceText += `\n\n${pendingUnknownQuestion.question}`;
-      this.markUnknownAsked(pendingUnknownQuestion.topic);
+      // P901: 仮説先行。未知語が意味の分かる部分に分解できるなら、
+      // 聞き返さずに仮の意味を宣言して進む（質問文では発火しない）。
+      const hypothesis = this.tryHypothesisDeclaration(prompt, pendingUnknownQuestion.topic);
+      if (hypothesis) {
+        surface.surfaceText += `\n\n${hypothesis}`;
+      } else {
+        surface.surfaceText += `\n\n${pendingUnknownQuestion.question}`;
+        this.markUnknownAsked(pendingUnknownQuestion.topic);
+      }
     }
     // P586: 話題質問への答えには、答えの内容から作った続きの質問を
     // 足し、その質問を深さ1の保留として残す（次も答えとして読める
@@ -2999,6 +3007,24 @@ export class ConversationCoreService {
       score += Math.min(activationService.score(term), 3);
     } catch { /* 補助経路 */ }
     return score;
+  }
+
+  /**
+   * P901: 仮説先行の宣言文。聞き返そうとしている未知語が、意味の
+   * 分かる部分へ完全に分解できる場合に限り、仮の意味を付けて
+   * 「〜という意味だと思って進めるね。違ったら教えて」と宣言する。
+   * 意味を聞かれている文（質問）では発火しない（推測で答えるのは
+   * 誤魔化しになる）。発火したら聞き返しの台帳には残さない
+   * （聞いていないので、次の発言は答えとして読まない）。
+   */
+  private tryHypothesisDeclaration(prompt: string, topic: string): string | undefined {
+    try {
+      if (/[？?]/.test(prompt)) return undefined;
+      if (prompt.includes(`${topic}って何`) || prompt.includes(`${topic}とは`) || prompt.includes(`${topic}ってどんな`)) return undefined;
+      const h = hypothesisGlossService.tryInfer(topic);
+      if (!h) return undefined;
+      return `「${topic}」は${h.gloss}という意味だと思って進めるね。違ったら教えて。`;
+    } catch { return undefined; }
   }
 
   private markUnknownAsked(topic: string): void {
