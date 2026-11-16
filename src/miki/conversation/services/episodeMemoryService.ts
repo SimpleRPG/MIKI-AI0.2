@@ -92,6 +92,24 @@ class EpisodeMemoryService {
     return out.sort((a, b) => b.hits.length - a.hits.length || a.daysAgo - b.daysAgo);
   }
 
+  /**
+   * P904（対応表#13 の後半「適応」）: 今の話題に合う過去の事例を、
+   * 今の場面で使える「思い出し」の文として返す。日付を聞かれた
+   * ときの想起（P848）と違い、こちらは似た場面が来たときに
+   * その日の様子ごと持ち出すための材料。保存済み summary は
+   * 「昨日は」で固定されているため、部品（話題・状態・何日前）から
+   * 今の視点で組み直す。最も合う 1 件だけを返す。
+   */
+  public adaptationFor(terms: string[]): { text: string; day: string; hits: string[]; daysAgo: number } | undefined {
+    const best = this.episodesMatching(terms)[0];
+    if (!best) return undefined;
+    const when = best.daysAgo === 1 ? '昨日' : best.daysAgo === 2 ? '一昨日' : `${best.daysAgo}日前`;
+    let text = `「${best.hits[0]}」の話は${when}もしましたね。`;
+    const label = best.episode.dominantState ? STATE_LABELS[best.episode.dominantState] : undefined;
+    if (label) text += `その日は${label}の一日でしたね。`;
+    return { text, day: best.episode.day, hits: best.hits, daysAgo: best.daysAgo };
+  }
+
   /** P627: 過去7日分のエピソードを（組めるものは組んで）日付順に返す。 */
   public recentEpisodes(days = 7): Episode[] {
     const out: Episode[] = [];

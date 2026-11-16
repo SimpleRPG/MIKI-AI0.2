@@ -2,6 +2,7 @@ import { worldModelGraphService } from '../../selfAwareness/services/worldModelG
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { associationGraphService } from '../../memory/services/associationGraphService';
 import { roleplaySessionService } from './roleplaySessionService';
+import { episodeMemoryService } from './episodeMemoryService';
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 
@@ -31,7 +32,7 @@ import { systemLogger } from '../../../services/systemLogger';
  * 中で育つほど、段落の顔ぶれは変わっていく。
  */
 
-type MaterialType = 'RELATION' | 'CLAIM' | 'ANALOGY' | 'ASSOCIATION';
+type MaterialType = 'RELATION' | 'CLAIM' | 'ANALOGY' | 'ASSOCIATION' | 'EPISODE';
 
 interface MaterialCandidate {
   type: MaterialType;
@@ -164,6 +165,25 @@ class ParagraphCompositionService {
       }
     }
 
+    // EPISODE (P904、対応表#13 の適応): 今の話題に合う過去の事例を、
+    // その日の様子ごと段落の材料にする。事実の詳細（Claim）より
+    // 弱く、緩い連想よりは確かな「思い出」として扱う。
+    if (terms.length > 0) {
+      try {
+        const adaptation = episodeMemoryService.adaptationFor(terms);
+        if (adaptation) {
+          addCandidate({
+            type: 'EPISODE',
+            key: `episode:${adaptation.day}:${adaptation.hits.join('|')}`,
+            text: adaptation.text,
+            fit: 1.8,
+          });
+        }
+      } catch {
+        /* エピソードが読めなければ他の材料だけにする */
+      }
+    }
+
     // ASSOCIATION (P541): 連想グラフからの緩い連想。事実では
     // なく「思い出す」こととしてだけ出す。適合は最低に置き、
     // 確かな材料があるときはそちらが優先される。
@@ -216,7 +236,8 @@ class ParagraphCompositionService {
     // 並べる：構造・定義（RELATION）→事実の詳細（CLAIM）→例え
     // （ANALOGY）→思い出（ASSOCIATION）。例えが事実より先に来ると
     // 読み手が宙に浮くため。選択そのものは従来どおり。
-    const ROLE_ORDER: Record<MaterialType, number> = { RELATION: 0, CLAIM: 1, ANALOGY: 2, ASSOCIATION: 3 };
+    // P904: EPISODE（過去の事例）は思い出の一種として連想より前に置く。
+    const ROLE_ORDER: Record<MaterialType, number> = { RELATION: 0, CLAIM: 1, ANALOGY: 2, EPISODE: 3, ASSOCIATION: 4 };
     const ordered = [...picked].sort((a, b) => ROLE_ORDER[a.type] - ROLE_ORDER[b.type]);
 
     this.recordUsage(ordered.map((c) => c.key));

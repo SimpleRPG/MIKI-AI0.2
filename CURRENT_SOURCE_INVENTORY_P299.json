@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1817,
     "sourceFileCount": 1370,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1281,
-    "relativeImportCandidateCount": 4354,
-    "resolvedRelativeImportCandidateCount": 4338,
+    "relativeImportCandidateCount": 4359,
+    "resolvedRelativeImportCandidateCount": 4343,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 447153,
-      "lines": 5266,
-      "sha256": "5985321549a167965a6f756f6d36f84bf3a9ed2dc7844c9f91a49e69d72e4fae",
+      "bytes": 449297,
+      "lines": 5293,
+      "sha256": "4ca08416709b815519e91987b8680980d042eded83c8291564489beca2d83d6a",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3458,10 +3458,34 @@
           "specifier": "../src/miki/execution/services/automationStudioService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/execution/services/automationStudioService.ts"
+        },
+        {
+          "line": 5257,
+          "specifier": "../src/services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 5258,
+          "specifier": "../src/miki/memory/services/dayKeyService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/dayKeyService.ts"
+        },
+        {
+          "line": 5259,
+          "specifier": "../src/miki/conversation/services/episodeMemoryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/episodeMemoryService.ts"
+        },
+        {
+          "line": 5260,
+          "specifier": "../src/miki/conversation/services/paragraphCompositionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/paragraphCompositionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 290,
-      "resolvedRelativeImportCount": 290,
+      "relativeImportCandidateCount": 294,
+      "resolvedRelativeImportCount": 294,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -13021,9 +13045,9 @@
     },
     {
       "path": "src/miki/conversation/services/episodeMemoryService.ts",
-      "bytes": 6047,
-      "lines": 141,
-      "sha256": "2857037012252106fcfbdb7a04bec6c663b1cb29cd794ee36c71c0401c901509",
+      "bytes": 7234,
+      "lines": 159,
+      "sha256": "1f9f63c25542570fc3876e19c4c37bb95c8e4d4aa0f6eb6de7726961c884becd",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -13255,9 +13279,9 @@
     },
     {
       "path": "src/miki/conversation/services/paragraphCompositionService.ts",
-      "bytes": 26151,
-      "lines": 508,
-      "sha256": "bfb954035d1caa3cbe093e6e344b9cf79342451e98ea4d8db0a76719d89cd43a",
+      "bytes": 27054,
+      "lines": 529,
+      "sha256": "27084d3b7985da32744139ee45061121b64f1faaec73a3038dfcf818860f1db0",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -13285,19 +13309,25 @@
         },
         {
           "line": 5,
+          "specifier": "./episodeMemoryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/episodeMemoryService.ts"
+        },
+        {
+          "line": 6,
           "specifier": "../../../services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
         },
         {
-          "line": 6,
+          "line": 7,
           "specifier": "../../../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {

@@ -5250,6 +5250,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P903 塊化済みの手順からは再登録しない', pc903.detectAndChunk(1).length === 0, 'deduped');
 }
 
+// P904: 対応表#13 の後半「適応」。今の話題に合う過去のエピソードが、
+// 日付を聞かれたときだけでなく、段落の材料として「その日の様子ごと」
+// 持ち出されることを確認する。
+{
+  const { storageService: st904 } = await import('../src/services/storageService');
+  const { daysAgoKey: dak904 } = await import('../src/miki/memory/services/dayKeyService');
+  const { episodeMemoryService: em904 } = await import('../src/miki/conversation/services/episodeMemoryService');
+  const { paragraphCompositionService: pc904 } = await import('../src/miki/conversation/services/paragraphCompositionService');
+  let eps904: any[] = [];
+  try { eps904 = JSON.parse(st904.getItem('miki_episodes_v1') || '[]'); } catch { eps904 = []; }
+  if (!Array.isArray(eps904)) eps904 = [];
+  let seededDaysAgo904 = 0;
+  for (const n of [3, 4, 5, 6]) {
+    if (!eps904.some((e: any) => e.day === dak904(n))) { seededDaysAgo904 = n; break; }
+  }
+  check('P904 空いている過去日へエピソードを置ける', seededDaysAgo904 > 0, `daysAgo=${seededDaysAgo904}`);
+  if (seededDaysAgo904 > 0) {
+    eps904.push({ day: dak904(seededDaysAgo904), topics: ['ルナ観測会'], dominantState: 'anxiety', summary: '昨日は、「ルナ観測会」の話をしましたね。' });
+    st904.setItem('miki_episodes_v1', JSON.stringify(eps904));
+    const ad904 = em904.adaptationFor(['ルナ観測会']);
+    check('P904 過去の事例が今の視点の文になる', Boolean(ad904) && ad904!.text.includes(`${seededDaysAgo904}日前`) && ad904!.text.includes('心配事が多め'), ad904 ? ad904.text : 'NONE');
+    check('P904 合わない話題では事例を持ち出さない', em904.adaptationFor(['無関係語彙904']) === undefined, 'no match');
+    const sup904 = pc904.buildSupplements({ subjectTerms: ['ルナ観測会'], supportingClaims: [], excludeText: 'ルナ観測会の話です。' });
+    check('P904 段落の材料に過去の事例が入る', sup904.some((s: string) => s.includes('ルナ観測会') && s.includes('もしましたね')), sup904.join(' / ').slice(0, 80));
+  }
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
