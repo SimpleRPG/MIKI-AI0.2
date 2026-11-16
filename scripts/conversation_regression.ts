@@ -5114,6 +5114,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   if (prevUsage896) storageService.setItem(USAGE896, prevUsage896); else storageService.removeItem(USAGE896);
 }
 
+// P898: ギャップ調査の束処理。アイドル学習サイクルが能力ギャップを
+// 先頭1件でなく影響度上位の最大3件まで回し、OPEN以外は対象外で、
+// 同点は元の順序を保つことを確認する。
+{
+  const { autonomousSearchService: as898 } = await import('../src/miki/research/services/autonomousSearchService');
+  const mk898 = (capabilityId: string, impact: string, status = 'OPEN') => ({ capabilityId, impact, status, description: 'probe898' } as any);
+  const ranked898 = as898.rankCapabilityGapsForLearning([
+    mk898('p898-low', 'LOW'),
+    mk898('p898-crit', 'CRITICAL'),
+    mk898('p898-high', 'HIGH'),
+    mk898('p898-mid', 'MEDIUM'),
+    mk898('p898-done', 'CRITICAL', 'RESOLVED'),
+  ], 3);
+  check('P898 能力ギャップが影響度順に最大3件選ばれる', ranked898.map((g: any) => g.capabilityId).join(',') === 'p898-crit,p898-high,p898-mid', ranked898.map((g: any) => g.capabilityId).join(','));
+  const all898 = as898.rankCapabilityGapsForLearning([mk898('p898-a', 'LOW'), mk898('p898-b', 'LOW')], 3);
+  check('P898 同点は元の順序を保ち件数以下でも全部返す', all898.map((g: any) => g.capabilityId).join(',') === 'p898-a,p898-b', all898.map((g: any) => g.capabilityId).join(','));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

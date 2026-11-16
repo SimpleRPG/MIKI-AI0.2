@@ -2078,6 +2078,27 @@ export class AutonomousSearchService {
   }
 
   /**
+   * P898: アイドル学習で埋める能力ギャップの優先順位付け。
+   * OPEN のものだけを、影響度（CRITICAL>HIGH>MEDIUM>LOW）の降順に
+   * 並べて上位 limit 件を返す。同点は元の並び順を保つ（安定ソート）。
+   * 以前は先頭の1件だけが対象で、穴埋めが1サイクルに1件しか
+   * 進まなかった。純関数にしてあるので単体で検証できる。
+   */
+  public rankCapabilityGapsForLearning<T extends { capabilityId: string; status: string; impact?: string }>(
+    gaps: T[],
+    limit = 3,
+  ): T[] {
+    const weight = (impact?: string): number =>
+      impact === 'CRITICAL' ? 3 : impact === 'HIGH' ? 2 : impact === 'MEDIUM' ? 1 : 0;
+    return gaps
+      .filter((g) => g.status === 'OPEN')
+      .map((g, i) => ({ g, i }))
+      .sort((a, b) => weight(b.g.impact) - weight(a.g.impact) || a.i - b.i)
+      .slice(0, Math.max(0, limit))
+      .map(({ g }) => g);
+  }
+
+  /**
    * 会話していない時 (アイドル時 / バックグラウンド / 睡眠時) に自律的にWeb検索して学習するループ
    * 設計思想 Master v5.0 第13章2節: Idle & Background Autonomous Web Learning
    */
@@ -2140,28 +2161,33 @@ export class AutonomousSearchService {
       });
 
       if (openGaps.length > 0) {
-        const topGap = openGaps[0];
-        const gapQuery = `${topGap.capabilityId} ${topGap.description || ''}`
-          .replace(/[\n\r]/g, ' ')
-          .slice(0, 40)
-          .trim();
+        // P898: 先頭1件だけでなく、影響度上位の最大3件までを
+        // 1サイクルで回す（束処理）。抑制済みのものは openGaps の
+        // 段階で除外されている。
+        for (const topGap of this.rankCapabilityGapsForLearning(openGaps, 3)) {
+          if (abortSignal?.aborted) break;
+          const gapQuery = `${topGap.capabilityId} ${topGap.description || ''}`
+            .replace(/[\n\r]/g, ' ')
+            .slice(0, 40)
+            .trim();
 
-        investigated.push(gapQuery);
-        details.push(`能力ギャップ「${topGap.capabilityId}」について自律Web検索開始: ${gapQuery}`);
+          investigated.push(gapQuery);
+          details.push(`能力ギャップ「${topGap.capabilityId}」について自律Web検索開始: ${gapQuery}`);
 
-        const { results, summary } = await this.executeSearch(gapQuery, { maxResults: 3 });
-        if (results.length === 0) {
-          details.push(`能力ギャップ「${topGap.capabilityId}」は検索結果を取得できませんでした。OPENを維持します。`);
-        } else {
-          const record = this.learnFromSearch(gapQuery, results, summary, {
-            triggerType: 'capability_gap',
-            verificationStatus: 'UNVERIFIED',
-          });
-          if (record.extractedKnowledge.length > 0) {
-            learnedCount++;
-            details.push(`能力ギャップ「${topGap.capabilityId}」の調査素材を未検証候補として保存しました。独立検証までOPENを維持します。`);
+          const { results, summary } = await this.executeSearch(gapQuery, { maxResults: 3 });
+          if (results.length === 0) {
+            details.push(`能力ギャップ「${topGap.capabilityId}」は検索結果を取得できませんでした。OPENを維持します。`);
           } else {
-            details.push(`能力ギャップ「${topGap.capabilityId}」の検索結果は学習条件を満たしません。OPENを維持します。`);
+            const record = this.learnFromSearch(gapQuery, results, summary, {
+              triggerType: 'capability_gap',
+              verificationStatus: 'UNVERIFIED',
+            });
+            if (record.extractedKnowledge.length > 0) {
+              learnedCount++;
+              details.push(`能力ギャップ「${topGap.capabilityId}」の調査素材を未検証候補として保存しました。独立検証までOPENを維持します。`);
+            } else {
+              details.push(`能力ギャップ「${topGap.capabilityId}」の検索結果は学習条件を満たしません。OPENを維持します。`);
+            }
           }
         }
       } else if (allOpenGaps.length > 0) {
