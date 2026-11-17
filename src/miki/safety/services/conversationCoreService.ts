@@ -67,6 +67,7 @@ import { japaneseDictionaryService } from '../../research/services/japaneseDicti
 import { userKnowledgeProfileService } from '../../conversation/services/userKnowledgeProfileService';
 import { projectNotebookService } from '../../memory/services/projectNotebookService';
 import { selfPreferenceService } from '../../selfAwareness/services/selfPreferenceService';
+import { productionConflictService } from '../../selfAwareness/services/productionConflictService';
 import { runtimeConversationCompositionService } from '../../conversation/services/runtimeConversationCompositionService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
 import { paragraphCompositionService } from '../../conversation/services/paragraphCompositionService';
@@ -649,6 +650,13 @@ export class ConversationCoreService {
       // 手がかりで最上級に答える。
       const factSuper = this.factSuperlativeAnswer(prompt, memories);
       if (factSuper) {
+        // P910: 競合の観測（対応表#2・第1段）。説明側も同時に
+        // 合っていたら記録だけ残す。挙動は変えない。
+        try {
+          if (!multiPart && this.glossSuperlativeAnswer(prompt)) {
+            productionConflictService.record('superlative', prompt);
+          }
+        } catch { /* 観測は補助経路 */ }
         return this.buildResult('RESOLVED', 'fact_superlative_answer', this.applyPersonaVoice(factSuper), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       const superlative = this.glossSuperlativeAnswer(prompt);
@@ -665,6 +673,12 @@ export class ConversationCoreService {
       }
       const factDiff = this.factDifferenceAnswer(prompt, memories);
       if (factDiff) {
+        // P910: 競合の観測（対応表#2・第1段）。同上。
+        try {
+          if (this.glossDifferenceAnswer(prompt)) {
+            productionConflictService.record('difference', prompt);
+          }
+        } catch { /* 観測は補助経路 */ }
         return this.buildResult('RESOLVED', 'fact_difference_answer', this.applyPersonaVoice(factDiff), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       const measDiff = this.measureDifferenceAnswer(prompt, state, recentMessages);
@@ -695,6 +709,12 @@ export class ConversationCoreService {
       // P821: 人の事実どうしの比と、年齢の見通しも、その場で答える。
       const factRatio = this.factRatioAnswer(prompt, memories);
       if (factRatio) {
+        // P910: 競合の観測（対応表#2・第1段）。同上。
+        try {
+          if (this.glossRatioAnswer(prompt, state, recentMessages)) {
+            productionConflictService.record('ratio', prompt);
+          }
+        } catch { /* 観測は補助経路 */ }
         return this.buildResult('RESOLVED', 'fact_ratio_answer', this.applyPersonaVoice(factRatio), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       const factProj = this.factAgeProjectionAnswer(prompt, memories);

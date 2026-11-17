@@ -5391,6 +5391,37 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P909 好きなのに知らない話題が学習へ流れる', rec909.desireGapsRaised >= 1 && openTargets909.includes('ルミナ結晶'), `raised=${rec909.desireGapsRaised}`);
 }
 
+// P910: 対応表#2（プロダクション競合解決）第1段。事実（fact_*）と
+// 説明（gloss_*）の同形ファミリーが同時にマッチする競合を、
+// 挙動を変えずに観測して台帳と自己点検に残す。
+{
+  const { productionConflictService } = await import('../src/miki/selfAwareness/services/productionConflictService');
+  const { knowledgeSelfInspectionService: ksi910 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const before910 = productionConflictService.summary();
+  let mem910: any[] = []; const hist910: any[] = []; let st910: any = undefined;
+  const run910 = async (t: string) => {
+    mem910 = conversationFactIntakeService.intakeFromUserText(t, mem910).updatedMemories;
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: mem910, recentMessages: hist910.slice(-8), conversationState: st910 } as any);
+    st910 = r.nextConversationState;
+    hist910.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  await run910('ニコの体重は30キロだよ');
+  await run910('マコの体重は90キロだよ');
+  japaneseDictionaryService.addPersonal('ニコ', { gloss: '体重が30キロくらいの小さい動物', semanticIds: ['suite-p910'] } as any);
+  japaneseDictionaryService.addPersonal('マコ', { gloss: '体重が90キロの大きい動物', semanticIds: ['suite-p910'] } as any);
+  const heavy910 = await run910('一番重いのは？');
+  check('P910 一番重いは従来どおり事実側が答える', heavy910.replyText.includes('一番重いのはマコです'), heavy910.replyText.slice(0, 130));
+  const mid910 = productionConflictService.summary();
+  check('P910 最上級の競合を観測した', (mid910.byFamily.superlative || 0) > (before910.byFamily.superlative || 0), JSON.stringify(mid910));
+  const ratio910 = await run910('マコの体重はニコの何倍？');
+  check('P910 何倍も従来どおり事実側が答える', ratio910.replyText.includes('体重は') && ratio910.replyText.includes('約3倍'), ratio910.replyText.slice(0, 130));
+  const after910 = productionConflictService.summary();
+  check('P910 比の競合も観測した', (after910.byFamily.ratio || 0) > (before910.byFamily.ratio || 0), JSON.stringify(after910));
+  const rec910: any = ksi910.inspect();
+  check('P910 自己点検に競合の観測が残る', !!rec910.productionConflicts && rec910.productionConflicts.total >= after910.total, JSON.stringify(rec910.productionConflicts));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

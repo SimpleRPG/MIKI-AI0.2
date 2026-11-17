@@ -11,6 +11,7 @@ import { dialogueExampleRecallService } from '../../memory/services/dialogueExam
 import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
 import { analogyCandidateService } from './analogyCandidateService';
 import { desireService } from './desireService';
+import { productionConflictService } from './productionConflictService';
 import { personaProfileService } from '../../conversation/services/personaProfileService';
 import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
 import { episodeDistillationService } from '../../conversation/services/episodeDistillationService';
@@ -54,6 +55,7 @@ export interface KnowledgeSelfInspectionRecord {
   gapPlanPhases: Record<string, number>;
   desireSummary: { talk: number; learn: number; topTalk: string[] };
   desireGapsRaised: number;
+  productionConflicts: { total: number; byFamily: Record<string, number> };
   findings: string[];
 }
 
@@ -230,6 +232,17 @@ class KnowledgeSelfInspectionService {
       }
     } catch { /* 欲求の合成は補助経路 */ }
 
+    // P910: プロダクション競合の観測（対応表#2・第1段）。
+    // 事実と説明の両方の受け口が同時に合った回数を点検に残す。
+    // 解決（第2段）は競合が実在するファミリーから入れる。
+    let productionConflicts = { total: 0, byFamily: {} as Record<string, number> };
+    try {
+      productionConflicts = productionConflictService.summary();
+      if (productionConflicts.total > 0) {
+        findings.push(`答えの受け口が同時に合った競合を${productionConflicts.total}件観測`);
+      }
+    } catch { /* 競合の観測は補助経路 */ }
+
     const record: KnowledgeSelfInspectionRecord = {
       inspectedAt: Date.now(),
       personalDictionary: personal.length,
@@ -261,6 +274,7 @@ class KnowledgeSelfInspectionService {
       gapPlanPhases,
       desireSummary,
       desireGapsRaised,
+      productionConflicts,
       findings,
     };
 
