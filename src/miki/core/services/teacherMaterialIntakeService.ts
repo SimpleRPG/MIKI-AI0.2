@@ -8,6 +8,7 @@ import {
 } from './reusableComponentFactoryService';
 import { definitionPatternService } from '../../research/services/definitionPatternService';
 import { lexicalRelationService, type LexicalRelationType } from '../../memory/services/lexicalRelationService';
+import { missedFormLearningService } from '../../conversation/services/missedFormLearningService';
 
 /*
  * P472: 教師教材パッケージの受け口。
@@ -80,6 +81,8 @@ export interface TeacherMaterialIntakeRecord {
   lexicalRelationCount?: number;
   // P878: このパッケージで登録された会話例の件数。
   exampleCount?: number;
+  // P914: このパッケージで登録された言い回しの形の件数。
+  formCount?: number;
   componentIds: string[];
   references: TeacherMaterialReferenceRecord[];
   receivedAt: number;
@@ -407,9 +410,31 @@ class TeacherMaterialIntakeService {
         },
       });
     }
+    // P914: 言い回しの形の供給（任意）。骨格（内容語を除いた機能語の
+    // 並び）→対話行為の対応を、教師印つきで形の台帳へ直接入れる
+    // （意図推定の一般化・第2段の取り込み口）。行為は既知の対話行為
+    // のみ受け付け、不正な形は理由を添えてスキップする。
+    const rawForms = Array.isArray((manifest as any).forms)
+      ? (manifest as any).forms as unknown[]
+      : [];
+    const FORM_ACTS = new Set(['REQUEST', 'REQUEST_EXPLANATION', 'REQUEST_ARTIFACT', 'REQUEST_RECOMMENDATION', 'QUESTION', 'REJECTION', 'CONTINUATION', 'CONFIRMATION', 'CORRECTION', 'TOPIC_SHIFT', 'FEEDBACK', 'CASUAL_CHAT']);
+    let dialogueFormCount = 0;
+    const formNotes: string[] = [];
+    for (const item of rawForms.slice(0, 60)) {
+      const f = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : {};
+      const skeleton = typeof f.skeleton === 'string' ? f.skeleton.trim() : '';
+      const act = typeof f.act === 'string' ? f.act.trim().toUpperCase() : '';
+      if (!skeleton || skeleton.length > 120 || skeleton.split('|').filter(Boolean).length < 3 || !FORM_ACTS.has(act)) {
+        formNotes.push(`言い回しの形 ${skeleton || '(skeleton無し)'}: 形式が不正か、act が対象外です`);
+        continue;
+      }
+      if (missedFormLearningService.learnForm(skeleton, act, 'teacher')) {
+        dialogueFormCount++;
+      }
+    }
     const rawLessons = manifest.lessons;
-    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0 && lexicalRelationCount === 0 && dialogueExamples.length === 0) {
-      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形・語彙ルール・会話例）を入れてください。', ['lessons が空配列または未設定で、有効な定義形・語彙ルール・会話例もありません', ...patternNotes, ...relationNotes, ...exampleNotes], identifiedCtx);
+    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0 && lexicalRelationCount === 0 && dialogueExamples.length === 0 && dialogueFormCount === 0) {
+      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形・語彙ルール・会話例・言い回しの形）を入れてください。', ['lessons が空配列または未設定で、有効な定義形・語彙ルール・会話例・言い回しの形もありません', ...patternNotes, ...relationNotes, ...exampleNotes, ...formNotes], identifiedCtx);
     }
     const lessons: TeacherLesson[] = [];
     for (const item of Array.isArray(rawLessons) ? rawLessons : []) {
@@ -563,14 +588,15 @@ class TeacherMaterialIntakeService {
       definitionPatternCount,
       lexicalRelationCount,
       exampleCount: dialogueExamples.length,
+      formCount: dialogueFormCount,
       componentIds,
       references,
       receivedAt,
     };
     this.ledger.set(intakeId, record);
     this.save();
-    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount} relations=${lexicalRelationCount} examples=${dialogueExamples.length}`, { subject });
-    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件、語彙ルール ${lexicalRelationCount} 件、会話例 ${dialogueExamples.length} 件）。`, reasons: [...patternNotes, ...relationNotes, ...exampleNotes], record: { ...record } };
+    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount} relations=${lexicalRelationCount} examples=${dialogueExamples.length} forms=${dialogueFormCount}`, { subject });
+    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件、語彙ルール ${lexicalRelationCount} 件、会話例 ${dialogueExamples.length} 件、言い回しの形 ${dialogueFormCount} 件）。`, reasons: [...patternNotes, ...relationNotes, ...exampleNotes, ...formNotes], record: { ...record } };
   }
 }
 

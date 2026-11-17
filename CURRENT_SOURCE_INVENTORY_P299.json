@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1822,
     "sourceFileCount": 1375,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1286,
-    "relativeImportCandidateCount": 4401,
-    "resolvedRelativeImportCandidateCount": 4385,
+    "relativeImportCandidateCount": 4404,
+    "resolvedRelativeImportCandidateCount": 4388,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 465885,
-      "lines": 5488,
-      "sha256": "01086a14e49467c8561ef7611ee30514b0213bcb3d34c43e4adaaca0aa4c5e36",
+      "bytes": 468584,
+      "lines": 5518,
+      "sha256": "a6e8db9a6115bd587fa0f6b7b4a989accc54dafb84ac2f743b5233db953c2b6d",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3626,10 +3626,22 @@
           "specifier": "../src/services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 5478,
+          "specifier": "../src/miki/core/services/teacherMaterialIntakeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/teacherMaterialIntakeService.ts"
+        },
+        {
+          "line": 5479,
+          "specifier": "../src/miki/conversation/services/missedFormLearningService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/missedFormLearningService.ts"
         }
       ],
-      "relativeImportCandidateCount": 318,
-      "resolvedRelativeImportCount": 318,
+      "relativeImportCandidateCount": 320,
+      "resolvedRelativeImportCount": 320,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -13458,9 +13470,9 @@
     },
     {
       "path": "src/miki/conversation/services/missedFormLearningService.ts",
-      "bytes": 4307,
-      "lines": 129,
-      "sha256": "6e27222b8942b41eaa096b0cbfc5f4dd33c71f63a5a969b1eb7596b77a102781",
+      "bytes": 7512,
+      "lines": 211,
+      "sha256": "3efbf016fd3e93c0949cf2b29f0c37a42a3ed58c668739af57298b5fe7550646",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -21600,9 +21612,9 @@
     },
     {
       "path": "src/miki/core/services/teacherMaterialIntakeService.ts",
-      "bytes": 26774,
-      "lines": 577,
-      "sha256": "d501427f0958b24de5c898a65b80908869c2c097526cf6dbfb65b02efd78d432",
+      "bytes": 28677,
+      "lines": 603,
+      "sha256": "a024baf97102792ec3fd65eb13e87109ab8b6eec38401b3d435fad82c14a9ab9",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -21639,10 +21651,16 @@
           "specifier": "../../memory/services/lexicalRelationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
+        },
+        {
+          "line": 11,
+          "specifier": "../../conversation/services/missedFormLearningService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/missedFormLearningService.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -29638,9 +29656,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 533942,
-      "lines": 7938,
-      "sha256": "6fce8bf169064b94f9e6df4e2144f06caf4d6d19cc0db87acc27c95effe1925b",
+      "bytes": 534245,
+      "lines": 7945,
+      "sha256": "7493af6bf6f5f2b798231932ff06bd002bc4d500f4e43b4f2bf5ecad371b85b9",
       "relativeImportCandidates": [
         {
           "line": 1,

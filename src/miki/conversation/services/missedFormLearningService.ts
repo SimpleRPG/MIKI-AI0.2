@@ -23,6 +23,8 @@ export interface LearnedForm {
   act: string;
   at: number;
   hits: number;
+  // P914: 出所。'rephrase' = 本人の言い直し（P911）、'teacher' = 教師教材。
+  source?: string;
 }
 
 export interface PendingMiss {
@@ -103,8 +105,9 @@ class MissedFormLearningService {
     if (existing) {
       existing.act = act;
       existing.at = Date.now();
+      existing.source = 'rephrase';
     } else {
-      store.learned.push({ skeleton: p.skeleton, act, at: Date.now(), hits: 0 });
+      store.learned.push({ skeleton: p.skeleton, act, at: Date.now(), hits: 0, source: 'rephrase' });
       while (store.learned.length > LEARNED_CAP) store.learned.shift();
     }
     this.save(store);
@@ -119,6 +122,85 @@ class MissedFormLearningService {
     hit.hits++;
     this.save(store);
     return hit.act;
+  }
+
+  /**
+   * P914: 教師教材からの直接登録（意図推定の一般化・第2段）。
+   * 言い直しの証拠を待たず、教師印の形を台帳へ入れる。
+   */
+  public learnForm(skeleton: string, act: string, source: string): boolean {
+    const skel = (skeleton || '').trim();
+    const a = (act || '').trim();
+    if (!skel || !a) return false;
+    if (skel.split('|').filter(Boolean).length < 3) return false;
+    const store = this.load();
+    const existing = store.learned.find((l) => l.skeleton === skel);
+    if (existing) {
+      existing.act = a;
+      existing.at = Date.now();
+      existing.source = source;
+    } else {
+      store.learned.push({ skeleton: skel, act: a, at: Date.now(), hits: 0, source });
+      while (store.learned.length > LEARNED_CAP) store.learned.shift();
+    }
+    this.save(store);
+    return true;
+  }
+
+  /**
+   * P914: 類推一般化（保守版）。完全一致が無いとき、台帳の形と
+   * 「部分列の関係にある」または「トークン編集距離1」の形だけを
+   * 候補にする。末尾トークンが同じことが条件で、別行為の候補が
+   * 同格に並んだら棄権する（例:「知りたい」と「終わりにしたい」は
+   * 距離が遠く、そもそも候補にならない）。
+   */
+  public lookupSimilar(skeleton: string): string | undefined {
+    if (!skeleton) return undefined;
+    const q = skeleton.split('|').filter(Boolean);
+    if (q.length < 3) return undefined;
+    const store = this.load();
+    const isSubseq = (small: string[], big: string[]): boolean => {
+      let i = 0;
+      for (const t of big) {
+        if (t === small[i]) i++;
+        if (i >= small.length) return true;
+      }
+      return i >= small.length;
+    };
+    const editDistance = (a: string[], b: string[]): number => {
+      let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+      for (let i = 1; i <= a.length; i++) {
+        const cur = [i];
+        for (let j = 1; j <= b.length; j++) {
+          cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+        }
+        prev = cur;
+      }
+      return prev[b.length];
+    };
+    let bestRank = Number.POSITIVE_INFINITY;
+    let bestEntry: LearnedForm | undefined;
+    let conflict = false;
+    for (const l of store.learned) {
+      const t = l.skeleton.split('|').filter(Boolean);
+      if (t.length < 3) continue;
+      if (t[t.length - 1] !== q[q.length - 1]) continue;
+      let rank = Number.POSITIVE_INFINITY;
+      if (isSubseq(t, q) || isSubseq(q, t)) rank = 0;
+      else if (editDistance(q, t) <= 1) rank = 1;
+      if (!Number.isFinite(rank)) continue;
+      if (rank < bestRank) {
+        bestRank = rank;
+        bestEntry = l;
+        conflict = false;
+      } else if (rank === bestRank && bestEntry && bestEntry.act !== l.act) {
+        conflict = true;
+      }
+    }
+    if (conflict || !bestEntry) return undefined;
+    bestEntry.hits++;
+    this.save(store);
+    return bestEntry.act;
   }
 
   public learnedForms(): LearnedForm[] {

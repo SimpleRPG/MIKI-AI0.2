@@ -277,6 +277,13 @@ export class ConversationCoreService {
         if (learnedAct) {
           dialogueAct = learnedAct;
           stages.missedFormApplied = 1;
+        } else {
+          // P914: 完全一致が無ければ保守的な類推一般化を試す。
+          const similarAct = missedFormLearningService.lookupSimilar(skeleton);
+          if (similarAct) {
+            dialogueAct = similarAct;
+            stages.missedFormApplied = 2;
+          }
         }
       }
       if (dialogueAct === 'STATEMENT' && interpretation.llmFallbackNeeded && skeleton) {

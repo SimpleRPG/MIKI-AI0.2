@@ -5472,6 +5472,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P913 保存データにプロファイルが含まれる', raw913.includes('p913-probe-key'), `len=${raw913.length}`);
 }
 
+// ---- P914 意図推定の一般化・第2段（教師の形パック取り込み＋類推一般化） ----
+{
+  const JSZip914 = (await import('jszip')).default;
+  const { teacherMaterialIntakeService } = await import('../src/miki/core/services/teacherMaterialIntakeService');
+  const { missedFormLearningService } = await import('../src/miki/conversation/services/missedFormLearningService');
+  const manifest914 = {
+    formatVersion: 1, packageType: 'TEACHER_MATERIAL', teacher: { name: 'Claude', role: '教師' },
+    subject: '言い回しの形テスト', version: 'T1', lessons: [],
+    forms: [
+      { skeleton: 'の|と|たい|な', act: 'REQUEST' },
+      { skeleton: 'の|、|も|に|たい|な', act: 'REJECTION' },
+    ],
+  };
+  const zip914 = new JSZip914();
+  zip914.file('teacher_material.json', JSON.stringify(manifest914));
+  zip914.file('INSTRUCTIONS.md', '# test');
+  const bytes914 = await zip914.generateAsync({ type: 'uint8array' });
+  const intake914: any = await teacherMaterialIntakeService.receivePackage({ fileName: 'forms.zip', bytes: bytes914 });
+  check('P914 形だけのパッケージを受け付ける', intake914?.ok === true && String(intake914?.message ?? '').includes('言い回しの形 2 件'), String(intake914?.message ?? '').slice(0, 60));
+  const learned914 = missedFormLearningService.learnedForms();
+  check('P914 形が教師印つきで台帳に入る', learned914.some((l: any) => l.skeleton === 'の|と|たい|な' && l.act === 'REQUEST' && l.source === 'teacher'), `n=${learned914.length}`);
+  const gen914: any = await conversationCoreService.execute({ prompt: 'ツバキのこと、知りたいな', memories: [], recentMessages: [], conversationId: 'suite-p914' } as any);
+  check('P914 未習の近い形へ類推で REQUEST になる', gen914?.intentCategory === 'REQUEST', `act=${gen914?.intentCategory}`);
+  check('P914 遠い形（終わりにしたい型）は REQUEST に化けない', missedFormLearningService.lookupSimilar('の|、|も|に|たい|な') !== 'REQUEST', `sim=${missedFormLearningService.lookupSimilar('の|、|も|に|たい|な')}`);
+  missedFormLearningService.learnForm('あ|い|う|お', 'REQUEST', 'teacher');
+  missedFormLearningService.learnForm('あ|い|か|お', 'QUESTION', 'teacher');
+  check('P914 別行為の候補が同格なら棄権する', missedFormLearningService.lookupSimilar('あ|い|う|か|お') === undefined, `sim=${missedFormLearningService.lookupSimilar('あ|い|う|か|お')}`);
+  check('P914 候補が1つなら類推が効く', missedFormLearningService.lookupSimilar('あ|い|う|わ|お') === 'REQUEST', `sim=${missedFormLearningService.lookupSimilar('あ|い|う|わ|お')}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
