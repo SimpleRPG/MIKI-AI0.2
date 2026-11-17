@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1835,
     "sourceFileCount": 1388,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1299,
-    "relativeImportCandidateCount": 4516,
-    "resolvedRelativeImportCandidateCount": 4500,
+    "relativeImportCandidateCount": 4520,
+    "resolvedRelativeImportCandidateCount": 4504,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 513792,
-      "lines": 5983,
-      "sha256": "1b61abf6e2a05f3fc2d01eb1f2f998eaa06f89dc37c3394e4152603549f7a0e8",
+      "bytes": 516005,
+      "lines": 6004,
+      "sha256": "0072c4f519a4d058dbf1282e2669077447a54ffd74ace3ab9879b5abacc80d94",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3944,10 +3944,28 @@
           "specifier": "../src/miki/selfAwareness/services/mistakeNotebookService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/mistakeNotebookService.ts"
+        },
+        {
+          "line": 5972,
+          "specifier": "../src/miki/selfAwareness/services/selfPreferenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/selfPreferenceService.ts"
+        },
+        {
+          "line": 5973,
+          "specifier": "../src/miki/selfAwareness/services/desireService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/desireService.ts"
+        },
+        {
+          "line": 5974,
+          "specifier": "../src/miki/conversation/services/personaProfileService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/personaProfileService.ts"
         }
       ],
-      "relativeImportCandidateCount": 371,
-      "resolvedRelativeImportCount": 371,
+      "relativeImportCandidateCount": 374,
+      "resolvedRelativeImportCount": 374,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -30103,9 +30121,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 548502,
-      "lines": 8180,
-      "sha256": "61220a8ec7dff344653dc49a097c989353398e919eaab73ee4f4f731f15f3838",
+      "bytes": 549835,
+      "lines": 8203,
+      "sha256": "7e0af736409e79bcf7071fce71877324945e3306d94f9e76e932e0017924a9a1",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31426,9 +31444,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/desireService.ts",
-      "bytes": 2779,
-      "lines": 61,
-      "sha256": "3abca0e96def285a66475c872a856005836dc06600ce932915203057c59b4132",
+      "bytes": 2950,
+      "lines": 62,
+      "sha256": "35973f1ec69c5ef94881a74a357654b871c2f7f4c9254c71fb6a96c9520da64b",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31612,9 +31630,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 23726,
-      "lines": 501,
-      "sha256": "85d5831c063eb2b029868163b3d77bf7c9920697ce709b7cd8fa8f2c65acfb45",
+      "bytes": 24104,
+      "lines": 510,
+      "sha256": "3c69e4d8cdd56522f73f734da64a8a6328a96336de22cf7851389a37a19ee2a5",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31789,10 +31807,16 @@
           "specifier": "./diaryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/diaryService.ts"
+        },
+        {
+          "line": 30,
+          "specifier": "./selfPreferenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/selfPreferenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 29,
-      "resolvedRelativeImportCount": 29,
+      "relativeImportCandidateCount": 30,
+      "resolvedRelativeImportCount": 30,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -32132,9 +32156,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/selfPreferenceService.ts",
-      "bytes": 4660,
-      "lines": 112,
-      "sha256": "620612c3bfe93ef62055ea379fe0a5c8030d9c1bd3887c63895f5d828b3b9816",
+      "bytes": 8679,
+      "lines": 186,
+      "sha256": "67ae1cb69e3c8b367189641ae0f7a18dca36586d8dd24a2c11814978268dc062",
       "relativeImportCandidates": [
         {
           "line": 1,

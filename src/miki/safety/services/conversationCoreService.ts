@@ -705,6 +705,11 @@ export class ConversationCoreService {
       if (diary && !multiPart) {
         return this.buildResult('RESOLVED', 'diary_answer', this.applyPersonaVoice(diary), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P935: 「好み変わった？」——育った好みを答える。
+      const grownPref = this.grownPreferenceAnswer(prompt);
+      if (grownPref && !multiPart) {
+        return this.buildResult('RESOLVED', 'grown_preference_answer', this.applyPersonaVoice(grownPref), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
       const factAgeCompare = this.factAgeComparisonAnswer(prompt, memories);
@@ -3938,6 +3943,24 @@ export class ConversationCoreService {
    * - 「おやすみ」: その場で整理を回して眠る挨拶を返す。
    * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
    */
+  /**
+   * P935: 育った好みの表明。「好み変わった？」「最近好きなもの
+   * ある？」に、頻度から育った好み（教示とは別）を答える。
+   */
+  private grownPreferenceAnswer(prompt: string): string | undefined {
+    if (!/(?:好み|好きなもの|好きなこと)/.test(prompt)) return undefined;
+    if (!/(?:変わ|最近|増え|ある|？|\?)/.test(prompt)) return undefined;
+    try {
+      const personaId = personaProfileService.get().profileId;
+      const grown = selfPreferenceService.listGrown(personaId);
+      if (!grown.length) {
+        return '好みはまだ育ってる途中かな。よく話すものが増えてきたら、好きになってくる気がする。';
+      }
+      const names = grown.slice(0, 3).map((g) => `「${g.term}」`).join('と');
+      return `うん、最近よく話してるうちに、${names}が好きになってきた気がする。`;
+    } catch { return undefined; }
+  }
+
   /**
    * P934: 「日記見せて」への答え。直近の日記をそのまま読む。
    */

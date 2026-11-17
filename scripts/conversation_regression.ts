@@ -5967,6 +5967,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P934 ただの言及では日記レーンは発火しない', r934ctl.reason !== 'diary_answer', `reason=${r934ctl.reason}`);
 }
 
+// ---- P935 好みが育つ ----
+{
+  const { selfPreferenceService: sp935 } = await import('../src/miki/selfAwareness/services/selfPreferenceService');
+  const { desireService: ds935 } = await import('../src/miki/selfAwareness/services/desireService');
+  const { personaProfileService: pp935 } = await import('../src/miki/conversation/services/personaProfileService');
+  const iso935 = 'suite-p935-persona';
+  for (let i = 0; i < 5; i++) sp935.observeTerms(iso935, ['砂浜ガラス']);
+  check('P935 少し話しただけでは好みは育たない', sp935.derivedInterestStrengths(iso935).length === 0 && sp935.listGrown(iso935).length === 0, 'below-threshold');
+  for (let i = 0; i < 11; i++) sp935.observeTerms(iso935, ['砂浜ガラス']);
+  const strengths935 = sp935.derivedInterestStrengths(iso935);
+  check('P935 よく話すうちに好みが育ち、強さも上がる', sp935.listGrown(iso935).some((g) => g.term === '砂浜ガラス') && (strengths935.find((s) => s.term === '砂浜ガラス')?.strength || 0) >= 0.7, `strengths=${JSON.stringify(strengths935)}`);
+  const desire935 = ds935.compose(iso935).find((d) => d.term === '砂浜ガラス');
+  check('P935 育った好みは欲求の強さに反映される', desire935?.kind === 'TALK' && (desire935?.strength || 0) >= 0.7, `desire=${JSON.stringify(desire935)}`);
+  const current935 = pp935.get().profileId;
+  for (let i = 0; i < 16; i++) sp935.observeTerms(current935, ['砂浜ガラス']);
+  const r935: any = await conversationCoreService.execute({ prompt: '好み変わった？', memories: [], recentMessages: [], conversationId: 'suite-p935' } as any);
+  check('P935 「好み変わった？」に育った好みを答える', r935.reason === 'grown_preference_answer' && String(r935.replyText || '').includes('砂浜ガラス'), `reason=${r935.reason} reply=${String(r935.replyText || '').slice(0, 60)}`);
+  const r935ctl: any = await conversationCoreService.execute({ prompt: 'それは好みの問題だね', memories: [], recentMessages: [], conversationId: 'suite-p935' } as any);
+  check('P935 ただの言及では好みレーンは発火しない', r935ctl.reason !== 'grown_preference_answer', `reason=${r935ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

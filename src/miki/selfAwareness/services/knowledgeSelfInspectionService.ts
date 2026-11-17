@@ -27,6 +27,7 @@ import { mistakeNotebookService } from './mistakeNotebookService';
 import { knowledgeConsolidationService } from './knowledgeConsolidationService';
 import { specialDayService } from './specialDayService';
 import { diaryService } from './diaryService';
+import { selfPreferenceService } from './selfPreferenceService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -87,6 +88,7 @@ export interface KnowledgeSelfInspectionRecord {
   sleepRuns: number;
   specialDays: number;
   diaryEntries: number;
+  grownPreferences: number;
   findings: string[];
 }
 
@@ -293,6 +295,7 @@ class KnowledgeSelfInspectionService {
     let sleepRuns = 0;
     let specialDays = 0;
     let diaryEntries = 0;
+    let grownPreferences = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -380,6 +383,11 @@ class KnowledgeSelfInspectionService {
       if (diaryEntries > 0) {
         findings.push(`日記を${diaryEntries}日分書いた`);
       }
+      // P935: 育った好みの数。
+      grownPreferences = selfPreferenceService.grownCount();
+      if (grownPreferences > 0) {
+        findings.push(`会話の中で育った好みが${grownPreferences}件ある`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -431,6 +439,7 @@ class KnowledgeSelfInspectionService {
       sleepRuns,
       specialDays,
       diaryEntries,
+      grownPreferences,
       findings,
     };
 

@@ -21,7 +21,7 @@ import { knowledgeGapService } from '../../unknown/services/knowledgeGapService'
 export interface Desire {
   kind: 'TALK' | 'LEARN';
   term: string;
-  /** 0..1。教示された好き=1.0、興味=0.85、頻度由来=0.4。 */
+  /** 0..1。教示された好き=1.0、興味=0.85、頻度由来は回数で育つ（P935: 0.3〜0.85）。 */
   strength: number;
   source: 'taught' | 'derived' | 'gap';
   /** 教示の時刻（taught のみ）。同点の並び替えに使う。 */
@@ -39,9 +39,10 @@ class DesireService {
           desires.push({ kind: 'TALK', term: p.term, strength: 0.85, source: 'taught', at: p.at });
         }
       }
-      for (const term of selfPreferenceService.derivedInterests(personaId, 10)) {
-        if (!desires.some((d) => d.term === term)) {
-          desires.push({ kind: 'TALK', term, strength: 0.4, source: 'derived' });
+      // P935: 頻度由来の強さは回数で育つ（育った好みは 0.7〜）。
+      for (const derived of selfPreferenceService.derivedInterestStrengths(personaId, 10)) {
+        if (!desires.some((d) => d.term === derived.term)) {
+          desires.push({ kind: 'TALK', term: derived.term, strength: derived.strength, source: 'derived' });
         }
       }
     } catch { /* 選好が読めなくても本流は止めない */ }
