@@ -5790,6 +5790,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P926 観察文に形の手がかりが入る', vb926(disc926).includes('形の手がかり') && vb926(disc926).includes('丸に近い領域'), 'verbalize');
 }
 
+// ---- P927 目・第4段＋描く・第2段（形を描き直して照合する） ----
+{
+  const { analyzeImagePixels: an927 } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const { verifyShapesByRendering: vs927, renderRegionShape: rr927, compareRegionShape: cr927 } = await import('../src/miki/conversation/services/shapeRenderVerificationService');
+  const W927 = 48, H927 = 48;
+  const make927 = (fn: (x: number, y: number) => [number, number, number]) => {
+    const a = new Uint8Array(W927 * H927 * 4);
+    for (let y = 0; y < H927; y++) for (let x = 0; x < W927; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W927 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return a;
+  };
+  const disc927 = an927(make927((x, y) => ((x - 24) ** 2 + (y - 24) ** 2 <= 144 ? [240, 240, 240] : [15, 15, 15]) as [number, number, number]), W927, H927);
+  check('P927 円盤の形の読みは描き直して再現できる', vs927(disc927).verified === true, `score=${vs927(disc927).score}`);
+  const block927 = an927(make927((x, y) => (x < 24 && y < 24 ? [15, 15, 15] : [240, 240, 240]) as [number, number, number]), W927, H927);
+  check('P927 四角の読みは描き直して再現できる（地の側を選ばない）', vs927(block927).verified === true, `score=${vs927(block927).score}`);
+  const bar927 = an927(make927((x, y) => (y >= 21 && y < 27 ? [240, 240, 240] : [15, 15, 15]) as [number, number, number]), W927, H927);
+  check('P927 棒の読みは描き直して再現できる', vs927(bar927).verified === true, `score=${vs927(bar927).score}`);
+  const white927 = disc927.regions.find((r) => r.colorName === '白');
+  const wrong927 = white927 ? an927((() => { const s = rr927({ ...white927, shape: '四角に近い' }); return s.rgba; })(), W927, H927) : null;
+  const wrongRegion927 = wrong927?.regions.find((r) => r.colorName === '赤');
+  check('P927 違う形で描くと読みがずれて検出できる', !!white927 && !!wrongRegion927 && cr927(white927, wrongRegion927) === false, `wrong=${wrongRegion927?.shape}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

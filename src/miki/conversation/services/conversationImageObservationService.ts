@@ -56,6 +56,11 @@ export interface ImageRegionFeature {
   share: number;
   centroidX: number;
   centroidY: number;
+  /** 外接矩形の幅・高さ（画像全体に対する 0..1）。P927 で描き直しに使う。 */
+  bboxWidth: number;
+  bboxHeight: number;
+  /** 画像の縁に触れている割合（0..1）。1に近い領域は「地」の側。 */
+  borderTouch: number;
   fillRatio: number;
   circularity: number;
   symmetry: number;
@@ -82,6 +87,8 @@ export interface ImageObservation {
   // 型だけここに置き、実体は materialRenderVerificationService が作る
   // （循環参照を避けるため import type で参照する）。
   verification?: import('./materialRenderVerificationService').MaterialVerification;
+  // P927: 形を描き直して照合した結果（任意）。
+  shapeVerification?: import('./shapeRenderVerificationService').ShapeVerification;
 }
 
 const COLOR_NAMES: Array<{ name: string; rgb: [number, number, number] }> = [
@@ -270,7 +277,7 @@ function measureRegions(
     let maxX = 0;
     let minY = height;
     let maxY = 0;
-    let perimeter = 0;
+    let borderCells = 0;
     for (const c of cells) {
       const x = c % width;
       const y = Math.floor(c / width);
@@ -283,18 +290,24 @@ function measureRegions(
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
-      if (x === 0 || !cellSet.has(c - 1)) perimeter++;
-      if (x === width - 1 || !cellSet.has(c + 1)) perimeter++;
-      if (y === 0 || !cellSet.has(c - width)) perimeter++;
-      if (y === height - 1 || !cellSet.has(c + width)) perimeter++;
+      if (x === 0 || y === 0 || x === width - 1 || y === height - 1) borderCells++;
     }
     const bboxW = maxX - minX + 1;
     const bboxH = maxY - minY + 1;
     const fillRatio = cells.length / (bboxW * bboxH);
-    // 格子の階段状の輪郭は周長を膨らませるため、等方的な形向けの
-    // 補正（×0.8）を入れてから円形度を出す。
-    const correctedPerimeter = perimeter * 0.8;
-    const circularity = Math.min(1, (4 * Math.PI * cells.length) / Math.max(1, correctedPerimeter * correctedPerimeter));
+    // 円形度は周長ベースだと格子の階段で歪むため、重心から最も
+    // 遠い点までの距離（フェレ径の近似）で出す（P927 で差し替え）。
+    const centroidCellX = sumX / cells.length;
+    const centroidCellY = sumY / cells.length;
+    let maxDistSq = 0;
+    for (const c of cells) {
+      const x = c % width;
+      const y = Math.floor(c / width);
+      const dSq = (x - centroidCellX) ** 2 + (y - centroidCellY) ** 2;
+      if (dSq > maxDistSq) maxDistSq = dSq;
+    }
+    const circularity = Math.min(1, cells.length / Math.max(1, Math.PI * maxDistSq));
+    const borderTouch = borderCells / Math.max(1, 2 * width + 2 * height - 4);
     let mirrorHit = 0;
     for (const c of cells) {
       const x = c % width;
@@ -308,6 +321,9 @@ function measureRegions(
       share,
       centroidX: (sumX / cells.length) / Math.max(1, width - 1),
       centroidY: (sumY / cells.length) / Math.max(1, height - 1),
+      bboxWidth: bboxW / Math.max(1, width),
+      bboxHeight: bboxH / Math.max(1, height),
+      borderTouch,
       fillRatio,
       circularity,
       symmetry: mirrorHit / cells.length,
@@ -451,7 +467,13 @@ class ConversationImageObservationService {
         const { verifyMaterialByRendering } = await import('./materialRenderVerificationService');
         verification = verifyMaterialByRendering(features);
       } catch { verification = undefined; }
-      return { text: verbalizeImageFeatures(features), features, material: hypothesizeMaterial(features), verification };
+      // P927: 形も描き直して照合する。
+      let shapeVerification: ImageObservation['shapeVerification'];
+      try {
+        const { verifyShapesByRendering } = await import('./shapeRenderVerificationService');
+        shapeVerification = verifyShapesByRendering(features);
+      } catch { shapeVerification = undefined; }
+      return { text: verbalizeImageFeatures(features), features, material: hypothesizeMaterial(features), verification, shapeVerification };
     } catch {
       return null;
     }
