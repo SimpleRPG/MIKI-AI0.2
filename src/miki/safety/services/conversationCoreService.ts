@@ -51,6 +51,7 @@ import { specialDayService } from '../../selfAwareness/services/specialDayServic
 import { diaryService } from '../../selfAwareness/services/diaryService';
 import { gamePlayService } from '../../selfAwareness/services/gamePlayService';
 import { groundedRebuttalService } from '../../selfAwareness/services/groundedRebuttalService';
+import { creativeWritingService } from '../../selfAwareness/services/creativeWritingService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -721,6 +722,11 @@ export class ConversationCoreService {
       const rebuttal = roleplaySessionService.isActive() ? undefined : this.groundedRebuttalAnswer(prompt);
       if (rebuttal && !multiPart) {
         return this.buildResult('RESOLVED', 'grounded_rebuttal_answer', this.applyPersonaVoice(rebuttal), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P938: 「俳句書いて」——自分で書いて推敲して見せる。
+      const creative = this.creativeWritingAnswer(prompt);
+      if (creative && !multiPart) {
+        return this.buildResult('RESOLVED', 'creative_writing_answer', this.applyPersonaVoice(creative), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3955,6 +3961,32 @@ export class ConversationCoreService {
    * - 「おやすみ」: その場で整理を回して眠る挨拶を返す。
    * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
    */
+  /**
+   * P938: 創作（俳句）を書いて推敲する。「○○の俳句書いて」で
+   * テーマを取り、「俳句見せて」で直近の作品を読む。
+   */
+  private creativeWritingAnswer(prompt: string): string | undefined {
+    if (!/(?:俳句|短歌|詩)/.test(prompt)) return undefined;
+    if (/(?:歴史|作り方|意味|とは)/.test(prompt)) return undefined;
+    try {
+      const personaId = personaProfileService.get().profileId;
+      if (/(?:見せて|読んで|聞かせて)/.test(prompt)) {
+        const latest = creativeWritingService.latest();
+        if (!latest) return 'まだ作品はないな。今書いてみようか。';
+        return `この前書いた俳句だよ。${latest.revised.join('　')}`;
+      }
+      if (/(?:書いて|詠んで|作って|ひねって)/.test(prompt)) {
+        const themeMatch = prompt.match(/([ぁ-んァ-ヶー]{2,5})の(?:俳句|短歌|詩)/);
+        const work = creativeWritingService.writeHaiku(personaId, themeMatch?.[1]);
+        if (!work) return undefined;
+        const head = work.theme ? `「${work.theme}」の俳句を書いたよ。` : '俳句を書いたよ。';
+        const revisionNote = work.changes.length ? `推敲で${work.changes[0]}。` : '';
+        return `${head}${work.revised.join('　')}。${revisionNote}`;
+      }
+      return undefined;
+    } catch { return undefined; }
+  }
+
   /**
    * P937: 根拠つきの反論。検証済み Claim と食い違う断定にだけ、
    * 記録そのものを根拠として示す。最終判断は利用者に残す言い方にする。

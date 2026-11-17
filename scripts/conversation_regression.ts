@@ -6021,6 +6021,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P937 反論が記録される', gr937.summary().rebuttals > before937, `before=${before937}`);
 }
 
+// ---- P938 創作を書いて自分で直す（俳句） ----
+{
+  const { creativeWritingService: cw938, moraCount: mc938 } = await import('../src/miki/selfAwareness/services/creativeWritingService');
+  check('P938 モーラ数が数えられる', mc938('つき') === 2 && mc938('ひかり') === 3 && mc938('もみじ') === 3, 'mora');
+  const work938 = cw938.writeHaiku('suite-p938-persona', 'つき', 1234);
+  check('P938 推敲後の俳句は五七五に合う', !!work938 && JSON.stringify(work938.revised.map((l: string) => mc938(l))) === '[5,7,5]', `work=${JSON.stringify(work938?.revised)}`);
+  check('P938 テーマが1行目に入り、初稿と推敲と変更が残る', !!work938 && work938.revised[0].includes('つき') && work938.draft.length === 3 && Array.isArray(work938.changes), `changes=${JSON.stringify(work938?.changes)}`);
+  const r938: any = await conversationCoreService.execute({ prompt: 'つきの俳句書いて', memories: [], recentMessages: [], conversationId: 'suite-p938' } as any);
+  check('P938 「俳句書いて」で書いて見せる', r938.reason === 'creative_writing_answer' && String(r938.replyText || '').includes('俳句を書いたよ'), `reason=${r938.reason} reply=${String(r938.replyText || '').slice(0, 60)}`);
+  const r938b: any = await conversationCoreService.execute({ prompt: '俳句見せて', memories: [], recentMessages: [], conversationId: 'suite-p938' } as any);
+  check('P938 「俳句見せて」で直近の作品を読む', r938b.reason === 'creative_writing_answer' && String(r938b.replyText || '').includes('この前書いた俳句'), `reason=${r938b.reason}`);
+  const r938ctl: any = await conversationCoreService.execute({ prompt: '俳句の歴史を教えて', memories: [], recentMessages: [], conversationId: 'suite-p938' } as any);
+  check('P938 歴史の質問では詠まない', r938ctl.reason !== 'creative_writing_answer', `reason=${r938ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
