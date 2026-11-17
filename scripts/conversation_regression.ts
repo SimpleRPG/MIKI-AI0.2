@@ -5298,6 +5298,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P905 蒸留済みの話題は再蒸留しない', ed905.distill(3).filter((d: any) => d.topic === 'ミント栽培').length === 0, 'deduped');
 }
 
+// P906: 対応表#7 の予測誤差ループ。能力ギャップの調査について
+// 「得られるか」を予測→照合し、連続空振りのギャップが調査順で
+// 後ろへ回ることを確認する。
+{
+  const { researchPredictionService: rp906 } = await import('../src/miki/research/services/researchPredictionService');
+  const { autonomousSearchService: as906 } = await import('../src/miki/research/services/autonomousSearchService');
+  const id906 = 'cap_suite_906';
+  check('P906 初回の調査予測は LEARNABLE', rp906.predict(id906) === 'LEARNABLE', 'initial');
+  check('P906 予測が外れたら誤差として数える', rp906.settle(id906, false).surprise === true, 'surprise');
+  rp906.predict(id906);
+  rp906.settle(id906, false);
+  check('P906 2回連続の空振りで予測が EMPTY になる', rp906.predict(id906) === 'EMPTY' && rp906.rankPenalty(id906) === 1, 'empty');
+  const ranked906 = as906.rankCapabilityGapsForLearning([
+    { capabilityId: id906, status: 'OPEN', impact: 'HIGH' },
+    { capabilityId: 'cap_suite_fresh_906', status: 'OPEN', impact: 'HIGH' },
+  ] as any, 3);
+  check('P906 連続空振りのギャップは調査順が後ろになる', ranked906[0].capabilityId === 'cap_suite_fresh_906', ranked906.map((g: any) => g.capabilityId).join(','));
+  rp906.settle(id906, true);
+  check('P906 得られたら予測は LEARNABLE に戻る', rp906.predict(id906) === 'LEARNABLE' && rp906.rankPenalty(id906) === 0, 'recovered');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

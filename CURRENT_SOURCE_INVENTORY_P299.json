@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1818,
-    "sourceFileCount": 1371,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1282,
-    "relativeImportCandidateCount": 4368,
-    "resolvedRelativeImportCandidateCount": 4352,
+    "trackedPathCountExcludingControlPaths": 1819,
+    "sourceFileCount": 1372,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1283,
+    "relativeImportCandidateCount": 4373,
+    "resolvedRelativeImportCandidateCount": 4357,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 451264,
-      "lines": 5314,
-      "sha256": "819e422a761bc47778a850a21cedc9d5474049a97060037b2d5f123cb995c410",
+      "bytes": 452756,
+      "lines": 5335,
+      "sha256": "1d2d9d076f5e27611f369f5e6fd94dbdc818f9507088e47484c4181c2289d60d",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3506,10 +3506,22 @@
           "specifier": "../src/miki/memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 5305,
+          "specifier": "../src/miki/research/services/researchPredictionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/researchPredictionService.ts"
+        },
+        {
+          "line": 5306,
+          "specifier": "../src/miki/research/services/autonomousSearchService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/autonomousSearchService.ts"
         }
       ],
-      "relativeImportCandidateCount": 298,
-      "resolvedRelativeImportCount": 298,
+      "relativeImportCandidateCount": 300,
+      "resolvedRelativeImportCount": 300,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -27840,9 +27852,9 @@
     },
     {
       "path": "src/miki/research/services/autonomousSearchService.ts",
-      "bytes": 105306,
-      "lines": 2296,
-      "sha256": "c9e5735c834b61b6995bbc98f6ec755af7ea39dfd252743104bf438196dd92ce",
+      "bytes": 106151,
+      "lines": 2305,
+      "sha256": "1e8990e348e20d67fb2102b206b8e093e5b781eef13af40ba4517d34a7198da0",
       "relativeImportCandidates": [
         {
           "line": 6,
@@ -27960,19 +27972,25 @@
         },
         {
           "line": 25,
+          "specifier": "./researchPredictionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/researchPredictionService.ts"
+        },
+        {
+          "line": 26,
           "specifier": "../../memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         },
         {
-          "line": 26,
+          "line": 27,
           "specifier": "../../memory/services/evidenceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/evidenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 21,
-      "resolvedRelativeImportCount": 21,
+      "relativeImportCandidateCount": 22,
+      "resolvedRelativeImportCount": 22,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -28383,6 +28401,29 @@
           "specifier": "../../core/services/crossDomainGraphConnectionP211Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/crossDomainGraphConnectionP211Service.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/research/services/researchPredictionService.ts",
+      "bytes": 3640,
+      "lines": 93,
+      "sha256": "cb8a1d302eb6635ef30fc42fb4d4205169e2f5048d2db2bc6e5d4e5446e2f664",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
         }
       ],
       "relativeImportCandidateCount": 2,

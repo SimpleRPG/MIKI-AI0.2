@@ -22,6 +22,7 @@ import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { surfaceVariationGrowthService } from '../../conversation/services/surfaceVariationGrowthService';
 import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
 import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
+import { researchPredictionService } from './researchPredictionService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { evidenceService, isSyntheticWebMaterial } from '../../memory/services/evidenceService';
 
@@ -2094,7 +2095,11 @@ export class AutonomousSearchService {
     return gaps
       .filter((g) => g.status === 'OPEN')
       .map((g, i) => ({ g, i }))
-      .sort((a, b) => weight(b.g.impact) - weight(a.g.impact) || a.i - b.i)
+      // P906: 予測誤差の還流。影響度が同程度なら、連続で空振り
+      // している（調査しても得られなさそうな）ギャップを後ろへ。
+      .sort((a, b) => weight(b.g.impact) - weight(a.g.impact)
+        || researchPredictionService.rankPenalty(a.g.capabilityId) - researchPredictionService.rankPenalty(b.g.capabilityId)
+        || a.i - b.i)
       .slice(0, Math.max(0, limit))
       .map(({ g }) => g);
   }
@@ -2180,16 +2185,20 @@ export class AutonomousSearchService {
           investigated.push(gapQuery);
           details.push(`能力ギャップ「${topGap.capabilityId}」について自律Web検索開始: ${gapQuery}`);
           procedureSteps.push('ギャップ検索');
+          // P906: 調べる前に「得られるか」を予測する。
+          try { researchPredictionService.predict(topGap.capabilityId); } catch { /* 予測は補助経路 */ }
 
           const { results, summary } = await this.executeSearch(gapQuery, { maxResults: 3 });
           if (results.length === 0) {
             details.push(`能力ギャップ「${topGap.capabilityId}」は検索結果を取得できませんでした。OPENを維持します。`);
+            try { researchPredictionService.settle(topGap.capabilityId, false); } catch { /* 照合は補助経路 */ }
           } else {
             const record = this.learnFromSearch(gapQuery, results, summary, {
               triggerType: 'capability_gap',
               verificationStatus: 'UNVERIFIED',
             });
             procedureSteps.push('学習記録');
+            try { researchPredictionService.settle(topGap.capabilityId, record.extractedKnowledge.length > 0); } catch { /* 照合は補助経路 */ }
             if (record.extractedKnowledge.length > 0) {
               learnedCount++;
               details.push(`能力ギャップ「${topGap.capabilityId}」の調査素材を未検証候補として保存しました。独立検証までOPENを維持します。`);
