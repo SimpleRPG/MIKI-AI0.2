@@ -1,6 +1,7 @@
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { associationGraphService } from '../../memory/services/associationGraphService';
+import { activationService } from '../../memory/services/activationService';
 import { roleplaySessionService } from './roleplaySessionService';
 import { episodeMemoryService } from './episodeMemoryService';
 import { storageService } from '../../../services/storageService';
@@ -327,9 +328,22 @@ class ParagraphCompositionService {
       // 台帳で回す。従来は一番確信度の高い関係の質問が毎回同じに
       // なっていた。材料（関係・連想）が増えれば候補も増える。
       const candidates: string[] = [];
+      // P908（対応表#1・消費側）: 候補の並びに活性化を混ぜる。関係の
+      // 相手が最近・頻繁に話題に出た語ほど、その関係の質問を回転の
+      // 前の方に置く。重みは確信度を大きく覆さない範囲に抑える
+      // （活性化の寄与は最大でも 0.15×4.4 ≒ 0.66）。舞台プールの
+      // ような「直近順が契約」の場面には入れない（P845 の実測）:
+      // ここは「どの関係を聞くか」の選択だけに限る。
       const mine = relations
         .filter((r) => r.from === subject || r.to === subject)
-        .sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+        .map((r) => {
+          const other = r.from === subject ? r.to : r.from;
+          let heat = 0;
+          try { heat = activationService.score(other); } catch { heat = 0; }
+          return { r, order: (r.confidence || 0) + 0.15 * heat };
+        })
+        .sort((a, b) => b.order - a.order)
+        .map((x) => x.r);
       for (const r of mine) {
         const q = this.questionForRelation(r.type, subject, r.from === subject ? r.to : r.from, r.from === subject);
         if (q && !candidates.includes(q)) candidates.push(q);

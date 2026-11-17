@@ -5335,6 +5335,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P907 自己点検に段ごとの件数が出る', Boolean(rec907.gapPlanPhases) && (rec907.gapPlanPhases['COLLECT_EVIDENCE'] || 0) >= 1, JSON.stringify(rec907.gapPlanPhases || {}));
 }
 
+// P908: 対応表#1（消費側）。話題の問いかけ候補の並びに活性化が
+// 効くこと: 活性化が無ければ確信度順、相手の語が熱いとその関係の
+// 質問が前に来る。大きな確信度差は覆らず、回転も壊れない。
+{
+  const { worldModelGraphService: wm908 } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { paragraphCompositionService: pc908 } = await import('../src/miki/conversation/services/paragraphCompositionService');
+  const { activationService: act908 } = await import('../src/miki/memory/services/activationService');
+  const { storageService: st908 } = await import('../src/services/storageService');
+  const resetUsage908 = () => { try { st908.setItem('miki_topic_question_usage_v1', '{}'); } catch { /* noop */ } };
+  wm908.addRelation({ fromName: '霧箱', toName: 'ムラ蒸気', type: 'USED_FOR', provisional: false, confidence: 0.9 } as any);
+  wm908.addRelation({ fromName: '霧箱', toName: 'キラ氷晶', type: 'USED_FOR', provisional: false, confidence: 0.6 } as any);
+  resetUsage908();
+  const q908a = pc908.buildTopicQuestion(['霧箱']);
+  check('P908 活性化が無ければ確信度順', Boolean(q908a) && q908a!.includes('ムラ蒸気'), q908a || 'NONE');
+  for (let i = 0; i < 30; i++) act908.tick('キラ氷晶');
+  resetUsage908();
+  const q908b = pc908.buildTopicQuestion(['霧箱']);
+  check('P908 熱い相手の関係が前に来る', Boolean(q908b) && q908b!.includes('キラ氷晶'), q908b || 'NONE');
+  resetUsage908();
+  const seen908 = new Set<string>();
+  for (let i = 0; i < 5; i++) { const q = pc908.buildTopicQuestion(['霧箱']); if (q) seen908.add(q); }
+  check('P908 回転は壊れない', seen908.size === 5, String(seen908.size));
+  wm908.addRelation({ fromName: '磁気瓶', toName: 'タマ陽子', type: 'USED_FOR', provisional: false, confidence: 0.95 } as any);
+  wm908.addRelation({ fromName: '磁気瓶', toName: 'ヒカリ電子', type: 'USED_FOR', provisional: false, confidence: 0.3 } as any);
+  for (let i = 0; i < 5; i++) act908.tick('ヒカリ電子');
+  resetUsage908();
+  const q908c = pc908.buildTopicQuestion(['磁気瓶']);
+  check('P908 大きな確信度差は覆らない', Boolean(q908c) && q908c!.includes('タマ陽子'), q908c || 'NONE');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
