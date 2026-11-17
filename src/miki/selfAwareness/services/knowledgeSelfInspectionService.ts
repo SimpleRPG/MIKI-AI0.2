@@ -35,6 +35,7 @@ import { dreamService } from './dreamService';
 import { duoDialogueService } from './duoDialogueService';
 import { motionPatternService } from './motionPatternService';
 import { avatarPresenceService } from './avatarPresenceService';
+import { computeResourceService } from './computeResourceService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -104,6 +105,7 @@ export interface KnowledgeSelfInspectionRecord {
   duoDialogues: number;
   motionPatterns: number;
   avatarPresence: number;
+  computeResourcesMeasured: number;
   findings: string[];
 }
 
@@ -319,6 +321,7 @@ class KnowledgeSelfInspectionService {
     let duoDialogues = 0;
     let motionPatterns = 0;
     let avatarPresence = 0;
+    let computeResourcesMeasured = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -448,6 +451,11 @@ class KnowledgeSelfInspectionService {
       if (avatarPresence > 0) {
         findings.push(`アバターの存在状態を${avatarPresence}人分持っている`);
       }
+      // P943: 速さを測った計算仕事の種類数。
+      computeResourcesMeasured = computeResourceService.summary().measuredKinds;
+      if (computeResourcesMeasured > 0) {
+        findings.push(`計算の速さを${computeResourcesMeasured}種の仕事で測った`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -508,6 +516,7 @@ class KnowledgeSelfInspectionService {
       duoDialogues,
       motionPatterns,
       avatarPresence,
+      computeResourcesMeasured,
       findings,
     };
 

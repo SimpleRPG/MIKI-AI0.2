@@ -6118,6 +6118,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P942 自己点検に存在状態の人数が入る', insp942.avatarPresence >= 1, `avatarPresence=${insp942.avatarPresence}`);
 }
 
+// ---- P943 計算資源の基盤 第1段 ----
+{
+  const { computeResourceService: cr943 } = await import('../src/miki/selfAwareness/services/computeResourceService');
+  const inv943 = cr943.inventory();
+  check('P943 体の棚卸しは分かる範囲だけを出す', (inv943.cpuCores === null || typeof inv943.cpuCores === 'number') && (inv943.webgpu === 'AVAILABLE' || inv943.webgpu === 'UNKNOWN'), `inv=${JSON.stringify(inv943)}`);
+  const meas943 = cr943.measureCpuWorkloads();
+  check('P943 CPUの速さを3種の仕事で測れる', meas943.length === 3 && meas943.every((m) => m.opsPerSec > 0 && m.ms > 0), `kinds=${meas943.map((m) => m.kind).join(',')}`);
+  check('P943 記号処理の向きはCPU', cr943.placementHint('SYMBOLIC').aptitude === 'CPU' && cr943.placementHint('SYMBOLIC').available, 'symbolic->cpu');
+  check('P943 未測定のGPU/NPUは使えると言わない', !cr943.placementHint('NUMERIC').available && !cr943.placementHint('SMALL_NN').available, 'gpu/npu unmeasured');
+  cr943.reportDeviceProbe({ socModel: 'suite-SoC-943', gpuAvailable: true, npuAvailable: false, nativeCoreOk: true });
+  const inv943b = cr943.inventory();
+  check('P943 端末報告で棚卸しが埋まる', inv943b.socModel === 'suite-SoC-943' && inv943b.gpuAvailable === true && inv943b.nativeCore === 'OK', `inv=${JSON.stringify(inv943b)}`);
+  check('P943 報告のあとはGPUが使えると分かる', cr943.placementHint('NUMERIC').available, 'gpu after probe');
+  check('P943 棚卸しを言葉にできる', cr943.describe().includes('体の棚卸し'), `desc=${cr943.describe()}`);
+  const { knowledgeSelfInspectionService: ksi943 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const insp943: any = ksi943.inspect();
+  check('P943 自己点検に測った仕事の種類数が入る', insp943.computeResourcesMeasured >= 3, `computeResourcesMeasured=${insp943.computeResourcesMeasured}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
