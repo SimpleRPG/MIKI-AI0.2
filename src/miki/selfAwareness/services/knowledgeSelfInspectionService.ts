@@ -32,6 +32,7 @@ import { gamePlayService } from './gamePlayService';
 import { groundedRebuttalService } from './groundedRebuttalService';
 import { creativeWritingService } from './creativeWritingService';
 import { dreamService } from './dreamService';
+import { duoDialogueService } from './duoDialogueService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -98,6 +99,7 @@ export interface KnowledgeSelfInspectionRecord {
   rebuttalsMade: number;
   creativeWorks: number;
   dreamsRecorded: number;
+  duoDialogues: number;
   findings: string[];
 }
 
@@ -310,6 +312,7 @@ class KnowledgeSelfInspectionService {
     let rebuttalsMade = 0;
     let creativeWorks = 0;
     let dreamsRecorded = 0;
+    let duoDialogues = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -424,6 +427,11 @@ class KnowledgeSelfInspectionService {
       if (dreamsRecorded > 0) {
         findings.push(`夢を${dreamsRecorded}回見た`);
       }
+      // P940: ビービーとの掛け合いの回数。
+      duoDialogues = duoDialogueService.summary().dialogues;
+      if (duoDialogues > 0) {
+        findings.push(`ビービーと${duoDialogues}回掛け合いをした`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -481,6 +489,7 @@ class KnowledgeSelfInspectionService {
       rebuttalsMade,
       creativeWorks,
       dreamsRecorded,
+      duoDialogues,
       findings,
     };
 

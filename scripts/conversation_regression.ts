@@ -6049,6 +6049,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P939 定義の質問では夢を語らない', r939ctl.reason !== 'dream_answer', `reason=${r939ctl.reason}`);
 }
 
+// ---- P940 2人の掛け合い ----
+{
+  const { duoDialogueService: dd940 } = await import('../src/miki/selfAwareness/services/duoDialogueService');
+  const dlg940 = dd940.banter('月夜石', 42);
+  check('P940 掛け合いは両方の声で組み立つ', dlg940.lines.length >= 3 && dlg940.lines.some((l) => l.speaker === 'miki') && dlg940.lines.some((l) => l.speaker === 'bibi') && dlg940.topic === '月夜石', `lines=${dlg940.lines.length}`);
+  const before940 = dd940.summary().dialogues;
+  const r940: any = await conversationCoreService.execute({ prompt: 'みきとビービーで話して', memories: [], recentMessages: [], conversationId: 'suite-p940' } as any);
+  check('P940 「みきとビービーで話して」で掛け合いを見せる', r940.reason === 'duo_dialogue_answer' && String(r940.replyText || '').includes('ビービー：') && String(r940.replyText || '').includes('みき：'), `reason=${r940.reason}`);
+  check('P940 掛け合いが記録される', dd940.summary().dialogues > before940, `before=${before940}`);
+  const r940ctl: any = await conversationCoreService.execute({ prompt: 'ビービーの名前の由来は？', memories: [], recentMessages: [], conversationId: 'suite-p940' } as any);
+  check('P940 由来の質問では掛け合いにならない', r940ctl.reason !== 'duo_dialogue_answer', `reason=${r940ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

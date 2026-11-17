@@ -53,6 +53,7 @@ import { gamePlayService } from '../../selfAwareness/services/gamePlayService';
 import { groundedRebuttalService } from '../../selfAwareness/services/groundedRebuttalService';
 import { creativeWritingService } from '../../selfAwareness/services/creativeWritingService';
 import { dreamService } from '../../selfAwareness/services/dreamService';
+import { duoDialogueService } from '../../selfAwareness/services/duoDialogueService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -733,6 +734,11 @@ export class ConversationCoreService {
       const dream = this.dreamAnswer(prompt);
       if (dream && !multiPart) {
         return this.buildResult('RESOLVED', 'dream_answer', this.applyPersonaVoice(dream), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P940: 「2人で話して」——みきとビービーの掛け合い。
+      const duo = this.duoDialogueAnswer(prompt);
+      if (duo && !multiPart) {
+        return this.buildResult('RESOLVED', 'duo_dialogue_answer', duo, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3967,6 +3973,24 @@ export class ConversationCoreService {
    * - 「おやすみ」: その場で整理を回して眠る挨拶を返す。
    * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
    */
+  /**
+   * P940: 2人の掛け合い。「2人で話して」「みきとビービーで話して」
+   * で、話題を取って短い掛け合いを見せる。人格の声は混ぜない
+   * （applyPersonaVoice を通さず、話者ラベルで出す）。
+   */
+  private duoDialogueAnswer(prompt: string): string | undefined {
+    const duoForm = /(?:2人|二人|ふたり)で/.test(prompt)
+      || /みきとビービー/.test(prompt)
+      || /掛け合い/.test(prompt);
+    if (!duoForm) return undefined;
+    if (!/(?:話|しゃべ|語|聞かせ)/.test(prompt)) return undefined;
+    try {
+      const topicMatch = prompt.match(/「(.+?)」/);
+      const dialogue = duoDialogueService.banter(topicMatch?.[1]);
+      return duoDialogueService.format(dialogue);
+    } catch { return undefined; }
+  }
+
   /**
    * P939: 夢の話。「どんな夢を見た？」に、眠って整理する時間に
    * 見た夢を語る。夢は知識ではないので、必ず夢として語る。
