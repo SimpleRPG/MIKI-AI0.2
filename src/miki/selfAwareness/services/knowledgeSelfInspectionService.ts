@@ -16,6 +16,7 @@ import { personaProfileService } from '../../conversation/services/personaProfil
 import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
 import { episodeDistillationService } from '../../conversation/services/episodeDistillationService';
 import { codeSynthesisStatsService } from '../../selfDevelopment/services/codeSynthesisStatsService';
+import { capabilityGapService } from '../../capability/services/capabilityGapService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -59,6 +60,7 @@ export interface KnowledgeSelfInspectionRecord {
   productionConflicts: { total: number; byFamily: Record<string, number> };
   codeComponents: { total: number; verified: number };
   codeSynthesis: { total: number; succeeded: number; byReason: Record<string, number> };
+  codeGapsOpen: number;
   findings: string[];
 }
 
@@ -251,6 +253,7 @@ class KnowledgeSelfInspectionService {
     // 点検に残す。分布がそのまま部品の不足リストになる。
     let codeComponents = { total: 0, verified: 0 };
     let codeSynthesis = { total: 0, succeeded: 0, byReason: {} as Record<string, number> };
+    let codeGapsOpen = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
         (item) => item.componentKind === 'CODE',
@@ -268,6 +271,12 @@ class KnowledgeSelfInspectionService {
       if (failedCount > 0) {
         const topReason = Object.entries(codeSynthesis.byReason).sort((a, b) => b[1] - a[1])[0];
         findings.push(`コード合成が${codeSynthesis.total}回中${failedCount}回止まった（最多理由 ${topReason ? `${topReason[0]} ${topReason[1]}件` : '不明'}）`);
+      }
+      // P917: 会話で実際に止まった不足が、成長課題として開いている件数。
+      codeGapsOpen = capabilityGapService.getAllGaps()
+        .filter((g) => g.gap_type === 'code_component_missing' && g.status === 'OPEN').length;
+      if (codeGapsOpen > 0) {
+        findings.push(`コード部品の不足が${codeGapsOpen}件、成長課題として開いている`);
       }
     } catch { /* コードの棚卸しは補助経路 */ }
 
@@ -305,6 +314,7 @@ class KnowledgeSelfInspectionService {
       productionConflicts,
       codeComponents,
       codeSynthesis,
+      codeGapsOpen,
       findings,
     };
 

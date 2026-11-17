@@ -5531,6 +5531,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P916 意味の問いはコードレーンに入らない', !String(code916c?.replyText ?? '').includes('今の部品ではまだ組めません'), String(code916c?.replyText ?? '').slice(0, 60));
 }
 
+// ---- P917 コード生成・第3段の入口（会話の不足が成長課題になる） ----
+{
+  const { capabilityGapService } = await import('../src/miki/capability/services/capabilityGapService');
+  const { knowledgeSelfInspectionService } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const before917 = capabilityGapService.getAllGaps().filter((g: any) => g.gap_type === 'code_component_missing').length;
+  await conversationCoreService.execute({ prompt: '磁石時計を直す関数が欲しい', memories: [], recentMessages: [], conversationId: 'suite-p917' } as any);
+  await conversationCoreService.execute({ prompt: '磁石時計を直す関数が欲しい', memories: [], recentMessages: [], conversationId: 'suite-p917' } as any);
+  const mine917 = capabilityGapService.getAllGaps().filter((g: any) => g.gap_type === 'code_component_missing');
+  check('P917 合成の不足が能力ギャップになる', mine917.length === before917 + 1, `before=${before917} after=${mine917.length}`);
+  check('P917 同じ依頼は頻度にまとまる', mine917.some((g: any) => g.frequency >= 2 && g.status === 'OPEN'), `freq=${mine917.map((g: any) => g.frequency).join(',')}`);
+  const rec917: any = knowledgeSelfInspectionService.inspect();
+  check('P917 自己点検に開いたコード不足が出る', rec917?.codeGapsOpen >= 1, `open=${rec917?.codeGapsOpen}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

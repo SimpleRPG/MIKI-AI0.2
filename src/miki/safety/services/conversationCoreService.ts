@@ -1371,7 +1371,28 @@ export class ConversationCoreService {
       const reusable = capabilityReuseService.findReusable(prompt);
       const executionEnvironment = compiled.environment || 'ANDROID';
       const synthesis = nonLlmCodeSynthesisService.plan(compiled, prompt);
-      if (synthesis.blockedReason) codeSynthesisBlockedReason = synthesis.blockedReason;
+      if (synthesis.blockedReason) {
+        codeSynthesisBlockedReason = synthesis.blockedReason;
+        // P917: コード生成・第3段の入口。会話で実際に止まった不足を、
+        // 統計（P915）だけでなく能力ギャップとして残し、自律成長の
+        // 既存ループ（課題発見・背景処理）が拾える形にする。
+        // 同じ依頼は目的のハッシュで重複をまとめる。
+        try {
+          let h = 2166136261;
+          const norm = prompt.trim().toLowerCase();
+          for (let i = 0; i < norm.length; i++) { h ^= norm.charCodeAt(i); h = Math.imul(h, 16777619); }
+          capabilityGapService.recordGap({
+            description: `コード合成の不足（${synthesis.blockedReason}）: ${prompt.slice(0, 80)}`,
+            gap_type: 'code_component_missing',
+            capabilityId: `code-synthesis-${(h >>> 0).toString(16).padStart(8, '0')}`,
+            impact: 'MEDIUM',
+            current_workaround: '検証済み部品で構成できないため、理由を返して終了する',
+            candidate_solution: '候補コード生成と検証を通して、不足する部品をレジストリへ追加する',
+            samplePrompt: prompt,
+            source: 'observed',
+          });
+        } catch { /* 不足の記録は補助経路。失敗しても会話は止めない */ }
+      }
       const plannedIds = synthesis.componentIds;
       const candidates = plannedIds.length
         ? plannedIds.map((id) => componentRegistryService.getComponent(id)).filter(Boolean) as any[]
