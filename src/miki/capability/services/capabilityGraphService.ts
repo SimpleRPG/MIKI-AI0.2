@@ -238,7 +238,18 @@ export class CapabilityGraphService {
   }
 
   private tokens(text: string): string[] {
-    return text.toLowerCase().split(/[^a-z0-9_\u3040-\u30ff\u3400-\u9fff]+/).filter(t => t.length >= 2).slice(0, 40);
+    const raw = text.toLowerCase().split(/[^a-z0-9_\u3040-\u30ff\u3400-\u9fff]+/).filter(t => t.length >= 2).slice(0, 40);
+    // P920: 日本語は分かち書きがなく、文全体が1トークンになって
+    // 目的文と一切一致しなかった（検証済み部品があっても計画が
+    // 立たない）。CJK の連なりからは文字バイグラムもトークンに
+    // 加え、部分一致で候補を拾えるようにする（検索の想起側）。
+    const out = new Set<string>(raw);
+    for (const t of raw) {
+      if (t.length >= 3 && /[\u3040-\u30ff\u3400-\u9fff]/.test(t)) {
+        for (let i = 0; i + 2 <= t.length; i++) out.add(t.slice(i, i + 2));
+      }
+    }
+    return [...out].slice(0, 120);
   }
 
   private matchOutputsToInputs(from: ComponentTxtPackage, to: ComponentTxtPackage): string[] {

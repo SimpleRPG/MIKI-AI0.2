@@ -5596,6 +5596,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P919 自己点検に供給済みの件数が出る', rec919?.codeSpecsSupplied >= 1, `supplied=${rec919?.codeSpecsSupplied}`);
 }
 
+// ---- P920 能力グラフの日本語照合（目的文が日本語でも部品が見つかる） ----
+{
+  const { componentRegistryService } = await import('../src/miki/capability/services/componentRegistryService');
+  const { capabilityGraphService } = await import('../src/miki/capability/services/capabilityGraphService');
+  const { nonLlmCodeSynthesisService } = await import('../src/miki/selfDevelopment/services/nonLlmCodeSynthesisService');
+  componentRegistryService.registerComponent({
+    component_id: 'suite.shuffle_920', version: '1.0.0', status: 'VERIFIED',
+    purpose: '配列をシャッフルして新しい配列を返す', entry_point: 'shuffleArray',
+    inputs: [{ name: 'items', type: 'array', description: 'items' }],
+    outputs: [{ name: 'shuffled', type: 'array', description: 'shuffled' }],
+    preconditions: [], postconditions: [], side_effects: [], dependencies: [],
+    supported_environments: ['EXTERNAL_RUNNER'], failure_behavior: 'fail', security_class: 'READ_ONLY',
+    idempotent: true, deterministic: true, component_txt: '{}',
+    implementation_txt: 'export function shuffleArray920(items: unknown[]): unknown[] { return [...items]; }',
+    tests_txt: 'TEST_CASE: NORMAL', validation_txt: 'ok', sources_txt: 'suite', history_txt: 'suite',
+    implementation_hash: 'suitehash920', validation_hash: 'suitev920', success_count: 0, failure_count: 0,
+    created_at: Date.now(), updated_at: Date.now(), componentKind: 'CODE',
+  } as any);
+  const plan920: any = capabilityGraphService.plan('配列をシャッフルする関数が欲しい');
+  check('P920 日本語の目的で検証済み部品が見つかる', Boolean(plan920) && plan920.component_ids.includes('suite.shuffle_920'), `plan=${plan920?.component_ids?.join(',')}`);
+  const plan920b: any = capabilityGraphService.plan('全然関係ない料理のレシピ');
+  check('P920 無関係な目的では拾わない', !plan920b || !plan920b.component_ids.includes('suite.shuffle_920'), `plan=${plan920b?.component_ids?.join(',')}`);
+  const syn920: any = nonLlmCodeSynthesisService.plan({ requestId: 'suite-p920', environment: 'EXTERNAL_RUNNER' } as any, '配列をシャッフルする関数が欲しい');
+  check('P920 合成まで通る', !syn920?.blockedReason && (syn920?.componentIds || []).includes('suite.shuffle_920'), `blocked=${syn920?.blockedReason} ids=${(syn920?.componentIds || []).join(',')}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
