@@ -14,6 +14,9 @@
  *   周期性・グラデーションの柔らかさを測り、素材パラメータの
  *   仮説（ツヤ・粗さ・繰り返し模様）まで立てる。仮説は印象として
  *   言葉にし、断定はしない。描いて照合する検証は後段の仕事。
+ * - P926（目・第3段）: 色のつながりを領域に分け、位置・大きさ・
+ *   丸さ・四角さ・細長さ・左右対称を測って観察文に含める。
+ *   物の同定はまだしない（形の物差しを用意する段）。
  *
  * できないこと（正直に範囲を切る）:
  * - 物体や人物の同定、文字の読み取り（OCR）は手段が無いのでしない。
@@ -39,6 +42,25 @@ export interface ImagePixelFeatures {
   highlightConcentration: number;
   gradientSoftness: number;
   periodicity: { period: number; strength: number } | null;
+  // P926（目・第3段）: 色の領域ごとの形の測定。
+  regions: ImageRegionFeature[];
+}
+
+/**
+ * P926: 色でつながった領域1つの形の測定値。位置・大きさ・
+ * 丸さ・四角さ・細長さ・左右対称を数値で持ち、印象ラベルも付ける。
+ * 物の同定はまだしない（形の物差しを用意する段）。
+ */
+export interface ImageRegionFeature {
+  colorName: string;
+  share: number;
+  centroidX: number;
+  centroidY: number;
+  fillRatio: number;
+  circularity: number;
+  symmetry: number;
+  elongation: number;
+  shape: '丸に近い' | '四角に近い' | '細長い' | 'いびつな形';
 }
 
 /**
@@ -104,6 +126,8 @@ export function analyzeImagePixels(
   let saturationSum = 0;
   let transparent = 0;
   const lumaGrid = new Float32Array(pixelCount).fill(-1);
+  const binGrid = new Int32Array(pixelCount).fill(-1);
+  const binIds = new Map<string, number>();
   const bins = new Map<string, { count: number; r: number; g: number; b: number }>();
   for (let i = 0; i < pixelCount; i++) {
     const r = rgba[i * 4];
@@ -121,6 +145,12 @@ export function analyzeImagePixels(
     const min = Math.min(r, g, b);
     saturationSum += max === 0 ? 0 : (max - min) / max;
     const key = `${Math.floor(r / 32)}-${Math.floor(g / 32)}-${Math.floor(b / 32)}`;
+    let binId = binIds.get(key);
+    if (binId === undefined) {
+      binId = binIds.size;
+      binIds.set(key, binId);
+    }
+    binGrid[i] = binId;
     const bin = bins.get(key) || { count: 0, r: 0, g: 0, b: 0 };
     bin.count++;
     bin.r += r;
@@ -176,6 +206,7 @@ export function analyzeImagePixels(
     ? Math.max(0, Math.min(1, 1 - (secondDiffSum / firstDiffSum) * 0.5))
     : 1;
   const periodicity = detectPeriodicity(lumaGrid, width, height);
+  const regions = measureRegions(binGrid, rgba, width, height);
 
   return {
     width,
@@ -192,7 +223,99 @@ export function analyzeImagePixels(
     highlightConcentration,
     gradientSoftness,
     periodicity,
+    regions,
   };
+}
+
+/**
+ * P926: 同じ色ビンのつながりを領域として切り分け、形を測る。
+ * 面積2%未満の小領域はノイズとして落とし、大きい順に最大5つ。
+ */
+function measureRegions(
+  binGrid: Int32Array,
+  rgba: Uint8Array | number[],
+  width: number,
+  height: number,
+): ImageRegionFeature[] {
+  const total = width * height;
+  const visited = new Uint8Array(total);
+  const regions: ImageRegionFeature[] = [];
+  const stack: number[] = [];
+  for (let start = 0; start < total; start++) {
+    const bin = binGrid[start];
+    if (bin < 0 || visited[start]) continue;
+    const cells: number[] = [];
+    stack.length = 0;
+    stack.push(start);
+    visited[start] = 1;
+    while (stack.length) {
+      const cur = stack.pop() as number;
+      cells.push(cur);
+      const cx = cur % width;
+      const cy = Math.floor(cur / width);
+      if (cx > 0 && !visited[cur - 1] && binGrid[cur - 1] === bin) { visited[cur - 1] = 1; stack.push(cur - 1); }
+      if (cx < width - 1 && !visited[cur + 1] && binGrid[cur + 1] === bin) { visited[cur + 1] = 1; stack.push(cur + 1); }
+      if (cy > 0 && !visited[cur - width] && binGrid[cur - width] === bin) { visited[cur - width] = 1; stack.push(cur - width); }
+      if (cy < height - 1 && !visited[cur + width] && binGrid[cur + width] === bin) { visited[cur + width] = 1; stack.push(cur + width); }
+    }
+    const share = cells.length / total;
+    if (share < 0.02) continue;
+    const cellSet = new Set(cells);
+    let sumX = 0;
+    let sumY = 0;
+    let rSum = 0;
+    let gSum = 0;
+    let bSum = 0;
+    let minX = width;
+    let maxX = 0;
+    let minY = height;
+    let maxY = 0;
+    let perimeter = 0;
+    for (const c of cells) {
+      const x = c % width;
+      const y = Math.floor(c / width);
+      sumX += x;
+      sumY += y;
+      rSum += rgba[c * 4];
+      gSum += rgba[c * 4 + 1];
+      bSum += rgba[c * 4 + 2];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      if (x === 0 || !cellSet.has(c - 1)) perimeter++;
+      if (x === width - 1 || !cellSet.has(c + 1)) perimeter++;
+      if (y === 0 || !cellSet.has(c - width)) perimeter++;
+      if (y === height - 1 || !cellSet.has(c + width)) perimeter++;
+    }
+    const bboxW = maxX - minX + 1;
+    const bboxH = maxY - minY + 1;
+    const fillRatio = cells.length / (bboxW * bboxH);
+    // 格子の階段状の輪郭は周長を膨らませるため、等方的な形向けの
+    // 補正（×0.8）を入れてから円形度を出す。
+    const correctedPerimeter = perimeter * 0.8;
+    const circularity = Math.min(1, (4 * Math.PI * cells.length) / Math.max(1, correctedPerimeter * correctedPerimeter));
+    let mirrorHit = 0;
+    for (const c of cells) {
+      const x = c % width;
+      const y = Math.floor(c / width);
+      const mx = minX + (maxX - x);
+      if (cellSet.has(y * width + mx)) mirrorHit++;
+    }
+    const elongation = Math.max(bboxW, bboxH) / Math.max(1, Math.min(bboxW, bboxH));
+    regions.push({
+      colorName: nearestColorName(rSum / cells.length, gSum / cells.length, bSum / cells.length),
+      share,
+      centroidX: (sumX / cells.length) / Math.max(1, width - 1),
+      centroidY: (sumY / cells.length) / Math.max(1, height - 1),
+      fillRatio,
+      circularity,
+      symmetry: mirrorHit / cells.length,
+      elongation,
+      shape: elongation >= 2.5 ? '細長い' : fillRatio >= 0.85 ? '四角に近い' : circularity >= 0.65 ? '丸に近い' : 'いびつな形',
+    });
+  }
+  return regions.sort((a, b) => b.share - a.share).slice(0, 5);
 }
 
 /**
@@ -300,7 +423,15 @@ export function verbalizeImageFeatures(features: ImagePixelFeatures): string {
     ? `。${material.patternPeriod <= 5 ? '細かい' : 'はっきりした'}繰り返し模様がありそう`
     : '';
   const gradient = material.softGradient ? '。色の移り変わりはなめらか' : '';
-  return `画像の観察：${features.aspect}の画像。全体に${brightness}。${vividness}。${colorCount}。${colors}${transparency}。${material.gloss}${pattern}${gradient}。具体的な物や文字までは読み取れない。`;
+  // P926: 形の手がかり（大きな領域を最大2つ、位置と形の印象で）。
+  const regionText = features.regions.slice(0, 2).map((r) => {
+    const h = r.centroidX < 0.36 ? '左' : r.centroidX > 0.64 ? '右' : '';
+    const v = r.centroidY < 0.36 ? '上' : r.centroidY > 0.64 ? '下' : '';
+    const pos = h + v || '中央';
+    return `${pos}に${r.colorName}の${r.shape}領域（約${Math.round(r.share * 100)}%）`;
+  }).join('、');
+  const shapes = regionText ? `。形の手がかり：${regionText}がある` : '';
+  return `画像の観察：${features.aspect}の画像。全体に${brightness}。${vividness}。${colorCount}。${colors}${transparency}。${material.gloss}${pattern}${gradient}${shapes}。具体的な物や文字までは読み取れない。`;
 }
 
 class ConversationImageObservationService {

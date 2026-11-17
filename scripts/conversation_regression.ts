@@ -5766,6 +5766,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P925 利用者側の宣言では主体性レーンは発火しない', r925ctl.reason !== 'idle_topic_answer', `reason=${r925ctl.reason}`);
 }
 
+// ---- P926 目・第3段（色の領域の形を測る） ----
+{
+  const { analyzeImagePixels: an926, verbalizeImageFeatures: vb926 } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const W926 = 48, H926 = 48;
+  const make926 = (fn: (x: number, y: number) => [number, number, number]) => {
+    const a = new Uint8Array(W926 * H926 * 4);
+    for (let y = 0; y < H926; y++) for (let x = 0; x < W926; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W926 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return a;
+  };
+  const disc926 = an926(make926((x, y) => ((x - 24) ** 2 + (y - 24) ** 2 <= 144 ? [240, 240, 240] : [15, 15, 15]) as [number, number, number]), W926, H926);
+  const white926 = disc926.regions.find((r) => r.colorName === '白');
+  check('P926 円盤を丸に近い領域として測れる', white926?.shape === '丸に近い' && white926.circularity >= 0.65 && white926.symmetry >= 0.9, `circ=${white926?.circularity.toFixed(2)} shape=${white926?.shape}`);
+  check('P926 円盤の位置と大きさが合う', !!white926 && Math.abs(white926.centroidX - 0.5) < 0.06 && white926.share > 0.15 && white926.share < 0.24, `centroid=${white926?.centroidX.toFixed(2)} share=${white926?.share.toFixed(2)}`);
+  const block926 = an926(make926((x, y) => (x < 24 && y < 24 ? [15, 15, 15] : [240, 240, 240]) as [number, number, number]), W926, H926);
+  const black926 = block926.regions.find((r) => r.colorName === '黒');
+  check('P926 四角いブロックを四角に近いと測れる', black926?.shape === '四角に近い' && black926.fillRatio >= 0.95, `fill=${black926?.fillRatio.toFixed(2)} shape=${black926?.shape}`);
+  const bar926 = an926(make926((x, y) => (y >= 21 && y < 27 ? [240, 240, 240] : [15, 15, 15]) as [number, number, number]), W926, H926);
+  check('P926 細い棒を細長いと測れる', bar926.regions.find((r) => r.colorName === '白')?.shape === '細長い', 'bar');
+  check('P926 観察文に形の手がかりが入る', vb926(disc926).includes('形の手がかり') && vb926(disc926).includes('丸に近い領域'), 'verbalize');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1829,
     "sourceFileCount": 1382,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1293,
-    "relativeImportCandidateCount": 4467,
-    "resolvedRelativeImportCandidateCount": 4451,
+    "relativeImportCandidateCount": 4468,
+    "resolvedRelativeImportCandidateCount": 4452,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 496471,
-      "lines": 5782,
-      "sha256": "58abfc9be108ba8597efe6b9d8530120a3cba17b29830232823ffa9777694e78",
+      "bytes": 498622,
+      "lines": 5806,
+      "sha256": "ea783b3fa630e502bcae4c186fbdd3f5e05ef5b71059ec5752cfea4e8827df15",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3836,10 +3836,16 @@
           "specifier": "../src/miki/selfAwareness/services/desireService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/desireService.ts"
+        },
+        {
+          "line": 5771,
+          "specifier": "../src/miki/conversation/services/conversationImageObservationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationImageObservationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 353,
-      "resolvedRelativeImportCount": 353,
+      "relativeImportCandidateCount": 354,
+      "resolvedRelativeImportCount": 354,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -12961,18 +12967,18 @@
     },
     {
       "path": "src/miki/conversation/services/conversationImageObservationService.ts",
-      "bytes": 16101,
-      "lines": 377,
-      "sha256": "3e1838e0a41ff8389d2596cfdb009eebe3b3a4d0d1f5166815211cf5d1abf6c8",
+      "bytes": 21484,
+      "lines": 508,
+      "sha256": "4e0c61c1fd4895cc4200eb4eb6640ffd2ed6456319f5e45a181bd98f7f3e2525",
       "relativeImportCandidates": [
         {
-          "line": 62,
+          "line": 84,
           "specifier": "./materialRenderVerificationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/materialRenderVerificationService.ts"
         },
         {
-          "line": 320,
+          "line": 451,
           "specifier": "./materialRenderVerificationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/materialRenderVerificationService.ts"
