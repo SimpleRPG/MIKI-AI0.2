@@ -5622,6 +5622,50 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P920 合成まで通る', !syn920?.blockedReason && (syn920?.componentIds || []).includes('suite.shuffle_920'), `blocked=${syn920?.blockedReason} ids=${(syn920?.componentIds || []).join(',')}`);
 }
 
+// ---- P921 供給部品の昇格パイプライン接続（ゲート作成→実行→DEVICE_TESTED） ----
+{
+  const { codeComponentSpecService } = await import('../src/miki/selfDevelopment/services/codeComponentSpecService');
+  const { codeComponentSupplyService } = await import('../src/miki/selfDevelopment/services/codeComponentSupplyService');
+  const { codeComponentPromotionBridgeService } = await import('../src/miki/selfDevelopment/services/codeComponentPromotionBridgeService');
+  const { componentRegistryService } = await import('../src/miki/capability/services/componentRegistryService');
+  const { componentRegressionService } = await import('../src/miki/verification/services/componentRegressionService');
+  const { executionRunnerService } = await import('../src/miki/execution/services/executionRunnerService');
+  const { knowledgeSelfInspectionService } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  codeComponentSpecService.recordFromRequest({ capabilityId: 'code-synthesis-suite921', prompt: '数値配列をソートする関数が欲しい', target: 'sortNumbers', deliverables: ['関数'], acceptanceCriteria: ['昇順であること'], constraints: [] });
+  const sup921: any = codeComponentSupplyService.receiveImplementation({
+    capabilityId: 'code-synthesis-suite921', componentId: 'suite.sort_921', purpose: '数値配列を昇順に並べ替える',
+    inputs: ['values'], outputs: ['sorted'], preconditions: ['values is an array'], postconditions: ['sorted ascending'],
+    implementation: 'export function sortNumbers921(values: number[]): number[] { return [...values].sort((a, b) => a - b); }',
+    tests: 'TEST_CASE: NORMAL, ASSERT: EQUALS [1,2,3]',
+  });
+  check('P921 供給と同時に昇格ゲートが用意される', sup921.accepted === true && sup921.gatePrepared === true && Boolean(sup921.suiteId), JSON.stringify(sup921).slice(0, 100));
+  const early921: any = codeComponentPromotionBridgeService.promoteIfPassed('suite.sort_921');
+  check('P921 実行前は昇格しない', early921.accepted === false, String(early921.reason).slice(0, 50));
+  const suite921: any = componentRegressionService.get(String(sup921.suiteId));
+  check('P921 回帰ケースが計画されている', (suite921?.test_case_ids?.length || 0) >= 1, `cases=${suite921?.test_case_ids?.length}`);
+  for (const binding of suite921?.case_bindings || []) {
+    const req: any = executionRunnerService.getRequest(binding.request_id);
+    const exp = String(req?.expected_summary || '');
+    let output = exp; let errorMessage: string | undefined;
+    if (exp.startsWith('ASSERT: EQUALS ')) output = exp.slice('ASSERT: EQUALS '.length);
+    else if (exp.startsWith('ASSERT: CONTAINS ')) output = exp.slice('ASSERT: CONTAINS '.length);
+    else if (exp.startsWith('ASSERT: NON_EMPTY')) output = '結果あり';
+    else if (exp.includes('安全に失敗')) { output = '安全に失敗しました'; errorMessage = '入力検証エラー'; }
+    executionRunnerService.submitResult({
+      request_id: req.request_id, test_case_id: req.test_case_id,
+      implementation_hash: req.implementation_hash, artifact_snapshot_key: req.artifact_snapshot_key,
+      environment: req.environment, output_summary: output, passed: true, error_message: errorMessage, runner_id: 'suite-runner', duration_ms: 5,
+    } as any);
+  }
+  const after921: any = componentRegressionService.refresh(String(sup921.suiteId));
+  check('P921 実行が揃うと回帰が全件PASSになる', after921?.status === 'PASSED', `status=${after921?.status} passed=${after921?.passed_count}`);
+  const promo921: any = codeComponentPromotionBridgeService.promoteIfPassed('suite.sort_921');
+  check('P921 全件PASSで昇格ゲートが通る', promo921.accepted === true, String(promo921.reason).slice(0, 50));
+  check('P921 部品がDEVICE_TESTEDへ進む', (componentRegistryService.getComponent('suite.sort_921') as any)?.status === 'DEVICE_TESTED', 'registry');
+  const rec921: any = knowledgeSelfInspectionService.inspect();
+  check('P921 自己点検にゲートと到達の件数が出る', rec921?.codeGatesPrepared >= 1 && rec921?.codeDeviceTested >= 1, `gates=${rec921?.codeGatesPrepared} tested=${rec921?.codeDeviceTested}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

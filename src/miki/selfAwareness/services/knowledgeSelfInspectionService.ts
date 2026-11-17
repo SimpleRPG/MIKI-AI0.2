@@ -18,6 +18,7 @@ import { episodeDistillationService } from '../../conversation/services/episodeD
 import { codeSynthesisStatsService } from '../../selfDevelopment/services/codeSynthesisStatsService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { codeComponentSpecService } from '../../selfDevelopment/services/codeComponentSpecService';
+import { codeComponentPromotionBridgeService } from '../../selfDevelopment/services/codeComponentPromotionBridgeService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -64,6 +65,9 @@ export interface KnowledgeSelfInspectionRecord {
   codeGapsOpen: number;
   codeSpecsDrafted: number;
   codeSpecsSupplied: number;
+  // P921: 昇格ゲートを用意した部品／DEVICE_TESTED まで進んだ部品
+  codeGatesPrepared: number;
+  codeDeviceTested: number;
   findings: string[];
 }
 
@@ -259,6 +263,8 @@ class KnowledgeSelfInspectionService {
     let codeGapsOpen = 0;
     let codeSpecsDrafted = 0;
     let codeSpecsSupplied = 0;
+    let codeGatesPrepared = 0;
+    let codeDeviceTested = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
         (item) => item.componentKind === 'CODE',
@@ -290,6 +296,13 @@ class KnowledgeSelfInspectionService {
       codeSpecsSupplied = specSummary.supplied;
       if (codeSpecsDrafted > 0) {
         findings.push(`不足から部品仕様の下書きが${codeSpecsDrafted}件できている（うち${codeSpecsSupplied}件は実装が到着し解析済み）`);
+      }
+      // P921: 供給部品の昇格ゲートの用意と DEVICE_TESTED 到達の件数。
+      const gateSummary = codeComponentPromotionBridgeService.summary();
+      codeGatesPrepared = gateSummary.prepared;
+      codeDeviceTested = gateSummary.deviceTested;
+      if (codeGatesPrepared > 0) {
+        findings.push(`供給部品の昇格ゲートが${codeGatesPrepared}件用意できている（うち${codeDeviceTested}件が実機検証済み候補まで到達）`);
       }
     } catch { /* コードの棚卸しは補助経路 */ }
 
@@ -330,6 +343,8 @@ class KnowledgeSelfInspectionService {
       codeGapsOpen,
       codeSpecsDrafted,
       codeSpecsSupplied,
+      codeGatesPrepared,
+      codeDeviceTested,
       findings,
     };
 

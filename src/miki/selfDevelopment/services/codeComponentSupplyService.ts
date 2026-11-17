@@ -1,5 +1,6 @@
 import { systemLogger } from '../../../services/systemLogger';
 import { codeComponentSpecService } from './codeComponentSpecService';
+import { codeComponentPromotionBridgeService } from './codeComponentPromotionBridgeService';
 import { generatedComponentVerificationRegistrationService } from './generatedComponentVerificationRegistrationService';
 import type { SynthesizedComponent } from './atomicComponentTemplateSynthesisService';
 
@@ -34,6 +35,8 @@ export interface CodeComponentSupplyResult {
   accepted: boolean;
   reason: 'REGISTERED_ANALYZED' | 'STATIC_VERIFICATION_FAILED' | 'SPEC_NOT_FOUND';
   registeredStatus?: string;
+  gatePrepared?: boolean;
+  suiteId?: string;
   diagnostics: string[];
 }
 
@@ -84,7 +87,11 @@ class CodeComponentSupplyService {
       '実装とテストが到着し、静的検証を通って ANALYZED で登録された',
     );
     systemLogger.info('SELF_IMPROVEMENT', `🧩 [部品供給] 登録: ${input.componentId}（仕様 ${input.capabilityId}）`);
-    return { accepted: true, reason: 'REGISTERED_ANALYZED', registeredStatus, diagnostics: result.diagnostics };
+    // P921: 登録できたら昇格ゲート（Artifact保存＋回帰Suite作成）まで
+    // 自動で用意する。失敗しても供給自体は成功として扱う。
+    let gate: { ok: boolean; suiteId?: string } | undefined;
+    try { gate = codeComponentPromotionBridgeService.prepare(input.componentId); } catch { gate = undefined; }
+    return { accepted: true, reason: 'REGISTERED_ANALYZED', registeredStatus, gatePrepared: Boolean(gate?.ok), suiteId: gate?.suiteId, diagnostics: result.diagnostics };
   }
 }
 
