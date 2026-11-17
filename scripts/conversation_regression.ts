@@ -5930,6 +5930,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P932 天気の話では記念日レーンは発火しない', r932ctl.reason !== 'special_day_answer', `reason=${r932ctl.reason}`);
 }
 
+// ---- P933 記念日を自分から持ち出す ----
+{
+  const { specialDayService: sd933 } = await import('../src/miki/selfAwareness/services/specialDayService');
+  const { idleActionService: ia933 } = await import('../src/miki/selfAwareness/services/idleActionService');
+  const now933 = new Date();
+  sd933.register('持ち出し記念日', now933.getMonth() + 1, now933.getDate());
+  // 今日の記念日は複数ありうる（P932 のブロックで登録した分を含む）。
+  // 持ち出しは「今日の分を、重複なく、一通り」であることが不変条件。
+  const brought933: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    const a933 = ia933.choose('suite-p933-persona');
+    if (a933?.kind !== 'BRING_UP_SPECIAL_DAY') break;
+    brought933.push(a933.term);
+  }
+  check('P933 今日の記念日は自分から持ち出す対象になる', brought933.length >= 1 && brought933.includes('持ち出し記念日'), `brought=${brought933.join('/')}`);
+  check('P933 同じ記念日は同じ日に繰り返し持ち出さない', new Set(brought933).size === brought933.length, `brought=${brought933.join('/')}`);
+  const after933 = ia933.choose('suite-p933-persona');
+  check('P933 今日の分を持ち出し終えたら通常の選択に戻る', after933?.kind !== 'BRING_UP_SPECIAL_DAY', `after=${after933?.kind}`);
+  check('P933 記念日の表明が言葉になる', ia933.phrase({ kind: 'BRING_UP_SPECIAL_DAY', term: '持ち出し記念日', strength: 1, at: Date.now() }).includes('持ち出し記念日'), 'phrase');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

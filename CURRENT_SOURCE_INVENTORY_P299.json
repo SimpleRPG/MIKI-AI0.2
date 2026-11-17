@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1834,
     "sourceFileCount": 1387,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1298,
-    "relativeImportCandidateCount": 4505,
-    "resolvedRelativeImportCandidateCount": 4489,
+    "relativeImportCandidateCount": 4508,
+    "resolvedRelativeImportCandidateCount": 4492,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 510833,
-      "lines": 5946,
-      "sha256": "f73b0469f65f882685881380987cc53493cb51656bfbbc4cc53eb2d38bbc31b6",
+      "bytes": 512395,
+      "lines": 5967,
+      "sha256": "a947d3aee354353735ff8a911a1f4b412aedd00d14d8f62c2437aed2d1d1096c",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3920,10 +3920,22 @@
           "specifier": "../src/miki/conversation/services/conversationFactIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationFactIntakeService.ts"
+        },
+        {
+          "line": 5935,
+          "specifier": "../src/miki/selfAwareness/services/specialDayService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/specialDayService.ts"
+        },
+        {
+          "line": 5936,
+          "specifier": "../src/miki/selfAwareness/services/idleActionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/idleActionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 367,
-      "resolvedRelativeImportCount": 367,
+      "relativeImportCandidateCount": 369,
+      "resolvedRelativeImportCount": 369,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -31419,9 +31431,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/idleActionService.ts",
-      "bytes": 3617,
-      "lines": 101,
-      "sha256": "b8f77b7b3461667305dc7692a110f8bc4fa1402d6ecccf9486b44cf2b63a3bf6",
+      "bytes": 5283,
+      "lines": 140,
+      "sha256": "03e5f8026451a6a2299ddaaa4e31ba61d4a9f035bbdba350e6c3b2243e4fa95c",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31434,10 +31446,16 @@
           "specifier": "./desireService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/desireService.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "./specialDayService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/specialDayService.ts"
         }
       ],
-      "relativeImportCandidateCount": 2,
-      "resolvedRelativeImportCount": 2,
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {

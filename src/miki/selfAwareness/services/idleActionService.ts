@@ -1,5 +1,6 @@
 import { storageService } from '../../../services/storageService';
 import { desireService } from './desireService';
+import { specialDayService } from './specialDayService';
 
 /**
  * P925: 主体性・第1段（欲求→行動選択）。
@@ -16,7 +17,7 @@ import { desireService } from './desireService';
  */
 
 export interface IdleAction {
-  kind: 'BRING_UP_TOPIC' | 'RESEARCH_GAP';
+  kind: 'BRING_UP_TOPIC' | 'RESEARCH_GAP' | 'BRING_UP_SPECIAL_DAY';
   term: string;
   strength: number;
   at: number;
@@ -27,6 +28,7 @@ interface IdleActionState {
   total: number;
   topics: number;
   researches: number;
+  specialDays: number;
 }
 
 const KEY = 'miki_idle_actions_v1';
@@ -43,10 +45,11 @@ class IdleActionService {
           total: parsed.total || 0,
           topics: parsed.topics || 0,
           researches: parsed.researches || 0,
+          specialDays: parsed.specialDays || 0,
         };
       }
     } catch { /* fall through */ }
-    return { choices: [], total: 0, topics: 0, researches: 0 };
+    return { choices: [], total: 0, topics: 0, researches: 0, specialDays: 0 };
   }
 
   private save(state: IdleActionState): void {
@@ -57,9 +60,22 @@ class IdleActionService {
 
   /** 欲求から次の行動を1つ選ぶ。欲求が無ければ null。 */
   public choose(personaId: string): IdleAction | null {
+    const state = this.load();
+    // P933: 今日が記念日・誕生日なら、その日いちばんに持ち出す
+    // （同じ日には1回だけ。当日を過ぎた持ち出しはしない）。
+    const special = this.pickSpecialDay(state);
+    if (special) {
+      state.choices.push(special);
+      if (state.choices.length > MAX_CHOICES) {
+        state.choices = state.choices.slice(state.choices.length - MAX_CHOICES);
+      }
+      state.total += 1;
+      state.specialDays += 1;
+      this.save(state);
+      return special;
+    }
     const desires = desireService.compose(personaId);
     if (!desires.length) return null;
-    const state = this.load();
     const recentTerms = new Set(state.choices.slice(-2).map((c) => c.term));
     const picked = desires.find((d) => !recentTerms.has(d.term)) || desires[0];
     const action: IdleAction = {
@@ -79,20 +95,43 @@ class IdleActionService {
     return action;
   }
 
+  private pickSpecialDay(state: IdleActionState): IdleAction | null {
+    try {
+      const todays = specialDayService.today();
+      if (!todays.length) return null;
+      const now = new Date();
+      const alreadyBroughtUp = new Set(
+        state.choices
+          .filter((c) => c.kind === 'BRING_UP_SPECIAL_DAY'
+            && new Date(c.at).getFullYear() === now.getFullYear()
+            && new Date(c.at).getMonth() === now.getMonth()
+            && new Date(c.at).getDate() === now.getDate())
+          .map((c) => c.term),
+      );
+      const next = todays.find((d) => !alreadyBroughtUp.has(d.name));
+      if (!next) return null;
+      return { kind: 'BRING_UP_SPECIAL_DAY', term: next.name, strength: 1, at: Date.now() };
+    } catch { return null; }
+  }
+
   /** 選んだ行動を自分の言葉にする。 */
   public phrase(action: IdleAction): string {
+    if (action.kind === 'BRING_UP_SPECIAL_DAY') {
+      return `そういえば、今日は${action.term}の日だよ。覚えてたよ。`;
+    }
     if (action.kind === 'BRING_UP_TOPIC') {
       return `うん、${action.term}の話がしたいな。最近気になってるの。`;
     }
     return `${action.term}のこと、まだよく分かってないから、暇なときに調べてみたいと思ってる。`;
   }
 
-  public summary(): { choices: number; topics: number; researches: number; lastTerm: string | null } {
+  public summary(): { choices: number; topics: number; researches: number; specialDays: number; lastTerm: string | null } {
     const state = this.load();
     return {
       choices: state.total,
       topics: state.topics,
       researches: state.researches,
+      specialDays: state.specialDays,
       lastTerm: state.choices.length ? state.choices[state.choices.length - 1].term : null,
     };
   }
