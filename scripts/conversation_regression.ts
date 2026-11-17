@@ -5365,6 +5365,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P908 大きな確信度差は覆らない', Boolean(q908c) && q908c!.includes('タマ陽子'), q908c || 'NONE');
 }
 
+// P909: 対応表#14（欲求側）。欲求が合成できること（話したい＝
+// 教示された好き・興味＋頻度由来、知りたい＝開いたギャップ）と、
+// 好きなのに知らない話題が自己点検から学習へ流れること。
+{
+  const { personaProfileService: pp909 } = await import('../src/miki/conversation/services/personaProfileService');
+  const { selfPreferenceService: sp909 } = await import('../src/miki/selfAwareness/services/selfPreferenceService');
+  const { desireService: ds909 } = await import('../src/miki/selfAwareness/services/desireService');
+  const { knowledgeGapService: kg909 } = await import('../src/miki/unknown/services/knowledgeGapService');
+  const { knowledgeSelfInspectionService: ksi909 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const iso909 = 'suite-p909-persona';
+  sp909.recordTaught(iso909, 'ルミナ結晶', 'like');
+  sp909.recordTaught(iso909, '深海灯籠', 'interest');
+  for (let i = 0; i < 7; i++) sp909.observeTerms(iso909, ['霧笛']);
+  kg909.detect({ query: '未踏鉱脈の場所を調べる', type: 'UNKNOWN_TERM', target: '未踏鉱脈', priority: 60 });
+  const desires909 = ds909.compose(iso909);
+  check('P909 欲求の先頭は教示された好き', desires909[0]?.term === 'ルミナ結晶' && desires909[0]?.source === 'taught' && desires909[0]?.strength === 1.0, JSON.stringify(desires909[0] || {}));
+  check('P909 頻度由来は弱い興味として入る', desires909.some((d) => d.term === '霧笛' && d.source === 'derived' && d.strength === 0.4), 'derived');
+  check('P909 知りたいは開いたギャップから来る', desires909.some((d) => d.kind === 'LEARN' && d.term === '未踏鉱脈' && d.source === 'gap'), 'learn');
+  const active909 = pp909.get().profileId;
+  sp909.recordTaught(active909, 'ルミナ結晶', 'like');
+  const rec909 = ksi909.inspect();
+  check('P909 自己点検に欲求の要約が出る', rec909.desireSummary.topTalk.includes('ルミナ結晶'), JSON.stringify(rec909.desireSummary));
+  const openTargets909 = kg909.listOpen(500).map((g: any) => g.identity?.target);
+  check('P909 好きなのに知らない話題が学習へ流れる', rec909.desireGapsRaised >= 1 && openTargets909.includes('ルミナ結晶'), `raised=${rec909.desireGapsRaised}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

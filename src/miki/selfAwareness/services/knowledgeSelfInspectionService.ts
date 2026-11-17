@@ -10,6 +10,8 @@ import { reusableComponentFactoryService } from '../../core/services/reusableCom
 import { dialogueExampleRecallService } from '../../memory/services/dialogueExampleRecallService';
 import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
 import { analogyCandidateService } from './analogyCandidateService';
+import { desireService } from './desireService';
+import { personaProfileService } from '../../conversation/services/personaProfileService';
 import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
 import { episodeDistillationService } from '../../conversation/services/episodeDistillationService';
 
@@ -50,6 +52,8 @@ export interface KnowledgeSelfInspectionRecord {
   procedureChunksCreated: number;
   episodeTopicsDistilled: number;
   gapPlanPhases: Record<string, number>;
+  desireSummary: { talk: number; learn: number; topTalk: string[] };
+  desireGapsRaised: number;
   findings: string[];
 }
 
@@ -57,6 +61,7 @@ const STORAGE_KEY = 'miki_knowledge_self_inspection_v1';
 const MAX_RECORDS = 10;
 const GLOSSLESS_GAP_LIMIT = 5;
 const DIALOGUE_MATERIAL_GAP_LIMIT = 3;
+const DESIRE_GAP_LIMIT = 2;
 
 class KnowledgeSelfInspectionService {
   public inspect(): KnowledgeSelfInspectionRecord {
@@ -185,6 +190,46 @@ class KnowledgeSelfInspectionService {
       gapPlanPhases[phase] = (gapPlanPhases[phase] || 0) + 1;
     }
 
+    // P909: 欲求の層（対応表#14）。欲求を合成して点検に残す。
+    // 教示された好き・興味のうち、世界の関係がまだ1件も無い話題
+    // （好きなのに知らない）は、欲求から学習の意図へ変える。
+    // 頻度由来の弱い興味からは起こさない（教示だけを確実とする）。
+    let desireSummary = { talk: 0, learn: 0, topTalk: [] as string[] };
+    let desireGapsRaised = 0;
+    try {
+      const desires = desireService.compose(personaProfileService.get().profileId);
+      const talkDesires = desires.filter((d) => d.kind === 'TALK');
+      desireSummary = {
+        talk: talkDesires.length,
+        learn: desires.length - talkDesires.length,
+        topTalk: talkDesires.slice(0, 5).map((d) => d.term),
+      };
+      const knownTerms = new Set<string>();
+      for (const r of relations) {
+        if (r.provisional) continue;
+        knownTerms.add(r.from);
+        knownTerms.add(r.to);
+      }
+      for (const d of talkDesires) {
+        if (desireGapsRaised >= DESIRE_GAP_LIMIT) break;
+        if (d.source !== 'taught') continue;
+        if (knownTerms.has(d.term) || openTargets.has(d.term)) continue;
+        try {
+          knowledgeGapService.detect({
+            query: `用語の意味を学ぶ: ${d.term}`,
+            reason: '自己点検で、好き・興味があるのにまだ知らない話題が分かったため。',
+            type: 'UNKNOWN_TERM',
+            target: d.term,
+            priority: 45,
+          });
+          desireGapsRaised++;
+        } catch { /* 1件の失敗で点検全体は止めない */ }
+      }
+      if (desireGapsRaised > 0) {
+        findings.push(`好き・興味があるのにまだ知らない話題を${desireGapsRaised}件、学習へ流した`);
+      }
+    } catch { /* 欲求の合成は補助経路 */ }
+
     const record: KnowledgeSelfInspectionRecord = {
       inspectedAt: Date.now(),
       personalDictionary: personal.length,
@@ -214,6 +259,8 @@ class KnowledgeSelfInspectionService {
       procedureChunksCreated: chunksCreated,
       episodeTopicsDistilled: distilledCount,
       gapPlanPhases,
+      desireSummary,
+      desireGapsRaised,
       findings,
     };
 

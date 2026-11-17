@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1819,
-    "sourceFileCount": 1372,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1283,
-    "relativeImportCandidateCount": 4380,
-    "resolvedRelativeImportCandidateCount": 4364,
+    "trackedPathCountExcludingControlPaths": 1820,
+    "sourceFileCount": 1373,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1284,
+    "relativeImportCandidateCount": 4389,
+    "resolvedRelativeImportCandidateCount": 4373,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 456778,
-      "lines": 5381,
-      "sha256": "8c110e41aa34314f06a6e93b77cc7a19e06a5854414283f89c693996e44b17b0",
+      "bytes": 459124,
+      "lines": 5407,
+      "sha256": "560c69ecd872d4b502affe92e25c1cca0836cf726cf22a24c4ea52e008c6fd2e",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3554,10 +3554,40 @@
           "specifier": "../src/services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 5372,
+          "specifier": "../src/miki/conversation/services/personaProfileService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/personaProfileService.ts"
+        },
+        {
+          "line": 5373,
+          "specifier": "../src/miki/selfAwareness/services/selfPreferenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/selfPreferenceService.ts"
+        },
+        {
+          "line": 5374,
+          "specifier": "../src/miki/selfAwareness/services/desireService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/desireService.ts"
+        },
+        {
+          "line": 5375,
+          "specifier": "../src/miki/unknown/services/knowledgeGapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
+        },
+        {
+          "line": 5376,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 306,
-      "resolvedRelativeImportCount": 306,
+      "relativeImportCandidateCount": 311,
+      "resolvedRelativeImportCount": 311,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -30817,6 +30847,29 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/selfAwareness/services/desireService.ts",
+      "bytes": 2779,
+      "lines": 61,
+      "sha256": "3abca0e96def285a66475c872a856005836dc06600ce932915203057c59b4132",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "./selfPreferenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/selfPreferenceService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../unknown/services/knowledgeGapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/selfAwareness/services/intelligenceSnapshotService.ts",
       "bytes": 94,
       "lines": 1,
@@ -30911,9 +30964,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 12912,
-      "lines": 284,
-      "sha256": "12cb7049daec267cef72f55bf9f675857e6d105ae2c3e060ac32b7b31a25d804",
+      "bytes": 15094,
+      "lines": 331,
+      "sha256": "71b897867ba5a0dc6449c472e14bd740c7a3f9b9b17fb204d11c9b05eede9b3d",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -30989,19 +31042,31 @@
         },
         {
           "line": 13,
+          "specifier": "./desireService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/desireService.ts"
+        },
+        {
+          "line": 14,
+          "specifier": "../../conversation/services/personaProfileService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/personaProfileService.ts"
+        },
+        {
+          "line": 15,
           "specifier": "../../execution/services/procedureChunkingService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/execution/services/procedureChunkingService.ts"
         },
         {
-          "line": 14,
+          "line": 16,
           "specifier": "../../conversation/services/episodeDistillationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/episodeDistillationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 14,
-      "resolvedRelativeImportCount": 14,
+      "relativeImportCandidateCount": 16,
+      "resolvedRelativeImportCount": 16,
       "unresolvedRelativeImportCount": 0
     },
     {
