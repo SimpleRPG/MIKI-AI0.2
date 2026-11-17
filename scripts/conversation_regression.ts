@@ -5742,6 +5742,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P924 違うパラメータで描くと判定がずれて検出できる', wrongMat924.gloss !== 'ツヤが強そう', `wrong gloss=${wrongMat924.gloss}`);
 }
 
+// ---- P925 主体性・第1段（欲求から次の行動を選ぶ） ----
+{
+  const { selfPreferenceService: sp925 } = await import('../src/miki/selfAwareness/services/selfPreferenceService');
+  const { knowledgeGapService: kg925 } = await import('../src/miki/unknown/services/knowledgeGapService');
+  const { idleActionService: ia925 } = await import('../src/miki/selfAwareness/services/idleActionService');
+  const { personaProfileService: pp925 } = await import('../src/miki/conversation/services/personaProfileService');
+  const { desireService: ds925 } = await import('../src/miki/selfAwareness/services/desireService');
+  check('P925 教示の無い人格に話したい欲求は生まれない（知りたいは全体の不足から来る）', ds925.compose('suite-p925-empty').every((d) => d.kind === 'LEARN'), 'empty-persona');
+  const iso925 = 'suite-p925-persona';
+  sp925.recordTaught(iso925, '月光石', 'like');
+  sp925.recordTaught(iso925, '星砂時計', 'interest');
+  kg925.detect({ query: '月光石の産地を調べる', type: 'UNKNOWN_TERM', target: '月光石の産地', priority: 60 });
+  const c925a = ia925.choose(iso925);
+  const c925b = ia925.choose(iso925);
+  const c925c = ia925.choose(iso925);
+  check('P925 最も強い欲求が話題として選ばれる', c925a?.kind === 'BRING_UP_TOPIC' && c925a?.term === '月光石', JSON.stringify(c925a));
+  check('P925 直近の話題は避けて回す', !!c925a && !!c925b && !!c925c && c925b.term !== c925a.term && c925c.term !== c925a.term && c925c.term !== c925b.term, `${c925a?.term} / ${c925b?.term} / ${c925c?.term}`);
+  sp925.recordTaught(pp925.get().profileId, '月光石', 'like');
+  const r925: any = await conversationCoreService.execute({ prompt: '何か話したいことある？', memories: [], recentMessages: [], conversationId: 'suite-p925' } as any);
+  check('P925 「話したいことある？」に自分の話題で答える', r925.reason === 'idle_topic_answer' && String(r925.replyText || '').includes('月光石'), `reason=${r925.reason} reply=${String(r925.replyText || '').slice(0, 40)}`);
+  const r925ctl: any = await conversationCoreService.execute({ prompt: '話したいことがあるんだけど、聞いてほしい', memories: [], recentMessages: [], conversationId: 'suite-p925' } as any);
+  check('P925 利用者側の宣言では主体性レーンは発火しない', r925ctl.reason !== 'idle_topic_answer', `reason=${r925ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -20,6 +20,7 @@ import { capabilityGapService } from '../../capability/services/capabilityGapSer
 import { codeComponentSpecService } from '../../selfDevelopment/services/codeComponentSpecService';
 import { codeComponentPromotionBridgeService } from '../../selfDevelopment/services/codeComponentPromotionBridgeService';
 import { multiStepReasoningService } from './multiStepReasoningService';
+import { idleActionService } from './idleActionService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -72,6 +73,7 @@ export interface KnowledgeSelfInspectionRecord {
   // P922: 多段の先読みの利用回数と、最も深く読めた段数
   reasoningLookAheads: number;
   reasoningDeepestChain: number;
+  idleActionsChosen: number;
   findings: string[];
 }
 
@@ -270,6 +272,7 @@ class KnowledgeSelfInspectionService {
     let codeGatesPrepared = 0;
     let codeDeviceTested = 0;
     let reasoningLookAheads = 0;
+    let idleActionsChosen = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -317,6 +320,11 @@ class KnowledgeSelfInspectionService {
       if (reasoningLookAheads > 0) {
         findings.push(`因果の先読みを${reasoningLookAheads}回使った（最も深くて${reasoningDeepestChain}段先まで）`);
       }
+      // P925: 主体性（欲求から選んだ行動）の件数。
+      idleActionsChosen = idleActionService.summary().choices;
+      if (idleActionsChosen > 0) {
+        findings.push(`欲求から次の行動を${idleActionsChosen}回選んだ`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -360,6 +368,7 @@ class KnowledgeSelfInspectionService {
       codeDeviceTested,
       reasoningLookAheads,
       reasoningDeepestChain,
+      idleActionsChosen,
       findings,
     };
 

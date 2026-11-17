@@ -44,6 +44,7 @@ import { utteranceFeatureService, isBackchannelText } from '../../memory/service
 import { topicStageService } from '../../memory/services/topicStageService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { multiStepReasoningService } from '../../selfAwareness/services/multiStepReasoningService';
+import { idleActionService } from '../../selfAwareness/services/idleActionService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -673,6 +674,12 @@ export class ConversationCoreService {
       const consequence = this.consequenceAnswer(prompt);
       if (consequence && !multiPart) {
         return this.buildResult('RESOLVED', 'consequence_answer', this.applyPersonaVoice(consequence), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P925: 「何か話したいことある？」——欲求から選んだ次の行動
+      // （持ち出したい話題／調べたい不足）を自分の言葉で答える。
+      const idleTopic = this.idleTopicAnswer(prompt);
+      if (idleTopic && !multiPart) {
+        return this.buildResult('RESOLVED', 'idle_topic_answer', this.applyPersonaVoice(idleTopic), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3861,6 +3868,23 @@ export class ConversationCoreService {
       }
     } catch { return undefined; }
     return undefined;
+  }
+
+  /**
+   * P925: 主体性の表明。「話したいことある？」「暇なとき何してる
+   * の」のように彼女自身へ向けられた問いに対して、欲求から選ん
+   * だ次の行動を答える。利用者側の宣言（「話したいことがある」）
+   * では発火しないよう、疑問の形（？・教えて・何してる等）を
+   * 必須にする。
+   */
+  private idleTopicAnswer(prompt: string): string | undefined {
+    if (!/(?:話したいこと|気になってること|暇なとき|暇な時)/.test(prompt)) return undefined;
+    if (!/(?:？|\?|教えて|聞かせて|何してる|なにしてる)/.test(prompt)) return undefined;
+    try {
+      const action = idleActionService.choose(personaProfileService.get().profileId);
+      if (!action) return undefined;
+      return idleActionService.phrase(action);
+    } catch { return undefined; }
   }
 
   /**
