@@ -6062,6 +6062,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P940 由来の質問では掛け合いにならない', r940ctl.reason !== 'duo_dialogue_answer', `reason=${r940ctl.reason}`);
 }
 
+// ---- P941 動作学習 第1段 ----
+{
+  const { motionPatternService: mp941 } = await import('../src/miki/selfAwareness/services/motionPatternService');
+  const mk941 = (fn: (t: number) => { x: number; y: number }, dur = 2000, step = 50): any[] => {
+    const out: any[] = [];
+    for (let t = 0; t <= dur; t += step) out.push({ t, ...fn(t) });
+    return out;
+  };
+  const sway941 = mk941((t) => ({ x: 0.5 + 0.3 * Math.sin((2 * Math.PI * t) / 800), y: 0.5 }));
+  const bounce941 = mk941((t) => ({ x: 0.5, y: 0.5 + 0.25 * Math.sin((2 * Math.PI * t) / 600) }));
+  const circle941 = mk941((t) => ({ x: 0.5 + 0.28 * Math.sin((2 * Math.PI * t) / 1000), y: 0.5 + 0.28 * Math.cos((2 * Math.PI * t) / 1000) }));
+  let seed941 = 4242;
+  const rnd941 = () => { seed941 = (seed941 * 1103515245 + 12345) % 2147483648; return seed941 / 2147483648; };
+  const noise941 = mk941(() => ({ x: 0.2 + 0.6 * rnd941(), y: 0.2 + 0.6 * rnd941() }));
+  const f941 = mp941.measure(sway941);
+  check('P941 横揺れを周期つきで測れる', !!f941 && f941.kind === 'SWAY' && Math.abs(f941.periodMs - 800) <= 160, `kind=${f941?.kind} period=${f941?.periodMs}`);
+  const before941 = mp941.summary().patterns;
+  const learn941 = mp941.learn('横揺れ見本', sway941);
+  check('P941 再現と照合を通れば動作部品になる', learn941.ok && mp941.summary().patterns === before941 + 1, `ok=${learn941.ok} reason=${learn941.reason || ''}`);
+  check('P941 縦跳ねと円回りも覚える', mp941.learn('縦跳ね見本', bounce941).ok && mp941.learn('円回り見本', circle941).ok, 'bounce/circle');
+  const noiseLearn941 = mp941.learn('雑音見本', noise941);
+  check('P941 不規則な動きは部品にしない', !noiseLearn941.ok, `ok=${noiseLearn941.ok}`);
+  let seed941b = 777;
+  const rnd941b = () => { seed941b = (seed941b * 1103515245 + 12345) % 2147483648; return seed941b / 2147483648; };
+  const sway941b = mk941((t) => ({ x: 0.5 + 0.3 * Math.sin((2 * Math.PI * t) / 900 + 1.1) + (rnd941b() - 0.5) * 0.03, y: 0.5 }));
+  const match941 = mp941.match(sway941b);
+  check('P941 位相の違う同じ動きを同定できる', !!match941 && match941.name === '横揺れ見本', `match=${JSON.stringify(match941)}`);
+  check('P941 動きを言葉で説明できる', String(mp941.describe(sway941) || '').includes('横揺れ'), `desc=${mp941.describe(sway941)}`);
+  const { knowledgeSelfInspectionService: ksi941 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const insp941: any = ksi941.inspect();
+  check('P941 自己点検に動作部品の数が入る', insp941.motionPatterns >= 3, `motionPatterns=${insp941.motionPatterns}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

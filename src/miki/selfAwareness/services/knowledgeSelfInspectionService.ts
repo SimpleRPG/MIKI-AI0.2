@@ -33,6 +33,7 @@ import { groundedRebuttalService } from './groundedRebuttalService';
 import { creativeWritingService } from './creativeWritingService';
 import { dreamService } from './dreamService';
 import { duoDialogueService } from './duoDialogueService';
+import { motionPatternService } from './motionPatternService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -100,6 +101,7 @@ export interface KnowledgeSelfInspectionRecord {
   creativeWorks: number;
   dreamsRecorded: number;
   duoDialogues: number;
+  motionPatterns: number;
   findings: string[];
 }
 
@@ -313,6 +315,7 @@ class KnowledgeSelfInspectionService {
     let creativeWorks = 0;
     let dreamsRecorded = 0;
     let duoDialogues = 0;
+    let motionPatterns = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -432,6 +435,11 @@ class KnowledgeSelfInspectionService {
       if (duoDialogues > 0) {
         findings.push(`ビービーと${duoDialogues}回掛け合いをした`);
       }
+      // P941: 動作部品として覚えた動きの数。
+      motionPatterns = motionPatternService.summary().patterns;
+      if (motionPatterns > 0) {
+        findings.push(`動きを${motionPatterns}件、動作部品として覚えた`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -490,6 +498,7 @@ class KnowledgeSelfInspectionService {
       creativeWorks,
       dreamsRecorded,
       duoDialogues,
+      motionPatterns,
       findings,
     };
 

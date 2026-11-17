@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1840,
-    "sourceFileCount": 1393,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1304,
-    "relativeImportCandidateCount": 4555,
-    "resolvedRelativeImportCandidateCount": 4539,
+    "trackedPathCountExcludingControlPaths": 1841,
+    "sourceFileCount": 1394,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1305,
+    "relativeImportCandidateCount": 4560,
+    "resolvedRelativeImportCandidateCount": 4544,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 524185,
-      "lines": 6078,
-      "sha256": "b246584d34b95892e96ace9b7647c12a10570c20e9059e78863311dd67d87fdc",
+      "bytes": 526859,
+      "lines": 6111,
+      "sha256": "a1351f1739a12d6075c6c42be6c86742c707dfe7f1bb689772e694e38d16c657",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3998,10 +3998,22 @@
           "specifier": "../src/miki/selfAwareness/services/duoDialogueService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/duoDialogueService.ts"
+        },
+        {
+          "line": 6067,
+          "specifier": "../src/miki/selfAwareness/services/motionPatternService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/motionPatternService.ts"
+        },
+        {
+          "line": 6093,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 380,
-      "resolvedRelativeImportCount": 380,
+      "relativeImportCandidateCount": 382,
+      "resolvedRelativeImportCount": 382,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -31865,9 +31877,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 26062,
-      "lines": 560,
-      "sha256": "4dcbf13c094e304ac4d88d3e69792706635282d00a0a6c04eaf24e19c2a338c2",
+      "bytes": 26455,
+      "lines": 569,
+      "sha256": "04904733eeb5d5c8c2249e2601276952dc74915b37e20009692993afa6f3a39e",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -32078,10 +32090,16 @@
           "specifier": "./duoDialogueService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/duoDialogueService.ts"
+        },
+        {
+          "line": 36,
+          "specifier": "./motionPatternService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/motionPatternService.ts"
         }
       ],
-      "relativeImportCandidateCount": 35,
-      "resolvedRelativeImportCount": 35,
+      "relativeImportCandidateCount": 36,
+      "resolvedRelativeImportCount": 36,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -32245,6 +32263,29 @@
       ],
       "relativeImportCandidateCount": 1,
       "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/selfAwareness/services/motionPatternService.ts",
+      "bytes": 15595,
+      "lines": 386,
+      "sha256": "5b943efa4707cf07c110fa29d267c3ca277c7608ed8caaa24c979b6a6eab3c09",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
