@@ -22,6 +22,7 @@ import { codeComponentPromotionBridgeService } from '../../selfDevelopment/servi
 import { multiStepReasoningService } from './multiStepReasoningService';
 import { idleActionService } from './idleActionService';
 import { visualPatternService } from '../../conversation/services/visualPatternService';
+import { visualScenePatternService } from '../../conversation/services/visualScenePatternService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -76,6 +77,7 @@ export interface KnowledgeSelfInspectionRecord {
   reasoningDeepestChain: number;
   idleActionsChosen: number;
   visualPatterns: number;
+  visualScenePatterns: number;
   findings: string[];
 }
 
@@ -276,6 +278,7 @@ class KnowledgeSelfInspectionService {
     let reasoningLookAheads = 0;
     let idleActionsChosen = 0;
     let visualPatterns = 0;
+    let visualScenePatterns = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -333,6 +336,11 @@ class KnowledgeSelfInspectionService {
       if (visualPatterns > 0) {
         findings.push(`見本として覚えた形が${visualPatterns}件ある`);
       }
+      // P929: 配置の見本の数。
+      visualScenePatterns = visualScenePatternService.summary().scenes;
+      if (visualScenePatterns > 0) {
+        findings.push(`配置の見本が${visualScenePatterns}件ある`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -378,6 +386,7 @@ class KnowledgeSelfInspectionService {
       reasoningDeepestChain,
       idleActionsChosen,
       visualPatterns,
+      visualScenePatterns,
       findings,
     };
 

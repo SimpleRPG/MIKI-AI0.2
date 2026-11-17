@@ -5841,6 +5841,42 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P928 似ていない形には名前を付けない', vp928.match(tri928) === null, 'triangle-null');
 }
 
+// ---- P929 目・第6段（配置の同定） ----
+{
+  const { analyzeImagePixels: an929 } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const { visualScenePatternService: vs929 } = await import('../src/miki/conversation/services/visualScenePatternService');
+  const W929 = 48, H929 = 48;
+  const SKIN929: [number, number, number] = [240, 200, 165];
+  const BLUE929: [number, number, number] = [40, 90, 210];
+  const BG929: [number, number, number] = [15, 15, 15];
+  const make929 = (fn: (x: number, y: number) => [number, number, number]) => {
+    const a = new Uint8Array(W929 * H929 * 4);
+    for (let y = 0; y < H929; y++) for (let x = 0; x < W929; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W929 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return a;
+  };
+  const person929 = (hx: number, hy: number, hr: number, bx0: number, bx1: number, by0: number, by1: number) =>
+    an929(make929((x, y) => {
+      if ((x - hx) ** 2 + (y - hy) ** 2 <= hr * hr) return SKIN929;
+      if (x >= bx0 && x <= bx1 && y >= by0 && y <= by1) return BLUE929;
+      return BG929;
+    }), W929, H929);
+  const p929a = person929(24, 13, 6, 17, 31, 21, 44);
+  check('P929 頭と体の配置を見本として登録できる', vs929.registerScene('人型', p929a)?.name === '人型', 'register');
+  const m929 = vs929.matchScene(person929(28, 12, 5, 22, 34, 20, 43));
+  check('P929 少しずれた人型も人型と同定できる', m929?.name === '人型' && (m929?.score || 0) >= 0.7, `match=${JSON.stringify(m929)}`);
+  const inverted929 = an929(make929((x, y) => {
+    if (x >= 17 && x <= 31 && y >= 3 && y <= 26) return BLUE929;
+    if ((x - 24) ** 2 + (y - 37) ** 2 <= 36) return SKIN929;
+    return BG929;
+  }), W929, H929);
+  check('P929 上下が逆の配置は人型と呼ばない', vs929.matchScene(inverted929) === null, 'inverted');
+  const discOnly929 = an929(make929((x, y) => ((x - 24) ** 2 + (y - 24) ** 2 <= 144 ? [240, 240, 240] : BG929) as [number, number, number]), W929, H929);
+  check('P929 領域が1つでは配置として同定しない', vs929.matchScene(discOnly929) === null, 'single');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
