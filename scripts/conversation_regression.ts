@@ -5688,6 +5688,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P922 自己点検に先読みの深さが出る', rec922?.reasoningDeepestChain >= 3 && rec922?.reasoningLookAheads >= 1, `deepest=${rec922?.reasoningDeepestChain} count=${rec922?.reasoningLookAheads}`);
 }
 
+// ---- P923 目・第1段（質感と模様の測定＋素材仮説） ----
+{
+  const { analyzeImagePixels, hypothesizeMaterial, verbalizeImageFeatures } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const W923 = 48, H923 = 48;
+  const make923 = (fn: (x: number, y: number) => [number, number, number]) => {
+    const a = new Uint8Array(W923 * H923 * 4);
+    for (let y = 0; y < H923; y++) for (let x = 0; x < W923; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W923 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return a;
+  };
+  const glossy923 = analyzeImagePixels(make923((x, y) => (x >= 22 && x <= 24 && y >= 22 && y <= 24) ? [255, 255, 255] : [45, 45, 50]), W923, H923);
+  const glossyMat923 = hypothesizeMaterial(glossy923);
+  check('P923 小さく鋭いハイライトはツヤが強いと仮説を立てる', glossyMat923.gloss === 'ツヤが強そう' && glossyMat923.roughness < 0.3, `gloss=${glossyMat923.gloss} rough=${glossyMat923.roughness} conc=${glossy923.highlightConcentration.toFixed(2)}`);
+  const matte923 = analyzeImagePixels(make923((x, y) => { const v = 120 + ((x * 7 + y * 13) % 5) - 2; return [v, v, v] as [number, number, number]; }), W923, H923);
+  check('P923 ハイライトの無い一様な面はツヤが弱い', hypothesizeMaterial(matte923).gloss === 'ツヤは弱そう', `gloss=${hypothesizeMaterial(matte923).gloss}`);
+  const stripes923 = analyzeImagePixels(make923((x) => ((x % 6) < 3 ? [30, 30, 30] : [210, 210, 210]) as [number, number, number]), W923, H923);
+  check('P923 縞の周期を自己相関で測れる', stripes923.periodicity?.period === 6 && (stripes923.periodicity?.strength || 0) >= 0.5, `period=${JSON.stringify(stripes923.periodicity)}`);
+  const grad923 = analyzeImagePixels(make923((x) => { const v = Math.round((x / (W923 - 1)) * 255); return [v, v, v] as [number, number, number]; }), W923, H923);
+  check('P923 なめらかなグラデーションを測れる', hypothesizeMaterial(grad923).softGradient === true && grad923.gradientSoftness >= 0.8, `soft=${grad923.gradientSoftness.toFixed(2)}`);
+  check('P923 観察文に質感の印象が入る', verbalizeImageFeatures(glossy923).includes('ツヤが強そう') && verbalizeImageFeatures(stripes923).includes('繰り返し模様がありそう'), 'verbalize');
+  check('P923 観察文の正直な範囲は保たれる', verbalizeImageFeatures(glossy923).includes('具体的な物や文字までは読み取れない'), 'honest-range');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

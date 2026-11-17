@@ -10,10 +10,14 @@
  * - data URL をデコードし、小さく縮小してピクセル特徴を取る
  * - 主な色（日本語の色名）・明るさ・彩度・色の多さ・縦横比・透明度
  *   を観察文にする
+ * - P923（目・第1段）: エッジ密度・ハイライトの鋭さと集中・模様の
+ *   周期性・グラデーションの柔らかさを測り、素材パラメータの
+ *   仮説（ツヤ・粗さ・繰り返し模様）まで立てる。仮説は印象として
+ *   言葉にし、断定はしない。描いて照合する検証は後段の仕事。
  *
  * できないこと（正直に範囲を切る）:
  * - 物体や人物の同定、文字の読み取り（OCR）は手段が無いのでしない。
- *   観察文は「色・明暗・大まかな形」までに限定し、それ以上は
+ *   観察文は「色・明暗・質感の印象」までに限定し、それ以上は
  *   分からないものとして扱う（identityRecognitionAllowed: false の
  *   既存の出所規律と一致）。
  */
@@ -27,11 +31,31 @@ export interface ImagePixelFeatures {
   transparentRatio: number;
   distinctColorBins: number;
   dominantColors: Array<{ name: string; share: number }>;
+  // P923（目・第1段）: 質感と模様の測定。設計メモの学習ループの
+  // 「測定」にあたる層で、すべて決定論で測れる量だけを足す。
+  edgeDensity: number;
+  contrastSpread: number;
+  highlightRatio: number;
+  highlightConcentration: number;
+  gradientSoftness: number;
+  periodicity: { period: number; strength: number } | null;
+}
+
+/**
+ * P923: 測定値からの素材パラメータの仮説。仮説は仮説として扱い、
+ * 描いて照合する検証（後段）が通るまでは部品化しない。
+ */
+export interface MaterialHypothesis {
+  gloss: 'ツヤが強そう' | 'ツヤは中くらい' | 'ツヤは弱そう';
+  roughness: number;
+  patternPeriod: number | null;
+  softGradient: boolean;
 }
 
 export interface ImageObservation {
   text: string;
   features: ImagePixelFeatures;
+  material: MaterialHypothesis;
 }
 
 const COLOR_NAMES: Array<{ name: string; rgb: [number, number, number] }> = [
@@ -75,6 +99,7 @@ export function analyzeImagePixels(
   let lumaSum = 0;
   let saturationSum = 0;
   let transparent = 0;
+  const lumaGrid = new Float32Array(pixelCount).fill(-1);
   const bins = new Map<string, { count: number; r: number; g: number; b: number }>();
   for (let i = 0; i < pixelCount; i++) {
     const r = rgba[i * 4];
@@ -85,7 +110,9 @@ export function analyzeImagePixels(
       transparent++;
       continue;
     }
-    lumaSum += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    lumaGrid[i] = luma;
+    lumaSum += luma;
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     saturationSum += max === 0 ? 0 : (max - min) / max;
@@ -106,6 +133,46 @@ export function analyzeImagePixels(
       share: bin.count / visible,
     }))
     .filter((color, index, all) => all.findIndex((c) => c.name === color.name) === index);
+  // P923: 輝度グリッドからの質感・模様の測定（透明セルは平均で埋める）。
+  const meanLumaRaw = lumaSum / visible;
+  for (let i = 0; i < pixelCount; i++) {
+    if (lumaGrid[i] < 0) lumaGrid[i] = meanLumaRaw;
+  }
+  let varianceSum = 0;
+  let highlightCount = 0;
+  let highlightCoreCount = 0;
+  let highlightBaseCount = 0;
+  for (let i = 0; i < pixelCount; i++) {
+    const l = lumaGrid[i];
+    varianceSum += (l - meanLumaRaw) ** 2;
+    if (l >= 235) highlightCount++;
+    if (l >= 250) highlightCoreCount++;
+    if (l >= 217) highlightBaseCount++;
+  }
+  const contrastSpread = Math.sqrt(varianceSum / pixelCount) / 255;
+  const highlightRatio = highlightCount / pixelCount;
+  const highlightConcentration = highlightBaseCount > 0 ? highlightCoreCount / highlightBaseCount : 0;
+  let gradientSum = 0;
+  let gradientCount = 0;
+  let firstDiffSum = 0;
+  let secondDiffSum = 0;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      const gx = Math.abs(lumaGrid[i + 1] - lumaGrid[i - 1]);
+      const gy = Math.abs(lumaGrid[i + width] - lumaGrid[i - width]);
+      gradientSum += (gx + gy) / 2;
+      gradientCount++;
+      firstDiffSum += gx;
+      secondDiffSum += Math.abs(lumaGrid[i + 1] - 2 * lumaGrid[i] + lumaGrid[i - 1]);
+    }
+  }
+  const edgeDensity = gradientCount > 0 ? gradientSum / gradientCount / 255 : 0;
+  const gradientSoftness = firstDiffSum > 0
+    ? Math.max(0, Math.min(1, 1 - (secondDiffSum / firstDiffSum) * 0.5))
+    : 1;
+  const periodicity = detectPeriodicity(lumaGrid, width, height);
+
   return {
     width,
     height,
@@ -115,6 +182,80 @@ export function analyzeImagePixels(
     transparentRatio: transparent / pixelCount,
     distinctColorBins: bins.size,
     dominantColors,
+    edgeDensity,
+    contrastSpread,
+    highlightRatio,
+    highlightConcentration,
+    gradientSoftness,
+    periodicity,
+  };
+}
+
+/**
+ * P923: 行・列方向の平均輝度プロファイルの自己相関から、繰り返し
+ * 模様の周期を推定する。最も相関の高いラグが十分強ければ周期として
+ * 返す（織り目・レンガ等の規則模様の検出）。
+ */
+function detectPeriodicity(
+  lumaGrid: Float32Array,
+  width: number,
+  height: number,
+): { period: number; strength: number } | null {
+  const profile = (length: number, at: (i: number) => number): number[] => {
+    const values: number[] = [];
+    for (let i = 0; i < length; i++) values.push(at(i));
+    return values;
+  };
+  const columnProfile = profile(width, (x) => {
+    let sum = 0;
+    for (let y = 0; y < height; y++) sum += lumaGrid[y * width + x];
+    return sum / Math.max(1, height);
+  });
+  const rowProfile = profile(height, (y) => {
+    let sum = 0;
+    for (let x = 0; x < width; x++) sum += lumaGrid[y * width + x];
+    return sum / Math.max(1, width);
+  });
+  let best: { period: number; strength: number } | null = null;
+  for (const values of [columnProfile, rowProfile]) {
+    const n = values.length;
+    if (n < 8) continue;
+    const mean = values.reduce((a, b) => a + b, 0) / n;
+    let denom = 0;
+    for (const v of values) denom += (v - mean) ** 2;
+    if (denom <= 0) continue;
+    const maxLag = Math.min(16, Math.floor(n / 2));
+    for (let lag = 2; lag <= maxLag; lag++) {
+      let num = 0;
+      for (let i = 0; i + lag < n; i++) num += (values[i] - mean) * (values[i + lag] - mean);
+      const strength = num / denom;
+      if (strength >= 0.5 && (!best || strength > best.strength)) {
+        best = { period: lag, strength };
+      }
+    }
+  }
+  return best;
+}
+
+/** P923: 測定値から素材パラメータの仮説を立てる（決定論の規則）。 */
+export function hypothesizeMaterial(features: ImagePixelFeatures): MaterialHypothesis {
+  let gloss: MaterialHypothesis['gloss'];
+  let roughness: number;
+  if (features.highlightRatio >= 0.002 && features.highlightConcentration >= 0.3) {
+    gloss = 'ツヤが強そう';
+    roughness = 0.15;
+  } else if (features.highlightRatio >= 0.0005 || features.highlightConcentration >= 0.15) {
+    gloss = 'ツヤは中くらい';
+    roughness = 0.45;
+  } else {
+    gloss = 'ツヤは弱そう';
+    roughness = features.edgeDensity >= 0.12 ? 0.9 : 0.75;
+  }
+  return {
+    gloss,
+    roughness,
+    patternPeriod: features.periodicity ? features.periodicity.period : null,
+    softGradient: features.gradientSoftness >= 0.8 && features.edgeDensity < 0.08,
   };
 }
 
@@ -127,7 +268,13 @@ export function verbalizeImageFeatures(features: ImagePixelFeatures): string {
     ? `主な色は${features.dominantColors.map((c) => `${c.name}（約${Math.round(c.share * 100)}%）`).join('、')}`
     : '主な色は読み取れなかった';
   const transparency = features.transparentRatio > 0.05 ? '、透明な部分がある' : '';
-  return `画像の観察：${features.aspect}の画像。全体に${brightness}。${vividness}。${colorCount}。${colors}${transparency}。具体的な物や文字までは読み取れない。`;
+  // P923: 質感と模様の印象（測定からの仮説なので断定しない）。
+  const material = hypothesizeMaterial(features);
+  const pattern = material.patternPeriod !== null
+    ? `。${material.patternPeriod <= 5 ? '細かい' : 'はっきりした'}繰り返し模様がありそう`
+    : '';
+  const gradient = material.softGradient ? '。色の移り変わりはなめらか' : '';
+  return `画像の観察：${features.aspect}の画像。全体に${brightness}。${vividness}。${colorCount}。${colors}${transparency}。${material.gloss}${pattern}${gradient}。具体的な物や文字までは読み取れない。`;
 }
 
 class ConversationImageObservationService {
@@ -141,7 +288,7 @@ class ConversationImageObservationService {
       if (!bitmap) return null;
       const { rgba, width, height } = bitmap;
       const features = analyzeImagePixels(rgba, width, height);
-      return { text: verbalizeImageFeatures(features), features };
+      return { text: verbalizeImageFeatures(features), features, material: hypothesizeMaterial(features) };
     } catch {
       return null;
     }
