@@ -5666,6 +5666,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P921 自己点検にゲートと到達の件数が出る', rec921?.codeGatesPrepared >= 1 && rec921?.codeDeviceTested >= 1, `gates=${rec921?.codeGatesPrepared} tested=${rec921?.codeDeviceTested}`);
 }
 
+// ---- P922 多段推論・第1段（因果を最大3段たどって先読みを答える） ----
+{
+  const { worldModelGraphService } = await import('../src/miki/selfAwareness/services/worldModelGraphService');
+  const { multiStepReasoningService } = await import('../src/miki/selfAwareness/services/multiStepReasoningService');
+  const { knowledgeSelfInspectionService } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  worldModelGraphService.addRelation({ fromName: 'プラズマ種火', toName: '着火', type: 'CAUSES', confidence: 0.9 });
+  worldModelGraphService.addRelation({ fromName: '着火', toName: '延焼', type: 'CAUSES', confidence: 0.9 });
+  worldModelGraphService.addRelation({ fromName: '延焼', toName: '焼失', type: 'CAUSES', confidence: 0.9 });
+  worldModelGraphService.addRelation({ fromName: '着火', toName: '煙', type: 'CAUSES', confidence: 0.4 });
+  worldModelGraphService.addRelation({ fromName: '朝霧の雫', toName: '結露', type: 'CAUSES', confidence: 0.3, provisional: true });
+  const ahead922 = multiStepReasoningService.lookAhead('プラズマ種火', 3);
+  check('P922 3段先まで連鎖が読める', ahead922.bestChain?.depth === 3 && ahead922.bestChain?.path.join('>') === 'プラズマ種火>着火>延焼>焼失', `chain=${ahead922.bestChain?.path.join('>')}`);
+  const r922a: any = await conversationCoreService.execute({ prompt: 'プラズマ種火が燃えるとどうなりますか', memories: [], recentMessages: [], conversationId: 'suite-p922' } as any);
+  check('P922 会話で3段の先読みを答える', String(r922a?.replyText || '').includes('焼失') && String(r922a?.replyText || '').includes('かもしれません'), `reply=${String(r922a?.replyText || '').slice(0, 60)}`);
+  const r922b: any = await conversationCoreService.execute({ prompt: '朝霧の雫はどうなるの', memories: [], recentMessages: [], conversationId: 'suite-p922' } as any);
+  check('P922 仮の関係は仮と添えて答える', String(r922b?.replyText || '').includes('結露') && String(r922b?.replyText || '').includes('仮の関係'), `reply=${String(r922b?.replyText || '').slice(0, 60)}`);
+  const r922c: any = await conversationCoreService.execute({ prompt: 'プラズマ種火の色は何色ですか', memories: [], recentMessages: [], conversationId: 'suite-p922' } as any);
+  check('P922 結果を聞かれていない時は先読みしない', !String(r922c?.replyText || '').includes('焼失'), `reply=${String(r922c?.replyText || '').slice(0, 40)}`);
+  const rec922: any = knowledgeSelfInspectionService.inspect();
+  check('P922 自己点検に先読みの深さが出る', rec922?.reasoningDeepestChain >= 3 && rec922?.reasoningLookAheads >= 1, `deepest=${rec922?.reasoningDeepestChain} count=${rec922?.reasoningLookAheads}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

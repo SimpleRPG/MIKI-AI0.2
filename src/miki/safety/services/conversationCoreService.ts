@@ -43,6 +43,7 @@ import { utteranceEventClassifierService } from '../../conversation/services/utt
 import { utteranceFeatureService, isBackchannelText } from '../../memory/services/utteranceFeatureService';
 import { topicStageService } from '../../memory/services/topicStageService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
+import { multiStepReasoningService } from '../../selfAwareness/services/multiStepReasoningService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -666,6 +667,12 @@ export class ConversationCoreService {
       const sibling = this.siblingAnswer(prompt);
       if (sibling && !multiPart) {
         return this.buildResult('RESOLVED', 'sibling_answer', this.applyPersonaVoice(sibling), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P922: 「Xするとどうなる？」——世界モデルの因果を最大3段
+      // たどって先読みを答える（予測は予測として出す）。
+      const consequence = this.consequenceAnswer(prompt);
+      if (consequence && !multiPart) {
+        return this.buildResult('RESOLVED', 'consequence_answer', this.applyPersonaVoice(consequence), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3813,6 +3820,44 @@ export class ConversationCoreService {
         return allProvisional
           ? `教わった説明の中では、他に${category}の仲間は知らないです。`
           : `他に${category}の仲間は、まだ知らないです。`;
+      }
+    } catch { return undefined; }
+    return undefined;
+  }
+
+  /**
+   * P922: 「Xするとどうなる？」に、世界モデルの CAUSES / ENABLES を
+   * 最大3段たどった先読みで答える。予測は事実として主張せず、
+   * 仮の関係が混ざる連鎖ではその旨を添える。因果の手がかりが
+   * 無い対象では undefined を返し、通常の流れに委ねる。
+   */
+  private consequenceAnswer(prompt: string): string | undefined {
+    if (!/(?:どうなる|どうなります|どうなっちゃう|したらどう|するとどう|たらどう)/.test(prompt)) return undefined;
+    try {
+      // 対象の特定は内容語トークンに頼らない（形態素解析が複合語を
+      // 分割し、実体名と一致しないため）。因果の起点になる実体名が
+      // 文にそのまま含まれるかを、長い名前から順に見る。
+      const fromNames = [...new Set(worldModelGraphService.relations()
+        .filter((r) => r.type === 'CAUSES' || r.type === 'ENABLES')
+        .map((r) => r.from))]
+        .filter((name) => name.length >= 2 && prompt.includes(name))
+        .sort((a, b) => b.length - a.length);
+      for (const t of fromNames) {
+        const ahead = multiStepReasoningService.lookAhead(t, 3);
+        if (!ahead.bestChain || ahead.steps.length === 0) continue;
+        const chain = ahead.bestChain;
+        const path = chain.path;
+        let sentence = `${path[0]}がきっかけだと、${path.slice(1).join('になって、')}になるかもしれません。`;
+        if (chain.provisional) {
+          sentence = `まだ仮の関係も混ざっているけど、${sentence}`;
+        } else if (chain.confidence < 0.25) {
+          sentence = `自信はあまりないけど、${sentence}`;
+        }
+        const other = ahead.steps.find((s) => s.entity !== chain.entity && !path.includes(s.entity));
+        if (other) {
+          sentence += `他には${other.entity}になる道もあります。`;
+        }
+        return sentence;
       }
     } catch { return undefined; }
     return undefined;

@@ -19,6 +19,7 @@ import { codeSynthesisStatsService } from '../../selfDevelopment/services/codeSy
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { codeComponentSpecService } from '../../selfDevelopment/services/codeComponentSpecService';
 import { codeComponentPromotionBridgeService } from '../../selfDevelopment/services/codeComponentPromotionBridgeService';
+import { multiStepReasoningService } from './multiStepReasoningService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -68,6 +69,9 @@ export interface KnowledgeSelfInspectionRecord {
   // P921: 昇格ゲートを用意した部品／DEVICE_TESTED まで進んだ部品
   codeGatesPrepared: number;
   codeDeviceTested: number;
+  // P922: 多段の先読みの利用回数と、最も深く読めた段数
+  reasoningLookAheads: number;
+  reasoningDeepestChain: number;
   findings: string[];
 }
 
@@ -265,6 +269,8 @@ class KnowledgeSelfInspectionService {
     let codeSpecsSupplied = 0;
     let codeGatesPrepared = 0;
     let codeDeviceTested = 0;
+    let reasoningLookAheads = 0;
+    let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
         (item) => item.componentKind === 'CODE',
@@ -303,6 +309,13 @@ class KnowledgeSelfInspectionService {
       codeDeviceTested = gateSummary.deviceTested;
       if (codeGatesPrepared > 0) {
         findings.push(`供給部品の昇格ゲートが${codeGatesPrepared}件用意できている（うち${codeDeviceTested}件が実機検証済み候補まで到達）`);
+      }
+      // P922: 多段の先読み（世界モデルの因果を最大3段たどる）の利用状況。
+      const reasoningSummary = multiStepReasoningService.summary();
+      reasoningLookAheads = reasoningSummary.lookAheads;
+      reasoningDeepestChain = reasoningSummary.deepestChain;
+      if (reasoningLookAheads > 0) {
+        findings.push(`因果の先読みを${reasoningLookAheads}回使った（最も深くて${reasoningDeepestChain}段先まで）`);
       }
     } catch { /* コードの棚卸しは補助経路 */ }
 
@@ -345,6 +358,8 @@ class KnowledgeSelfInspectionService {
       codeSpecsSupplied,
       codeGatesPrepared,
       codeDeviceTested,
+      reasoningLookAheads,
+      reasoningDeepestChain,
       findings,
     };
 
