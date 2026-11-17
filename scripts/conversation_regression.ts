@@ -5988,6 +5988,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P935 ただの言及では好みレーンは発火しない', r935ctl.reason !== 'grown_preference_answer', `reason=${r935ctl.reason}`);
 }
 
+// ---- P936 ゲームを自分で遊ぶ（第1段: 数当て） ----
+{
+  const { gamePlayService: gp936 } = await import('../src/miki/selfAwareness/services/gamePlayService');
+  const rec936 = gp936.playNumberGuess(777);
+  check('P936 数当てを最後まで遊んで勝てる', rec936.won === true && rec936.moves >= 1 && rec936.moves <= 7 && rec936.trace.length === rec936.moves, `moves=${rec936.moves}`);
+  const rec936b = gp936.playNumberGuess(777);
+  check('P936 同じ種では同じ遊びになる（決定的）', rec936b.moves === rec936.moves && rec936b.answer === rec936.answer, 'deterministic');
+  const before936 = gp936.summary().sessions;
+  const r936: any = await conversationCoreService.execute({ prompt: '数当てゲームして', memories: [], recentMessages: [], conversationId: 'suite-p936' } as any);
+  check('P936 「数当てゲームして」で実際に遊んで結果を話す', r936.reason === 'game_play_answer' && String(r936.replyText || '').includes('手で当てた') && gp936.summary().sessions > before936, `reason=${r936.reason} reply=${String(r936.replyText || '').slice(0, 60)}`);
+  const r936b: any = await conversationCoreService.execute({ prompt: 'ゲームの結果はどうだった？', memories: [], recentMessages: [], conversationId: 'suite-p936' } as any);
+  check('P936 「ゲームの結果は？」に直近の記録を答える', r936b.reason === 'game_play_answer' && String(r936b.replyText || '').includes('遊んだときは'), `reason=${r936b.reason}`);
+  const r936ctl: any = await conversationCoreService.execute({ prompt: 'ゲームの作り方を教えて', memories: [], recentMessages: [], conversationId: 'suite-p936' } as any);
+  check('P936 作り方の話では遊ばない', r936ctl.reason !== 'game_play_answer', `reason=${r936ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

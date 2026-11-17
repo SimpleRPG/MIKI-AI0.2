@@ -28,6 +28,7 @@ import { knowledgeConsolidationService } from './knowledgeConsolidationService';
 import { specialDayService } from './specialDayService';
 import { diaryService } from './diaryService';
 import { selfPreferenceService } from './selfPreferenceService';
+import { gamePlayService } from './gamePlayService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -89,6 +90,8 @@ export interface KnowledgeSelfInspectionRecord {
   specialDays: number;
   diaryEntries: number;
   grownPreferences: number;
+  gameSessions: number;
+  gameWins: number;
   findings: string[];
 }
 
@@ -296,6 +299,8 @@ class KnowledgeSelfInspectionService {
     let specialDays = 0;
     let diaryEntries = 0;
     let grownPreferences = 0;
+    let gameSessions = 0;
+    let gameWins = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -388,6 +393,13 @@ class KnowledgeSelfInspectionService {
       if (grownPreferences > 0) {
         findings.push(`会話の中で育った好みが${grownPreferences}件ある`);
       }
+      // P936: 自分で遊んだゲームの記録。
+      const gameSummary = gamePlayService.summary();
+      gameSessions = gameSummary.sessions;
+      gameWins = gameSummary.wins;
+      if (gameSessions > 0) {
+        findings.push(`ゲームを${gameSessions}回遊んで${gameWins}回勝った`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -440,6 +452,8 @@ class KnowledgeSelfInspectionService {
       specialDays,
       diaryEntries,
       grownPreferences,
+      gameSessions,
+      gameWins,
       findings,
     };
 

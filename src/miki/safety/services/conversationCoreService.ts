@@ -49,6 +49,7 @@ import { mistakeNotebookService } from '../../selfAwareness/services/mistakeNote
 import { knowledgeConsolidationService } from '../../selfAwareness/services/knowledgeConsolidationService';
 import { specialDayService } from '../../selfAwareness/services/specialDayService';
 import { diaryService } from '../../selfAwareness/services/diaryService';
+import { gamePlayService } from '../../selfAwareness/services/gamePlayService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -709,6 +710,11 @@ export class ConversationCoreService {
       const grownPref = this.grownPreferenceAnswer(prompt);
       if (grownPref && !multiPart) {
         return this.buildResult('RESOLVED', 'grown_preference_answer', this.applyPersonaVoice(grownPref), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P936: 「数当てゲームして」——自分で遊んで結果を話す。
+      const gamePlay = this.gamePlayAnswer(prompt);
+      if (gamePlay && !multiPart) {
+        return this.buildResult('RESOLVED', 'game_play_answer', this.applyPersonaVoice(gamePlay), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3943,6 +3949,28 @@ export class ConversationCoreService {
    * - 「おやすみ」: その場で整理を回して眠る挨拶を返す。
    * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
    */
+  /**
+   * P936: ゲームを自分で遊ぶ。「数当てゲームして」で実際に
+   * 1セッション遊んで結果を話し、「ゲームの結果は？」で
+   * 直近の記録を答える。作る・開発の話は対象外。
+   */
+  private gamePlayAnswer(prompt: string): string | undefined {
+    if (!/(?:ゲーム|数当て)/.test(prompt)) return undefined;
+    if (/(?:作|開発|プログラム|コード|設計|ルール|遊び方)/.test(prompt)) return undefined;
+    try {
+      if (/(?:結果|どうだった|勝った|負けた)/.test(prompt)) {
+        const last = gamePlayService.lastSession();
+        if (!last) return 'まだゲームで遊んだことはないな。今度遊んでみようか。';
+        return `この前${last.title}で遊んだときは、${last.summary}。`;
+      }
+      if (/(?:して|しよう|したい|やろう|やる|遊んで|遊ぼう)/.test(prompt)) {
+        const record = gamePlayService.playNumberGuess();
+        return `数当てで遊んだよ。${record.summary}。真ん中から絞っていくのが一番早いんだ。`;
+      }
+      return undefined;
+    } catch { return undefined; }
+  }
+
   /**
    * P935: 育った好みの表明。「好み変わった？」「最近好きなもの
    * ある？」に、頻度から育った好み（教示とは別）を答える。
