@@ -11,6 +11,7 @@ import { dialogueExampleRecallService } from '../../memory/services/dialogueExam
 import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
 import { analogyCandidateService } from './analogyCandidateService';
 import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
+import { episodeDistillationService } from '../../conversation/services/episodeDistillationService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -47,6 +48,7 @@ export interface KnowledgeSelfInspectionRecord {
   dialogueMaterialGapsRaised: number;
   analogyCandidatesCreated: number;
   procedureChunksCreated: number;
+  episodeTopicsDistilled: number;
   findings: string[];
 }
 
@@ -167,6 +169,13 @@ class KnowledgeSelfInspectionService {
       findings.push(`繰り返し手順を${chunksCreated}件、塊として登録した`);
     }
 
+    // P905: 蒸留。繰り返し現れる話題をエピソードから知識候補へ。
+    let distilledCount = 0;
+    try { distilledCount = episodeDistillationService.distill(3).length; } catch { /* 補助経路 */ }
+    if (distilledCount > 0) {
+      findings.push(`繰り返し話題を${distilledCount}件、知識として蒸留した`);
+    }
+
     const record: KnowledgeSelfInspectionRecord = {
       inspectedAt: Date.now(),
       personalDictionary: personal.length,
@@ -194,6 +203,7 @@ class KnowledgeSelfInspectionService {
       dialogueMaterialGapsRaised,
       analogyCandidatesCreated: analogyCreated,
       procedureChunksCreated: chunksCreated,
+      episodeTopicsDistilled: distilledCount,
       findings,
     };
 

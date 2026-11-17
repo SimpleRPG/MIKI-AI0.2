@@ -110,6 +110,11 @@ class EpisodeMemoryService {
     return { text, day: best.episode.day, hits: best.hits, daysAgo: best.daysAgo };
   }
 
+  /** P905: 保存済みのエピソードをそのまま返す（蒸留などの走査用）。 */
+  public storedEpisodes(): Episode[] {
+    return this.loadEpisodes();
+  }
+
   /** P627: 過去7日分のエピソードを（組めるものは組んで）日付順に返す。 */
   public recentEpisodes(days = 7): Episode[] {
     const out: Episode[] = [];

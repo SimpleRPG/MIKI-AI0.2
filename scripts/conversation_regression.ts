@@ -5277,6 +5277,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 }
 
+// P905: 対応表#12 の蒸留。3日以上にわたって現れた話題が、エピソード
+// から Claim 候補へ蒸留されることを確認する（2日の話題は対象外）。
+{
+  const { storageService: st905 } = await import('../src/services/storageService');
+  const { daysAgoKey: dak905 } = await import('../src/miki/memory/services/dayKeyService');
+  const { episodeDistillationService: ed905 } = await import('../src/miki/conversation/services/episodeDistillationService');
+  const { claimDatabaseService: cd905 } = await import('../src/miki/memory/services/claimDatabaseService');
+  let eps905: any[] = [];
+  try { eps905 = JSON.parse(st905.getItem('miki_episodes_v1') || '[]'); } catch { eps905 = []; }
+  if (!Array.isArray(eps905)) eps905 = [];
+  for (const n of [2, 3, 4]) eps905.push({ day: dak905(n), topics: ['ミント栽培'], summary: '昨日は、「ミント栽培」の話をしましたね。' });
+  for (const n of [2, 3]) eps905.push({ day: dak905(n), topics: ['パセリ栽培'], summary: '昨日は、「パセリ栽培」の話をしましたね。' });
+  st905.setItem('miki_episodes_v1', JSON.stringify(eps905));
+  const distilled905 = ed905.distill(3);
+  check('P905 3日現れた話題が蒸留される', distilled905.some((d: any) => d.topic === 'ミント栽培' && d.days >= 3), JSON.stringify(distilled905).slice(0, 80));
+  check('P905 2日だけの話題は蒸留されない', !distilled905.some((d: any) => d.topic === 'パセリ栽培'), 'below threshold');
+  const claim905 = cd905.listClaims().find((c: any) => c.source === 'episode_distillation' && String(c.statement).includes('ミント栽培'));
+  check('P905 蒸留が Claim 候補として登録される', Boolean(claim905) && claim905!.status === 'CANDIDATE', claim905 ? claim905.status : 'NONE');
+  check('P905 蒸留済みの話題は再蒸留しない', ed905.distill(3).filter((d: any) => d.topic === 'ミント栽培').length === 0, 'deduped');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
