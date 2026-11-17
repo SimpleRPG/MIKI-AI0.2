@@ -74,13 +74,12 @@ export function compareRegionShape(
 }
 
 /**
- * 主な「物」候補（縁をぐるりと囲まない最大の領域）を描き直して
- * 照合する。地の側の領域は形として描き直す対象にしない。
+ * 主な「物」候補を選ぶ（縁をぐるりと囲まない領域で、他の領域を
+ * 外接矩形に含む「地」の側を避け、最大のものを取る）。同定でも
+ * 共通で使うため公開する。
  */
-export function verifyShapesByRendering(features: ImagePixelFeatures): ShapeVerification {
+export function selectMainObjectRegion(features: ImagePixelFeatures): ImageRegionFeature | null {
   const candidates = features.regions.filter((r) => r.borderTouch < 0.9);
-  // 「地」は他の領域を外接矩形に含む側なので、含む側を避けて
-  // 最も大きい「物」候補を選ぶ。
   const containsOther = (r: ImageRegionFeature): boolean => {
     const minX = r.centroidX - r.bboxWidth / 2;
     const maxX = r.centroidX + r.bboxWidth / 2;
@@ -90,7 +89,15 @@ export function verifyShapesByRendering(features: ImagePixelFeatures): ShapeVeri
       && o.centroidX >= minX && o.centroidX <= maxX
       && o.centroidY >= minY && o.centroidY <= maxY);
   };
-  const main = candidates.find((r) => !containsOther(r)) || candidates[0];
+  return candidates.find((r) => !containsOther(r)) || candidates[0] || null;
+}
+
+/**
+ * 主な「物」候補（縁をぐるりと囲まない最大の領域）を描き直して
+ * 照合する。地の側の領域は形として描き直す対象にしない。
+ */
+export function verifyShapesByRendering(features: ImagePixelFeatures): ShapeVerification {
+  const main = selectMainObjectRegion(features);
   const targets = main ? [main] : [];
   const regions = targets.map((target) => {
     const swatch = renderRegionShape(target);

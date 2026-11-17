@@ -473,7 +473,19 @@ class ConversationImageObservationService {
         const { verifyShapesByRendering } = await import('./shapeRenderVerificationService');
         shapeVerification = verifyShapesByRendering(features);
       } catch { shapeVerification = undefined; }
-      return { text: verbalizeImageFeatures(features), features, material: hypothesizeMaterial(features), verification, shapeVerification };
+      // P928: 見本と照合して同定する（似ているときだけ名前で呼ぶ）。
+      let text = verbalizeImageFeatures(features);
+      try {
+        const { visualPatternService } = await import('./visualPatternService');
+        const match = visualPatternService.match(features);
+        if (match) {
+          text = text.replace(
+            '。具体的な物や文字までは読み取れない。',
+            `。形としては「${match.name}」に似ている。具体的な物や文字までは読み取れない。`,
+          );
+        }
+      } catch { /* 同定できなくても観察は返す */ }
+      return { text, features, material: hypothesizeMaterial(features), verification, shapeVerification };
     } catch {
       return null;
     }

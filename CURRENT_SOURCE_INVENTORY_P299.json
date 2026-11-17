@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1830,
-    "sourceFileCount": 1383,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1294,
-    "relativeImportCandidateCount": 4473,
-    "resolvedRelativeImportCandidateCount": 4457,
+    "trackedPathCountExcludingControlPaths": 1831,
+    "sourceFileCount": 1384,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1295,
+    "relativeImportCandidateCount": 4480,
+    "resolvedRelativeImportCandidateCount": 4464,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 500741,
-      "lines": 5831,
-      "sha256": "c0dcab8496fc27ec36834b185284eb47ff2da1699f260498d35db1f1996a0ca8",
+      "bytes": 503010,
+      "lines": 5857,
+      "sha256": "76f4447b3a0e705dcc2470f1af1d388de284a2d8a098da7b4414c81dbdf7c3b0",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3854,10 +3854,22 @@
           "specifier": "../src/miki/conversation/services/shapeRenderVerificationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/shapeRenderVerificationService.ts"
+        },
+        {
+          "line": 5820,
+          "specifier": "../src/miki/conversation/services/conversationImageObservationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationImageObservationService.ts"
+        },
+        {
+          "line": 5821,
+          "specifier": "../src/miki/conversation/services/visualPatternService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPatternService.ts"
         }
       ],
-      "relativeImportCandidateCount": 356,
-      "resolvedRelativeImportCount": 356,
+      "relativeImportCandidateCount": 358,
+      "resolvedRelativeImportCount": 358,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -12979,9 +12991,9 @@
     },
     {
       "path": "src/miki/conversation/services/conversationImageObservationService.ts",
-      "bytes": 22570,
-      "lines": 530,
-      "sha256": "49b06c4c267760c510a40bbeea5ce0327c1729d2120b71a9dda075e6808fac39",
+      "bytes": 23174,
+      "lines": 542,
+      "sha256": "173e17efef5058751e62654d1039707086fa7612acf1904222369be29cb9bfff",
       "relativeImportCandidates": [
         {
           "line": 89,
@@ -13006,10 +13018,16 @@
           "specifier": "./shapeRenderVerificationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/shapeRenderVerificationService.ts"
+        },
+        {
+          "line": 479,
+          "specifier": "./visualPatternService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPatternService.ts"
         }
       ],
-      "relativeImportCandidateCount": 4,
-      "resolvedRelativeImportCount": 4,
+      "relativeImportCandidateCount": 5,
+      "resolvedRelativeImportCount": 5,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -13986,9 +14004,9 @@
     },
     {
       "path": "src/miki/conversation/services/shapeRenderVerificationService.ts",
-      "bytes": 4312,
-      "lines": 113,
-      "sha256": "c1e4b197edd20f81a7fef21964d00a463328fa191fd386d1a9d8f70c404c77e2",
+      "bytes": 4562,
+      "lines": 120,
+      "sha256": "ccad4f7a017a5e7cfc67d4b7ad46d4f8c217b835d4c216a4ac48846b61aa77a4",
       "relativeImportCandidates": [
         {
           "line": 5,
@@ -14339,6 +14357,35 @@
       ],
       "relativeImportCandidateCount": 2,
       "resolvedRelativeImportCount": 2,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/conversation/services/visualPatternService.ts",
+      "bytes": 3872,
+      "lines": 113,
+      "sha256": "ed77739fc9ff1834655ad2a2a4df313e237194b0a29d7d6c848921667ef2bc82",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "./conversationImageObservationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationImageObservationService.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "./shapeRenderVerificationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/shapeRenderVerificationService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -31369,9 +31416,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 21145,
-      "lines": 439,
-      "sha256": "7c64adfd57c442f44af161fa753c2b09838e8b5894d443f87c9b0cf3758f78d0",
+      "bytes": 21552,
+      "lines": 448,
+      "sha256": "f5b7991b68de97aabf0914a51cf1ec47eaf967e6d9c26c1bb62551153573f1a1",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31510,10 +31557,16 @@
           "specifier": "./idleActionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/idleActionService.ts"
+        },
+        {
+          "line": 24,
+          "specifier": "../../conversation/services/visualPatternService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPatternService.ts"
         }
       ],
-      "relativeImportCandidateCount": 23,
-      "resolvedRelativeImportCount": 23,
+      "relativeImportCandidateCount": 24,
+      "resolvedRelativeImportCount": 24,
       "unresolvedRelativeImportCount": 0
     },
     {

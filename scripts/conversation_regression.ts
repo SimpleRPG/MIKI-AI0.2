@@ -5815,6 +5815,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P927 違う形で描くと読みがずれて検出できる', !!white927 && !!wrongRegion927 && cr927(white927, wrongRegion927) === false, `wrong=${wrongRegion927?.shape}`);
 }
 
+// ---- P928 目・第5段（見本からの同定） ----
+{
+  const { analyzeImagePixels: an928 } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const { visualPatternService: vp928 } = await import('../src/miki/conversation/services/visualPatternService');
+  const W928 = 48, H928 = 48;
+  const make928 = (fn: (x: number, y: number) => [number, number, number]) => {
+    const a = new Uint8Array(W928 * H928 * 4);
+    for (let y = 0; y < H928; y++) for (let x = 0; x < W928; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W928 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return a;
+  };
+  const disc928 = an928(make928((x, y) => ((x - 24) ** 2 + (y - 24) ** 2 <= 144 ? [240, 240, 240] : [15, 15, 15]) as [number, number, number]), W928, H928);
+  const bar928 = an928(make928((x, y) => (y >= 21 && y < 27 ? [240, 240, 240] : [15, 15, 15]) as [number, number, number]), W928, H928);
+  const block928 = an928(make928((x, y) => (x < 24 && y < 24 ? [15, 15, 15] : [240, 240, 240]) as [number, number, number]), W928, H928);
+  check('P928 描き直しが通った形を見本として登録できる', vp928.register('円盤', disc928)?.name === '円盤' && vp928.register('棒', bar928)?.name === '棒' && vp928.register('四角い板', block928)?.name === '四角い板', 'register');
+  const smallDisc928 = an928(make928((x, y) => ((x - 24) ** 2 + (y - 24) ** 2 <= 100 ? [240, 240, 240] : [15, 15, 15]) as [number, number, number]), W928, H928);
+  const mDisc928 = vp928.match(smallDisc928);
+  check('P928 少し小さい円盤も円盤と同定できる', mDisc928?.name === '円盤' && (mDisc928?.score || 0) >= 0.7, `match=${JSON.stringify(mDisc928)}`);
+  const smallBlock928 = an928(make928((x, y) => (x < 22 && y < 22 ? [15, 15, 15] : [240, 240, 240]) as [number, number, number]), W928, H928);
+  check('P928 少し小さい四角も四角い板と同定できる', vp928.match(smallBlock928)?.name === '四角い板', 'block-match');
+  const tri928 = an928(make928((x, y) => (x + y < 24 ? [15, 15, 15] : [240, 240, 240]) as [number, number, number]), W928, H928);
+  check('P928 似ていない形には名前を付けない', vp928.match(tri928) === null, 'triangle-null');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
