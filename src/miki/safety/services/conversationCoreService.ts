@@ -21,6 +21,7 @@ import { latentIntentMiningService } from '../../unknown/services/latentIntentMi
 import { answerContentIrService } from '../../conversation/services/answerContentIrService';
 import { unknownResearchConversationBridgeService, selectUnverifiedPresentation, buildUnverifiedConclusion } from '../../conversation/services/unknownResearchConversationBridgeService';
 import { conversationUnknownVocabularyService } from '../../conversation/services/conversationUnknownVocabularyService';
+import { missedFormLearningService } from '../../conversation/services/missedFormLearningService';
 import { conversationImageObservationService } from '../../conversation/services/conversationImageObservationService';
 import { scopedVersionedMemoryService } from '../../memory/services/scopedVersionedMemoryService';
 import { conversationUserFactRecallService, looksInterrogative, UserFactIntakeSummary } from '../../conversation/services/conversationUserFactRecallService';
@@ -257,7 +258,31 @@ export class ConversationCoreService {
         : [],
       recentMessages,
     );
-    const dialogueAct = interpretation.dialogueAct;
+    let dialogueAct = interpretation.dialogueAct;
+    // P911: 外した形の学習（意図推定の一般化・第1段）。前ターンに
+    // 「陳述＋意味未確定」へ落ちた形が一時記録されていたら、
+    // 本ターンが強い行為として通り内容語が重なるときに限り、
+    // その形と行為の対応を台帳へ昇格する。台帳にある形が陳述に
+    // 落ちたら、台帳の行為で解釈する（積極判定は上書きしない）。
+    try {
+      const missedKey = params.conversationId || state.conversationId || 'active';
+      const skeleton = missedFormLearningService.skeletonOf(japaneseAnalysis);
+      const pendingMiss = missedFormLearningService.pendingFor(missedKey);
+      if (pendingMiss && dialogueAct !== 'STATEMENT' && dialogueAct !== 'CASUAL_CHAT') {
+        const overlap = (japaneseAnalysis.contentTokens || []).some((t) => pendingMiss.contentTokens.includes(t));
+        if (overlap) missedFormLearningService.promote(missedKey, dialogueAct);
+      }
+      if (dialogueAct === 'STATEMENT' && skeleton) {
+        const learnedAct = missedFormLearningService.lookup(skeleton);
+        if (learnedAct) {
+          dialogueAct = learnedAct;
+          stages.missedFormApplied = 1;
+        }
+      }
+      if (dialogueAct === 'STATEMENT' && interpretation.llmFallbackNeeded && skeleton) {
+        missedFormLearningService.noteMiss(missedKey, skeleton, japaneseAnalysis.contentTokens || []);
+      }
+    } catch { /* 形の学習は補助経路 */ }
     // P856: P214 の談話スタックへ、通常会話の話題も供給する。
     // 今までは P212（自己照会）の経路でしか積まれず、自己照会の
     // 質問が来た時点でスタックが空・古いことが多かった。積み方は

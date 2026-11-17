@@ -5422,6 +5422,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P910 自己点検に競合の観測が残る', !!rec910.productionConflicts && rec910.productionConflicts.total >= after910.total, JSON.stringify(rec910.productionConflicts));
 }
 
+// P911: 意図推定の一般化・第1段（外した形の学習）。陳述＋意味
+// 未確定に落ちた形を一時記録し、本人の言い直しが強い行為で
+// 通ったら骨格→行為を台帳へ昇格。以後は同じ形が最初から通る。
+{
+  const { missedFormLearningService } = await import('../src/miki/conversation/services/missedFormLearningService');
+  const { conversationComponentPipelineService: ccps911 } = await import('../src/miki/conversation/services/conversationComponentPipelineService');
+  missedFormLearningService.clearPending('suite-p911');
+  const skel911 = missedFormLearningService.skeletonOf(ccps911.analyzeSync('モコロンのこと、知りたいな').analysis);
+  let st911: any = undefined; const hist911: any[] = [];
+  const run911 = async (t: string) => {
+    const r: any = await conversationCoreService.execute({ prompt: t, memories: [], recentMessages: hist911.slice(-8), conversationState: st911, conversationId: 'suite-p911' } as any);
+    st911 = r.nextConversationState;
+    hist911.push({ role: 'user', content: t }, { role: 'assistant', content: r.replyText });
+    return r;
+  };
+  const preLearned911 = missedFormLearningService.learnedForms().some((l: any) => l.skeleton === skel911);
+  const t1_911 = await run911('モコロンのこと、知りたいな');
+  const pending911 = missedFormLearningService.pendingFor('suite-p911');
+  check('P911 外した形が一時記録される', !!pending911 || preLearned911, `act=${t1_911.intentCategory}`);
+  await run911('モコロンについて教えて');
+  const learned911 = missedFormLearningService.learnedForms().find((l: any) => l.skeleton === skel911);
+  check('P911 言い直しで形が台帳に昇格する', !!learned911 && learned911.act === 'REQUEST', JSON.stringify(learned911 || {}));
+  const t3_911 = await run911('ヒナモのこと、知りたいな');
+  check('P911 同じ形の次の発話は最初から行為が通る', t3_911.intentCategory === 'REQUEST', `act=${t3_911.intentCategory} reply=${t3_911.replyText.slice(0, 60)}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

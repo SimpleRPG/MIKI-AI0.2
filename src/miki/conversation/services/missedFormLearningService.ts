@@ -1,0 +1,129 @@
+import { storageService } from '../../../services/storageService';
+
+/**
+ * P911: 外した形の学習（意図推定の一般化・第1段）。
+ *
+ * 解釈が「陳述（STATEMENT）＋意味未確定」に落ちた発話は、
+ * 言い回しの形（内容語を除いた骨格）だけを一時記録する。
+ * 次のターンで本人が言い直し、内容語が重なる発話が強い
+ * 対話行為として通ったら、骨格→行為の対応を台帳へ昇格する。
+ * 以後、同じ骨格の発話が陳述に落ちたら台帳の行為で解釈する。
+ *
+ * 境界:
+ * - 昇格は本人の言い直しという会話の証拠があるときだけ
+ *   （推測で形を増やさない。自己証明なし）。
+ * - 消費は陳述に落ちた場合だけ。分類器の積極判定
+ *   （質問・訂正・依頼など）は台帳で上書きしない。
+ * - 骨格は機能語3つ以上ある形だけを対象にする
+ *   （短い骨格は一般的すぎて誤爆する）。
+ */
+
+export interface LearnedForm {
+  skeleton: string;
+  act: string;
+  at: number;
+  hits: number;
+}
+
+export interface PendingMiss {
+  skeleton: string;
+  contentTokens: string[];
+  at: number;
+}
+
+interface MissedFormStore {
+  learned: LearnedForm[];
+  pending: Record<string, PendingMiss>;
+}
+
+const STORAGE_KEY = 'miki_missed_forms_v1';
+const LEARNED_CAP = 100;
+const PENDING_FRESH_MS = 60 * 60 * 1000;
+
+class MissedFormLearningService {
+  private load(): MissedFormStore {
+    try {
+      const raw = storageService.getItem(STORAGE_KEY);
+      if (!raw) return { learned: [], pending: {} };
+      const parsed = JSON.parse(raw);
+      return {
+        learned: Array.isArray(parsed?.learned) ? parsed.learned : [],
+        pending: parsed?.pending && typeof parsed.pending === 'object' ? parsed.pending : {},
+      };
+    } catch {
+      return { learned: [], pending: {} };
+    }
+  }
+
+  private save(store: MissedFormStore): void {
+    try {
+      storageService.setItem(STORAGE_KEY, JSON.stringify(store));
+    } catch { /* 形の学習は補助経路 */ }
+  }
+
+  /** 発話の骨格（内容語を除いた機能語の並び）。短すぎる形は空を返す。 */
+  public skeletonOf(analysis: { tokens?: Array<{ surface: string }>; contentTokens?: string[] }): string {
+    const content = new Set(analysis?.contentTokens || []);
+    const parts = (analysis?.tokens || [])
+      .map((t) => t.surface)
+      .filter((s) => s && !content.has(s));
+    if (parts.length < 3) return '';
+    return parts.join('|');
+  }
+
+  public noteMiss(key: string, skeleton: string, contentTokens: string[]): void {
+    if (!skeleton || !contentTokens || contentTokens.length === 0) return;
+    const store = this.load();
+    store.pending[key] = { skeleton, contentTokens: [...contentTokens], at: Date.now() };
+    this.save(store);
+  }
+
+  public pendingFor(key: string): PendingMiss | undefined {
+    const p = this.load().pending[key];
+    if (!p) return undefined;
+    if (Date.now() - p.at > PENDING_FRESH_MS) return undefined;
+    return p;
+  }
+
+  public clearPending(key: string): void {
+    const store = this.load();
+    if (store.pending[key]) {
+      delete store.pending[key];
+      this.save(store);
+    }
+  }
+
+  /** 言い直しが通ったので、保留中の外しを台帳へ昇格する。 */
+  public promote(key: string, act: string): boolean {
+    const store = this.load();
+    const p = store.pending[key];
+    if (!p) return false;
+    delete store.pending[key];
+    const existing = store.learned.find((l) => l.skeleton === p.skeleton);
+    if (existing) {
+      existing.act = act;
+      existing.at = Date.now();
+    } else {
+      store.learned.push({ skeleton: p.skeleton, act, at: Date.now(), hits: 0 });
+      while (store.learned.length > LEARNED_CAP) store.learned.shift();
+    }
+    this.save(store);
+    return true;
+  }
+
+  public lookup(skeleton: string): string | undefined {
+    if (!skeleton) return undefined;
+    const store = this.load();
+    const hit = store.learned.find((l) => l.skeleton === skeleton);
+    if (!hit) return undefined;
+    hit.hits++;
+    this.save(store);
+    return hit.act;
+  }
+
+  public learnedForms(): LearnedForm[] {
+    return this.load().learned;
+  }
+}
+
+export const missedFormLearningService = new MissedFormLearningService();
