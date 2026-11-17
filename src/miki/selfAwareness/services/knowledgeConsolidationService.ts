@@ -5,6 +5,7 @@ import { worldModelGraphService } from './worldModelGraphService';
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
 import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
+import { mistakeNotebookService } from './mistakeNotebookService';
 
 /**
  * P542: 統合パス（寝ている間の整理）。成長ループから1日1回まで
@@ -22,8 +23,23 @@ import { knowledgeGapService } from '../../unknown/services/knowledgeGapService'
  */
 
 const LAST_RUN_KEY = 'miki_consolidation_last_run_v1';
+const REPORT_KEY = 'miki_sleep_report_v1';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_SCHEMAS_PER_RUN = 3;
+
+/** P931: 眠って整理した結果の報告（朝に彼女が語れる形で残す）。 */
+export interface SleepReport {
+  at: number;
+  runs: number;
+  relationsAdded: number;
+  schemas: number;
+  distilled: number;
+  predictionsConfirmed: number;
+  predictionsRefuted: number;
+  relearnGaps: number;
+  mistakesReviewed: number;
+  mistakeRelearnGaps: number;
+}
 
 const SHARED_RELATION_PHRASE: Record<string, (to: string) => string> = {
   USED_FOR: (to) => `${to}に使われます`,
@@ -37,6 +53,28 @@ class KnowledgeConsolidationService {
     let last = 0;
     try { last = parseInt(storageService.getItem(LAST_RUN_KEY) || '0', 10) || 0; } catch { /* 読めなければ今回回す */ }
     if (now - last < DAY_MS) return undefined;
+    return this.run(now);
+  }
+
+  /** P931: 「おやすみ」で今すぐ眠る（1日1回の門を飛ばして整理する）。 */
+  public sleepNow(now = Date.now()): SleepReport {
+    this.run(now);
+    return this.lastReport() as SleepReport;
+  }
+
+  /** P931: 直近の整理の報告を読む。 */
+  public lastReport(): SleepReport | null {
+    try {
+      const raw = storageService.getItem(REPORT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.at === 'number') return parsed as SleepReport;
+      }
+    } catch { /* fall through */ }
+    return null;
+  }
+
+  private run(now: number): { relationsAdded: number; schemas: number; distilled: number; predictions: { confirmed: number; refuted: number; refutedTargets: string[] }; relearnGaps: number } {
     try { storageService.setItem(LAST_RUN_KEY, String(now)); } catch { /* 書けなくても今回は回す */ }
 
     let relationsAdded = 0;
@@ -63,7 +101,45 @@ class KnowledgeConsolidationService {
         if (gap && gap.status === 'OPEN') relearnGaps++;
       }
     } catch { /* ギャップ化できなくても統合は止めない */ }
+    // P931: 間違い帳の見直し。繰り返した誤りは学び直しの不足へ
+    // 戻す（1回の整理で最大2件）。寝ることは、間違いと向き合う
+    // 時間でもある。
+    let mistakesReviewed = 0;
+    let mistakeRelearnGaps = 0;
+    try {
+      const recurring = mistakeNotebookService.list(50)
+        .filter((e) => !e.resolved && e.occurrences >= 2);
+      mistakesReviewed = recurring.length;
+      for (const entry of recurring.slice(0, 2)) {
+        if (!entry.right) continue;
+        const gap = knowledgeGapService.detect({
+          query: `「${entry.wrong}」ではなく「${entry.right}」であることを学び直す`,
+          reason: '同じ間違いを繰り返したため、眠って整理する中で学び直す',
+          type: 'UNKNOWN_TERM',
+          target: entry.right,
+          priority: 55,
+        });
+        if (gap && gap.status === 'OPEN') mistakeRelearnGaps++;
+      }
+    } catch { /* 見直しできなくても統合は止めない */ }
     systemLogger.info('SELF_IMPROVEMENT', `🌙 [統合] 関係の再抽出で ${relationsAdded} 件を追加し、図式を ${schemas} 件立て、繰り返しの話題を ${distilled} 件蒸留し、予測を ${predictions.confirmed + predictions.refuted} 件照合しました（外れ ${predictions.refuted} 件）`);
+    // P931: 報告を残す（朝、聞かれたら語れるように）。
+    try {
+      const previous = this.lastReport();
+      const report: SleepReport = {
+        at: now,
+        runs: (previous?.runs || 0) + 1,
+        relationsAdded,
+        schemas,
+        distilled,
+        predictionsConfirmed: predictions.confirmed,
+        predictionsRefuted: predictions.refuted,
+        relearnGaps,
+        mistakesReviewed,
+        mistakeRelearnGaps,
+      };
+      storageService.setItem(REPORT_KEY, JSON.stringify(report));
+    } catch { /* 報告が残せなくても統合自体は済んでいる */ }
     return { relationsAdded, schemas, distilled, predictions, relearnGaps };
   }
 

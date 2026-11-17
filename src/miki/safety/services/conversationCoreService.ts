@@ -46,6 +46,7 @@ import { worldModelGraphService } from '../../selfAwareness/services/worldModelG
 import { multiStepReasoningService } from '../../selfAwareness/services/multiStepReasoningService';
 import { idleActionService } from '../../selfAwareness/services/idleActionService';
 import { mistakeNotebookService } from '../../selfAwareness/services/mistakeNotebookService';
+import { knowledgeConsolidationService } from '../../selfAwareness/services/knowledgeConsolidationService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -686,6 +687,11 @@ export class ConversationCoreService {
       const mistakeNote = this.mistakeNotebookAnswer(prompt);
       if (mistakeNote && !multiPart) {
         return this.buildResult('RESOLVED', 'mistake_notebook_answer', this.applyPersonaVoice(mistakeNote), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P931: 「おやすみ」で眠って整理し、朝は整理の報告を答える。
+      const sleepReply = this.sleepAnswer(prompt);
+      if (sleepReply && !multiPart) {
+        return this.buildResult('RESOLVED', 'sleep_answer', this.applyPersonaVoice(sleepReply), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3913,6 +3919,34 @@ export class ConversationCoreService {
       if (summary.recurring > 0) parts.push(`同じ間違いを繰り返したものが${summary.recurring}件あって、そこは特に気をつけてる。`);
       return parts.join('');
     } catch { return undefined; }
+  }
+
+  /**
+   * P931: 眠って整理する時間。
+   * - 「おやすみ」: その場で整理を回して眠る挨拶を返す。
+   * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
+   */
+  private sleepAnswer(prompt: string): string | undefined {
+    try {
+      if (/おやすみ/.test(prompt)) {
+        knowledgeConsolidationService.sleepNow();
+        return 'おやすみ。寝てる間に今日の分を整理しておくね。';
+      }
+      if (/(?:寝てる間|寝ている間|よく眠れた|眠れた)/.test(prompt)
+        && /(?:？|\?|何した|なにした|どう|整理)/.test(prompt)) {
+        const report = knowledgeConsolidationService.lastReport();
+        if (!report) return 'まだ整理の記録はないよ。今夜が初めての整理になりそう。';
+        const parts = ['寝てる間に整理したよ。'];
+        if (report.relationsAdded > 0) parts.push(`関係を${report.relationsAdded}件つなぎ直して、`);
+        if (report.schemas > 0) parts.push(`共通の型を${report.schemas}件立てて、`);
+        if (report.distilled > 0) parts.push(`繰り返しの話題を${report.distilled}件蒸留して、`);
+        if (report.predictionsRefuted > 0) parts.push(`外れた予測が${report.predictionsRefuted}件あったから学び直しに入れたよ。`);
+        if (report.mistakesReviewed > 0) parts.push(`間違い帳で繰り返してた間違いを${report.mistakesReviewed}件見直した。`);
+        if (parts.length === 1) parts.push('大きな変化はなかったけど、頭の中は整えておいたよ。');
+        return parts.join('');
+      }
+    } catch { return undefined; }
+    return undefined;
   }
 
   /**

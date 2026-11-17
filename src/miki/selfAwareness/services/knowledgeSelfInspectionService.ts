@@ -24,6 +24,7 @@ import { idleActionService } from './idleActionService';
 import { visualPatternService } from '../../conversation/services/visualPatternService';
 import { visualScenePatternService } from '../../conversation/services/visualScenePatternService';
 import { mistakeNotebookService } from './mistakeNotebookService';
+import { knowledgeConsolidationService } from './knowledgeConsolidationService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -81,6 +82,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualScenePatterns: number;
   mistakesRecorded: number;
   mistakesRecurring: number;
+  sleepRuns: number;
   findings: string[];
 }
 
@@ -284,6 +286,7 @@ class KnowledgeSelfInspectionService {
     let visualScenePatterns = 0;
     let mistakesRecorded = 0;
     let mistakesRecurring = 0;
+    let sleepRuns = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -356,6 +359,11 @@ class KnowledgeSelfInspectionService {
       if (mistakesRecurring > 0) {
         findings.push(`同じ間違いを繰り返したものが${mistakesRecurring}件ある`);
       }
+      // P931: 眠って整理した回数。
+      sleepRuns = knowledgeConsolidationService.lastReport()?.runs || 0;
+      if (sleepRuns > 0) {
+        findings.push(`眠って整理を${sleepRuns}回した`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -404,6 +412,7 @@ class KnowledgeSelfInspectionService {
       visualScenePatterns,
       mistakesRecorded,
       mistakesRecurring,
+      sleepRuns,
       findings,
     };
 

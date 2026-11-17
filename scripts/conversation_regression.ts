@@ -5896,6 +5896,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P930 ただの言及では間違い帳レーンは発火しない', r930ctl.reason !== 'mistake_notebook_answer', `reason=${r930ctl.reason}`);
 }
 
+// ---- P931 眠って整理する時間 ----
+{
+  const { knowledgeConsolidationService: kc931 } = await import('../src/miki/selfAwareness/services/knowledgeConsolidationService');
+  const { mistakeNotebookService: nb931 } = await import('../src/miki/selfAwareness/services/mistakeNotebookService');
+  const { knowledgeGapService: kg931 } = await import('../src/miki/unknown/services/knowledgeGapService');
+  nb931.recordCorrection('ユキワリ石', '雪割石');
+  nb931.recordCorrection('ユキワリ石', '雪割石');
+  const report931 = kc931.sleepNow();
+  check('P931 眠って整理が回り、報告が残る', report931.runs >= 1 && report931.at > 0 && kc931.lastReport()?.runs === report931.runs, `runs=${report931.runs}`);
+  check('P931 繰り返した間違いが見直され、学び直しの不足になる', report931.mistakesReviewed >= 1 && kg931.listOpen(100).some((g: any) => g?.identity?.target === '雪割石'), `reviewed=${report931.mistakesReviewed} relearn=${report931.mistakeRelearnGaps}`);
+  const r931: any = await conversationCoreService.execute({ prompt: 'おやすみ', memories: [], recentMessages: [], conversationId: 'suite-p931' } as any);
+  check('P931 「おやすみ」で眠る挨拶が返る', r931.reason === 'sleep_answer' && String(r931.replyText || '').includes('おやすみ'), `reason=${r931.reason}`);
+  const r931b: any = await conversationCoreService.execute({ prompt: '寝てる間に何したの？', memories: [], recentMessages: [], conversationId: 'suite-p931' } as any);
+  check('P931 朝に整理の報告を語れる', r931b.reason === 'sleep_answer' && String(r931b.replyText || '').includes('整理'), `reason=${r931b.reason} reply=${String(r931b.replyText || '').slice(0, 60)}`);
+  const r931ctl: any = await conversationCoreService.execute({ prompt: '眠いなあ', memories: [], recentMessages: [], conversationId: 'suite-p931' } as any);
+  check('P931 ただ眠いだけでは睡眠レーンは発火しない', r931ctl.reason !== 'sleep_answer', `reason=${r931ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
