@@ -475,26 +475,41 @@ class ConversationImageObservationService {
       } catch { shapeVerification = undefined; }
       // P928: 見本と照合して同定する（似ているときだけ名前で呼ぶ）。
       // P929: 配置の見本が合えばそちらを優先する。
+      // P945: 人の形らしい配置は、どの見本よりも先に読む。
       let text = verbalizeImageFeatures(features);
+      let figureMatched = false;
       try {
-        const { visualScenePatternService } = await import('./visualScenePatternService');
-        const sceneMatch = visualScenePatternService.matchScene(features);
-        if (sceneMatch) {
+        const { visualFigureService } = await import('./visualFigureService');
+        const figure = visualFigureService.identifyFigure(features);
+        if (figure) {
           text = text.replace(
             '。具体的な物や文字までは読み取れない。',
-            `。配置としては「${sceneMatch.name}」に似ている。具体的な物や文字までは読み取れない。`,
+            `。${figure.description}が見える。具体的な物や文字までは読み取れない。`,
           );
-        } else {
-          const { visualPatternService } = await import('./visualPatternService');
-          const match = visualPatternService.match(features);
-          if (match) {
+          figureMatched = true;
+        }
+      } catch { /* 人の同定ができなくても観察は返す */ }
+      if (!figureMatched) {
+        try {
+          const { visualScenePatternService } = await import('./visualScenePatternService');
+          const sceneMatch = visualScenePatternService.matchScene(features);
+          if (sceneMatch) {
             text = text.replace(
               '。具体的な物や文字までは読み取れない。',
-              `。形としては「${match.name}」に似ている。具体的な物や文字までは読み取れない。`,
+              `。配置としては「${sceneMatch.name}」に似ている。具体的な物や文字までは読み取れない。`,
             );
+          } else {
+            const { visualPatternService } = await import('./visualPatternService');
+            const match = visualPatternService.match(features);
+            if (match) {
+              text = text.replace(
+                '。具体的な物や文字までは読み取れない。',
+                `。形としては「${match.name}」に似ている。具体的な物や文字までは読み取れない。`,
+              );
+            }
           }
-        }
-      } catch { /* 同定できなくても観察は返す */ }
+        } catch { /* 同定できなくても観察は返す */ }
+      }
       return { text, features, material: hypothesizeMaterial(features), verification, shapeVerification };
     } catch {
       return null;

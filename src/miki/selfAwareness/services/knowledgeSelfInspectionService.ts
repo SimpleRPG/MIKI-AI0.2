@@ -37,6 +37,7 @@ import { motionPatternService } from './motionPatternService';
 import { avatarPresenceService } from './avatarPresenceService';
 import { computeResourceService } from './computeResourceService';
 import { swarmVerificationService } from './swarmVerificationService';
+import { visualFigureService } from '../../conversation/services/visualFigureService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -108,6 +109,7 @@ export interface KnowledgeSelfInspectionRecord {
   avatarPresence: number;
   computeResourcesMeasured: number;
   swarmVerifications: number;
+  visualFigures: number;
   findings: string[];
 }
 
@@ -325,6 +327,7 @@ class KnowledgeSelfInspectionService {
     let avatarPresence = 0;
     let computeResourcesMeasured = 0;
     let swarmVerifications = 0;
+    let visualFigures = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -464,6 +467,11 @@ class KnowledgeSelfInspectionService {
       if (swarmVerifications > 0) {
         findings.push(`ビービーの群れで${swarmVerifications}件の文を検証した`);
       }
+      // P945: 登録した人の形の見本数。
+      visualFigures = visualFigureService.summary().figures;
+      if (visualFigures > 0) {
+        findings.push(`人の形の見本を${visualFigures}件覚えた`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -526,6 +534,7 @@ class KnowledgeSelfInspectionService {
       avatarPresence,
       computeResourcesMeasured,
       swarmVerifications,
+      visualFigures,
       findings,
     };
 

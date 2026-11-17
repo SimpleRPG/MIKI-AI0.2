@@ -6156,6 +6156,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P944 自己点検に群れ検証の件数が入る', insp944.swarmVerifications >= 4, `swarmVerifications=${insp944.swarmVerifications}`);
 }
 
+// ---- P945 目・第7段（人間の同定） ----
+{
+  const { analyzeImagePixels: an945 } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const { visualFigureService: vf945 } = await import('../src/miki/conversation/services/visualFigureService');
+  const W945 = 48, H945 = 48;
+  const make945 = (fn: (x: number, y: number) => boolean) => {
+    const a = new Uint8Array(W945 * H945 * 4);
+    for (let y = 0; y < H945; y++) for (let x = 0; x < W945; x++) {
+      const v = fn(x, y) ? 30 : 240; const i = (y * W945 + x) * 4;
+      a[i] = v; a[i + 1] = v; a[i + 2] = v; a[i + 3] = 255;
+    }
+    return a;
+  };
+  const person945 = an945(make945((x, y) => ((x - 24) ** 2 + (y - 10) ** 2 <= 16) || (x >= 18 && x <= 29 && y >= 18 && y <= 41)), W945, H945);
+  const id945 = vf945.identifyFigure(person945);
+  check('P945 頭が上で体が下の配置を人の形らしく読む', !!id945 && id945.headRatio >= 0.1 && id945.headRatio <= 0.32, `id=${JSON.stringify(id945)}`);
+  check('P945 比率で描き直すと自分の測定でも仮説が立つ', vf945.verifyFigure(person945) === true, 'verify');
+  const inverted945 = an945(make945((x, y) => ((x - 24) ** 2 + (y - 38) ** 2 <= 16) || (x >= 18 && x <= 29 && y >= 6 && y <= 29)), W945, H945);
+  check('P945 上下が逆では人の形とは読まない', vf945.identifyFigure(inverted945) === null, 'inverted');
+  const squares945 = an945(make945((x, y) => (x >= 19 && x <= 28 && y >= 5 && y <= 14) || (x >= 18 && x <= 29 && y >= 18 && y <= 41)), W945, H945);
+  check('P945 頭が丸くない配置は人の形とは読まない', vf945.identifyFigure(squares945) === null, 'squares');
+  const rec945 = vf945.registerFigureExample('立っている人', person945);
+  check('P945 照合を通った人の見本だけ登録される', !!rec945 && vf945.summary().figures >= 1, `rec=${JSON.stringify(rec945)}`);
+  const { knowledgeSelfInspectionService: ksi945 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const insp945: any = ksi945.inspect();
+  check('P945 自己点検に人の見本数が入る', insp945.visualFigures >= 1, `visualFigures=${insp945.visualFigures}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
