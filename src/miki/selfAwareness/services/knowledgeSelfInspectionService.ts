@@ -49,6 +49,7 @@ export interface KnowledgeSelfInspectionRecord {
   analogyCandidatesCreated: number;
   procedureChunksCreated: number;
   episodeTopicsDistilled: number;
+  gapPlanPhases: Record<string, number>;
   findings: string[];
 }
 
@@ -176,6 +177,14 @@ class KnowledgeSelfInspectionService {
       findings.push(`繰り返し話題を${distilledCount}件、知識として蒸留した`);
     }
 
+    // P907: 開いているギャップのサブ目標（解決プラン）の進み具合を
+    // 段ごとに数える。プラン無しは P907 以前の名残として NO_PLAN。
+    const gapPlanPhases: Record<string, number> = {};
+    for (const g of openGaps) {
+      const phase = g.resolutionPlan?.phase || 'NO_PLAN';
+      gapPlanPhases[phase] = (gapPlanPhases[phase] || 0) + 1;
+    }
+
     const record: KnowledgeSelfInspectionRecord = {
       inspectedAt: Date.now(),
       personalDictionary: personal.length,
@@ -204,6 +213,7 @@ class KnowledgeSelfInspectionService {
       analogyCandidatesCreated: analogyCreated,
       procedureChunksCreated: chunksCreated,
       episodeTopicsDistilled: distilledCount,
+      gapPlanPhases,
       findings,
     };
 

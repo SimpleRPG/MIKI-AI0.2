@@ -145,7 +145,13 @@ export class KnowledgeGapService {
     // 調査で出典除外（同じ出典の再取得＝独立性の喪失）も独立裏付け
     // の焦点も効かなかった。
     ...(params.claimIds?.filter(Boolean).length?{researchClaimIds:[...new Set(params.claimIds.filter(Boolean))]}:{})};
-    this.gaps.unshift(gap); this.save(); systemLogger.info('SELF_IMPROVEMENT',`🔎 [Knowledge Gap] ${gap.id}: ${gap.type} / ${gap.query}`); return gap;
+    this.gaps.unshift(gap); this.save(); systemLogger.info('SELF_IMPROVEMENT',`🔎 [Knowledge Gap] ${gap.id}: ${gap.type} / ${gap.query}`);
+    // P907（対応表#4）: 検出の時点でサブ目標（解決プラン）を立てる。
+    // 以前は調査が始まるまでプランが無く、「何を・どの段まで」
+    // 解こうとしているかがギャップ側に残らなかった。マージ経路は
+    // 既存のプランを保持する（ここは新規作成のときだけ）。
+    try { this.buildResolutionPlan(gap); } catch { /* プランは補助経路 */ }
+    return this.getById(gap.id) || gap;
   }
 
   /**

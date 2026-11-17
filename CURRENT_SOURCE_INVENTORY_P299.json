@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1819,
     "sourceFileCount": 1372,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1283,
-    "relativeImportCandidateCount": 4373,
-    "resolvedRelativeImportCandidateCount": 4357,
+    "relativeImportCandidateCount": 4375,
+    "resolvedRelativeImportCandidateCount": 4359,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 452756,
-      "lines": 5335,
-      "sha256": "1d2d9d076f5e27611f369f5e6fd94dbdc818f9507088e47484c4181c2289d60d",
+      "bytes": 454462,
+      "lines": 5351,
+      "sha256": "e4ed84564c9292224271c374b94eafe9559c55403c68577dbb433f541ea5f59b",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3518,10 +3518,22 @@
           "specifier": "../src/miki/research/services/autonomousSearchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/autonomousSearchService.ts"
+        },
+        {
+          "line": 5326,
+          "specifier": "../src/miki/unknown/services/knowledgeGapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
+        },
+        {
+          "line": 5327,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 300,
-      "resolvedRelativeImportCount": 300,
+      "relativeImportCandidateCount": 302,
+      "resolvedRelativeImportCount": 302,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -30869,9 +30881,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 12451,
-      "lines": 274,
-      "sha256": "028da497af4b328fe44c1973578a5f8a8564c0b50aaafe74713a49ef1afc6981",
+      "bytes": 12912,
+      "lines": 284,
+      "sha256": "12cb7049daec267cef72f55bf9f675857e6d105ae2c3e060ac32b7b31a25d804",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -38095,9 +38107,9 @@
     },
     {
       "path": "src/miki/unknown/services/knowledgeGapService.ts",
-      "bytes": 31239,
-      "lines": 508,
-      "sha256": "b26f57dfa6502d005bbb0d3d11e9481a7ad82088f1ce63eca5c8b6dac7404e4c",
+      "bytes": 31721,
+      "lines": 514,
+      "sha256": "46617f0de74f0bd70a87ba3749a8a8d9142ec3dc76bdcce32902dab61a593612",
       "relativeImportCandidates": [
         {
           "line": 1,

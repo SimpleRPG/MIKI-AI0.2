@@ -5319,6 +5319,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P906 得られたら予測は LEARNABLE に戻る', rp906.predict(id906) === 'LEARNABLE' && rp906.rankPenalty(id906) === 0, 'recovered');
 }
 
+// P907: 対応表#4。ギャップは検出の時点でサブ目標（解決プラン）を
+// 持ち、段の前進にステップが追随すること、自己点検の記録に段ごと
+// の件数が出ることを確認する。
+{
+  const { knowledgeGapService: kg907 } = await import('../src/miki/unknown/services/knowledgeGapService');
+  const { knowledgeSelfInspectionService: ksi907 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const gap907 = kg907.detect({ query: '月面苔の育て方を調べる', type: 'UNKNOWN_TERM', target: '月面苔', priority: 50 });
+  check('P907 検出時点でサブ目標が立つ', Boolean(gap907.resolutionPlan) && gap907.resolutionPlan!.phase === 'IDENTIFY' && (gap907.resolutionPlan!.steps || []).length === 3, gap907.resolutionPlan ? gap907.resolutionPlan.phase : 'NO_PLAN');
+  const adv907 = kg907.advanceResolutionPlan(gap907.id, 'COLLECT_EVIDENCE', 'RESEARCH');
+  check('P907 段の前進にステップが追随する', adv907?.resolutionPlan?.steps?.find((s: any) => s.key === 'collect')?.status === 'ACTIVE', adv907?.resolutionPlan?.phase || 'NONE');
+  const merged907 = kg907.detect({ query: '月面苔の育て方を調べる', type: 'UNKNOWN_TERM', target: '月面苔', priority: 50 });
+  check('P907 マージではプランが保持される', merged907.id === gap907.id && merged907.resolutionPlan?.phase === 'COLLECT_EVIDENCE', merged907.resolutionPlan?.phase || 'NONE');
+  const rec907 = ksi907.inspect();
+  check('P907 自己点検に段ごとの件数が出る', Boolean(rec907.gapPlanPhases) && (rec907.gapPlanPhases['COLLECT_EVIDENCE'] || 0) >= 1, JSON.stringify(rec907.gapPlanPhases || {}));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
