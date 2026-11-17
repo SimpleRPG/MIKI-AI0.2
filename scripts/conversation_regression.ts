@@ -6184,6 +6184,46 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P945 自己点検に人の見本数が入る', insp945.visualFigures >= 1, `visualFigures=${insp945.visualFigures}`);
 }
 
+// ---- P946 動画理解・第3層 第1段（場面分解） ----
+{
+  const { videoSceneService: vs946 } = await import('../src/miki/conversation/services/videoSceneService');
+  const W946 = 24, H946 = 24;
+  const frame946 = (tMs: number, fn: (x: number, y: number) => [number, number, number]) => {
+    const rgba = new Uint8Array(W946 * H946 * 4);
+    for (let y = 0; y < H946; y++) for (let x = 0; x < W946; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W946 + x) * 4;
+      rgba[i] = r; rgba[i + 1] = g; rgba[i + 2] = b; rgba[i + 3] = 255;
+    }
+    return { tMs, rgba, width: W946, height: H946 };
+  };
+  const L946: [number, number, number] = [240, 240, 240];
+  const D946: [number, number, number] = [20, 20, 20];
+  const R946: [number, number, number] = [200, 40, 40];
+  const frames946 = [
+    frame946(0, (x, y) => (x >= 3 && x <= 8 && y >= 9 && y <= 14) ? D946 : L946),
+    frame946(1000, (x, y) => (x >= 4 && x <= 9 && y >= 9 && y <= 14) ? D946 : L946),
+    frame946(2000, (x, y) => (x >= 3 && x <= 8 && y >= 9 && y <= 14) ? D946 : L946),
+    frame946(3000, (x, y) => ((x - 17) ** 2 + (y - 12) ** 2 <= 16) ? L946 : D946),
+    frame946(4000, (x, y) => ((x - 17) ** 2 + (y - 12) ** 2 <= 16) ? L946 : D946),
+    frame946(5000, (x, y) => ((x - 12) ** 2 + (y - 12) ** 2 <= 25) ? R946 : L946),
+    frame946(6000, (x, y) => ((x - 12) ** 2 + (y - 12) ** 2 <= 25) ? R946 : L946),
+  ];
+  const before946 = vs946.summary().scenesTotal;
+  const { scenes: scenes946, cutsMs: cuts946 } = vs946.decompose(frames946 as any, [
+    { startMs: 0, endMs: 2500, text: '導入の字幕' },
+    { startMs: 3100, endMs: 5200, text: '次の場面の字幕' },
+  ]);
+  check('P946 硬い切り替わりで場面に分かれる', scenes946.length === 3 && JSON.stringify(cuts946) === '[3000,5000]', `scenes=${scenes946.length} cuts=${JSON.stringify(cuts946)}`);
+  check('P946 場面内の小さな動きでは割れない', scenes946[0].startMs === 0 && scenes946[0].endMs === 3000, `scene0=${scenes946[0].startMs}-${scenes946[0].endMs}`);
+  check('P946 字幕が場面に対応づく', scenes946[0].subtitleText.includes('導入の字幕') && scenes946[1].subtitleText.includes('次の場面の字幕'), `subs=${JSON.stringify(scenes946.map((s) => s.subtitleText))}`);
+  check('P946 代表フレームが場面の中から選ばれる', scenes946.every((s) => s.representativeTMs >= s.startMs && s.representativeTMs <= Math.max(s.endMs, s.startMs)), 'representative');
+  check('P946 場面の文章化ができる', vs946.describeScenes(scenes946).includes('場面1'), 'describe');
+  check('P946 分解が台帳に残る', vs946.summary().scenesTotal >= before946 + 3, `before=${before946} after=${vs946.summary().scenesTotal}`);
+  const { knowledgeSelfInspectionService: ksi946 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const insp946: any = ksi946.inspect();
+  check('P946 自己点検に場面数が入る', insp946.videoScenes >= 3, `videoScenes=${insp946.videoScenes}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

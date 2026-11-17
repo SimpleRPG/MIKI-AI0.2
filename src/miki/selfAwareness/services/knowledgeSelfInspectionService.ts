@@ -38,6 +38,7 @@ import { avatarPresenceService } from './avatarPresenceService';
 import { computeResourceService } from './computeResourceService';
 import { swarmVerificationService } from './swarmVerificationService';
 import { visualFigureService } from '../../conversation/services/visualFigureService';
+import { videoSceneService } from '../../conversation/services/videoSceneService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -110,6 +111,7 @@ export interface KnowledgeSelfInspectionRecord {
   computeResourcesMeasured: number;
   swarmVerifications: number;
   visualFigures: number;
+  videoScenes: number;
   findings: string[];
 }
 
@@ -328,6 +330,7 @@ class KnowledgeSelfInspectionService {
     let computeResourcesMeasured = 0;
     let swarmVerifications = 0;
     let visualFigures = 0;
+    let videoScenes = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -472,6 +475,11 @@ class KnowledgeSelfInspectionService {
       if (visualFigures > 0) {
         findings.push(`人の形の見本を${visualFigures}件覚えた`);
       }
+      // P946: 切り分けた動画の場面の総数。
+      videoScenes = videoSceneService.summary().scenesTotal;
+      if (videoScenes > 0) {
+        findings.push(`動画を${videoScenes}場面に切り分けた`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -535,6 +543,7 @@ class KnowledgeSelfInspectionService {
       computeResourcesMeasured,
       swarmVerifications,
       visualFigures,
+      videoScenes,
       findings,
     };
 
