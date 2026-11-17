@@ -15,6 +15,7 @@ import { productionConflictService } from './productionConflictService';
 import { personaProfileService } from '../../conversation/services/personaProfileService';
 import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
 import { episodeDistillationService } from '../../conversation/services/episodeDistillationService';
+import { codeSynthesisStatsService } from '../../selfDevelopment/services/codeSynthesisStatsService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -56,6 +57,8 @@ export interface KnowledgeSelfInspectionRecord {
   desireSummary: { talk: number; learn: number; topTalk: string[] };
   desireGapsRaised: number;
   productionConflicts: { total: number; byFamily: Record<string, number> };
+  codeComponents: { total: number; verified: number };
+  codeSynthesis: { total: number; succeeded: number; byReason: Record<string, number> };
   findings: string[];
 }
 
@@ -243,6 +246,31 @@ class KnowledgeSelfInspectionService {
       }
     } catch { /* 競合の観測は補助経路 */ }
 
+    // P915: コード生成の棚卸し（能力リスト第3項・第1段）。
+    // 検証済みコード部品の件数と、合成が止まった理由の分布を
+    // 点検に残す。分布がそのまま部品の不足リストになる。
+    let codeComponents = { total: 0, verified: 0 };
+    let codeSynthesis = { total: 0, succeeded: 0, byReason: {} as Record<string, number> };
+    try {
+      const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
+        (item) => item.componentKind === 'CODE',
+      );
+      const verifiedStatuses = new Set(['VERIFIED', 'USER_APPROVED', 'MIKI_APPROVED', 'ACTIVE']);
+      codeComponents = {
+        total: codeItems.length,
+        verified: codeItems.filter((item) => verifiedStatuses.has(String(item.lifecycleStatus))).length,
+      };
+      codeSynthesis = codeSynthesisStatsService.summary();
+      if (codeComponents.verified === 0) {
+        findings.push('検証済みのコード部品が0件で、コード合成の材料が無い');
+      }
+      const failedCount = codeSynthesis.total - codeSynthesis.succeeded;
+      if (failedCount > 0) {
+        const topReason = Object.entries(codeSynthesis.byReason).sort((a, b) => b[1] - a[1])[0];
+        findings.push(`コード合成が${codeSynthesis.total}回中${failedCount}回止まった（最多理由 ${topReason ? `${topReason[0]} ${topReason[1]}件` : '不明'}）`);
+      }
+    } catch { /* コードの棚卸しは補助経路 */ }
+
     const record: KnowledgeSelfInspectionRecord = {
       inspectedAt: Date.now(),
       personalDictionary: personal.length,
@@ -275,6 +303,8 @@ class KnowledgeSelfInspectionService {
       desireSummary,
       desireGapsRaised,
       productionConflicts,
+      codeComponents,
+      codeSynthesis,
       findings,
     };
 

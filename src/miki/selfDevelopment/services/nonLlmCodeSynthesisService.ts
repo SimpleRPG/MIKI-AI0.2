@@ -2,6 +2,7 @@ import { CompiledRequestType } from '../../../types';
 import { capabilityGraphService } from '../../capability/services/capabilityGraphService';
 import { componentCompositionService, CompositionPlan } from '../../capability/services/componentCompositionService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
+import { codeSynthesisStatsService } from './codeSynthesisStatsService';
 
 /*
  * P462: 合成できない理由コードの人間可読な説明。機械可読コードは
@@ -124,16 +125,20 @@ export class NonLlmCodeSynthesisService {
       componentIds.length === 0 ||
       !registryComplete
     ) {
+      const blockedReason = gapReason || 'REGISTRY_COMPONENT_INCOMPLETE';
+      // P915: 止まった理由を統計へ（不足リストの材料）。
+      try { codeSynthesisStatsService.record(blockedReason); } catch { /* 統計は補助経路 */ }
       return {
         requestId: request.requestId,
         deterministic: false,
         composition,
         componentIds,
         source,
-        blockedReason: gapReason || 'REGISTRY_COMPONENT_INCOMPLETE',
+        blockedReason,
       };
     }
 
+    try { codeSynthesisStatsService.record(); } catch { /* 統計は補助経路 */ }
     return {
       requestId: request.requestId,
       deterministic: true,

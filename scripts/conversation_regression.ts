@@ -5502,6 +5502,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P914 候補が1つなら類推が効く', missedFormLearningService.lookupSimilar('あ|い|う|わ|お') === 'REQUEST', `sim=${missedFormLearningService.lookupSimilar('あ|い|う|わ|お')}`);
 }
 
+// ---- P915 コード生成・第1段（部品件数と合成失敗理由の棚卸し） ----
+{
+  const { nonLlmCodeSynthesisService } = await import('../src/miki/selfDevelopment/services/nonLlmCodeSynthesisService');
+  const { codeSynthesisStatsService } = await import('../src/miki/selfDevelopment/services/codeSynthesisStatsService');
+  const { knowledgeSelfInspectionService } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const plan915: any = nonLlmCodeSynthesisService.plan({ requestId: 'suite-p915', environment: 'ANDROID' } as any, '存在しない目的スイート915のための量子もつれ計算処理', []);
+  check('P915 構成できない合成は理由つきで止まる', Boolean(plan915?.blockedReason) && plan915?.deterministic === false, `reason=${plan915?.blockedReason}`);
+  const stats915 = codeSynthesisStatsService.summary();
+  check('P915 合成の試行と失敗理由が統計に残る', stats915.total >= 1 && (stats915.byReason[String(plan915?.blockedReason)] || 0) >= 1, `stats=${JSON.stringify(stats915).slice(0, 100)}`);
+  const rec915: any = knowledgeSelfInspectionService.inspect();
+  check('P915 自己点検にコード部品の件数が出る', typeof rec915?.codeComponents?.total === 'number' && rec915.codeComponents.total > 0 && typeof rec915?.codeComponents?.verified === 'number', `cc=${JSON.stringify(rec915?.codeComponents)}`);
+  check('P915 自己点検に合成の分布が出る', rec915?.codeSynthesis?.total >= 1 && typeof rec915?.codeSynthesis?.byReason === 'object', `cs=${JSON.stringify(rec915?.codeSynthesis).slice(0, 100)}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
