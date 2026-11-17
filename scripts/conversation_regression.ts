@@ -5561,6 +5561,41 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P918 教師への依頼リストが描ける', codeComponentSpecService.renderRequestList(5).includes('虹色クラゲ'), 'list');
 }
 
+// ---- P919 コード生成・第3段の供給接続（仕様へ実装が届き、検証の門を通る） ----
+{
+  const { codeComponentSpecService } = await import('../src/miki/selfDevelopment/services/codeComponentSpecService');
+  const { codeComponentSupplyService } = await import('../src/miki/selfDevelopment/services/codeComponentSupplyService');
+  const { componentRegistryService } = await import('../src/miki/capability/services/componentRegistryService');
+  const { knowledgeSelfInspectionService } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  await conversationCoreService.execute({ prompt: '月虹貝の殻を数える関数が欲しい', memories: [], recentMessages: [], conversationId: 'suite-p919' } as any);
+  const spec919 = codeComponentSpecService.list().find((s: any) => s.purpose.includes('月虹貝'));
+  check('P919 仕様が用意できている', Boolean(spec919) && spec919?.status === 'SPEC_DRAFT', `spec=${spec919?.capabilityId}`);
+  const ok919 = codeComponentSupplyService.receiveImplementation({
+    capabilityId: String(spec919?.capabilityId), componentId: 'suite.count_shells_919',
+    purpose: '月虹貝の殻の数を数える',
+    inputs: ['shells'], outputs: ['count'], preconditions: ['shells is an array'], postconditions: ['count equals shells length'],
+    implementation: 'export function countShells919(shells: string[]): number { return shells.length; }',
+    tests: 'TEST_CASE: NORMAL, ASSERT: countShells919(["a","b"]) === 2',
+  });
+  check('P919 決定的な実装は門を通り登録される', ok919.accepted === true && ok919.registeredStatus === 'ANALYZED', JSON.stringify(ok919).slice(0, 80));
+  check('P919 登録先はレジストリで状態つき', (componentRegistryService.getComponent('suite.count_shells_919') as any)?.status === 'ANALYZED', 'registry');
+  check('P919 仕様が供給済みに進む', codeComponentSpecService.get(String(spec919?.capabilityId))?.status === 'SUPPLIED', 'spec-status');
+  await conversationCoreService.execute({ prompt: '砂時計の砂を量る関数が欲しい', memories: [], recentMessages: [], conversationId: 'suite-p919' } as any);
+  const spec919b = codeComponentSpecService.list().find((s: any) => s.purpose.includes('砂時計'));
+  const ng919 = codeComponentSupplyService.receiveImplementation({
+    capabilityId: String(spec919b?.capabilityId), componentId: 'suite.measure_sand_919',
+    purpose: '砂時計の砂を量る',
+    inputs: ['sand'], outputs: ['amount'], preconditions: ['sand exists'], postconditions: ['amount returned'],
+    implementation: 'export function measureSand919(): number { return Math.random(); }',
+    tests: 'TEST_CASE: NORMAL',
+  });
+  check('P919 非決定的な実装は門で止まる', ng919.accepted === false && codeComponentSpecService.get(String(spec919b?.capabilityId))?.status === 'SPEC_DRAFT', JSON.stringify(ng919).slice(0, 80));
+  const none919 = codeComponentSupplyService.receiveImplementation({ capabilityId: 'code-synthesis-00000000', componentId: 'suite.none_919', purpose: 'x', inputs: ['a'], outputs: ['b'], preconditions: ['p'], postconditions: ['q'], implementation: 'export const x919 = 1;', tests: 't' });
+  check('P919 宛先の無い供給は断る', none919.accepted === false && none919.reason === 'SPEC_NOT_FOUND', none919.reason);
+  const rec919: any = knowledgeSelfInspectionService.inspect();
+  check('P919 自己点検に供給済みの件数が出る', rec919?.codeSpecsSupplied >= 1, `supplied=${rec919?.codeSpecsSupplied}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

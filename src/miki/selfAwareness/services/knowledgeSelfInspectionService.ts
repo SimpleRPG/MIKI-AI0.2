@@ -63,6 +63,7 @@ export interface KnowledgeSelfInspectionRecord {
   codeSynthesis: { total: number; succeeded: number; byReason: Record<string, number> };
   codeGapsOpen: number;
   codeSpecsDrafted: number;
+  codeSpecsSupplied: number;
   findings: string[];
 }
 
@@ -257,6 +258,7 @@ class KnowledgeSelfInspectionService {
     let codeSynthesis = { total: 0, succeeded: 0, byReason: {} as Record<string, number> };
     let codeGapsOpen = 0;
     let codeSpecsDrafted = 0;
+    let codeSpecsSupplied = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
         (item) => item.componentKind === 'CODE',
@@ -282,9 +284,12 @@ class KnowledgeSelfInspectionService {
         findings.push(`コード部品の不足が${codeGapsOpen}件、成長課題として開いている`);
       }
       // P918: 不足から作られた部品仕様の下書きの件数。
-      codeSpecsDrafted = codeComponentSpecService.summary().drafted;
+      // P919: そのうち実装が到着し静的検証を通った件数も数える。
+      const specSummary = codeComponentSpecService.summary();
+      codeSpecsDrafted = specSummary.drafted;
+      codeSpecsSupplied = specSummary.supplied;
       if (codeSpecsDrafted > 0) {
-        findings.push(`不足から部品仕様の下書きが${codeSpecsDrafted}件できている（実装とテストの到着待ち）`);
+        findings.push(`不足から部品仕様の下書きが${codeSpecsDrafted}件できている（うち${codeSpecsSupplied}件は実装が到着し解析済み）`);
       }
     } catch { /* コードの棚卸しは補助経路 */ }
 
@@ -324,6 +329,7 @@ class KnowledgeSelfInspectionService {
       codeSynthesis,
       codeGapsOpen,
       codeSpecsDrafted,
+      codeSpecsSupplied,
       findings,
     };
 

@@ -24,7 +24,10 @@ export interface CodeComponentSpec {
   sampleCount: number;
   firstSeenAt: number;
   lastSeenAt: number;
-  status: 'SPEC_DRAFT';
+  status: 'SPEC_DRAFT' | 'SUPPLIED';
+  suppliedComponentId?: string;
+  suppliedAt?: number;
+  supplyNote?: string;
 }
 
 const STORAGE_KEY = 'miki_code_component_specs_v1';
@@ -106,8 +109,26 @@ class CodeComponentSpecService {
     return [...this.load().values()].sort((a, b) => b.sampleCount - a.sampleCount || b.lastSeenAt - a.lastSeenAt);
   }
 
-  public summary(): { drafted: number } {
-    return { drafted: this.load().size };
+  public get(capabilityId: string): CodeComponentSpec | undefined {
+    return this.load().get(capabilityId);
+  }
+
+  /** P919: 実装が供給され静的検証を通ったことを仕様側に記録する。 */
+  public markSupplied(capabilityId: string, componentId: string, note: string): boolean {
+    const specs = this.load();
+    const spec = specs.get(capabilityId);
+    if (!spec) return false;
+    spec.status = 'SUPPLIED';
+    spec.suppliedComponentId = componentId;
+    spec.suppliedAt = Date.now();
+    spec.supplyNote = note.slice(0, 160);
+    this.save();
+    return true;
+  }
+
+  public summary(): { drafted: number; supplied: number } {
+    const all = [...this.load().values()];
+    return { drafted: all.length, supplied: all.filter((s) => s.status === 'SUPPLIED').length };
   }
 
   /** 教師へ渡すための依頼リスト。頻度の高い順。 */
