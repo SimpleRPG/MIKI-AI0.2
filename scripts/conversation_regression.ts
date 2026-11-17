@@ -5459,6 +5459,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P912 製造手順系は初期設定で従来どおり止まる', bomb912.isBanned === true, `banned=${bomb912.isBanned}`);
 }
 
+// ---- P913 学習台帳の保存を軽量化（並べ替え省略＋保存の集約） ----
+{
+  const { mikiUnifiedLearningContinuumService } = await import('../src/miki/learning/services/mikiUnifiedLearningContinuumService');
+  const { storageService } = await import('../src/services/storageService');
+  mikiUnifiedLearningContinuumService.observe({ domain: 'conversation', key: 'p913-probe-key', outcome: 'SUCCESS', verified: true, capabilityIds: ['p913-cap'] });
+  const prof913 = mikiUnifiedLearningContinuumService.getProfile('p913-probe-key');
+  check('P913 観測した学習プロファイルが残る', Boolean(prof913 && prof913.uses >= 1 && prof913.successes >= 1), `prof=${JSON.stringify(prof913).slice(0, 80)}`);
+  const cap913 = mikiUnifiedLearningContinuumService.getProfile('capability:p913-cap');
+  check('P913 capability の再帰観測も記録される', Boolean(cap913 && cap913.uses >= 1), `cap=${JSON.stringify(cap913).slice(0, 80)}`);
+  const raw913 = storageService.getItem('miki_unified_learning_continuum_v1') || '';
+  check('P913 保存データにプロファイルが含まれる', raw913.includes('p913-probe-key'), `len=${raw913.length}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

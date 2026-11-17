@@ -86,6 +86,8 @@ export class MikiUnifiedLearningContinuumService {
   private profiles = new Map<string, LearningProfile>();
   private causalPromotionKeys = new Set<string>();
   private initialized = false;
+  // P913: observe の再帰（capabilityIds）では保存を最外側の1回にまとめる
+  private observeDepth = 0;
 
   constructor() { this.load(); }
 
@@ -122,7 +124,12 @@ export class MikiUnifiedLearningContinuumService {
 
   private save() {
     try {
-      const profiles = [...this.profiles.values()].sort((a, b) => b.lastObservedAt - a.lastObservedAt).slice(0, MAX_PROFILES);
+      // P913: 上限以下なら並べ替えは不要（読み込み時に Map へ入れ直すため
+      // 保存順は意味を持たない）。上限超過時のみ新しい順に切る。
+      const all = [...this.profiles.values()];
+      const profiles = all.length > MAX_PROFILES
+        ? all.sort((a, b) => b.lastObservedAt - a.lastObservedAt).slice(0, MAX_PROFILES)
+        : all;
       storageService.setItem(KEY, JSON.stringify({ version: 1, updatedAt: Date.now(), profiles, causalPromotionKeys: [...this.causalPromotionKeys].slice(-2000) }));
     } catch (error) { systemLogger.warn('PERSISTENCE', `[LearningContinuum] save failed: ${String(error)}`); }
   }
@@ -144,6 +151,8 @@ export class MikiUnifiedLearningContinuumService {
     concepts?: string[];
     lesson?: string;
   }) {
+    const isOutermost = this.observeDepth === 0;
+    this.observeDepth += 1;
     const now = Date.now();
     const effectiveKey = input.key || input.action || input.input || 'general';
     const keys = Array.from(new Set([normalizeKey(effectiveKey), ...(input.concepts || []).map(normalizeKey).filter(Boolean)])).filter(Boolean).slice(0, 20);
@@ -181,7 +190,8 @@ export class MikiUnifiedLearningContinuumService {
       const key = `capability:${normalizeKey(id)}`;
       this.observe({ domain: input.domain, key, outcome: input.outcome, verified: input.verified, lesson: input.lesson });
     }
-    this.save();
+    this.observeDepth -= 1;
+    if (isOutermost) this.save();
   }
 
   /**
