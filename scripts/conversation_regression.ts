@@ -5951,6 +5951,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P933 記念日の表明が言葉になる', ia933.phrase({ kind: 'BRING_UP_SPECIAL_DAY', term: '持ち出し記念日', strength: 1, at: Date.now() }).includes('持ち出し記念日'), 'phrase');
 }
 
+// ---- P934 日記を書く ----
+{
+  const { diaryService: di934 } = await import('../src/miki/selfAwareness/services/diaryService');
+  const { mistakeNotebookService: nb934 } = await import('../src/miki/selfAwareness/services/mistakeNotebookService');
+  nb934.recordCorrection('ツキヨ石', '月夜石');
+  const entry934 = di934.writeToday();
+  check('P934 その日の材料から日記が書ける', entry934.text.includes('月夜石') && entry934.date.length === 10, `text=${entry934.text.slice(0, 60)}`);
+  const count934 = di934.summary().entries;
+  di934.writeToday();
+  check('P934 同じ日の日記は1件に保たれる', di934.summary().entries === count934, `count=${count934}`);
+  const r934: any = await conversationCoreService.execute({ prompt: '日記見せて', memories: [], recentMessages: [], conversationId: 'suite-p934' } as any);
+  check('P934 「日記見せて」で直近の日記が読める', r934.reason === 'diary_answer' && String(r934.replyText || '').includes('月夜石'), `reason=${r934.reason} reply=${String(r934.replyText || '').slice(0, 60)}`);
+  const r934ctl: any = await conversationCoreService.execute({ prompt: '日記を買ったよ', memories: [], recentMessages: [], conversationId: 'suite-p934' } as any);
+  check('P934 ただの言及では日記レーンは発火しない', r934ctl.reason !== 'diary_answer', `reason=${r934ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

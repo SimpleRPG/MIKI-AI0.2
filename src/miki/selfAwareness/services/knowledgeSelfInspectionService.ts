@@ -26,6 +26,7 @@ import { visualScenePatternService } from '../../conversation/services/visualSce
 import { mistakeNotebookService } from './mistakeNotebookService';
 import { knowledgeConsolidationService } from './knowledgeConsolidationService';
 import { specialDayService } from './specialDayService';
+import { diaryService } from './diaryService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -85,6 +86,7 @@ export interface KnowledgeSelfInspectionRecord {
   mistakesRecurring: number;
   sleepRuns: number;
   specialDays: number;
+  diaryEntries: number;
   findings: string[];
 }
 
@@ -290,6 +292,7 @@ class KnowledgeSelfInspectionService {
     let mistakesRecurring = 0;
     let sleepRuns = 0;
     let specialDays = 0;
+    let diaryEntries = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -372,6 +375,11 @@ class KnowledgeSelfInspectionService {
       if (specialDays > 0) {
         findings.push(`記念日や誕生日を${specialDays}件覚えている`);
       }
+      // P934: 書いた日記の数。
+      diaryEntries = diaryService.summary().entries;
+      if (diaryEntries > 0) {
+        findings.push(`日記を${diaryEntries}日分書いた`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -422,6 +430,7 @@ class KnowledgeSelfInspectionService {
       mistakesRecurring,
       sleepRuns,
       specialDays,
+      diaryEntries,
       findings,
     };
 

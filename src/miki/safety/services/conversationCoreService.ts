@@ -48,6 +48,7 @@ import { idleActionService } from '../../selfAwareness/services/idleActionServic
 import { mistakeNotebookService } from '../../selfAwareness/services/mistakeNotebookService';
 import { knowledgeConsolidationService } from '../../selfAwareness/services/knowledgeConsolidationService';
 import { specialDayService } from '../../selfAwareness/services/specialDayService';
+import { diaryService } from '../../selfAwareness/services/diaryService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -698,6 +699,11 @@ export class ConversationCoreService {
       const specialDay = this.specialDayAnswer(prompt);
       if (specialDay && !multiPart) {
         return this.buildResult('RESOLVED', 'special_day_answer', this.applyPersonaVoice(specialDay), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P934: 「日記見せて」——直近の日記を読む。
+      const diary = this.diaryAnswer(prompt);
+      if (diary && !multiPart) {
+        return this.buildResult('RESOLVED', 'diary_answer', this.applyPersonaVoice(diary), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3933,6 +3939,19 @@ export class ConversationCoreService {
    * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
    */
   /**
+   * P934: 「日記見せて」への答え。直近の日記をそのまま読む。
+   */
+  private diaryAnswer(prompt: string): string | undefined {
+    if (!/日記/.test(prompt)) return undefined;
+    if (!/(?:見せて|読んで|書いた|ある|は？|？|\?)/.test(prompt)) return undefined;
+    try {
+      const latest = diaryService.latest();
+      if (!latest) return 'まだ日記はないよ。おやすみのときに、その日のことを書くね。';
+      return `${latest.date}の日記。${latest.text}`;
+    } catch { return undefined; }
+  }
+
+  /**
    * P932: 「今日は何の日？」への答え。今日の記念日があれば
    * それを、無ければ近いもの（7日以内）を添えて答える。
    */
@@ -3956,6 +3975,8 @@ export class ConversationCoreService {
     try {
       if (/おやすみ/.test(prompt)) {
         knowledgeConsolidationService.sleepNow();
+        // P934: 眠る前に今日の日記も書く。
+        try { diaryService.writeToday(); } catch { /* 日記が書けなくても挨拶は返す */ }
         return 'おやすみ。寝てる間に今日の分を整理しておくね。';
       }
       if (/(?:寝てる間|寝ている間|よく眠れた|眠れた)/.test(prompt)
