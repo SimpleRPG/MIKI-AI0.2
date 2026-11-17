@@ -6004,6 +6004,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P936 作り方の話では遊ばない', r936ctl.reason !== 'game_play_answer', `reason=${r936ctl.reason}`);
 }
 
+// ---- P937 根拠つきで反論できること ----
+{
+  const { claimDatabaseService: cdb937 } = await import('../src/miki/memory/services/claimDatabaseService');
+  const { groundedRebuttalService: gr937 } = await import('../src/miki/selfAwareness/services/groundedRebuttalService');
+  cdb937.registerClaim({ statement: '紅玉石の産地は北の山だ', world: 'REAL', kind: 'FACT_CLAIM', status: 'SUPPORTED', source: 'teacher_verified' } as any);
+  cdb937.registerClaim({ statement: '青玉石の産地は東の森だ', world: 'REAL', kind: 'FACT_CLAIM', status: 'UNVERIFIED', source: 'web_unverified' } as any);
+  const before937 = gr937.summary().rebuttals;
+  const hit937 = gr937.check('紅玉石の産地は南の海だ');
+  check('P937 検証済みの記録と食い違う断定には根拠を示せる', !!hit937 && hit937.claimValue === '北の山' && hit937.userValue === '南の海', `hit=${JSON.stringify(hit937)}`);
+  check('P937 記録と一致する断定には反論しない', gr937.check('紅玉石の産地は北の山だ') === null, 'agree');
+  check('P937 未検証の記録では反論しない', gr937.check('青玉石の産地は西の谷だ') === null, 'unverified');
+  check('P937 質問には反論しない', gr937.check('紅玉石の産地はどこ？') === null, 'question');
+  const r937: any = await conversationCoreService.execute({ prompt: '紅玉石の産地は南の海だ', memories: [], recentMessages: [], conversationId: 'suite-p937' } as any);
+  check('P937 会話で根拠つきに反論する', r937.reason === 'grounded_rebuttal_answer' && String(r937.replyText || '').includes('北の山'), `reason=${r937.reason} reply=${String(r937.replyText || '').slice(0, 60)}`);
+  check('P937 反論が記録される', gr937.summary().rebuttals > before937, `before=${before937}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

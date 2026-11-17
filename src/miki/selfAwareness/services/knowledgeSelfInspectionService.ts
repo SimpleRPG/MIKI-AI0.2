@@ -29,6 +29,7 @@ import { specialDayService } from './specialDayService';
 import { diaryService } from './diaryService';
 import { selfPreferenceService } from './selfPreferenceService';
 import { gamePlayService } from './gamePlayService';
+import { groundedRebuttalService } from './groundedRebuttalService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -92,6 +93,7 @@ export interface KnowledgeSelfInspectionRecord {
   grownPreferences: number;
   gameSessions: number;
   gameWins: number;
+  rebuttalsMade: number;
   findings: string[];
 }
 
@@ -301,6 +303,7 @@ class KnowledgeSelfInspectionService {
     let grownPreferences = 0;
     let gameSessions = 0;
     let gameWins = 0;
+    let rebuttalsMade = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -400,6 +403,11 @@ class KnowledgeSelfInspectionService {
       if (gameSessions > 0) {
         findings.push(`ゲームを${gameSessions}回遊んで${gameWins}回勝った`);
       }
+      // P937: 根拠を示して反論した回数。
+      rebuttalsMade = groundedRebuttalService.summary().rebuttals;
+      if (rebuttalsMade > 0) {
+        findings.push(`記録と違う断定に根拠を示して反論したことが${rebuttalsMade}回ある`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -454,6 +462,7 @@ class KnowledgeSelfInspectionService {
       grownPreferences,
       gameSessions,
       gameWins,
+      rebuttalsMade,
       findings,
     };
 

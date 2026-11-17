@@ -50,6 +50,7 @@ import { knowledgeConsolidationService } from '../../selfAwareness/services/know
 import { specialDayService } from '../../selfAwareness/services/specialDayService';
 import { diaryService } from '../../selfAwareness/services/diaryService';
 import { gamePlayService } from '../../selfAwareness/services/gamePlayService';
+import { groundedRebuttalService } from '../../selfAwareness/services/groundedRebuttalService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -715,6 +716,11 @@ export class ConversationCoreService {
       const gamePlay = this.gamePlayAnswer(prompt);
       if (gamePlay && !multiPart) {
         return this.buildResult('RESOLVED', 'game_play_answer', this.applyPersonaVoice(gamePlay), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P937: 検証済みの記録と食い違う断定には、根拠を示して異を唱える。
+      const rebuttal = roleplaySessionService.isActive() ? undefined : this.groundedRebuttalAnswer(prompt);
+      if (rebuttal && !multiPart) {
+        return this.buildResult('RESOLVED', 'grounded_rebuttal_answer', this.applyPersonaVoice(rebuttal), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3949,6 +3955,18 @@ export class ConversationCoreService {
    * - 「おやすみ」: その場で整理を回して眠る挨拶を返す。
    * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
    */
+  /**
+   * P937: 根拠つきの反論。検証済み Claim と食い違う断定にだけ、
+   * 記録そのものを根拠として示す。最終判断は利用者に残す言い方にする。
+   */
+  private groundedRebuttalAnswer(prompt: string): string | undefined {
+    try {
+      const hit = groundedRebuttalService.check(prompt);
+      if (!hit) return undefined;
+      return `それは違うと思う。前に確かめた記録では「${hit.claimText}」だよ。`;
+    } catch { return undefined; }
+  }
+
   /**
    * P936: ゲームを自分で遊ぶ。「数当てゲームして」で実際に
    * 1セッション遊んで結果を話し、「ゲームの結果は？」で
