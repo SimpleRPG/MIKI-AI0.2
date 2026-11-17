@@ -45,6 +45,7 @@ import { topicStageService } from '../../memory/services/topicStageService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { multiStepReasoningService } from '../../selfAwareness/services/multiStepReasoningService';
 import { idleActionService } from '../../selfAwareness/services/idleActionService';
+import { mistakeNotebookService } from '../../selfAwareness/services/mistakeNotebookService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -680,6 +681,11 @@ export class ConversationCoreService {
       const idleTopic = this.idleTopicAnswer(prompt);
       if (idleTopic && !multiPart) {
         return this.buildResult('RESOLVED', 'idle_topic_answer', this.applyPersonaVoice(idleTopic), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P930: 「間違い帳見せて」——自分の間違いの記録を答える。
+      const mistakeNote = this.mistakeNotebookAnswer(prompt);
+      if (mistakeNote && !multiPart) {
+        return this.buildResult('RESOLVED', 'mistake_notebook_answer', this.applyPersonaVoice(mistakeNote), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3884,6 +3890,28 @@ export class ConversationCoreService {
       const action = idleActionService.choose(personaProfileService.get().profileId);
       if (!action) return undefined;
       return idleActionService.phrase(action);
+    } catch { return undefined; }
+  }
+
+  /**
+   * P930: 間違い帳の表明。「間違い帳見せて」「間違えたことある？」
+   * に、記録の件数と最近の訂正・繰り返しを答える。
+   */
+  private mistakeNotebookAnswer(prompt: string): string | undefined {
+    if (!/(?:間違い帳|間違えたこと|間違いの記録)/.test(prompt)) return undefined;
+    if (!/(?:？|\?|見せて|教えて|ある|何|なに|見たい)/.test(prompt)) return undefined;
+    try {
+      const summary = mistakeNotebookService.summary();
+      if (summary.total === 0) {
+        return '間違い帳はまだ空だよ。訂正されたことや外れた予測は、ここに残していくね。';
+      }
+      const recent = mistakeNotebookService.list(3)
+        .filter((e) => e.kind === 'CORRECTION')
+        .map((e) => `「${e.wrong}」を「${e.right}」に直したこと`);
+      const parts = [`間違い帳には今${summary.total}件あるよ。`];
+      if (recent.length > 0) parts.push(`最近だと、${recent.join('、')}。`);
+      if (summary.recurring > 0) parts.push(`同じ間違いを繰り返したものが${summary.recurring}件あって、そこは特に気をつけてる。`);
+      return parts.join('');
     } catch { return undefined; }
   }
 

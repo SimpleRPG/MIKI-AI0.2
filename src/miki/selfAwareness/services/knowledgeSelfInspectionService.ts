@@ -23,6 +23,7 @@ import { multiStepReasoningService } from './multiStepReasoningService';
 import { idleActionService } from './idleActionService';
 import { visualPatternService } from '../../conversation/services/visualPatternService';
 import { visualScenePatternService } from '../../conversation/services/visualScenePatternService';
+import { mistakeNotebookService } from './mistakeNotebookService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -78,6 +79,8 @@ export interface KnowledgeSelfInspectionRecord {
   idleActionsChosen: number;
   visualPatterns: number;
   visualScenePatterns: number;
+  mistakesRecorded: number;
+  mistakesRecurring: number;
   findings: string[];
 }
 
@@ -279,6 +282,8 @@ class KnowledgeSelfInspectionService {
     let idleActionsChosen = 0;
     let visualPatterns = 0;
     let visualScenePatterns = 0;
+    let mistakesRecorded = 0;
+    let mistakesRecurring = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -341,6 +346,16 @@ class KnowledgeSelfInspectionService {
       if (visualScenePatterns > 0) {
         findings.push(`配置の見本が${visualScenePatterns}件ある`);
       }
+      // P930: 間違い帳の件数と繰り返し。
+      const mistakeSummary = mistakeNotebookService.summary();
+      mistakesRecorded = mistakeSummary.total;
+      mistakesRecurring = mistakeSummary.recurring;
+      if (mistakesRecorded > 0) {
+        findings.push(`間違い帳に${mistakesRecorded}件の記録がある`);
+      }
+      if (mistakesRecurring > 0) {
+        findings.push(`同じ間違いを繰り返したものが${mistakesRecurring}件ある`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -387,6 +402,8 @@ class KnowledgeSelfInspectionService {
       idleActionsChosen,
       visualPatterns,
       visualScenePatterns,
+      mistakesRecorded,
+      mistakesRecurring,
       findings,
     };
 

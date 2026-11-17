@@ -16,6 +16,7 @@ import { utteranceFeatureService } from '../../memory/services/utteranceFeatureS
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
+import { mistakeNotebookService } from '../../selfAwareness/services/mistakeNotebookService';
 
 /**
  * P452: 会話の理解の土台 ― ユーザー発言からの事実取り込み。
@@ -1255,6 +1256,12 @@ export class ConversationFactIntakeService {
       this.observeUserKnowledgeSignals(text);
     } catch { /* best-effort */ }
     const { facts, invalidations, correctionPair } = this.extractUserFacts(text);
+    // P930: 訂正は間違い帳にも残す（同じ誤りの繰り返しを数える）。
+    if (correctionPair) {
+      try {
+        mistakeNotebookService.recordCorrection(correctionPair.wrong, correctionPair.right);
+      } catch { /* best-effort */ }
+    }
     const now = Date.now();
     const updated: MemoryItem[] = existingMemories.map((m) => ({ ...m }));
     const added: MemoryItem[] = [];

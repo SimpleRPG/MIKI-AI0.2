@@ -5877,6 +5877,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P929 領域が1つでは配置として同定しない', vs929.matchScene(discOnly929) === null, 'single');
 }
 
+// ---- P930 間違い帳 ----
+{
+  const { conversationFactIntakeService: fi930 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  const { mistakeNotebookService: nb930 } = await import('../src/miki/selfAwareness/services/mistakeNotebookService');
+  const before930 = nb930.summary().total;
+  const mem930: any[] = [];
+  fi930.intakeFromUserText('ペットの名前はゼフィアだよ', mem930);
+  fi930.intakeFromUserText('ゼフィアじゃなくてルミナだよ', mem930);
+  const entry930 = nb930.list(50).find((e) => e.kind === 'CORRECTION' && e.wrong === 'ゼフィア');
+  check('P930 訂正が間違い帳に残る', nb930.summary().total > before930 && !!entry930 && entry930.right.includes('ルミナ'), `entry=${JSON.stringify(entry930)}`);
+  fi930.intakeFromUserText('ゼフィアじゃなくてルミナだよ', mem930);
+  const entry930b = nb930.list(50).find((e) => e.kind === 'CORRECTION' && e.wrong === 'ゼフィア');
+  check('P930 同じ訂正は繰り返しとして数える', (entry930b?.occurrences || 0) >= 2 && nb930.summary().recurring >= 1, `occ=${entry930b?.occurrences}`);
+  const r930: any = await conversationCoreService.execute({ prompt: '間違い帳見せて', memories: [], recentMessages: [], conversationId: 'suite-p930' } as any);
+  check('P930 「間違い帳見せて」に記録を答える', r930.reason === 'mistake_notebook_answer' && String(r930.replyText || '').includes('ゼフィア'), `reason=${r930.reason} reply=${String(r930.replyText || '').slice(0, 60)}`);
+  const r930ctl: any = await conversationCoreService.execute({ prompt: '間違い帳を買ったよ', memories: [], recentMessages: [], conversationId: 'suite-p930' } as any);
+  check('P930 ただの言及では間違い帳レーンは発火しない', r930ctl.reason !== 'mistake_notebook_answer', `reason=${r930ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
