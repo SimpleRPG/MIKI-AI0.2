@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1823,
     "sourceFileCount": 1376,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1287,
-    "relativeImportCandidateCount": 4410,
-    "resolvedRelativeImportCandidateCount": 4394,
+    "relativeImportCandidateCount": 4411,
+    "resolvedRelativeImportCandidateCount": 4395,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 470214,
-      "lines": 5532,
-      "sha256": "c36af3aa204ae0dd79536a312f25b1f0bcc14aa3f64ab6e5df24d4019871632b",
+      "bytes": 472370,
+      "lines": 5547,
+      "sha256": "5716eeec0ff72a2478fbe39f3c82f28a14629aaad50188712ddb26bde2a68319",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3656,10 +3656,16 @@
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 5521,
+          "specifier": "../src/miki/selfDevelopment/services/requestTypeCompilerService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/requestTypeCompilerService.ts"
         }
       ],
-      "relativeImportCandidateCount": 323,
-      "resolvedRelativeImportCount": 323,
+      "relativeImportCandidateCount": 324,
+      "resolvedRelativeImportCount": 324,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -29674,9 +29680,9 @@
     },
     {
       "path": "src/miki/safety/services/conversationCoreService.ts",
-      "bytes": 534245,
-      "lines": 7945,
-      "sha256": "7493af6bf6f5f2b798231932ff06bd002bc4d500f4e43b4f2bf5ecad371b85b9",
+      "bytes": 535913,
+      "lines": 7969,
+      "sha256": "01bba5ec8795e3bc35501c6773eae18707afd34e0f370a223b070691d208e20b",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -35894,9 +35900,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/requestTypeCompilerService.ts",
-      "bytes": 9041,
-      "lines": 200,
-      "sha256": "b6c9de739e4e4ebb05ef7edb90e3d23c1a7560094104d33c7dc0de0ebb0f442b",
+      "bytes": 9958,
+      "lines": 215,
+      "sha256": "e82d9fa3dc9403952824226093a74bd44792834ef34a5f7edc43bc7e2783b1e6",
       "relativeImportCandidates": [
         {
           "line": 1,

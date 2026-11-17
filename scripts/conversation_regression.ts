@@ -5516,6 +5516,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P915 自己点検に合成の分布が出る', rec915?.codeSynthesis?.total >= 1 && typeof rec915?.codeSynthesis?.byReason === 'object', `cs=${JSON.stringify(rec915?.codeSynthesis).slice(0, 100)}`);
 }
 
+// ---- P916 コード生成・第2段（会話接続：日常の依頼形がコードレーンへ届く） ----
+{
+  const { isCodeSynthesisText } = await import('../src/miki/selfDevelopment/services/requestTypeCompilerService');
+  check('P916 関数が欲しいは合成依頼', isCodeSynthesisText('配列をシャッフルする関数が欲しい') === true);
+  check('P916 処理を書いては合成依頼', isCodeSynthesisText('HPが0になったらゲームオーバーにする処理を書いて') === true);
+  check('P916 意味の問いは合成依頼ではない', isCodeSynthesisText('関数って何？') === false && isCodeSynthesisText('プログラムの意味を教えて') === false);
+  check('P916 日常の作る依頼は合成依頼ではない', isCodeSynthesisText('夕飯を作って') === false && isCodeSynthesisText('手紙を書いて') === false);
+  const code916a: any = await conversationCoreService.execute({ prompt: '配列をシャッフルする関数が欲しい', memories: [], recentMessages: [], conversationId: 'suite-p916' } as any);
+  check('P916 関数依頼がコードレーンの正直な不足回答になる', String(code916a?.replyText ?? '').includes('今の部品ではまだ組めません'), String(code916a?.replyText ?? '').slice(0, 60));
+  const code916b: any = await conversationCoreService.execute({ prompt: 'ランダムな整数を作るコードを教えて', memories: [], recentMessages: [], conversationId: 'suite-p916' } as any);
+  check('P916 未知語混じりでも調査橋で止まらない', String(code916b?.replyText ?? '').includes('今の部品ではまだ組めません') && !String(code916b?.replyText ?? '').includes('まだ確認できていない'), String(code916b?.replyText ?? '').slice(0, 60));
+  const code916c: any = await conversationCoreService.execute({ prompt: '関数って何？', memories: [], recentMessages: [], conversationId: 'suite-p916' } as any);
+  check('P916 意味の問いはコードレーンに入らない', !String(code916c?.replyText ?? '').includes('今の部品ではまだ組めません'), String(code916c?.replyText ?? '').slice(0, 60));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

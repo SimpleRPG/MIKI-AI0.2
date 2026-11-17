@@ -14,7 +14,7 @@ import {
   buildConversationTemporalContext,
   verifyConversationEntityTimeStateConsistency,
 } from '../../conversation/services/conversationStateService';
-import { requestTypeCompilerService } from '../../selfDevelopment/services/requestTypeCompilerService';
+import { requestTypeCompilerService, isCodeSynthesisText } from '../../selfDevelopment/services/requestTypeCompilerService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { longTermMemoryService } from '../../memory/services/longTermMemoryService';
 import { latentIntentMiningService } from '../../unknown/services/latentIntentMiningService';
@@ -76,7 +76,7 @@ import { hypothesisGlossService } from '../../conversation/services/hypothesisGl
 import { userStateTrailService } from '../../conversation/services/userStateTrailService';
 import { hybridConversationEngineService } from '../../conversation/services/hybridConversationEngineService';
 import { implementationSelectionService } from '../../strategy/services/implementationSelectionService';
-import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
+import { nonLlmCodeSynthesisService, describeGapReason } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
 import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { formalConstraintSolverService } from '../../verification/services/formalConstraintSolverService';
 import { deterministicCapabilityExecutionService } from '../../capability/services/deterministicCapabilityExecutionService';
@@ -386,7 +386,11 @@ export class ConversationCoreService {
     const explicitUnknownInquiry = unknownTerms.length > 0
       && unknownTerms.some((t) => prompt.includes(t))
       && /意味|定義|とは|何|調べ|検索|教えて|使い方/.test(prompt)
-      && !compoundKnownSubject;
+      && !compoundKnownSubject
+      // P916: コード合成の依頼は未知語が混ざっても調査橋で止めず、
+      // コードレーンへ通す（「ランダムな整数を作るコードを教えて」が
+      // 「ランダムは未確認」で終わっていた）。
+      && !isCodeSynthesisText(prompt);
     // P498: 雑談の中で出た未知語は、その場で聞き返さなくても
     // 意味学習の gap として残す。従来はターンの解釈に使われる
     // だけで、明示的に意味を聞かれない限り学習の入口に入らず、
@@ -1359,11 +1363,15 @@ export class ConversationCoreService {
     let usedComponents: string[] = [...componentAnalysis.usedComponentIds];
     let assembledCode: string | undefined;
     let taskExecution: ConversationCoreResult['taskExecution'];
+    // P916: 合成が止まった理由を結論段まで運ぶ（組めなかったときに
+    // 雑談の相づちへ落ちず、理由を正直に返すため）。
+    let codeSynthesisBlockedReason: string | undefined;
     const isCodeRequest = compiled.category === 'CODE_SYNTHESIS';
     if (isCodeRequest) {
       const reusable = capabilityReuseService.findReusable(prompt);
       const executionEnvironment = compiled.environment || 'ANDROID';
       const synthesis = nonLlmCodeSynthesisService.plan(compiled, prompt);
+      if (synthesis.blockedReason) codeSynthesisBlockedReason = synthesis.blockedReason;
       const plannedIds = synthesis.componentIds;
       const candidates = plannedIds.length
         ? plannedIds.map((id) => componentRegistryService.getComponent(id)).filter(Boolean) as any[]
@@ -1507,6 +1515,22 @@ export class ConversationCoreService {
         detailLevel: 'STANDARD',
       });
       skeleton = 'TASK_COMPLETION';
+    } else if (isCodeRequest && codeSynthesisBlockedReason) {
+      // P916: コード依頼で合成が止まった場合は、理由をそのまま返す。
+      // 未検証の連結コードは作らず、不足が第1段の統計（P915）に
+      // 残るので、部品を育てる材料になる。
+      ir = answerContentIrService.buildAnswerIR({
+        conclusion: `そのコードは今の部品ではまだ組めません。${describeGapReason(codeSynthesisBlockedReason)}`,
+        target: compiled.target,
+        reasons: ['検証済み部品の組み合わせで構成できる場合だけ、コードとして返します。'],
+        conditions: compiled.constraints,
+        nextActions: ['足りない部品を学習・追加できれば、組めるようになります。'],
+        certainty: 'CERTAIN',
+        detailLevel: 'STANDARD',
+      });
+      skeleton = 'TASK_COMPLETION';
+      status = 'UNRESOLVED';
+      reason = `code_synthesis_blocked:${codeSynthesisBlockedReason}`;
     } else if (appliedReasoningResult && appliedReasoningResult.matched) {
       ir = appliedReasoningResult.answerIR;
       skeleton = appliedReasoningResult.skeletonType;

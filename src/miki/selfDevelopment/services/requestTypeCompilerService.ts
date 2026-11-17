@@ -3,6 +3,21 @@ import { systemLogger } from '../../../services/systemLogger';
 import { decomposeMultiIntent } from '../../unknown/services/multiIntentDecompositionService';
 
 /**
+ * P916: コード合成の依頼かどうかを、コード系の名詞で判定する
+ * （コード生成・第2段の会話接続）。従来は「マクロ／vba／コード／
+ * 実装」だけが対象で、「関数が欲しい」「処理を書いて」のような
+ * 日常の依頼形がコードレーンへ届かなかった。意味を聞く問い
+ * （「関数って何？」）は、作る依頼が混ざらない限り合成依頼に
+ * しない。会話コアの調査橋ガードと分類で同じ物差しを使う。
+ */
+export function isCodeSynthesisText(text: string): boolean {
+  const hasCodeNoun = /マクロ|vba|コード|実装|関数|プログラム|スクリプト/i.test(text) || /処理を(書|作)/.test(text);
+  if (!hasCodeNoun) return false;
+  if (/(とは|って何|の意味)/.test(text) && !/(作っ|書い|欲しい|ください|お願い)/.test(text)) return false;
+  return true;
+}
+
+/**
  * 非LLM中心・自己成長型AIコンパニオン 設計思想指示書(統合版) 第10.1節
  * 要求型コンパイラ (Request Type Compiler)
  *
@@ -160,7 +175,7 @@ export class RequestTypeCompilerService {
       goal,
       target,
       targetEntity: target,
-      category: /マクロ|vba|コード|実装/i.test(rawText)
+      category: isCodeSynthesisText(rawText)
         ? 'CODE_SYNTHESIS'
         : /教えて|どう|なぜ|何/i.test(rawText)
         ? 'FACT_INQUIRY'
