@@ -6095,6 +6095,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P941 自己点検に動作部品の数が入る', insp941.motionPatterns >= 3, `motionPatterns=${insp941.motionPatterns}`);
 }
 
+// ---- P942 アバターの存在状態 第1段 ----
+{
+  const { avatarPresenceService: ap942 } = await import('../src/miki/selfAwareness/services/avatarPresenceService');
+  const { motionPatternService: mp942 } = await import('../src/miki/selfAwareness/services/motionPatternService');
+  const t942 = 1700000000000;
+  check('P942 初期状態は起きている', ap942.snapshot('suite-p942', t942).mode === 'AWAKE', 'default');
+  ap942.noteSleep('suite-p942', t942);
+  check('P942 整理の間は寝ている', ap942.snapshot('suite-p942', t942 + 1000).mode === 'SLEEPING', 'sleep');
+  check('P942 8時間経てば朝に起きている', ap942.snapshot('suite-p942', t942 + 8 * 3600 * 1000 + 1).mode === 'AWAKE', 'wake');
+  ap942.noteIdleChoice('suite-p942', { kind: 'BRING_UP_TOPIC', term: '青い鳥の巣' }, t942 + 2000);
+  const snap942 = ap942.snapshot('suite-p942', t942 + 3000);
+  check('P942 話題の欲求で寄ってくる', snap942.mode === 'APPROACHING' && snap942.topic === '青い鳥の巣', `mode=${snap942.mode}`);
+  check('P942 状態を言葉にできる', ap942.describe('suite-p942', t942 + 3000).includes('寄ってきている'), `desc=${ap942.describe('suite-p942', t942 + 3000)}`);
+  const sway942: any[] = [];
+  for (let t = 0; t <= 2000; t += 50) sway942.push({ t, x: 0.5 + 0.3 * Math.sin((2 * Math.PI * t) / 800), y: 0.5 });
+  mp942.learn('アバター用横揺れ', sway942);
+  check('P942 覚えた動きだけ身に着けられる', ap942.setMotion('suite-p942', 'アバター用横揺れ', t942 + 4000) && !ap942.setMotion('suite-p942', '存在しない動き942', t942 + 4000), 'motion gate');
+  check('P942 動きには期限がある', !!ap942.snapshot('suite-p942', t942 + 5000).motionName && !ap942.snapshot('suite-p942', t942 + 4000 + 16000).motionName, 'motion expiry');
+  const { knowledgeSelfInspectionService: ksi942 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const insp942: any = ksi942.inspect();
+  check('P942 自己点検に存在状態の人数が入る', insp942.avatarPresence >= 1, `avatarPresence=${insp942.avatarPresence}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

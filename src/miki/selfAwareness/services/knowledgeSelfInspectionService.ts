@@ -34,6 +34,7 @@ import { creativeWritingService } from './creativeWritingService';
 import { dreamService } from './dreamService';
 import { duoDialogueService } from './duoDialogueService';
 import { motionPatternService } from './motionPatternService';
+import { avatarPresenceService } from './avatarPresenceService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -102,6 +103,7 @@ export interface KnowledgeSelfInspectionRecord {
   dreamsRecorded: number;
   duoDialogues: number;
   motionPatterns: number;
+  avatarPresence: number;
   findings: string[];
 }
 
@@ -316,6 +318,7 @@ class KnowledgeSelfInspectionService {
     let dreamsRecorded = 0;
     let duoDialogues = 0;
     let motionPatterns = 0;
+    let avatarPresence = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -440,6 +443,11 @@ class KnowledgeSelfInspectionService {
       if (motionPatterns > 0) {
         findings.push(`動きを${motionPatterns}件、動作部品として覚えた`);
       }
+      // P942: アバターの存在状態を持つ人数。
+      avatarPresence = avatarPresenceService.summary().personas;
+      if (avatarPresence > 0) {
+        findings.push(`アバターの存在状態を${avatarPresence}人分持っている`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -499,6 +507,7 @@ class KnowledgeSelfInspectionService {
       dreamsRecorded,
       duoDialogues,
       motionPatterns,
+      avatarPresence,
       findings,
     };
 

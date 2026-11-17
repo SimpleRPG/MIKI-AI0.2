@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1841,
-    "sourceFileCount": 1394,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1305,
-    "relativeImportCandidateCount": 4560,
-    "resolvedRelativeImportCandidateCount": 4544,
+    "trackedPathCountExcludingControlPaths": 1842,
+    "sourceFileCount": 1395,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1306,
+    "relativeImportCandidateCount": 4569,
+    "resolvedRelativeImportCandidateCount": 4553,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 526859,
-      "lines": 6111,
-      "sha256": "a1351f1739a12d6075c6c42be6c86742c707dfe7f1bb689772e694e38d16c657",
+      "bytes": 528988,
+      "lines": 6134,
+      "sha256": "e1a75bceae35db7c2c9a8889d03e9b0de0821289b43d6ae7d4c7f8a85a3047c1",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4010,10 +4010,28 @@
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 6100,
+          "specifier": "../src/miki/selfAwareness/services/avatarPresenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/avatarPresenceService.ts"
+        },
+        {
+          "line": 6101,
+          "specifier": "../src/miki/selfAwareness/services/motionPatternService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/motionPatternService.ts"
+        },
+        {
+          "line": 6116,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 382,
-      "resolvedRelativeImportCount": 382,
+      "relativeImportCandidateCount": 385,
+      "resolvedRelativeImportCount": 385,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -31451,6 +31469,35 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/selfAwareness/services/avatarPresenceService.ts",
+      "bytes": 5430,
+      "lines": 130,
+      "sha256": "ddb703c5996de57ed547638f25d62241d8dede33ecc7e2af4eb317839f1d724b",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../../services/systemLogger",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/systemLogger.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "./motionPatternService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/motionPatternService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/selfAwareness/services/cognitiveEvidenceIntegrationService.ts",
       "bytes": 1985,
       "lines": 42,
@@ -31743,9 +31790,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/idleActionService.ts",
-      "bytes": 5283,
-      "lines": 140,
-      "sha256": "03e5f8026451a6a2299ddaaa4e31ba61d4a9f035bbdba350e6c3b2243e4fa95c",
+      "bytes": 5565,
+      "lines": 143,
+      "sha256": "74184cc224904a1da70334777182fade7438c6271d9590ccb87bf2ddb8086318",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31764,10 +31811,16 @@
           "specifier": "./specialDayService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/specialDayService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "./avatarPresenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/avatarPresenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 3,
-      "resolvedRelativeImportCount": 3,
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -31789,9 +31842,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeConsolidationService.ts",
-      "bytes": 11200,
-      "lines": 234,
-      "sha256": "49c203d6523983d9e7bd5018d102dec3234b0a6b24c901ba3ee6565eb3c88903",
+      "bytes": 11543,
+      "lines": 240,
+      "sha256": "20304a75d6fe8b901b805c8f7ba537b6bc86bf80983044815863f7cf7f5b2112",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31846,10 +31899,16 @@
           "specifier": "./dreamService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/dreamService.ts"
+        },
+        {
+          "line": 10,
+          "specifier": "./avatarPresenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/avatarPresenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 9,
-      "resolvedRelativeImportCount": 9,
+      "relativeImportCandidateCount": 10,
+      "resolvedRelativeImportCount": 10,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -31877,9 +31936,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 26455,
-      "lines": 569,
-      "sha256": "04904733eeb5d5c8c2249e2601276952dc74915b37e20009692993afa6f3a39e",
+      "bytes": 26857,
+      "lines": 578,
+      "sha256": "09d3b1bd7a4b0230081fc853c0febfcc8453029ff1c876183220e97c023f6e78",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -32096,10 +32155,16 @@
           "specifier": "./motionPatternService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/motionPatternService.ts"
+        },
+        {
+          "line": 37,
+          "specifier": "./avatarPresenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/avatarPresenceService.ts"
         }
       ],
-      "relativeImportCandidateCount": 36,
-      "resolvedRelativeImportCount": 36,
+      "relativeImportCandidateCount": 37,
+      "resolvedRelativeImportCount": 37,
       "unresolvedRelativeImportCount": 0
     },
     {

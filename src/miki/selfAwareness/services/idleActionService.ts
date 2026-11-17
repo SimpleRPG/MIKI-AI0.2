@@ -1,6 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { desireService } from './desireService';
 import { specialDayService } from './specialDayService';
+import { avatarPresenceService } from './avatarPresenceService';
 
 /**
  * P925: 主体性・第1段（欲求→行動選択）。
@@ -72,6 +73,7 @@ class IdleActionService {
       state.total += 1;
       state.specialDays += 1;
       this.save(state);
+      try { avatarPresenceService.noteIdleChoice(personaId, special); } catch { /* 存在状態は補助 */ }
       return special;
     }
     const desires = desireService.compose(personaId);
@@ -92,6 +94,7 @@ class IdleActionService {
     if (action.kind === 'BRING_UP_TOPIC') state.topics += 1;
     else state.researches += 1;
     this.save(state);
+    try { avatarPresenceService.noteIdleChoice(personaId, action); } catch { /* 存在状態は補助 */ }
     return action;
   }
 
