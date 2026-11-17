@@ -77,6 +77,7 @@ import { userStateTrailService } from '../../conversation/services/userStateTrai
 import { hybridConversationEngineService } from '../../conversation/services/hybridConversationEngineService';
 import { implementationSelectionService } from '../../strategy/services/implementationSelectionService';
 import { nonLlmCodeSynthesisService, describeGapReason } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
+import { codeComponentSpecService } from '../../selfDevelopment/services/codeComponentSpecService';
 import { answerPlanService } from '../../strategy/services/answerPlanService';
 import { formalConstraintSolverService } from '../../verification/services/formalConstraintSolverService';
 import { deterministicCapabilityExecutionService } from '../../capability/services/deterministicCapabilityExecutionService';
@@ -1381,15 +1382,26 @@ export class ConversationCoreService {
           let h = 2166136261;
           const norm = prompt.trim().toLowerCase();
           for (let i = 0; i < norm.length; i++) { h ^= norm.charCodeAt(i); h = Math.imul(h, 16777619); }
+          const gapCapabilityId = `code-synthesis-${(h >>> 0).toString(16).padStart(8, '0')}`;
           capabilityGapService.recordGap({
             description: `コード合成の不足（${synthesis.blockedReason}）: ${prompt.slice(0, 80)}`,
             gap_type: 'code_component_missing',
-            capabilityId: `code-synthesis-${(h >>> 0).toString(16).padStart(8, '0')}`,
+            capabilityId: gapCapabilityId,
             impact: 'MEDIUM',
             current_workaround: '検証済み部品で構成できないため、理由を返して終了する',
             candidate_solution: '候補コード生成と検証を通して、不足する部品をレジストリへ追加する',
             samplePrompt: prompt,
             source: 'observed',
+          });
+          // P918: 不足を「作れる形の仕様」に変える。要求コンパイルの
+          // 対象・成果物・受入条件・制約を仕様の下書きとして残す。
+          codeComponentSpecService.recordFromRequest({
+            capabilityId: gapCapabilityId,
+            prompt,
+            target: compiled.target,
+            deliverables: compiled.deliverables,
+            acceptanceCriteria: compiled.acceptanceCriteria,
+            constraints: compiled.constraints,
           });
         } catch { /* 不足の記録は補助経路。失敗しても会話は止めない */ }
       }

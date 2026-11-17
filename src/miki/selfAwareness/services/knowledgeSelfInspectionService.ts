@@ -17,6 +17,7 @@ import { procedureChunkingService } from '../../execution/services/procedureChun
 import { episodeDistillationService } from '../../conversation/services/episodeDistillationService';
 import { codeSynthesisStatsService } from '../../selfDevelopment/services/codeSynthesisStatsService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
+import { codeComponentSpecService } from '../../selfDevelopment/services/codeComponentSpecService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -61,6 +62,7 @@ export interface KnowledgeSelfInspectionRecord {
   codeComponents: { total: number; verified: number };
   codeSynthesis: { total: number; succeeded: number; byReason: Record<string, number> };
   codeGapsOpen: number;
+  codeSpecsDrafted: number;
   findings: string[];
 }
 
@@ -254,6 +256,7 @@ class KnowledgeSelfInspectionService {
     let codeComponents = { total: 0, verified: 0 };
     let codeSynthesis = { total: 0, succeeded: 0, byReason: {} as Record<string, number> };
     let codeGapsOpen = 0;
+    let codeSpecsDrafted = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
         (item) => item.componentKind === 'CODE',
@@ -277,6 +280,11 @@ class KnowledgeSelfInspectionService {
         .filter((g) => g.gap_type === 'code_component_missing' && g.status === 'OPEN').length;
       if (codeGapsOpen > 0) {
         findings.push(`コード部品の不足が${codeGapsOpen}件、成長課題として開いている`);
+      }
+      // P918: 不足から作られた部品仕様の下書きの件数。
+      codeSpecsDrafted = codeComponentSpecService.summary().drafted;
+      if (codeSpecsDrafted > 0) {
+        findings.push(`不足から部品仕様の下書きが${codeSpecsDrafted}件できている（実装とテストの到着待ち）`);
       }
     } catch { /* コードの棚卸しは補助経路 */ }
 
@@ -315,6 +323,7 @@ class KnowledgeSelfInspectionService {
       codeComponents,
       codeSynthesis,
       codeGapsOpen,
+      codeSpecsDrafted,
       findings,
     };
 

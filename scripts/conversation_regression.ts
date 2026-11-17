@@ -5545,6 +5545,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P917 自己点検に開いたコード不足が出る', rec917?.codeGapsOpen >= 1, `open=${rec917?.codeGapsOpen}`);
 }
 
+// ---- P918 コード生成・第3段の続き（不足が部品仕様の下書きになる） ----
+{
+  const { codeComponentSpecService } = await import('../src/miki/selfDevelopment/services/codeComponentSpecService');
+  const { knowledgeSelfInspectionService } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const before918 = codeComponentSpecService.summary().drafted;
+  await conversationCoreService.execute({ prompt: '虹色クラゲの数を数える関数が欲しい', memories: [], recentMessages: [], conversationId: 'suite-p918' } as any);
+  await conversationCoreService.execute({ prompt: '虹色クラゲの数を数える関数が欲しい', memories: [], recentMessages: [], conversationId: 'suite-p918' } as any);
+  const specs918 = codeComponentSpecService.list();
+  check('P918 不足から仕様の下書きができる', specs918.length === before918 + 1 && specs918.some((s: any) => s.purpose.includes('虹色クラゲ')), `drafted=${specs918.length}`);
+  check('P918 同じ依頼は仕様の依頼回数にまとまる', specs918.some((s: any) => s.purpose.includes('虹色クラゲ') && s.sampleCount >= 2), `counts=${specs918.map((s: any) => s.sampleCount).join(',')}`);
+  check('P918 仕様に受入条件が入る', specs918.some((s: any) => s.purpose.includes('虹色クラゲ') && Array.isArray(s.acceptanceCriteria) && s.acceptanceCriteria.length > 0), `criteria=${JSON.stringify(specs918[0]?.acceptanceCriteria).slice(0, 60)}`);
+  const rec918: any = knowledgeSelfInspectionService.inspect();
+  check('P918 自己点検に仕様の件数が出る', rec918?.codeSpecsDrafted >= 1, `drafted=${rec918?.codeSpecsDrafted}`);
+  check('P918 教師への依頼リストが描ける', codeComponentSpecService.renderRequestList(5).includes('虹色クラゲ'), 'list');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
