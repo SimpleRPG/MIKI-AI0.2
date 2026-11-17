@@ -6,6 +6,7 @@ import { conversationOpenTopicService } from '../../conversation/services/conver
 import { predictionLedgerService } from '../../memory/services/predictionLedgerService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 import { mistakeNotebookService } from './mistakeNotebookService';
+import { dreamService } from './dreamService';
 
 /**
  * P542: 統合パス（寝ている間の整理）。成長ループから1日1回まで
@@ -122,6 +123,9 @@ class KnowledgeConsolidationService {
         if (gap && gap.status === 'OPEN') mistakeRelearnGaps++;
       }
     } catch { /* 見直しできなくても統合は止めない */ }
+    // P939: 整理の仕上げに夢を見る（その日の材料の組み合わせ。
+    // 知識には入れない）。材料が無ければ見ない。
+    try { dreamService.dreamTonight(now); } catch { /* 夢が見られなくても統合は止めない */ }
     systemLogger.info('SELF_IMPROVEMENT', `🌙 [統合] 関係の再抽出で ${relationsAdded} 件を追加し、図式を ${schemas} 件立て、繰り返しの話題を ${distilled} 件蒸留し、予測を ${predictions.confirmed + predictions.refuted} 件照合しました（外れ ${predictions.refuted} 件）`);
     // P931: 報告を残す（朝、聞かれたら語れるように）。
     try {

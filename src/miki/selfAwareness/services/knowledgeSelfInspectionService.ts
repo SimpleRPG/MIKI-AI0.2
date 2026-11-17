@@ -31,6 +31,7 @@ import { selfPreferenceService } from './selfPreferenceService';
 import { gamePlayService } from './gamePlayService';
 import { groundedRebuttalService } from './groundedRebuttalService';
 import { creativeWritingService } from './creativeWritingService';
+import { dreamService } from './dreamService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -96,6 +97,7 @@ export interface KnowledgeSelfInspectionRecord {
   gameWins: number;
   rebuttalsMade: number;
   creativeWorks: number;
+  dreamsRecorded: number;
   findings: string[];
 }
 
@@ -307,6 +309,7 @@ class KnowledgeSelfInspectionService {
     let gameWins = 0;
     let rebuttalsMade = 0;
     let creativeWorks = 0;
+    let dreamsRecorded = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -416,6 +419,11 @@ class KnowledgeSelfInspectionService {
       if (creativeWorks > 0) {
         findings.push(`自分で書いた作品が${creativeWorks}首ある`);
       }
+      // P939: 見た夢の数。
+      dreamsRecorded = dreamService.summary().dreams;
+      if (dreamsRecorded > 0) {
+        findings.push(`夢を${dreamsRecorded}回見た`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -472,6 +480,7 @@ class KnowledgeSelfInspectionService {
       gameWins,
       rebuttalsMade,
       creativeWorks,
+      dreamsRecorded,
       findings,
     };
 

@@ -52,6 +52,7 @@ import { diaryService } from '../../selfAwareness/services/diaryService';
 import { gamePlayService } from '../../selfAwareness/services/gamePlayService';
 import { groundedRebuttalService } from '../../selfAwareness/services/groundedRebuttalService';
 import { creativeWritingService } from '../../selfAwareness/services/creativeWritingService';
+import { dreamService } from '../../selfAwareness/services/dreamService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -727,6 +728,11 @@ export class ConversationCoreService {
       const creative = this.creativeWritingAnswer(prompt);
       if (creative && !multiPart) {
         return this.buildResult('RESOLVED', 'creative_writing_answer', this.applyPersonaVoice(creative), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P939: 「どんな夢を見た？」——昨夜の夢を話す。
+      const dream = this.dreamAnswer(prompt);
+      if (dream && !multiPart) {
+        return this.buildResult('RESOLVED', 'dream_answer', this.applyPersonaVoice(dream), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3961,6 +3967,26 @@ export class ConversationCoreService {
    * - 「おやすみ」: その場で整理を回して眠る挨拶を返す。
    * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
    */
+  /**
+   * P939: 夢の話。「どんな夢を見た？」に、眠って整理する時間に
+   * 見た夢を語る。夢は知識ではないので、必ず夢として語る。
+   */
+  private dreamAnswer(prompt: string): string | undefined {
+    if (!/夢/.test(prompt)) return undefined;
+    if (/(?:とは|って何|意味|占い)/.test(prompt)) return undefined;
+    // 彼女の夢を聞く形だけを受ける。利用者自身の夢の報告
+    // （「昨日変な夢見た」）は、内容を聞き返す従来の流れの領分。
+    const asksHers = /どんな夢/.test(prompt)
+      || (/[？?]/.test(prompt) && /(?:見た|みた|見る)/.test(prompt))
+      || (/(?:みき|ビービー|あなた|君)/.test(prompt) && /夢/.test(prompt));
+    if (!asksHers) return undefined;
+    try {
+      const latest = dreamService.latest();
+      if (!latest) return '昨夜は夢を見なかったみたい。覚えてないだけかもしれないけど。';
+      return `うん、見たよ。${latest.text}`;
+    } catch { return undefined; }
+  }
+
   /**
    * P938: 創作（俳句）を書いて推敲する。「○○の俳句書いて」で
    * テーマを取り、「俳句見せて」で直近の作品を読む。

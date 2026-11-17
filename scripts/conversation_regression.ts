@@ -6036,6 +6036,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P938 歴史の質問では詠まない', r938ctl.reason !== 'creative_writing_answer', `reason=${r938ctl.reason}`);
 }
 
+// ---- P939 夢を見る ----
+{
+  const { dreamService: dr939 } = await import('../src/miki/selfAwareness/services/dreamService');
+  const dream939 = dr939.dreamTonight();
+  check('P939 材料があれば夢を見て、夢として残る', !!dream939 && dream939.text.includes('夢の中で') && dream939.materials.length >= 1, `dream=${JSON.stringify(dream939?.text)}`);
+  const dream939b = dr939.dreamTonight();
+  check('P939 夢は1日に1つだけ', !!dream939b && dream939b.text === dream939?.text && dr939.summary().dreams >= 1, 'one-per-day');
+  const r939: any = await conversationCoreService.execute({ prompt: 'どんな夢を見た？', memories: [], recentMessages: [], conversationId: 'suite-p939' } as any);
+  check('P939 「どんな夢を見た？」に夢を語る', r939.reason === 'dream_answer' && String(r939.replyText || '').includes('見たよ'), `reason=${r939.reason} reply=${String(r939.replyText || '').slice(0, 60)}`);
+  const r939ctl: any = await conversationCoreService.execute({ prompt: '夢とは何？', memories: [], recentMessages: [], conversationId: 'suite-p939' } as any);
+  check('P939 定義の質問では夢を語らない', r939ctl.reason !== 'dream_answer', `reason=${r939ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
