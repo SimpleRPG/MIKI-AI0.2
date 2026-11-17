@@ -5914,6 +5914,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P931 ただ眠いだけでは睡眠レーンは発火しない', r931ctl.reason !== 'sleep_answer', `reason=${r931ctl.reason}`);
 }
 
+// ---- P932 記念日・約束の日 ----
+{
+  const { specialDayService: sd932 } = await import('../src/miki/selfAwareness/services/specialDayService');
+  const { conversationFactIntakeService: fi932 } = await import('../src/miki/conversation/services/conversationFactIntakeService');
+  check('P932 記念日を登録して日付で引ける', sd932.register('回帰記念日', 1, 1)?.name === '回帰記念日' && sd932.onDate(1, 1).some((d) => d.name === '回帰記念日'), 'register');
+  check('P932 あり得ない日付は登録しない', sd932.register('だめな日', 13, 40) === null, 'invalid');
+  fi932.intakeFromUserText('従姉妹の誕生日は9月15日だよ', []);
+  check('P932 誕生日の教示を取り込める', sd932.list().some((d) => d.name === '従姉妹の誕生日' && d.month === 9 && d.day === 15), 'birthday-intake');
+  const now932 = new Date();
+  sd932.register('今日の記念日', now932.getMonth() + 1, now932.getDate());
+  const r932: any = await conversationCoreService.execute({ prompt: '今日は何の日？', memories: [], recentMessages: [], conversationId: 'suite-p932' } as any);
+  check('P932 「今日は何の日？」に今日の記念日を答える', r932.reason === 'special_day_answer' && String(r932.replyText || '').includes('今日の記念日'), `reason=${r932.reason} reply=${String(r932.replyText || '').slice(0, 50)}`);
+  const r932ctl: any = await conversationCoreService.execute({ prompt: '今日はいい天気だね', memories: [], recentMessages: [], conversationId: 'suite-p932' } as any);
+  check('P932 天気の話では記念日レーンは発火しない', r932ctl.reason !== 'special_day_answer', `reason=${r932ctl.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

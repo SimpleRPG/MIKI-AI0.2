@@ -47,6 +47,7 @@ import { multiStepReasoningService } from '../../selfAwareness/services/multiSte
 import { idleActionService } from '../../selfAwareness/services/idleActionService';
 import { mistakeNotebookService } from '../../selfAwareness/services/mistakeNotebookService';
 import { knowledgeConsolidationService } from '../../selfAwareness/services/knowledgeConsolidationService';
+import { specialDayService } from '../../selfAwareness/services/specialDayService';
 import { episodeMemoryService } from '../../conversation/services/episodeMemoryService';
 import { dayKeyService } from '../../memory/services/dayKeyService';
 import { unitConversionService } from '../../memory/services/unitConversionService';
@@ -692,6 +693,11 @@ export class ConversationCoreService {
       const sleepReply = this.sleepAnswer(prompt);
       if (sleepReply && !multiPart) {
         return this.buildResult('RESOLVED', 'sleep_answer', this.applyPersonaVoice(sleepReply), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P932: 「今日は何の日？」——覚えている記念日・誕生日を答える。
+      const specialDay = this.specialDayAnswer(prompt);
+      if (specialDay && !multiPart) {
+        return this.buildResult('RESOLVED', 'special_day_answer', this.applyPersonaVoice(specialDay), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P732: 「AとB、どっちが大きい？」——説明文の手がかりで比べ、
       // 足りなければ正直に言う（作業目安の書式が会話に漏れない）。
@@ -3926,6 +3932,26 @@ export class ConversationCoreService {
    * - 「おやすみ」: その場で整理を回して眠る挨拶を返す。
    * - 「寝てる間に何したの？」等: 直近の整理の報告を語る。
    */
+  /**
+   * P932: 「今日は何の日？」への答え。今日の記念日があれば
+   * それを、無ければ近いもの（7日以内）を添えて答える。
+   */
+  private specialDayAnswer(prompt: string): string | undefined {
+    if (!/(?:今日は?何の日|今日なにの日|何の日)/.test(prompt)) return undefined;
+    try {
+      const todays = specialDayService.today();
+      if (todays.length > 0) {
+        return `今日は${todays.map((d) => `「${d.name}」`).join('と')}の日だよ。`;
+      }
+      const upcoming = specialDayService.upcoming(Date.now(), 7).filter((u) => u.inDays > 0);
+      if (upcoming.length > 0) {
+        const next = upcoming[0];
+        return `今日は覚えている特別な日はないけど、${next.inDays}日後に「${next.day.name}」（${next.day.month}月${next.day.day}日）があるよ。`;
+      }
+      return '今日は覚えている特別な日はないよ。誕生日や記念日を教えてくれたら覚えておくね。';
+    } catch { return undefined; }
+  }
+
   private sleepAnswer(prompt: string): string | undefined {
     try {
       if (/おやすみ/.test(prompt)) {

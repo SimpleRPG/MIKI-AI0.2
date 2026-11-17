@@ -17,6 +17,7 @@ import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
 import { pendingSlotService } from '../../memory/services/pendingSlotService';
 import { mistakeNotebookService } from '../../selfAwareness/services/mistakeNotebookService';
+import { specialDayService } from '../../selfAwareness/services/specialDayService';
 
 /**
  * P452: 会話の理解の土台 ― ユーザー発言からの事実取り込み。
@@ -895,6 +896,24 @@ export class ConversationFactIntakeService {
     selfPreferenceService.recordTaught(personaId, term, kind as 'like' | 'interest' | 'good_at');
   }
 
+  /**
+   * P932: 記念日・誕生日を教わる（「3月14日はホワイトデーだよ」
+   * 「妹の誕生日は5月2日だよ」）。日付の形が明確なときだけ記録
+   * する。
+   */
+  private learnSpecialDaysFromUserText(text: string): void {
+    const value = String(text || '');
+    const dayForm = value.match(/(\d{1,2})月(\d{1,2})日は(.{1,20}?)の日/);
+    if (dayForm) {
+      specialDayService.register(dayForm[3].trim(), parseInt(dayForm[1], 10), parseInt(dayForm[2], 10));
+      return;
+    }
+    const birthdayForm = value.match(/(.{1,12}?)の誕生日は(\d{1,2})月(\d{1,2})日/);
+    if (birthdayForm) {
+      specialDayService.register(`${birthdayForm[1].trim()}の誕生日`, parseInt(birthdayForm[2], 10), parseInt(birthdayForm[3], 10));
+    }
+  }
+
   private observeUserKnowledgeSignals(text: string): void {
     const value = String(text || '');
     let questionedTerm: string | undefined;
@@ -1249,6 +1268,10 @@ export class ConversationFactIntakeService {
     // P578-A: 彼女自身の好みの教示（「みきはXが好き」）。
     try {
       this.learnSelfPreferenceFromUserText(text);
+    } catch { /* best-effort */ }
+    // P932: 記念日・誕生日の教示（「○月○日は△の日」）。
+    try {
+      this.learnSpecialDaysFromUserText(text);
     } catch { /* best-effort */ }
     // P544: 相手の知識モデル（知っている言葉／知らない言葉）の
     // 材料集め。失敗しても取り込み自体は止めない。
