@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1827,
-    "sourceFileCount": 1380,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1291,
-    "relativeImportCandidateCount": 4453,
-    "resolvedRelativeImportCandidateCount": 4437,
+    "trackedPathCountExcludingControlPaths": 1828,
+    "sourceFileCount": 1381,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1292,
+    "relativeImportCandidateCount": 4458,
+    "resolvedRelativeImportCandidateCount": 4442,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 491226,
-      "lines": 5729,
-      "sha256": "9bb20546fccefb557000732e4dc6e59914c4cde52c0754d55802ade6372c24a2",
+      "bytes": 494013,
+      "lines": 5758,
+      "sha256": "c01c0097d7e7bd33e45144f54e73ca4ab7c76cbb0abdaac5e6d4b603df364a71",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3794,10 +3794,22 @@
           "specifier": "../src/miki/conversation/services/conversationImageObservationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationImageObservationService.ts"
+        },
+        {
+          "line": 5718,
+          "specifier": "../src/miki/conversation/services/conversationImageObservationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationImageObservationService.ts"
+        },
+        {
+          "line": 5719,
+          "specifier": "../src/miki/conversation/services/materialRenderVerificationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/materialRenderVerificationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 346,
-      "resolvedRelativeImportCount": 346,
+      "relativeImportCandidateCount": 348,
+      "resolvedRelativeImportCount": 348,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -12919,12 +12931,25 @@
     },
     {
       "path": "src/miki/conversation/services/conversationImageObservationService.ts",
-      "bytes": 14255,
-      "lines": 345,
-      "sha256": "2eac46caafbb0afe3a4770f32ee996eb345190fe82bc68163c1df51cfbc76070",
-      "relativeImportCandidates": [],
-      "relativeImportCandidateCount": 0,
-      "resolvedRelativeImportCount": 0,
+      "bytes": 16101,
+      "lines": 377,
+      "sha256": "3e1838e0a41ff8389d2596cfdb009eebe3b3a4d0d1f5166815211cf5d1abf6c8",
+      "relativeImportCandidates": [
+        {
+          "line": 62,
+          "specifier": "./materialRenderVerificationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/materialRenderVerificationService.ts"
+        },
+        {
+          "line": 320,
+          "specifier": "./materialRenderVerificationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/materialRenderVerificationService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -13622,6 +13647,23 @@
       ],
       "relativeImportCandidateCount": 3,
       "resolvedRelativeImportCount": 3,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/conversation/services/materialRenderVerificationService.ts",
+      "bytes": 4891,
+      "lines": 128,
+      "sha256": "e383f348d25b9d65de0c0e85d4a9bcc6832efb5472780960ddad215d2faede5d",
+      "relativeImportCandidates": [
+        {
+          "line": 6,
+          "specifier": "./conversationImageObservationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/conversationImageObservationService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
       "unresolvedRelativeImportCount": 0
     },
     {

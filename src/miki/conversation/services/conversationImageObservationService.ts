@@ -56,6 +56,10 @@ export interface ImageObservation {
   text: string;
   features: ImagePixelFeatures;
   material: MaterialHypothesis;
+  // P924: 仮説パラメータで描き直して照合した結果（任意）。
+  // 型だけここに置き、実体は materialRenderVerificationService が作る
+  // （循環参照を避けるため import type で参照する）。
+  verification?: import('./materialRenderVerificationService').MaterialVerification;
 }
 
 const COLOR_NAMES: Array<{ name: string; rgb: [number, number, number] }> = [
@@ -217,19 +221,41 @@ function detectPeriodicity(
     return sum / Math.max(1, width);
   });
   let best: { period: number; strength: number } | null = null;
-  for (const values of [columnProfile, rowProfile]) {
-    const n = values.length;
+  for (const rawValues of [columnProfile, rowProfile]) {
+    const n = rawValues.length;
     if (n < 8) continue;
+    // P924: 大きな明暗のうねり（ハイライト等）が小さいラグの相関を
+    // 持ち上げて周期を埋めるため、移動平均のトレンドを引いてから
+    // 相関を取る。
+    const values = rawValues.map((v, i) => {
+      let sum = 0;
+      let count = 0;
+      for (let k = Math.max(0, i - 6); k <= Math.min(n - 1, i + 6); k++) {
+        sum += rawValues[k];
+        count++;
+      }
+      return v - sum / Math.max(1, count);
+    });
     const mean = values.reduce((a, b) => a + b, 0) / n;
     let denom = 0;
     for (const v of values) denom += (v - mean) ** 2;
     if (denom <= 0) continue;
     const maxLag = Math.min(16, Math.floor(n / 2));
-    for (let lag = 2; lag <= maxLag; lag++) {
+    // ラグ2はデトレンド残差の揺れを拾いやすく、48px 級の縮小画像で
+    // 1px 市松はノイズと区別できないため、周期は3以上を対象にする。
+    // また、なめらかな明暗のうねりの残差は小さいラグほど相関が
+    // 単調に高いため、「前のラグより明確に盛り上がったピーク」だけを
+    // 周期とみなす（本物の繰り返しは半周期で相関が沈む）。
+    const strengths: number[] = [0];
+    for (let lag = 1; lag <= maxLag; lag++) {
       let num = 0;
       for (let i = 0; i + lag < n; i++) num += (values[i] - mean) * (values[i + lag] - mean);
-      const strength = num / denom;
-      if (strength >= 0.5 && (!best || strength > best.strength)) {
+      strengths.push(num / denom);
+    }
+    for (let lag = 3; lag <= maxLag; lag++) {
+      const strength = strengths[lag];
+      if (strength >= 0.5 && strength - strengths[lag - 1] >= 0.05
+        && (!best || strength > best.strength)) {
         best = { period: lag, strength };
       }
     }
@@ -288,7 +314,13 @@ class ConversationImageObservationService {
       if (!bitmap) return null;
       const { rgba, width, height } = bitmap;
       const features = analyzeImagePixels(rgba, width, height);
-      return { text: verbalizeImageFeatures(features), features, material: hypothesizeMaterial(features) };
+      // P924: 仮説で描き直して照合する（失敗しても観察自体は返す）。
+      let verification: ImageObservation['verification'];
+      try {
+        const { verifyMaterialByRendering } = await import('./materialRenderVerificationService');
+        verification = verifyMaterialByRendering(features);
+      } catch { verification = undefined; }
+      return { text: verbalizeImageFeatures(features), features, material: hypothesizeMaterial(features), verification };
     } catch {
       return null;
     }

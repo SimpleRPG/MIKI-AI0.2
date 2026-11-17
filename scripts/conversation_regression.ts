@@ -5713,6 +5713,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P923 観察文の正直な範囲は保たれる', verbalizeImageFeatures(glossy923).includes('具体的な物や文字までは読み取れない'), 'honest-range');
 }
 
+// ---- P924 目・第2段＋描く・第1段（仮説で描き直して測定で照合する） ----
+{
+  const { analyzeImagePixels, hypothesizeMaterial } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const { verifyMaterialByRendering, renderMaterialSwatch } = await import('../src/miki/conversation/services/materialRenderVerificationService');
+  const W924 = 48, H924 = 48;
+  const make924 = (fn: (x: number, y: number) => [number, number, number]) => {
+    const a = new Uint8Array(W924 * H924 * 4);
+    for (let y = 0; y < H924; y++) for (let x = 0; x < W924; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W924 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return a;
+  };
+  const glossy924 = analyzeImagePixels(make924((x, y) => (x >= 22 && x <= 24 && y >= 22 && y <= 24) ? [255, 255, 255] : [45, 45, 50]), W924, H924);
+  const vGloss924 = verifyMaterialByRendering(glossy924);
+  check('P924 ツヤの仮説は描き直して再現できる', vGloss924.verified === true && vGloss924.renderedHypothesis.gloss === 'ツヤが強そう', `score=${vGloss924.score} checks=${JSON.stringify(vGloss924.checks)}`);
+  const stripes924 = analyzeImagePixels(make924((x) => ((x % 6) < 3 ? [30, 30, 30] : [210, 210, 210]) as [number, number, number]), W924, H924);
+  const vStripes924 = verifyMaterialByRendering(stripes924);
+  check('P924 周期模様の仮説は描き直して再現できる', vStripes924.verified === true && vStripes924.renderedHypothesis.patternPeriod === 6, `score=${vStripes924.score} period=${vStripes924.renderedHypothesis.patternPeriod}`);
+  const grad924 = analyzeImagePixels(make924((x) => { const v = Math.round((x / (W924 - 1)) * 200); return [v, v, v] as [number, number, number]; }), W924, H924);
+  const vGrad924 = verifyMaterialByRendering(grad924);
+  check('P924 なめらかなグラデーションの仮説は描き直して再現できる', vGrad924.verified === true && vGrad924.renderedHypothesis.softGradient === true, `score=${vGrad924.score}`);
+  const matte924 = analyzeImagePixels(make924((x, y) => { const v = 120 + ((x * 7 + y * 13) % 5) - 2; return [v, v, v] as [number, number, number]; }), W924, H924);
+  check('P924 マットな面の仮説も描き直して再現できる', verifyMaterialByRendering(matte924).verified === true, 'matte');
+  const wrong924 = renderMaterialSwatch({ baseLuma: glossy924.meanLuma, roughness: 0.95, patternPeriod: null, softGradient: false });
+  const wrongMat924 = hypothesizeMaterial(analyzeImagePixels(wrong924.rgba, wrong924.width, wrong924.height));
+  check('P924 違うパラメータで描くと判定がずれて検出できる', wrongMat924.gloss !== 'ツヤが強そう', `wrong gloss=${wrongMat924.gloss}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
