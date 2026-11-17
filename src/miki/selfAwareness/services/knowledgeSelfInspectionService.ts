@@ -36,6 +36,7 @@ import { duoDialogueService } from './duoDialogueService';
 import { motionPatternService } from './motionPatternService';
 import { avatarPresenceService } from './avatarPresenceService';
 import { computeResourceService } from './computeResourceService';
+import { swarmVerificationService } from './swarmVerificationService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -106,6 +107,7 @@ export interface KnowledgeSelfInspectionRecord {
   motionPatterns: number;
   avatarPresence: number;
   computeResourcesMeasured: number;
+  swarmVerifications: number;
   findings: string[];
 }
 
@@ -322,6 +324,7 @@ class KnowledgeSelfInspectionService {
     let motionPatterns = 0;
     let avatarPresence = 0;
     let computeResourcesMeasured = 0;
+    let swarmVerifications = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -456,6 +459,11 @@ class KnowledgeSelfInspectionService {
       if (computeResourcesMeasured > 0) {
         findings.push(`計算の速さを${computeResourcesMeasured}種の仕事で測った`);
       }
+      // P944: 群れで検証した文の数。
+      swarmVerifications = swarmVerificationService.summary().checked;
+      if (swarmVerifications > 0) {
+        findings.push(`ビービーの群れで${swarmVerifications}件の文を検証した`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -517,6 +525,7 @@ class KnowledgeSelfInspectionService {
       motionPatterns,
       avatarPresence,
       computeResourcesMeasured,
+      swarmVerifications,
       findings,
     };
 

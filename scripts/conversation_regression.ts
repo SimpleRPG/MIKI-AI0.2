@@ -6137,6 +6137,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P943 自己点検に測った仕事の種類数が入る', insp943.computeResourcesMeasured >= 3, `computeResourcesMeasured=${insp943.computeResourcesMeasured}`);
 }
 
+// ---- P944 ビービーの群れによる並列検証 第1段 ----
+{
+  const { claimDatabaseService: cdb944 } = await import('../src/miki/memory/services/claimDatabaseService');
+  const { swarmVerificationService: sw944 } = await import('../src/miki/selfAwareness/services/swarmVerificationService');
+  cdb944.registerClaim({ statement: '群石の産地は北の洞窟だ', world: 'REAL', kind: 'FACT_CLAIM', status: 'SUPPORTED', source: 'teacher_verified' } as any);
+  const before944 = sw944.summary().checked;
+  const run944 = sw944.verifyBatch(['群石の産地は南の浜だ', '群石の産地は北の洞窟だ', '群石の色は赤だ', '今日はいい天気だ']);
+  const verdict944 = (s: string) => run944.items.find((i) => i.statement === s)?.verdict;
+  check('P944 食い違う文は群れが見つける', verdict944('群石の産地は南の浜だ') === 'CONTRADICTED' && run944.contradicted === 1, `run=${JSON.stringify(run944.items.map((i) => i.verdict))}`);
+  check('P944 一致・記録なし・判定できないを区別する', verdict944('群石の産地は北の洞窟だ') === 'CONSISTENT' && verdict944('群石の色は赤だ') === 'NO_RECORD' && verdict944('今日はいい天気だ') === 'UNCHECKABLE', 'verdicts');
+  check('P944 文は群れに分かれて処理される', run944.bees.length === 4 && run944.bees.every((b) => b.checked === 1), `bees=${JSON.stringify(run944.bees)}`);
+  check('P944 検証が台帳に残る', sw944.summary().checked >= before944 + 4, `before=${before944} after=${sw944.summary().checked}`);
+  const analogy944 = sw944.verifyAnalogyCandidates(8);
+  check('P944 類推候補の点検が動く', analogy944 === null || analogy944.total >= 1, `analogy=${JSON.stringify(analogy944?.total)}`);
+  const { knowledgeSelfInspectionService: ksi944 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const insp944: any = ksi944.inspect();
+  check('P944 自己点検に群れ検証の件数が入る', insp944.swarmVerifications >= 4, `swarmVerifications=${insp944.swarmVerifications}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
