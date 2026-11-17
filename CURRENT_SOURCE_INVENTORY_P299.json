@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1822,
     "sourceFileCount": 1375,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1286,
-    "relativeImportCandidateCount": 4398,
-    "resolvedRelativeImportCandidateCount": 4382,
+    "relativeImportCandidateCount": 4399,
+    "resolvedRelativeImportCandidateCount": 4383,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 463770,
-      "lines": 5464,
-      "sha256": "133e92d2d3db93eb9fedbc42373fa7527edf7b71ffa3294cdf8e497a4da4b005",
+      "bytes": 464707,
+      "lines": 5475,
+      "sha256": "2ab22d712c6c290e6964e595cd941f6995d71d09d71e50b3ee42fdf57810caa8",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -3608,10 +3608,16 @@
           "specifier": "../src/miki/conversation/services/conversationComponentPipelineService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationComponentPipelineService.ts"
+        },
+        {
+          "line": 5453,
+          "specifier": "../src/miki/safety/services/bannedTopicsConfigService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/safety/services/bannedTopicsConfigService.ts"
         }
       ],
-      "relativeImportCandidateCount": 315,
-      "resolvedRelativeImportCount": 315,
+      "relativeImportCandidateCount": 316,
+      "resolvedRelativeImportCount": 316,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -29533,18 +29539,18 @@
     },
     {
       "path": "src/miki/safety/services/bannedTopicsConfigService.ts",
-      "bytes": 4950,
-      "lines": 154,
-      "sha256": "16d1067ee9262d20600582a6047d7ee217b8fa6dc2cc90781093f37191d9241b",
+      "bytes": 5158,
+      "lines": 155,
+      "sha256": "8290e27a6b96e04c1051dd67df5361f178cdedd4a21bb467ba0785489cc5621d",
       "relativeImportCandidates": [
         {
-          "line": 11,
+          "line": 13,
           "specifier": "../../../services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
         },
         {
-          "line": 12,
+          "line": 14,
           "specifier": "../../../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
