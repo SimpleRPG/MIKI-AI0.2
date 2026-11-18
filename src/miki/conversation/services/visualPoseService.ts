@@ -293,6 +293,130 @@ function buildMaskFine(rgba: Uint8Array | number[], width: number, height: numbe
   return mask;
 }
 
+/**
+ * P1003: 線による領域分割の第1段。暗い線（輪郭線）を壁として
+ * 領域に区切り、髪の領域を取り除いた「体だけのマスク」を返す。
+ * 後ろ髪が体の幅に混ざる問題は色では分けられないため、
+ * 線で区切った領域の単位で髪と体を分ける。
+ * 髪の判定：図の上部1割の平均色に近く、肌色でない領域。
+ */
+function segmentBodyMask(rgba: Uint8Array | number[], width: number, height: number): Uint8Array | null {
+  const N = width * height;
+  const lumArr = new Float32Array(N);
+  for (let i = 0; i < N; i++) lumArr[i] = rgba[i * 4] * 0.3 + rgba[i * 4 + 1] * 0.59 + rgba[i * 4 + 2] * 0.11;
+  const wall = new Uint8Array(N);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (rgba[i * 4 + 3] < 128) { wall[i] = 1; continue; }
+      // 線とは「近傍よりはっきり暗い画素」。暗い色の服の内側は
+      // 近傍も同じ暗さなので線にならない（面と線の区別）。
+      let sum = 0; let n = 0;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const nx = x + dx; const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        sum += lumArr[ny * width + nx]; n++;
+      }
+      if (lumArr[i] < sum / Math.max(1, n) - 22) wall[i] = 1;
+    }
+  }
+  // 壁を1px膨らませて、線の切れ目を塞ぐ。
+  const wallDil = new Uint8Array(wall);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!wall[y * width + x]) continue;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx; const ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < width && ny < height) wallDil[ny * width + nx] = 1;
+      }
+    }
+  }
+  wall.set(wallDil);
+  const comp = new Int32Array(N).fill(-1);
+  const regions: Array<{ area: number; r: number; g: number; b: number; touchesBorder: boolean; minX: number; maxX: number; minY: number; maxY: number }> = [];
+  const stack: number[] = [];
+  for (let s = 0; s < N; s++) {
+    if (wall[s] || comp[s] >= 0) continue;
+    const id = regions.length;
+    let area = 0; let r = 0; let g = 0; let b = 0; let touchesBorder = false; let minX = width; let maxX = -1; let minY = height; let maxY = -1;
+    stack.length = 0;
+    stack.push(s);
+    comp[s] = id;
+    while (stack.length) {
+      const cur = stack.pop() as number;
+      const cx = cur % width; const cy = Math.floor(cur / width);
+      area++;
+      if (cx < minX) minX = cx;
+      if (cx > maxX) maxX = cx;
+      if (cy < minY) minY = cy;
+      if (cy > maxY) maxY = cy;
+      r += rgba[cur * 4]; g += rgba[cur * 4 + 1]; b += rgba[cur * 4 + 2];
+      if (cx === 0 || cy === 0 || cx === width - 1 || cy === height - 1) touchesBorder = true;
+      const nb = [cx > 0 ? cur - 1 : -1, cx < width - 1 ? cur + 1 : -1, cy > 0 ? cur - width : -1, cy < height - 1 ? cur + width : -1];
+      for (const n of nb) if (n >= 0 && !wall[n] && comp[n] < 0) { comp[n] = id; stack.push(n); }
+    }
+    regions.push({ area, r: r / Math.max(1, area), g: g / Math.max(1, area), b: b / Math.max(1, area), touchesBorder, minX, maxX, minY, maxY });
+  }
+  if (!regions.length) return null;
+  // 背景＝縁に触れる最大の領域
+  let bgId = -1; let bgArea = -1;
+  regions.forEach((rg, i) => { if (rg.touchesBorder && rg.area > bgArea) { bgArea = rg.area; bgId = i; } });
+  if (bgId < 0) return null;
+  // 図の範囲（背景以外の領域の外接）
+  let figTop = height; let figBottom = -1; let figLeft = width; let figRight = -1;
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const c = comp[y * width + x];
+    if (c >= 0 && c !== bgId) { if (y < figTop) figTop = y; if (y > figBottom) figBottom = y; if (x < figLeft) figLeft = x; if (x > figRight) figRight = x; }
+  }
+  if (figBottom < 0) return null;
+  const figH = figBottom - figTop + 1;
+  // 髪色の見本：図の上部1割・中央寄りの非背景画素の平均
+  let hr = 0; let hg = 0; let hb = 0; let hn = 0;
+  const cxMid = (figLeft + figRight) / 2;
+  for (let y = figTop; y <= Math.min(figBottom, figTop + figH * 0.1); y++) {
+    for (let x = Math.max(0, Math.floor(cxMid - (figRight - figLeft) * 0.3)); x <= Math.min(width - 1, Math.ceil(cxMid + (figRight - figLeft) * 0.3)); x++) {
+      const c = comp[y * width + x];
+      if (c < 0 || c === bgId) continue;
+      hr += rgba[(y * width + x) * 4]; hg += rgba[(y * width + x) * 4 + 1]; hb += rgba[(y * width + x) * 4 + 2]; hn++;
+    }
+  }
+  if (hn < 10) return null;
+  hr /= hn; hg /= hn; hb /= hn;
+  // 肌は r ≥ g ≥ b の順で、ピンクの髪（g < b）と区別する。薄い肌にも効く形。
+  const isSkinAvg = (r: number, g: number, b: number): boolean => r > 190 && g >= b && r - b >= 12;
+  const hairIds = new Set<number>();
+  regions.forEach((rg, i) => {
+    if (i === bgId || rg.area < 12) return;
+    // 図の外周に触れていない内側の領域は髪ではない（水着など）。
+    const touchesFigureEdge = rg.minX <= figLeft + 1 || rg.maxX >= figRight - 1 || rg.minY <= figTop + 1;
+    if (!touchesFigureEdge) return;
+    const dist = Math.abs(rg.r - hr) + Math.abs(rg.g - hg) + Math.abs(rg.b - hb);
+    if (dist <= 80 && !isSkinAvg(rg.r, rg.g, rg.b)) hairIds.add(i);
+  });
+  if (!hairIds.size) return null;
+  const mask = new Uint8Array(N);
+  let fg = 0;
+  for (let i = 0; i < N; i++) {
+    const c = comp[i];
+    if (c >= 0 && c !== bgId && !hairIds.has(c)) { mask[i] = 1; fg++; }
+  }
+  const bboxArea = (figRight - figLeft + 1) * figH;
+  const share = fg / Math.max(1, bboxArea);
+  if (share < 0.12 || share > 0.8) return null;
+  // 髪で隠れた首など、縦の小さな隙間（3pxまで）を繋ぐ。
+  for (let x = 0; x < width; x++) {
+    let lastFg = -1;
+    for (let y = 0; y < height; y++) {
+      if (!mask[y * width + x]) continue;
+      if (lastFg >= 0 && y - lastFg <= 4) {
+        for (let yy = lastFg + 1; yy < y; yy++) mask[yy * width + x] = 1;
+      }
+      lastFg = y;
+    }
+  }
+  return mask;
+}
+
 /** P1001: 影色の自動生成。素の色を暗くし、少し冷たく寄せる（色のルール第1段） */
 function deriveShadow(c: [number, number, number]): [number, number, number] {
   return [
@@ -347,15 +471,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; recentLeans: string[]; recentTempos: string[] } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; recentLeans: string[]; recentTempos: string[] } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; facesDrawn?: number; facesOk?: number; smooth?: number; smoothOk?: number; shaded?: number; shadedOk?: number; curved?: number; curvedOk?: number; outline?: number; outlineOk?: number; eyesDrawn?: number; eyesOk?: number; maskFill?: number; cel?: number; celOk?: number; hairDetail?: number; hairDetailOk?: number; bust?: number; bustOk?: number; targets?: number; drills?: number; drillsOk?: number; clothes?: number; clothesOk?: number; lineRole?: number; lineRoleOk?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, facesDrawn: raw.facesDrawn || 0, facesOk: raw.facesOk || 0, smooth: raw.smooth || 0, smoothOk: raw.smoothOk || 0, shaded: raw.shaded || 0, shadedOk: raw.shadedOk || 0, curved: raw.curved || 0, curvedOk: raw.curvedOk || 0, outline: raw.outline || 0, outlineOk: raw.outlineOk || 0, eyesDrawn: raw.eyesDrawn || 0, eyesOk: raw.eyesOk || 0, maskFill: raw.maskFill || 0, cel: raw.cel || 0, celOk: raw.celOk || 0, hairDetail: raw.hairDetail || 0, hairDetailOk: raw.hairDetailOk || 0, bust: raw.bust || 0, bustOk: raw.bustOk || 0, targets: raw.targets || 0, drills: raw.drills || 0, drillsOk: raw.drillsOk || 0, clothes: raw.clothes || 0, clothesOk: raw.clothesOk || 0, lineRole: raw.lineRole || 0, lineRoleOk: raw.lineRoleOk || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; facesDrawn?: number; facesOk?: number; smooth?: number; smoothOk?: number; shaded?: number; shadedOk?: number; curved?: number; curvedOk?: number; outline?: number; outlineOk?: number; eyesDrawn?: number; eyesOk?: number; maskFill?: number; cel?: number; celOk?: number; hairDetail?: number; hairDetailOk?: number; bust?: number; bustOk?: number; targets?: number; drills?: number; drillsOk?: number; clothes?: number; clothesOk?: number; lineRole?: number; lineRoleOk?: number; regions?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, facesDrawn: raw.facesDrawn || 0, facesOk: raw.facesOk || 0, smooth: raw.smooth || 0, smoothOk: raw.smoothOk || 0, shaded: raw.shaded || 0, shadedOk: raw.shadedOk || 0, curved: raw.curved || 0, curvedOk: raw.curvedOk || 0, outline: raw.outline || 0, outlineOk: raw.outlineOk || 0, eyesDrawn: raw.eyesDrawn || 0, eyesOk: raw.eyesOk || 0, maskFill: raw.maskFill || 0, cel: raw.cel || 0, celOk: raw.celOk || 0, hairDetail: raw.hairDetail || 0, hairDetailOk: raw.hairDetailOk || 0, bust: raw.bust || 0, bustOk: raw.bustOk || 0, targets: raw.targets || 0, drills: raw.drills || 0, drillsOk: raw.drillsOk || 0, clothes: raw.clothes || 0, clothesOk: raw.clothesOk || 0, lineRole: raw.lineRole || 0, lineRoleOk: raw.lineRoleOk || 0, regions: raw.regions || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, facesDrawn: 0, facesOk: 0, smooth: 0, smoothOk: 0, shaded: 0, shadedOk: 0, curved: 0, curvedOk: 0, outline: 0, outlineOk: 0, eyesDrawn: 0, eyesOk: 0, maskFill: 0, cel: 0, celOk: 0, hairDetail: 0, hairDetailOk: 0, bust: 0, bustOk: 0, targets: 0, drills: 0, drillsOk: 0, clothes: 0, clothesOk: 0, lineRole: 0, lineRoleOk: 0, recentLeans: [], recentTempos: [] };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, facesDrawn: 0, facesOk: 0, smooth: 0, smoothOk: 0, shaded: 0, shadedOk: 0, curved: 0, curvedOk: 0, outline: 0, outlineOk: 0, eyesDrawn: 0, eyesOk: 0, maskFill: 0, cel: 0, celOk: 0, hairDetail: 0, hairDetailOk: 0, bust: 0, bustOk: 0, targets: 0, drills: 0, drillsOk: 0, clothes: 0, clothesOk: 0, lineRole: 0, lineRoleOk: 0, regions: 0, recentLeans: [], recentTempos: [] };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
     const s = this.load();
     // P967: 姿勢の癖。最近20件の傾きのうち、10件以上あって
     // 6割以上が同じ向きなら、それを癖と読む。
@@ -379,7 +503,7 @@ class VisualPoseService {
       const top = (Object.entries(counts) as [keyof typeof counts, number][]).sort((a, b) => b[1] - a[1])[0];
       if (top && top[1] / s.recentTempos.length >= 0.6) motionHabit = top[0];
     }
-    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, facesDrawn: s.facesDrawn, facesOk: s.facesOk, smooth: s.smooth, smoothOk: s.smoothOk, shaded: s.shaded, shadedOk: s.shadedOk, curved: s.curved, curvedOk: s.curvedOk, outline: s.outline, outlineOk: s.outlineOk, eyesDrawn: s.eyesDrawn, eyesOk: s.eyesOk, maskFill: s.maskFill, cel: s.cel, celOk: s.celOk, hairDetail: s.hairDetail, hairDetailOk: s.hairDetailOk, bust: s.bust, bustOk: s.bustOk, targets: s.targets, drills: s.drills, drillsOk: s.drillsOk, clothes: s.clothes, clothesOk: s.clothesOk, lineRole: s.lineRole, lineRoleOk: s.lineRoleOk, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
+    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, facesDrawn: s.facesDrawn, facesOk: s.facesOk, smooth: s.smooth, smoothOk: s.smoothOk, shaded: s.shaded, shadedOk: s.shadedOk, curved: s.curved, curvedOk: s.curvedOk, outline: s.outline, outlineOk: s.outlineOk, eyesDrawn: s.eyesDrawn, eyesOk: s.eyesOk, maskFill: s.maskFill, cel: s.cel, celOk: s.celOk, hairDetail: s.hairDetail, hairDetailOk: s.hairDetailOk, bust: s.bust, bustOk: s.bustOk, targets: s.targets, drills: s.drills, drillsOk: s.drillsOk, clothes: s.clothes, clothesOk: s.clothesOk, lineRole: s.lineRole, lineRoleOk: s.lineRoleOk, regions: s.regions, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
   }
 
   /**
@@ -1796,10 +1920,40 @@ class VisualPoseService {
         }
       }
     }
+    // P1003: 長い髪がある時は、線で区切った領域から髪を除いた
+    // マスクでも測り直し、胸の幅が細くなる（＝後ろ髪が混ざって
+    // いた）なら、そちらのプロファイルを採る。
+    let regionApplied = false;
+    if (chosen && chosen.hair?.length === 'long') {
+      const bodyMask = segmentBodyMask(rgba, width, height);
+      if (bodyMask) {
+        // 詰まり具合は元の輪郭のものを渡す（体だけのマスクは
+        // 島状で当然まばらなので、その密度で正直さの門にかけない）。
+        const rr = this.analyzePoseWithMask(rgba, width, height, bodyMask, chosenMethod, chosen.silhouetteDensity);
+        // 置き換えは「胸がはっきり細くなる時」だけ。少しの差で
+        // 測り方の基準が揺れると、描いて測り直す照合が壊れる。
+        // さらに、髪を除いて広くなる部位がある読みは信用しない
+        // （除去で狭くなるのが筋で、広がるのは分割の失敗）。
+        let neverWider = true;
+        if (rr) {
+          for (const k of ['shoulder', 'chest', 'waist', 'hip', 'thigh', 'calf', 'ankle'] as const) {
+            const a = chosen.bodyProfile[k];
+            const b = rr.bodyProfile[k];
+            if (a !== null && b !== null && b > a + 0.03) { neverWider = false; break; }
+          }
+        }
+        if (rr && rr.profileComplete && neverWider && (!chosen.profileComplete
+          || (rr.bodyProfile.chest !== null && chosen.bodyProfile.chest !== null && rr.bodyProfile.chest >= 0.12 && rr.bodyProfile.chest < chosen.bodyProfile.chest - 0.08))) {
+          chosen = { ...chosen, bodyProfile: rr.bodyProfile, profileComplete: true };
+          regionApplied = true;
+        }
+      }
+    }
     if (chosen) {
       const state = this.load();
       state.analyzed++;
       if (chosenMethod !== 'bin') state.maskFill++;
+      if (regionApplied) state.regions++;
       if (chosen.verified) state.verified++;
       if (chosen.clothingDescription) state.clothing++;
       if (chosen.extrasDescription) state.extras++;

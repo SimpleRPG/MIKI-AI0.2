@@ -8134,6 +8134,40 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1002 自己点検の記録に服と線の照合が入っている', insp1002.visualClothes >= 1 && insp1002.visualLineRoles >= 1, `clothes=${insp1002.visualClothes} lines=${insp1002.visualLineRoles}`);
 }
 
+// ---- P1003 線による領域分割 ----
+{
+  const { visualPoseService: vpose1003 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi1003 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB1003 = [number, number, number];
+  const DARK1003: RGB1003 = [30, 30, 30];
+  const PINKH1003: RGB1003 = [243, 205, 215];
+  const SKIN1003: RGB1003 = [232, 190, 160];
+  const BLUE1003: RGB1003 = [40, 40, 120];
+  const W = 96, H = 120;
+  const px1003: RGB1003[] = []; for (let i = 0; i < W * H; i++) px1003.push([245, 245, 245]);
+  const rectB1003 = (x0: number, y0: number, x1: number, y1: number, fill: RGB1003) => {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1003[y * W + x] = (x === x0 || x === x1 || y === y0 || y === y1) ? DARK1003 : fill;
+  };
+  const discB1003 = (cx: number, cy: number, r: number, fill: RGB1003) => {
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const d = (x - cx) ** 2 + (y - cy) ** 2; if (d <= r * r) px1003[y * W + x] = d > (r - 1) * (r - 1) ? DARK1003 : fill; }
+  };
+  rectB1003(15, 27, 80, 96, PINKH1003);   // 後ろ髪パネル（輪郭幅いっぱいに広がる）
+  rectB1003(36, 36, 60, 78, BLUE1003);   // 胴
+  rectB1003(27, 39, 33, 72, BLUE1003);   // 腕
+  rectB1003(63, 39, 69, 72, BLUE1003);
+  rectB1003(37, 78, 45, 111, BLUE1003);  // 脚
+  rectB1003(51, 78, 59, 111, BLUE1003);
+  discB1003(48, 21, 13, PINKH1003);      // 頭の髪
+  discB1003(48, 22, 7, SKIN1003);        // 顔
+  const img1003 = new Uint8Array(W * H * 4);
+  px1003.forEach((c, i) => { img1003[i * 4] = c[0]; img1003[i * 4 + 1] = c[1]; img1003[i * 4 + 2] = c[2]; img1003[i * 4 + 3] = 255; });
+  const reading1003 = vpose1003.analyzePose(img1003, W, H);
+  check('P1003 後ろ髪が広がっていても体の幅は髪込みにならない', reading1003 !== null && reading1003.profileComplete && reading1003.bodyProfile.chest !== null && reading1003.bodyProfile.chest <= 0.3, `chest=${reading1003?.bodyProfile.chest}`);
+  check('P1003 領域分割で測り直した記録が残る', vpose1003.summary().regions >= 1, `regions=${vpose1003.summary().regions}`);
+  const insp1003 = ksi1003.inspect();
+  check('P1003 自己点検の記録に領域分割が入っている', insp1003.visualRegions >= 1, `visualRegions=${insp1003.visualRegions}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
