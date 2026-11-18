@@ -7568,6 +7568,37 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P985 自己点検の記録に生え際（visualHairline）が入っている', typeof insp985.visualHairline === 'number' && insp985.visualHairline >= 1, `visualHairline=${insp985.visualHairline}`);
 }
 
+// ---- P986 腕の長さの第1段 ----
+{
+  const { visualPoseService: vpose986 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi986 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB986 = [number, number, number];
+  const SKIN986: RGB986 = [232, 190, 160];
+  const HAIR986: RGB986 = [45, 32, 22];
+  const BLUE986: RGB986 = [40, 40, 120];
+  const person986 = (armBottom: number) => {
+    const px: RGB986[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB986) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB986) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(22, 9, 6, HAIR986); disc(22, 10, 5, SKIN986);
+    rect(16, 15, 28, 32, BLUE986);
+    if (armBottom > 32) { rect(11, 16, 14, armBottom, BLUE986); rect(30, 16, 33, armBottom, BLUE986); }
+    else { rect(12, 16, 15, armBottom, BLUE986); rect(29, 16, 32, armBottom, BLUE986); }
+    rect(16, 32, 21, 50, BLUE986); rect(23, 32, 28, 50, BLUE986);
+    const o = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const std986 = vpose986.analyzePose(person986(30), 48, 56);
+  check('P986 普通の腕の長さは言わない', std986?.armLength === null, `armLength=${std986?.armLength}`);
+  const long986 = vpose986.analyzePose(person986(44), 48, 56);
+  check('P986 長い腕が読める（手の探索範囲を超えてもマスクから測る）', long986?.armLength === 'long' && long986.armLengthDescription === '腕が長い', `armLength=${long986?.armLength}`);
+  const short986 = vpose986.analyzePose(person986(21), 48, 56);
+  check('P986 短い腕が読める', short986?.armLength === 'short', `armLength=${short986?.armLength}`);
+  const insp986 = ksi986.inspect();
+  check('P986 自己点検の記録に腕の長さ（visualArmLength）が入っている', typeof insp986.visualArmLength === 'number' && insp986.visualArmLength >= 1, `visualArmLength=${insp986.visualArmLength}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
