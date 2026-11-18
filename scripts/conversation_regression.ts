@@ -8338,6 +8338,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1009 描いて測り直す照合が保たれる', ver1009?.verified === true, `score=${ver1009?.score}`);
 }
 
+// ---- P1010 部品描きの目の大きさと色の読み ----
+{
+  const { visualPoseService: vpose1010 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB1010 = [number, number, number];
+  const SKIN1010: RGB1010 = [232, 190, 160];
+  const HAIR1010: RGB1010 = [45, 32, 22];
+  const BLUE1010: RGB1010 = [40, 40, 120];
+  const px1010: RGB1010[] = []; for (let i = 0; i < 48 * 56; i++) px1010.push([245, 245, 245]);
+  const rect1010 = (x0: number, y0: number, x1: number, y1: number, c: RGB1010) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1010[y * 48 + x] = c; };
+  const disc1010 = (cx: number, cy: number, r: number, c: RGB1010) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1010[y * 48 + x] = c; };
+  rect1010(16, 15, 28, 32, BLUE1010); rect1010(12, 16, 15, 30, SKIN1010); rect1010(29, 16, 32, 30, SKIN1010);
+  rect1010(16, 32, 21, 50, BLUE1010); rect1010(23, 32, 28, 50, BLUE1010);
+  disc1010(22, 9, 6, HAIR1010); disc1010(22, 10, 5, SKIN1010);
+  const img1010 = new Uint8Array(48 * 56 * 4);
+  px1010.forEach((c, i) => { img1010[i * 4] = c[0]; img1010[i * 4 + 1] = c[1]; img1010[i * 4 + 2] = c[2]; img1010[i * 4 + 3] = 255; });
+  const reading1010 = vpose1010.analyzePose(img1010, 48, 56);
+  const big1010 = reading1010 ? vpose1010.verifyEyeDetail(reading1010, { eyeSize: 'large', brows: false, mouthSize: null, iris: [90, 130, 220], irisName: '青' }) : null;
+  check('P1010 大きい虹彩の目は大きさまで一致する', big1010?.verified === true && big1010?.eyeSize === 'large', `verified=${big1010?.verified} eyeSize=${big1010?.eyeSize}`);
+  const smallBrown1010 = reading1010 ? vpose1010.verifyEyeDetail(reading1010, { eyeSize: 'small', brows: false, mouthSize: null, iris: [140, 90, 50], irisName: '茶色' }) : null;
+  check('P1010 小さい茶色の虹彩は色も大きさも潰れない', smallBrown1010?.verified === true && smallBrown1010?.eyeColor === '茶色' && smallBrown1010?.eyeSize === 'small', `verified=${smallBrown1010?.verified} eyeColor=${smallBrown1010?.eyeColor} eyeSize=${smallBrown1010?.eyeSize}`);
+  const smallPink1010 = reading1010 ? vpose1010.verifyEyeDetail(reading1010, { eyeSize: 'small', brows: false, mouthSize: null, iris: [232, 120, 160], irisName: 'ピンク' }) : null;
+  check('P1010 小さいピンクの虹彩も色と大きさが読める', smallPink1010?.verified === true && smallPink1010?.eyeColor === 'ピンク' && smallPink1010?.eyeSize === 'small', `verified=${smallPink1010?.verified} eyeColor=${smallPink1010?.eyeColor} eyeSize=${smallPink1010?.eyeSize}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

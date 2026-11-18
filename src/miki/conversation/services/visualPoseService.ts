@@ -1800,7 +1800,7 @@ class VisualPoseService {
    * P1000: 目の作画の照合。虹彩つきで顔を描き、頭を切り出して
    * 顔の読みにかけ、目の数と目の色が指定と一致するか。
    */
-  public verifyEyeDetail(reading: PoseReading, face: BodyFaceSpec): { verified: boolean; eyes: number; eyeColor: string | null; image: Uint8Array } | null {
+  public verifyEyeDetail(reading: PoseReading, face: BodyFaceSpec): { verified: boolean; eyes: number; eyeColor: string | null; eyeSize: 'large' | 'small' | null; image: Uint8Array } | null {
     if (!reading.head) return null;
     // 目の部品は小さいので、大きく描いてから切り出す（64では虹彩が瞳孔に潰れる）。
     const image = this.renderBody(reading, 192, face);
@@ -1810,16 +1810,18 @@ class VisualPoseService {
     const fr = visualZoomService.analyzeFace(crop.pixels);
     let verified = false;
     if (fr) {
-      // 照合は目の数と虹彩の色。目の大きさの読みは部品の目では
-      // クラスタの形が変わって読みが安定しないため、P994の丸い目の照合に任せる。
+      // 照合は目の数と虹彩の色、それに目の大きさ（P1010で部品の目でも
+      // 読めるようになった：顔の箱を中心の肌の塊で取り、大きさは
+      // 虹彩の色画素の横幅で測る）。
       verified = fr.eyes === 2;
       if (face.irisName && fr.eyeColor !== face.irisName) verified = false;
+      if (face.eyeSize && fr.eyeSize !== face.eyeSize) verified = false;
     }
     const state = this.load();
     state.eyesDrawn++;
     if (verified) state.eyesOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
-    return { verified, eyes: fr?.eyes ?? 0, eyeColor: fr?.eyeColor ?? null, image };
+    return { verified, eyes: fr?.eyes ?? 0, eyeColor: fr?.eyeColor ?? null, eyeSize: fr?.eyeSize ?? null, image };
   }
 
   /**

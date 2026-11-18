@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1848,
     "sourceFileCount": 1401,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1312,
-    "relativeImportCandidateCount": 4741,
-    "resolvedRelativeImportCandidateCount": 4725,
+    "relativeImportCandidateCount": 4742,
+    "resolvedRelativeImportCandidateCount": 4726,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 705882,
-      "lines": 8354,
-      "sha256": "d7bc4a76d20b61bd49ed587f9a812244646ba4f7f226bae9ec56823942aa96fd",
+      "bytes": 708529,
+      "lines": 8378,
+      "sha256": "5311e8f1da88e6da157862367dde7b7a9f0ad77fa017ba4b551d7ce95d029daf",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4820,10 +4820,16 @@
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
+        },
+        {
+          "line": 8343,
+          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         }
       ],
-      "relativeImportCandidateCount": 517,
-      "resolvedRelativeImportCount": 517,
+      "relativeImportCandidateCount": 518,
+      "resolvedRelativeImportCount": 518,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -15486,9 +15492,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 170095,
-      "lines": 3359,
-      "sha256": "fa8d844196b1ba9229912cac41fad2341a9866c3417c76053f6419122e19fede",
+      "bytes": 170271,
+      "lines": 3361,
+      "sha256": "1315a089c3b67491462029caae3220f3ae7dd1ad3416ec927b05a7fd42b0aabf",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -15556,9 +15562,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualZoomService.ts",
-      "bytes": 30850,
-      "lines": 612,
-      "sha256": "20149b392f7769e80cd9ac3f4a22f6a6684c7dc52aeaaf0cb2c07998b0a7ff62",
+      "bytes": 34080,
+      "lines": 672,
+      "sha256": "5e4358f8206e191878b422bc27083e1f6ed860a0f4081aab70d92be196a502ab",
       "relativeImportCandidates": [
         {
           "line": 1,
