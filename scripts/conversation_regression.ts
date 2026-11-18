@@ -6605,6 +6605,46 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P953 自己点検の記録に拡大測定（visualZooms）が入っている', typeof insp953.visualZooms === 'number' && insp953.visualZooms >= 1, `visualZooms=${insp953.visualZooms}`);
 }
 
+// ---- P954 表情（顔の中身：目と口） ----
+{
+  const { visualZoomService: vzoom954 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi954 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const W954 = 96, H954 = 96;
+  type RGB954 = [number, number, number];
+  const HAIR954: RGB954 = [45, 32, 22];
+  const SKIN954: RGB954 = [232, 190, 160];
+  const DARK954: RGB954 = [30, 30, 30];
+  const makeFace954 = (mouth: 'smile' | 'frown' | 'none', withEyes = true) => {
+    const px: RGB954[] = [];
+    for (let i = 0; i < W954 * H954; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB954) => { for (let y = 0; y < H954; y++) for (let x = 0; x < W954; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W954 + x] = c; };
+    disc(48, 40, 32, HAIR954); disc(48, 50, 28, SKIN954);
+    if (withEyes) { disc(38, 44, 3, DARK954); disc(58, 44, 3, DARK954); }
+    if (mouth !== 'none') {
+      for (let x = 36; x <= 60; x++) {
+        const t = (x - 36) / 24;
+        const y = mouth === 'smile' ? 64 + Math.round(3.5 * Math.sin(t * Math.PI)) : 68 - Math.round(3.5 * Math.sin(t * Math.PI));
+        px[y * W954 + x] = DARK954; px[(y + 1) * W954 + x] = DARK954;
+      }
+    }
+    const out = new Uint8Array(W954 * H954 * 4);
+    px.forEach((c, i) => { out[i * 4] = c[0]; out[i * 4 + 1] = c[1]; out[i * 4 + 2] = c[2]; out[i * 4 + 3] = 255; });
+    return out;
+  };
+  const readFace954 = (img: Uint8Array) => {
+    const z = vzoom954.cropAnalyze(img, W954, H954, 0.5, 0.52, 0.8);
+    return z ? vzoom954.analyzeFace(z.pixels) : null;
+  };
+  const smile954 = readFace954(makeFace954('smile'));
+  check('P954 笑った顔は目2つ＋笑い口で照合を通る', smile954?.eyes === 2 && smile954?.mouthShape === 'smile' && smile954?.verified === true, `smile=${JSON.stringify(smile954 && { e: smile954.eyes, m: smile954.mouthShape, v: smile954.verified })}`);
+  const frown954 = readFace954(makeFace954('frown'));
+  check('P954 口元が下がった顔も読み分けられる', frown954?.eyes === 2 && frown954?.mouthShape === 'frown' && frown954?.verified === true, `frown=${JSON.stringify(frown954 && { e: frown954.eyes, m: frown954.mouthShape })}`);
+  const plain954 = readFace954(makeFace954('none', false));
+  check('P954 目も口もない顔では何も見えたと言わない（髪を目と誤らない）', plain954?.eyes === 0 && plain954?.mouthShape === 'none' && plain954?.description === '', `plain=${JSON.stringify(plain954 && { e: plain954.eyes, m: plain954.mouthShape })}`);
+  const insp954 = ksi954.inspect();
+  check('P954 自己点検の記録に顔の読み（visualFaces）が入っている', typeof insp954.visualFaces === 'number' && insp954.visualFaces >= 1, `visualFaces=${insp954.visualFaces}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

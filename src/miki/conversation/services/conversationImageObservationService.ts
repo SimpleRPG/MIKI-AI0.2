@@ -572,6 +572,23 @@ class ConversationImageObservationService {
                 '具体的な物や文字までは読み取れない。',
                 `${zoomText}具体的な物や文字までは読み取れない。`,
               );
+              // P954: 顔（肌色の領域）だけをもう一段きつく
+              // 拡大して、目と口を読む。
+              const faceZoom = visualZoomService.cropAnalyze(
+                bitmap.full.rgba, bitmap.full.width, bitmap.full.height,
+                (zoom.crop.x + skin.centroidX * zoom.crop.side) / bitmap.full.width,
+                (zoom.crop.y + skin.centroidY * zoom.crop.side) / bitmap.full.height,
+                (skin.bboxHeight * zoom.crop.side * 1.5) / bitmap.full.width,
+              );
+              if (faceZoom) {
+                const face = visualZoomService.analyzeFace(faceZoom.pixels);
+                if (face && face.verified && face.description) {
+                  text = text.replace(
+                    '具体的な物や文字までは読み取れない。',
+                    `顔をよく見ると、${face.description}具体的な物や文字までは読み取れない。`,
+                  );
+                }
+              }
             }
           }
         } catch { /* 拡大できなくても観察は返す */ }

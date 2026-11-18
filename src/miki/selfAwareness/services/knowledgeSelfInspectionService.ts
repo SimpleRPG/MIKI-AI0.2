@@ -118,6 +118,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualPoses: number;
   visualPoseMotions: number;
   visualZooms: number;
+  visualFaces: number;
   findings: string[];
 }
 
@@ -341,6 +342,7 @@ class KnowledgeSelfInspectionService {
     let visualPoses = 0;
     let visualPoseMotions = 0;
     let visualZooms = 0;
+    let visualFaces = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -510,6 +512,11 @@ class KnowledgeSelfInspectionService {
       if (visualZooms > 0) {
         findings.push(`部分を拡大して${visualZooms}件測り直した`);
       }
+      // P954: 顔の中身を読んだ回数。
+      visualFaces = visualZoomService.summary().faces;
+      if (visualFaces > 0) {
+        findings.push(`顔の中身を${visualFaces}件読んだ`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -578,6 +585,7 @@ class KnowledgeSelfInspectionService {
       visualPoses,
       visualPoseMotions,
       visualZooms,
+      visualFaces,
       findings,
     };
 
