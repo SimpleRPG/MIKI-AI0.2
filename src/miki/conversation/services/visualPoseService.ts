@@ -804,7 +804,7 @@ class VisualPoseService {
         const b = re.bodyProfile[k];
         if (a === null || b === null) continue;
         compared++;
-        if (Math.abs(a - b) <= 0.09) ok++;
+        if (Math.abs(a - b) <= 0.09 + 1e-9) ok++; // P1009: 値は0.01単位に丸めてあるので、0.09ちょうどの差は浮動小数の誤差で落ちないよう僅かに緩める
       }
       // P993: 髪の長さの一致も照合に含める。
       if (reading.hair && re.hair) {
@@ -874,7 +874,7 @@ class VisualPoseService {
         const b = re.bodyProfile[k];
         if (a === null || b === null) continue;
         compared++;
-        if (Math.abs(a - b) <= 0.09) ok++;
+        if (Math.abs(a - b) <= 0.09 + 1e-9) ok++; // P1009: 値は0.01単位に丸めてあるので、0.09ちょうどの差は浮動小数の誤差で落ちないよう僅かに緩める
       }
       if (reading.hair && re.hair) {
         compared++;
@@ -1120,7 +1120,7 @@ class VisualPoseService {
         const b = re.bodyProfile[k];
         if (a === null || b === null) continue;
         compared++;
-        if (Math.abs(a - b) <= 0.09) ok++;
+        if (Math.abs(a - b) <= 0.09 + 1e-9) ok++; // P1009: 値は0.01単位に丸めてあるので、0.09ちょうどの差は浮動小数の誤差で落ちないよう僅かに緩める
       }
       if (reading.hair && re.hair) {
         compared++;
@@ -1524,7 +1524,10 @@ class VisualPoseService {
       if (d < bestDiff - 0.004) { bestDiff = d; bestProfile = current; staleRounds = 0; }
       else if (d < bestDiff) { bestDiff = d; bestProfile = current; staleRounds++; }
       else staleRounds++;
-      if (bestDiff <= 0.06) break;
+      // P1009: 差分は0.01単位に丸めた値の合計なので、0.06ちょうどは
+      // 浮動小数の誤差（0.06000000000000005）で収束と判定されず、
+      // 床に張り付いたまま停滞に化けることがある。僅かに緩める。
+      if (bestDiff <= 0.06 + 1e-9) break;
       if (staleRounds >= 3 && round >= 3) { plateau = true; break; }
       const next: PoseReading['bodyProfile'] = { ...current };
       for (const k of keys) {
@@ -2530,7 +2533,10 @@ class VisualPoseService {
     const bodyProfile = {
       shoulder: ratio991(spanWidthAt991(shoulderY)),
       chest: ratio991(band991(neckY + figH * 0.08, hipY - figH * 0.12, spanWidthAt991, 'max')),
-      waist: ratio991(band991(hipY - figH * 0.18, hipY - figH * 0.02, spanWidthAt991, 'min')),
+      // P1009: 腰は帯の最小行でなく下から25%の行で測る。最小行は、領域分割の
+      // 壁線などで数行だけ潰れた行に引っ張られて実物より細く出る
+      // （全身サンプルで腰0.04。帯の行の多くは14〜16pxなのに最小は9pxだった）。
+      waist: ratio991(band991(hipY - figH * 0.18, hipY - figH * 0.02, spanWidthAt991, 'p25')),
       hip: ratio991(spanWidthAt991(hipY)),
       thigh: crotchY > 0 ? ratio991(band991(crotchY + 1, crotchY + figH * 0.12, totalWidthAt991, 'max')) : null,
       calf: ratio991(totalWidthAt991(figBottom - figH * 0.16)),

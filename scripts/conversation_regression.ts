@@ -8309,6 +8309,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1008 セル髪でも髪色と長さが保たれる', reCel1008?.hairColor === 'ピンク' && reCel1008?.hair?.length === 'long', `color=${reCel1008?.hairColor} len=${reCel1008?.hair?.length}`);
 }
 
+// ---- P1009 腰の幅の頑丈な測り方（帯の下位パーセンタイル） ----
+{
+  const { visualPoseService: vpose1009 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB1009 = [number, number, number];
+  const SKIN1009: RGB1009 = [232, 190, 160];
+  const HAIR1009: RGB1009 = [45, 32, 22];
+  const BLUE1009: RGB1009 = [40, 40, 120];
+  const BG1009: RGB1009 = [245, 245, 245];
+  const build1009 = (pinch: boolean) => {
+    const px: RGB1009[] = []; for (let i = 0; i < 48 * 56; i++) px.push(BG1009);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB1009) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB1009) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    rect(16, 15, 28, 32, BLUE1009); rect(12, 16, 15, 30, SKIN1009); rect(29, 16, 32, 30, SKIN1009);
+    rect(16, 32, 21, 50, BLUE1009); rect(23, 32, 28, 50, BLUE1009);
+    disc(22, 9, 6, HAIR1009); disc(22, 10, 5, SKIN1009);
+    // 壁線で潰れた行の再現：腰の帯の2行だけ胴を細片にする
+    if (pinch) for (const y of [25, 26]) for (let x = 16; x <= 28; x++) px[y * 48 + x] = x >= 20 && x <= 24 ? BLUE1009 : BG1009;
+    const img = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { img[i * 4] = c[0]; img[i * 4 + 1] = c[1]; img[i * 4 + 2] = c[2]; img[i * 4 + 3] = 255; });
+    return img;
+  };
+  const std1009 = vpose1009.analyzePose(build1009(false), 48, 56);
+  const pinched1009 = vpose1009.analyzePose(build1009(true), 48, 56);
+  check('P1009 潰れた行があってもプロファイルが作れる', pinched1009?.profileComplete === true && pinched1009.bodyProfile.waist !== null, `profile=${JSON.stringify(pinched1009?.bodyProfile)}`);
+  check('P1009 数行の潰れで腰の幅が潰れない（が、細くは出る）', (pinched1009?.bodyProfile.waist ?? 0) >= (std1009?.bodyProfile.waist ?? 99) - 0.2 && (pinched1009?.bodyProfile.waist ?? 99) < (std1009?.bodyProfile.waist ?? 0), `std=${std1009?.bodyProfile.waist} pinched=${pinched1009?.bodyProfile.waist}`);
+  const ver1009 = std1009 ? vpose1009.verifyBody(std1009) : null;
+  check('P1009 描いて測り直す照合が保たれる', ver1009?.verified === true, `score=${ver1009?.score}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
