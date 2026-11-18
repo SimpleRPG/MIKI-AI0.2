@@ -7338,6 +7338,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P977 立っている人は立っているまま読める', stand977?.posture === 'STANDING', `posture=${stand977?.posture}`);
 }
 
+// ---- P978 眉の第1段 ----
+{
+  const { visualZoomService: vzoom978 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi978 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB978 = [number, number, number];
+  const SKIN978: RGB978 = [232, 190, 160];
+  const HAIR978: RGB978 = [45, 32, 22];
+  const DARK978: RGB978 = [30, 30, 30];
+  const face978 = (withBrows: boolean) => {
+    const px: RGB978[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB978) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB978) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR978); disc(24, 25, 14, SKIN978);
+    disc(17, 22, 3, DARK978); disc(31, 22, 3, DARK978);
+    if (withBrows) { rect(12, 14, 22, 16, HAIR978); rect(26, 14, 36, 16, HAIR978); }
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const with978 = vzoom978.analyzeFace(face978(true));
+  check('P978 眉のある顔で眉が読める', with978?.brows === true && with978.description.includes('眉が見える'), `brows=${with978?.brows}`);
+  const without978 = vzoom978.analyzeFace(face978(false));
+  check('P978 眉のない顔では眉は無いと読む', without978?.brows === false, `brows=${without978?.brows}`);
+  const insp978 = ksi978.inspect();
+  check('P978 自己点検の記録に眉（visualBrows）が入っている', typeof insp978.visualBrows === 'number' && insp978.visualBrows >= 1, `visualBrows=${insp978.visualBrows}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
