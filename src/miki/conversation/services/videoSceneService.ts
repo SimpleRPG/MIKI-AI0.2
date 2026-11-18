@@ -65,6 +65,22 @@ export interface VideoScene {
   motionText?: string;
 }
 
+/**
+ * P970: 字幕から言葉の候補を取り出す。句読点や括弧で切り、
+ * 末尾の助詞や丁寧語を落とし、短すぎる断片と決まり文句を除く。
+ * 粗い切り方だが、対応づけの回数でふるいにかける前提の第1段。
+ */
+export function extractCaptionWords(text: string): string[] {
+  const stop = new Set(['これ', 'それ', 'あれ', 'ここ', 'そこ', 'もの', 'こと', 'よう', 'ため', 'とき', 'ところ', 'さん', 'くん', 'ちゃん', 'です', 'ます', 'ない', 'ある', 'いる', 'する', 'なる']);
+  const raw = (text || '').split(/[\s、。，．・「」『』（）()【】\[\]!！?？:：;；…]+/).filter(Boolean);
+  const words = new Set<string>();
+  for (let tok of raw) {
+    tok = tok.replace(/(は|が|を|に|へ|と|の|も|から|まで|です|ます|でした|だった|である|だ)$/u, '');
+    if (tok.length >= 2 && tok.length <= 8 && !stop.has(tok)) words.add(tok);
+  }
+  return [...words];
+}
+
 /** 特徴量どうしの距離（0..1）。色・領域・明るさ・エッジの合成。 */
 export function frameFeatureDistance(a: ImagePixelFeatures, b: ImagePixelFeatures): number {
   const colorMap = (f: ImagePixelFeatures) => {
@@ -171,9 +187,33 @@ class VideoSceneService {
       state.scenesTotal += scenes.length;
       state.motionsTotal += scenes.filter((sc) => sc.motionText).length;
       state.lastSceneCount = scenes.length;
+      // P970: 場面の同定と字幕の言葉の対応づけ。同じ対応が
+      // 繰り返し現れたら、画面の中身の名前の候補になる。
+      for (const sc of scenes) {
+        if (!sc.identifications.length || !sc.subtitleText) continue;
+        const words = extractCaptionWords(sc.subtitleText);
+        for (const ident of sc.identifications) {
+          for (const w of words) {
+            const k = `${ident}|${w}`;
+            state.pairs[k] = (state.pairs[k] || 0) + 1;
+          }
+        }
+      }
       storageService.setItem(KEY, JSON.stringify(state));
     } catch { /* 台帳は補助経路 */ }
     return { scenes, cutsMs: cutAt.map((i) => sorted[i].tMs) };
+  }
+
+  /** P970: 3回以上対応づいた（同定，言葉）を名前の候補として返す。 */
+  public wordCandidates(): { identification: string; word: string; count: number }[] {
+    const pairs = this.loadState().pairs;
+    return Object.entries(pairs)
+      .filter(([, n]) => n >= 3)
+      .map(([k, n]) => {
+        const [identification, word] = k.split('|');
+        return { identification, word, count: n };
+      })
+      .sort((a, b) => b.count - a.count);
   }
 
   /** 場面の並びを文章にする（会話や日記の材料）。 */
@@ -192,7 +232,7 @@ class VideoSceneService {
     }).join('\n');
   }
 
-  private loadState(): { runs: number; scenesTotal: number; motionsTotal: number; lastSceneCount: number } {
+  private loadState(): { runs: number; scenesTotal: number; motionsTotal: number; lastSceneCount: number; pairs: Record<string, number> } {
     try {
       const parsed = JSON.parse(storageService.getItem(KEY) || '{}');
       return {
@@ -200,15 +240,23 @@ class VideoSceneService {
         scenesTotal: Number(parsed.scenesTotal || 0),
         motionsTotal: Number(parsed.motionsTotal || 0),
         lastSceneCount: Number(parsed.lastSceneCount || 0),
+        pairs: (parsed.pairs && typeof parsed.pairs === 'object') ? parsed.pairs : {},
       };
     } catch {
-      return { runs: 0, scenesTotal: 0, motionsTotal: 0, lastSceneCount: 0 };
+      return { runs: 0, scenesTotal: 0, motionsTotal: 0, lastSceneCount: 0, pairs: {} };
     }
   }
 
-  public summary(): { runs: number; scenesTotal: number; motionsTotal: number } {
+  public summary(): { runs: number; scenesTotal: number; motionsTotal: number; wordPairs: number; wordCandidates: number } {
     const state = this.loadState();
-    return { runs: state.runs, scenesTotal: state.scenesTotal, motionsTotal: state.motionsTotal };
+    const counts = Object.values(state.pairs);
+    return {
+      runs: state.runs,
+      scenesTotal: state.scenesTotal,
+      motionsTotal: state.motionsTotal,
+      wordPairs: counts.length,
+      wordCandidates: counts.filter((n) => n >= 3).length,
+    };
   }
 }
 

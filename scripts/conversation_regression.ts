@@ -7140,6 +7140,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P969 自己点検の記録に目の色（visualEyeColor）が入っている', typeof insp969.visualEyeColor === 'number' && insp969.visualEyeColor >= 1, `visualEyeColor=${insp969.visualEyeColor}`);
 }
 
+// ---- P970 動画学習の第1段（字幕と画面の対応づけ） ----
+{
+  const { videoSceneService: vscene970 } = await import('../src/miki/conversation/services/videoSceneService');
+  const { knowledgeSelfInspectionService: ksi970 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB970 = [number, number, number];
+  const SKIN970: RGB970 = [232, 190, 160];
+  const HAIR970: RGB970 = [45, 32, 22];
+  const BLUE970: RGB970 = [40, 40, 120];
+  const px970: RGB970[] = []; for (let i = 0; i < 48 * 56; i++) px970.push([245, 245, 245]);
+  const rect970 = (x0: number, y0: number, x1: number, y1: number, c: RGB970) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px970[y * 48 + x] = c; };
+  const disc970 = (cx: number, cy: number, r: number, c: RGB970) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px970[y * 48 + x] = c; };
+  disc970(22, 9, 6, HAIR970); disc970(22, 10, 5, SKIN970);
+  rect970(16, 15, 28, 32, BLUE970);
+  rect970(12, 16, 15, 30, BLUE970); rect970(29, 16, 32, 30, BLUE970);
+  rect970(16, 32, 21, 50, BLUE970); rect970(23, 32, 28, 50, BLUE970);
+  const frame970 = new Uint8Array(48 * 56 * 4);
+  px970.forEach((c, i) => { frame970[i * 4] = c[0]; frame970[i * 4 + 1] = c[1]; frame970[i * 4 + 2] = c[2]; frame970[i * 4 + 3] = 255; });
+  const frames970 = [0, 1000, 2000].map((tMs) => ({ tMs, rgba: frame970, width: 48, height: 56 }));
+  const segs970 = [{ startMs: 0, endMs: 2500, text: '人が歩く場面です' }];
+  for (let i = 0; i < 3; i++) vscene970.decompose(frames970, segs970);
+  const cand970 = vscene970.wordCandidates();
+  check('P970 字幕と画面の対応が3回で候補になる', cand970.some((c) => c.word === '人が歩く場面' && c.count >= 3), `candidates=${JSON.stringify(cand970.slice(0, 2))}`);
+  const insp970 = ksi970.inspect();
+  check('P970 自己点検の記録に字幕対応（visualCaptionPairs）が入っている', typeof insp970.visualCaptionPairs === 'number' && insp970.visualCaptionPairs >= 1, `visualCaptionPairs=${insp970.visualCaptionPairs}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

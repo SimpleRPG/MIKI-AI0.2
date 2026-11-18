@@ -114,6 +114,7 @@ export interface KnowledgeSelfInspectionRecord {
   swarmVerifications: number;
   visualFigures: number;
   videoScenes: number;
+  visualCaptionPairs: number;
   videoMotions: number;
   visualPoses: number;
   visualPoseMotions: number;
@@ -354,6 +355,7 @@ class KnowledgeSelfInspectionService {
     let swarmVerifications = 0;
     let visualFigures = 0;
     let videoScenes = 0;
+    let visualCaptionPairs = 0;
     let videoMotions = 0;
     let visualPoses = 0;
     let visualPoseMotions = 0;
@@ -523,6 +525,11 @@ class KnowledgeSelfInspectionService {
       videoScenes = videoSceneService.summary().scenesTotal;
       if (videoScenes > 0) {
         findings.push(`動画を${videoScenes}場面に切り分けた`);
+      }
+      // P970: 字幕と画面の対応づけで候補になった数。
+      visualCaptionPairs = videoSceneService.summary().wordCandidates;
+      if (visualCaptionPairs > 0) {
+        findings.push(`動画の字幕と画面の対応を${visualCaptionPairs}件覚えた`);
       }
       // P947: 動きを記述できた場面の総数。
       videoMotions = videoSceneService.summary().motionsTotal;
@@ -694,6 +701,7 @@ class KnowledgeSelfInspectionService {
       swarmVerifications,
       visualFigures,
       videoScenes,
+      visualCaptionPairs,
       videoMotions,
       visualPoses,
       visualPoseMotions,
