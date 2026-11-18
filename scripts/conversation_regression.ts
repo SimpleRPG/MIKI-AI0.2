@@ -7655,6 +7655,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P988 自己点検の記録に目の大きさ（visualEyeSize）が入っている', typeof insp988.visualEyeSize === 'number' && insp988.visualEyeSize >= 1, `visualEyeSize=${insp988.visualEyeSize}`);
 }
 
+// ---- P989 口の大きさの第1段 ----
+{
+  const { visualZoomService: vzoom989 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi989 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB989 = [number, number, number];
+  const SKIN989: RGB989 = [232, 190, 160];
+  const HAIR989: RGB989 = [45, 32, 22];
+  const DARK989: RGB989 = [30, 30, 30];
+  const face989 = (mouth: [number, number]) => {
+    const px: RGB989[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB989) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR989); disc(24, 24, 16, SKIN989);
+    disc(17, 20, 3, DARK989); disc(31, 20, 3, DARK989);
+    for (let y = 33; y <= 34; y++) for (let x = mouth[0]; x <= mouth[1]; x++) px[y * 48 + x] = DARK989;
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const wide989 = vzoom989.analyzeFace(face989([15, 33]));
+  check('P989 大きい口が読める', wide989?.mouthSize === 'large' && wide989.mouthSizeDescription === '口が大きい', `mouthSize=${wide989?.mouthSize}`);
+  const small989 = vzoom989.analyzeFace(face989([22, 26]));
+  check('P989 小さい口が読める', small989?.mouthSize === 'small', `mouthSize=${small989?.mouthSize}`);
+  const mid989 = vzoom989.analyzeFace(face989([19, 29]));
+  check('P989 普通の口の大きさは言わない', mid989?.mouthSize === null, `mouthSize=${mid989?.mouthSize}`);
+  const insp989 = ksi989.inspect();
+  check('P989 自己点検の記録に口の大きさ（visualMouthSize）が入っている', typeof insp989.visualMouthSize === 'number' && insp989.visualMouthSize >= 1, `visualMouthSize=${insp989.visualMouthSize}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
