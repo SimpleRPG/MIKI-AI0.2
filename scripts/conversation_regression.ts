@@ -7628,6 +7628,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P987 自己点検の記録に脚の長さ（visualLegLength）が入っている', typeof insp987.visualLegLength === 'number' && insp987.visualLegLength >= 1, `visualLegLength=${insp987.visualLegLength}`);
 }
 
+// ---- P988 目の大きさの第1段 ----
+{
+  const { visualZoomService: vzoom988 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi988 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB988 = [number, number, number];
+  const SKIN988: RGB988 = [232, 190, 160];
+  const HAIR988: RGB988 = [45, 32, 22];
+  const DARK988: RGB988 = [30, 30, 30];
+  const face988 = (eyeR: number) => {
+    const px: RGB988[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB988) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR988); disc(24, 24, 16, SKIN988);
+    disc(17, 20, eyeR, DARK988); disc(31, 20, eyeR, DARK988);
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const large988 = vzoom988.analyzeFace(face988(3));
+  check('P988 大きめの目が読める', large988?.eyeSize === 'large' && large988.eyeSizeDescription === '目が大きい', `eyeSize=${large988?.eyeSize}`);
+  const mid988 = vzoom988.analyzeFace(face988(2));
+  check('P988 普通の目の大きさは言わない', mid988?.eyeSize === null, `eyeSize=${mid988?.eyeSize}`);
+  const small988 = vzoom988.analyzeFace(face988(1));
+  check('P988 小さい目が読める', small988?.eyeSize === 'small', `eyeSize=${small988?.eyeSize}`);
+  const insp988 = ksi988.inspect();
+  check('P988 自己点検の記録に目の大きさ（visualEyeSize）が入っている', typeof insp988.visualEyeSize === 'number' && insp988.visualEyeSize >= 1, `visualEyeSize=${insp988.visualEyeSize}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

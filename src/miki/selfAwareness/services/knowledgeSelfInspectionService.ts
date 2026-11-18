@@ -149,6 +149,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualHairline: number;
   visualArmLength: number;
   visualLegLength: number;
+  visualEyeSize: number;
   findings: string[];
 }
 
@@ -403,6 +404,7 @@ class KnowledgeSelfInspectionService {
     let visualHairline = 0;
     let visualArmLength = 0;
     let visualLegLength = 0;
+    let visualEyeSize = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -681,6 +683,11 @@ class KnowledgeSelfInspectionService {
       if (visualLegLength > 0) {
         findings.push(`脚の長さを${visualLegLength}件読んだ`);
       }
+      // P988: 目の大きさを読んだ回数。
+      visualEyeSize = visualZoomService.summary().eyeSizes;
+      if (visualEyeSize > 0) {
+        findings.push(`目の大きさを${visualEyeSize}件読んだ`);
+      }
       // P960: 裸の状態を読んだ回数。
       visualBare = visualPoseService.summary().bare;
       if (visualBare > 0) {
@@ -828,6 +835,7 @@ class KnowledgeSelfInspectionService {
       visualHairline,
       visualArmLength,
       visualLegLength,
+      visualEyeSize,
       findings,
     };
 
