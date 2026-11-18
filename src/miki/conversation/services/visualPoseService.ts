@@ -2806,6 +2806,10 @@ class VisualPoseService {
     // P958: 髪の色。頭の範囲で、肌色でない前景の最頻色。
     let hairColor: string | null = null;
     let hairBinKey: string | null = null;
+    // P1008: 髪の一族（影色・ツヤ色の変種を束ねた集合）と基準色。
+    // 長さ・形・作画読みで共有する。
+    let hairFamKeys: Set<string> | null = null;
+    let hairBaseAvg: [number, number, number] | null = null;
     {
       const groups = new Map<string, { n: number; r: number; g: number; b: number }>();
       const hr = headR * 1.25;
@@ -2827,8 +2831,49 @@ class VisualPoseService {
       let bestH: { n: number; r: number; g: number; b: number } | null = null;
       let bestHKey: string | null = null;
       for (const [k, v] of groups) if (!bestH || v.n > bestH.n) { bestH = v; bestHKey = k; }
-      if (bestH && bestH.n >= 10) hairColor = nearestExtraColor(bestH.r / bestH.n, bestH.g / bestH.n, bestH.b / bestH.n).name;
       hairBinKey = bestH && bestH.n >= 10 ? bestHKey : null;
+      if (bestH && bestH.n >= 10) {
+        // P1008: 基準色は最頻ビンとは限らない（影色が最頻になる
+        // ことがある）。ただし明るさだけで選ぶと頭の縁に入った服や
+        // 首の色を拾う。候補の中で「その影色・ツヤ色まで含めた
+        // 一族の総量」が一番大きいものを地の色とする（地の色は
+        // 変種まで含めて一番多くを説明できる）。
+        const lum = (r: number, g: number, b: number) => 0.3 * r + 0.59 * g + 0.11 * b;
+        const distC = (a: [number, number, number], c: [number, number, number]) => Math.abs(a[0] - c[0]) + Math.abs(a[1] - c[1]) + Math.abs(a[2] - c[2]);
+        let base: { n: number; r: number; g: number; b: number } | null = null;
+        let baseScore = -1;
+        for (const v of groups.values()) {
+          if (v.n < Math.max(10, bestH.n * 0.25)) continue;
+          const cAvg: [number, number, number] = [v.r / v.n, v.g / v.n, v.b / v.n];
+          const cShadow = deriveShadow(cAvg);
+          const cShine: [number, number, number] = [cAvg[0] + (255 - cAvg[0]) * 0.45, cAvg[1] + (255 - cAvg[1]) * 0.45, cAvg[2] + (255 - cAvg[2]) * 0.45];
+          let score = 0;
+          for (const w of groups.values()) {
+            const wAvg: [number, number, number] = [w.r / w.n, w.g / w.n, w.b / w.n];
+            if (distC(wAvg, cAvg) <= 60 || distC(wAvg, cShadow) <= 60 || distC(wAvg, cShine) <= 60) score += w.n;
+          }
+          if (score > baseScore || (score === baseScore && base && lum(v.r / v.n, v.g / v.n, v.b / v.n) > lum(base.r / base.n, base.g / base.n, base.b / base.n))) { base = v; baseScore = score; }
+        }
+        const bAvg: [number, number, number] = base ? [base.r / base.n, base.g / base.n, base.b / base.n] : [bestH.r / bestH.n, bestH.g / bestH.n, bestH.b / bestH.n];
+        hairBaseAvg = bAvg;
+        hairColor = nearestExtraColor(bAvg[0], bAvg[1], bAvg[2]).name;
+        // 一族＝地の色・影色・ツヤ色の近くにあるビン全部
+        const shadow = deriveShadow(bAvg);
+        const shine: [number, number, number] = [bAvg[0] + (255 - bAvg[0]) * 0.45, bAvg[1] + (255 - bAvg[1]) * 0.45, bAvg[2] + (255 - bAvg[2]) * 0.45];
+        const nearC = (a: [number, number, number], c: [number, number, number]) => Math.abs(a[0] - c[0]) + Math.abs(a[1] - c[1]) + Math.abs(a[2] - c[2]) <= 60;
+        const fam = new Set<string>();
+        for (const [k, v] of groups) {
+          const a: [number, number, number] = [v.r / v.n, v.g / v.n, v.b / v.n];
+          if (nearC(a, bAvg) || nearC(a, shadow) || nearC(a, shine)) fam.add(k);
+        }
+        // ツヤ色は背景とビンが重なってマスクに入らず、グループが
+        // できないことがある。色から直接ビンを作って一族に足す。
+        const keyOf = (c: [number, number, number]) => `${Math.round(c[0]) >> 6},${Math.round(c[1]) >> 6},${Math.round(c[2]) >> 6}`;
+        fam.add(keyOf(bAvg));
+        fam.add(keyOf(shadow));
+        fam.add(keyOf(shine));
+        hairFamKeys = fam;
+      }
     }
 
     // P964: 髪の長さ。髪色の領域が頭から下へどこまで
@@ -2844,7 +2889,8 @@ class VisualPoseService {
           const p = y * width + x;
           if (!mask[p]) continue;
           const i = p * 4;
-          if (`${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}` === hairBinKey) cnt++;
+          const bk = `${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}`;
+          if (hairFamKeys ? hairFamKeys.has(bk) : bk === hairBinKey) cnt++;
         }
         if (cnt >= 2) { hairBottom = y; gap = 0; }
         else {
@@ -2859,48 +2905,31 @@ class VisualPoseService {
     // P1007: 髪の作画の読み取り。描けるようになったツヤの帯と
     // 房の分かれを、読む側でも測る。髪色の平均を基準に、
     // 明るい画素＝ツヤ、暗い画素の縦の連なり＝房の境目とする。
-    if (hair && hairBinKey) {
-      // 基準色は最頻ビン単独では取らない。影色・ツヤ色の変種が
-      // 混ざると最頻ビンが変種に移って基準がずれるため、最頻ビンの
-      // 平均に近いビン（距離110以内）を全部束ねた「髪の一族」の
-      // 平均を基準にする。
-      const groups = new Map<string, { n: number; r: number; g: number; b: number }>();
-      const hrB = headR * 1.25;
-      for (let y = Math.max(0, Math.floor(headCy - hrB)); y <= Math.min(height - 1, Math.ceil(headCy + hrB)); y++) {
-        for (let x = Math.max(0, Math.floor(headCx - hrB)); x <= Math.min(width - 1, Math.ceil(headCx + hrB)); x++) {
-          if ((x - headCx) ** 2 + (y - headCy) ** 2 > hrB * hrB) continue;
-          const p = y * width + x;
-          if (!mask[p]) continue;
-          const i = p * 4;
-          const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
-          if (r > 170 && g > 110 && g < 220 && b > 70 && b < 195 && r > g && g >= b - 5 && r - b > 35) continue;
-          const k = `${r >> 6},${g >> 6},${b >> 6}`;
-          const cur = groups.get(k) || { n: 0, r: 0, g: 0, b: 0 };
-          cur.n++; cur.r += r; cur.g += g; cur.b += b;
-          groups.set(k, cur);
-        }
-      }
-      let dom: { n: number; r: number; g: number; b: number } | null = null;
-      for (const v of groups.values()) if (!dom || v.n > dom.n) dom = v;
-      if (dom && dom.n >= 10) {
-        const dR = dom.r / dom.n, dG = dom.g / dom.n, dB = dom.b / dom.n;
-        let baseR = 0, baseG = 0, baseB = 0, baseN = 0;
-        const famKeys = new Set<string>();
-        for (const [k, v] of groups) {
-          const aR = v.r / v.n, aG = v.g / v.n, aB = v.b / v.n;
-          if (Math.abs(aR - dR) + Math.abs(aG - dG) + Math.abs(aB - dB) > 170) continue;
-          famKeys.add(k);
-          baseR += v.r; baseG += v.g; baseB += v.b; baseN += v.n;
-        }
-        baseR /= baseN; baseG /= baseN; baseB /= baseN;
+    if (hair && hairBinKey && hairBaseAvg && hairFamKeys) {
+      // P1008: 基準色と一族は髪色の段で決めたものを共有する。
+      const baseR = hairBaseAvg[0], baseG = hairBaseAvg[1], baseB = hairBaseAvg[2];
+      const famKeys = hairFamKeys;
+      {
         const baseLum = 0.3 * baseR + 0.59 * baseG + 0.11 * baseB;
         const bandHalf = headR * 2.4;
         const x0 = Math.max(0, Math.floor(headCx - bandHalf)), x1 = Math.min(width - 1, Math.ceil(headCx + bandHalf));
         const yTop = Math.max(0, figTop), yBot = Math.min(height - 1, Math.round(headCy + headR * 2.2));
+        // ツヤ色は背景と色ビンが重なるためマスクに入らないことが
+        // ある。その行の輪郭の内側にあるかで代用する（内側にある
+        // 一族の色は髪とみなす）。
+        const rowMin = new Map<number, number>();
+        const rowMax = new Map<number, number>();
+        for (let y = yTop; y <= yBot; y++) {
+          for (let x = x0; x <= x1; x++) {
+            if (!mask[y * width + x]) continue;
+            if (!rowMin.has(y)) rowMin.set(y, x);
+            rowMax.set(y, x);
+          }
+        }
         const isHairFam = (x: number, y: number): boolean => {
-          const p = y * width + x;
-          if (!mask[p]) return false;
-          const i = p * 4;
+          const lo = rowMin.get(y), hi = rowMax.get(y);
+          if (lo === undefined || hi === undefined || x < lo || x > hi) return false;
+          const i = (y * width + x) * 4;
           return famKeys.has(`${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}`);
         };
         const lumAt = (x: number, y: number): number => { const i = (y * width + x) * 4; return 0.3 * rgba[i] + 0.59 * rgba[i + 1] + 0.11 * rgba[i + 2]; };
@@ -2961,7 +2990,8 @@ class VisualPoseService {
           const p = y * width + x;
           if (!mask[p]) continue;
           const i = p * 4;
-          if (`${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}` === hairBinKey) bottom = y;
+          const bk2 = `${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}`;
+          if (hairFamKeys ? hairFamKeys.has(bk2) : bk2 === hairBinKey) bottom = y;
         }
         if (bottom >= 0) bottoms.push(bottom);
       }

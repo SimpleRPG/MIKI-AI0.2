@@ -8282,6 +8282,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1007 髪の作画読みの記録が残る', sum1007.hairReads >= 1, `reads=${sum1007.hairReads}`);
 }
 
+// ---- P1008 髪の一族（色と長さの頑丈さ） ----
+{
+  const { visualPoseService: vpose1008 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB1008 = [number, number, number];
+  const SKIN1008: RGB1008 = [232, 190, 160];
+  const PINK1008: RGB1008 = [240, 150, 180];
+  const BLUE1008: RGB1008 = [40, 40, 120];
+  const px1008: RGB1008[] = []; for (let i = 0; i < 48 * 56; i++) px1008.push([240, 240, 240]);
+  const rect1008 = (x0: number, y0: number, x1: number, y1: number, c: RGB1008) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1008[y * 48 + x] = c; };
+  const disc1008 = (cx: number, cy: number, r: number, c: RGB1008) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1008[y * 48 + x] = c; };
+  rect1008(16, 15, 28, 32, BLUE1008); rect1008(12, 16, 15, 30, BLUE1008); rect1008(29, 16, 32, 30, BLUE1008);
+  rect1008(16, 32, 21, 50, BLUE1008); rect1008(23, 32, 28, 50, BLUE1008);
+  rect1008(13, 4, 31, 12, PINK1008); rect1008(13, 4, 15, 40, PINK1008); rect1008(29, 4, 31, 40, PINK1008);
+  disc1008(22, 9, 6, PINK1008); disc1008(22, 10, 5, SKIN1008);
+  const img1008 = new Uint8Array(48 * 56 * 4);
+  px1008.forEach((c, i) => { img1008[i * 4] = c[0]; img1008[i * 4 + 1] = c[1]; img1008[i * 4 + 2] = c[2]; img1008[i * 4 + 3] = 255; });
+  const reading1008 = vpose1008.analyzePose(img1008, 48, 56);
+  // 影色とツヤ色が混ざった作画髪でも、色は地の色・長さは長いのまま
+  const det1008 = reading1008 ? vpose1008.renderBodyHairDetail(reading1008, 192) : null;
+  const reDet1008 = det1008 ? vpose1008.analyzePose(det1008, 192, 192) : null;
+  check('P1008 作画髪でも髪色と長さが保たれる', reDet1008?.hairColor === 'ピンク' && reDet1008?.hair?.length === 'long' && reDet1008?.hair?.shine === true, `color=${reDet1008?.hairColor} len=${reDet1008?.hair?.length} shine=${reDet1008?.hair?.shine}`);
+  // セル陰影だけでも色と長さは保たれる
+  const cel1008 = reading1008 ? vpose1008.renderBodyCel(reading1008, 192) : null;
+  const reCel1008 = cel1008 ? vpose1008.analyzePose(cel1008, 192, 192) : null;
+  check('P1008 セル髪でも髪色と長さが保たれる', reCel1008?.hairColor === 'ピンク' && reCel1008?.hair?.length === 'long', `color=${reCel1008?.hairColor} len=${reCel1008?.hair?.length}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
