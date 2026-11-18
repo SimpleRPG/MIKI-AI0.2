@@ -121,6 +121,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualFaces: number;
   visualViewpoints: number;
   visualClothing: number;
+  visualExtras: number;
   findings: string[];
 }
 
@@ -347,6 +348,7 @@ class KnowledgeSelfInspectionService {
     let visualFaces = 0;
     let visualViewpoints = 0;
     let visualClothing = 0;
+    let visualExtras = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -531,6 +533,11 @@ class KnowledgeSelfInspectionService {
       if (visualClothing > 0) {
         findings.push(`服の形を${visualClothing}件読んだ`);
       }
+      // P957: 持ち物や重なりを読んだ回数。
+      visualExtras = visualPoseService.summary().extras;
+      if (visualExtras > 0) {
+        findings.push(`持ち物や重なりを${visualExtras}件読んだ`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -602,6 +609,7 @@ class KnowledgeSelfInspectionService {
       visualFaces,
       visualViewpoints,
       visualClothing,
+      visualExtras,
       findings,
     };
 

@@ -56,6 +56,37 @@ export interface PoseMotionReading {
   jumping: boolean;
 }
 
+/** P957: 持ち物と重なりの読み（色の名前が入る） */
+export interface PoseExtras {
+  heldL: string | null;
+  heldR: string | null;
+  frontPatch: string | null;
+}
+
+const EXTRA_COLORS: Array<{ name: string; adj: string; rgb: [number, number, number] }> = [
+  { name: '赤', adj: '赤い', rgb: [200, 50, 50] },
+  { name: '青', adj: '青い', rgb: [50, 60, 180] },
+  { name: '緑', adj: '緑の', rgb: [50, 160, 60] },
+  { name: '黄', adj: '黄色い', rgb: [230, 200, 60] },
+  { name: '白', adj: '白い', rgb: [240, 240, 240] },
+  { name: '黒', adj: '黒い', rgb: [30, 30, 30] },
+  { name: '茶', adj: '茶色い', rgb: [130, 85, 50] },
+  { name: 'ピンク', adj: 'ピンクの', rgb: [240, 150, 180] },
+  { name: '紫', adj: '紫の', rgb: [140, 80, 180] },
+  { name: 'オレンジ', adj: 'オレンジの', rgb: [240, 140, 40] },
+  { name: '灰', adj: '灰色の', rgb: [140, 140, 140] },
+];
+
+function nearestExtraColor(r: number, g: number, b: number): { name: string; adj: string } {
+  let best = EXTRA_COLORS[0];
+  let bestD = Infinity;
+  for (const c of EXTRA_COLORS) {
+    const d = (r - c.rgb[0]) ** 2 + (g - c.rgb[1]) ** 2 + (b - c.rgb[2]) ** 2;
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
 /** P956: 服の形の読み */
 export interface PoseClothing {
   /** flare=スカート状の広がり / split=ズボン状の分かれ */
@@ -83,6 +114,9 @@ export interface PoseReading {
   /** P956: 服の形 */
   clothing: PoseClothing;
   clothingDescription: string;
+  /** P957: 持ち物と重なり */
+  extras: PoseExtras;
+  extrasDescription: string;
   verified: boolean;
   fit: number;
 }
@@ -132,15 +166,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number } {
     return this.load();
   }
 
@@ -523,12 +557,80 @@ class VisualPoseService {
     else if (clothing.twoPiece === false && clothing.bottom !== 'unknown') clothingParts.push('服は上下が同じ色');
     const clothingDescription = clothingParts.length ? clothingParts.join('。') + '。' : '';
 
+    // P957: 持ち物と重なり。体の最頻色（服）と肌色を除いて、
+    // 手の周りや体の前にまとまった別の色があれば、それは
+    // 持っている物や前に重なった物と読む。
+    let extras: PoseExtras = { heldL: null, heldR: null, frontPatch: null };
+    {
+      const binOf = (i: number) => `${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}`;
+      const isSkinPx = (i: number) => {
+        const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+        return r > 170 && g > 110 && g < 220 && b > 70 && b < 195 && r > g && g >= b - 5 && r - b > 35;
+      };
+      // 体全体の最頻色ビン（服の色）
+      const allBins = new Map<string, number>();
+      for (let p = 0; p < width * height; p++) {
+        if (!mask[p] || isSkinPx(p * 4)) continue;
+        const k = binOf(p * 4);
+        allBins.set(k, (allBins.get(k) || 0) + 1);
+      }
+      let domBin: string | null = null;
+      let domN = 0;
+      for (const [k, n] of allBins) if (n > domN) { domBin = k; domN = n; }
+      // 指定範囲で、服とも肌とも違う最頻色の塊を探す
+      const alienBlob = (cx: number, cy: number, radius: number, minPx: number, minShare: number): string | null => {
+        const groups = new Map<string, { n: number; r: number; g: number; b: number }>();
+        let fg = 0;
+        for (let y = Math.max(0, cy - radius); y <= Math.min(height - 1, cy + radius); y++) {
+          for (let x = Math.max(0, cx - radius); x <= Math.min(width - 1, cx + radius); x++) {
+            if ((x - cx) ** 2 + (y - cy) ** 2 > radius * radius) continue;
+            const p = y * width + x;
+            if (!mask[p]) continue;
+            fg++;
+            const i = p * 4;
+            if (isSkinPx(i) || binOf(i) === domBin) continue;
+            const k = binOf(i);
+            const cur = groups.get(k) || { n: 0, r: 0, g: 0, b: 0 };
+            cur.n++;
+            cur.r += rgba[i]; cur.g += rgba[i + 1]; cur.b += rgba[i + 2];
+            groups.set(k, cur);
+          }
+        }
+        let best: { n: number; r: number; g: number; b: number } | null = null;
+        for (const g of groups.values()) if (!best || g.n > best.n) best = g;
+        if (!best || best.n < minPx || fg === 0 || best.n / fg < minShare) return null;
+        return nearestExtraColor(best.r / best.n, best.g / best.n, best.b / best.n).adj;
+      };
+      const discR = Math.max(3, Math.round(figH * 0.11));
+      if (armL.hand) extras.heldL = alienBlob(Math.round(armL.hand.x), Math.round(armL.hand.y), discR, 8, 0.3);
+      if (armR.hand) extras.heldR = alienBlob(Math.round(armR.hand.x), Math.round(armR.hand.y), discR, 8, 0.3);
+      // 体の前：胴の範囲を矩形として同じ探し方をする
+      const hipRefE = neckY + figH * 0.45;
+      const torsoCx = Math.round((torsoLeft + torsoRight) / 2);
+      const torsoCy = Math.round((neckY + hipRefE) / 2);
+      const torsoR = Math.max(4, Math.round(Math.max(torsoRight - torsoLeft, hipRefE - neckY) / 2));
+      extras.frontPatch = alienBlob(torsoCx, torsoCy, torsoR, 15, 0.12);
+      // 手の塊と胴の塊が同じ物を二重に数えないよう、胴側が
+      // 手の検出と重なる場合は胴側を優先しない（手側を残す）。
+      if (extras.frontPatch && (extras.heldL || extras.heldR)) {
+        const nearHand = (armL.hand && Math.abs(armL.hand.x - torsoCx) <= torsoR && Math.abs(armL.hand.y - torsoCy) <= torsoR)
+          || (armR.hand && Math.abs(armR.hand.x - torsoCx) <= torsoR && Math.abs(armR.hand.y - torsoCy) <= torsoR);
+        if (nearHand && extras.frontPatch === (extras.heldL || extras.heldR)) extras.frontPatch = null;
+      }
+    }
+    const extrasParts: string[] = [];
+    if (extras.heldL) extrasParts.push(`左手に${extras.heldL}ものを持っているようだ`);
+    if (extras.heldR) extrasParts.push(`右手に${extras.heldR}ものを持っているようだ`);
+    if (extras.frontPatch) extrasParts.push(`体の前に${extras.frontPatch}ものがあるようだ`);
+    const extrasDescription = extrasParts.length ? extrasParts.join('。') + '。' : '';
+
     const description = parts.join('。') + '。';
 
     const state = this.load();
     state.analyzed++;
     if (verified) state.verified++;
     if (clothingDescription) state.clothing++;
+    if (extrasDescription) state.extras++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
     const norm = (p: PosePoint | null): PosePoint | null =>
@@ -549,6 +651,8 @@ class VisualPoseService {
       skinCues,
       clothing,
       clothingDescription,
+      extras,
+      extrasDescription,
       verified,
       fit,
     };

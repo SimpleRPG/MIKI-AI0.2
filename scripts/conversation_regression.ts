@@ -6716,6 +6716,40 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P956 自己点検の記録に服の形（visualClothing）が入っている', typeof insp956.visualClothing === 'number' && insp956.visualClothing >= 1, `visualClothing=${insp956.visualClothing}`);
 }
 
+// ---- P957 重なりと持ち物 ----
+{
+  const { visualPoseService: vpose957 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi957 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const S957 = 48;
+  type RGB957 = [number, number, number];
+  const SKIN957: RGB957 = [232, 190, 160];
+  const BLUE957: RGB957 = [40, 40, 120];
+  const RED957: RGB957 = [200, 40, 40];
+  const GREEN957: RGB957 = [40, 160, 60];
+  const base957 = () => {
+    const px: RGB957[] = [];
+    for (let i = 0; i < S957 * S957; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB957) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * S957 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB957) => { for (let y = 0; y < S957; y++) for (let x = 0; x < S957; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * S957 + x] = c; };
+    disc(24, 6, 5, SKIN957);
+    rect(19, 11, 29, 26, BLUE957); rect(15, 12, 18, 24, BLUE957); rect(30, 12, 33, 24, BLUE957);
+    rect(19, 26, 23, 44, BLUE957); rect(25, 26, 29, 44, BLUE957);
+    return { px, rect, disc };
+  };
+  const toRgba957 = (px: RGB957[]) => { const o = new Uint8Array(S957 * S957 * 4); px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; }); return o; };
+  const plain957 = base957();
+  const rp957 = vpose957.analyzePose(toRgba957(plain957.px), S957, S957);
+  check('P957 何も持っていない人では持ち物を言わない', rp957?.extras.heldL === null && rp957?.extras.heldR === null && rp957?.extras.frontPatch === null && rp957?.extrasDescription === '', `plain=${JSON.stringify(rp957?.extras)}`);
+  const ball957 = base957(); ball957.disc(33, 27, 4, RED957);
+  const rb957 = vpose957.analyzePose(toRgba957(ball957.px), S957, S957);
+  check('P957 右手の赤い玉は持ち物と読める（体の前とは二重に数えない）', rb957?.extras.heldR === '赤い' && rb957?.extras.frontPatch === null, `ball=${JSON.stringify(rb957?.extras)}`);
+  const patch957 = base957(); patch957.rect(20, 16, 28, 22, GREEN957);
+  const rg957 = vpose957.analyzePose(toRgba957(patch957.px), S957, S957);
+  check('P957 体の前の緑の塊は重なりと読める', rg957?.extras.frontPatch === '緑の' && rg957?.extras.heldR === null, `patch=${JSON.stringify(rg957?.extras)}`);
+  const insp957 = ksi957.inspect();
+  check('P957 自己点検の記録に持ち物・重なり（visualExtras）が入っている', typeof insp957.visualExtras === 'number' && insp957.visualExtras >= 1, `visualExtras=${insp957.visualExtras}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

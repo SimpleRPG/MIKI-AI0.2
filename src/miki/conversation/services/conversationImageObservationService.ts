@@ -552,6 +552,13 @@ class ConversationImageObservationService {
                 `服は、${pose953.clothingDescription}具体的な物や文字までは読み取れない。`,
               );
             }
+            // P957: 持ち物や重なりも添える。
+            if (pose953.extrasDescription) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `${pose953.extrasDescription}具体的な物や文字までは読み取れない。`,
+              );
+            }
           }
         } catch { /* 姿勢が読めなくても観察は返す */ }
       }
