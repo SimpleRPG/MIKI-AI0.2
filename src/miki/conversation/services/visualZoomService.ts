@@ -298,6 +298,7 @@ class VisualZoomService {
       eyeColor = lum < 55 ? '黒'
         : b > r + 15 && b > g ? '青'
         : g >= r && g >= b ? '緑'
+        : r > g + 10 && b >= g && r - b > 20 ? 'ピンク'
         : r > g && g > b && r - b > 25 ? '茶色'
         : '暗い色';
     }

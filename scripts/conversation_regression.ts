@@ -8008,6 +8008,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P999 自己点検の記録に輪郭線の照合（visualOutlinedBodies）が入っている', typeof insp999.visualOutlinedBodies === 'number' && insp999.visualOutlinedBodies >= 1, `visualOutlinedBodies=${insp999.visualOutlinedBodies}`);
 }
 
+// ---- P1000 目の作画部品 ----
+{
+  const { visualPoseService: vpose1000 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi1000 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB1000 = [number, number, number];
+  const SKIN1000: RGB1000 = [232, 190, 160];
+  const PINK1000: RGB1000 = [240, 150, 180];
+  const BLUE1000: RGB1000 = [40, 40, 120];
+  const px1000: RGB1000[] = []; for (let i = 0; i < 48 * 56; i++) px1000.push([245, 245, 245]);
+  const rect1000 = (x0: number, y0: number, x1: number, y1: number, c: RGB1000) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1000[y * 48 + x] = c; };
+  const disc1000 = (cx: number, cy: number, r: number, c: RGB1000) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1000[y * 48 + x] = c; };
+  rect1000(16, 15, 28, 32, BLUE1000); rect1000(12, 16, 15, 30, BLUE1000); rect1000(29, 16, 32, 30, BLUE1000);
+  rect1000(16, 32, 21, 50, BLUE1000); rect1000(23, 32, 28, 50, BLUE1000);
+  rect1000(13, 4, 31, 12, PINK1000); rect1000(13, 4, 15, 40, PINK1000); rect1000(29, 4, 31, 40, PINK1000);
+  disc1000(22, 10, 5, SKIN1000);
+  const img1000 = new Uint8Array(48 * 56 * 4);
+  px1000.forEach((c, i) => { img1000[i * 4] = c[0]; img1000[i * 4 + 1] = c[1]; img1000[i * 4 + 2] = c[2]; img1000[i * 4 + 3] = 255; });
+  const reading1000 = vpose1000.analyzePose(img1000, 48, 56);
+  const ve1000 = reading1000 ? vpose1000.verifyEyeDetail(reading1000, { eyeSize: 'large', brows: true, mouthSize: null, iris: [232, 120, 160], irisName: 'ピンク' }) : null;
+  check('P1000 ピンクの虹彩で目を部品として描き、目の色まで一致する', ve1000?.verified === true && ve1000?.eyeColor === 'ピンク', `verified=${ve1000?.verified} eyeColor=${ve1000?.eyeColor}`);
+  const ve1000b = reading1000 ? vpose1000.verifyEyeDetail(reading1000, { eyeSize: null, brows: false, mouthSize: null, iris: [90, 130, 220], irisName: '青' }) : null;
+  check('P1000 青い虹彩でも描いて照合できる', ve1000b?.verified === true && ve1000b?.eyeColor === '青', `verified=${ve1000b?.verified} eyeColor=${ve1000b?.eyeColor}`);
+  const insp1000 = ksi1000.inspect();
+  check('P1000 自己点検の記録に目の作画の照合（visualDrawnEyes）が入っている', typeof insp1000.visualDrawnEyes === 'number' && insp1000.visualDrawnEyes >= 1, `visualDrawnEyes=${insp1000.visualDrawnEyes}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
