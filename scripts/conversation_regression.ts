@@ -6451,6 +6451,64 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P950 自己点検の記録に姿勢の読み（visualPoses）が入っている', typeof insp950.visualPoses === 'number' && insp950.visualPoses >= 5, `visualPoses=${insp950.visualPoses}`);
 }
 
+// ---- P951 姿勢・第2段a（肉付きと肌の島） ----
+{
+  const { visualPoseService: vpose951 } = await import('../src/miki/conversation/services/visualPoseService');
+  const W951 = 48, H951 = 48;
+  type RGB951 = [number, number, number];
+  const BG951: RGB951 = [245, 245, 245];
+  const G951: RGB951 = [60, 60, 60];
+  const BLUE951: RGB951 = [40, 40, 120];
+  const SKIN951: RGB951 = [232, 190, 160];
+  const draw951 = (paint: (x: number, y: number) => RGB951 | null) => {
+    const a = new Uint8Array(W951 * H951 * 4);
+    for (let y = 0; y < H951; y++) for (let x = 0; x < W951; x++) {
+      const c = paint(x, y) || BG951;
+      const i = (y * W951 + x) * 4;
+      a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255;
+    }
+    return vpose951.analyzePose(a, W951, H951);
+  };
+  const inRect = (x: number, y: number, x0: number, x1: number, y0: number, y1: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+  const slim951 = draw951((x, y) => {
+    if ((x - 24) ** 2 + (y - 10) ** 2 <= 16) return G951;
+    if (inRect(x, y, 21, 26, 18, 34) || inRect(x, y, 19, 20, 18, 30) || inRect(x, y, 27, 28, 18, 30)) return G951;
+    if (inRect(x, y, 21, 23, 34, 39) || inRect(x, y, 21, 22, 40, 44) || inRect(x, y, 24, 26, 34, 39) || inRect(x, y, 25, 26, 40, 44)) return G951;
+    return null;
+  });
+  check('P951 細い体格と足首の細りを肉付きとして読める', slim951?.build?.label === '細い' && (slim951?.build?.ankleRatio ?? 1) <= 0.8 && slim951?.buildDescription.includes('足首'), `slim=${JSON.stringify(slim951?.build)}`);
+  const std951 = draw951((x, y) => {
+    if ((x - 24) ** 2 + (y - 10) ** 2 <= 25) return G951;
+    if (inRect(x, y, 20, 28, 18, 34) || inRect(x, y, 17, 19, 18, 32) || inRect(x, y, 29, 31, 18, 32)) return G951;
+    if (inRect(x, y, 20, 23, 34, 44) || inRect(x, y, 25, 28, 34, 44)) return G951;
+    return null;
+  });
+  check('P951 標準の体格を中肉と読める', std951?.build?.label === '中肉', `std=${JSON.stringify(std951?.build)}`);
+  const heavy951 = draw951((x, y) => {
+    if ((x - 24) ** 2 + (y - 10) ** 2 <= 25) return G951;
+    if (inRect(x, y, 17, 31, 18, 34) || inRect(x, y, 14, 16, 18, 32) || inRect(x, y, 32, 34, 18, 32)) return G951;
+    if (inRect(x, y, 18, 23, 34, 44) || inRect(x, y, 25, 30, 34, 44)) return G951;
+    return null;
+  });
+  check('P951 太い体格をがっしりと読める', heavy951?.build?.label === 'がっしり', `heavy=${JSON.stringify(heavy951?.build)}`);
+  const musc951 = draw951((x, y) => {
+    if ((x - 24) ** 2 + (y - 10) ** 2 <= 16) return G951;
+    if (inRect(x, y, 18, 30, 18, 26) || inRect(x, y, 21, 27, 26, 34)) return G951;
+    if (inRect(x, y, 15, 17, 18, 32) || inRect(x, y, 31, 33, 18, 32)) return G951;
+    if (inRect(x, y, 20, 23, 34, 44) || inRect(x, y, 25, 28, 34, 44)) return G951;
+    return null;
+  });
+  check('P951 広い肩と細い腰をがっしり＋腰の細さとして読める', musc951?.build?.label === 'がっしり' && musc951?.buildDescription.includes('腰が細く'), `musc=${JSON.stringify(musc951?.build)}`);
+  const skin951 = draw951((x, y) => {
+    if ((x - 24) ** 2 + (y - 10) ** 2 <= 16) return SKIN951;
+    if (inRect(x, y, 17, 19, 29, 32) || inRect(x, y, 29, 31, 29, 32)) return SKIN951;
+    if (inRect(x, y, 20, 28, 18, 34) || inRect(x, y, 17, 19, 18, 28) || inRect(x, y, 29, 31, 18, 28)) return BLUE951;
+    if (inRect(x, y, 20, 23, 34, 44) || inRect(x, y, 25, 28, 34, 44)) return BLUE951;
+    return null;
+  });
+  check('P951 肌の島から顔と両手を確認できる', skin951?.skinCues.face === true && skin951?.skinCues.handL === true && skin951?.skinCues.handR === true && skin951?.verified === true, `skin=${JSON.stringify(skin951?.skinCues)}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

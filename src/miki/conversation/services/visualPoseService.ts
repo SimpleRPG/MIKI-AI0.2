@@ -26,6 +26,22 @@ export type PostureState = 'STANDING' | 'SITTING' | 'UNKNOWN';
 
 export interface PosePoint { x: number; y: number }
 
+export interface PoseBuild {
+  label: '細い' | '中肉' | 'がっしり' | '不明';
+  /** 肩幅 ÷ 全体の高さ */
+  shoulderRatio: number;
+  /** 腰の細さ ÷ 肩幅 */
+  waistRatio: number | null;
+  /** 腰幅 ÷ 全体の高さ */
+  hipRatio: number | null;
+  /** 腕の太さ ÷ 全体の高さ */
+  armThickness: number | null;
+  /** 太ももの太さ ÷ 全体の高さ */
+  legThickness: number | null;
+  /** 足首 ÷ 太もも（関節の細り） */
+  ankleRatio: number | null;
+}
+
 export interface PoseReading {
   head: (PosePoint & { r: number }) | null;
   handL: PosePoint | null;
@@ -37,6 +53,11 @@ export interface PoseReading {
   legs: LegState;
   posture: PostureState;
   description: string;
+  /** P951: 肉付き（アバターの体格パラメータにそのまま使える形） */
+  build: PoseBuild | null;
+  buildDescription: string;
+  /** P951: 肌の色の島から得た補強（顔の確認・手の位置） */
+  skinCues: { face: boolean; handL: boolean; handR: boolean };
   verified: boolean;
   fit: number;
 }
@@ -150,10 +171,20 @@ class VisualPoseService {
     const headTop = headCy - headR;
     const neckY = headCy + headR;
 
-    // 脚の分かれ（股）の開始行と、腰の位置。
+    // 脚の分かれ（股）の開始行と、腰の位置。腕と胴の間の
+    // 隙間を股と誤らないよう、両端の span の中心列が
+    // 足元まで届いている行だけを股と認める。
     let crotchY = -1;
+    const reachesBottom = (cx: number) => {
+      for (let y = Math.max(0, figBottom - 2); y <= figBottom; y++) if (mask[y * width + Math.round(cx)]) return true;
+      return false;
+    };
     for (let y = Math.floor(figTop + figH * 0.5); y <= figBottom; y++) {
-      if (rows[y].spans.length >= 2) { crotchY = y; break; }
+      const spans = rows[y].spans;
+      if (spans.length < 2) continue;
+      const l = spans[0];
+      const r = spans[spans.length - 1];
+      if (reachesBottom((l.minX + l.maxX) / 2) && reachesBottom((r.minX + r.maxX) / 2)) { crotchY = y; break; }
     }
     const hipY = crotchY > 0 ? crotchY - 2 : neckY + figH * 0.45;
 
@@ -239,9 +270,136 @@ class VisualPoseService {
       if (lowPt) return { state: 'DOWN', hand: lowPt };
       return { state: 'UNKNOWN', hand: null };
     };
-    const armL = armFor('L');
-    const armR = armFor('R');
-    if (posture === 'SITTING') { /* 座りでは脚は前に伸びる形として扱い、脚の記述は体勢に含める */ }
+    let armL = armFor('L');
+    let armR = armFor('R');
+
+    // P951: 肌の色の島で補強する。手の島は領域の2%床より
+    // 小さいことが多いので、画素を直接数える。肌が図の
+    // 大部分を占める場合は「島」ではないので使わない
+    // （その場合は輪郭ルートが受け持つ）。
+    const skinCues = { face: false, handL: false, handR: false };
+    {
+      const isSkinPx = (idx: number) => {
+        const r = rgba[idx]; const g = rgba[idx + 1]; const b = rgba[idx + 2];
+        return r > 170 && g > 110 && g < 220 && b > 70 && b < 195 && r > g && g >= b - 5 && r - b > 35;
+      };
+      let skinCount = 0; let maskCount = 0;
+      let faceCount = 0;
+      const sidePixels: Record<'L' | 'R', { x: number; y: number }[]> = { L: [], R: [] };
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          if (!mask[y * width + x]) continue;
+          maskCount++;
+          if (!isSkinPx((y * width + x) * 4)) continue;
+          skinCount++;
+          if (Math.hypot(x - headCx, y - headCy) <= headR * 1.2) { faceCount++; continue; }
+          if (y > neckY) sidePixels[x < headCx ? 'L' : 'R'].push({ x, y });
+        }
+      }
+      if (maskCount > 0 && skinCount / maskCount < 0.35) {
+        if (faceCount >= 8) skinCues.face = true;
+        const skinHand = (side: 'L' | 'R', arm: { state: ArmState; hand: PosePoint | null }): boolean => {
+          const pts = sidePixels[side];
+          if (pts.length < 4) return false;
+          const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
+          const cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+          if (arm.hand) {
+            if (Math.hypot(cx - arm.hand.x, cy - arm.hand.y) <= 8) { arm.hand = { x: cx, y: cy }; return true; }
+            return false;
+          }
+          if (arm.state === 'UNKNOWN' && cy >= shoulderY && cy <= hipY + figH * 0.18) {
+            arm.state = 'DOWN';
+            arm.hand = { x: cx, y: cy };
+            return true;
+          }
+          return false;
+        };
+        skinCues.handL = skinHand('L', armL);
+        skinCues.handR = skinHand('R', armR);
+      }
+    }
+
+    // P951: 肉付き。横幅プロファイルから肩まわり・腰・
+    // 手足の太さを測り、アバターの体格パラメータの形にする。
+    const spanContaining = (y: number) => {
+      const row = rows[Math.max(0, Math.min(height - 1, y))];
+      return row ? row.spans.find((s) => headCx >= s.minX && headCx <= s.maxX) || null : null;
+    };
+    const chestSpan = spanContaining(Math.round(shoulderY));
+    const chestW = chestSpan ? chestSpan.maxX - chestSpan.minX + 1 : (torsoRight - torsoLeft + 1);
+    // 腰は「腕が終わった下の胴だけの行」を混ぜないよう、
+    // 下りた手の先までの範囲で測る（腕込み同士で比べる）。
+    const handEndY = Math.max(
+      armL.state === 'DOWN' && armL.hand ? armL.hand.y : -1,
+      armR.state === 'DOWN' && armR.hand ? armR.hand.y : -1,
+    );
+    const waistEnd = Math.min(Math.round(hipY), handEndY > 0 ? Math.round(handEndY) : Math.round(hipY));
+    let waistW: number | null = null;
+    for (let y = Math.round(shoulderY + (hipY - shoulderY) * 0.4); y <= waistEnd; y++) {
+      const s = spanContaining(y);
+      if (s) { const w = s.maxX - s.minX + 1; if (waistW === null || w < waistW) waistW = w; }
+    }
+    const hipRow = rows[Math.max(0, Math.min(height - 1, Math.round(hipY)))];
+    const hipW = hipRow && hipRow.minX >= 0 ? hipRow.maxX - hipRow.minX + 1 : null;
+    let legThickness: number | null = null;
+    let ankleRatio: number | null = null;
+    {
+      // 太ももは脚の上半分で一番太い所（分かれる前の行は
+      // 両脚まとめて半分と見積もる。ただし腕込みの胴の行は
+      // 除外）。足首は下から3行目。
+      const legTop = Math.round(hipY);
+      const midLeg = Math.round((legTop + figBottom) / 2);
+      let thighW: number | null = null;
+      let thighCenter: number | null = null;
+      for (let y = legTop; y <= midLeg; y++) {
+        const row = rows[y];
+        if (!row || !row.spans.length) continue;
+        const s = row.spans[0];
+        if (row.spans.length < 2 && (s.maxX - s.minX + 1) > chestW * 0.8) continue;
+        const w = row.spans.length >= 2 ? (s.maxX - s.minX + 1) : (s.maxX - s.minX + 1) / 2;
+        if (thighW === null || w > thighW) { thighW = w; thighCenter = (s.minX + s.maxX) / 2; }
+      }
+      if (thighW !== null && thighCenter !== null && figBottom - legTop >= 4) {
+        legThickness = thighW / figH;
+        const ankleRow = rows[Math.max(0, figBottom - 3)];
+        if (ankleRow && ankleRow.spans.length) {
+          const s = ankleRow.spans.find((sp) => Math.abs((sp.minX + sp.maxX) / 2 - (thighCenter as number)) <= 4) || ankleRow.spans[0];
+          const aw = ankleRow.spans.length >= 2 ? (s.maxX - s.minX + 1) : (s.maxX - s.minX + 1) / 2;
+          ankleRatio = aw / Math.max(1, thighW);
+        }
+      }
+    }
+    let armThickness: number | null = null;
+    if (armL.state === 'DOWN' || armR.state === 'DOWN') {
+      let ext = 0;
+      for (let y = Math.round(shoulderY); y <= Math.round(hipY); y++) {
+        const row = rows[y];
+        if (row.minX < 0) continue;
+        ext = Math.max(ext, torsoLeft - row.minX, row.maxX - torsoRight);
+      }
+      if (ext > 0) armThickness = ext / figH;
+    }
+    const frameW = torsoWidth !== Infinity ? torsoWidth : chestW;
+    const frameRatio = frameW / figH;
+    const chestRatio = chestW / figH;
+    const taperRatio = chestW > 0 ? frameW / chestW : 1;
+    const buildLabel: PoseBuild['label'] = frameRatio >= 0.3 || (taperRatio <= 0.45 && chestRatio >= 0.3)
+      ? 'がっしり'
+      : frameRatio <= 0.17 ? '細い' : '中肉';
+    const build: PoseBuild = {
+      label: buildLabel,
+      shoulderRatio: chestRatio,
+      waistRatio: waistW !== null && chestW > 0 ? Math.min(1.5, waistW / chestW) : null,
+      hipRatio: hipW !== null ? hipW / figH : null,
+      armThickness,
+      legThickness,
+      ankleRatio,
+    };
+    const buildParts: string[] = [`体格は${buildLabel}寄り`];
+    if (build.waistRatio !== null && build.waistRatio <= 0.78) buildParts.push('腰が細くなっている');
+    if (build.waistRatio !== null && build.waistRatio >= 0.95) buildParts.push('腰は肩とほぼ同じ幅');
+    if (ankleRatio !== null && ankleRatio <= 0.8) buildParts.push('足首が太ももより細くなっている');
+    const buildDescription = buildParts.join('。') + '。';
 
     // 股の位置：分かれ始めの行の span の中心。分かれが無ければ胴幅から。
     let hipL: PosePoint = { x: (torsoLeft + torsoRight) / 2 - (torsoRight - torsoLeft) / 4, y: hipY };
@@ -307,6 +465,9 @@ class VisualPoseService {
       legs,
       posture,
       description,
+      build,
+      buildDescription,
+      skinCues,
       verified,
       fit,
     };
