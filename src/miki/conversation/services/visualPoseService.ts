@@ -112,6 +112,9 @@ export interface PoseClothing {
   /** P958: 上着と下半身の色の名前（個体識別の署名に使う） */
   topColor: string | null;
   bottomColor: string | null;
+  /** P1015: 上着と下半身の色の実測RGB（色名で潰さず描くため） */
+  topRgb?: [number, number, number] | null;
+  bottomRgb?: [number, number, number] | null;
 }
 
 /** P958: 人の特徴署名（同じ人かどうかの見分けに使う） */
@@ -150,6 +153,10 @@ export interface PoseReading {
   extrasDescription: string;
   /** P958: 髪の色の名前（頭の肌色でない部分の最頻色） */
   hairColor: string | null;
+  /** P1015: 本人の肌色の実測RGB（頭の円の肌らしい画素の平均） */
+  skinColor?: [number, number, number] | null;
+  /** P1015: 髪の基準色の実測RGB（色名でなく実測で描くため） */
+  hairRgb?: [number, number, number] | null;
   /** P960: 服を着ていないらしいか（肌色率から。判定できなければ null） */
   bare: boolean | null;
   bareDescription: string;
@@ -600,10 +607,20 @@ class VisualPoseService {
     if (!reading.head || !reading.profileComplete) return null;
     const S = size;
     const prof = reading.bodyProfile;
+    // P1015: 描くのは「その人」。色の既定は読み取り本人の実測
+    // から取る（肌色・髪色・服の色）。ドリルや照合が青いテスト
+    // 人形の色条件で訓練することにならないようにするため
+    // （2026-11-19にきりあが指摘：1人をどうこうする話）。
+    const SKIN: [number, number, number] = reading.skinColor ?? [232, 190, 160];
+    const HAIR0: [number, number, number] = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
+    const distBg = (c: [number, number, number]): number => Math.abs(c[0] - 245) + Math.abs(c[1] - 245) + Math.abs(c[2] - 245);
+    const topRgb = reading.clothing?.topRgb ?? (reading.clothing?.topColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing.topColor)?.rgb : undefined);
+    const BODY: [number, number, number] = colors?.body ?? (topRgb && distBg(topRgb) > 40 ? topRgb : (reading.skinColor ?? [40, 40, 120]));
+    // 本人の色が背景に近い時は描く板の色を落とす（白い水着や
+    // 薄い肌が白い板に溶けて測れなくなるのを防ぐ）。
+    const BG_COL: [number, number, number] = Math.min(distBg(BODY), distBg(SKIN), distBg(HAIR0)) <= 60 ? [168, 168, 172] : [245, 245, 245];
     const px: Array<[number, number, number]> = [];
-    for (let i = 0; i < S * S; i++) px.push([245, 245, 245]);
-    const BODY: [number, number, number] = colors?.body ?? [40, 40, 120];
-    const SKIN: [number, number, number] = [232, 190, 160];
+    for (let i = 0; i < S * S; i++) px.push(BG_COL);
     const set = (x: number, y: number, c: [number, number, number]) => {
       const xi = Math.round(x), yi = Math.round(y);
       if (xi >= 0 && xi < S && yi >= 0 && yi < S) px[yi * S + xi] = c;
@@ -707,7 +724,7 @@ class VisualPoseService {
     // 顔の部分は肌の頭を後から描いて出す。
     // P995: 髪の色は読みの色名から引く（指定があればそちら）。
     if (reading.hair) {
-      const HAIR: [number, number, number] = colors?.hair ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
+      const HAIR: [number, number, number] = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
       const hairTopY = (head.y - head.r) * (S - 1);
       const hairBottomY = hairTopY + reading.hair.lengthRatio * figHn * (S - 1);
       const hx = head.x * (S - 1), hr = Math.max(2, head.r * S);
@@ -734,7 +751,7 @@ class VisualPoseService {
     // 房の境目は下端が上がって額の肌が見える（＝房の分かれ）。
     // 顔の中身より先に描くので、眉と目は前髪の上から読める。
     if (shape?.frontHair && reading.hair) {
-      const HAIR: [number, number, number] = colors?.hair ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
+      const HAIR: [number, number, number] = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
       const hyPx = head.y * (S - 1);
       const strandW = Math.max(3, faceR * 0.55);
       for (let y = Math.round(faceCy - faceR); y <= Math.round(faceCy - faceR * 0.3); y++) {
@@ -1346,7 +1363,7 @@ class VisualPoseService {
     const base = this.renderBodyCel(reading, size, face, colors, shape);
     if (!base || !reading.head || !reading.hair) return base;
     const out = new Uint8Array(base);
-    const HAIR: [number, number, number] = colors?.hair ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
+    const HAIR: [number, number, number] = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
     const HAIR_SH = deriveShadow(HAIR);
     const nearHair = (i: number): boolean => {
       const d1 = Math.abs(out[i] - HAIR[0]) + Math.abs(out[i + 1] - HAIR[1]) + Math.abs(out[i + 2] - HAIR[2]);
@@ -1631,7 +1648,7 @@ class VisualPoseService {
     const out = new Uint8Array(base);
     const bg: [number, number, number] = [base[0], base[1], base[2]];
     const isBg = (i: number): boolean => Math.abs(base[i] - bg[0]) <= 10 && Math.abs(base[i + 1] - bg[1]) <= 10 && Math.abs(base[i + 2] - bg[2]) <= 10;
-    const HAIR: [number, number, number] = colors?.hair ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
+    const HAIR: [number, number, number] = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
     const near = (i: number, c: [number, number, number], tol: number): boolean => Math.abs(base[i] - c[0]) + Math.abs(base[i + 1] - c[1]) + Math.abs(base[i + 2] - c[2]) <= tol;
     const isHair = (i: number): boolean => near(i, HAIR, 42) || near(i, deriveShadow(HAIR), 42);
     const isSkin = (i: number): boolean => base[i] > 170 && base[i + 1] > 110 && base[i + 1] < 220 && base[i + 2] > 70 && base[i + 2] < 195 && base[i] > base[i + 1] && base[i] - base[i + 2] > 35;
@@ -2109,6 +2126,17 @@ class VisualPoseService {
     if (chosen && chosen.hair?.length === 'long') {
       const seg = segmentBodyMask(rgba, width, height);
       if (seg) {
+        // P1015: 髪の実測色は、領域分割の髪マスクの平均が一番
+        // 正直（色ビンでは薄い髪と肌が同じビンに混ざり、ビンの
+        // 平均が肌色に引っ張られるため）。
+        {
+          let hr2 = 0, hg2 = 0, hb2 = 0, hn2 = 0;
+          for (let i = 0; i < seg.hair.length; i++) {
+            if (!seg.hair[i]) continue;
+            hr2 += rgba[i * 4]; hg2 += rgba[i * 4 + 1]; hb2 += rgba[i * 4 + 2]; hn2++;
+          }
+          if (hn2 >= 50) chosen.hairRgb = [Math.round(hr2 / hn2), Math.round(hg2 / hn2), Math.round(hb2 / hn2)];
+        }
         // 詰まり具合は元の輪郭のものを渡す（体だけのマスクは
         // 島状で当然まばらなので、その密度で正直さの門にかけない）。
         const rr = this.analyzePoseWithMask(rgba, width, height, seg.body, chosenMethod, chosen.silhouetteDensity);
@@ -2722,7 +2750,7 @@ class VisualPoseService {
         if (waistW > 0 && flareW > waistW * 1.12) bottom = 'flare';
         else if (crotchY > 0) bottom = 'split';
       }
-      const bandMode = (y0: number, y1: number): { key: string; name: string } | null => {
+      const bandMode = (y0: number, y1: number): { key: string; name: string; rgb: [number, number, number] } | null => {
         const counts = new Map<string, { n: number; r: number; g: number; b: number }>();
         let total = 0;
         for (let y = Math.max(0, y0); y <= Math.min(height - 1, y1); y++) {
@@ -2742,7 +2770,7 @@ class VisualPoseService {
         let best: { n: number; r: number; g: number; b: number } | null = null;
         for (const [k, v] of counts) if (!best || v.n > best.n) { best = v; bestKey = k; }
         if (!best || !bestKey) return null;
-        return { key: bestKey, name: nearestExtraColor(best.r / best.n, best.g / best.n, best.b / best.n).name };
+        return { key: bestKey, name: nearestExtraColor(best.r / best.n, best.g / best.n, best.b / best.n).name, rgb: [Math.round(best.r / best.n), Math.round(best.g / best.n), Math.round(best.b / best.n)] };
       };
       const topBand = bandMode(Math.ceil(neckY), Math.floor(hipRef));
       const bottomBand = bandMode(Math.ceil(hipRef + figH * 0.08), figBottom);
@@ -2751,6 +2779,8 @@ class VisualPoseService {
         twoPiece: topBand && bottomBand ? topBand.key !== bottomBand.key : null,
         topColor: topBand?.name ?? null,
         bottomColor: bottomBand?.name ?? null,
+        topRgb: topBand?.rgb ?? null,
+        bottomRgb: bottomBand?.rgb ?? null,
       };
     }
     const clothingParts: string[] = [];
@@ -3224,6 +3254,24 @@ class VisualPoseService {
 
     const norm = (p: PosePoint | null): PosePoint | null =>
       (p ? { x: p.x / (width - 1), y: p.y / (height - 1) } : null);
+    // P1015: 本人の肌色の実測。頭の円の中で肌らしい画素を平均
+    // する（緩い判定：薄い肌でも拾える。P1004/P1011と同じ物差し）。
+    // 描くときに「その人の色」で描くための材料で、色名では
+    // 潰れてしまう実測の色を持つ。
+    let skinColor: [number, number, number] | null = null;
+    {
+      let sr = 0, sg = 0, sb = 0, sn = 0;
+      const hr = Math.max(2, headR);
+      for (let y = Math.max(0, Math.floor(headCy - hr)); y <= Math.min(height - 1, Math.ceil(headCy + hr)); y++) {
+        for (let x = Math.max(0, Math.floor(headCx - hr)); x <= Math.min(width - 1, Math.ceil(headCx + hr)); x++) {
+          if ((x - headCx) ** 2 + (y - headCy) ** 2 > hr * hr) continue;
+          const i = (y * width + x) * 4;
+          const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+          if (r > 190 && g >= b && r - b >= 12) { sr += r; sg += g; sb += b; sn++; }
+        }
+      }
+      if (sn >= 10) skinColor = [Math.round(sr / sn), Math.round(sg / sn), Math.round(sb / sn)];
+    }
     return {
       head: { x: headCx / (width - 1), y: headCy / (height - 1), r: headR / width },
       handL: norm(armL.hand),
@@ -3245,6 +3293,8 @@ class VisualPoseService {
       extras,
       extrasDescription,
       hairColor,
+      skinColor,
+      hairRgb: hairBaseAvg ? [Math.round(hairBaseAvg[0]), Math.round(hairBaseAvg[1]), Math.round(hairBaseAvg[2])] as [number, number, number] : null,
       bare,
       bareDescription,
       balance,

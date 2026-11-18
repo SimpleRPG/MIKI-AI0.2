@@ -8506,6 +8506,43 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1014 複数人の記録が残る', sum.multi >= 1, `multi=${sum.multi}`);
 }
 
+// P1015: 描く色を本人の実測色にする。読み取りに肌色・髪色・
+// 服色の実測RGBを持たせ、描画の既定色をその人の色にする
+// （青いテスト人形の色条件でドリル・照合をしないため）。
+// 本人の色が背景に近い時は、描く板の色を落とす。
+{
+  const svc = (await import('../src/miki/conversation/services/visualPoseService')).visualPoseService;
+  type RGB = [number, number, number];
+  const mkPerson = (skin: RGB, hair: RGB, cloth: RGB, bg: RGB) => {
+    const W = 48, H = 56;
+    const a = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { a[i * 4] = bg[0]; a[i * 4 + 1] = bg[1]; a[i * 4 + 2] = bg[2]; a[i * 4 + 3] = 255; }
+    rect(16, 15, 28, 32, cloth); rect(12, 16, 15, 30, cloth); rect(29, 16, 32, 30, cloth);
+    rect(16, 32, 21, 50, cloth); rect(23, 32, 28, 50, cloth);
+    disc(22, 9, 6, hair); disc(22, 10, 5, skin);
+    return { a, W, H };
+  };
+  const near = (c: number[] | null | undefined, t: RGB, tol: number) => !!c && Math.abs(c[0] - t[0]) + Math.abs(c[1] - t[1]) + Math.abs(c[2] - t[2]) <= tol;
+  const std = mkPerson([232, 190, 160], [45, 32, 22], [40, 40, 120], [245, 245, 245]);
+  const rs: any = svc.analyzePose(std.a, std.W, std.H);
+  check('P1015 読みに肌色と髪色の実測が入る', near(rs?.skinColor, [232, 190, 160], 6) && near(rs?.hairRgb, [45, 32, 22], 6), `skin=${JSON.stringify(rs?.skinColor)} hair=${JSON.stringify(rs?.hairRgb)}`);
+  const pale = mkPerson([243, 222, 205], [243, 205, 215], [150, 160, 190], [208, 210, 212]);
+  const rp: any = svc.analyzePose(pale.a, pale.W, pale.H);
+  check('P1015 薄い人の肌色と服色の実測が入る', near(rp?.skinColor, [243, 222, 205], 6) && near(rp?.clothing?.topRgb, [150, 160, 190], 42), `skin=${JSON.stringify(rp?.skinColor)} top=${JSON.stringify(rp?.clothing?.topRgb)}`);
+  const renP: any = rp ? svc.renderBody(rp, 48) : null;
+  const pxP = (x: number, y: number) => renP ? [renP[(y * 48 + x) * 4], renP[(y * 48 + x) * 4 + 1], renP[(y * 48 + x) * 4 + 2]] : null;
+  check('P1015 薄い人を描くと本人の服色と肌色になる（青くない）', near(pxP(22, 22), [150, 160, 190], 18) && near(pxP(22, 10), [243, 222, 205], 6) && !near(pxP(22, 22), [40, 40, 120], 100), `chest=${JSON.stringify(pxP(22, 22))} face=${JSON.stringify(pxP(22, 10))}`);
+  const white = mkPerson([244, 228, 223], [243, 205, 215], [150, 160, 190], [208, 210, 212]);
+  const rw: any = svc.analyzePose(white.a, white.W, white.H);
+  const renW: any = rw ? svc.renderBody(rw, 48) : null;
+  const bgW = renW ? [renW[0], renW[1], renW[2]] : null;
+  check('P1015 本人の色が背景に近い時は板の色が落ちる', near(bgW, [168, 168, 172], 6), `bg=${JSON.stringify(bgW)}`);
+  const vbP: any = rp ? svc.verifyBody(rp) : null;
+  check('P1015 薄い人は本人の色で描いても照合が通る', vbP?.verified === true, `score=${vbP?.score}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
