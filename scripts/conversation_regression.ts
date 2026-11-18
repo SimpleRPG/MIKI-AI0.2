@@ -8105,6 +8105,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1001 自己点検の記録に統合分の照合が入っている', insp1001.visualCelBodies >= 1 && insp1001.visualHairDetails >= 1 && insp1001.visualBusts >= 1 && insp1001.visualDrills >= 1 && insp1001.visualMaskFill >= 1, `cel=${insp1001.visualCelBodies} hair=${insp1001.visualHairDetails} bust=${insp1001.visualBusts} drills=${insp1001.visualDrills} mask=${insp1001.visualMaskFill}`);
 }
 
+// ---- P1002 服の描画と線の役割別 ----
+{
+  const { visualPoseService: vpose1002 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi1002 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB1002 = [number, number, number];
+  const SKIN1002: RGB1002 = [232, 190, 160];
+  const PINK1002: RGB1002 = [240, 150, 180];
+  const BLUE1002: RGB1002 = [40, 40, 120];
+  const W = 48, H = 56;
+  const px1002: RGB1002[] = []; for (let i = 0; i < W * H; i++) px1002.push([245, 245, 245]);
+  const rect1002 = (x0: number, y0: number, x1: number, y1: number, c: RGB1002) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1002[y * W + x] = c; };
+  const disc1002 = (cx: number, cy: number, r: number, c: RGB1002) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1002[y * W + x] = c; };
+  rect1002(16, 15, 28, 32, BLUE1002); rect1002(12, 16, 15, 30, BLUE1002); rect1002(29, 16, 32, 30, BLUE1002);
+  rect1002(16, 32, 21, 50, BLUE1002); rect1002(23, 32, 28, 50, BLUE1002);
+  rect1002(13, 4, 31, 12, PINK1002); rect1002(13, 4, 15, 40, PINK1002); rect1002(29, 4, 31, 40, PINK1002);
+  disc1002(22, 10, 5, SKIN1002);
+  const img1002 = new Uint8Array(W * H * 4);
+  px1002.forEach((c, i) => { img1002[i * 4] = c[0]; img1002[i * 4 + 1] = c[1]; img1002[i * 4 + 2] = c[2]; img1002[i * 4 + 3] = 255; });
+  const reading1002 = vpose1002.analyzePose(img1002, W, H);
+  const skirt1002 = reading1002 ? vpose1002.verifyClothes(reading1002, { top: [200, 60, 60], bottom: 'skirt', bottomColor: [60, 60, 160] }) : null;
+  check('P1002 スカートを着せるとスカートとして読める', skirt1002?.verified === true, `bottom=${skirt1002?.bottom} top=${skirt1002?.topColor}`);
+  const pants1002 = reading1002 ? vpose1002.verifyClothes(reading1002, { top: [60, 160, 60], bottom: 'pants', bottomColor: [90, 60, 40] }) : null;
+  check('P1002 ズボンを着せるとズボンとして読める', pants1002?.verified === true, `bottom=${pants1002?.bottom} top=${pants1002?.topColor}`);
+  const role1002 = reading1002 ? vpose1002.verifyOutlineRole(reading1002) : null;
+  check('P1002 外周の線は通常の輪郭線より太い', role1002?.verified === true, `outer=${role1002?.outerBand} plain=${role1002?.plainBand}`);
+  const insp1002 = ksi1002.inspect();
+  check('P1002 自己点検の記録に服と線の照合が入っている', insp1002.visualClothes >= 1 && insp1002.visualLineRoles >= 1, `clothes=${insp1002.visualClothes} lines=${insp1002.visualLineRoles}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
