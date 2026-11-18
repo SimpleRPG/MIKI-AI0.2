@@ -167,6 +167,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualClothes: number;
   visualLineRoles: number;
   visualRegions: number;
+  visualElementDrills: number;
   findings: string[];
 }
 
@@ -439,6 +440,7 @@ class KnowledgeSelfInspectionService {
     let visualClothes = 0;
     let visualLineRoles = 0;
     let visualRegions = 0;
+    let visualElementDrills = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -807,6 +809,11 @@ class KnowledgeSelfInspectionService {
       if (visualRegions > 0) {
         findings.push(`線で区切って髪を除いて${visualRegions}件測り直した`);
       }
+      // P1005: 部位ごとの要素ドリルで近づけた回数。
+      visualElementDrills = visualPoseService.summary().elementDrillsOk;
+      if (visualElementDrills > 0) {
+        findings.push(`部位ごとに練習して${visualElementDrills}件近づけた`);
+      }
       // P960: 裸の状態を読んだ回数。
       visualBare = visualPoseService.summary().bare;
       if (visualBare > 0) {
@@ -972,6 +979,7 @@ class KnowledgeSelfInspectionService {
       visualClothes,
       visualLineRoles,
       visualRegions,
+      visualElementDrills,
       findings,
     };
 

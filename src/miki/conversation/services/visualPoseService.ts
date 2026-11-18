@@ -480,15 +480,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; recentLeans: string[]; recentTempos: string[] } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; drillLevel: number; elementDrills: number; elementDrillsOk: number; plateaus: number; graduations: number; recentLeans: string[]; recentTempos: string[] } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; facesDrawn?: number; facesOk?: number; smooth?: number; smoothOk?: number; shaded?: number; shadedOk?: number; curved?: number; curvedOk?: number; outline?: number; outlineOk?: number; eyesDrawn?: number; eyesOk?: number; maskFill?: number; cel?: number; celOk?: number; hairDetail?: number; hairDetailOk?: number; bust?: number; bustOk?: number; targets?: number; drills?: number; drillsOk?: number; clothes?: number; clothesOk?: number; lineRole?: number; lineRoleOk?: number; regions?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, facesDrawn: raw.facesDrawn || 0, facesOk: raw.facesOk || 0, smooth: raw.smooth || 0, smoothOk: raw.smoothOk || 0, shaded: raw.shaded || 0, shadedOk: raw.shadedOk || 0, curved: raw.curved || 0, curvedOk: raw.curvedOk || 0, outline: raw.outline || 0, outlineOk: raw.outlineOk || 0, eyesDrawn: raw.eyesDrawn || 0, eyesOk: raw.eyesOk || 0, maskFill: raw.maskFill || 0, cel: raw.cel || 0, celOk: raw.celOk || 0, hairDetail: raw.hairDetail || 0, hairDetailOk: raw.hairDetailOk || 0, bust: raw.bust || 0, bustOk: raw.bustOk || 0, targets: raw.targets || 0, drills: raw.drills || 0, drillsOk: raw.drillsOk || 0, clothes: raw.clothes || 0, clothesOk: raw.clothesOk || 0, lineRole: raw.lineRole || 0, lineRoleOk: raw.lineRoleOk || 0, regions: raw.regions || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; facesDrawn?: number; facesOk?: number; smooth?: number; smoothOk?: number; shaded?: number; shadedOk?: number; curved?: number; curvedOk?: number; outline?: number; outlineOk?: number; eyesDrawn?: number; eyesOk?: number; maskFill?: number; cel?: number; celOk?: number; hairDetail?: number; hairDetailOk?: number; bust?: number; bustOk?: number; targets?: number; drills?: number; drillsOk?: number; clothes?: number; clothesOk?: number; lineRole?: number; lineRoleOk?: number; regions?: number; drillLevel?: number; elementDrills?: number; elementDrillsOk?: number; plateaus?: number; graduations?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, facesDrawn: raw.facesDrawn || 0, facesOk: raw.facesOk || 0, smooth: raw.smooth || 0, smoothOk: raw.smoothOk || 0, shaded: raw.shaded || 0, shadedOk: raw.shadedOk || 0, curved: raw.curved || 0, curvedOk: raw.curvedOk || 0, outline: raw.outline || 0, outlineOk: raw.outlineOk || 0, eyesDrawn: raw.eyesDrawn || 0, eyesOk: raw.eyesOk || 0, maskFill: raw.maskFill || 0, cel: raw.cel || 0, celOk: raw.celOk || 0, hairDetail: raw.hairDetail || 0, hairDetailOk: raw.hairDetailOk || 0, bust: raw.bust || 0, bustOk: raw.bustOk || 0, targets: raw.targets || 0, drills: raw.drills || 0, drillsOk: raw.drillsOk || 0, clothes: raw.clothes || 0, clothesOk: raw.clothesOk || 0, lineRole: raw.lineRole || 0, lineRoleOk: raw.lineRoleOk || 0, regions: raw.regions || 0, drillLevel: raw.drillLevel || 1, elementDrills: raw.elementDrills || 0, elementDrillsOk: raw.elementDrillsOk || 0, plateaus: raw.plateaus || 0, graduations: raw.graduations || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, facesDrawn: 0, facesOk: 0, smooth: 0, smoothOk: 0, shaded: 0, shadedOk: 0, curved: 0, curvedOk: 0, outline: 0, outlineOk: 0, eyesDrawn: 0, eyesOk: 0, maskFill: 0, cel: 0, celOk: 0, hairDetail: 0, hairDetailOk: 0, bust: 0, bustOk: 0, targets: 0, drills: 0, drillsOk: 0, clothes: 0, clothesOk: 0, lineRole: 0, lineRoleOk: 0, regions: 0, recentLeans: [], recentTempos: [] };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, facesDrawn: 0, facesOk: 0, smooth: 0, smoothOk: 0, shaded: 0, shadedOk: 0, curved: 0, curvedOk: 0, outline: 0, outlineOk: 0, eyesDrawn: 0, eyesOk: 0, maskFill: 0, cel: 0, celOk: 0, hairDetail: 0, hairDetailOk: 0, bust: 0, bustOk: 0, targets: 0, drills: 0, drillsOk: 0, clothes: 0, clothesOk: 0, lineRole: 0, lineRoleOk: 0, regions: 0, drillLevel: 1, elementDrills: 0, elementDrillsOk: 0, plateaus: 0, graduations: 0, recentLeans: [], recentTempos: [] };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; drillLevel: number; elementDrills: number; elementDrillsOk: number; plateaus: number; graduations: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
     const s = this.load();
     // P967: 姿勢の癖。最近20件の傾きのうち、10件以上あって
     // 6割以上が同じ向きなら、それを癖と読む。
@@ -512,7 +512,7 @@ class VisualPoseService {
       const top = (Object.entries(counts) as [keyof typeof counts, number][]).sort((a, b) => b[1] - a[1])[0];
       if (top && top[1] / s.recentTempos.length >= 0.6) motionHabit = top[0];
     }
-    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, facesDrawn: s.facesDrawn, facesOk: s.facesOk, smooth: s.smooth, smoothOk: s.smoothOk, shaded: s.shaded, shadedOk: s.shadedOk, curved: s.curved, curvedOk: s.curvedOk, outline: s.outline, outlineOk: s.outlineOk, eyesDrawn: s.eyesDrawn, eyesOk: s.eyesOk, maskFill: s.maskFill, cel: s.cel, celOk: s.celOk, hairDetail: s.hairDetail, hairDetailOk: s.hairDetailOk, bust: s.bust, bustOk: s.bustOk, targets: s.targets, drills: s.drills, drillsOk: s.drillsOk, clothes: s.clothes, clothesOk: s.clothesOk, lineRole: s.lineRole, lineRoleOk: s.lineRoleOk, regions: s.regions, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
+    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, facesDrawn: s.facesDrawn, facesOk: s.facesOk, smooth: s.smooth, smoothOk: s.smoothOk, shaded: s.shaded, shadedOk: s.shadedOk, curved: s.curved, curvedOk: s.curvedOk, outline: s.outline, outlineOk: s.outlineOk, eyesDrawn: s.eyesDrawn, eyesOk: s.eyesOk, maskFill: s.maskFill, cel: s.cel, celOk: s.celOk, hairDetail: s.hairDetail, hairDetailOk: s.hairDetailOk, bust: s.bust, bustOk: s.bustOk, targets: s.targets, drills: s.drills, drillsOk: s.drillsOk, clothes: s.clothes, clothesOk: s.clothesOk, lineRole: s.lineRole, lineRoleOk: s.lineRoleOk, regions: s.regions, drillLevel: s.drillLevel, elementDrills: s.elementDrills, elementDrillsOk: s.elementDrillsOk, plateaus: s.plateaus, graduations: s.graduations, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
   }
 
   /**
@@ -1467,7 +1467,7 @@ class VisualPoseService {
    * プロファイルを目標へ寄せる、を繰り返し、一番差分の
    * 小さかったパラメータを返す（柱4の土台）。
    */
-  public drillToTarget(start: PoseReading, maxRounds = 14): { initialDiff: number; finalDiff: number; improved: boolean; reading: PoseReading } | null {
+  public drillToTarget(start: PoseReading, maxRounds = 14): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; plateau: boolean; graduated: boolean; level: number; reading: PoseReading } | null {
     const target = this.getTarget();
     if (!target || !start.head) return null;
     const keys = ['shoulder', 'chest', 'waist', 'hip', 'thigh', 'calf', 'ankle'] as const;
@@ -1487,6 +1487,12 @@ class VisualPoseService {
     let bestProfile = current;
     let bestDiff = Number.POSITIVE_INFINITY;
     let initialDiff: number | null = null;
+    // P1005: 停滞の検出。最良差分が3ラウンド続けて
+    // 0.004未満しか縮まなければ、これ以上回しても縮まない
+    // （＝今の部品と測り方の限界）と見て打ち切る。
+    let staleRounds = 0;
+    let plateau = false;
+    let roundsUsed = 0;
     for (let round = 0; round <= maxRounds; round++) {
       const candidate: PoseReading = { ...start, bodyProfile: current, profileComplete: true };
       // 測る大きさは64（照合で一致が取れている大きさ。96では
@@ -1497,8 +1503,13 @@ class VisualPoseService {
       if (!re) break;
       const d = diffOf(re.bodyProfile);
       if (d === null) break;
+      roundsUsed = round + 1;
       if (initialDiff === null) initialDiff = d;
-      if (d < bestDiff) { bestDiff = d; bestProfile = current; }
+      if (d < bestDiff - 0.004) { bestDiff = d; bestProfile = current; staleRounds = 0; }
+      else if (d < bestDiff) { bestDiff = d; bestProfile = current; staleRounds++; }
+      else staleRounds++;
+      if (bestDiff <= 0.06) break;
+      if (staleRounds >= 3 && round >= 3) { plateau = true; break; }
       const next: PoseReading['bodyProfile'] = { ...current };
       for (const k of keys) {
         const measured = re.bodyProfile[k];
@@ -1513,8 +1524,59 @@ class VisualPoseService {
     state.drills++;
     const improved = bestDiff < initialDiff * 0.6;
     if (improved) state.drillsOk++;
+    if (plateau) state.plateaus++;
+    // P1005: 卒業判定。レベルが上がるほど合格の許容差分は
+    // 狭くなる（0.14 → ×0.8ずつ）。卒業したらレベルを上げる。
+    const tolerance = 0.14 * Math.pow(0.8, state.drillLevel - 1);
+    const graduated = bestDiff <= tolerance;
+    if (graduated) { state.graduations++; state.drillLevel++; }
+    const level = state.drillLevel;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
-    return { initialDiff, finalDiff: bestDiff, improved, reading: { ...start, bodyProfile: bestProfile } };
+    return { initialDiff, finalDiff: bestDiff, improved, rounds: roundsUsed, plateau, graduated, level, reading: { ...start, bodyProfile: bestProfile } };
+  }
+
+  /**
+   * P1005: 要素ドリル。プロファイルの1項目だけを目標へ寄せる。
+   * 全体ドリルでは「どの部位が縮まらないのか」が見えないため、
+   * 部位ごとに単独で練習し、縮む部位と縮まない部位を分ける。
+   */
+  public drillElement(start: PoseReading, key: 'shoulder' | 'chest' | 'waist' | 'hip' | 'thigh' | 'calf' | 'ankle', maxRounds = 8): { key: string; initialDiff: number; finalDiff: number; ok: boolean; plateau: boolean } | null {
+    const target = this.getTarget();
+    if (!target || !start.head) return null;
+    const goal = target.profile[key];
+    if (goal === null || start.bodyProfile[key] === null) return null;
+    let current: PoseReading['bodyProfile'] = { ...start.bodyProfile };
+    let bestDiff = Number.POSITIVE_INFINITY;
+    let initialDiff: number | null = null;
+    let staleRounds = 0;
+    let plateau = false;
+    for (let round = 0; round <= maxRounds; round++) {
+      const candidate: PoseReading = { ...start, bodyProfile: current, profileComplete: true };
+      const img = this.renderBody(candidate, 64);
+      if (!img) break;
+      const re = this.analyzePose(img, 64, 64);
+      if (!re) break;
+      const measured = re.bodyProfile[key];
+      if (measured === null) break;
+      const d = Math.abs(measured - goal);
+      if (initialDiff === null) initialDiff = d;
+      if (d < bestDiff - 0.004) { bestDiff = d; staleRounds = 0; }
+      else if (d < bestDiff) { bestDiff = d; staleRounds++; }
+      else staleRounds++;
+      if (bestDiff <= 0.01) break;
+      if (staleRounds >= 3 && round >= 3) { plateau = true; break; }
+      const next: PoseReading['bodyProfile'] = { ...current };
+      next[key] = Math.max(0.02, Math.min(0.9, (current[key] as number) + (goal - measured) * 0.9));
+      current = next;
+    }
+    if (initialDiff === null || !Number.isFinite(bestDiff)) return null;
+    const ok = bestDiff <= 0.03 || bestDiff < initialDiff * 0.6;
+    const state = this.load();
+    state.elementDrills++;
+    if (ok) state.elementDrillsOk++;
+    if (plateau) state.plateaus++;
+    try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    return { key, initialDiff, finalDiff: bestDiff, ok, plateau };
   }
 
   /**

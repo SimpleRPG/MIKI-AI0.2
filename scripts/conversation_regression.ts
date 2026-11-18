@@ -8194,6 +8194,37 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1004 曲線化描画の照合が保たれる', curved1004?.verified === true, `score=${curved1004?.score}`);
 }
 
+// ---- P1005 ドリル第2段（停滞検出・卒業・要素ドリル） ----
+{
+  const { visualPoseService: vpose1005 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB1005 = [number, number, number];
+  const SKIN1005: RGB1005 = [232, 190, 160];
+  const HAIR1005: RGB1005 = [45, 32, 22];
+  const BLUE1005: RGB1005 = [40, 40, 120];
+  const px1005: RGB1005[] = []; for (let i = 0; i < 48 * 56; i++) px1005.push([240, 240, 240]);
+  const rect1005 = (x0: number, y0: number, x1: number, y1: number, c: RGB1005) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1005[y * 48 + x] = c; };
+  const disc1005 = (cx: number, cy: number, r: number, c: RGB1005) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1005[y * 48 + x] = c; };
+  rect1005(16, 15, 28, 32, BLUE1005); rect1005(12, 16, 15, 30, BLUE1005); rect1005(29, 16, 32, 30, BLUE1005);
+  rect1005(16, 32, 21, 50, BLUE1005); rect1005(23, 32, 28, 50, BLUE1005);
+  disc1005(22, 9, 6, HAIR1005); disc1005(22, 10, 5, SKIN1005);
+  const img1005 = new Uint8Array(48 * 56 * 4);
+  px1005.forEach((c, i) => { img1005[i * 4] = c[0]; img1005[i * 4 + 1] = c[1]; img1005[i * 4 + 2] = c[2]; img1005[i * 4 + 3] = 255; });
+  const reading1005 = vpose1005.analyzePose(img1005, 48, 56);
+  // 届く目標：卒業してレベルが上がり、停滞とは言わない
+  if (reading1005) vpose1005.setTarget({ ...reading1005, bodyProfile: { ...reading1005.bodyProfile, chest: (reading1005.bodyProfile.chest ?? 0.3) + 0.12 } } as never);
+  const drill1005 = reading1005 ? vpose1005.drillToTarget(reading1005) : null;
+  check('P1005 届く目標は卒業する', drill1005?.graduated === true && drill1005.level >= 2 && drill1005.plateau === false, `final=${drill1005?.finalDiff} level=${drill1005?.level} plateau=${drill1005?.plateau}`);
+  // 要素ドリル：胸だけを寄せられる
+  const elem1005 = reading1005 ? vpose1005.drillElement(reading1005, 'chest') : null;
+  check('P1005 要素ドリルで胸だけ寄せられる', elem1005?.ok === true && elem1005.finalDiff < elem1005.initialDiff, `init=${elem1005?.initialDiff} final=${elem1005?.finalDiff}`);
+  // 届かない目標：停滞を検出して打ち切る
+  if (reading1005) vpose1005.setTarget({ ...reading1005, bodyProfile: { ...reading1005.bodyProfile, waist: 0.02, ankle: 0.9 } } as never);
+  const hard1005 = reading1005 ? vpose1005.drillToTarget(reading1005) : null;
+  check('P1005 届かない目標は停滞として打ち切る', hard1005?.plateau === true, `final=${hard1005?.finalDiff} rounds=${hard1005?.rounds}`);
+  const sum1005 = vpose1005.summary();
+  check('P1005 要素ドリルの記録が残る', sum1005.elementDrillsOk >= 1 && sum1005.plateaus >= 1 && sum1005.graduations >= 1, `elem=${sum1005.elementDrillsOk} plateaus=${sum1005.plateaus} grad=${sum1005.graduations}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
