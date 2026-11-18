@@ -2528,6 +2528,26 @@ class VisualPoseService {
       if (!row || row.minX < 0) return null;
       return row.maxX - row.minX + 1;
     };
+    // P1012: 腰の行は、股の間に垂れた髪や壁線で左右に割れることが
+    // ある（全身サンプルでは骨盤が2つのスパンに割れ、体の中心が
+    // 隙間に落ちて、幅が半分以下に読めた）。中心を含むスパンが
+    // ある行は従来どおり。中心が隙間に落ちた行だけ、細い隙間
+    // （図の高さの3.5%まで）をまたいで両側のスパンをつなぐ。
+    // 横に離れた髪の塊や、隣り合った腕は対象にならない。
+    const bridgedWidthAt991 = (y: number): number | null => {
+      const row = rows[Math.max(0, Math.min(height - 1, Math.round(y)))];
+      if (!row || !row.spans.length) return null;
+      if (row.spans.some((sp) => headCx >= sp.minX - 0.5 && headCx <= sp.maxX + 0.5)) return spanWidthAt991(y);
+      const gapMax = Math.max(2, figH * 0.035);
+      const merged: Array<{ minX: number; maxX: number }> = [];
+      for (const s of row.spans) {
+        const last = merged[merged.length - 1];
+        if (last && s.minX - last.maxX - 1 <= gapMax) last.maxX = s.maxX;
+        else merged.push({ minX: s.minX, maxX: s.maxX });
+      }
+      const strad = merged.find((m) => headCx >= m.minX && headCx <= m.maxX);
+      return strad ? strad.maxX - strad.minX + 1 : spanWidthAt991(y);
+    };
     const band991 = (y0: number, y1: number, fn: (y: number) => number | null, mode: 'max' | 'min' | 'p25'): number | null => {
       if (mode === 'p25') {
         // P1004: 帯の最小は1行の隙間で壊れるので、下から
@@ -2557,7 +2577,7 @@ class VisualPoseService {
       // 壁線などで数行だけ潰れた行に引っ張られて実物より細く出る
       // （全身サンプルで腰0.04。帯の行の多くは14〜16pxなのに最小は9pxだった）。
       waist: ratio991(band991(hipY - figH * 0.18, hipY - figH * 0.02, spanWidthAt991, 'p25')),
-      hip: ratio991(spanWidthAt991(hipY)),
+      hip: ratio991(band991(hipY - figH * 0.05, hipY + figH * 0.01, bridgedWidthAt991, 'p25')),
       thigh: crotchY > 0 ? ratio991(band991(crotchY + 1, crotchY + figH * 0.12, totalWidthAt991, 'max')) : null,
       calf: ratio991(totalWidthAt991(figBottom - figH * 0.16)),
       ankle: ratio991(totalWidthAt991(figBottom - figH * 0.03)),
