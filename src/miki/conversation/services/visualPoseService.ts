@@ -4,6 +4,14 @@ import {
   type ImagePixelFeatures,
 } from './conversationImageObservationService';
 import { visualFigureService } from './visualFigureService';
+import { visualZoomService } from './visualZoomService';
+
+/** P994: 素体に描く顔の指定 */
+export interface BodyFaceSpec {
+  eyeSize: 'large' | 'small' | null;
+  brows: boolean;
+  mouthSize: 'large' | 'small' | null;
+}
 import { motionPatternService, type MotionSample } from '../../selfAwareness/services/motionPatternService';
 
 /**
@@ -213,15 +221,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; recentLeans: string[]; recentTempos: string[] } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; recentLeans: string[]; recentTempos: string[] } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; facesDrawn?: number; facesOk?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, facesDrawn: raw.facesDrawn || 0, facesOk: raw.facesOk || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, recentLeans: [], recentTempos: [] };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, facesDrawn: 0, facesOk: 0, recentLeans: [], recentTempos: [] };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
     const s = this.load();
     // P967: 姿勢の癖。最近20件の傾きのうち、10件以上あって
     // 6割以上が同じ向きなら、それを癖と読む。
@@ -245,7 +253,7 @@ class VisualPoseService {
       const top = (Object.entries(counts) as [keyof typeof counts, number][]).sort((a, b) => b[1] - a[1])[0];
       if (top && top[1] / s.recentTempos.length >= 0.6) motionHabit = top[0];
     }
-    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
+    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, facesDrawn: s.facesDrawn, facesOk: s.facesOk, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
   }
 
   /**
@@ -324,7 +332,7 @@ class VisualPoseService {
    * 一致するかで照合する（verifyBody）。服はまだ着せない。
    * P993: 髪も描く（読みの髪の長さに合わせ、照合にも含める）。
    */
-  public renderBody(reading: PoseReading, size = 64): Uint8Array | null {
+  public renderBody(reading: PoseReading, size = 64, face: BodyFaceSpec | null = null): Uint8Array | null {
     if (!reading.head || !reading.profileComplete) return null;
     const S = size;
     const prof = reading.bodyProfile;
@@ -391,10 +399,12 @@ class VisualPoseService {
     };
     seg(reading.shoulderL, reading.handL);
     seg(reading.shoulderR, reading.handR);
-    // 首と頭
+    // 首と頭。首は影の色で描く（肌色で描くと顔の読みで
+    // 顔の範囲に首が混ざり、目と口の帯がずれるため）。
+    const NECK: [number, number, number] = [168, 118, 92];
     const neckW = shoulderW * 0.36;
     for (let y = Math.round(head.y * (S - 1)); y <= y0; y++) {
-      for (let x = Math.round(cxN * (S - 1) - neckW / 2); x <= Math.round(cxN * (S - 1) + neckW / 2); x++) set(x, y, SKIN);
+      for (let x = Math.round(cxN * (S - 1) - neckW / 2); x <= Math.round(cxN * (S - 1) + neckW / 2); x++) set(x, y, NECK);
     }
     // P993: 髪。読みの髪の長さに合わせて、頭の上と両脇を覆う。
     // 顔の部分は肌の頭を後から描いて出す。
@@ -418,6 +428,34 @@ class VisualPoseService {
     // 顔は頭より一回り小さく、少し下に描く（髪が上と脇に残る）。
     if (reading.hair) stamp(head.x * (S - 1), head.y * (S - 1) + Math.max(2, head.r * S) * 0.15, Math.max(2, head.r * S) * 0.8, SKIN);
     else stamp(head.x * (S - 1), head.y * (S - 1), Math.max(2, head.r * S), SKIN);
+    // P994: 顔の中身（目・眉・口）を指定どおりに描く。
+    if (face) {
+      const DARK: [number, number, number] = [30, 30, 30];
+      const hrPx = Math.max(2, head.r * S);
+      const faceR = reading.hair ? hrPx * 0.8 : hrPx;
+      const faceCy = head.y * (S - 1) + (reading.hair ? hrPx * 0.15 : 0);
+      const hxPx = head.x * (S - 1);
+      const eyeY = faceCy - faceR * 0.1;
+      const eyeDX = faceR * 0.42;
+      const eyeR = face.eyeSize === 'large' ? faceR * 0.22 : face.eyeSize === 'small' ? faceR * 0.1 : faceR * 0.15;
+      stamp(hxPx - eyeDX, eyeY, eyeR, DARK);
+      stamp(hxPx + eyeDX, eyeY, eyeR, DARK);
+      if (face.brows) {
+        const browY = faceCy - faceR * 0.68;
+        const browT = Math.max(1, faceR * 0.07);
+        for (const sgn of [-1, 1]) {
+          for (let y = Math.round(browY - browT / 2); y <= Math.round(browY + browT / 2); y++) {
+            for (let x = Math.round(hxPx + sgn * eyeDX - faceR * 0.24); x <= Math.round(hxPx + sgn * eyeDX + faceR * 0.24); x++) set(x, y, DARK);
+          }
+        }
+      }
+      const mw = face.mouthSize === 'large' ? faceR * 0.8 : face.mouthSize === 'small' ? faceR * 0.22 : faceR * 0.45;
+      const mouthY = faceCy + faceR * 0.55;
+      const mouthT = Math.max(1, faceR * 0.12);
+      for (let y = Math.round(mouthY - mouthT / 2); y <= Math.round(mouthY + mouthT / 2); y++) {
+        for (let x = Math.round(hxPx - mw / 2); x <= Math.round(hxPx + mw / 2); x++) set(x, y, DARK);
+      }
+    }
     const image = new Uint8Array(S * S * 4);
     px.forEach((c, i) => { image[i * 4] = c[0]; image[i * 4 + 1] = c[1]; image[i * 4 + 2] = c[2]; image[i * 4 + 3] = 255; });
     return image;
@@ -456,6 +494,31 @@ class VisualPoseService {
     if (verified) state.bodiesOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     return { score, verified, image, size: 64 };
+  }
+
+  /**
+   * P994: 顔の描画の照合。顔つきを指定して素体を描き、頭を
+   * 切り出して顔の読みにかけ、目と口の読みが指定と一致するか。
+   */
+  public verifyFace(reading: PoseReading, face: BodyFaceSpec): { verified: boolean; eyes: number; mouthSize: string | null; image: Uint8Array } | null {
+    if (!reading.head) return null;
+    const image = this.renderBody(reading, 64, face);
+    if (!image) return null;
+    const crop = visualZoomService.cropAnalyze(image, 64, 64, reading.head.x, reading.head.y, reading.head.r * 3.4);
+    if (!crop) return null;
+    const fr = visualZoomService.analyzeFace(crop.pixels);
+    let verified = false;
+    if (fr) {
+      verified = fr.eyes === 2;
+      if (face.mouthSize !== null && fr.mouthSize !== face.mouthSize) verified = false;
+      if (face.eyeSize !== null && fr.eyeSize !== face.eyeSize) verified = false;
+      if (face.brows && fr.brows !== true) verified = false;
+    }
+    const state = this.load();
+    state.facesDrawn++;
+    if (verified) state.facesOk++;
+    try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    return { verified, eyes: fr?.eyes ?? 0, mouthSize: fr?.mouthSize ?? null, image };
   }
 
   /** P958: 姿勢読みから特徴署名を作る */

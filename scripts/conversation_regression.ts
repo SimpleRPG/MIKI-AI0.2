@@ -7849,6 +7849,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P993 描いた側の髪も長いと読める', reHair993?.hair?.length === 'long', `hair=${reHair993?.hair?.length}`);
 }
 
+// ---- P994 素体レンダラに顔 ----
+{
+  const { visualPoseService: vpose994 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi994 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB994 = [number, number, number];
+  const SKIN994: RGB994 = [232, 190, 160];
+  const HAIR994: RGB994 = [45, 32, 22];
+  const BLUE994: RGB994 = [40, 40, 120];
+  const px994: RGB994[] = []; for (let i = 0; i < 48 * 56; i++) px994.push([245, 245, 245]);
+  const rect994 = (x0: number, y0: number, x1: number, y1: number, c: RGB994) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px994[y * 48 + x] = c; };
+  const disc994 = (cx: number, cy: number, r: number, c: RGB994) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px994[y * 48 + x] = c; };
+  rect994(16, 15, 28, 32, BLUE994); rect994(12, 16, 15, 30, BLUE994); rect994(29, 16, 32, 30, BLUE994);
+  rect994(16, 32, 21, 50, BLUE994); rect994(23, 32, 28, 50, BLUE994);
+  rect994(13, 4, 31, 12, HAIR994); rect994(13, 4, 15, 40, HAIR994); rect994(29, 4, 31, 40, HAIR994);
+  disc994(22, 10, 5, SKIN994);
+  const img994 = new Uint8Array(48 * 56 * 4);
+  px994.forEach((c, i) => { img994[i * 4] = c[0]; img994[i * 4 + 1] = c[1]; img994[i * 4 + 2] = c[2]; img994[i * 4 + 3] = 255; });
+  const reading994 = vpose994.analyzePose(img994, 48, 56);
+  const vf994a = reading994 ? vpose994.verifyFace(reading994, { eyeSize: 'large', brows: true, mouthSize: 'large' }) : null;
+  check('P994 大きい目・眉・大きい口の顔が描いて照合できる', vf994a?.verified === true && vf994a.eyes === 2, `verified=${vf994a?.verified} eyes=${vf994a?.eyes}`);
+  const vf994b = reading994 ? vpose994.verifyFace(reading994, { eyeSize: 'small', brows: false, mouthSize: 'small' }) : null;
+  check('P994 小さい目・小さい口の顔が描いて照合できる', vf994b?.verified === true, `verified=${vf994b?.verified}`);
+  const insp994 = ksi994.inspect();
+  check('P994 自己点検の記録に顔の照合（visualDrawnFaces）が入っている', typeof insp994.visualDrawnFaces === 'number' && insp994.visualDrawnFaces >= 1, `visualDrawnFaces=${insp994.visualDrawnFaces}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
