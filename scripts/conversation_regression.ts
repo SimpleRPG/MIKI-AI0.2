@@ -7821,6 +7821,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P992 自己点検の記録に素体の照合（visualBodies）が入っている', typeof insp992.visualBodies === 'number' && insp992.visualBodies >= 1, `visualBodies=${insp992.visualBodies}`);
 }
 
+// ---- P993 素体レンダラに髪 ----
+{
+  const { visualPoseService: vpose993 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB993 = [number, number, number];
+  const SKIN993: RGB993 = [232, 190, 160];
+  const HAIR993: RGB993 = [45, 32, 22];
+  const BLUE993: RGB993 = [40, 40, 120];
+  const person993 = (hairBottom: number) => {
+    const px: RGB993[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB993) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB993) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    rect(16, 15, 28, 32, BLUE993); rect(12, 16, 15, 30, BLUE993); rect(29, 16, 32, 30, BLUE993);
+    rect(16, 32, 21, 50, BLUE993); rect(23, 32, 28, 50, BLUE993);
+    rect(13, 4, 31, 12, HAIR993); rect(13, 4, 15, hairBottom, HAIR993); rect(29, 4, 31, hairBottom, HAIR993);
+    disc(22, 10, 5, SKIN993);
+    const o = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const long993 = vpose993.analyzePose(person993(40), 48, 56);
+  check('P993 長い髪が読める', long993?.hair?.length === 'long', `hair=${long993?.hair?.length}`);
+  const verify993 = long993 ? vpose993.verifyBody(long993) : null;
+  check('P993 描いた素体の髪の長さが一致して照合できる', verify993?.verified === true, `score=${verify993?.score}`);
+  const rendered993 = long993 ? vpose993.renderBody(long993) : null;
+  const reHair993 = rendered993 ? vpose993.analyzePose(rendered993, 64, 64) : null;
+  check('P993 描いた側の髪も長いと読める', reHair993?.hair?.length === 'long', `hair=${reHair993?.hair?.length}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

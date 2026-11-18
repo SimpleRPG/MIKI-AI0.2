@@ -322,6 +322,7 @@ class VisualPoseService {
    * P992: 素体レンダラ第1段。姿勢読みの関節と素体プロファイルから、
    * 塗りのある体の輪郭を描く。描いた側を測り直してプロファイルが
    * 一致するかで照合する（verifyBody）。服はまだ着せない。
+   * P993: 髪も描く（読みの髪の長さに合わせ、照合にも含める）。
    */
   public renderBody(reading: PoseReading, size = 64): Uint8Array | null {
     if (!reading.head || !reading.profileComplete) return null;
@@ -395,7 +396,28 @@ class VisualPoseService {
     for (let y = Math.round(head.y * (S - 1)); y <= y0; y++) {
       for (let x = Math.round(cxN * (S - 1) - neckW / 2); x <= Math.round(cxN * (S - 1) + neckW / 2); x++) set(x, y, SKIN);
     }
-    stamp(head.x * (S - 1), head.y * (S - 1), Math.max(2, head.r * S), SKIN);
+    // P993: 髪。読みの髪の長さに合わせて、頭の上と両脇を覆う。
+    // 顔の部分は肌の頭を後から描いて出す。
+    if (reading.hair) {
+      const HAIR: [number, number, number] = [45, 32, 22];
+      const hairTopY = (head.y - head.r) * (S - 1);
+      const hairBottomY = hairTopY + reading.hair.lengthRatio * figHn * (S - 1);
+      const hx = head.x * (S - 1), hr = Math.max(2, head.r * S);
+      const hy = head.y * (S - 1);
+      for (let y = Math.round(hairTopY); y <= Math.round(hairBottomY); y++) {
+        const inCap = y <= hy;
+        // 上部は頭の丸みに沿わせる（一番上の行が広いと
+        // 人の形の門で頭と認められないため）。
+        const half = inCap ? Math.sqrt(Math.max(0, hr * hr - (y - hy) * (y - hy))) * 1.12 : hr * 0.95;
+        for (let x = Math.round(hx - half); x <= Math.round(hx + half); x++) {
+          if (!inCap && Math.abs(x - hx) < hr * 0.55) continue;
+          set(x, y, HAIR);
+        }
+      }
+    }
+    // 顔は頭より一回り小さく、少し下に描く（髪が上と脇に残る）。
+    if (reading.hair) stamp(head.x * (S - 1), head.y * (S - 1) + Math.max(2, head.r * S) * 0.15, Math.max(2, head.r * S) * 0.8, SKIN);
+    else stamp(head.x * (S - 1), head.y * (S - 1), Math.max(2, head.r * S), SKIN);
     const image = new Uint8Array(S * S * 4);
     px.forEach((c, i) => { image[i * 4] = c[0]; image[i * 4 + 1] = c[1]; image[i * 4 + 2] = c[2]; image[i * 4 + 3] = 255; });
     return image;
@@ -418,6 +440,11 @@ class VisualPoseService {
         if (a === null || b === null) continue;
         compared++;
         if (Math.abs(a - b) <= 0.09) ok++;
+      }
+      // P993: 髪の長さの一致も照合に含める。
+      if (reading.hair && re.hair) {
+        compared++;
+        if (reading.hair.length === re.hair.length) ok++;
       }
       if (compared >= 4) {
         score = ok / compared;
