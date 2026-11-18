@@ -7365,6 +7365,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P978 自己点検の記録に眉（visualBrows）が入っている', typeof insp978.visualBrows === 'number' && insp978.visualBrows >= 1, `visualBrows=${insp978.visualBrows}`);
 }
 
+// ---- P979 鼻の第1段 ----
+{
+  const { visualZoomService: vzoom979 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi979 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB979 = [number, number, number];
+  const SKIN979: RGB979 = [232, 190, 160];
+  const HAIR979: RGB979 = [45, 32, 22];
+  const DARK979: RGB979 = [30, 30, 30];
+  const SHADOW979: RGB979 = [203, 163, 133];
+  const face979 = (withNose: boolean) => {
+    const px: RGB979[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB979) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB979) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR979); disc(24, 24, 16, SKIN979);
+    disc(17, 20, 3, DARK979); disc(31, 20, 3, DARK979);
+    if (withNose) rect(22, 25, 26, 28, SHADOW979);
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const with979 = vzoom979.analyzeFace(face979(true));
+  check('P979 鼻の影のある顔で鼻が読める', with979?.nose === true && with979.description.includes('鼻の影が見える'), `nose=${with979?.nose}`);
+  const flat979 = vzoom979.analyzeFace(face979(false));
+  check('P979 平らな顔では鼻は分からないままにする', flat979?.nose === null, `nose=${flat979?.nose}`);
+  const insp979 = ksi979.inspect();
+  check('P979 自己点検の記録に鼻（visualNose）が入っている', typeof insp979.visualNose === 'number' && insp979.visualNose >= 1, `visualNose=${insp979.visualNose}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
