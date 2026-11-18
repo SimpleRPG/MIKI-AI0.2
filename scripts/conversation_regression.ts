@@ -7481,6 +7481,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P982 自己点検の記録に頬（visualCheeks）が入っている', typeof insp982.visualCheeks === 'number' && insp982.visualCheeks >= 1, `visualCheeks=${insp982.visualCheeks}`);
 }
 
+// ---- P983 動画学習の第3段（動画をまたいだ一貫性） ----
+{
+  const { videoSceneService: vscene983 } = await import('../src/miki/conversation/services/videoSceneService');
+  const { knowledgeSelfInspectionService: ksi983 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB983 = [number, number, number];
+  const SKIN983: RGB983 = [232, 190, 160];
+  const HAIR983: RGB983 = [45, 32, 22];
+  const BLUE983: RGB983 = [40, 40, 120];
+  const px983: RGB983[] = []; for (let i = 0; i < 48 * 56; i++) px983.push([245, 245, 245]);
+  const rect983 = (x0: number, y0: number, x1: number, y1: number, c: RGB983) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px983[y * 48 + x] = c; };
+  const disc983 = (cx: number, cy: number, r: number, c: RGB983) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px983[y * 48 + x] = c; };
+  disc983(22, 9, 6, HAIR983); disc983(22, 10, 5, SKIN983);
+  rect983(16, 15, 28, 32, BLUE983); rect983(12, 16, 15, 30, BLUE983); rect983(29, 16, 32, 30, BLUE983);
+  rect983(16, 32, 21, 50, BLUE983); rect983(23, 32, 28, 50, BLUE983);
+  const person983 = new Uint8Array(48 * 56 * 4);
+  px983.forEach((c, i) => { person983[i * 4] = c[0]; person983[i * 4 + 1] = c[1]; person983[i * 4 + 2] = c[2]; person983[i * 4 + 3] = 255; });
+  const solid983 = new Uint8Array(48 * 56 * 4);
+  for (let i = 0; i < 48 * 56; i++) { solid983[i * 4] = 200; solid983[i * 4 + 1] = 40; solid983[i * 4 + 2] = 40; solid983[i * 4 + 3] = 255; }
+  const framesA983 = [0, 1000, 2000].map((tMs) => ({ tMs, rgba: person983, width: 48, height: 56 }));
+  for (let i = 0; i < 3; i++) vscene983.decompose(framesA983, [{ startMs: 0, endMs: 2500, text: '猫が寝る場面です' }]);
+  const framesB983 = [0, 1000, 2000, 3000, 4000].map((tMs, i) => ({ tMs, rgba: i % 2 === 0 ? person983 : solid983, width: 48, height: 56 }));
+  vscene983.decompose(framesB983, [{ startMs: 0, endMs: 4500, text: '犬が走る場面です' }]);
+  const cons983 = vscene983.consistentCandidates();
+  check('P983 別の動画でも繰り返す対応は一貫した候補になる', cons983.some((c) => c.word === '猫が寝る場面' && c.runs >= 2), `consistent=${JSON.stringify(cons983.slice(0, 2))}`);
+  check('P983 1本の中でだけ繰り返す対応は一貫した候補にはならない', !cons983.some((c) => c.word === '犬が走る場面') && vscene983.wordCandidates().some((c) => c.word === '犬が走る場面'), `consistentWords=${JSON.stringify(cons983.map((c) => c.word))}`);
+  const insp983 = ksi983.inspect();
+  check('P983 自己点検の記録に一貫候補（visualConsistentPairs）が入っている', typeof insp983.visualConsistentPairs === 'number' && insp983.visualConsistentPairs >= 1, `visualConsistentPairs=${insp983.visualConsistentPairs}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

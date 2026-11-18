@@ -144,6 +144,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualEars: number;
   visualFaceShape: number;
   visualCheeks: number;
+  visualConsistentPairs: number;
   findings: string[];
 }
 
@@ -393,6 +394,7 @@ class KnowledgeSelfInspectionService {
     let visualEars = 0;
     let visualFaceShape = 0;
     let visualCheeks = 0;
+    let visualConsistentPairs = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -646,6 +648,11 @@ class KnowledgeSelfInspectionService {
       if (visualCheeks > 0) {
         findings.push(`頬の赤みを${visualCheeks}件読んだ`);
       }
+      // P983: 動画をまたいで繰り返し現れた名前の候補の数。
+      visualConsistentPairs = videoSceneService.summary().consistentPairs;
+      if (visualConsistentPairs > 0) {
+        findings.push(`動画をまたいで現れた名前の候補が${visualConsistentPairs}件ある`);
+      }
       // P960: 裸の状態を読んだ回数。
       visualBare = visualPoseService.summary().bare;
       if (visualBare > 0) {
@@ -788,6 +795,7 @@ class KnowledgeSelfInspectionService {
       visualEars,
       visualFaceShape,
       visualCheeks,
+      visualConsistentPairs,
       findings,
     };
 

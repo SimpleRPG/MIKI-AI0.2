@@ -190,6 +190,10 @@ class VideoSceneService {
       state.lastSceneCount = scenes.length;
       // P970: 場面の同定と字幕の言葉の対応づけ。同じ対応が
       // 繰り返し現れたら、画面の中身の名前の候補になる。
+      // P983: この動画で現れた対応は、動画をまたいだ回数も数える。
+      // 1本の動画の中でだけ繰り返す対応より、別の動画でも
+      // 現れる対応の方が、名前の候補として確かだと考える。
+      const runKeys = new Set<string>();
       for (const sc of scenes) {
         if (!sc.identifications.length || !sc.subtitleText) continue;
         const words = extractCaptionWords(sc.subtitleText);
@@ -197,8 +201,12 @@ class VideoSceneService {
           for (const w of words) {
             const k = `${ident}|${w}`;
             state.pairs[k] = (state.pairs[k] || 0) + 1;
+            runKeys.add(k);
           }
         }
+      }
+      for (const k of runKeys) {
+        state.pairRuns[k] = (state.pairRuns[k] || 0) + 1;
       }
       storageService.setItem(KEY, JSON.stringify(state));
     } catch { /* 台帳は補助経路 */ }
@@ -253,6 +261,21 @@ class VideoSceneService {
       .sort((a, b) => b.count - a.count);
   }
 
+  /**
+   * P983: 動画をまたいだ一貫性。候補のうち、2本以上の別の動画で
+   * 現れたものを返す。1本の中の繰り返しだけの候補より確か。
+   */
+  public consistentCandidates(): { identification: string; word: string; count: number; runs: number }[] {
+    const state = this.loadState();
+    return Object.entries(state.pairs)
+      .filter(([k, n]) => n >= 3 && (state.pairRuns[k] || 0) >= 2)
+      .map(([k, n]) => {
+        const [identification, word] = k.split('|');
+        return { identification, word, count: n, runs: state.pairRuns[k] || 0 };
+      })
+      .sort((a, b) => b.runs - a.runs || b.count - a.count);
+  }
+
   /** 場面の並びを文章にする（会話や日記の材料）。 */
   public describeScenes(scenes: VideoScene[]): string {
     if (!scenes.length) return '場面は切り分けられなかった。';
@@ -269,7 +292,7 @@ class VideoSceneService {
     }).join('\n');
   }
 
-  private loadState(): { runs: number; scenesTotal: number; motionsTotal: number; lastSceneCount: number; pairs: Record<string, number>; promoted: string[] } {
+  private loadState(): { runs: number; scenesTotal: number; motionsTotal: number; lastSceneCount: number; pairs: Record<string, number>; promoted: string[]; pairRuns: Record<string, number> } {
     try {
       const parsed = JSON.parse(storageService.getItem(KEY) || '{}');
       return {
@@ -279,13 +302,14 @@ class VideoSceneService {
         lastSceneCount: Number(parsed.lastSceneCount || 0),
         pairs: (parsed.pairs && typeof parsed.pairs === 'object') ? parsed.pairs : {},
         promoted: Array.isArray(parsed.promoted) ? parsed.promoted : [],
+        pairRuns: (parsed.pairRuns && typeof parsed.pairRuns === 'object') ? parsed.pairRuns : {},
       };
     } catch {
-      return { runs: 0, scenesTotal: 0, motionsTotal: 0, lastSceneCount: 0, pairs: {}, promoted: [] };
+      return { runs: 0, scenesTotal: 0, motionsTotal: 0, lastSceneCount: 0, pairs: {}, promoted: [], pairRuns: {} };
     }
   }
 
-  public summary(): { runs: number; scenesTotal: number; motionsTotal: number; wordPairs: number; wordCandidates: number; promotedClaims: number } {
+  public summary(): { runs: number; scenesTotal: number; motionsTotal: number; wordPairs: number; wordCandidates: number; promotedClaims: number; consistentPairs: number } {
     const state = this.loadState();
     const counts = Object.values(state.pairs);
     return {
@@ -295,6 +319,7 @@ class VideoSceneService {
       wordPairs: counts.length,
       wordCandidates: counts.filter((n) => n >= 3).length,
       promotedClaims: state.promoted.length,
+      consistentPairs: Object.entries(state.pairs).filter(([k, n]) => n >= 3 && (state.pairRuns[k] || 0) >= 2).length,
     };
   }
 }
