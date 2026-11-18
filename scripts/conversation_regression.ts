@@ -8168,6 +8168,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1003 自己点検の記録に領域分割が入っている', insp1003.visualRegions >= 1, `visualRegions=${insp1003.visualRegions}`);
 }
 
+// ---- P1004 領域分割の採用条件と描画照合の両立 ----
+{
+  const { visualPoseService: vpose1004 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB1004 = [number, number, number];
+  const SKIN1004: RGB1004 = [232, 190, 160];
+  const PINK1004: RGB1004 = [240, 150, 180];
+  const BLUE1004: RGB1004 = [40, 40, 120];
+  const px1004: RGB1004[] = []; for (let i = 0; i < 48 * 56; i++) px1004.push([245, 245, 245]);
+  const rect1004 = (x0: number, y0: number, x1: number, y1: number, c: RGB1004) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1004[y * 48 + x] = c; };
+  const disc1004 = (cx: number, cy: number, r: number, c: RGB1004) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1004[y * 48 + x] = c; };
+  rect1004(16, 15, 28, 32, BLUE1004); rect1004(12, 16, 15, 30, BLUE1004); rect1004(29, 16, 32, 30, BLUE1004);
+  rect1004(16, 32, 21, 50, BLUE1004); rect1004(23, 32, 28, 50, BLUE1004);
+  rect1004(13, 4, 31, 12, PINK1004); rect1004(13, 4, 15, 40, PINK1004); rect1004(29, 4, 31, 40, PINK1004);
+  disc1004(22, 10, 5, SKIN1004);
+  const img1004 = new Uint8Array(48 * 56 * 4);
+  px1004.forEach((c, i) => { img1004[i * 4] = c[0]; img1004[i * 4 + 1] = c[1]; img1004[i * 4 + 2] = c[2]; img1004[i * 4 + 3] = 255; });
+  const reading1004 = vpose1004.analyzePose(img1004, 48, 56);
+  // 領域分割の採用条件を締めても、描いて測り直す照合が壊れないこと
+  const plain1004 = reading1004 ? vpose1004.verifyBody(reading1004) : null;
+  check('P1004 通常描画の照合が保たれる', plain1004?.verified === true, `score=${plain1004?.score}`);
+  const smooth1004 = reading1004 ? vpose1004.verifyBodySmooth(reading1004) : null;
+  check('P1004 滑らか描画の照合が保たれる', smooth1004?.verified === true, `score=${smooth1004?.score}`);
+  const curved1004 = reading1004 ? vpose1004.verifyBodyCurved(reading1004) : null;
+  check('P1004 曲線化描画の照合が保たれる', curved1004?.verified === true, `score=${curved1004?.score}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -300,7 +300,7 @@ function buildMaskFine(rgba: Uint8Array | number[], width: number, height: numbe
  * 線で区切った領域の単位で髪と体を分ける。
  * 髪の判定：図の上部1割の平均色に近く、肌色でない領域。
  */
-function segmentBodyMask(rgba: Uint8Array | number[], width: number, height: number): Uint8Array | null {
+function segmentBodyMask(rgba: Uint8Array | number[], width: number, height: number): { body: Uint8Array; hair: Uint8Array } | null {
   const N = width * height;
   const lumArr = new Float32Array(N);
   for (let i = 0; i < N; i++) lumArr[i] = rgba[i * 4] * 0.3 + rgba[i * 4 + 1] * 0.59 + rgba[i * 4 + 2] * 0.11;
@@ -385,19 +385,28 @@ function segmentBodyMask(rgba: Uint8Array | number[], width: number, height: num
   // 肌は r ≥ g ≥ b の順で、ピンクの髪（g < b）と区別する。薄い肌にも効く形。
   const isSkinAvg = (r: number, g: number, b: number): boolean => r > 190 && g >= b && r - b >= 12;
   const hairIds = new Set<number>();
+  const figCxEst = (figLeft + figRight) / 2;
+  const figWEst = figRight - figLeft + 1;
   regions.forEach((rg, i) => {
     if (i === bgId || rg.area < 12) return;
-    // 図の外周に触れていない内側の領域は髪ではない（水着など）。
-    const touchesFigureEdge = rg.minX <= figLeft + 1 || rg.maxX >= figRight - 1 || rg.minY <= figTop + 1;
-    if (!touchesFigureEdge) return;
+    // 髪らしい場所：頭の上部にあるか、中心から横にずれている。
+    // 体の中心にある領域は水着などの服として守る。
+    const centerX = (rg.minX + rg.maxX) / 2;
+    const inTopBand = rg.minY <= figTop + figH * 0.12;
+    const offCenter = Math.abs(centerX - figCxEst) > figWEst * 0.18;
+    // 図の面積の2割を超える大きな領域は服ではない（背後の髪など）。
+    const huge = rg.area > figWEst * figH * 0.2;
+    if (!inTopBand && !offCenter && !huge) return;
     const dist = Math.abs(rg.r - hr) + Math.abs(rg.g - hg) + Math.abs(rg.b - hb);
     if (dist <= 80 && !isSkinAvg(rg.r, rg.g, rg.b)) hairIds.add(i);
   });
   if (!hairIds.size) return null;
   const mask = new Uint8Array(N);
+  const hairMask = new Uint8Array(N);
   let fg = 0;
   for (let i = 0; i < N; i++) {
     const c = comp[i];
+    if (c >= 0 && hairIds.has(c)) hairMask[i] = 1;
     if (c >= 0 && c !== bgId && !hairIds.has(c)) { mask[i] = 1; fg++; }
   }
   const bboxArea = (figRight - figLeft + 1) * figH;
@@ -414,7 +423,7 @@ function segmentBodyMask(rgba: Uint8Array | number[], width: number, height: num
       lastFg = y;
     }
   }
-  return mask;
+  return { body: mask, hair: hairMask };
 }
 
 /** P1001: 影色の自動生成。素の色を暗くし、少し冷たく寄せる（色のルール第1段） */
@@ -1882,6 +1891,7 @@ class VisualPoseService {
     if (!binMask) return null;
     const binDensity = maskDensity(binMask, width, height);
     let chosen = this.analyzePoseWithMask(rgba, width, height, binMask, 'bin', binDensity);
+    let chosenMask = binMask;
     let chosenMethod: 'bin' | 'fine' | 'fill' = 'bin';
     let chosenDensity = binDensity;
     const bboxH = (m: Uint8Array): number => {
@@ -1914,38 +1924,77 @@ class VisualPoseService {
         const moreComplete = mh > chosenBBoxH * 1.15;
         if (!chosen || (r.verified && !chosen.verified) || (r.verified === chosen.verified && (d > chosenDensity || moreComplete))) {
           chosen = r;
+          chosenMask = m;
           chosenMethod = method;
           chosenDensity = d;
           chosenBBoxH = mh;
         }
       }
     }
-    // P1003: 長い髪がある時は、線で区切った領域から髪を除いた
-    // マスクでも測り直し、胸の幅が細くなる（＝後ろ髪が混ざって
-    // いた）なら、そちらのプロファイルを採る。
+    // P1003/P1004: 長い髪がある時は、線で区切った領域から髪を
+    // 除いたマスクでも測り直し、部位ごとに差し替える。差し替えは
+    // 「領域側が細い」時だけ。潰れた値（元の35%未満）は、その行の
+    // 輪郭が実際に髪で汚れている時だけ採る。
     let regionApplied = false;
     if (chosen && chosen.hair?.length === 'long') {
-      const bodyMask = segmentBodyMask(rgba, width, height);
-      if (bodyMask) {
+      const seg = segmentBodyMask(rgba, width, height);
+      if (seg) {
         // 詰まり具合は元の輪郭のものを渡す（体だけのマスクは
         // 島状で当然まばらなので、その密度で正直さの門にかけない）。
-        const rr = this.analyzePoseWithMask(rgba, width, height, bodyMask, chosenMethod, chosen.silhouetteDensity);
-        // 置き換えは「胸がはっきり細くなる時」だけ。少しの差で
-        // 測り方の基準が揺れると、描いて測り直す照合が壊れる。
-        // さらに、髪を除いて広くなる部位がある読みは信用しない
-        // （除去で狭くなるのが筋で、広がるのは分割の失敗）。
-        let neverWider = true;
-        if (rr) {
-          for (const k of ['shoulder', 'chest', 'waist', 'hip', 'thigh', 'calf', 'ankle'] as const) {
+        const rr = this.analyzePoseWithMask(rgba, width, height, seg.body, chosenMethod, chosen.silhouetteDensity);
+        if (rr && rr.posture === chosen.posture) {
+          const S1w = width - 1;
+          const S1h = height - 1;
+          const headCx = chosen.head ? chosen.head.x * S1w : width / 2;
+          const figTop = chosen.head ? (chosen.head.y - chosen.head.r) * S1h : 0;
+          const footYn = Math.max(chosen.footL?.y ?? 0, chosen.footR?.y ?? 0);
+          const figBottom = (footYn > 0 ? footYn : 0.98) * S1h;
+          const figHn = Math.max(1, figBottom - figTop);
+          const neckY = chosen.head ? (chosen.head.y + chosen.head.r) * S1h : figTop + figHn * 0.15;
+          const shoulderY = chosen.shoulderL && chosen.shoulderR ? ((chosen.shoulderL.y + chosen.shoulderR.y) / 2) * S1h : neckY + figHn * 0.05;
+          const hipY = neckY + figHn * 0.45;
+          const bandRow: Record<'shoulder' | 'chest' | 'waist' | 'hip' | 'thigh' | 'calf' | 'ankle', number> = {
+            shoulder: shoulderY, chest: neckY + figHn * 0.2, waist: hipY - figHn * 0.1, hip: hipY,
+            thigh: hipY + figHn * 0.08, calf: figBottom - figHn * 0.16, ankle: figBottom - figHn * 0.03,
+          };
+          // その行で、髪を除くと輪郭が2割以上細くなるか
+          // （＝その行の幅は髪で膨らんでいた、という汚れの判定）。
+          const rowExtent = (m: Uint8Array, y: number): number => {
+            const yy = Math.max(0, Math.min(height - 1, Math.round(y)));
+            let minX = -1;
+            let maxX = -1;
+            for (let x = 0; x < width; x++) if (m[yy * width + x]) { if (minX < 0) minX = x; maxX = x; }
+            return minX < 0 ? 0 : maxX - minX + 1;
+          };
+          const contaminated = (y: number): boolean => {
+            const sil = rowExtent(chosenMask, y);
+            const bod = rowExtent(seg.body, y);
+            return sil > 0 && bod > 0 && bod < sil * 0.8;
+          };
+          // 図全体が髪で膨らんでいる時だけ、領域側のプロファイル
+          // を丸ごと採る（部位ごとに混ぜると、描く時の寸法として
+          // 自己矛盾する）。判定は胸とふくらはぎの2行で、髪を
+          // 除くと輪郭が2割以上細くなること。
+          const figureDirty = contaminated(bandRow.chest) && contaminated(bandRow.calf);
+          // 広がってはいけないのは胸と脚の合計幅（分割の失敗の印）。
+          // 肩は1行で測るため、多少の揺れは許す。
+          let neverWider = true;
+          for (const k of ['chest', 'calf', 'ankle'] as const) {
             const a = chosen.bodyProfile[k];
             const b = rr.bodyProfile[k];
             if (a !== null && b !== null && b > a + 0.03) { neverWider = false; break; }
           }
-        }
-        if (rr && rr.profileComplete && neverWider && (!chosen.profileComplete
-          || (rr.bodyProfile.chest !== null && chosen.bodyProfile.chest !== null && rr.bodyProfile.chest >= 0.12 && rr.bodyProfile.chest < chosen.bodyProfile.chest - 0.08))) {
-          chosen = { ...chosen, bodyProfile: rr.bodyProfile, profileComplete: true };
-          regionApplied = true;
+          if (figureDirty && neverWider && rr.profileComplete && (!chosen.profileComplete
+            || (rr.bodyProfile.chest !== null && chosen.bodyProfile.chest !== null && rr.bodyProfile.chest >= 0.12 && rr.bodyProfile.chest < chosen.bodyProfile.chest - 0.08))) {
+            const mergedProfile = { ...rr.bodyProfile };
+            // 太ももだけは例外：股の位置は髪でずれやすく、領域側の
+            // 帯が胴に入って広がることがある。その時は元の値を残す。
+            if (mergedProfile.thigh !== null && chosen.bodyProfile.thigh !== null && mergedProfile.thigh > chosen.bodyProfile.thigh + 0.03) {
+              mergedProfile.thigh = chosen.bodyProfile.thigh;
+            }
+            chosen = { ...chosen, bodyProfile: mergedProfile, profileComplete: true };
+            regionApplied = true;
+          }
         }
       }
     }
@@ -2339,7 +2388,19 @@ class VisualPoseService {
       if (!row || row.minX < 0) return null;
       return row.maxX - row.minX + 1;
     };
-    const band991 = (y0: number, y1: number, fn: (y: number) => number | null, mode: 'max' | 'min'): number | null => {
+    const band991 = (y0: number, y1: number, fn: (y: number) => number | null, mode: 'max' | 'min' | 'p25'): number | null => {
+      if (mode === 'p25') {
+        // P1004: 帯の最小は1行の隙間で壊れるので、下から
+        // 25%の行の幅を腰とする（細い行の代表として頑健）。
+        const vals: number[] = [];
+        for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) {
+          const v = fn(y);
+          if (v !== null) vals.push(v);
+        }
+        if (!vals.length) return null;
+        vals.sort((a, b) => a - b);
+        return vals[Math.floor((vals.length - 1) * 0.25)];
+      }
       let best: number | null = null;
       for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) {
         const v = fn(y);
