@@ -7510,6 +7510,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P983 自己点検の記録に一貫候補（visualConsistentPairs）が入っている', typeof insp983.visualConsistentPairs === 'number' && insp983.visualConsistentPairs >= 1, `visualConsistentPairs=${insp983.visualConsistentPairs}`);
 }
 
+// ---- P984 首のくびれの第1段 ----
+{
+  const { visualPoseService: vpose984 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi984 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB984 = [number, number, number];
+  const SKIN984: RGB984 = [232, 190, 160];
+  const HAIR984: RGB984 = [45, 32, 22];
+  const BLUE984: RGB984 = [40, 40, 120];
+  const person984 = (fillNeck: boolean) => {
+    const px: RGB984[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB984) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB984) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(22, 9, 6, HAIR984); disc(22, 10, 5, SKIN984);
+    if (fillNeck) rect(13, 11, 31, 16, SKIN984);
+    rect(16, 15, 28, 32, BLUE984); rect(12, 16, 15, 30, BLUE984); rect(29, 16, 32, 30, BLUE984);
+    rect(16, 32, 21, 50, BLUE984); rect(23, 32, 28, 50, BLUE984);
+    const o = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const std984 = vpose984.analyzePose(person984(false), 48, 56);
+  check('P984 普通の人で首のくびれが読める', std984?.neck === true && std984.neckDescription === '首のくびれが見える', `neck=${std984?.neck}`);
+  const filled984 = vpose984.analyzePose(person984(true), 48, 56);
+  check('P984 首が埋まった人ではくびれなしと読む', filled984?.neck === false, `neck=${filled984?.neck}`);
+  const insp984 = ksi984.inspect();
+  check('P984 自己点検の記録に首（visualNeck）が入っている', typeof insp984.visualNeck === 'number' && insp984.visualNeck >= 1, `visualNeck=${insp984.visualNeck}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
