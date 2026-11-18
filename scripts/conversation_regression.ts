@@ -7956,6 +7956,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P997 自己点検の記録に陰影の照合（visualShadedBodies）が入っている', typeof insp997.visualShadedBodies === 'number' && insp997.visualShadedBodies >= 1, `visualShadedBodies=${insp997.visualShadedBodies}`);
 }
 
+// ---- P998 素体の輪郭の曲線化 ----
+{
+  const { visualPoseService: vpose998 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi998 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB998 = [number, number, number];
+  const SKIN998: RGB998 = [232, 190, 160];
+  const PINK998: RGB998 = [240, 150, 180];
+  const BLUE998: RGB998 = [40, 40, 120];
+  const px998: RGB998[] = []; for (let i = 0; i < 48 * 56; i++) px998.push([245, 245, 245]);
+  const rect998 = (x0: number, y0: number, x1: number, y1: number, c: RGB998) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px998[y * 48 + x] = c; };
+  const disc998 = (cx: number, cy: number, r: number, c: RGB998) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px998[y * 48 + x] = c; };
+  rect998(16, 15, 28, 32, BLUE998); rect998(12, 16, 15, 30, BLUE998); rect998(29, 16, 32, 30, BLUE998);
+  rect998(16, 32, 21, 50, BLUE998); rect998(23, 32, 28, 50, BLUE998);
+  rect998(13, 4, 31, 12, PINK998); rect998(13, 4, 15, 40, PINK998); rect998(29, 4, 31, 40, PINK998);
+  disc998(22, 10, 5, SKIN998);
+  const img998 = new Uint8Array(48 * 56 * 4);
+  px998.forEach((c, i) => { img998[i * 4] = c[0]; img998[i * 4 + 1] = c[1]; img998[i * 4 + 2] = c[2]; img998[i * 4 + 3] = 255; });
+  const reading998 = vpose998.analyzePose(img998, 48, 56);
+  const curved998 = reading998 ? vpose998.renderBodyCurved(reading998, 96) : null;
+  check('P998 輪郭を曲線化した素体が描ける', curved998 !== null && curved998.length === 96 * 96 * 4, `len=${curved998?.length}`);
+  const vs998 = reading998 ? vpose998.verifyBodyCurved(reading998) : null;
+  check('P998 輪郭を曲線化しても測り直すと同じ読みになる', vs998?.verified === true, `score=${vs998?.score}`);
+  const insp998 = ksi998.inspect();
+  check('P998 自己点検の記録に輪郭の曲線化の照合（visualCurvedBodies）が入っている', typeof insp998.visualCurvedBodies === 'number' && insp998.visualCurvedBodies >= 1, `visualCurvedBodies=${insp998.visualCurvedBodies}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
