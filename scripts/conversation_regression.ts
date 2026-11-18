@@ -7599,6 +7599,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P986 自己点検の記録に腕の長さ（visualArmLength）が入っている', typeof insp986.visualArmLength === 'number' && insp986.visualArmLength >= 1, `visualArmLength=${insp986.visualArmLength}`);
 }
 
+// ---- P987 脚の長さの第1段 ----
+{
+  const { visualPoseService: vpose987 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi987 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB987 = [number, number, number];
+  const SKIN987: RGB987 = [232, 190, 160];
+  const HAIR987: RGB987 = [45, 32, 22];
+  const BLUE987: RGB987 = [40, 40, 120];
+  const person987 = (W: number, H: number, legBottom: number) => {
+    const px: RGB987[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB987) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB987) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(22, 9, 6, HAIR987); disc(22, 10, 5, SKIN987);
+    rect(16, 15, 28, 32, BLUE987); rect(12, 16, 15, 30, BLUE987); rect(29, 16, 32, 30, BLUE987);
+    rect(16, 32, 21, legBottom, BLUE987); rect(23, 32, 28, legBottom, BLUE987);
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const std987 = vpose987.analyzePose(person987(48, 56, 50), 48, 56);
+  check('P987 普通の脚の長さは言わない', std987?.legLength === null, `legLength=${std987?.legLength}`);
+  const long987 = vpose987.analyzePose(person987(48, 68, 62), 48, 68);
+  check('P987 長い脚が読める', long987?.legLength === 'long' && long987.legLengthDescription === '脚が長い', `legLength=${long987?.legLength}`);
+  const short987 = vpose987.analyzePose(person987(48, 48, 44), 48, 48);
+  check('P987 短い脚が読める', short987?.legLength === 'short', `legLength=${short987?.legLength}`);
+  const insp987 = ksi987.inspect();
+  check('P987 自己点検の記録に脚の長さ（visualLegLength）が入っている', typeof insp987.visualLegLength === 'number' && insp987.visualLegLength >= 1, `visualLegLength=${insp987.visualLegLength}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -573,6 +573,13 @@ class ConversationImageObservationService {
                 `${pose953.armLengthDescription}。具体的な物や文字までは読み取れない。`,
               );
             }
+            // P987: 脚の長さも添える。
+            if (pose953.legLengthDescription) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `${pose953.legLengthDescription}。具体的な物や文字までは読み取れない。`,
+              );
+            }
             // P973: 髪の形も添える。
             if (pose953.hairShapeDescription) {
               text = text.replace(
