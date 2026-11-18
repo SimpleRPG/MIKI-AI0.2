@@ -7453,6 +7453,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P981 自己点検の記録に顔の形（visualFaceShape）が入っている', typeof insp981.visualFaceShape === 'number' && insp981.visualFaceShape >= 1, `visualFaceShape=${insp981.visualFaceShape}`);
 }
 
+// ---- P982 頬の赤みの第1段 ----
+{
+  const { visualZoomService: vzoom982 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi982 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB982 = [number, number, number];
+  const SKIN982: RGB982 = [232, 190, 160];
+  const HAIR982: RGB982 = [45, 32, 22];
+  const DARK982: RGB982 = [30, 30, 30];
+  const BLUSH982: RGB982 = [238, 150, 130];
+  const face982 = (withBlush: boolean) => {
+    const px: RGB982[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB982) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB982) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR982); disc(24, 24, 16, SKIN982);
+    disc(17, 20, 3, DARK982); disc(31, 20, 3, DARK982);
+    if (withBlush) { rect(10, 27, 17, 33, BLUSH982); rect(31, 27, 38, 33, BLUSH982); }
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const with982 = vzoom982.analyzeFace(face982(true));
+  check('P982 頬の赤みが読める', with982?.cheekFlush === true && with982.description.includes('頬が赤みを帯びている'), `flush=${with982?.cheekFlush}`);
+  const plain982 = vzoom982.analyzeFace(face982(false));
+  check('P982 赤みのない顔では頬は不明のまま', plain982?.cheekFlush === null, `flush=${plain982?.cheekFlush}`);
+  const insp982 = ksi982.inspect();
+  check('P982 自己点検の記録に頬（visualCheeks）が入っている', typeof insp982.visualCheeks === 'number' && insp982.visualCheeks >= 1, `visualCheeks=${insp982.visualCheeks}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
