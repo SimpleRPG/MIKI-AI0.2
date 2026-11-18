@@ -213,7 +213,30 @@ export function analyzeImagePixels(
     ? Math.max(0, Math.min(1, 1 - (secondDiffSum / firstDiffSum) * 0.5))
     : 1;
   const periodicity = detectPeriodicity(lumaGrid, width, height);
-  const regions = measureRegions(binGrid, rgba, width, height);
+  // P948: 画素ノイズのある画像では、細かい色ビンのちらつきで
+  // 同じ色の領域が粉々に割れ、領域として拾えなくなる。まず
+  // 普通に測り、拾えた領域の合計が画面の97%に届かなければ
+  // 「割れている」と判断して、粗いビン（64刻み）で測り直し、
+  // より多く拾えた方を採る。色の分布の報告は細かいビンの
+  // ままにする——そちらが正直な測定なので。
+  let regions = measureRegions(binGrid, rgba, width, height);
+  const coveredShare = (rs: ImageRegionFeature[]) => rs.reduce((a, r) => a + r.share, 0);
+  if (coveredShare(regions) < 0.97) {
+    const coarseGrid = new Int32Array(pixelCount).fill(-1);
+    const coarseIds = new Map<string, number>();
+    for (let i = 0; i < pixelCount; i++) {
+      if (rgba[i * 4 + 3] < 128) continue;
+      const key = `${Math.floor(rgba[i * 4] / 64)}-${Math.floor(rgba[i * 4 + 1] / 64)}-${Math.floor(rgba[i * 4 + 2] / 64)}`;
+      let id = coarseIds.get(key);
+      if (id === undefined) {
+        id = coarseIds.size;
+        coarseIds.set(key, id);
+      }
+      coarseGrid[i] = id;
+    }
+    const coarseRegions = measureRegions(coarseGrid, rgba, width, height);
+    if (coveredShare(coarseRegions) > coveredShare(regions)) regions = coarseRegions;
+  }
 
   return {
     width,

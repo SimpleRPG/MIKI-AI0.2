@@ -6256,6 +6256,108 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P947 自己点検に動きの記述数が入る', insp947.videoMotions >= 3, `videoMotions=${insp947.videoMotions}`);
 }
 
+// ---- P948 画像・動画理解の検定バッテリー（画像） ----
+{
+  const { analyzeImagePixels: an948 } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const { verifyMaterialByRendering: vm948 } = await import('../src/miki/conversation/services/materialRenderVerificationService');
+  const { visualPatternService: vp948 } = await import('../src/miki/conversation/services/visualPatternService');
+  const { visualScenePatternService: vsp948 } = await import('../src/miki/conversation/services/visualScenePatternService');
+  const { visualFigureService: vf948 } = await import('../src/miki/conversation/services/visualFigureService');
+  const W948 = 48, H948 = 48;
+  type RGB948 = [number, number, number];
+  const make948 = (fn: (x: number, y: number) => RGB948) => {
+    const a = new Uint8Array(W948 * H948 * 4);
+    for (let y = 0; y < H948; y++) for (let x = 0; x < W948; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W948 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return a;
+  };
+  const img948 = (fn: (x: number, y: number) => RGB948) => an948(make948(fn), W948, H948);
+  const noise948 = (fn: (x: number, y: number) => RGB948, amp: number) => (x: number, y: number): RGB948 => {
+    const [r, g, b] = fn(x, y);
+    let s = 7 + x * 374761393 + y * 668265263;
+    s = (s ^ (s >> 13)) * 1274126177;
+    const d = (((s ^ (s >> 16)) >>> 0) % (2 * amp + 1)) - amp;
+    const cl = (v: number) => Math.max(0, Math.min(255, v + d));
+    return [cl(r), cl(g), cl(b)];
+  };
+  // 素材: 位置の違うツヤ・周期の違う縞でも仮説と照合が立つ
+  const glossy948 = img948((x, y) => (x >= 4 && x <= 6 && y >= 4 && y <= 6) ? [255, 255, 255] : [45, 45, 50]);
+  const vg948 = vm948(glossy948);
+  check('P948検定 素材: 隅のツヤも仮説が立ち照合が通る', vg948.verified === true && vg948.renderedHypothesis.gloss === 'ツヤが強そう', `score=${vg948.score}`);
+  const stripes948 = img948((x) => ((x % 8) < 4 ? [30, 30, 30] : [210, 210, 210]) as RGB948);
+  const vs948 = vm948(stripes948);
+  check('P948検定 素材: 周期8の縞も照合が通る', vs948.verified === true && vs948.renderedHypothesis.patternPeriod === 8, `period=${vs948.renderedHypothesis.patternPeriod}`);
+  // 同定: 楕円の見本で、移動・縮小・色違いを同定し、四角は誤認しない
+  const ellipse948 = (cx: number, cy: number, rx: number, ry: number, fg: RGB948, bg: RGB948) => (x: number, y: number): RGB948 =>
+    (((x - cx) ** 2) / (rx * rx) + ((y - cy) ** 2) / (ry * ry) <= 1 ? fg : bg);
+  check('P948検定 同定: 楕円の見本を登録できる', vp948.register('検定楕円', img948(ellipse948(24, 24, 14, 8, [200, 40, 40], [15, 15, 15])))?.name === '検定楕円', 'register');
+  check('P948検定 同定: 移動した楕円も同定できる', vp948.match(img948(ellipse948(16, 32, 14, 8, [200, 40, 40], [15, 15, 15])))?.name === '検定楕円', 'shifted');
+  check('P948検定 同定: 縮小した楕円も同定できる', vp948.match(img948(ellipse948(24, 24, 10, 6, [200, 40, 40], [15, 15, 15])))?.name === '検定楕円', 'scaled');
+  check('P948検定 同定: 色の違う楕円も同定できる', vp948.match(img948(ellipse948(24, 24, 14, 8, [40, 40, 200], [15, 15, 15])))?.name === '検定楕円', 'color');
+  const square948 = img948((x, y) => (x >= 14 && x <= 34 && y >= 14 && y <= 34) ? [200, 40, 40] : [15, 15, 15]);
+  check('P948検定 同定: 四角を楕円と誤認しない', vp948.match(square948)?.name !== '検定楕円', `match=${JSON.stringify(vp948.match(square948))}`);
+  // 配置: 2色の並びを登録し、移動しても同定し、縦並びは誤認しない
+  const pair948 = (dy: number) => (x: number, y: number): RGB948 => {
+    if ((x - 14) ** 2 + (y - (24 + dy)) ** 2 <= 36) return [200, 40, 40];
+    if (x >= 30 && x <= 40 && y >= 19 + dy && y <= 29 + dy) return [40, 40, 200];
+    return [15, 15, 15];
+  };
+  check('P948検定 配置: 2色の並びを登録できる', vsp948.registerScene('検定ならび', img948(pair948(0)))?.name === '検定ならび', 'register-scene');
+  check('P948検定 配置: 移動した並びも同定できる', vsp948.matchScene(img948(pair948(5)))?.name === '検定ならび', 'scene-shifted');
+  const stacked948 = img948((x, y) => {
+    if ((x - 24) ** 2 + (y - 13) ** 2 <= 36) return [200, 40, 40] as RGB948;
+    if (x >= 19 && x <= 29 && y >= 30 && y <= 40) return [40, 40, 200] as RGB948;
+    return [15, 15, 15] as RGB948;
+  });
+  check('P948検定 配置: 縦並びを横並びと誤認しない', vsp948.matchScene(stacked948)?.name !== '検定ならび', 'scene-stacked');
+  // 人: 位置違い・小さい頭（2%の床の内側）を読み、大きすぎる頭は人と読まない
+  const person948 = (cx: number, headR: number, headCy: number, bodyTop: number, bodyBottom: number, bodyHalfW: number) => (x: number, y: number): RGB948 =>
+    (((x - cx) ** 2 + (y - headCy) ** 2 <= headR * headR) || (Math.abs(x - cx) <= bodyHalfW && y >= bodyTop && y <= bodyBottom)) ? [30, 30, 30] : [240, 240, 240];
+  check('P948検定 人: 左に寄った人も読める', vf948.identifyFigure(img948(person948(14, 4, 10, 18, 41, 6))) !== null, 'figure-left');
+  check('P948検定 人: 頭が小さい側（半径4）でも読める', vf948.identifyFigure(img948(person948(24, 4, 10, 18, 41, 6))) !== null, 'figure-small-head');
+  check('P948検定 人: 頭が大きすぎる配置は人と読まない', vf948.identifyFigure(img948(person948(24, 10, 14, 30, 44, 7))) === null, 'figure-big-head');
+  check('P948検定 人: 頭が面積2%未満だと領域として拾えない（測定の床）', vf948.identifyFigure(img948(person948(24, 3, 8, 15, 42, 7))) === null, 'figure-below-floor');
+  // 頑健さ: 画素ノイズ±18でも同定と人の読みが崩れない
+  check('P948検定 頑健さ: ノイズ入りの楕円も同定できる', vp948.match(img948(noise948(ellipse948(24, 24, 14, 8, [200, 40, 40], [15, 15, 15]), 18)))?.name === '検定楕円', 'noisy-ellipse');
+  check('P948検定 頑健さ: ノイズ入りの人も読める', vf948.identifyFigure(img948(noise948(person948(24, 4, 10, 18, 41, 6), 18))) !== null, 'noisy-person');
+}
+
+// ---- P948 画像・動画理解の検定バッテリー（動画） ----
+{
+  const { videoSceneService: vs948v } = await import('../src/miki/conversation/services/videoSceneService');
+  const W948v = 48, H948v = 48;
+  type RGB948v = [number, number, number];
+  const frame948 = (tMs: number, fn: (x: number, y: number) => RGB948v) => {
+    const rgba = new Uint8Array(W948v * H948v * 4);
+    for (let y = 0; y < H948v; y++) for (let x = 0; x < W948v; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W948v + x) * 4;
+      rgba[i] = r; rgba[i + 1] = g; rgba[i + 2] = b; rgba[i + 3] = 255;
+    }
+    return { tMs, rgba, width: W948v, height: H948v };
+  };
+  const L948v: RGB948v = [240, 240, 240];
+  const D948v: RGB948v = [25, 25, 25];
+  const frames948: any[] = [];
+  for (let i = 0; i < 10; i++) frames948.push(frame948(i * 100, (x, y) => (x >= 19 && x <= 28 && y >= 19 && y <= 28) ? D948v : L948v));
+  for (let i = 0; i < 19; i++) {
+    const left = Math.round(19 + 10 * Math.sin((2 * Math.PI * i * 100) / 900));
+    frames948.push(frame948(1000 + i * 100, (x, y) => (x >= left && x <= left + 9 && y >= 19 && y <= 28) ? L948v : D948v));
+  }
+  for (let i = 0; i < 10; i++) frames948.push(frame948(3000 + i * 100, (x, y) => (((x - 24) ** 2 + (y - 10) ** 2 <= 16) || (Math.abs(x - 24) <= 6 && y >= 18 && y <= 41)) ? D948v : L948v));
+  const { scenes: scenes948, cutsMs: cuts948 } = vs948v.decompose(frames948, [
+    { startMs: 0, endMs: 900, text: '最初の場面の字幕' },
+    { startMs: 1000, endMs: 2800, text: '揺れる場面の字幕' },
+    { startMs: 3000, endMs: 3900, text: '人の場面の字幕' },
+  ]);
+  check('P948検定 動画: 3場面に正しく分かれる', scenes948.length === 3 && JSON.stringify(cuts948) === '[1000,3000]', `scenes=${scenes948.length} cuts=${JSON.stringify(cuts948)}`);
+  check('P948検定 動画: 静止・横揺れ・静止の動きが場面ごとに付く', String(scenes948[0].motionText || '').includes('動いていない') && String(scenes948[1].motionText || '').includes('横揺れ') && String(scenes948[2].motionText || '').includes('動いていない'), `motions=${JSON.stringify(scenes948.map((s) => s.motionText))}`);
+  check('P948検定 動画: 人の場面で人の形が同定される', scenes948[2].identifications.some((t) => t.includes('人の形らしい配置')), `ids=${JSON.stringify(scenes948[2].identifications)}`);
+  check('P948検定 動画: 字幕が場面ごとに付く', scenes948[0].subtitleText.includes('最初の場面') && scenes948[1].subtitleText.includes('揺れる場面') && scenes948[2].subtitleText.includes('人の場面'), 'subtitles');
+  check('P948検定 動画: 場面の文章化が3行そろう', vs948v.describeScenes(scenes948).split('\n').length === 3, 'describe');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
