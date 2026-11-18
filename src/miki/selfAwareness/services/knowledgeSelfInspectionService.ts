@@ -129,6 +129,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualImitations: number;
   visualBalance: number;
   visualMotionQuality: number;
+  visualHair: number;
   findings: string[];
 }
 
@@ -363,6 +364,7 @@ class KnowledgeSelfInspectionService {
     let visualImitations = 0;
     let visualBalance = 0;
     let visualMotionQuality = 0;
+    let visualHair = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -586,6 +588,11 @@ class KnowledgeSelfInspectionService {
       if (visualMotionQuality > 0) {
         findings.push(`動きの質を${visualMotionQuality}件読んだ`);
       }
+      // P964: 髪の長さを読んだ回数。
+      visualHair = visualPoseService.summary().hairs;
+      if (visualHair > 0) {
+        findings.push(`髪の長さを${visualHair}件読んだ`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -665,6 +672,7 @@ class KnowledgeSelfInspectionService {
       visualImitations,
       visualBalance,
       visualMotionQuality,
+      visualHair,
       findings,
     };
 

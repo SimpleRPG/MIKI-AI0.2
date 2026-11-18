@@ -143,6 +143,9 @@ export interface PoseReading {
   /** P962: 重心（輪郭の重心と、足の支えの中心とのずれ） */
   balance: { centroidX: number; centroidY: number; lean: number; label: 'balanced' | 'left' | 'right' } | null;
   balanceDescription: string;
+  /** P964: 髪の長さ */
+  hair: { length: 'short' | 'medium' | 'long'; lengthRatio: number } | null;
+  hairDescription: string;
   verified: boolean;
   fit: number;
 }
@@ -192,15 +195,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number } {
     return this.load();
   }
 
@@ -866,6 +869,7 @@ class VisualPoseService {
 
     // P958: 髪の色。頭の範囲で、肌色でない前景の最頻色。
     let hairColor: string | null = null;
+    let hairBinKey: string | null = null;
     {
       const groups = new Map<string, { n: number; r: number; g: number; b: number }>();
       const hr = headR * 1.25;
@@ -885,9 +889,40 @@ class VisualPoseService {
         }
       }
       let bestH: { n: number; r: number; g: number; b: number } | null = null;
-      for (const v of groups.values()) if (!bestH || v.n > bestH.n) bestH = v;
+      let bestHKey: string | null = null;
+      for (const [k, v] of groups) if (!bestH || v.n > bestH.n) { bestH = v; bestHKey = k; }
       if (bestH && bestH.n >= 10) hairColor = nearestExtraColor(bestH.r / bestH.n, bestH.g / bestH.n, bestH.b / bestH.n).name;
+      hairBinKey = bestH && bestH.n >= 10 ? bestHKey : null;
     }
+
+    // P964: 髪の長さ。髪色の領域が頭から下へどこまで
+    // 続いているか（途切れたらそこまで）を測る。
+    let hair: PoseReading['hair'] = null;
+    if (hairBinKey) {
+      const bandHalf = headR * 2.4;
+      let hairBottom = Math.round(headCy + headR);
+      let gap = 0;
+      for (let y = Math.round(headCy + headR); y <= figBottom; y++) {
+        let cnt = 0;
+        for (let x = Math.max(0, Math.floor(headCx - bandHalf)); x <= Math.min(width - 1, Math.ceil(headCx + bandHalf)); x++) {
+          const p = y * width + x;
+          if (!mask[p]) continue;
+          const i = p * 4;
+          if (`${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}` === hairBinKey) cnt++;
+        }
+        if (cnt >= 2) { hairBottom = y; gap = 0; }
+        else {
+          gap++;
+          if (gap > 2) break;
+        }
+      }
+      const lengthRatio = figH > 0 ? (hairBottom - figTop) / figH : 0;
+      const length = lengthRatio <= 0.28 ? 'short' : lengthRatio <= 0.55 ? 'medium' : 'long';
+      hair = { length, lengthRatio };
+    }
+    const hairDescription = hair
+      ? hair.length === 'short' ? '髪は短い' : hair.length === 'medium' ? '髪は肩くらいまである' : '髪は長く垂れている'
+      : '';
 
     // P957: 持ち物と重なり。体の最頻色（服）と肌色を除いて、
     // 手の周りや体の前にまとまった別の色があれば、それは
@@ -965,6 +1000,7 @@ class VisualPoseService {
     if (extrasDescription) state.extras++;
     if (bare === true) state.bare++;
     if (balance) state.balances++;
+    if (hair) state.hairs++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
     const norm = (p: PosePoint | null): PosePoint | null =>
@@ -994,6 +1030,8 @@ class VisualPoseService {
       bareDescription,
       balance,
       balanceDescription,
+      hair,
+      hairDescription,
       verified,
       fit,
     };

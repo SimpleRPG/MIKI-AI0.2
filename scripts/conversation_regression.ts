@@ -6974,6 +6974,37 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P963 自己点検の記録に動きの質（visualMotionQuality）が入っている', typeof insp963.visualMotionQuality === 'number' && insp963.visualMotionQuality >= 1, `visualMotionQuality=${insp963.visualMotionQuality}`);
 }
 
+// ---- P964 髪の長さの第1段 ----
+{
+  const { visualPoseService: vpose964 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi964 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB964 = [number, number, number];
+  const SKIN964: RGB964 = [232, 190, 160];
+  const HAIR964: RGB964 = [45, 32, 22];
+  const BLUE964: RGB964 = [40, 40, 120];
+  const draw964 = (hairTo: number) => {
+    const px: RGB964[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB964) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB964) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(22, 9, 6, HAIR964); disc(22, 10, 5, SKIN964);
+    rect(16, 15, 28, 32, BLUE964);
+    rect(12, 16, 15, 30, BLUE964); rect(29, 16, 32, 30, BLUE964);
+    rect(16, 32, 21, 50, BLUE964); rect(23, 32, 28, 50, BLUE964);
+    if (hairTo > 0) { rect(15, 6, 18, hairTo, HAIR964); rect(26, 6, 29, hairTo, HAIR964); }
+    const o = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const short964 = vpose964.analyzePose(draw964(0), 48, 56);
+  check('P964 頭だけの髪は短いと読める', short964?.hair?.length === 'short', `hair=${JSON.stringify(short964?.hair)}`);
+  const med964 = vpose964.analyzePose(draw964(26), 48, 56);
+  check('P964 肩までの髪は肩くらいと読める', med964?.hair?.length === 'medium', `hair=${JSON.stringify(med964?.hair)}`);
+  const long964 = vpose964.analyzePose(draw964(42), 48, 56);
+  check('P964 長く垂れた髪は長いと読める', long964?.hair?.length === 'long', `hair=${JSON.stringify(long964?.hair)}`);
+  const insp964 = ksi964.inspect();
+  check('P964 自己点検の記録に髪（visualHair）が入っている', typeof insp964.visualHair === 'number' && insp964.visualHair >= 1, `visualHair=${insp964.visualHair}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
