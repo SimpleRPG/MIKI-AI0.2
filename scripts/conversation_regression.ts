@@ -7116,6 +7116,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P968 自己点検の記録に指の本数（visualFingerDetails）が入っている', typeof insp968.visualFingerDetails === 'number' && insp968.visualFingerDetails >= 1, `visualFingerDetails=${insp968.visualFingerDetails}`);
 }
 
+// ---- P969 目の色の第1段 ----
+{
+  const { visualZoomService: vzoom969 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi969 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB969 = [number, number, number];
+  const SKIN969: RGB969 = [232, 190, 160];
+  const HAIR969: RGB969 = [45, 32, 22];
+  const face969 = (eye: RGB969) => {
+    const px: RGB969[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB969) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR969); disc(24, 25, 14, SKIN969);
+    disc(17, 22, 3, eye); disc(31, 22, 3, eye);
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const brown969 = vzoom969.analyzeFace(face969([120, 72, 40]));
+  check('P969 茶色い目が読める', brown969?.eyeColor === '茶色', `eyeColor=${brown969?.eyeColor}`);
+  const black969 = vzoom969.analyzeFace(face969([30, 30, 30]));
+  check('P969 黒い目が読める', black969?.eyeColor === '黒', `eyeColor=${black969?.eyeColor}`);
+  const insp969 = ksi969.inspect();
+  check('P969 自己点検の記録に目の色（visualEyeColor）が入っている', typeof insp969.visualEyeColor === 'number' && insp969.visualEyeColor >= 1, `visualEyeColor=${insp969.visualEyeColor}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -49,18 +49,20 @@ export interface FaceReading {
   mouthWidthRatio: number;
   verified: boolean;
   description: string;
+  /** P969: 目の色（目の暗い点の平均色から） */
+  eyeColor: string | null;
 }
 
 class VisualZoomService {
-  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number } {
+  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number; fingerDetails?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0, fingerDetails: raw.fingerDetails || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number; fingerDetails?: number; eyeColors?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0, fingerDetails: raw.fingerDetails || 0, eyeColors: raw.eyeColors || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0, fingerDetails: 0 };
+    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0, fingerDetails: 0, eyeColors: 0 };
   }
 
-  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number } {
+  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number } {
     return this.load();
   }
 
@@ -263,9 +265,26 @@ class VisualZoomService {
     const schematic = this.renderFaceSchematic(raw);
     const again = schematic ? this.measureFace(schematic) : null;
     const verified = !!again && again.eyes === raw.eyes && again.mouthShape === raw.mouthShape;
+    // P969: 目の色。目として拾った暗い点の平均色から読む。
+    let eyeColor: string | null = null;
+    if (raw.eyePts.length >= 2) {
+      let sr = 0, sg = 0, sb = 0;
+      for (const p of raw.eyePts) {
+        const i = (p.y * OUT + p.x) * 4;
+        sr += pixels[i]; sg += pixels[i + 1]; sb += pixels[i + 2];
+      }
+      const r = sr / raw.eyePts.length, g = sg / raw.eyePts.length, b = sb / raw.eyePts.length;
+      const lum = r * 0.3 + g * 0.59 + b * 0.11;
+      eyeColor = lum < 55 ? '黒'
+        : b > r + 15 && b > g ? '青'
+        : g >= r && g >= b ? '緑'
+        : r > g && g > b && r - b > 25 ? '茶色'
+        : '暗い色';
+    }
     const parts: string[] = [];
     if (raw.eyes === 2) parts.push('目が2つ見える');
     else if (raw.eyes === 1) parts.push('目が1つ見える');
+    if (eyeColor) parts.push(`目の色は${eyeColor}`);
     if (raw.mouthShape !== 'none') parts.push('口が見える');
     let description = parts.join('。');
     if (description) description += '。';
@@ -273,8 +292,9 @@ class VisualZoomService {
     else if (raw.mouthShape === 'frown') description += '口元が下がっているように見える。';
     const state = this.load();
     state.faces++;
+    if (eyeColor) state.eyeColors++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
-    return { ...raw, verified, description };
+    return { ...raw, verified, description, eyeColor };
   }
 
   private measureFace(pixels: Uint8Array): { eyes: 0 | 1 | 2; mouthShape: FaceReading['mouthShape']; mouthWidthRatio: number; eyePts: { x: number; y: number }[]; mouthPts: { x: number; y: number }[]; faceBox: { x0: number; y0: number; x1: number; y1: number } } | null {
