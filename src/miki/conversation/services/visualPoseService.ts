@@ -1926,9 +1926,9 @@ class VisualPoseService {
    * それぞれに姿勢読みをかける。重なって輪郭がくっついた
    * 人は分けられない（その場合は1人として読まれる）。
    */
-  public analyzePeople(rgba: Uint8Array | number[], width: number, height: number): { count: number; readings: PoseReading[]; holdingHands: boolean } {
-    const mask = buildMask(rgba, width, height);
-    if (!mask) return { count: 0, readings: [], holdingHands: false };
+  // P1014: 1つのマスクから人を数える本体。skip は既に読めた
+  // 人の箱で、重なる成分は二重に数えない。
+  private peopleFromMask(rgba: Uint8Array | number[], width: number, height: number, mask: Uint8Array, skip: Array<{ x0: number; y0: number; x1: number; y1: number }>): { readings: PoseReading[]; imageHands: Array<Array<{ x: number; y: number }>>; boxes: Array<{ x0: number; y0: number; x1: number; y1: number }> } {
     const label = new Int32Array(width * height).fill(-1);
     const comps: Array<{ id: number; area: number; x0: number; y0: number; x1: number; y1: number }> = [];
     const stack: number[] = [];
@@ -1960,6 +1960,7 @@ class VisualPoseService {
     }
     const bg: [number, number, number] = [rgba[0], rgba[1], rgba[2]];
     const readings: PoseReading[] = [];
+    const boxes: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
     // P959: 元画像の座標に戻した手の位置（人ごと）
     const imageHands: Array<Array<{ x: number; y: number }>> = [];
     for (const c of comps) {
@@ -1967,6 +1968,15 @@ class VisualPoseService {
       const bw = c.x1 - c.x0 + 1;
       const bh = c.y1 - c.y0 + 1;
       if (bh < height * 0.15) continue;
+      // P1014: 既に読めた人と重なる成分は数え直さない（小さい
+      // 方の箱の半分以上が重なれば同一人物と見る）。
+      const already = skip.some((b) => {
+        const ox = Math.max(0, Math.min(c.x1, b.x1) - Math.max(c.x0, b.x0) + 1);
+        const oy = Math.max(0, Math.min(c.y1, b.y1) - Math.max(c.y0, b.y0) + 1);
+        const minArea = Math.min(bw * bh, (b.x1 - b.x0 + 1) * (b.y1 - b.y0 + 1));
+        return minArea > 0 && (ox * oy) / minArea >= 0.5;
+      });
+      if (already) continue;
       // 背景色で余白を足してから切り出す。余白が無いと、
       // 服の色が画面の最頻色になって「背景」と誤判定され、
       // 輪郭が反転して読めなくなるため。
@@ -1988,6 +1998,7 @@ class VisualPoseService {
       const reading = this.analyzePose(sub, sw, sh);
       if (reading && reading.verified) {
         readings.push(reading);
+        boxes.push({ x0: c.x0, y0: c.y0, x1: c.x1, y1: c.y1 });
         const hands: Array<{ x: number; y: number }> = [];
         for (const h of [reading.handL, reading.handR]) {
           if (!h) continue;
@@ -1998,6 +2009,23 @@ class VisualPoseService {
         }
         imageHands.push(hands);
       }
+    }
+    return { readings, imageHands, boxes };
+  }
+
+  public analyzePeople(rgba: Uint8Array | number[], width: number, height: number): { count: number; readings: PoseReading[]; holdingHands: boolean } {
+    // P1014: まず色ビン（64刻み）で数える。薄い色の人は肌や髪が
+    // 背景と同じビンに溶けて数えられないため、細かいビン
+    // （32刻み）でも数え、重ならない人だけ足す。
+    const binMask = buildMask(rgba, width, height);
+    const first = binMask ? this.peopleFromMask(rgba, width, height, binMask, []) : { readings: [] as PoseReading[], imageHands: [] as Array<Array<{ x: number; y: number }>>, boxes: [] as Array<{ x0: number; y0: number; x1: number; y1: number }> };
+    let readings = first.readings;
+    let imageHands = first.imageHands;
+    const fineMask = buildMaskFine(rgba, width, height);
+    if (fineMask) {
+      const second = this.peopleFromMask(rgba, width, height, fineMask, first.boxes);
+      readings = readings.concat(second.readings);
+      imageHands = imageHands.concat(second.imageHands);
     }
     // P959: 別々の人の手同士が重なる位置にあれば、手を
     // つないでいるサインとして読む。

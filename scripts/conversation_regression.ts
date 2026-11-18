@@ -8471,6 +8471,41 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1013 素体描画の照合が保たれる', !!(vb && vb.verified), JSON.stringify(vb && { verified: vb.verified, score: vb.score }));
 }
 
+// P1014: 複数人の数え方にも測り方の使い分けを入れる。薄い色の
+// 人は肌や髪が背景と同じ色ビン（64刻み）に溶けて、人数の数え
+// 本体から見落とされていた。細かいビン（32刻み）でも数え、
+// 既に読めた人と重ならない人だけを足す（二重数え防止）。
+{
+  const svc = (await import('../src/miki/conversation/services/visualPoseService')).visualPoseService;
+  type RGB = [number, number, number];
+  const BG: RGB = [208, 210, 212];
+  const D_SKIN: RGB = [232, 190, 160], D_HAIR: RGB = [45, 32, 22], D_CLOTH: RGB = [40, 40, 120];
+  const P_SKIN: RGB = [243, 222, 205], P_HAIR: RGB = [243, 205, 215], P_CLOTH: RGB = [150, 160, 190];
+  const mkPair = (paleSecond: boolean) => {
+    const W = 96, H = 56;
+    const a = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { a[i * 4] = BG[0]; a[i * 4 + 1] = BG[1]; a[i * 4 + 2] = BG[2]; a[i * 4 + 3] = 255; }
+    const person = (ox: number, skin: RGB, hair: RGB, cloth: RGB) => {
+      rect(ox + 16, 15, ox + 28, 32, cloth); rect(ox + 12, 16, ox + 15, 30, skin); rect(ox + 29, 16, ox + 32, 30, skin);
+      rect(ox + 16, 32, ox + 21, 50, cloth); rect(ox + 23, 32, ox + 28, 50, cloth);
+      disc(ox + 22, 9, 6, hair); disc(ox + 22, 10, 5, skin);
+    };
+    person(2, D_SKIN, D_HAIR, D_CLOTH);
+    if (paleSecond) person(50, P_SKIN, P_HAIR, P_CLOTH); else person(50, D_SKIN, D_HAIR, D_CLOTH);
+    return { a, W, H };
+  };
+  const mixed = mkPair(true);
+  const resMixed = svc.analyzePeople(mixed.a, mixed.W, mixed.H);
+  check('P1014 薄い色の人も含めて2人と数える', resMixed.count === 2, `count=${resMixed.count}`);
+  const both = mkPair(false);
+  const resBoth = svc.analyzePeople(both.a, both.W, both.H);
+  check('P1014 通常の2人は二重に数えない', resBoth.count === 2, `count=${resBoth.count}`);
+  const sum: any = svc.summary();
+  check('P1014 複数人の記録が残る', sum.multi >= 1, `multi=${sum.multi}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1848,
     "sourceFileCount": 1401,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1312,
-    "relativeImportCandidateCount": 4746,
-    "resolvedRelativeImportCandidateCount": 4730,
+    "relativeImportCandidateCount": 4747,
+    "resolvedRelativeImportCandidateCount": 4731,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 717530,
-      "lines": 8487,
-      "sha256": "6a6bcf0ac1a2a12294739e9025cbee3da6c641db375e9ed03a55b9f5be246bed",
+      "bytes": 720026,
+      "lines": 8522,
+      "sha256": "2ef52c14f0d200b66b65691448085dcea190fed47a8e2186d02c90b0803bb0a6",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4850,10 +4850,16 @@
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
+        },
+        {
+          "line": 8479,
+          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         }
       ],
-      "relativeImportCandidateCount": 522,
-      "resolvedRelativeImportCount": 522,
+      "relativeImportCandidateCount": 523,
+      "resolvedRelativeImportCount": 523,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -15516,9 +15522,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 177781,
-      "lines": 3471,
-      "sha256": "2d7f264b05c223def387a43ab44a71205e839ad21198d47f683438349a77fd7e",
+      "bytes": 179755,
+      "lines": 3499,
+      "sha256": "c5edb8a6fab36f5f1941d4975b4d1994536ce199f26d92fd2cf4bbdbe9f4b7c3",
       "relativeImportCandidates": [
         {
           "line": 1,
