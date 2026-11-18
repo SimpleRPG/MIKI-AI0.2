@@ -556,9 +556,11 @@ class VisualPoseService {
       legs = 'TOGETHER';
     }
 
-    // 体勢：座りは「下の行が広く、縦横比が低く、股の分かれが無い」。
+    // 体勢：座りは「下の行が広く、縦横比が低い」。股の分かれが
+    // 無いか、あっても下の方（座った時のすねの分かれ）なら座り。
     let posture: PostureState = 'UNKNOWN';
-    if (figH < figW * 1.05 && crotchY < 0 && bottomWide) posture = 'SITTING';
+    const crotchLow = crotchY > 0 && figH > 0 && (crotchY - figTop) / figH >= 0.75;
+    if (figH < figW * 1.05 && (crotchY < 0 || crotchLow) && bottomWide) posture = 'SITTING';
     else if (figH >= figW * 0.9 && legs !== 'UNKNOWN') posture = 'STANDING';
 
     // 腕：側帯（胴の外側）にある前景の出方で読む。

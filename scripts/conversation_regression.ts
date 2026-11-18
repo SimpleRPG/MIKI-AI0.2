@@ -7301,6 +7301,43 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P976 座った形の描き直し照合が通る', vfig976.verifyFigure(feats976) === true, `verify=${vfig976.verifyFigure(feats976)}`);
 }
 
+// ---- P977 姿勢読みの座り判定 ----
+{
+  const { visualPoseService: vpose977 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB977 = [number, number, number];
+  const SKIN977: RGB977 = [232, 190, 160];
+  const HAIR977: RGB977 = [45, 32, 22];
+  const BLUE977: RGB977 = [40, 40, 120];
+  const seated977 = () => {
+    const W = 64, H = 44;
+    const px: RGB977[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB977) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB977) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(32, 7, 6, HAIR977); disc(32, 8, 5, SKIN977);
+    rect(24, 13, 40, 22, BLUE977);
+    rect(10, 22, 54, 29, BLUE977);
+    rect(12, 29, 17, 35, BLUE977); rect(47, 29, 52, 35, BLUE977);
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const sit977 = vpose977.analyzePose(seated977(), 64, 44);
+  check('P977 すねの分かれがあっても座っている姿勢として読める', sit977?.posture === 'SITTING', `posture=${sit977?.posture}`);
+  const standing977 = (() => {
+    const px: RGB977[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB977) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB977) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(22, 9, 6, HAIR977); disc(22, 10, 5, SKIN977);
+    rect(16, 15, 28, 32, BLUE977); rect(12, 16, 15, 30, BLUE977); rect(29, 16, 32, 30, BLUE977);
+    rect(16, 32, 21, 50, BLUE977); rect(23, 32, 28, 50, BLUE977);
+    const o = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  })();
+  const stand977 = vpose977.analyzePose(standing977, 48, 56);
+  check('P977 立っている人は立っているまま読める', stand977?.posture === 'STANDING', `posture=${stand977?.posture}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
