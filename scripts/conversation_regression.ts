@@ -7187,6 +7187,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P971 緑の目が目として読める', green971?.eyes === 2 && green971?.eyeColor === '緑', `eyes=${green971?.eyes} eyeColor=${green971?.eyeColor}`);
 }
 
+// ---- P972 アバターの存在状態を会話に接続 ----
+{
+  const { avatarPresenceService: av972 } = await import('../src/miki/selfAwareness/services/avatarPresenceService');
+  av972.noteSleep('bibi');
+  av972.noteAwake('miki');
+  const r972a: any = await conversationCoreService.execute({ prompt: 'ビービーは今寝てる？', memories: [], recentMessages: [], conversationId: 'suite-p972' } as any);
+  check('P972 「ビービーは今寝てる？」に存在状態で答える', r972a.reason === 'presence_answer' && String(r972a.replyText || '').includes('ビービーは今、寝ているよ'), `reason=${r972a.reason} reply=${String(r972a.replyText || '').slice(0, 40)}`);
+  const r972b: any = await conversationCoreService.execute({ prompt: 'みきは今起きてる？', memories: [], recentMessages: [], conversationId: 'suite-p972' } as any);
+  check('P972 「みきは今起きてる？」に存在状態で答える', r972b.reason === 'presence_answer' && String(r972b.replyText || '').includes('そばにいる'), `reason=${r972b.reason} reply=${String(r972b.replyText || '').slice(0, 40)}`);
+  const r972c: any = await conversationCoreService.execute({ prompt: '相方は今寝てる？', memories: [], recentMessages: [], conversationId: 'suite-p972' } as any);
+  check('P972 他の人の睡眠の話は横取りしない', r972c.reason !== 'presence_answer', `reason=${r972c.reason}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

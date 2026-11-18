@@ -49,6 +49,7 @@ import { mistakeNotebookService } from '../../selfAwareness/services/mistakeNote
 import { knowledgeConsolidationService } from '../../selfAwareness/services/knowledgeConsolidationService';
 import { specialDayService } from '../../selfAwareness/services/specialDayService';
 import { diaryService } from '../../selfAwareness/services/diaryService';
+import { avatarPresenceService } from '../../selfAwareness/services/avatarPresenceService';
 import { gamePlayService } from '../../selfAwareness/services/gamePlayService';
 import { groundedRebuttalService } from '../../selfAwareness/services/groundedRebuttalService';
 import { creativeWritingService } from '../../selfAwareness/services/creativeWritingService';
@@ -709,6 +710,11 @@ export class ConversationCoreService {
       const diary = this.diaryAnswer(prompt);
       if (diary && !multiPart) {
         return this.buildResult('RESOLVED', 'diary_answer', this.applyPersonaVoice(diary), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P972: 「みき今寝てる？」——アバターの存在状態を答える。
+      const presence = this.presenceAnswer(prompt);
+      if (presence && !multiPart) {
+        return this.buildResult('RESOLVED', 'presence_answer', this.applyPersonaVoice(presence), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P935: 「好み変わった？」——育った好みを答える。
       const grownPref = this.grownPreferenceAnswer(prompt);
@@ -4086,6 +4092,23 @@ export class ConversationCoreService {
       }
       const names = grown.slice(0, 3).map((g) => `「${g.term}」`).join('と');
       return `うん、最近よく話してるうちに、${names}が好きになってきた気がする。`;
+    } catch { return undefined; }
+  }
+
+  /**
+   * P972: 「みき今寝てる？」への答え。アバターの存在状態
+   * （起きている・寄ってきている・寝ている）をそのまま返す。
+   * 人格の名前がある時だけ発火し、短い状態質問だけ例外にする
+   * （他の人の睡眠の話を横取りしないため）。
+   */
+  private presenceAnswer(prompt: string): string | undefined {
+    const asksState = /(?:寝てる|寝ている|起きてる|起きている|どこにいる|そばにいる|今なにしてる|今何してる)/.test(prompt);
+    const shortState = /^(?:ねてる|寝てる|おきてる|起きてる)[？?]?$/.test(prompt.trim());
+    if (!asksState && !shortState) return undefined;
+    const personaId = /ビービー/.test(prompt) ? 'bibi' : /みき/.test(prompt) ? 'miki' : null;
+    if (!personaId && !shortState) return undefined;
+    try {
+      return avatarPresenceService.describe(personaId ?? 'miki');
     } catch { return undefined; }
   }
 
