@@ -6407,6 +6407,50 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P949検定 人: 座った姿は立っている人として読まない（第1段の境界）', vf949.identifyFigure(sitting949) === null, 'person-sitting');
 }
 
+// ---- P950 姿勢・第1段（関節で姿勢を読む） ----
+{
+  const { visualPoseService: vpose950 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi950 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const W950 = 48, H950 = 48;
+  type RGB950 = [number, number, number];
+  const BG950: RGB950 = [240, 240, 240];
+  const P950C: RGB950 = [30, 30, 30];
+  const head950 = (cx: number, cy: number, r: number) => (x: number, y: number) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
+  const rect950 = (x0: number, x1: number, y0: number, y1: number) => (x: number, y: number) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+  const pose950 = (label: string, fns: Array<(x: number, y: number) => boolean>) => {
+    const a = new Uint8Array(W950 * H950 * 4);
+    for (let y = 0; y < H950; y++) for (let x = 0; x < W950; x++) {
+      const [r, g, b] = fns.some((f) => f(x, y)) ? P950C : BG950;
+      const i = (y * W950 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return vpose950.analyzePose(a, W950, H950);
+  };
+  const legs950 = [rect950(20, 23, 34, 44), rect950(25, 28, 34, 44)];
+  const f1 = pose950('f1', [head950(24, 10, 4), rect950(20, 28, 18, 34), rect950(17, 19, 18, 32), rect950(29, 31, 18, 32), ...legs950]);
+  check('P950 腕を下ろした立ち姿を関節で読める', f1?.posture === 'STANDING' && f1?.armL === 'DOWN' && f1?.armR === 'DOWN' && f1?.legs === 'SPLIT' && f1?.verified === true, `f1=${JSON.stringify(f1 && { p: f1.posture, a: [f1.armL, f1.armR], l: f1.legs, fit: f1.fit })}`);
+  const f2 = pose950('f2', [head950(24, 14, 4), rect950(20, 28, 20, 34), rect950(13, 16, 2, 16), rect950(32, 35, 2, 16), ...legs950]);
+  check('P950 両腕を上げた姿勢を読める', f2?.armL === 'RAISED' && f2?.armR === 'RAISED' && f2?.verified === true, `f2=${JSON.stringify(f2 && { a: [f2.armL, f2.armR], fit: f2.fit })}`);
+  const f3 = pose950('f3', [head950(24, 10, 4), rect950(20, 28, 18, 34), rect950(4, 19, 19, 22), rect950(29, 44, 19, 22), ...legs950]);
+  check('P950 腕を横に広げた姿勢（Tポーズ）を読める', f3?.armL === 'SPREAD' && f3?.armR === 'SPREAD' && f3?.verified === true, `f3=${JSON.stringify(f3 && { a: [f3.armL, f3.armR], fit: f3.fit })}`);
+  const f4 = pose950('f4', [head950(24, 8, 4), rect950(18, 30, 16, 26), rect950(10, 38, 26, 31)]);
+  check('P950 座った姿勢を読める', f4?.posture === 'SITTING' && f4?.verified === true, `f4=${JSON.stringify(f4 && { p: f4.posture, fit: f4.fit })}`);
+  const f6 = pose950('f6', [head950(24, 10, 4), rect950(20, 28, 18, 34), rect950(29, 31, 18, 32), rect950(13, 16, 2, 16), ...legs950]);
+  check('P950 片腕だけ上げた姿勢を左右別に読める', f6?.armL === 'RAISED' && f6?.armR === 'DOWN', `f6=${JSON.stringify(f6 && { a: [f6.armL, f6.armR] })}`);
+  const square950 = (() => {
+    const a = new Uint8Array(W950 * H950 * 4);
+    for (let y = 0; y < H950; y++) for (let x = 0; x < W950; x++) {
+      const [r, g, b] = (x >= 14 && x <= 34 && y >= 14 && y <= 34) ? P950C : BG950;
+      const i = (y * W950 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return vpose950.analyzePose(a, W950, H950);
+  })();
+  check('P950 人でない輪郭には姿勢を読まない', square950 === null, 'square-null');
+  const insp950 = ksi950.inspect();
+  check('P950 自己点検の記録に姿勢の読み（visualPoses）が入っている', typeof insp950.visualPoses === 'number' && insp950.visualPoses >= 5, `visualPoses=${insp950.visualPoses}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

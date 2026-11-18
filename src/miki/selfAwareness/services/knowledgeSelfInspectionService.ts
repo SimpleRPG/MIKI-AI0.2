@@ -39,6 +39,7 @@ import { computeResourceService } from './computeResourceService';
 import { swarmVerificationService } from './swarmVerificationService';
 import { visualFigureService } from '../../conversation/services/visualFigureService';
 import { videoSceneService } from '../../conversation/services/videoSceneService';
+import { visualPoseService } from '../../conversation/services/visualPoseService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -113,6 +114,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualFigures: number;
   videoScenes: number;
   videoMotions: number;
+  visualPoses: number;
   findings: string[];
 }
 
@@ -333,6 +335,7 @@ class KnowledgeSelfInspectionService {
     let visualFigures = 0;
     let videoScenes = 0;
     let videoMotions = 0;
+    let visualPoses = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -487,6 +490,11 @@ class KnowledgeSelfInspectionService {
       if (videoMotions > 0) {
         findings.push(`動画の${videoMotions}場面で動きを記述した`);
       }
+      // P950: 関節から姿勢を読んだ回数。
+      visualPoses = visualPoseService.summary().analyzed;
+      if (visualPoses > 0) {
+        findings.push(`姿勢を${visualPoses}件読んだ`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -552,6 +560,7 @@ class KnowledgeSelfInspectionService {
       visualFigures,
       videoScenes,
       videoMotions,
+      visualPoses,
       findings,
     };
 

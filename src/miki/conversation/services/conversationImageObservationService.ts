@@ -533,6 +533,20 @@ class ConversationImageObservationService {
           }
         } catch { /* 同定できなくても観察は返す */ }
       }
+      // P950: 人の形が読めたら、関節から姿勢も読んで添える
+      // （照合を通った読みだけ）。
+      if (figureMatched) {
+        try {
+          const { visualPoseService } = await import('./visualPoseService');
+          const pose = visualPoseService.analyzePose(rgba, width, height);
+          if (pose && pose.verified) {
+            text = text.replace(
+              '。具体的な物や文字までは読み取れない。',
+              `。姿勢は、${pose.description}具体的な物や文字までは読み取れない。`,
+            );
+          }
+        } catch { /* 姿勢が読めなくても観察は返す */ }
+      }
       return { text, features, material: hypothesizeMaterial(features), verification, shapeVerification };
     } catch {
       return null;
