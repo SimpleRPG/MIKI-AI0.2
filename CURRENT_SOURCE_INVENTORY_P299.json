@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1848,
     "sourceFileCount": 1401,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1312,
-    "relativeImportCandidateCount": 4721,
-    "resolvedRelativeImportCandidateCount": 4705,
+    "relativeImportCandidateCount": 4723,
+    "resolvedRelativeImportCandidateCount": 4707,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 671401,
-      "lines": 7946,
-      "sha256": "3122271dc22db03c0fd875bc219799529b01c28520f77c3aa14eda70f93f905a",
+      "bytes": 673555,
+      "lines": 7972,
+      "sha256": "b063de35758cabfd55f72d10b0a9155295ab26ec7421da0ebe0a73220f6619da",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4700,10 +4700,22 @@
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7935,
+          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
+        },
+        {
+          "line": 7936,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 497,
-      "resolvedRelativeImportCount": 497,
+      "relativeImportCandidateCount": 499,
+      "resolvedRelativeImportCount": 499,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -15366,9 +15378,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 87469,
-      "lines": 1797,
-      "sha256": "4a5c9156dad325d3e0e90c96808f1bf0b973e596855f4036fe200aced35599b7",
+      "bytes": 92376,
+      "lines": 1909,
+      "sha256": "6b3ed97383d9b04eb1eab6f0fc9e8ece8068884d2a31423e2dc60b79bf40fd60",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -32837,9 +32849,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 41614,
-      "lines": 946,
-      "sha256": "022b7ac0918c3d7f45eb8b7b88baa7bd1da39927cf2f77035897de507ceed347",
+      "bytes": 41962,
+      "lines": 954,
+      "sha256": "a0e797c028a2449f21760bacbbd95ceb56c3c5c8c485b14b592dce3a6c16bf7e",
       "relativeImportCandidates": [
         {
           "line": 1,

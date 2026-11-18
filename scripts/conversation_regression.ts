@@ -7930,6 +7930,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P996 自己点検の記録に滑らか描画の照合（visualSmoothBodies）が入っている', typeof insp996.visualSmoothBodies === 'number' && insp996.visualSmoothBodies >= 1, `visualSmoothBodies=${insp996.visualSmoothBodies}`);
 }
 
+// ---- P997 素体の陰影 ----
+{
+  const { visualPoseService: vpose997 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi997 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB997 = [number, number, number];
+  const SKIN997: RGB997 = [232, 190, 160];
+  const PINK997: RGB997 = [240, 150, 180];
+  const BLUE997: RGB997 = [40, 40, 120];
+  const px997: RGB997[] = []; for (let i = 0; i < 48 * 56; i++) px997.push([245, 245, 245]);
+  const rect997 = (x0: number, y0: number, x1: number, y1: number, c: RGB997) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px997[y * 48 + x] = c; };
+  const disc997 = (cx: number, cy: number, r: number, c: RGB997) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px997[y * 48 + x] = c; };
+  rect997(16, 15, 28, 32, BLUE997); rect997(12, 16, 15, 30, BLUE997); rect997(29, 16, 32, 30, BLUE997);
+  rect997(16, 32, 21, 50, BLUE997); rect997(23, 32, 28, 50, BLUE997);
+  rect997(13, 4, 31, 12, PINK997); rect997(13, 4, 15, 40, PINK997); rect997(29, 4, 31, 40, PINK997);
+  disc997(22, 10, 5, SKIN997);
+  const img997 = new Uint8Array(48 * 56 * 4);
+  px997.forEach((c, i) => { img997[i * 4] = c[0]; img997[i * 4 + 1] = c[1]; img997[i * 4 + 2] = c[2]; img997[i * 4 + 3] = 255; });
+  const reading997 = vpose997.analyzePose(img997, 48, 56);
+  const shaded997 = reading997 ? vpose997.renderBodyShaded(reading997, 96) : null;
+  check('P997 陰影つきの素体が描ける', shaded997 !== null && shaded997.length === 96 * 96 * 4, `len=${shaded997?.length}`);
+  const vs997 = reading997 ? vpose997.verifyBodyShaded(reading997) : null;
+  check('P997 陰影を付けても輪郭は変わらず、縁が暗くなる', vs997?.verified === true, `score=${vs997?.score}`);
+  const insp997 = ksi997.inspect();
+  check('P997 自己点検の記録に陰影の照合（visualShadedBodies）が入っている', typeof insp997.visualShadedBodies === 'number' && insp997.visualShadedBodies >= 1, `visualShadedBodies=${insp997.visualShadedBodies}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
