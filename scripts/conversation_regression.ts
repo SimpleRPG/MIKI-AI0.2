@@ -7065,6 +7065,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P966 自己点検の記録に鎖骨（visualCollarbone）が入っている', typeof insp966.visualCollarbone === 'number' && insp966.visualCollarbone >= 1, `visualCollarbone=${insp966.visualCollarbone}`);
 }
 
+// ---- P967 姿勢の癖の第1段 ----
+{
+  const { visualPoseService: vpose967 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi967 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB967 = [number, number, number];
+  const SKIN967: RGB967 = [232, 190, 160];
+  const HAIR967: RGB967 = [45, 32, 22];
+  const BLUE967: RGB967 = [40, 40, 120];
+  const lean967 = () => {
+    const px: RGB967[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB967) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB967) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(22, 9, 6, HAIR967); disc(22, 10, 5, SKIN967);
+    rect(16, 15, 28, 32, BLUE967);
+    rect(12, 16, 15, 30, BLUE967); rect(29, 16, 32, 30, BLUE967);
+    rect(16, 32, 21, 50, BLUE967); rect(23, 32, 28, 50, BLUE967);
+    disc(41, 30, 6, BLUE967);
+    const o = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const img967 = lean967();
+  for (let i = 0; i < 20; i++) vpose967.analyzePose(img967, 48, 56);
+  const sum967 = vpose967.summary();
+  check('P967 右寄りの観察が続くと癖が右と読める', sum967.habit === 'right' && sum967.leanWindow === 20, `habit=${sum967.habit} window=${sum967.leanWindow}`);
+  const insp967 = ksi967.inspect();
+  check('P967 自己点検の記録に傾きの窓（visualLeanWindow）が入っている', typeof insp967.visualLeanWindow === 'number' && insp967.visualLeanWindow >= 10, `visualLeanWindow=${insp967.visualLeanWindow}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
