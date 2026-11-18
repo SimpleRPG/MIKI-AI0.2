@@ -7166,6 +7166,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P970 自己点検の記録に字幕対応（visualCaptionPairs）が入っている', typeof insp970.visualCaptionPairs === 'number' && insp970.visualCaptionPairs >= 1, `visualCaptionPairs=${insp970.visualCaptionPairs}`);
 }
 
+// ---- P971 明るい色の目の検出 ----
+{
+  const { visualZoomService: vzoom971 } = await import('../src/miki/conversation/services/visualZoomService');
+  type RGB971 = [number, number, number];
+  const SKIN971: RGB971 = [232, 190, 160];
+  const HAIR971: RGB971 = [45, 32, 22];
+  const face971 = (eye: RGB971) => {
+    const px: RGB971[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB971) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR971); disc(24, 25, 14, SKIN971);
+    disc(17, 22, 3, eye); disc(31, 22, 3, eye);
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const blue971 = vzoom971.analyzeFace(face971([70, 110, 180]));
+  check('P971 明るい青い目が目として読める', blue971?.eyes === 2 && blue971?.eyeColor === '青', `eyes=${blue971?.eyes} eyeColor=${blue971?.eyeColor}`);
+  const green971 = vzoom971.analyzeFace(face971([80, 150, 90]));
+  check('P971 緑の目が目として読める', green971?.eyes === 2 && green971?.eyeColor === '緑', `eyes=${green971?.eyes} eyeColor=${green971?.eyeColor}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

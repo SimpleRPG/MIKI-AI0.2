@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1848,
     "sourceFileCount": 1401,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1312,
-    "relativeImportCandidateCount": 4669,
-    "resolvedRelativeImportCandidateCount": 4653,
+    "relativeImportCandidateCount": 4670,
+    "resolvedRelativeImportCandidateCount": 4654,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 611917,
-      "lines": 7182,
-      "sha256": "a03870d371478cfd3b7accea289de667e1a64eac8225adbf31081c2d312f9908",
+      "bytes": 613261,
+      "lines": 7203,
+      "sha256": "4777fd6e311b65f0f684bc1995192cc4f0443af1cb8b17b472885df81afe140b",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4412,10 +4412,16 @@
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7171,
+          "specifier": "../src/miki/conversation/services/visualZoomService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         }
       ],
-      "relativeImportCandidateCount": 449,
-      "resolvedRelativeImportCount": 449,
+      "relativeImportCandidateCount": 450,
+      "resolvedRelativeImportCount": 450,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -15136,9 +15142,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualZoomService.ts",
-      "bytes": 19623,
-      "lines": 422,
-      "sha256": "c5cdad3286da0002b0efca4c41454261b082de1fcb72a5f029a44ff44ca35132",
+      "bytes": 20336,
+      "lines": 433,
+      "sha256": "8a949b95a99f71febae9ab3fab5a47595c18e967785f0e8dba396a49ab687848",
       "relativeImportCandidates": [
         {
           "line": 1,

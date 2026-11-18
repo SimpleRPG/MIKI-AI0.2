@@ -328,8 +328,7 @@ class VisualZoomService {
     // 外側にある髪を目と誤る。輪で見るのは、細い線（口）や
     // 小さい点（目）でも内側と判定できるようにするため。
     const skinAt = (x: number, y: number) => x >= 0 && y >= 0 && x < S && y < S && isSkin((y * S + x) * 4);
-    const isFacialDark = (x: number, y: number) => {
-      if (!isDark((y * S + x) * 4)) return false;
+    const ringSkinShare = (x: number, y: number) => {
       let skin = 0;
       let total = 0;
       for (let dy = -3; dy <= 3; dy++) {
@@ -342,14 +341,26 @@ class VisualZoomService {
           if (skinAt(nx, ny)) skin++;
         }
       }
-      return total > 0 && skin / total >= 0.7;
+      return total > 0 ? skin / total : 0;
     };
-    // 目：顔の上寄りの帯にある暗い点（左右に分けて数える）
+    const isFacialDark = (x: number, y: number) => isDark((y * S + x) * 4) && ringSkinShare(x, y) >= 0.7;
+    // P971: 明るい色の目。暗くないが色のついた点（青い虹彩など）も、
+    // 肌色の輪に囲まれていれば目の候補にする。
+    const isColoredEyePx = (x: number, y: number) => {
+      const i = (y * S + x) * 4;
+      if (isSkin(i) || isDark(i)) return false;
+      const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+      const lum = r * 0.3 + g * 0.59 + b * 0.11;
+      if (lum >= 240) return false;
+      return Math.max(r, g, b) - Math.min(r, g, b) >= 40;
+    };
+    const isFacialColored = (x: number, y: number) => isColoredEyePx(x, y) && ringSkinShare(x, y) >= 0.7;
+    // 目：顔の上寄りの帯にある暗い点・色の点（左右に分けて数える）
     const eyeBand = { y0: sy0 + fh * 0.2, y1: sy0 + fh * 0.52 };
     const eyePts: { x: number; y: number }[] = [];
     for (let y = Math.floor(eyeBand.y0); y <= Math.ceil(eyeBand.y1); y++) {
       for (let x = sx0; x <= sx1; x++) {
-        if (isFacialDark(x, y)) eyePts.push({ x, y });
+        if (isFacialDark(x, y) || isFacialColored(x, y)) eyePts.push({ x, y });
       }
     }
     const leftEyes = eyePts.filter((p) => p.x < cx);
