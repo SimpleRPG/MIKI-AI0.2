@@ -685,6 +685,13 @@ class ConversationImageObservationService {
             );
             if (!hz) continue;
             const hr = visualZoomService.analyzeHand(hz.pixels, { x: dx / len, y: dy / len });
+            // P968: 指の本数が読めたら添える。
+            if (hr && hr.fingers.count >= 2) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `指が${hr.fingers.count}本見える。具体的な物や文字までは読み取れない。`,
+              );
+            }
             // P965: 爪が見えたら添える。
             if (hr && hr.nails.present) {
               text = text.replace(

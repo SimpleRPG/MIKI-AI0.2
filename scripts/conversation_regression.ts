@@ -7094,6 +7094,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P967 自己点検の記録に傾きの窓（visualLeanWindow）が入っている', typeof insp967.visualLeanWindow === 'number' && insp967.visualLeanWindow >= 10, `visualLeanWindow=${insp967.visualLeanWindow}`);
 }
 
+// ---- P968 手と指の第2段 ----
+{
+  const { visualZoomService: vzoom968 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi968 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB968 = [number, number, number];
+  const SKIN968: RGB968 = [232, 190, 160];
+  const hand968 = () => {
+    const px: RGB968[] = []; for (let i = 0; i < 48 * 48; i++) px.push([250, 250, 250]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB968) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    rect(14, 24, 34, 42, SKIN968);
+    for (const fx of [12, 19, 26, 33]) rect(fx, fx === 19 ? 4 : 8, fx + 3, 26, SKIN968);
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const hr968 = vzoom968.analyzeHand(hand968(), { x: 0, y: 1 });
+  check('P968 指が4本と読める', hr968?.fingers.count === 4, `fingers=${JSON.stringify(hr968?.fingers)}`);
+  check('P968 一番長い指が真ん中と読める', hr968?.fingers.longest === 'center', `longest=${hr968?.fingers.longest}`);
+  const insp968 = ksi968.inspect();
+  check('P968 自己点検の記録に指の本数（visualFingerDetails）が入っている', typeof insp968.visualFingerDetails === 'number' && insp968.visualFingerDetails >= 1, `visualFingerDetails=${insp968.visualFingerDetails}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

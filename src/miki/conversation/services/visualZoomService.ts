@@ -32,6 +32,8 @@ export interface HandReading {
   description: string;
   /** P965: 爪（指先の、肌でも背景でもない色のパッチ） */
   nails: { present: boolean; colorLabel: string | null };
+  /** P968: 指の本数・広がり・一番長い指の位置 */
+  fingers: { count: number; spread: number; longest: 'left' | 'center' | 'right' | null };
 }
 
 /** P955: 向きの読み（正面・横向き・後ろ姿） */
@@ -50,15 +52,15 @@ export interface FaceReading {
 }
 
 class VisualZoomService {
-  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number } {
+  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number; fingerDetails?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0, fingerDetails: raw.fingerDetails || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0 };
+    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0, fingerDetails: 0 };
   }
 
-  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number } {
+  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number } {
     return this.load();
   }
 
@@ -88,6 +90,8 @@ class VisualZoomService {
     let maxRuns = 0;
     let tipD = 0;
     let tipCenters: number[] = [];
+    let bestD = 0;
+    let bestCenters: number[] = [];
     for (let d = 3; d <= 21; d += 2) {
       const lx = cx + away.x * d;
       const ly = cy + away.y * d;
@@ -101,10 +105,36 @@ class VisualZoomService {
         else if (!s && inRun) { centers.push((runStart + t - 1) / 2); inRun = false; }
       }
       if (inRun) centers.push((runStart + 17) / 2);
-      if (runs > maxRuns) maxRuns = runs;
+      if (runs > maxRuns) { maxRuns = runs; bestD = d; bestCenters = centers; }
       if (centers.length > 0) { tipD = d; tipCenters = centers; }
     }
     const fingersSeparated = maxRuns >= 2;
+
+    // P968: 指の本数と、一本ごとの長さ。分かれが一番
+    // よく見える走査線の並びを指の列とし、各指について
+    // 肌がどこまで続くか（その指の先端）を測る。
+    let fingers: HandReading['fingers'] = { count: 0, spread: 0, longest: null };
+    if (bestCenters.length > 0) {
+      const spread = bestCenters.length >= 2
+        ? (bestCenters[bestCenters.length - 1] - bestCenters[0]) / S
+        : 0;
+      let longestT: number | null = null;
+      let longestTip = -1;
+      for (const t of bestCenters) {
+        let ownTip = bestD;
+        for (let d = bestD; d <= 23; d++) {
+          const sx = Math.round(cx + away.x * d + perp.x * t);
+          const sy = Math.round(cy + away.y * d + perp.y * t);
+          if (isSkin(sx, sy)) ownTip = d;
+        }
+        if (ownTip > longestTip) { longestTip = ownTip; longestT = t; }
+      }
+      fingers = {
+        count: bestCenters.length,
+        spread,
+        longest: longestT === null ? null : Math.abs(longestT) <= 5 ? 'center' : longestT < 0 ? 'left' : 'right',
+      };
+    }
 
     // P965: 爪。爪は肌の走査が止まる先端の、少し先にある。
     // 先端の2〜4先で、肌でも背景でもない色のパッチが
@@ -148,11 +178,13 @@ class VisualZoomService {
     const state = this.load();
     state.hands++;
     if (nails.present) state.nails++;
+    if (fingers.count >= 2) state.fingerDetails++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     return {
       fingersSeparated,
       maxRuns,
       nails,
+      fingers,
       description: fingersSeparated ? '指が分かれて見える' : '指は分かれて見えない（握っているか、指がくっついているようだ）',
     };
   }
