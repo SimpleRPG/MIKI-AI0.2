@@ -6572,6 +6572,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P952 自己点検の記録に姿勢の動き（visualPoseMotions）が入っている', typeof insp952.visualPoseMotions === 'number' && insp952.visualPoseMotions >= 5, `visualPoseMotions=${insp952.visualPoseMotions}`);
 }
 
+// ---- P953 拡大測定の土台（2段構えの目） ----
+{
+  const { visualPoseService: vpose953 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { visualZoomService: vzoom953 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi953 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const W953 = 192, H953 = 192;
+  type RGB953 = [number, number, number];
+  const HAIR953: RGB953 = [45, 32, 22];
+  const SKIN953: RGB953 = [232, 190, 160];
+  const BLUE953: RGB953 = [40, 40, 120];
+  const px953: RGB953[] = [];
+  for (let i = 0; i < W953 * H953; i++) px953.push([245, 245, 245]);
+  const rect953 = (x0: number, y0: number, x1: number, y1: number, c: RGB953) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px953[y * W953 + x] = c; };
+  const disc953 = (cx: number, cy: number, r: number, c: RGB953) => { for (let y = 0; y < H953; y++) for (let x = 0; x < W953; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px953[y * W953 + x] = c; };
+  disc953(96, 36, 20, HAIR953); disc953(96, 46, 16, SKIN953);
+  rect953(80, 68, 112, 140, BLUE953); rect953(68, 72, 79, 116, BLUE953); rect953(113, 72, 124, 116, BLUE953);
+  rect953(82, 140, 94, 180, BLUE953); rect953(98, 140, 110, 180, BLUE953);
+  const toRgba953 = (a: RGB953[]) => { const out = new Uint8Array(a.length * 4); a.forEach((c, i) => { out[i * 4] = c[0]; out[i * 4 + 1] = c[1]; out[i * 4 + 2] = c[2]; out[i * 4 + 3] = 255; }); return out; };
+  const small953: RGB953[] = [];
+  for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) small953.push(px953[(y * 4) * W953 + x * 4]);
+  const pose953 = vpose953.analyzePose(toRgba953(small953), 48, 48);
+  check('P953 粗い全体像（48px）でも姿勢が読める', pose953?.verified === true && !!pose953?.head, `pose=${JSON.stringify(pose953 && { v: pose953.verified })}`);
+  const zoom953 = pose953?.head ? vzoom953.cropAnalyze(toRgba953(px953), W953, H953, pose953.head.x, pose953.head.y, pose953.head.r * 5) : null;
+  const skin953 = zoom953?.features.regions.find((r) => r.colorName === '肌色');
+  const above953 = zoom953?.features.regions
+    .filter((r) => r !== skin953 && r.borderTouch < 0.5 && skin953 && r.centroidY < skin953.centroidY - 0.05)
+    .sort((a, b) => b.share - a.share)[0];
+  check('P953 頭を拡大すると髪（上）と顔（肌色）が分かれて見える', !!skin953 && above953?.colorName === '黒', `zoom=${JSON.stringify(zoom953?.features.regions.map((r) => `${r.colorName}:${r.share.toFixed(2)}`))}`);
+  check('P953 切り出しは全体ではなく頭の周辺だけ', !!zoom953 && zoom953.crop.side < W953, `crop=${JSON.stringify(zoom953?.crop)}`);
+  const insp953 = ksi953.inspect();
+  check('P953 自己点検の記録に拡大測定（visualZooms）が入っている', typeof insp953.visualZooms === 'number' && insp953.visualZooms >= 1, `visualZooms=${insp953.visualZooms}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

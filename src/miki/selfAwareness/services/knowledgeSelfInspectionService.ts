@@ -40,6 +40,7 @@ import { swarmVerificationService } from './swarmVerificationService';
 import { visualFigureService } from '../../conversation/services/visualFigureService';
 import { videoSceneService } from '../../conversation/services/videoSceneService';
 import { visualPoseService } from '../../conversation/services/visualPoseService';
+import { visualZoomService } from '../../conversation/services/visualZoomService';
 
 /**
  * P501: 知識と語彙の自己点検。
@@ -116,6 +117,7 @@ export interface KnowledgeSelfInspectionRecord {
   videoMotions: number;
   visualPoses: number;
   visualPoseMotions: number;
+  visualZooms: number;
   findings: string[];
 }
 
@@ -338,6 +340,7 @@ class KnowledgeSelfInspectionService {
     let videoMotions = 0;
     let visualPoses = 0;
     let visualPoseMotions = 0;
+    let visualZooms = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -502,6 +505,11 @@ class KnowledgeSelfInspectionService {
       if (visualPoseMotions > 0) {
         findings.push(`姿勢の動きを${visualPoseMotions}件読んだ`);
       }
+      // P953: 拡大して測り直した回数。
+      visualZooms = visualZoomService.summary().analyzed;
+      if (visualZooms > 0) {
+        findings.push(`部分を拡大して${visualZooms}件測り直した`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -569,6 +577,7 @@ class KnowledgeSelfInspectionService {
       videoMotions,
       visualPoses,
       visualPoseMotions,
+      visualZooms,
       findings,
     };
 

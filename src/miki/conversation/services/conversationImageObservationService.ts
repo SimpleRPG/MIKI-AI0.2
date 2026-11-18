@@ -535,17 +535,46 @@ class ConversationImageObservationService {
       }
       // P950: 人の形が読めたら、関節から姿勢も読んで添える
       // （照合を通った読みだけ）。
+      let pose953: import('./visualPoseService').PoseReading | null = null;
       if (figureMatched) {
         try {
           const { visualPoseService } = await import('./visualPoseService');
-          const pose = visualPoseService.analyzePose(rgba, width, height);
-          if (pose && pose.verified) {
+          pose953 = visualPoseService.analyzePose(rgba, width, height);
+          if (pose953 && pose953.verified) {
             text = text.replace(
               '。具体的な物や文字までは読み取れない。',
-              `。姿勢は、${pose.description}具体的な物や文字までは読み取れない。`,
+              `。姿勢は、${pose953.description}具体的な物や文字までは読み取れない。`,
             );
           }
         } catch { /* 姿勢が読めなくても観察は返す */ }
+      }
+      // P953: 元の解像度が残っていれば、頭を切り出して
+      // 拡大して測り直す（髪と顔の分かれなど、全体像では
+      // 画素以下になるものを見るため）。
+      if (figureMatched && pose953 && pose953.head && bitmap.full) {
+        try {
+          const { visualZoomService } = await import('./visualZoomService');
+          const zoom = visualZoomService.cropAnalyze(
+            bitmap.full.rgba, bitmap.full.width, bitmap.full.height,
+            pose953.head.x, pose953.head.y, pose953.head.r * 5,
+          );
+          if (zoom) {
+            const regions = zoom.features.regions;
+            const skin = regions.find((r) => r.colorName === '肌色');
+            if (skin) {
+              const above = regions
+                .filter((r) => r !== skin && r.borderTouch < 0.5 && r.centroidY < skin.centroidY - 0.05)
+                .sort((a, b) => b.share - a.share)[0];
+              const zoomText = above
+                ? `頭を拡大して見ると、上のほうに${above.colorName}、下に肌色が見える。`
+                : '頭を拡大して見ると、肌色が見える。';
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `${zoomText}具体的な物や文字までは読み取れない。`,
+              );
+            }
+          }
+        } catch { /* 拡大できなくても観察は返す */ }
       }
       return { text, features, material: hypothesizeMaterial(features), verification, shapeVerification };
     } catch {
@@ -555,7 +584,11 @@ class ConversationImageObservationService {
 
   private async decode(
     dataUrl: string,
-  ): Promise<{ rgba: Uint8Array; width: number; height: number } | null> {
+  ): Promise<{
+    rgba: Uint8Array; width: number; height: number;
+    // P953: 拡大測定用に、元の解像度（最大192）も残す。
+    full: { rgba: Uint8Array; width: number; height: number } | null;
+  } | null> {
     const maxSide = 48;
     // createImageBitmap が使える環境ではそれを使う
     if (typeof createImageBitmap === 'function' && typeof fetch === 'function') {
@@ -572,7 +605,24 @@ class ConversationImageObservationService {
         if (!context) return null;
         context.drawImage(bitmap, 0, 0, width, height);
         const data = context.getImageData(0, 0, width, height);
-        return { rgba: new Uint8Array(data.data), width, height };
+        let full: { rgba: Uint8Array; width: number; height: number } | null = null;
+        if (Math.max(bitmap.width, bitmap.height) > maxSide) {
+          try {
+            const fScale = Math.min(1, 192 / Math.max(bitmap.width, bitmap.height));
+            const fw = Math.max(1, Math.round(bitmap.width * fScale));
+            const fh = Math.max(1, Math.round(bitmap.height * fScale));
+            const fCanvas = document.createElement('canvas');
+            fCanvas.width = fw;
+            fCanvas.height = fh;
+            const fContext = fCanvas.getContext('2d');
+            if (fContext) {
+              fContext.drawImage(bitmap, 0, 0, fw, fh);
+              const fData = fContext.getImageData(0, 0, fw, fh);
+              full = { rgba: new Uint8Array(fData.data), width: fw, height: fh };
+            }
+          } catch { full = null; }
+        }
+        return { rgba: new Uint8Array(data.data), width, height, full };
       } catch { /* 次の手段へ */ }
     }
     // フォールバック: Image 要素経由
@@ -594,7 +644,24 @@ class ConversationImageObservationService {
         if (!context) return null;
         context.drawImage(image, 0, 0, width, height);
         const data = context.getImageData(0, 0, width, height);
-        return { rgba: new Uint8Array(data.data), width, height };
+        let full: { rgba: Uint8Array; width: number; height: number } | null = null;
+        if (Math.max(image.width, image.height) > maxSide) {
+          try {
+            const fScale = Math.min(1, 192 / Math.max(image.width, image.height));
+            const fw = Math.max(1, Math.round(image.width * fScale));
+            const fh = Math.max(1, Math.round(image.height * fScale));
+            const fCanvas = document.createElement('canvas');
+            fCanvas.width = fw;
+            fCanvas.height = fh;
+            const fContext = fCanvas.getContext('2d');
+            if (fContext) {
+              fContext.drawImage(image, 0, 0, fw, fh);
+              const fData = fContext.getImageData(0, 0, fw, fh);
+              full = { rgba: new Uint8Array(fData.data), width: fw, height: fh };
+            }
+          } catch { full = null; }
+        }
+        return { rgba: new Uint8Array(data.data), width, height, full };
       } catch { /* デコード不能 */ }
     }
     return null;
