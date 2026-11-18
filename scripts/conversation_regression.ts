@@ -8253,6 +8253,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1006 前髪の記録が残る', sum1006.frontHairOk >= 1, `ok=${sum1006.frontHairOk}`);
 }
 
+// ---- P1007 髪の作画の読み取り（ツヤと房） ----
+{
+  const { visualPoseService: vpose1007 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB1007 = [number, number, number];
+  const SKIN1007: RGB1007 = [232, 190, 160];
+  const PINK1007: RGB1007 = [240, 150, 180];
+  const BLUE1007: RGB1007 = [40, 40, 120];
+  const px1007: RGB1007[] = []; for (let i = 0; i < 48 * 56; i++) px1007.push([240, 240, 240]);
+  const rect1007 = (x0: number, y0: number, x1: number, y1: number, c: RGB1007) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1007[y * 48 + x] = c; };
+  const disc1007 = (cx: number, cy: number, r: number, c: RGB1007) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1007[y * 48 + x] = c; };
+  rect1007(16, 15, 28, 32, BLUE1007); rect1007(12, 16, 15, 30, BLUE1007); rect1007(29, 16, 32, 30, BLUE1007);
+  rect1007(16, 32, 21, 50, BLUE1007); rect1007(23, 32, 28, 50, BLUE1007);
+  rect1007(13, 4, 31, 12, PINK1007); rect1007(13, 4, 15, 40, PINK1007); rect1007(29, 4, 31, 40, PINK1007);
+  disc1007(22, 9, 6, PINK1007); disc1007(22, 10, 5, SKIN1007);
+  const img1007 = new Uint8Array(48 * 56 * 4);
+  px1007.forEach((c, i) => { img1007[i * 4] = c[0]; img1007[i * 4 + 1] = c[1]; img1007[i * 4 + 2] = c[2]; img1007[i * 4 + 3] = 255; });
+  const reading1007 = vpose1007.analyzePose(img1007, 48, 56);
+  // 作画した髪（ツヤの帯＋房の線）は読みでも分かる
+  const det1007 = reading1007 ? vpose1007.renderBodyHairDetail(reading1007, 192) : null;
+  const reDet1007 = det1007 ? vpose1007.analyzePose(det1007, 192, 192) : null;
+  check('P1007 作画した髪のツヤと房が読める', reDet1007?.hair?.shine === true && (reDet1007?.hair?.clumps ?? 0) >= 2, `shine=${reDet1007?.hair?.shine} clumps=${reDet1007?.hair?.clumps}`);
+  // 平らな髪にはツヤも房も無いと読む
+  const plain1007 = reading1007 ? vpose1007.renderBody(reading1007, 192) : null;
+  const rePlain1007 = plain1007 ? vpose1007.analyzePose(plain1007, 192, 192) : null;
+  check('P1007 平らな髪にツヤと房は無い', rePlain1007?.hair?.shine === false && !rePlain1007?.hair?.clumps, `shine=${rePlain1007?.hair?.shine} clumps=${rePlain1007?.hair?.clumps}`);
+  const sum1007 = vpose1007.summary();
+  check('P1007 髪の作画読みの記録が残る', sum1007.hairReads >= 1, `reads=${sum1007.hairReads}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
