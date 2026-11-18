@@ -7982,6 +7982,32 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P998 自己点検の記録に輪郭の曲線化の照合（visualCurvedBodies）が入っている', typeof insp998.visualCurvedBodies === 'number' && insp998.visualCurvedBodies >= 1, `visualCurvedBodies=${insp998.visualCurvedBodies}`);
 }
 
+// ---- P999 素体の輪郭線 ----
+{
+  const { visualPoseService: vpose999 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi999 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB999 = [number, number, number];
+  const SKIN999: RGB999 = [232, 190, 160];
+  const PINK999: RGB999 = [240, 150, 180];
+  const BLUE999: RGB999 = [40, 40, 120];
+  const px999: RGB999[] = []; for (let i = 0; i < 48 * 56; i++) px999.push([245, 245, 245]);
+  const rect999 = (x0: number, y0: number, x1: number, y1: number, c: RGB999) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px999[y * 48 + x] = c; };
+  const disc999 = (cx: number, cy: number, r: number, c: RGB999) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px999[y * 48 + x] = c; };
+  rect999(16, 15, 28, 32, BLUE999); rect999(12, 16, 15, 30, BLUE999); rect999(29, 16, 32, 30, BLUE999);
+  rect999(16, 32, 21, 50, BLUE999); rect999(23, 32, 28, 50, BLUE999);
+  rect999(13, 4, 31, 12, PINK999); rect999(13, 4, 15, 40, PINK999); rect999(29, 4, 31, 40, PINK999);
+  disc999(22, 10, 5, SKIN999);
+  const img999 = new Uint8Array(48 * 56 * 4);
+  px999.forEach((c, i) => { img999[i * 4] = c[0]; img999[i * 4 + 1] = c[1]; img999[i * 4 + 2] = c[2]; img999[i * 4 + 3] = 255; });
+  const reading999 = vpose999.analyzePose(img999, 48, 56);
+  const lined999 = reading999 ? vpose999.renderBodyOutline(reading999, 96) : null;
+  check('P999 輪郭線つきの素体が描ける', lined999 !== null && lined999.length === 96 * 96 * 4, `len=${lined999?.length}`);
+  const vs999 = reading999 ? vpose999.verifyBodyOutline(reading999) : null;
+  check('P999 線を引いても輪郭は変わらず、輪郭帯が暗くなる', vs999?.verified === true, `score=${vs999?.score}`);
+  const insp999 = ksi999.inspect();
+  check('P999 自己点検の記録に輪郭線の照合（visualOutlinedBodies）が入っている', typeof insp999.visualOutlinedBodies === 'number' && insp999.visualOutlinedBodies >= 1, `visualOutlinedBodies=${insp999.visualOutlinedBodies}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
