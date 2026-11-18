@@ -36,6 +36,8 @@ export interface FigureHypothesis {
   body: ImageRegionFeature;
   headRatio: number;
   score: number;
+  /** P976: 座っている形（横に広がった体）かどうか。 */
+  seated?: boolean;
 }
 
 export interface FigureRecord {
@@ -64,17 +66,28 @@ class VisualFigureService {
         const headAbove = bottom(head) <= top(body) + 0.04
           || head.centroidY < body.centroidY - body.bboxHeight * 0.2;
         if (!headAbove) continue;
-        if (body.bboxHeight < body.bboxWidth * 0.8) continue; // 立っている体は縦長寄り
         const dx = Math.abs(head.centroidX - body.centroidX);
         if (dx > body.bboxWidth * 0.6 + 0.02) continue; // 左右のずれが小さい
         const figureHeight = bottom(body) - top(head);
         if (figureHeight <= 0) continue;
         const headRatio = head.bboxHeight / figureHeight;
-        if (headRatio < HEAD_RATIO_MIN || headRatio > HEAD_RATIO_MAX) continue;
         const alignPart = 1 - Math.min(1, dx / (body.bboxWidth * 0.6 + 0.02));
-        const ratioPart = 1 - Math.min(1, Math.abs(headRatio - 0.18) / 0.15);
+        if (body.bboxHeight >= body.bboxWidth * 0.8) {
+          // 立っている体は縦長寄り
+          if (headRatio < HEAD_RATIO_MIN || headRatio > HEAD_RATIO_MAX) continue;
+          const ratioPart = 1 - Math.min(1, Math.abs(headRatio - 0.18) / 0.15);
+          const score = Math.round((0.4 * head.circularity + 0.3 * alignPart + 0.3 * ratioPart) * 100) / 100;
+          if (!best || score > best.score) best = { head, body, headRatio: Math.round(headRatio * 1000) / 1000, score };
+          continue;
+        }
+        // P976: 座っている体は横に広がる。頭は体の真上に
+        // あり、全高が低いぶん頭の比率は大きめに出る。
+        if (body.bboxWidth < body.bboxHeight * 1.05) continue;
+        if (!(bottom(head) <= top(body) + 0.04)) continue;
+        if (headRatio < 0.10 || headRatio > 0.45) continue;
+        const ratioPart = 1 - Math.min(1, Math.abs(headRatio - 0.28) / 0.18);
         const score = Math.round((0.4 * head.circularity + 0.3 * alignPart + 0.3 * ratioPart) * 100) / 100;
-        if (!best || score > best.score) best = { head, body, headRatio: Math.round(headRatio * 1000) / 1000, score };
+        if (!best || score > best.score) best = { head, body, headRatio: Math.round(headRatio * 1000) / 1000, score, seated: true };
       }
     }
     return best;
@@ -109,14 +122,46 @@ class VisualFigureService {
     return { rgba, width: W, height: H };
   }
 
+  /** P976: 座った人形を描く（照合用、48×48）。体は横に広い塊。 */
+  private renderSeatedFigure(headRatio: number): { rgba: Uint8Array; width: number; height: number } {
+    const W = 48;
+    const H = 48;
+    const rgba = new Uint8Array(W * H * 4);
+    const figTop = 0.12 * H;
+    const figBottom = 0.88 * H;
+    const figHeight = figBottom - figTop;
+    const headH = Math.max(3, headRatio * figHeight);
+    const headCx = W / 2;
+    const headCy = figTop + headH / 2;
+    const headR = headH / 2;
+    const bodyHalfW = 0.34 * W;
+    const bodyTop = figTop + headH + 2;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        const inHead = (x - headCx) ** 2 + (y - headCy) ** 2 <= headR * headR;
+        const inBody = Math.abs(x - headCx) <= bodyHalfW && y >= bodyTop && y <= figBottom;
+        const v = inHead || inBody ? 30 : 240;
+        rgba[i] = v;
+        rgba[i + 1] = v;
+        rgba[i + 2] = v;
+        rgba[i + 3] = 255;
+      }
+    }
+    return { rgba, width: W, height: H };
+  }
+
   /** 仮説の比率で描き直し、自分の測定で同じ仮説が立つか確かめる。 */
   public verifyFigure(features: ImagePixelFeatures): boolean {
     const hypothesis = this.hypothesizeFigure(features);
     if (!hypothesis) return false;
-    const rendered = this.renderFigure(hypothesis.headRatio);
+    const rendered = hypothesis.seated
+      ? this.renderSeatedFigure(hypothesis.headRatio)
+      : this.renderFigure(hypothesis.headRatio);
     const renderedFeatures = analyzeImagePixels(rendered.rgba, rendered.width, rendered.height);
     const remeasured = this.hypothesizeFigure(renderedFeatures);
     if (!remeasured) return false;
+    if (!!remeasured.seated !== !!hypothesis.seated) return false;
     return Math.abs(remeasured.headRatio - hypothesis.headRatio) <= 0.08;
   }
 
@@ -124,6 +169,13 @@ class VisualFigureService {
   public identifyFigure(features: ImagePixelFeatures): { headRatio: number; score: number; description: string } | null {
     const hypothesis = this.hypothesizeFigure(features);
     if (!hypothesis || hypothesis.score < IDENTIFY_THRESHOLD) return null;
+    if (hypothesis.seated) {
+      return {
+        headRatio: hypothesis.headRatio,
+        score: hypothesis.score,
+        description: `座っている人の形らしい配置（頭らしい丸い領域が上に、横に広がった体らしい領域が下に。頭は全体の約${Math.round(hypothesis.headRatio * 100)}%）`,
+      };
+    }
     return {
       headRatio: hypothesis.headRatio,
       score: hypothesis.score,

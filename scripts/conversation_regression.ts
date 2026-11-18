@@ -6388,7 +6388,7 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P949検定 物: 少し大きくなったりんごも同定できる', vsp949.matchScene(img949(apple949(0, 0, 1.15)))?.name === '検定りんご', 'apple-scaled');
   const redOnly949 = img949((x, y) => ((x - 24) ** 2 + (y - 28) ** 2 <= 121 ? [210, 40, 40] : BG949));
   check('P949検定 物: 赤い丸だけではりんごと呼ばない', vsp949.matchScene(redOnly949)?.name !== '検定りんご', 'apple-negative');
-  // 人のバリエーション: 色が分かれていても、背が高くても低くても読める。座り姿は第1段の対象外
+  // 人のバリエーション: 色が分かれていても、背が高くても低くても読める。座り姿はP976で対象になった
   const twoColor949 = img949((x, y) => {
     if ((x - 24) ** 2 + (y - 10) ** 2 <= 16) return [232, 190, 160] as RGB949;
     if (Math.abs(x - 24) <= 6 && y >= 18 && y <= 41) return [60, 80, 180] as RGB949;
@@ -6404,7 +6404,7 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     if (Math.abs(x - 24) <= 12 && y >= 20 && y <= 30) return [30, 30, 30] as RGB949;
     return BG949;
   });
-  check('P949検定 人: 座った姿は立っている人として読まない（第1段の境界）', vf949.identifyFigure(sitting949) === null, 'person-sitting');
+  check('P949検定 人: 座った姿は座っている人として読む（P976で境界を広げた）', vf949.identifyFigure(sitting949)?.description.includes('座っている人') ?? false, 'person-sitting');
 }
 
 // ---- P950 姿勢・第1段（関節で姿勢を読む） ----
@@ -7272,6 +7272,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P975 速い動きが続くと動きの癖として読める', sum975.motionHabit === 'fast' && sum975.qualityWindow >= 10, `habit=${sum975.motionHabit} window=${sum975.qualityWindow}`);
   const insp975 = ksi975.inspect();
   check('P975 自己点検の記録に動きの癖の窓（visualMotionHabit）が入っている', typeof insp975.visualMotionHabit === 'number' && insp975.visualMotionHabit >= 10, `visualMotionHabit=${insp975.visualMotionHabit}`);
+}
+
+// ---- P976 座っている人の形の同定 ----
+{
+  const { analyzeImagePixels: analyze976 } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const { visualFigureService: vfig976 } = await import('../src/miki/conversation/services/visualFigureService');
+  type RGB976 = [number, number, number];
+  const SKIN976: RGB976 = [232, 190, 160];
+  const HAIR976: RGB976 = [45, 32, 22];
+  const BLUE976: RGB976 = [40, 40, 120];
+  const seated976 = () => {
+    const W = 64, H = 44;
+    const px: RGB976[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB976) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB976) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(32, 7, 6, HAIR976); disc(32, 8, 5, SKIN976);
+    rect(24, 13, 40, 22, BLUE976);
+    rect(10, 22, 54, 29, BLUE976);
+    rect(12, 29, 17, 35, BLUE976); rect(47, 29, 52, 35, BLUE976);
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const feats976 = analyze976(seated976(), 64, 44);
+  const id976 = vfig976.identifyFigure(feats976);
+  check('P976 座っている人の形が同定できる', !!id976 && id976.description.includes('座っている人'), `desc=${id976?.description?.slice(0, 40)}`);
+  check('P976 座った形の描き直し照合が通る', vfig976.verifyFigure(feats976) === true, `verify=${vfig976.verifyFigure(feats976)}`);
 }
 
 // ---- 結果 ----
