@@ -158,6 +158,9 @@ export interface PoseReading {
   /** P987: 脚の長さ（立つ姿勢の時だけ読む） */
   legLength: 'long' | 'short' | null;
   legLengthDescription: string;
+  /** P991: 素体プロファイル（部位ごとの幅 ÷ 図の高さ） */
+  bodyProfile: { shoulder: number | null; chest: number | null; waist: number | null; hip: number | null; thigh: number | null; calf: number | null; ankle: number | null };
+  profileComplete: boolean;
   /** P973: 髪の形（下端のばらつきから） */
   hairShape: 'straight' | 'wavy' | 'curly' | null;
   hairShapeDescription: string;
@@ -210,15 +213,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; recentLeans: string[]; recentTempos: string[] } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; recentLeans: string[]; recentTempos: string[] } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, recentLeans: [], recentTempos: [] };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, recentLeans: [], recentTempos: [] };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
     const s = this.load();
     // P967: 姿勢の癖。最近20件の傾きのうち、10件以上あって
     // 6割以上が同じ向きなら、それを癖と読む。
@@ -242,7 +245,7 @@ class VisualPoseService {
       const top = (Object.entries(counts) as [keyof typeof counts, number][]).sort((a, b) => b[1] - a[1])[0];
       if (top && top[1] / s.recentTempos.length >= 0.6) motionHabit = top[0];
     }
-    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
+    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
   }
 
   /**
@@ -784,6 +787,41 @@ class VisualPoseService {
     }
     const legLengthDescription = legLength === 'long' ? '脚が長い' : legLength === 'short' ? '脚が短い' : '';
 
+    // P991: 素体プロファイル。部位ごとの輪郭の幅を、図の高さで
+    // 割った数値表にする。服はこの素体との差分として読むのが
+    // 次の段（2026-11-18にきりあと合意した素体優先の方針）。
+    const spanWidthAt991 = (y: number): number | null => {
+      const row = rows[Math.max(0, Math.min(height - 1, Math.round(y)))];
+      if (!row) return null;
+      const s = row.spans.find((sp) => headCx >= sp.minX - 0.5 && headCx <= sp.maxX + 0.5);
+      return s ? s.maxX - s.minX + 1 : null;
+    };
+    const totalWidthAt991 = (y: number): number | null => {
+      const row = rows[Math.max(0, Math.min(height - 1, Math.round(y)))];
+      if (!row || row.minX < 0) return null;
+      return row.maxX - row.minX + 1;
+    };
+    const band991 = (y0: number, y1: number, fn: (y: number) => number | null, mode: 'max' | 'min'): number | null => {
+      let best: number | null = null;
+      for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) {
+        const v = fn(y);
+        if (v === null) continue;
+        if (best === null || (mode === 'max' ? v > best : v < best)) best = v;
+      }
+      return best;
+    };
+    const ratio991 = (v: number | null): number | null => (v === null || figH <= 0 ? null : Math.round((v / figH) * 100) / 100);
+    const bodyProfile = {
+      shoulder: ratio991(spanWidthAt991(shoulderY)),
+      chest: ratio991(band991(neckY + figH * 0.08, hipY - figH * 0.12, spanWidthAt991, 'max')),
+      waist: ratio991(band991(hipY - figH * 0.18, hipY - figH * 0.02, spanWidthAt991, 'min')),
+      hip: ratio991(spanWidthAt991(hipY)),
+      thigh: crotchY > 0 ? ratio991(band991(crotchY + 1, crotchY + figH * 0.12, totalWidthAt991, 'max')) : null,
+      calf: ratio991(totalWidthAt991(figBottom - figH * 0.16)),
+      ankle: ratio991(totalWidthAt991(figBottom - figH * 0.03)),
+    };
+    const profileComplete = bodyProfile.shoulder !== null && bodyProfile.chest !== null && bodyProfile.waist !== null && bodyProfile.hip !== null;
+
     // 股の位置：分かれ始めの行の span の中心。分かれが無ければ胴幅から。
     let hipL: PosePoint = { x: (torsoLeft + torsoRight) / 2 - (torsoRight - torsoLeft) / 4, y: hipY };
     let hipR: PosePoint = { x: (torsoLeft + torsoRight) / 2 + (torsoRight - torsoLeft) / 4, y: hipY };
@@ -1209,6 +1247,7 @@ class VisualPoseService {
     if (neck === true) state.necks++;
     if (armLength) state.armLengths++;
     if (legLength) state.legLengths++;
+    if (profileComplete) state.profiles++;
     if (hairShape) state.hairShapes++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
@@ -1249,6 +1288,8 @@ class VisualPoseService {
       armLengthDescription,
       legLength,
       legLengthDescription,
+      bodyProfile,
+      profileComplete,
       hairShape,
       hairShapeDescription,
       verified,

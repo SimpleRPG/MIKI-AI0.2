@@ -7763,6 +7763,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P990 バッテリー：顔の形は丸い', round990?.faceShape === 'round', `faceShape=${round990?.faceShape}`);
 }
 
+// ---- P991 素体プロファイルの第1段 ----
+{
+  const { visualPoseService: vpose991 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi991 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB991 = [number, number, number];
+  const SKIN991: RGB991 = [232, 190, 160];
+  const HAIR991: RGB991 = [45, 32, 22];
+  const BLUE991: RGB991 = [40, 40, 120];
+  const person991 = (tapered: boolean) => {
+    const W = 48, H = 56;
+    const px: RGB991[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB991) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB991) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(22, 9, 6, HAIR991); disc(22, 10, 5, SKIN991);
+    rect(16, 15, 28, 32, BLUE991); rect(12, 16, 15, 30, BLUE991); rect(29, 16, 32, 30, BLUE991);
+    if (tapered) {
+      rect(14, 32, 20, 40, BLUE991); rect(24, 32, 30, 40, BLUE991);
+      rect(16, 40, 21, 50, BLUE991); rect(23, 40, 28, 50, BLUE991);
+    } else {
+      rect(16, 32, 21, 50, BLUE991); rect(23, 32, 28, 50, BLUE991);
+    }
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const std991 = vpose991.analyzePose(person991(false), 48, 56);
+  check('P991 素体プロファイルが部位ごとに作れる', std991?.profileComplete === true && std991.bodyProfile.chest !== null && std991.bodyProfile.waist !== null && std991.bodyProfile.thigh !== null, `profile=${JSON.stringify(std991?.bodyProfile)}`);
+  const tap991 = vpose991.analyzePose(person991(true), 48, 56);
+  check('P991 太ももと足首の太さの違いが表に出る', (tap991?.bodyProfile.thigh ?? 0) > (tap991?.bodyProfile.ankle ?? 99), `thigh=${tap991?.bodyProfile.thigh} ankle=${tap991?.bodyProfile.ankle}`);
+  const insp991 = ksi991.inspect();
+  check('P991 自己点検の記録に素体プロファイル（visualBodyProfile）が入っている', typeof insp991.visualBodyProfile === 'number' && insp991.visualBodyProfile >= 1, `visualBodyProfile=${insp991.visualBodyProfile}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
