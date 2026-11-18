@@ -1500,6 +1500,11 @@ class VisualPoseService {
     if (!target || !start.head) return null;
     // P1011: 奥行きプロファイルからドリルは始めない。
     if (start.profileKind === 'depth') return null;
+    // P1013: 停滞は「卒業の許容差分より上で縮まらなくなった」
+    // こと。許容差分に届いたあと差分が縮まらなくなるのは到達で
+    // あって停滞ではない（測り値の量子化で、届いた値のまま
+    // 同じ最良差分が続くことがある）。
+    const toleranceAtStart = 0.14 * Math.pow(0.8, this.load().drillLevel - 1);
     const keys = ['shoulder', 'chest', 'waist', 'hip', 'thigh', 'calf', 'ankle'] as const;
     const diffOf = (p: PoseReading['bodyProfile']): number | null => {
       let sum = 0;
@@ -1542,7 +1547,7 @@ class VisualPoseService {
       // 浮動小数の誤差（0.06000000000000005）で収束と判定されず、
       // 床に張り付いたまま停滞に化けることがある。僅かに緩める。
       if (bestDiff <= 0.06 + 1e-9) break;
-      if (staleRounds >= 3 && round >= 3) { plateau = true; break; }
+      if (staleRounds >= 3 && round >= 3) { plateau = bestDiff > toleranceAtStart; break; }
       const next: PoseReading['bodyProfile'] = { ...current };
       for (const k of keys) {
         const measured = re.bodyProfile[k];
@@ -2548,10 +2553,36 @@ class VisualPoseService {
       const strad = merged.find((m) => headCx >= m.minX && headCx <= m.maxX);
       return strad ? strad.maxX - strad.minX + 1 : spanWidthAt991(y);
     };
-    const band991 = (y0: number, y1: number, fn: (y: number) => number | null, mode: 'max' | 'min' | 'p25'): number | null => {
-      if (mode === 'p25') {
+    // P1013: 肩の行は、前に垂れた髪や壁線で細かく割れやすい
+    // （全身サンプルでは肩の行が5pxの破片になり0.02と読めた）。
+    // 肩は常につないで測る：細い隙間（図の高さの3.5%まで）を
+    // またいで、中心を含む塊の幅を取る。上げた腕や広げた腕は
+    // 隙間が大きいので混ざらない。肩の幅はもともと、その高さの
+    // 輪郭の幅（くっついた腕を含む）として測ってきた値と揃える。
+    const shoulderWidthAt991 = (y: number): number | null => {
+      const row = rows[Math.max(0, Math.min(height - 1, Math.round(y)))];
+      if (!row || !row.spans.length) return null;
+      const gapMax = Math.max(2, figH * 0.035);
+      const merged: Array<{ minX: number; maxX: number }> = [];
+      for (const s of row.spans) {
+        const last = merged[merged.length - 1];
+        if (last && s.minX - last.maxX - 1 <= gapMax) last.maxX = s.maxX;
+        else merged.push({ minX: s.minX, maxX: s.maxX });
+      }
+      let best: { minX: number; maxX: number } | null = null;
+      let bestDist = Infinity;
+      for (const m of merged) {
+        const d = headCx >= m.minX && headCx <= m.maxX ? 0 : Math.min(Math.abs(headCx - m.minX), Math.abs(headCx - m.maxX));
+        if (d < bestDist) { bestDist = d; best = m; }
+      }
+      return best ? best.maxX - best.minX + 1 : null;
+    };
+    const band991 = (y0: number, y1: number, fn: (y: number) => number | null, mode: 'max' | 'min' | 'p25' | 'median'): number | null => {
+      if (mode === 'p25' || mode === 'median') {
         // P1004: 帯の最小は1行の隙間で壊れるので、下から
         // 25%の行の幅を腰とする（細い行の代表として頑健）。
+        // P1013: 肩は中央値。帯の最大は胸へ広がる行を拾って
+        // 描画ドリルで肩と胸が連動し、最小は割れた行を拾う。
         const vals: number[] = [];
         for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) {
           const v = fn(y);
@@ -2559,7 +2590,7 @@ class VisualPoseService {
         }
         if (!vals.length) return null;
         vals.sort((a, b) => a - b);
-        return vals[Math.floor((vals.length - 1) * 0.25)];
+        return mode === 'median' ? vals[Math.floor((vals.length - 1) * 0.5)] : vals[Math.floor((vals.length - 1) * 0.25)];
       }
       let best: number | null = null;
       for (let y = Math.floor(y0); y <= Math.ceil(y1); y++) {
@@ -2571,7 +2602,7 @@ class VisualPoseService {
     };
     const ratio991 = (v: number | null): number | null => (v === null || figH <= 0 ? null : Math.round((v / figH) * 100) / 100);
     const bodyProfile = {
-      shoulder: ratio991(spanWidthAt991(shoulderY)),
+      shoulder: ratio991(band991(shoulderY - figH * 0.01, shoulderY + figH * 0.05, shoulderWidthAt991, 'median')),
       chest: ratio991(band991(neckY + figH * 0.08, hipY - figH * 0.12, spanWidthAt991, 'max')),
       // P1009: 腰は帯の最小行でなく下から25%の行で測る。最小行は、領域分割の
       // 壁線などで数行だけ潰れた行に引っ張られて実物より細く出る

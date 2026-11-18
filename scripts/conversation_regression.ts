@@ -8437,6 +8437,40 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1012 素体描画の照合が保たれる', !!(vb && vb.verified), JSON.stringify(vb && { verified: vb.verified, score: vb.score }));
 }
 
+// P1013: 肩の幅の頑丈な測り方。肩の行は前に垂れた髪や壁線で
+// 細かく割れやすく、全身サンプルでは肩の行が5pxの破片になって
+// 0.02と読めた。細い隙間（図の高さの3.5%まで）をまたいで中心を
+// 含む塊の幅を取り、肩の帯（肩の行の少し上〜下5%）の中央値を
+// 使う。帯の最大は胸へ広がる行を拾って描画ドリルで肩と胸が
+// 連動し、最小や単独行は割れた行を拾う（P1013の初回束で実際に
+// 最大版がドリルを停滞させた）。
+{
+  const svc = (await import('../src/miki/conversation/services/visualPoseService')).visualPoseService;
+  type RGB = [number, number, number];
+  const SKIN: RGB = [232, 190, 160], HAIRC: RGB = [45, 32, 22], BLUE: RGB = [40, 40, 120], BG: RGB = [245, 245, 245];
+  const mkFig = (splitShoulder: boolean) => {
+    const W = 48, H = 56;
+    const a = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { a[i * 4] = BG[0]; a[i * 4 + 1] = BG[1]; a[i * 4 + 2] = BG[2]; a[i * 4 + 3] = 255; }
+    rect(16, 15, 28, 32, BLUE); rect(12, 16, 15, 30, SKIN); rect(29, 16, 32, 30, SKIN);
+    rect(16, 32, 21, 50, BLUE); rect(23, 32, 28, 50, BLUE);
+    if (splitShoulder) { rect(20, 14, 21, 24, BG); rect(24, 14, 25, 24, BG); }
+    disc(22, 9, 6, HAIRC); disc(22, 10, 5, SKIN);
+    return { a, W, H };
+  };
+  const std = mkFig(false);
+  const rStd: any = svc.analyzePose(std.a, std.W, std.H);
+  const split = mkFig(true);
+  const rSplit: any = svc.analyzePose(split.a, split.W, split.H);
+  check('P1013 肩が割れた姿でもプロファイルが揃う', !!(rSplit && rSplit.profileComplete && rSplit.bodyProfile.shoulder !== null), JSON.stringify(rSplit?.bodyProfile));
+  check('P1013 割れた肩の幅はつないだ値になる', !!(rSplit && rSplit.bodyProfile.shoulder >= 0.35), `shoulder=${rSplit?.bodyProfile?.shoulder}`);
+  check('P1013 通常の姿の肩は従来どおり', !!(rStd && rStd.bodyProfile.shoulder >= 0.38 && rStd.bodyProfile.shoulder <= 0.5), `shoulder=${rStd?.bodyProfile?.shoulder}`);
+  const vb: any = rStd ? svc.verifyBody(rStd) : null;
+  check('P1013 素体描画の照合が保たれる', !!(vb && vb.verified), JSON.stringify(vb && { verified: vb.verified, score: vb.score }));
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
