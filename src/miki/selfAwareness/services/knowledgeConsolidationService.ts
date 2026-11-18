@@ -9,6 +9,7 @@ import { mistakeNotebookService } from './mistakeNotebookService';
 import { dreamService } from './dreamService';
 import { avatarPresenceService } from './avatarPresenceService';
 import { swarmVerificationService } from './swarmVerificationService';
+import { videoSceneService } from '../../conversation/services/videoSceneService';
 
 /**
  * P542: 統合パス（寝ている間の整理）。成長ループから1日1回まで
@@ -135,6 +136,9 @@ class KnowledgeConsolidationService {
     } catch { /* 存在状態が書けなくても統合は止めない */ }
     // P944: 類推候補をビービーの群れで点検する（判定だけ。知識は書き換えない）。
     try { swarmVerificationService.verifyAnalogyCandidates(8, now); } catch { /* 群れが止まっても統合は止めない */ }
+    // P974: 動画の字幕対応で育った名前の候補を、未検証の
+    // 主張として登録する（検証待ちとして残すのが第2段）。
+    try { videoSceneService.promoteCandidates(); } catch { /* 昇格が止まっても統合は止めない */ }
     systemLogger.info('SELF_IMPROVEMENT', `🌙 [統合] 関係の再抽出で ${relationsAdded} 件を追加し、図式を ${schemas} 件立て、繰り返しの話題を ${distilled} 件蒸留し、予測を ${predictions.confirmed + predictions.refuted} 件照合しました（外れ ${predictions.refuted} 件）`);
     // P931: 報告を残す（朝、聞かれたら語れるように）。
     try {

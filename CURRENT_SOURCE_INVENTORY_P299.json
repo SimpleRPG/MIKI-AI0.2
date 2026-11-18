@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1848,
     "sourceFileCount": 1401,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1312,
-    "relativeImportCandidateCount": 4674,
-    "resolvedRelativeImportCandidateCount": 4658,
+    "relativeImportCandidateCount": 4679,
+    "resolvedRelativeImportCandidateCount": 4663,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 616831,
-      "lines": 7246,
-      "sha256": "1e95b57e20667b9578d7df374fe13fe82b11762a0f4fc8beb66f9982cf0541ba",
+      "bytes": 618147,
+      "lines": 7261,
+      "sha256": "c48259465bb9eecade66e09c124258e81888e86ec4954ff1178a63368a38c98a",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4436,10 +4436,28 @@
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7235,
+          "specifier": "../src/miki/conversation/services/videoSceneService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/videoSceneService.ts"
+        },
+        {
+          "line": 7236,
+          "specifier": "../src/miki/memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 7237,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         }
       ],
-      "relativeImportCandidateCount": 453,
-      "resolvedRelativeImportCount": 453,
+      "relativeImportCandidateCount": 456,
+      "resolvedRelativeImportCount": 456,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -14985,9 +15003,9 @@
     },
     {
       "path": "src/miki/conversation/services/videoSceneService.ts",
-      "bytes": 11829,
-      "lines": 263,
-      "sha256": "8a1c0b6978021a82dbaf1e35dd8adc070e3c2c5434744c00f130e6a1952eed5e",
+      "bytes": 13528,
+      "lines": 302,
+      "sha256": "b18cafea0d4a846227d2643cab57bc12d2d5d410634ec301f00c4a663813790d",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -14996,44 +15014,50 @@
           "resolvedPath": "src/services/storageService.ts"
         },
         {
-          "line": 5,
+          "line": 2,
+          "specifier": "../../memory/services/claimDatabaseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 6,
           "specifier": "./conversationImageObservationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationImageObservationService.ts"
         },
         {
-          "line": 6,
+          "line": 7,
           "specifier": "./visualPatternService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPatternService.ts"
         },
         {
-          "line": 7,
+          "line": 8,
           "specifier": "./visualScenePatternService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualScenePatternService.ts"
         },
         {
-          "line": 8,
+          "line": 9,
           "specifier": "./visualFigureService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualFigureService.ts"
         },
         {
-          "line": 9,
+          "line": 10,
           "specifier": "./shapeRenderVerificationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/shapeRenderVerificationService.ts"
         },
         {
-          "line": 10,
+          "line": 11,
           "specifier": "../../selfAwareness/services/motionPatternService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/motionPatternService.ts"
         }
       ],
-      "relativeImportCandidateCount": 7,
-      "resolvedRelativeImportCount": 7,
+      "relativeImportCandidateCount": 8,
+      "resolvedRelativeImportCount": 8,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -32455,9 +32479,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeConsolidationService.ts",
-      "bytes": 11862,
-      "lines": 243,
-      "sha256": "7c5333dedacc8cf01d5ec5c3b00bef7ac900fe609f56edf21175a3bc22520f60",
+      "bytes": 12222,
+      "lines": 247,
+      "sha256": "452096bb9c5ca97f484a0584533aaf4edeb2e4986a8abb6b4ba641a62960a8b3",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -32524,10 +32548,16 @@
           "specifier": "./swarmVerificationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/swarmVerificationService.ts"
+        },
+        {
+          "line": 12,
+          "specifier": "../../conversation/services/videoSceneService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/videoSceneService.ts"
         }
       ],
-      "relativeImportCandidateCount": 11,
-      "resolvedRelativeImportCount": 11,
+      "relativeImportCandidateCount": 12,
+      "resolvedRelativeImportCount": 12,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -32555,9 +32585,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 35796,
-      "lines": 801,
-      "sha256": "b46f974c7bb232c18f38298459e35571178f4451f8f7d2ce65506f0a59d9d5d2",
+      "bytes": 36216,
+      "lines": 809,
+      "sha256": "80ef5f3dd0a460a391ded807bfe20e7ae5a48e89fd52bb5ce3b920f5b79890f9",
       "relativeImportCandidates": [
         {
           "line": 1,

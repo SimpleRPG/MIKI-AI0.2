@@ -7230,6 +7230,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P973 自己点検の記録に髪の形（visualHairShape）が入っている', typeof insp973.visualHairShape === 'number' && insp973.visualHairShape >= 1, `visualHairShape=${insp973.visualHairShape}`);
 }
 
+// ---- P974 動画学習の第2段（候補から主張へ） ----
+{
+  const { videoSceneService: vscene974 } = await import('../src/miki/conversation/services/videoSceneService');
+  const { claimDatabaseService: claims974 } = await import('../src/miki/memory/services/claimDatabaseService');
+  const { knowledgeSelfInspectionService: ksi974 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const added974 = vscene974.promoteCandidates();
+  check('P974 字幕対応の候補が未検証の主張として登録される', added974 >= 1, `added=${added974}`);
+  const found974 = claims974.searchClaims('人が歩く場面', 5) as any[];
+  check('P974 登録された主張が検索でき、CANDIDATE のままである', found974.some((c) => String(c.statement || '').includes('動画の中で') && c.status === 'CANDIDATE'), `found=${found974.length}`);
+  const again974 = vscene974.promoteCandidates();
+  check('P974 同じ候補は二度登録されない', again974 === 0, `again=${again974}`);
+  const insp974 = ksi974.inspect();
+  check('P974 自己点検の記録に昇格数（visualPromotedClaims）が入っている', typeof insp974.visualPromotedClaims === 'number' && insp974.visualPromotedClaims >= 1, `visualPromotedClaims=${insp974.visualPromotedClaims}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -137,6 +137,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualFingerDetails: number;
   visualEyeColor: number;
   visualHairShape: number;
+  visualPromotedClaims: number;
   findings: string[];
 }
 
@@ -379,6 +380,7 @@ class KnowledgeSelfInspectionService {
     let visualFingerDetails = 0;
     let visualEyeColor = 0;
     let visualHairShape = 0;
+    let visualPromotedClaims = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -532,6 +534,11 @@ class KnowledgeSelfInspectionService {
       visualCaptionPairs = videoSceneService.summary().wordCandidates;
       if (visualCaptionPairs > 0) {
         findings.push(`動画の字幕と画面の対応を${visualCaptionPairs}件覚えた`);
+      }
+      // P974: 候補から未検証の主張として登録した数。
+      visualPromotedClaims = videoSceneService.summary().promotedClaims;
+      if (visualPromotedClaims > 0) {
+        findings.push(`動画で覚えた名前の候補を${visualPromotedClaims}件、検証待ちの主張として登録した`);
       }
       // P947: 動きを記述できた場面の総数。
       videoMotions = videoSceneService.summary().motionsTotal;
@@ -731,6 +738,7 @@ class KnowledgeSelfInspectionService {
       visualFingerDetails,
       visualEyeColor,
       visualHairShape,
+      visualPromotedClaims,
       findings,
     };
 

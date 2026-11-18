@@ -1,4 +1,5 @@
 import { storageService } from '../../../services/storageService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import {
   analyzeImagePixels,
   type ImagePixelFeatures,
@@ -204,6 +205,42 @@ class VideoSceneService {
     return { scenes, cutsMs: cutAt.map((i) => sorted[i].tMs) };
   }
 
+  /**
+   * P974: 名前の候補を、未検証（CANDIDATE）の主張として
+   * 主張DBへ登録する。眠って整理する時間から呼ばれる。
+   * 候補のままでは会話の検索に乗らないので、検証待ちの
+   * 主張として残すのが第2段。同じ組み合わせは二度登録しない。
+   */
+  public promoteCandidates(): number {
+    const state = this.loadState();
+    const promoted = new Set(state.promoted);
+    let added = 0;
+    for (const c of this.wordCandidates()) {
+      const key = `${c.identification}|${c.word}`;
+      if (promoted.has(key)) continue;
+      try {
+        claimDatabaseService.registerClaim({
+          statement: `動画の中で「${c.word}」という言葉は、${c.identification}が見えている場面で使われていた。`,
+          world: 'REAL',
+          kind: 'FACT_CLAIM',
+          status: 'CANDIDATE',
+          source: 'VIDEO_CAPTION_PAIRING',
+          self_provenance: 'SELF_SUPPORTED',
+          maturity: 'DEFINED',
+          origin_source_id: 'video_caption_pairing',
+          independence_cluster_id: 'cluster_video_captions',
+        } as any);
+        promoted.add(key);
+        added++;
+      } catch { /* Claim 登録は補助経路 */ }
+    }
+    if (added > 0) {
+      state.promoted = [...promoted];
+      try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 台帳は補助 */ }
+    }
+    return added;
+  }
+
   /** P970: 3回以上対応づいた（同定，言葉）を名前の候補として返す。 */
   public wordCandidates(): { identification: string; word: string; count: number }[] {
     const pairs = this.loadState().pairs;
@@ -232,7 +269,7 @@ class VideoSceneService {
     }).join('\n');
   }
 
-  private loadState(): { runs: number; scenesTotal: number; motionsTotal: number; lastSceneCount: number; pairs: Record<string, number> } {
+  private loadState(): { runs: number; scenesTotal: number; motionsTotal: number; lastSceneCount: number; pairs: Record<string, number>; promoted: string[] } {
     try {
       const parsed = JSON.parse(storageService.getItem(KEY) || '{}');
       return {
@@ -241,13 +278,14 @@ class VideoSceneService {
         motionsTotal: Number(parsed.motionsTotal || 0),
         lastSceneCount: Number(parsed.lastSceneCount || 0),
         pairs: (parsed.pairs && typeof parsed.pairs === 'object') ? parsed.pairs : {},
+        promoted: Array.isArray(parsed.promoted) ? parsed.promoted : [],
       };
     } catch {
-      return { runs: 0, scenesTotal: 0, motionsTotal: 0, lastSceneCount: 0, pairs: {} };
+      return { runs: 0, scenesTotal: 0, motionsTotal: 0, lastSceneCount: 0, pairs: {}, promoted: [] };
     }
   }
 
-  public summary(): { runs: number; scenesTotal: number; motionsTotal: number; wordPairs: number; wordCandidates: number } {
+  public summary(): { runs: number; scenesTotal: number; motionsTotal: number; wordPairs: number; wordCandidates: number; promotedClaims: number } {
     const state = this.loadState();
     const counts = Object.values(state.pairs);
     return {
@@ -256,6 +294,7 @@ class VideoSceneService {
       motionsTotal: state.motionsTotal,
       wordPairs: counts.length,
       wordCandidates: counts.filter((n) => n >= 3).length,
+      promotedClaims: state.promoted.length,
     };
   }
 }
