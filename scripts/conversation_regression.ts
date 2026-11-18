@@ -7796,6 +7796,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P991 自己点検の記録に素体プロファイル（visualBodyProfile）が入っている', typeof insp991.visualBodyProfile === 'number' && insp991.visualBodyProfile >= 1, `visualBodyProfile=${insp991.visualBodyProfile}`);
 }
 
+// ---- P992 素体レンダラの第1段 ----
+{
+  const { visualPoseService: vpose992 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi992 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB992 = [number, number, number];
+  const SKIN992: RGB992 = [232, 190, 160];
+  const HAIR992: RGB992 = [45, 32, 22];
+  const BLUE992: RGB992 = [40, 40, 120];
+  const px992: RGB992[] = []; for (let i = 0; i < 48 * 56; i++) px992.push([245, 245, 245]);
+  const rect992 = (x0: number, y0: number, x1: number, y1: number, c: RGB992) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px992[y * 48 + x] = c; };
+  const disc992 = (cx: number, cy: number, r: number, c: RGB992) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px992[y * 48 + x] = c; };
+  disc992(22, 9, 6, HAIR992); disc992(22, 10, 5, SKIN992);
+  rect992(16, 15, 28, 32, BLUE992); rect992(12, 16, 15, 30, BLUE992); rect992(29, 16, 32, 30, BLUE992);
+  rect992(16, 32, 21, 50, BLUE992); rect992(23, 32, 28, 50, BLUE992);
+  const img992 = new Uint8Array(48 * 56 * 4);
+  px992.forEach((c, i) => { img992[i * 4] = c[0]; img992[i * 4 + 1] = c[1]; img992[i * 4 + 2] = c[2]; img992[i * 4 + 3] = 255; });
+  const reading992 = vpose992.analyzePose(img992, 48, 56);
+  const rendered992 = reading992 ? vpose992.renderBody(reading992) : null;
+  check('P992 素体が描ける', rendered992 !== null && rendered992.length === 64 * 64 * 4, `rendered=${rendered992?.length}`);
+  const verify992 = reading992 ? vpose992.verifyBody(reading992) : null;
+  check('P992 描いた素体を測り直すとプロファイルが一致する', verify992?.verified === true && verify992.score >= 0.7, `score=${verify992?.score}`);
+  const insp992 = ksi992.inspect();
+  check('P992 自己点検の記録に素体の照合（visualBodies）が入っている', typeof insp992.visualBodies === 'number' && insp992.visualBodies >= 1, `visualBodies=${insp992.visualBodies}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

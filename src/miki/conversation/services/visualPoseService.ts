@@ -213,15 +213,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; recentLeans: string[]; recentTempos: string[] } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; recentLeans: string[]; recentTempos: string[] } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, recentLeans: [], recentTempos: [] };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, recentLeans: [], recentTempos: [] };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
     const s = this.load();
     // P967: 姿勢の癖。最近20件の傾きのうち、10件以上あって
     // 6割以上が同じ向きなら、それを癖と読む。
@@ -245,7 +245,7 @@ class VisualPoseService {
       const top = (Object.entries(counts) as [keyof typeof counts, number][]).sort((a, b) => b[1] - a[1])[0];
       if (top && top[1] / s.recentTempos.length >= 0.6) motionHabit = top[0];
     }
-    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
+    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
   }
 
   /**
@@ -316,6 +316,119 @@ class VisualPoseService {
     if (verified) state.imitationsOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     return { score, verified, image, size: S };
+  }
+
+  /**
+   * P992: 素体レンダラ第1段。姿勢読みの関節と素体プロファイルから、
+   * 塗りのある体の輪郭を描く。描いた側を測り直してプロファイルが
+   * 一致するかで照合する（verifyBody）。服はまだ着せない。
+   */
+  public renderBody(reading: PoseReading, size = 64): Uint8Array | null {
+    if (!reading.head || !reading.profileComplete) return null;
+    const S = size;
+    const prof = reading.bodyProfile;
+    const px: Array<[number, number, number]> = [];
+    for (let i = 0; i < S * S; i++) px.push([245, 245, 245]);
+    const BODY: [number, number, number] = [40, 40, 120];
+    const SKIN: [number, number, number] = [232, 190, 160];
+    const set = (x: number, y: number, c: [number, number, number]) => {
+      const xi = Math.round(x), yi = Math.round(y);
+      if (xi >= 0 && xi < S && yi >= 0 && yi < S) px[yi * S + xi] = c;
+    };
+    const stamp = (cx: number, cy: number, r: number, c: [number, number, number]) => {
+      for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(S - 1, Math.ceil(cy + r)); y++) {
+        for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(S - 1, Math.ceil(cx + r)); x++) {
+          if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * S + x] = c;
+        }
+      }
+    };
+    const head = reading.head;
+    const shoulderY = reading.shoulderL && reading.shoulderR ? (reading.shoulderL.y + reading.shoulderR.y) / 2 : head.y + head.r * 1.6;
+    const cxN = reading.shoulderL && reading.shoulderR ? (reading.shoulderL.x + reading.shoulderR.x) / 2 : head.x;
+    const footY = reading.footL && reading.footR ? (reading.footL.y + reading.footR.y) / 2 : 0.95;
+    const hipY = shoulderY + (footY - shoulderY) * 0.43;
+    const figHn = Math.max(0.1, footY - (head.y - head.r));
+    const W = (ratio: number | null, fallback: number) => (ratio !== null ? ratio * figHn * (S - 1) : fallback);
+    const shoulderW = W(prof.shoulder, (S - 1) * 0.3);
+    const chestW = W(prof.chest, shoulderW);
+    const waistW = W(prof.waist, chestW);
+    const hipW = W(prof.hip, waistW);
+    // 脚の幅はプロファイルでは両脚の合計幅。1本分は合計の
+    // 0.42倍、中心は ±0.27倍に置いて、股の隙間を残す。
+    const thighW = W(prof.thigh, hipW) * 0.42;
+    const calfW = W(prof.calf, thighW) * 0.42;
+    const ankleW = W(prof.ankle, calfW) * 0.42;
+    const legSpread = W(prof.thigh, hipW) * 0.27;
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    const torsoW = (t: number) => (t < 0.3 ? lerp(shoulderW, chestW, t / 0.3) : t < 0.55 ? lerp(chestW, waistW, (t - 0.3) / 0.25) : t < 0.85 ? waistW : lerp(waistW, hipW, (t - 0.85) / 0.15));
+    // 胴：行ごとに幅を補間して塗る
+    const y0 = Math.round(shoulderY * (S - 1)), y1 = Math.round(hipY * (S - 1));
+    for (let y = y0; y <= y1; y++) {
+      const t = y1 > y0 ? (y - y0) / (y1 - y0) : 0;
+      const w = torsoW(t);
+      for (let x = Math.round(cxN * (S - 1) - w / 2); x <= Math.round(cxN * (S - 1) + w / 2); x++) set(x, y, BODY);
+    }
+    // 脚：腰から足先へ、太もも→ふくらはぎ→足首と細くする
+    const legTop = y1, legBottom = Math.round(footY * (S - 1));
+    for (const sideSign of [-1, 1]) {
+      const foot = sideSign < 0 ? reading.footL : reading.footR;
+      const hipX = cxN * (S - 1) + sideSign * legSpread;
+      const footX = foot ? foot.x * (S - 1) : hipX;
+      for (let y = legTop; y <= legBottom; y++) {
+        const t = legBottom > legTop ? (y - legTop) / (legBottom - legTop) : 0;
+        const w = t < 0.6 ? lerp(thighW, calfW, t / 0.6) : lerp(calfW, ankleW, (t - 0.6) / 0.4);
+        const cxp = lerp(hipX, footX, t);
+        for (let x = Math.round(cxp - w / 2); x <= Math.round(cxp + w / 2); x++) set(x, y, BODY);
+      }
+    }
+    // 腕：肩から手へ太い線
+    const seg = (a: { x: number; y: number } | null, b: { x: number; y: number } | null) => {
+      if (!a || !b) return;
+      const ax = a.x * (S - 1), ay = a.y * (S - 1), bx = b.x * (S - 1), by = b.y * (S - 1);
+      const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay)));
+      for (let i = 0; i <= steps; i++) stamp(ax + (bx - ax) * (i / steps), ay + (by - ay) * (i / steps), Math.max(1.4, figHn * S * 0.03), BODY);
+    };
+    seg(reading.shoulderL, reading.handL);
+    seg(reading.shoulderR, reading.handR);
+    // 首と頭
+    const neckW = shoulderW * 0.36;
+    for (let y = Math.round(head.y * (S - 1)); y <= y0; y++) {
+      for (let x = Math.round(cxN * (S - 1) - neckW / 2); x <= Math.round(cxN * (S - 1) + neckW / 2); x++) set(x, y, SKIN);
+    }
+    stamp(head.x * (S - 1), head.y * (S - 1), Math.max(2, head.r * S), SKIN);
+    const image = new Uint8Array(S * S * 4);
+    px.forEach((c, i) => { image[i * 4] = c[0]; image[i * 4 + 1] = c[1]; image[i * 4 + 2] = c[2]; image[i * 4 + 3] = 255; });
+    return image;
+  }
+
+  /** P992: 描いた素体を測り直し、プロファイルの一致で照合する */
+  public verifyBody(reading: PoseReading): { score: number; verified: boolean; image: Uint8Array; size: number } | null {
+    const image = this.renderBody(reading, 64);
+    if (!image) return null;
+    const re = this.analyzePose(image, 64, 64);
+    let score = 0;
+    let verified = false;
+    if (re) {
+      const keys = ['shoulder', 'chest', 'waist', 'hip', 'thigh', 'calf', 'ankle'] as const;
+      let ok = 0;
+      let compared = 0;
+      for (const k of keys) {
+        const a = reading.bodyProfile[k];
+        const b = re.bodyProfile[k];
+        if (a === null || b === null) continue;
+        compared++;
+        if (Math.abs(a - b) <= 0.09) ok++;
+      }
+      if (compared >= 4) {
+        score = ok / compared;
+        verified = score >= 0.7;
+      }
+    }
+    const state = this.load();
+    state.bodies++;
+    if (verified) state.bodiesOk++;
+    try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    return { score, verified, image, size: 64 };
   }
 
   /** P958: 姿勢読みから特徴署名を作る */
