@@ -56,6 +56,14 @@ export interface PoseMotionReading {
   jumping: boolean;
 }
 
+/** P956: 服の形の読み */
+export interface PoseClothing {
+  /** flare=スカート状の広がり / split=ズボン状の分かれ */
+  bottom: 'flare' | 'split' | 'unknown';
+  /** 上下で色が違うか（測れなければ null） */
+  twoPiece: boolean | null;
+}
+
 export interface PoseReading {
   head: (PosePoint & { r: number }) | null;
   handL: PosePoint | null;
@@ -72,6 +80,9 @@ export interface PoseReading {
   buildDescription: string;
   /** P951: 肌の色の島から得た補強（顔の確認・手の位置） */
   skinCues: { face: boolean; handL: boolean; handR: boolean };
+  /** P956: 服の形 */
+  clothing: PoseClothing;
+  clothingDescription: string;
   verified: boolean;
   fit: number;
 }
@@ -121,15 +132,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number } {
     return this.load();
   }
 
@@ -459,11 +470,65 @@ class VisualPoseService {
       if (legs === 'SPLIT') parts.push('脚は左右に分かれている');
       else if (legs === 'TOGETHER') parts.push('脚はそろっている');
     }
+    // P956: 服の形。下半身の広がり（股の分かれが無く、腰から
+    // 裾へ広がるならスカート状）と、上下の色の違いを読む。
+    let clothing: PoseClothing = { bottom: 'unknown', twoPiece: null };
+    {
+      const rowWidth = (y: number) => {
+        const s = rows[y]?.spans;
+        if (!s || !s.length) return 0;
+        return s[s.length - 1].maxX - s[0].minX + 1;
+      };
+      // 腰の基準は股の位置に引きずられない解剖学的な位置で取る
+      // （股は hipY の算出に使われていて循環するため）。
+      const hipRef = neckY + figH * 0.45;
+      const waistW = rowWidth(Math.round(neckY + figH * 0.32));
+      let bottom: PoseClothing['bottom'] = 'unknown';
+      if (crotchY > 0 && crotchY <= hipRef + figH * 0.12) {
+        // 股が腰のすぐ下から分かれている＝ズボン状。
+        bottom = 'split';
+      } else {
+        // 分かれが無いか、分かれの直前まで広がっている＝スカート状。
+        const flareY = crotchY > 0 ? crotchY - 2 : Math.floor(figBottom - figH * 0.05);
+        const flareW = rowWidth(flareY);
+        if (waistW > 0 && flareW > waistW * 1.12) bottom = 'flare';
+        else if (crotchY > 0) bottom = 'split';
+      }
+      const bandMode = (y0: number, y1: number): string | null => {
+        const counts = new Map<string, number>();
+        let total = 0;
+        for (let y = Math.max(0, y0); y <= Math.min(height - 1, y1); y++) {
+          for (let x = 0; x < width; x += 2) {
+            if (!mask[y * width + x]) continue;
+            const i = (y * width + x) * 4;
+            const k = `${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}`;
+            counts.set(k, (counts.get(k) || 0) + 1);
+            total++;
+          }
+        }
+        if (total < 20) return null;
+        let best: string | null = null;
+        let bestN = 0;
+        for (const [k, n] of counts) if (n > bestN) { best = k; bestN = n; }
+        return best;
+      };
+      const topColor = bandMode(Math.ceil(neckY), Math.floor(hipRef));
+      const bottomColor = bandMode(Math.ceil(hipRef + figH * 0.08), figBottom);
+      clothing = { bottom, twoPiece: topColor && bottomColor ? topColor !== bottomColor : null };
+    }
+    const clothingParts: string[] = [];
+    if (clothing.bottom === 'flare') clothingParts.push('下半身はスカートのように広がっている');
+    else if (clothing.bottom === 'split') clothingParts.push('下半身はズボンのように脚が分かれている');
+    if (clothing.twoPiece === true) clothingParts.push('服は上下で色が違う');
+    else if (clothing.twoPiece === false && clothing.bottom !== 'unknown') clothingParts.push('服は上下が同じ色');
+    const clothingDescription = clothingParts.length ? clothingParts.join('。') + '。' : '';
+
     const description = parts.join('。') + '。';
 
     const state = this.load();
     state.analyzed++;
     if (verified) state.verified++;
+    if (clothingDescription) state.clothing++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
     const norm = (p: PosePoint | null): PosePoint | null =>
@@ -482,6 +547,8 @@ class VisualPoseService {
       build,
       buildDescription,
       skinCues,
+      clothing,
+      clothingDescription,
       verified,
       fit,
     };

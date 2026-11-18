@@ -6680,6 +6680,42 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P955 自己点検の記録に向きの読み（visualViewpoints）が入っている', typeof insp955.visualViewpoints === 'number' && insp955.visualViewpoints >= 1, `visualViewpoints=${insp955.visualViewpoints}`);
 }
 
+// ---- P956 服の形（スカート状の広がり・上下の色） ----
+{
+  const { visualPoseService: vpose956 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi956 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const S956 = 48;
+  type RGB956 = [number, number, number];
+  const SKIN956: RGB956 = [232, 190, 160];
+  const BLUE956: RGB956 = [40, 40, 120];
+  const RED956: RGB956 = [170, 40, 40];
+  const canvas956 = () => { const px: RGB956[] = []; for (let i = 0; i < S956 * S956; i++) px.push([245, 245, 245]); return px; };
+  const rect956 = (px: RGB956[], x0: number, y0: number, x1: number, y1: number, c: RGB956) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * S956 + x] = c; };
+  const disc956 = (px: RGB956[], cx: number, cy: number, r: number, c: RGB956) => { for (let y = 0; y < S956; y++) for (let x = 0; x < S956; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * S956 + x] = c; };
+  const toRgba956 = (px: RGB956[]) => { const o = new Uint8Array(S956 * S956 * 4); px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; }); return o; };
+  const pants956 = canvas956();
+  disc956(pants956, 24, 6, 5, SKIN956);
+  rect956(pants956, 19, 11, 29, 26, BLUE956); rect956(pants956, 15, 12, 18, 24, BLUE956); rect956(pants956, 30, 12, 33, 24, BLUE956);
+  rect956(pants956, 19, 26, 23, 44, BLUE956); rect956(pants956, 25, 26, 29, 44, BLUE956);
+  const skirt956 = canvas956();
+  disc956(skirt956, 24, 6, 5, SKIN956);
+  rect956(skirt956, 19, 11, 29, 20, BLUE956); rect956(skirt956, 15, 12, 18, 24, BLUE956); rect956(skirt956, 30, 12, 33, 24, BLUE956);
+  for (let y = 20; y <= 40; y++) { const w = 5 + Math.round((y - 20) * 0.55); rect956(skirt956, 24 - w, y, 24 + w, y, BLUE956); }
+  rect956(skirt956, 20, 40, 22, 44, SKIN956); rect956(skirt956, 26, 40, 28, 44, SKIN956);
+  const two956 = canvas956();
+  disc956(two956, 24, 6, 5, SKIN956);
+  rect956(two956, 19, 11, 29, 26, RED956); rect956(two956, 15, 12, 18, 24, RED956); rect956(two956, 30, 12, 33, 24, RED956);
+  rect956(two956, 19, 26, 23, 44, BLUE956); rect956(two956, 25, 26, 29, 44, BLUE956);
+  const rp956 = vpose956.analyzePose(toRgba956(pants956), S956, S956);
+  check('P956 ズボンは分かれ＋上下同色と読める', rp956?.clothing.bottom === 'split' && rp956?.clothing.twoPiece === false, `pants=${JSON.stringify(rp956?.clothing)}`);
+  const rs956 = vpose956.analyzePose(toRgba956(skirt956), S956, S956);
+  check('P956 スカートは裾の広がりと読める（裾下の脚の分かれに引きずられない）', rs956?.clothing.bottom === 'flare' && rs956?.clothing.twoPiece === false, `skirt=${JSON.stringify(rs956?.clothing)}`);
+  const rt956 = vpose956.analyzePose(toRgba956(two956), S956, S956);
+  check('P956 上下で色が違う服も読める', rt956?.clothing.bottom === 'split' && rt956?.clothing.twoPiece === true, `two=${JSON.stringify(rt956?.clothing)}`);
+  const insp956 = ksi956.inspect();
+  check('P956 自己点検の記録に服の形（visualClothing）が入っている', typeof insp956.visualClothing === 'number' && insp956.visualClothing >= 1, `visualClothing=${insp956.visualClothing}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

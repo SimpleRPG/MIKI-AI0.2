@@ -545,6 +545,13 @@ class ConversationImageObservationService {
               '。具体的な物や文字までは読み取れない。',
               `。姿勢は、${pose953.description}具体的な物や文字までは読み取れない。`,
             );
+            // P956: 服の形も添える。
+            if (pose953.clothingDescription) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `服は、${pose953.clothingDescription}具体的な物や文字までは読み取れない。`,
+              );
+            }
           }
         } catch { /* 姿勢が読めなくても観察は返す */ }
       }
