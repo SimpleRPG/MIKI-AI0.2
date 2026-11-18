@@ -8362,6 +8362,49 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1010 小さいピンクの虹彩も色と大きさが読める', smallPink1010?.verified === true && smallPink1010?.eyeColor === 'ピンク' && smallPink1010?.eyeSize === 'small', `verified=${smallPink1010?.verified} eyeColor=${smallPink1010?.eyeColor} eyeSize=${smallPink1010?.eyeSize}`);
 }
 
+// ---- P1011 向き（正面・横・後ろ）と幅の種別 ----
+{
+  const { visualPoseService: vpose1011 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi1011 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB1011 = [number, number, number];
+  const SKIN1011: RGB1011 = [232, 190, 160];
+  const HAIR1011: RGB1011 = [45, 32, 22];
+  const BLUE1011: RGB1011 = [40, 40, 120];
+  const build1011 = (kind: 'front' | 'together' | 'side' | 'back') => {
+    const px: RGB1011[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB1011) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB1011) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    if (kind === 'side') {
+      rect(18, 15, 27, 32, BLUE1011); rect(19, 32, 26, 50, BLUE1011); rect(25, 16, 28, 30, SKIN1011);
+      disc(22, 9, 6, HAIR1011); disc(24, 10, 5, SKIN1011);
+    } else if (kind === 'back') {
+      rect(16, 15, 28, 32, BLUE1011); rect(12, 16, 15, 30, SKIN1011); rect(29, 16, 32, 30, SKIN1011);
+      rect(16, 32, 21, 50, BLUE1011); rect(23, 32, 28, 50, BLUE1011);
+      disc(22, 10, 6, HAIR1011);
+    } else {
+      rect(16, 15, 28, 32, BLUE1011); rect(12, 16, 15, 30, SKIN1011); rect(29, 16, 32, 30, SKIN1011);
+      if (kind === 'together') rect(18, 32, 27, 50, BLUE1011);
+      else { rect(16, 32, 21, 50, BLUE1011); rect(23, 32, 28, 50, BLUE1011); }
+      disc(22, 9, 6, HAIR1011); disc(22, 10, 5, SKIN1011);
+    }
+    const img = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { img[i * 4] = c[0]; img[i * 4 + 1] = c[1]; img[i * 4 + 2] = c[2]; img[i * 4 + 3] = 255; });
+    return img;
+  };
+  const front1011 = vpose1011.analyzePose(build1011('front'), 48, 56);
+  check('P1011 正面は正面・幅として読める', front1011?.viewpoint === 'front' && front1011?.profileKind === 'width', `view=${front1011?.viewpoint} kind=${front1011?.profileKind}`);
+  const together1011 = vpose1011.analyzePose(build1011('together'), 48, 56);
+  check('P1011 正面で脚をそろえても横向きにしない', together1011?.viewpoint === 'front', `view=${together1011?.viewpoint}`);
+  const side1011 = vpose1011.analyzePose(build1011('side'), 48, 56);
+  check('P1011 横向きは奥行きとして読める', side1011?.viewpoint === 'side' && side1011?.profileKind === 'depth' && (side1011?.description ?? '').includes('横向き'), `view=${side1011?.viewpoint} kind=${side1011?.profileKind}`);
+  const back1011 = vpose1011.analyzePose(build1011('back'), 48, 56);
+  check('P1011 後ろ向きが読める（幅は幅のまま）', back1011?.viewpoint === 'back' && back1011?.profileKind === 'width', `view=${back1011?.viewpoint} kind=${back1011?.profileKind}`);
+  const vSide1011 = side1011 ? vpose1011.verifyBody(side1011) : null;
+  check('P1011 奥行きプロファイルは正面の照合・目標に混ざらない', vSide1011?.verified === false && (side1011 ? vpose1011.setTarget(side1011) : true) === false, `verified=${vSide1011?.verified}`);
+  const insp1011 = ksi1011.inspect();
+  check('P1011 自己点検の記録に向きの読み（visualPoseViews）が入っている', typeof insp1011.visualPoseViews === 'number' && insp1011.visualPoseViews >= 1, `visualPoseViews=${insp1011.visualPoseViews}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
