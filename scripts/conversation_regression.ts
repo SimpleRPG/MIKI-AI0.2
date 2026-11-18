@@ -7900,6 +7900,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P995 描いた側の髪もピンクと読める', re995?.hairColor === 'ピンク', `hairColor=${re995?.hairColor}`);
 }
 
+// ---- P996 素体の滑らか描画 ----
+{
+  const { visualPoseService: vpose996 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi996 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB996 = [number, number, number];
+  const SKIN996: RGB996 = [232, 190, 160];
+  const PINK996: RGB996 = [240, 150, 180];
+  const BLUE996: RGB996 = [40, 40, 120];
+  const px996: RGB996[] = []; for (let i = 0; i < 48 * 56; i++) px996.push([245, 245, 245]);
+  const rect996 = (x0: number, y0: number, x1: number, y1: number, c: RGB996) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px996[y * 48 + x] = c; };
+  const disc996 = (cx: number, cy: number, r: number, c: RGB996) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px996[y * 48 + x] = c; };
+  rect996(16, 15, 28, 32, BLUE996); rect996(12, 16, 15, 30, BLUE996); rect996(29, 16, 32, 30, BLUE996);
+  rect996(16, 32, 21, 50, BLUE996); rect996(23, 32, 28, 50, BLUE996);
+  rect996(13, 4, 31, 12, PINK996); rect996(13, 4, 15, 40, PINK996); rect996(29, 4, 31, 40, PINK996);
+  disc996(22, 10, 5, SKIN996);
+  const img996 = new Uint8Array(48 * 56 * 4);
+  px996.forEach((c, i) => { img996[i * 4] = c[0]; img996[i * 4 + 1] = c[1]; img996[i * 4 + 2] = c[2]; img996[i * 4 + 3] = 255; });
+  const reading996 = vpose996.analyzePose(img996, 48, 56);
+  const smooth996 = reading996 ? vpose996.renderBodySmooth(reading996, 96) : null;
+  check('P996 滑らかな素体が描ける', smooth996 !== null && smooth996.length === 96 * 96 * 4, `len=${smooth996?.length}`);
+  const flat996 = new Set(['245,245,245', '40,40,120', '232,190,160', '240,150,180', '168,118,92', '30,30,30']);
+  let blends996 = 0;
+  if (smooth996) for (let i = 0; i < smooth996.length; i += 4) if (!flat996.has(`${smooth996[i]},${smooth996[i + 1]},${smooth996[i + 2]}`)) blends996++;
+  check('P996 輪郭に中間色（滑らかさ）が出ている', blends996 >= 50, `blends=${blends996}`);
+  const vs996 = reading996 ? vpose996.verifyBodySmooth(reading996) : null;
+  check('P996 滑らかに描いても測り直すと同じ読みになる', vs996?.verified === true, `score=${vs996?.score}`);
+  const insp996 = ksi996.inspect();
+  check('P996 自己点検の記録に滑らか描画の照合（visualSmoothBodies）が入っている', typeof insp996.visualSmoothBodies === 'number' && insp996.visualSmoothBodies >= 1, `visualSmoothBodies=${insp996.visualSmoothBodies}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
