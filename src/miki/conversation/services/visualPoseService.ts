@@ -111,6 +111,9 @@ export interface PoseReading {
   head: (PosePoint & { r: number }) | null;
   handL: PosePoint | null;
   handR: PosePoint | null;
+  /** P959: 肩の位置（手の向き＝腕の軸の算出に使う） */
+  shoulderL: PosePoint | null;
+  shoulderR: PosePoint | null;
   footL: PosePoint | null;
   footR: PosePoint | null;
   armL: ArmState;
@@ -180,15 +183,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number } {
     return this.load();
   }
 
@@ -235,9 +238,9 @@ class VisualPoseService {
    * それぞれに姿勢読みをかける。重なって輪郭がくっついた
    * 人は分けられない（その場合は1人として読まれる）。
    */
-  public analyzePeople(rgba: Uint8Array | number[], width: number, height: number): { count: number; readings: PoseReading[] } {
+  public analyzePeople(rgba: Uint8Array | number[], width: number, height: number): { count: number; readings: PoseReading[]; holdingHands: boolean } {
     const mask = buildMask(rgba, width, height);
-    if (!mask) return { count: 0, readings: [] };
+    if (!mask) return { count: 0, readings: [], holdingHands: false };
     const label = new Int32Array(width * height).fill(-1);
     const comps: Array<{ id: number; area: number; x0: number; y0: number; x1: number; y1: number }> = [];
     const stack: number[] = [];
@@ -269,6 +272,8 @@ class VisualPoseService {
     }
     const bg: [number, number, number] = [rgba[0], rgba[1], rgba[2]];
     const readings: PoseReading[] = [];
+    // P959: 元画像の座標に戻した手の位置（人ごと）
+    const imageHands: Array<Array<{ x: number; y: number }>> = [];
     for (const c of comps) {
       if (c.area < width * height * 0.03) continue;
       const bw = c.x1 - c.x0 + 1;
@@ -293,14 +298,39 @@ class VisualPoseService {
         }
       }
       const reading = this.analyzePose(sub, sw, sh);
-      if (reading && reading.verified) readings.push(reading);
+      if (reading && reading.verified) {
+        readings.push(reading);
+        const hands: Array<{ x: number; y: number }> = [];
+        for (const h of [reading.handL, reading.handR]) {
+          if (!h) continue;
+          hands.push({
+            x: (c.x0 - pad + h.x * (sw - 1)) / Math.max(1, width - 1),
+            y: (c.y0 - pad + h.y * (sh - 1)) / Math.max(1, height - 1),
+          });
+        }
+        imageHands.push(hands);
+      }
+    }
+    // P959: 別々の人の手同士が重なる位置にあれば、手を
+    // つないでいるサインとして読む。
+    let holdingHands = false;
+    for (let i = 0; i < imageHands.length && !holdingHands; i++) {
+      for (let j = i + 1; j < imageHands.length && !holdingHands; j++) {
+        for (const a of imageHands[i]) {
+          for (const b of imageHands[j]) {
+            if (Math.hypot(a.x - b.x, a.y - b.y) < 0.055) { holdingHands = true; break; }
+          }
+          if (holdingHands) break;
+        }
+      }
     }
     if (readings.length >= 2) {
       const state = this.load();
       state.multi++;
+      if (holdingHands) state.holding++;
       try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     }
-    return { count: readings.length, readings };
+    return { count: readings.length, readings, holdingHands };
   }
 
   /** 画像から姿勢を読む。人らしい輪郭でなければ null。 */
@@ -798,6 +828,8 @@ class VisualPoseService {
       head: { x: headCx / (width - 1), y: headCy / (height - 1), r: headR / width },
       handL: norm(armL.hand),
       handR: norm(armR.hand),
+      shoulderL: norm(joints.shoulderL),
+      shoulderR: norm(joints.shoulderR),
       footL: norm(footL),
       footR: norm(footR),
       armL: armL.state,

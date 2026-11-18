@@ -6794,6 +6794,64 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P958 自己点検の記録に複数人（visualPeople）が入っている', typeof insp958.visualPeople === 'number' && insp958.visualPeople >= 1, `visualPeople=${insp958.visualPeople}`);
 }
 
+// ---- P959 手と指の第1段と、手をつなぐ様子 ----
+{
+  const { visualZoomService: vzoom959 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { visualPoseService: vpose959 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi959 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB959 = [number, number, number];
+  const SKIN959: RGB959 = [232, 190, 160];
+  const px48of959 = (draw: (set: (x: number, y: number, c: RGB959) => void) => void) => {
+    const px: RGB959[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const set = (x: number, y: number, c: RGB959) => { if (x >= 0 && y >= 0 && x < 48 && y < 48) px[y * 48 + x] = c; };
+    draw(set);
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const rect959 = (set: (x: number, y: number, c: RGB959) => void, x0: number, y0: number, x1: number, y1: number, c: RGB959) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, c); };
+  const disc959 = (set: (x: number, y: number, c: RGB959) => void, cx: number, cy: number, r: number, c: RGB959) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) set(x, y, c); };
+  const open959 = px48of959((set) => {
+    rect959(set, 20, 0, 27, 14, SKIN959);
+    disc959(set, 24, 24, 8, SKIN959);
+    for (const fx of [14, 20, 26, 32]) rect959(set, fx, 27, fx + 3, 39, SKIN959);
+  });
+  const fist959 = px48of959((set) => {
+    rect959(set, 20, 0, 27, 14, SKIN959);
+    disc959(set, 24, 25, 9, SKIN959);
+  });
+  const openReading959 = vzoom959.analyzeHand(open959, { x: 0, y: -1 });
+  check('P959 開いた手は指が分かれて見える', openReading959?.fingersSeparated === true && (openReading959?.maxRuns || 0) >= 3, `open=${JSON.stringify(openReading959)}`);
+  const fistReading959 = vzoom959.analyzeHand(fist959, { x: 0, y: -1 });
+  check('P959 握った手は指が分かれて見えない', fistReading959?.fingersSeparated === false, `fist=${JSON.stringify(fistReading959)}`);
+  // 手をつなぐ2人
+  const HAIR959: RGB959 = [45, 32, 22];
+  const BLUE959: RGB959 = [40, 40, 120];
+  const RED959: RGB959 = [170, 40, 40];
+  const W959 = 140, H959 = 60;
+  const pair959: RGB959[] = []; for (let i = 0; i < W959 * H959; i++) pair959.push([245, 245, 245]);
+  const rectW959 = (x0: number, y0: number, x1: number, y1: number, c: RGB959) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) pair959[y * W959 + x] = c; };
+  const discW959 = (cx: number, cy: number, r: number, c: RGB959) => { for (let y = 0; y < H959; y++) for (let x = 0; x < W959; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) pair959[y * W959 + x] = c; };
+  const body959 = (ox: number, top: RGB959) => {
+    discW959(ox + 12, 11, 6, HAIR959); discW959(ox + 12, 12, 5, SKIN959);
+    rectW959(ox + 6, 17, ox + 18, 34, top);
+    rectW959(ox + 6, 34, ox + 11, 52, BLUE959); rectW959(ox + 13, 34, ox + 18, 52, BLUE959);
+  };
+  body959(30, BLUE959); body959(58, RED959);
+  rectW959(32, 18, 35, 32, BLUE959); rectW959(77, 18, 80, 32, RED959);
+  for (let i = 0; i <= 4; i++) rectW959(48 + i, 18 + 2 * i, 50 + i, 20 + 2 * i, BLUE959);
+  for (let j = 0; j <= 4; j++) rectW959(52, 28 + 2 * j, 54, 30 + 2 * j, BLUE959);
+  for (let i = 0; i <= 4; i++) rectW959(62 - i, 18 + 2 * i, 64 - i, 20 + 2 * i, RED959);
+  for (let j = 0; j <= 4; j++) rectW959(59, 28 + 2 * j, 61, 30 + 2 * j, RED959);
+  discW959(54, 40, 2, SKIN959); discW959(60, 40, 2, SKIN959);
+  const pairRgba959 = new Uint8Array(W959 * H959 * 4);
+  pair959.forEach((c, i) => { pairRgba959[i * 4] = c[0]; pairRgba959[i * 4 + 1] = c[1]; pairRgba959[i * 4 + 2] = c[2]; pairRgba959[i * 4 + 3] = 255; });
+  const people959 = vpose959.analyzePeople(pairRgba959, W959, H959);
+  check('P959 近くで手が重なる2人は手をつないでいると読める', people959.count === 2 && people959.holdingHands === true, `count=${people959.count} holding=${people959.holdingHands}`);
+  const insp959 = ksi959.inspect();
+  check('P959 自己点検の記録に手つなぎと手（visualHoldingHands・visualHands）が入っている', typeof insp959.visualHoldingHands === 'number' && insp959.visualHoldingHands >= 1 && typeof insp959.visualHands === 'number' && insp959.visualHands >= 1, `holding=${insp959.visualHoldingHands} hands=${insp959.visualHands}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

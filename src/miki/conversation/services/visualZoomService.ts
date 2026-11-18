@@ -25,6 +25,13 @@ export interface ZoomResult {
   pixels: Uint8Array;
 }
 
+/** P959: 手の読み（拡大した手で指の分かれを見る） */
+export interface HandReading {
+  fingersSeparated: boolean;
+  maxRuns: number;
+  description: string;
+}
+
 /** P955: 向きの読み（正面・横向き・後ろ姿） */
 export interface ViewpointReading {
   viewpoint: 'front' | 'profile' | 'back';
@@ -41,16 +48,63 @@ export interface FaceReading {
 }
 
 class VisualZoomService {
-  private load(): { analyzed: number; faces: number; viewpoints: number } {
+  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, faces: 0, viewpoints: 0 };
+    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0 };
   }
 
-  public summary(): { analyzed: number; faces: number; viewpoints: number } {
+  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number } {
     return this.load();
+  }
+
+  /**
+   * P959: 拡大した手（48×48、手が中心）を読む。
+   * axisToArm は「手の中心から腕（手首）の方への単位
+   * ベクトル」。腕と反対の方向へ線をずらしながら肌色の
+   * 連なりを数え、2つ以上に分かれる線があれば指が
+   * 開いていると読む。分かれなければ握っているか
+   * 指がくっついている。
+   */
+  public analyzeHand(pixels: Uint8Array, axisToArm: { x: number; y: number }): HandReading | null {
+    const S = OUT;
+    const isSkin = (x: number, y: number) => {
+      if (x < 0 || y < 0 || x >= S || y >= S) return false;
+      const i = (y * S + x) * 4;
+      const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+      return r > 170 && g > 110 && g < 220 && b > 70 && b < 195 && r > g && g >= b - 5 && r - b > 35;
+    };
+    let skinCount = 0;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (isSkin(x, y)) skinCount++;
+    if (skinCount < 30) return null;
+    const away = { x: -axisToArm.x, y: -axisToArm.y };
+    const perp = { x: -away.y, y: away.x };
+    const cx = (S - 1) / 2;
+    const cy = (S - 1) / 2;
+    let maxRuns = 0;
+    for (let d = 3; d <= 21; d += 2) {
+      const lx = cx + away.x * d;
+      const ly = cy + away.y * d;
+      let runs = 0;
+      let inRun = false;
+      for (let t = -17; t <= 17; t++) {
+        const s = isSkin(Math.round(lx + perp.x * t), Math.round(ly + perp.y * t));
+        if (s && !inRun) { runs++; inRun = true; }
+        else if (!s) inRun = false;
+      }
+      if (runs > maxRuns) maxRuns = runs;
+    }
+    const fingersSeparated = maxRuns >= 2;
+    const state = this.load();
+    state.hands++;
+    try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    return {
+      fingersSeparated,
+      maxRuns,
+      description: fingersSeparated ? '指が分かれて見える' : '指は分かれて見えない（握っているか、指がくっついているようだ）',
+    };
   }
 
   /**

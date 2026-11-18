@@ -628,10 +628,40 @@ class ConversationImageObservationService {
         if (people.count >= 2) {
           text = text.replace(
             '具体的な物や文字までは読み取れない。',
-            `人が${people.count}人いるようだ。具体的な物や文字までは読み取れない。`,
+            `人が${people.count}人いるようだ。${people.holdingHands ? '手をつないでいるようだ。' : ''}具体的な物や文字までは読み取れない。`,
           );
         }
       } catch { /* 人数が読めなくても観察は返す */ }
+      // P959: 手を拡大して指の分かれを見る。
+      if (figureMatched && pose953 && pose953.verified && bitmap.full) {
+        try {
+          const { visualZoomService } = await import('./visualZoomService');
+          const handPairs = [
+            { hand: pose953.handL, shoulder: pose953.shoulderL },
+            { hand: pose953.handR, shoulder: pose953.shoulderR },
+          ];
+          for (const { hand, shoulder } of handPairs) {
+            if (!hand || !shoulder) continue;
+            const dx = shoulder.x - hand.x;
+            const dy = shoulder.y - hand.y;
+            const len = Math.hypot(dx, dy);
+            if (len < 0.01) continue;
+            const hz = visualZoomService.cropAnalyze(
+              bitmap.full.rgba, bitmap.full.width, bitmap.full.height,
+              hand.x, hand.y, pose953.head ? pose953.head.r * 3.2 : 0.15,
+            );
+            if (!hz) continue;
+            const hr = visualZoomService.analyzeHand(hz.pixels, { x: dx / len, y: dy / len });
+            if (hr && hr.fingersSeparated) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                '手を拡大して見ると、指が分かれて見える。具体的な物や文字までは読み取れない。',
+              );
+              break;
+            }
+          }
+        } catch { /* 手が読めなくても観察は返す */ }
+      }
       return { text, features, material: hypothesizeMaterial(features), verification, shapeVerification };
     } catch {
       return null;
