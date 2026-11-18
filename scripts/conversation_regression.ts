@@ -7005,6 +7005,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P964 自己点検の記録に髪（visualHair）が入っている', typeof insp964.visualHair === 'number' && insp964.visualHair >= 1, `visualHair=${insp964.visualHair}`);
 }
 
+// ---- P965 爪の第1段 ----
+{
+  const { visualZoomService: vzoom965 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi965 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB965 = [number, number, number];
+  const SKIN965: RGB965 = [232, 190, 160];
+  const hand965 = (nail: RGB965 | null) => {
+    const px: RGB965[] = []; for (let i = 0; i < 48 * 48; i++) px.push([250, 250, 250]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB965) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    rect(14, 24, 34, 42, SKIN965);
+    for (const fx of [12, 19, 26, 33]) {
+      rect(fx, 8, fx + 3, 26, SKIN965);
+      if (nail) rect(fx, 8, fx + 3, 11, nail);
+    }
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const pink965 = vzoom965.analyzeHand(hand965([245, 205, 200]), { x: 0, y: 1 });
+  check('P965 薄いピンクの爪が読める', pink965?.nails.present === true && pink965?.nails.colorLabel === '薄いピンク', `nails=${JSON.stringify(pink965?.nails)}`);
+  const red965 = vzoom965.analyzeHand(hand965([200, 60, 60]), { x: 0, y: 1 });
+  check('P965 赤い爪が読める', red965?.nails.present === true && red965?.nails.colorLabel === '赤い', `nails=${JSON.stringify(red965?.nails)}`);
+  const none965 = vzoom965.analyzeHand(hand965(null), { x: 0, y: 1 });
+  check('P965 爪のない手は爪なしと読める', none965?.nails.present === false, `nails=${JSON.stringify(none965?.nails)}`);
+  const insp965 = ksi965.inspect();
+  check('P965 自己点検の記録に爪（visualNails）が入っている', typeof insp965.visualNails === 'number' && insp965.visualNails >= 1, `visualNails=${insp965.visualNails}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

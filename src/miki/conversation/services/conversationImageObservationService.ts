@@ -678,6 +678,13 @@ class ConversationImageObservationService {
             );
             if (!hz) continue;
             const hr = visualZoomService.analyzeHand(hz.pixels, { x: dx / len, y: dy / len });
+            // P965: 爪が見えたら添える。
+            if (hr && hr.nails.present) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `指先に爪が見える（${hr.nails.colorLabel ?? '色のある'}）。具体的な物や文字までは読み取れない。`,
+              );
+            }
             if (hr && hr.fingersSeparated) {
               text = text.replace(
                 '具体的な物や文字までは読み取れない。',

@@ -30,6 +30,8 @@ export interface HandReading {
   fingersSeparated: boolean;
   maxRuns: number;
   description: string;
+  /** P965: 爪（指先の、肌でも背景でもない色のパッチ） */
+  nails: { present: boolean; colorLabel: string | null };
 }
 
 /** P955: 向きの読み（正面・横向き・後ろ姿） */
@@ -48,15 +50,15 @@ export interface FaceReading {
 }
 
 class VisualZoomService {
-  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number } {
+  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0 };
+    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0 };
   }
 
-  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number } {
+  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number } {
     return this.load();
   }
 
@@ -84,25 +86,73 @@ class VisualZoomService {
     const cx = (S - 1) / 2;
     const cy = (S - 1) / 2;
     let maxRuns = 0;
+    let tipD = 0;
+    let tipCenters: number[] = [];
     for (let d = 3; d <= 21; d += 2) {
       const lx = cx + away.x * d;
       const ly = cy + away.y * d;
       let runs = 0;
       let inRun = false;
+      let runStart = 0;
+      const centers: number[] = [];
       for (let t = -17; t <= 17; t++) {
         const s = isSkin(Math.round(lx + perp.x * t), Math.round(ly + perp.y * t));
-        if (s && !inRun) { runs++; inRun = true; }
-        else if (!s) inRun = false;
+        if (s && !inRun) { runs++; inRun = true; runStart = t; }
+        else if (!s && inRun) { centers.push((runStart + t - 1) / 2); inRun = false; }
       }
+      if (inRun) centers.push((runStart + 17) / 2);
       if (runs > maxRuns) maxRuns = runs;
+      if (centers.length > 0) { tipD = d; tipCenters = centers; }
     }
     const fingersSeparated = maxRuns >= 2;
+
+    // P965: 爪。爪は肌の走査が止まる先端の、少し先にある。
+    // 先端の2〜4先で、肌でも背景でもない色のパッチが
+    // まとまっていれば爪と読む。
+    let nails: HandReading['nails'] = { present: false, colorLabel: null };
+    if (tipD >= 6 && tipCenters.length > 0) {
+      let cr = 0, cg = 0, cb = 0, cn = 0;
+      let found = false;
+      for (const t of tipCenters) {
+        let bestCand = 0;
+        let bsr = 0, bsg = 0, bsb = 0;
+        for (const dN of [tipD + 2, tipD + 4]) {
+          const px0 = Math.round(cx + away.x * dN + perp.x * t);
+          const py0 = Math.round(cy + away.y * dN + perp.y * t);
+          let cand = 0;
+          let sr = 0, sg = 0, sb = 0;
+          for (let yy = py0 - 1; yy <= py0 + 1; yy++) {
+            for (let xx = px0 - 1; xx <= px0 + 1; xx++) {
+              if (xx < 0 || yy < 0 || xx >= S || yy >= S) continue;
+              if (isSkin(xx, yy)) continue;
+              const i = (yy * S + xx) * 4;
+              const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+              if (r > 235 && g > 235 && b > 235) continue;
+              cand++; sr += r; sg += g; sb += b;
+            }
+          }
+          if (cand > bestCand) { bestCand = cand; bsr = sr; bsg = sg; bsb = sb; }
+        }
+        if (bestCand >= 5) { found = true; cr += bsr; cg += bsg; cb += bsb; cn += bestCand; }
+      }
+      if (found && cn > 0) {
+        const r = cr / cn, g = cg / cn, b = cb / cn;
+        const colorLabel = r > 210 && g > 165 && b > 155 && r - g < 60 ? '薄いピンク'
+          : r > 150 && r > g + 50 && r > b + 50 ? '赤い'
+          : r > 200 && g > 200 && b > 200 ? '白っぽい'
+          : r < 110 && g < 110 && b < 110 ? '暗い色の' : '色のある';
+        nails = { present: true, colorLabel };
+      }
+    }
+
     const state = this.load();
     state.hands++;
+    if (nails.present) state.nails++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     return {
       fingersSeparated,
       maxRuns,
+      nails,
       description: fingersSeparated ? '指が分かれて見える' : '指は分かれて見えない（握っているか、指がくっついているようだ）',
     };
   }
