@@ -6750,6 +6750,50 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P957 自己点検の記録に持ち物・重なり（visualExtras）が入っている', typeof insp957.visualExtras === 'number' && insp957.visualExtras >= 1, `visualExtras=${insp957.visualExtras}`);
 }
 
+// ---- P958 複数人と、同じ人の見分け ----
+{
+  const { visualPoseService: vpose958 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi958 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB958 = [number, number, number];
+  const SKIN958: RGB958 = [232, 190, 160];
+  const HAIR958: RGB958 = [45, 32, 22];
+  const BLUE958: RGB958 = [40, 40, 120];
+  const RED958: RGB958 = [170, 40, 40];
+  const GREEN958: RGB958 = [40, 130, 60];
+  const drawPerson958 = (px: RGB958[], W: number, ox: number, oy: number, top: RGB958, bottom: RGB958, armsUp = false) => {
+    const H = px.length / W;
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB958) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB958) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(ox + 12, oy + 7, 6, HAIR958); disc(ox + 12, oy + 8, 5, SKIN958);
+    rect(ox + 6, oy + 13, ox + 18, oy + 30, top);
+    if (armsUp) { rect(ox + 1, oy + 2, ox + 4, oy + 16, top); rect(ox + 20, oy + 2, ox + 23, oy + 16, top); }
+    else { rect(ox + 2, oy + 14, ox + 5, oy + 28, top); rect(ox + 19, oy + 14, ox + 22, oy + 28, top); }
+    rect(ox + 6, oy + 30, ox + 11, oy + 48, bottom); rect(ox + 13, oy + 30, ox + 18, oy + 48, bottom);
+  };
+  const canvas958 = (W: number, H: number) => { const px: RGB958[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]); return px; };
+  const toRgba958 = (px: RGB958[]) => { const o = new Uint8Array(px.length * 4); px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; }); return o; };
+  const two958 = canvas958(96, 60);
+  drawPerson958(two958, 96, 6, 4, BLUE958, BLUE958);
+  drawPerson958(two958, 96, 58, 4, RED958, BLUE958);
+  const people958 = vpose958.analyzePeople(toRgba958(two958), 96, 60);
+  check('P958 離れた2人は2人と数えられる', people958.count === 2, `count=${people958.count}`);
+  const one958 = canvas958(96, 60);
+  drawPerson958(one958, 96, 30, 4, BLUE958, BLUE958);
+  check('P958 1人だけなら1人', vpose958.analyzePeople(toRgba958(one958), 96, 60).count === 1, '');
+  const a958 = canvas958(48, 56); drawPerson958(a958, 48, 10, 2, BLUE958, BLUE958, false);
+  const b958 = canvas958(48, 56); drawPerson958(b958, 48, 10, 2, BLUE958, BLUE958, true);
+  const c958 = canvas958(48, 56); drawPerson958(c958, 48, 10, 2, RED958, GREEN958, false);
+  const ra958 = vpose958.analyzePose(toRgba958(a958), 48, 56);
+  const rb958 = vpose958.analyzePose(toRgba958(b958), 48, 56);
+  const rc958 = vpose958.analyzePose(toRgba958(c958), 48, 56);
+  const same958 = ra958 && rb958 ? vpose958.compareSignatures(vpose958.personSignature(ra958), vpose958.personSignature(rb958)) : null;
+  check('P958 同じ人はポーズが違っても同じ人らしいと分かる', same958?.same === true, `same=${JSON.stringify(same958)}`);
+  const diff958 = ra958 && rc958 ? vpose958.compareSignatures(vpose958.personSignature(ra958), vpose958.personSignature(rc958)) : null;
+  check('P958 色の違う別人とは見分ける', diff958?.same === false, `diff=${JSON.stringify(diff958)}`);
+  const insp958 = ksi958.inspect();
+  check('P958 自己点検の記録に複数人（visualPeople）が入っている', typeof insp958.visualPeople === 'number' && insp958.visualPeople >= 1, `visualPeople=${insp958.visualPeople}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

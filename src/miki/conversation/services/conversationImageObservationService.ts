@@ -620,6 +620,18 @@ class ConversationImageObservationService {
           }
         } catch { /* 拡大できなくても観察は返す */ }
       }
+      // P958: 複数いる場合は人数も添える（輪郭が分かれている
+      // 人だけを数える）。
+      try {
+        const { visualPoseService } = await import('./visualPoseService');
+        const people = visualPoseService.analyzePeople(rgba, width, height);
+        if (people.count >= 2) {
+          text = text.replace(
+            '具体的な物や文字までは読み取れない。',
+            `人が${people.count}人いるようだ。具体的な物や文字までは読み取れない。`,
+          );
+        }
+      } catch { /* 人数が読めなくても観察は返す */ }
       return { text, features, material: hypothesizeMaterial(features), verification, shapeVerification };
     } catch {
       return null;

@@ -93,6 +93,18 @@ export interface PoseClothing {
   bottom: 'flare' | 'split' | 'unknown';
   /** 上下で色が違うか（測れなければ null） */
   twoPiece: boolean | null;
+  /** P958: 上着と下半身の色の名前（個体識別の署名に使う） */
+  topColor: string | null;
+  bottomColor: string | null;
+}
+
+/** P958: 人の特徴署名（同じ人かどうかの見分けに使う） */
+export interface PersonSignature {
+  build: string | null;
+  topColor: string | null;
+  bottomColor: string | null;
+  hairColor: string | null;
+  shoulderRatio: number | null;
 }
 
 export interface PoseReading {
@@ -117,6 +129,8 @@ export interface PoseReading {
   /** P957: 持ち物と重なり */
   extras: PoseExtras;
   extrasDescription: string;
+  /** P958: 髪の色の名前（頭の肌色でない部分の最頻色） */
+  hairColor: string | null;
   verified: boolean;
   fit: number;
 }
@@ -166,16 +180,127 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number } {
     return this.load();
+  }
+
+  /** P958: 姿勢読みから特徴署名を作る */
+  public personSignature(reading: PoseReading): PersonSignature {
+    return {
+      build: reading.build?.label ?? null,
+      topColor: reading.clothing.topColor,
+      bottomColor: reading.clothing.bottomColor,
+      hairColor: reading.hairColor,
+      shoulderRatio: reading.build?.shoulderRatio ?? null,
+    };
+  }
+
+  /** P958: 署名同士を比べて、同じ人らしいかを返す */
+  public compareSignatures(a: PersonSignature, b: PersonSignature): { score: number; same: boolean; compared: number } {
+    const items: Array<{ w: number; hit: number | null }> = [];
+    const colorHit = (x: string | null, y: string | null) => (x && y ? (x === y ? 1 : 0) : null);
+    items.push({ w: 0.3, hit: colorHit(a.topColor, b.topColor) });
+    items.push({ w: 0.25, hit: colorHit(a.bottomColor, b.bottomColor) });
+    items.push({ w: 0.2, hit: colorHit(a.hairColor, b.hairColor) });
+    items.push({ w: 0.15, hit: a.build && b.build ? (a.build === b.build ? 1 : 0) : null });
+    items.push({
+      w: 0.1,
+      hit: a.shoulderRatio !== null && b.shoulderRatio !== null
+        ? (Math.abs(a.shoulderRatio - b.shoulderRatio) <= 0.05 ? 1 : Math.abs(a.shoulderRatio - b.shoulderRatio) <= 0.1 ? 0.5 : 0)
+        : null,
+    });
+    let wSum = 0;
+    let score = 0;
+    let compared = 0;
+    for (const it of items) {
+      if (it.hit === null) continue;
+      wSum += it.w;
+      score += it.w * it.hit;
+      compared++;
+    }
+    const norm = wSum > 0 ? score / wSum : 0;
+    return { score: norm, same: compared >= 3 && norm >= 0.75, compared };
+  }
+
+  /**
+   * P958: 複数人を読む。輪郭の連結成分ごとに切り分けて、
+   * それぞれに姿勢読みをかける。重なって輪郭がくっついた
+   * 人は分けられない（その場合は1人として読まれる）。
+   */
+  public analyzePeople(rgba: Uint8Array | number[], width: number, height: number): { count: number; readings: PoseReading[] } {
+    const mask = buildMask(rgba, width, height);
+    if (!mask) return { count: 0, readings: [] };
+    const label = new Int32Array(width * height).fill(-1);
+    const comps: Array<{ id: number; area: number; x0: number; y0: number; x1: number; y1: number }> = [];
+    const stack: number[] = [];
+    for (let s = 0; s < width * height; s++) {
+      if (!mask[s] || label[s] >= 0) continue;
+      const id = comps.length;
+      let area = 0;
+      let x0 = width, y0 = height, x1 = -1, y1 = -1;
+      stack.push(s);
+      label[s] = id;
+      while (stack.length) {
+        const p = stack.pop() as number;
+        const x = p % width;
+        const y = Math.floor(p / width);
+        area++;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+        const nb = [p - 1, p + 1, p - width, p + width];
+        for (const q of nb) {
+          if (q < 0 || q >= width * height || !mask[q] || label[q] >= 0) continue;
+          if (Math.abs((q % width) - x) > 1) continue;
+          label[q] = id;
+          stack.push(q);
+        }
+      }
+      comps.push({ id, area, x0, y0, x1, y1 });
+    }
+    const bg: [number, number, number] = [rgba[0], rgba[1], rgba[2]];
+    const readings: PoseReading[] = [];
+    for (const c of comps) {
+      if (c.area < width * height * 0.03) continue;
+      const bw = c.x1 - c.x0 + 1;
+      const bh = c.y1 - c.y0 + 1;
+      if (bh < height * 0.15) continue;
+      // 背景色で余白を足してから切り出す。余白が無いと、
+      // 服の色が画面の最頻色になって「背景」と誤判定され、
+      // 輪郭が反転して読めなくなるため。
+      const pad = Math.max(4, Math.round(Math.min(bw, bh) * 0.25));
+      const sw = bw + pad * 2;
+      const sh = bh + pad * 2;
+      const sub = new Uint8Array(sw * sh * 4);
+      for (let i = 0; i < sw * sh; i++) {
+        sub[i * 4] = bg[0]; sub[i * 4 + 1] = bg[1]; sub[i * 4 + 2] = bg[2]; sub[i * 4 + 3] = 255;
+      }
+      for (let y = 0; y < bh; y++) {
+        for (let x = 0; x < bw; x++) {
+          const sp = (c.y0 + y) * width + (c.x0 + x);
+          if (label[sp] !== c.id) continue;
+          const di = ((y + pad) * sw + (x + pad)) * 4;
+          sub[di] = rgba[sp * 4]; sub[di + 1] = rgba[sp * 4 + 1]; sub[di + 2] = rgba[sp * 4 + 2]; sub[di + 3] = 255;
+        }
+      }
+      const reading = this.analyzePose(sub, sw, sh);
+      if (reading && reading.verified) readings.push(reading);
+    }
+    if (readings.length >= 2) {
+      const state = this.load();
+      state.multi++;
+      try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    }
+    return { count: readings.length, readings };
   }
 
   /** 画像から姿勢を読む。人らしい輪郭でなければ null。 */
@@ -506,7 +631,7 @@ class VisualPoseService {
     }
     // P956: 服の形。下半身の広がり（股の分かれが無く、腰から
     // 裾へ広がるならスカート状）と、上下の色の違いを読む。
-    let clothing: PoseClothing = { bottom: 'unknown', twoPiece: null };
+    let clothing: PoseClothing = { bottom: 'unknown', twoPiece: null, topColor: null, bottomColor: null };
     {
       const rowWidth = (y: number) => {
         const s = rows[y]?.spans;
@@ -528,27 +653,36 @@ class VisualPoseService {
         if (waistW > 0 && flareW > waistW * 1.12) bottom = 'flare';
         else if (crotchY > 0) bottom = 'split';
       }
-      const bandMode = (y0: number, y1: number): string | null => {
-        const counts = new Map<string, number>();
+      const bandMode = (y0: number, y1: number): { key: string; name: string } | null => {
+        const counts = new Map<string, { n: number; r: number; g: number; b: number }>();
         let total = 0;
         for (let y = Math.max(0, y0); y <= Math.min(height - 1, y1); y++) {
           for (let x = 0; x < width; x += 2) {
             if (!mask[y * width + x]) continue;
             const i = (y * width + x) * 4;
             const k = `${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}`;
-            counts.set(k, (counts.get(k) || 0) + 1);
+            const cur = counts.get(k) || { n: 0, r: 0, g: 0, b: 0 };
+            cur.n++;
+            cur.r += rgba[i]; cur.g += rgba[i + 1]; cur.b += rgba[i + 2];
+            counts.set(k, cur);
             total++;
           }
         }
         if (total < 20) return null;
-        let best: string | null = null;
-        let bestN = 0;
-        for (const [k, n] of counts) if (n > bestN) { best = k; bestN = n; }
-        return best;
+        let bestKey: string | null = null;
+        let best: { n: number; r: number; g: number; b: number } | null = null;
+        for (const [k, v] of counts) if (!best || v.n > best.n) { best = v; bestKey = k; }
+        if (!best || !bestKey) return null;
+        return { key: bestKey, name: nearestExtraColor(best.r / best.n, best.g / best.n, best.b / best.n).name };
       };
-      const topColor = bandMode(Math.ceil(neckY), Math.floor(hipRef));
-      const bottomColor = bandMode(Math.ceil(hipRef + figH * 0.08), figBottom);
-      clothing = { bottom, twoPiece: topColor && bottomColor ? topColor !== bottomColor : null };
+      const topBand = bandMode(Math.ceil(neckY), Math.floor(hipRef));
+      const bottomBand = bandMode(Math.ceil(hipRef + figH * 0.08), figBottom);
+      clothing = {
+        bottom,
+        twoPiece: topBand && bottomBand ? topBand.key !== bottomBand.key : null,
+        topColor: topBand?.name ?? null,
+        bottomColor: bottomBand?.name ?? null,
+      };
     }
     const clothingParts: string[] = [];
     if (clothing.bottom === 'flare') clothingParts.push('下半身はスカートのように広がっている');
@@ -556,6 +690,31 @@ class VisualPoseService {
     if (clothing.twoPiece === true) clothingParts.push('服は上下で色が違う');
     else if (clothing.twoPiece === false && clothing.bottom !== 'unknown') clothingParts.push('服は上下が同じ色');
     const clothingDescription = clothingParts.length ? clothingParts.join('。') + '。' : '';
+
+    // P958: 髪の色。頭の範囲で、肌色でない前景の最頻色。
+    let hairColor: string | null = null;
+    {
+      const groups = new Map<string, { n: number; r: number; g: number; b: number }>();
+      const hr = headR * 1.25;
+      for (let y = Math.max(0, Math.floor(headCy - hr)); y <= Math.min(height - 1, Math.ceil(headCy + hr)); y++) {
+        for (let x = Math.max(0, Math.floor(headCx - hr)); x <= Math.min(width - 1, Math.ceil(headCx + hr)); x++) {
+          if ((x - headCx) ** 2 + (y - headCy) ** 2 > hr * hr) continue;
+          const p = y * width + x;
+          if (!mask[p]) continue;
+          const i = p * 4;
+          const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+          if (r > 170 && g > 110 && g < 220 && b > 70 && b < 195 && r > g && g >= b - 5 && r - b > 35) continue;
+          const k = `${r >> 6},${g >> 6},${b >> 6}`;
+          const cur = groups.get(k) || { n: 0, r: 0, g: 0, b: 0 };
+          cur.n++;
+          cur.r += r; cur.g += g; cur.b += b;
+          groups.set(k, cur);
+        }
+      }
+      let bestH: { n: number; r: number; g: number; b: number } | null = null;
+      for (const v of groups.values()) if (!bestH || v.n > bestH.n) bestH = v;
+      if (bestH && bestH.n >= 10) hairColor = nearestExtraColor(bestH.r / bestH.n, bestH.g / bestH.n, bestH.b / bestH.n).name;
+    }
 
     // P957: 持ち物と重なり。体の最頻色（服）と肌色を除いて、
     // 手の周りや体の前にまとまった別の色があれば、それは
@@ -653,6 +812,7 @@ class VisualPoseService {
       clothingDescription,
       extras,
       extrasDescription,
+      hairColor,
       verified,
       fit,
     };
