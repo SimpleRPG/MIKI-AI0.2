@@ -7538,6 +7538,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P984 自己点検の記録に首（visualNeck）が入っている', typeof insp984.visualNeck === 'number' && insp984.visualNeck >= 1, `visualNeck=${insp984.visualNeck}`);
 }
 
+// ---- P985 生え際の形の第1段 ----
+{
+  const { visualZoomService: vzoom985 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi985 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB985 = [number, number, number];
+  const SKIN985: RGB985 = [232, 190, 160];
+  const HAIR985: RGB985 = [45, 32, 22];
+  const DARK985: RGB985 = [30, 30, 30];
+  const mk985 = () => { const px: RGB985[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]); return px; };
+  const fin985 = (px: RGB985[]) => { const o = new Uint8Array(48 * 48 * 4); px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; }); return o; };
+  const rect985 = (px: RGB985[], x0: number, y0: number, x1: number, y1: number, c: RGB985) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+  const eyes985 = (px: RGB985[]) => { const disc = (cx: number, cy: number, r: number, c: RGB985) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; }; disc(17, 24, 3, DARK985); disc(31, 24, 3, DARK985); };
+  const straightPx = mk985();
+  rect985(straightPx, 8, 4, 40, 15, HAIR985); rect985(straightPx, 10, 16, 38, 44, SKIN985); eyes985(straightPx);
+  const straight985 = vzoom985.analyzeFace(fin985(straightPx));
+  check('P985 平らな生え際はまっすぐと読める', straight985?.hairline === 'straight' && straight985.hairlineDescription === '生え際はまっすぐ', `hairline=${straight985?.hairline}`);
+  const mPx = mk985();
+  rect985(mPx, 8, 4, 40, 15, HAIR985); rect985(mPx, 10, 16, 38, 44, SKIN985);
+  rect985(mPx, 10, 10, 16, 16, SKIN985); rect985(mPx, 32, 10, 38, 16, SKIN985); eyes985(mPx);
+  const m985 = vzoom985.analyzeFace(fin985(mPx));
+  check('P985 両脇で肌が上がる生え際はM字型と読める', m985?.hairline === 'm-shaped', `hairline=${m985?.hairline}`);
+  const roundPx = mk985();
+  const disc985 = (cx: number, cy: number, r: number, c: RGB985) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) roundPx[y * 48 + x] = c; };
+  disc985(24, 20, 16, HAIR985); disc985(24, 24, 16, SKIN985); disc985(17, 20, 3, DARK985); disc985(31, 20, 3, DARK985);
+  const round985 = vzoom985.analyzeFace(fin985(roundPx));
+  check('P985 円盤の顔の生え際は丸いと読める', round985?.hairline === 'round', `hairline=${round985?.hairline}`);
+  const insp985 = ksi985.inspect();
+  check('P985 自己点検の記録に生え際（visualHairline）が入っている', typeof insp985.visualHairline === 'number' && insp985.visualHairline >= 1, `visualHairline=${insp985.visualHairline}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
