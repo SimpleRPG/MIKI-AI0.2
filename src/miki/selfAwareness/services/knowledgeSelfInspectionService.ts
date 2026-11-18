@@ -115,6 +115,7 @@ export interface KnowledgeSelfInspectionRecord {
   videoScenes: number;
   videoMotions: number;
   visualPoses: number;
+  visualPoseMotions: number;
   findings: string[];
 }
 
@@ -336,6 +337,7 @@ class KnowledgeSelfInspectionService {
     let videoScenes = 0;
     let videoMotions = 0;
     let visualPoses = 0;
+    let visualPoseMotions = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -495,6 +497,11 @@ class KnowledgeSelfInspectionService {
       if (visualPoses > 0) {
         findings.push(`姿勢を${visualPoses}件読んだ`);
       }
+      // P952: 関節軌跡から動作を読んだ回数。
+      visualPoseMotions = visualPoseService.summary().motions;
+      if (visualPoseMotions > 0) {
+        findings.push(`姿勢の動きを${visualPoseMotions}件読んだ`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -561,6 +568,7 @@ class KnowledgeSelfInspectionService {
       videoScenes,
       videoMotions,
       visualPoses,
+      visualPoseMotions,
       findings,
     };
 

@@ -58,7 +58,12 @@ class VisualFigureService {
       for (const body of regions) {
         if (body === head) continue;
         if (head.share >= body.share) continue;
-        if (bottom(head) > top(body) + 0.04) continue; // 頭は体の上
+        // 頭は体の上。ただし腕を上げた姿勢では体の領域の
+        // 上端が手になって頭より上へ出るため、上端でなく
+        // 「頭の重心が体の重心より十分に上」でも認める。
+        const headAbove = bottom(head) <= top(body) + 0.04
+          || head.centroidY < body.centroidY - body.bboxHeight * 0.2;
+        if (!headAbove) continue;
         if (body.bboxHeight < body.bboxWidth * 0.8) continue; // 立っている体は縦長寄り
         const dx = Math.abs(head.centroidX - body.centroidX);
         if (dx > body.bboxWidth * 0.6 + 0.02) continue; // 左右のずれが小さい

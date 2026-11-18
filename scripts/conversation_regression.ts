@@ -6509,6 +6509,69 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P951 肌の島から顔と両手を確認できる', skin951?.skinCues.face === true && skin951?.skinCues.handL === true && skin951?.skinCues.handR === true && skin951?.verified === true, `skin=${JSON.stringify(skin951?.skinCues)}`);
 }
 
+// ---- P952 姿勢・第2段b（関節軌跡で動作を読む） ----
+{
+  const { visualPoseService: vpose952 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi952 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const W952 = 48, H952 = 48;
+  type RGB952 = [number, number, number];
+  const BG952: RGB952 = [245, 245, 245];
+  const G952: RGB952 = [60, 60, 60];
+  const frames952 = (paint: (px: (x: number, y: number, c: RGB952) => void, i: number) => void) => {
+    const frames: { rgba: Uint8Array; width: number; height: number; t: number }[] = [];
+    for (let i = 0; i < 10; i++) {
+      const a = new Uint8Array(W952 * H952 * 4);
+      for (let k = 0; k < W952 * H952; k++) { a[k * 4] = BG952[0]; a[k * 4 + 1] = BG952[1]; a[k * 4 + 2] = BG952[2]; a[k * 4 + 3] = 255; }
+      const set = (x: number, y: number, c: RGB952) => { if (x < 0 || y < 0 || x >= W952 || y >= H952) return; const j = (y * W952 + x) * 4; a[j] = c[0]; a[j + 1] = c[1]; a[j + 2] = c[2]; };
+      paint(set, i);
+      frames.push({ rgba: a, width: W952, height: H952, t: i * 100 });
+    }
+    return vpose952.analyzePoseMotion(frames);
+  };
+  const disc952 = (set: (x: number, y: number, c: RGB952) => void, cx: number, cy: number, r: number) => { for (let y = 0; y < H952; y++) for (let x = 0; x < W952; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) set(x, y, G952); };
+  const rect952 = (set: (x: number, y: number, c: RGB952) => void, x0: number, x1: number, y0: number, y1: number) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, G952); };
+  const seg952 = (set: (x: number, y: number, c: RGB952) => void, x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = 0; y < H952; y++) for (let x = 0; x < W952; x++) {
+      const dx = x1 - x0, dy = y1 - y0; const len2 = dx * dx + dy * dy || 1;
+      let t = ((x - x0) * dx + (y - y0) * dy) / len2; t = Math.max(0, Math.min(1, t));
+      if ((x - (x0 + t * dx)) ** 2 + (y - (y0 + t * dy)) ** 2 <= 1.6 * 1.6) set(x, y, G952);
+    }
+  };
+  const base952 = (set: (x: number, y: number, c: RGB952) => void, off = 0) => {
+    disc952(set, 24, 10 + off, 4); rect952(set, 20, 28, 18 + off, 34 + off);
+    rect952(set, 20, 23, 34 + off, 44 + off); rect952(set, 25, 28, 34 + off, 44 + off);
+  };
+  const swing952 = frames952((set, i) => {
+    base952(set); rect952(set, 17, 19, 18, 32);
+    const th = 0.55 * Math.sin(2 * Math.PI * i / 5);
+    seg952(set, 29, 20, 29 + 13 * Math.sin(th), 20 + 13 * Math.cos(th));
+  });
+  check('P952 右腕を振る動きを関節軌跡から読める', swing952?.handSwingR === true && swing952?.description.includes('右腕を振っている'), `swing=${JSON.stringify(swing952 && { d: swing952.description })}`);
+  const wave952 = frames952((set, i) => {
+    base952(set); rect952(set, 17, 19, 18, 32);
+    seg952(set, 29, 20, 36 + 3 * Math.sin(2 * Math.PI * i / 4), 5);
+  });
+  check('P952 頭の上で右手を振る動きを読める', wave952?.wavingR === true && wave952?.description.includes('右手を振っている'), `wave=${JSON.stringify(wave952 && { d: wave952.description })}`);
+  const walk952 = frames952((set, i) => {
+    disc952(set, 24, 10, 4); rect952(set, 20, 28, 18, 34);
+    rect952(set, 17, 19, 18, 32); rect952(set, 29, 31, 18, 32);
+    const s = Math.sin(2 * Math.PI * i / 4);
+    seg952(set, 22, 34, 21 + 5 * s, 44); seg952(set, 26, 34, 27 - 5 * s, 44);
+  });
+  check('P952 歩く脚の動きを読める', walk952?.walking === true, `walk=${JSON.stringify(walk952 && { d: walk952.description })}`);
+  const jump952 = frames952((set, i) => {
+    const off = (i === 3 || i === 4) ? -5 : (i === 2 || i === 5) ? -3 : 0;
+    base952(set, off); rect952(set, 17, 19, 18 + off, 32 + off); rect952(set, 29, 31, 18 + off, 32 + off);
+  });
+  check('P952 跳ぶ動きを足の離地から読める', jump952?.jumping === true, `jump=${JSON.stringify(jump952 && { d: jump952.description })}`);
+  const still952 = frames952((set) => {
+    base952(set); rect952(set, 17, 19, 18, 32); rect952(set, 29, 31, 18, 32);
+  });
+  check('P952 静止した人には大きな動きを読まない', still952 !== null && !still952.walking && !still952.jumping && !still952.handSwingR && still952.description.includes('大きな動きは見られない'), `still=${JSON.stringify(still952 && { d: still952.description })}`);
+  const insp952 = ksi952.inspect();
+  check('P952 自己点検の記録に姿勢の動き（visualPoseMotions）が入っている', typeof insp952.visualPoseMotions === 'number' && insp952.visualPoseMotions >= 5, `visualPoseMotions=${insp952.visualPoseMotions}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

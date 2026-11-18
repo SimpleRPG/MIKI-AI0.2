@@ -4,6 +4,7 @@ import {
   type ImagePixelFeatures,
 } from './conversationImageObservationService';
 import { visualFigureService } from './visualFigureService';
+import { motionPatternService, type MotionSample } from '../../selfAwareness/services/motionPatternService';
 
 /**
  * P950: 姿勢・第1段「関節で姿勢を読む」。
@@ -40,6 +41,19 @@ export interface PoseBuild {
   legThickness: number | null;
   /** 足首 ÷ 太もも（関節の細り） */
   ankleRatio: number | null;
+}
+
+export interface PoseMotionReading {
+  frames: number;
+  readFrames: number;
+  verifiedFrames: number;
+  description: string;
+  handSwingL: boolean;
+  handSwingR: boolean;
+  wavingL: boolean;
+  wavingR: boolean;
+  walking: boolean;
+  jumping: boolean;
 }
 
 export interface PoseReading {
@@ -107,15 +121,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number } {
+  private load(): { analyzed: number; verified: number; motions: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0 };
+    return { analyzed: 0, verified: 0, motions: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number } {
+  public summary(): { analyzed: number; verified: number; motions: number } {
     return this.load();
   }
 
@@ -470,6 +484,123 @@ class VisualPoseService {
       skinCues,
       verified,
       fit,
+    };
+  }
+
+  /**
+   * P952: 姿勢・第2段b「関節軌跡で動作を読む」。
+   * フレーム列に姿勢読みをかけ、関節の軌跡から動作を
+   * 記述する。手の軌跡は P941 の動きの測定（measure）に
+   * 通し、周期と振幅で「振っている」を判定する。歩行は
+   * 両足の間隔の符号変化、跳躍は足が地面から離れる量で
+   * 読む。読みが照合を通ったフレームが半分未満なら、
+   * 動作は読めないとして null を返す（正直さ）。
+   */
+  public analyzePoseMotion(
+    frames: { rgba: Uint8Array | number[]; width: number; height: number; t: number }[],
+  ): PoseMotionReading | null {
+    if (frames.length < 3) return null;
+    const readings: (PoseReading | null)[] = frames.map((f) => this.analyzePose(f.rgba, f.width, f.height));
+    const valid = readings.filter((r): r is PoseReading => r !== null);
+    if (valid.length < 3) return null;
+    const verifiedFrames = valid.filter((r) => r.verified).length;
+    if (verifiedFrames < valid.length / 2) return null;
+
+    const traj = (pick: (r: PoseReading) => PosePoint | null): MotionSample[] => {
+      const out: MotionSample[] = [];
+      readings.forEach((r, i) => {
+        if (!r) return;
+        const p = pick(r);
+        if (p) out.push({ t: frames[i].t, x: p.x, y: p.y });
+      });
+      return out;
+    };
+    const headTraj = traj((r) => r.head);
+    const handLTraj = traj((r) => r.handL);
+    const handRTraj = traj((r) => r.handR);
+    const headY = headTraj.length ? headTraj.reduce((a, s) => a + s.y, 0) / headTraj.length : 0;
+
+    const dirChanges = (vals: number[]) => {
+      let changes = 0;
+      let prev = 0;
+      for (let i = 1; i < vals.length; i++) {
+        const d = vals[i] - vals[i - 1];
+        const s = d > 0.004 ? 1 : d < -0.004 ? -1 : 0;
+        if (s !== 0 && prev !== 0 && s !== prev) changes++;
+        if (s !== 0) prev = s;
+      }
+      return changes;
+    };
+    const isOscillating = (samples: MotionSample[]) => {
+      if (samples.length < 4) return false;
+      const f = motionPatternService.measure(samples);
+      if (!f || Math.max(f.rangeX, f.rangeY) < 0.06) return false;
+      return dirChanges(samples.map((s) => s.x)) >= 2 || dirChanges(samples.map((s) => s.y)) >= 2;
+    };
+    const waving = (samples: MotionSample[]) => {
+      if (samples.length < 4) return false;
+      const above = samples.filter((s) => s.y < headY).length / samples.length;
+      if (above < 0.6) return false;
+      const f = motionPatternService.measure(samples);
+      return !!f && f.rangeX >= 0.04 && dirChanges(samples.map((s) => s.x)) >= 2;
+    };
+    const wavingL = waving(handLTraj);
+    const wavingR = waving(handRTraj);
+    const handSwingL = !wavingL && !!isOscillating(handLTraj);
+    const handSwingR = !wavingR && !!isOscillating(handRTraj);
+
+    // 跳躍：両足のうち低い方（画面の下側）が、地面の位置
+    // からどれだけ離れるか。
+    let jumping = false;
+    {
+      const lows: number[] = [];
+      for (const r of valid) {
+        const feet = [r.footL, r.footR].filter((p): p is PosePoint => p !== null);
+        if (feet.length) lows.push(Math.max(...feet.map((p) => p.y)));
+      }
+      if (lows.length >= 3) {
+        const ground = Math.max(...lows);
+        const lift = ground - Math.min(...lows);
+        jumping = lift >= 0.06;
+      }
+    }
+    // 歩行：両足の間隔が開閉を繰り返す（脚の前後の交代。
+    // 足の左右は画像の位置で付けられるため、符号ではなく
+    // 間隔の大きさの振動で読む）。
+    let walking = false;
+    {
+      const seps: MotionSample[] = [];
+      readings.forEach((r, i) => {
+        if (r?.footL && r?.footR) seps.push({ t: frames[i].t, x: Math.abs(r.footR.x - r.footL.x), y: 0 });
+      });
+      if (seps.length >= 4) {
+        const f = motionPatternService.measure(seps);
+        walking = !!f && f.rangeX >= 0.08 && dirChanges(seps.map((s) => s.x)) >= 2 && !jumping;
+      }
+    }
+    const headFeat = headTraj.length >= 4 ? motionPatternService.measure(headTraj) : null;
+    const bodySway = !!headFeat && headFeat.kind === 'SWAY' && headFeat.rangeX >= 0.03 && !walking;
+
+    const parts: string[] = [];
+    if (jumping) parts.push('跳んでいる（足が地面から離れる）');
+    if (walking) parts.push('歩いているような脚の動きをしている');
+    if (wavingL) parts.push('左手を振っている');
+    if (wavingR) parts.push('右手を振っている');
+    if (handSwingL) parts.push('左腕を振っている');
+    if (handSwingR) parts.push('右腕を振っている');
+    if (bodySway) parts.push('上体が左右に揺れている');
+    const description = (parts.length ? parts.join('。') : '大きな動きは見られない') + '。';
+
+    const state = this.load();
+    state.motions = (state.motions || 0) + 1;
+    try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+
+    return {
+      frames: frames.length,
+      readFrames: valid.length,
+      verifiedFrames,
+      description,
+      handSwingL, handSwingR, wavingL, wavingR, walking, jumping,
     };
   }
 
