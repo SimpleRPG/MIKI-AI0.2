@@ -6885,6 +6885,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P960 自己点検の記録に裸の状態（visualBare）が入っている', typeof insp960.visualBare === 'number' && insp960.visualBare >= 1, `visualBare=${insp960.visualBare}`);
 }
 
+// ---- P961 真似の第1段 ----
+{
+  const { visualPoseService: vpose961 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi961 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB961 = [number, number, number];
+  const SKIN961: RGB961 = [232, 190, 160];
+  const HAIR961: RGB961 = [45, 32, 22];
+  const BLUE961: RGB961 = [40, 40, 120];
+  const px961: RGB961[] = []; for (let i = 0; i < 48 * 56; i++) px961.push([245, 245, 245]);
+  const rect961 = (x0: number, y0: number, x1: number, y1: number, c: RGB961) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px961[y * 48 + x] = c; };
+  const disc961 = (cx: number, cy: number, r: number, c: RGB961) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px961[y * 48 + x] = c; };
+  disc961(22, 9, 6, HAIR961); disc961(22, 10, 5, SKIN961);
+  rect961(16, 15, 28, 32, BLUE961);
+  rect961(12, 16, 15, 30, BLUE961); rect961(29, 16, 32, 30, BLUE961);
+  rect961(16, 32, 21, 50, BLUE961); rect961(23, 32, 28, 50, BLUE961);
+  const rgba961 = new Uint8Array(48 * 56 * 4);
+  px961.forEach((c, i) => { rgba961[i * 4] = c[0]; rgba961[i * 4 + 1] = c[1]; rgba961[i * 4 + 2] = c[2]; rgba961[i * 4 + 3] = 255; });
+  const pose961 = vpose961.analyzePose(rgba961, 48, 56);
+  const im961 = pose961 ? vpose961.imitatePose(pose961) : null;
+  check('P961 読んだ姿勢を描き直して読み直すと関節が一致する', !!im961 && im961.verified && im961.score >= 0.7, `score=${im961?.score.toFixed(2)} verified=${im961?.verified}`);
+  const insp961 = ksi961.inspect();
+  check('P961 自己点検の記録に真似（visualImitations）が入っている', typeof insp961.visualImitations === 'number' && insp961.visualImitations >= 1, `visualImitations=${insp961.visualImitations}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

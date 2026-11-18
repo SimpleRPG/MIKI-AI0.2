@@ -186,16 +186,86 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number } {
     return this.load();
+  }
+
+  /**
+   * P961: 真似の第1段。姿勢読みの関節から棒人間を描き直し、
+   * 描いた側を読み直して関節のずれで照合する。アバターの
+   * 関節駆動の土台（測る→描く→測って比べる、の「描く」）。
+   */
+  public imitatePose(reading: PoseReading, size = 64): { score: number; verified: boolean; image: Uint8Array; size: number } | null {
+    if (!reading.head) return null;
+    const S = size;
+    const px: Array<[number, number, number]> = [];
+    for (let i = 0; i < S * S; i++) px.push([245, 245, 245]);
+    const BODY: [number, number, number] = [40, 40, 120];
+    const SKIN: [number, number, number] = [232, 190, 160];
+    const stamp = (cx: number, cy: number, r: number, c: [number, number, number]) => {
+      for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(S - 1, Math.ceil(cy + r)); y++) {
+        for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(S - 1, Math.ceil(cx + r)); x++) {
+          if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * S + x] = c;
+        }
+      }
+    };
+    const seg = (a: { x: number; y: number } | null, b: { x: number; y: number } | null, c: [number, number, number]) => {
+      if (!a || !b) return;
+      const ax = a.x * (S - 1), ay = a.y * (S - 1), bx = b.x * (S - 1), by = b.y * (S - 1);
+      const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay)));
+      for (let i = 0; i <= steps; i++) stamp(ax + (bx - ax) * (i / steps), ay + (by - ay) * (i / steps), 1.6, c);
+    };
+    const head = reading.head;
+    stamp(head.x * (S - 1), head.y * (S - 1), Math.max(2, head.r * S), SKIN);
+    const neck = reading.shoulderL && reading.shoulderR
+      ? { x: (reading.shoulderL.x + reading.shoulderR.x) / 2, y: (reading.shoulderL.y + reading.shoulderR.y) / 2 }
+      : { x: head.x, y: head.y + head.r };
+    const footMid = reading.footL && reading.footR
+      ? { x: (reading.footL.x + reading.footR.x) / 2, y: (reading.footL.y + reading.footR.y) / 2 }
+      : null;
+    const hipC = footMid ? { x: neck.x + (footMid.x - neck.x) * 0.2, y: neck.y + (footMid.y - neck.y) * 0.45 } : null;
+    seg(neck, reading.shoulderL, BODY);
+    seg(neck, reading.shoulderR, BODY);
+    seg(reading.shoulderL, reading.handL, BODY);
+    seg(reading.shoulderR, reading.handR, BODY);
+    seg(neck, hipC, BODY);
+    seg(hipC, reading.footL, BODY);
+    seg(hipC, reading.footR, BODY);
+    const image = new Uint8Array(S * S * 4);
+    px.forEach((c, i) => { image[i * 4] = c[0]; image[i * 4 + 1] = c[1]; image[i * 4 + 2] = c[2]; image[i * 4 + 3] = 255; });
+    const re = this.analyzePose(image, S, S);
+    let score = 0;
+    let verified = false;
+    if (re) {
+      const pairs: Array<[{ x: number; y: number } | null, { x: number; y: number } | null]> = [
+        [reading.head, re.head], [reading.handL, re.handL], [reading.handR, re.handR],
+        [reading.footL, re.footL], [reading.footR, re.footR],
+      ];
+      let sum = 0;
+      let n = 0;
+      for (const [a, b] of pairs) {
+        if (!a || !b) continue;
+        sum += Math.hypot(a.x - b.x, a.y - b.y);
+        n++;
+      }
+      if (n >= 3) {
+        score = Math.max(0, 1 - (sum / n) / 0.25);
+        verified = re.verified && score >= 0.7 && re.posture === reading.posture;
+      }
+    }
+    const state = this.load();
+    state.imitations++;
+    if (verified) state.imitationsOk++;
+    try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    return { score, verified, image, size: S };
   }
 
   /** P958: 姿勢読みから特徴署名を作る */

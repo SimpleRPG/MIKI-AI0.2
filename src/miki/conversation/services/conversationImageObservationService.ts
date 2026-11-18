@@ -566,6 +566,11 @@ class ConversationImageObservationService {
                 `${pose953.extrasDescription}具体的な物や文字までは読み取れない。`,
               );
             }
+            // P961: 読めた姿勢は真似て描き直し、読み直して
+            // 照合する（真似の練習。本文には出さない）。
+            if (pose953.verified) {
+              try { visualPoseService.imitatePose(pose953); } catch { /* 真似に失敗しても観察は返す */ }
+            }
           }
         } catch { /* 姿勢が読めなくても観察は返す */ }
       }
