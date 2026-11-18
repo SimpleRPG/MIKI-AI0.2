@@ -159,6 +159,11 @@ export interface KnowledgeSelfInspectionRecord {
   visualCurvedBodies: number;
   visualOutlinedBodies: number;
   visualDrawnEyes: number;
+  visualMaskFill: number;
+  visualCelBodies: number;
+  visualHairDetails: number;
+  visualBusts: number;
+  visualDrills: number;
   findings: string[];
 }
 
@@ -423,6 +428,11 @@ class KnowledgeSelfInspectionService {
     let visualCurvedBodies = 0;
     let visualOutlinedBodies = 0;
     let visualDrawnEyes = 0;
+    let visualMaskFill = 0;
+    let visualCelBodies = 0;
+    let visualHairDetails = 0;
+    let visualBusts = 0;
+    let visualDrills = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -751,6 +761,31 @@ class KnowledgeSelfInspectionService {
       if (visualDrawnEyes > 0) {
         findings.push(`目を部品として描いて${visualDrawnEyes}件照合できた`);
       }
+      // P1001: 線で囲む取り方で輪郭を取った回数。
+      visualMaskFill = visualPoseService.summary().maskFill;
+      if (visualMaskFill > 0) {
+        findings.push(`線で囲んで輪郭を${visualMaskFill}件取った`);
+      }
+      // P1001: 2段陰影で描いて照合できた回数。
+      visualCelBodies = visualPoseService.summary().celOk;
+      if (visualCelBodies > 0) {
+        findings.push(`2段の影で素体を描いて${visualCelBodies}件照合できた`);
+      }
+      // P1001: 髪の房とツヤを描いて照合できた回数。
+      visualHairDetails = visualPoseService.summary().hairDetailOk;
+      if (visualHairDetails > 0) {
+        findings.push(`髪の房とツヤを描いて${visualHairDetails}件照合できた`);
+      }
+      // P1001: 胸の曲線を描いて照合できた回数。
+      visualBusts = visualPoseService.summary().bustOk;
+      if (visualBusts > 0) {
+        findings.push(`胸の曲線を描いて${visualBusts}件照合できた`);
+      }
+      // P1001: 目標へのドリルで近づけた回数。
+      visualDrills = visualPoseService.summary().drillsOk;
+      if (visualDrills > 0) {
+        findings.push(`目標に向けて描き直して${visualDrills}件近づけた`);
+      }
       // P960: 裸の状態を読んだ回数。
       visualBare = visualPoseService.summary().bare;
       if (visualBare > 0) {
@@ -908,6 +943,11 @@ class KnowledgeSelfInspectionService {
       visualCurvedBodies,
       visualOutlinedBodies,
       visualDrawnEyes,
+      visualMaskFill,
+      visualCelBodies,
+      visualHairDetails,
+      visualBusts,
+      visualDrills,
       findings,
     };
 

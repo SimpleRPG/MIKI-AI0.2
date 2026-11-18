@@ -8034,6 +8034,77 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1000 自己点検の記録に目の作画の照合（visualDrawnEyes）が入っている', typeof insp1000.visualDrawnEyes === 'number' && insp1000.visualDrawnEyes >= 1, `visualDrawnEyes=${insp1000.visualDrawnEyes}`);
 }
 
+// ---- P1001 描画部品の統合＋測定の使い分け ----
+{
+  const { visualPoseService: vpose1001 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi1001 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB1001 = [number, number, number];
+  const SKIN1001: RGB1001 = [232, 190, 160];
+  const PINK1001: RGB1001 = [240, 150, 180];
+  const BLUE1001: RGB1001 = [40, 40, 120];
+  const mkPerson1001 = (wide = false) => {
+    const W = 48, H = 56;
+    const px: RGB1001[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB1001) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB1001) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    if (!wide) {
+      rect(16, 15, 28, 32, BLUE1001); rect(12, 16, 15, 30, BLUE1001); rect(29, 16, 32, 30, BLUE1001);
+      rect(16, 32, 21, 50, BLUE1001); rect(23, 32, 28, 50, BLUE1001);
+    } else {
+      rect(13, 15, 31, 32, BLUE1001); rect(9, 16, 12, 30, BLUE1001); rect(32, 16, 35, 30, BLUE1001);
+      rect(13, 32, 19, 50, BLUE1001); rect(25, 32, 31, 50, BLUE1001);
+    }
+    rect(13, 4, 31, 12, PINK1001); rect(13, 4, 15, 40, PINK1001); rect(29, 4, 31, 40, PINK1001);
+    disc(22, 10, 5, SKIN1001);
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const reading1001 = vpose1001.analyzePose(mkPerson1001(), 48, 56);
+  check('P1001 2段陰影で描いて照合できる', reading1001 ? vpose1001.verifyBodyCel(reading1001)?.verified === true : false, `cel=${reading1001 ? vpose1001.verifyBodyCel(reading1001)?.verified : 'no-reading'}`);
+  check('P1001 髪の房とツヤを描いて照合できる', reading1001 ? vpose1001.verifyBodyHairDetail(reading1001)?.verified === true : false, 'hairDetail');
+  check('P1001 胸の曲線で胸の幅が広がる', reading1001 ? vpose1001.verifyBust(reading1001)?.verified === true : false, 'bust');
+  // 薄い肌色の人物：粗い色ビンでは背景と同化するので、細かいビンの取り方に切り替わる
+  const pale1001 = (() => {
+    const W = 48, H = 56;
+    const BG: RGB1001 = [208, 210, 212]; const PSKIN: RGB1001 = [243, 222, 205]; const PHAIR: RGB1001 = [243, 205, 215]; const PCLOTH: RGB1001 = [150, 160, 190];
+    const px: RGB1001[] = []; for (let i = 0; i < W * H; i++) px.push(BG);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB1001) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB1001) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    rect(16, 15, 28, 32, PCLOTH); rect(12, 16, 15, 30, PCLOTH); rect(29, 16, 32, 30, PCLOTH);
+    rect(16, 32, 21, 50, PCLOTH); rect(23, 32, 28, 50, PCLOTH);
+    rect(13, 4, 31, 12, PHAIR); rect(13, 4, 15, 40, PHAIR); rect(29, 4, 31, 40, PHAIR);
+    disc(22, 10, 5, PSKIN);
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  })();
+  const paleReading1001 = vpose1001.analyzePose(pale1001, 48, 56);
+  check('P1001 薄い肌色の人物は細かいビンの取り方で読める', paleReading1001 !== null && paleReading1001.maskMethod === 'fine', `method=${paleReading1001?.maskMethod} density=${paleReading1001?.silhouetteDensity}`);
+  // 見切れた体：脚が下端で切れている
+  const trunc1001 = (() => {
+    const W = 48, H = 44;
+    const px: RGB1001[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB1001) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB1001) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    rect(16, 14, 28, 28, BLUE1001); rect(12, 15, 15, 26, BLUE1001); rect(29, 15, 32, 26, BLUE1001);
+    rect(16, 28, 21, 43, BLUE1001); rect(23, 28, 28, 43, BLUE1001);
+    disc(22, 8, 5, SKIN1001);
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  })();
+  const truncReading1001 = vpose1001.analyzePose(trunc1001, 48, 44);
+  check('P1001 見切れた体は見切れと分かる', truncReading1001 !== null && truncReading1001.truncated === true && truncReading1001.description.includes('見切れている'), `truncated=${truncReading1001?.truncated}`);
+  // 目標の保存とドリル
+  const wide1001 = vpose1001.analyzePose(mkPerson1001(true), 48, 56);
+  const targetOk1001 = wide1001 ? vpose1001.setTarget(wide1001) : false;
+  const drill1001 = reading1001 && targetOk1001 ? vpose1001.drillToTarget(reading1001) : null;
+  check('P1001 目標を保存し、ドリルで差分が縮む', targetOk1001 && drill1001 !== null && drill1001.improved === true, `initial=${drill1001?.initialDiff} final=${drill1001?.finalDiff}`);
+  const insp1001 = ksi1001.inspect();
+  check('P1001 自己点検の記録に統合分の照合が入っている', insp1001.visualCelBodies >= 1 && insp1001.visualHairDetails >= 1 && insp1001.visualBusts >= 1 && insp1001.visualDrills >= 1 && insp1001.visualMaskFill >= 1, `cel=${insp1001.visualCelBodies} hair=${insp1001.visualHairDetails} bust=${insp1001.visualBusts} drills=${insp1001.visualDrills} mask=${insp1001.visualMaskFill}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
