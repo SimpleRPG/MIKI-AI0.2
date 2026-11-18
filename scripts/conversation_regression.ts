@@ -8225,6 +8225,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1005 要素ドリルの記録が残る', sum1005.elementDrillsOk >= 1 && sum1005.plateaus >= 1 && sum1005.graduations >= 1, `elem=${sum1005.elementDrillsOk} plateaus=${sum1005.plateaus} grad=${sum1005.graduations}`);
 }
 
+// ---- P1006 前髪の描画 ----
+{
+  const { visualPoseService: vpose1006 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB1006 = [number, number, number];
+  const SKIN1006: RGB1006 = [232, 190, 160];
+  const PINK1006: RGB1006 = [240, 150, 180];
+  const BLUE1006: RGB1006 = [40, 40, 120];
+  const px1006: RGB1006[] = []; for (let i = 0; i < 48 * 56; i++) px1006.push([240, 240, 240]);
+  const rect1006 = (x0: number, y0: number, x1: number, y1: number, c: RGB1006) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1006[y * 48 + x] = c; };
+  const disc1006 = (cx: number, cy: number, r: number, c: RGB1006) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1006[y * 48 + x] = c; };
+  rect1006(16, 15, 28, 32, BLUE1006); rect1006(12, 16, 15, 30, BLUE1006); rect1006(29, 16, 32, 30, BLUE1006);
+  rect1006(16, 32, 21, 50, BLUE1006); rect1006(23, 32, 28, 50, BLUE1006);
+  rect1006(13, 4, 31, 12, PINK1006); rect1006(13, 4, 15, 40, PINK1006); rect1006(29, 4, 31, 40, PINK1006);
+  disc1006(22, 9, 6, PINK1006); disc1006(22, 10, 5, SKIN1006);
+  const img1006 = new Uint8Array(48 * 56 * 4);
+  px1006.forEach((c, i) => { img1006[i * 4] = c[0]; img1006[i * 4 + 1] = c[1]; img1006[i * 4 + 2] = c[2]; img1006[i * 4 + 3] = 255; });
+  const reading1006 = vpose1006.analyzePose(img1006, 48, 56);
+  const face1006 = { eyeSize: null, brows: true, mouthSize: null };
+  const vf1006 = reading1006 ? vpose1006.verifyFrontHair(reading1006, face1006) : null;
+  check('P1006 前髪が房として描けて目が壊れない', vf1006?.verified === true && vf1006.eyes === 2, `share=${vf1006?.bangShare} eyes=${vf1006?.eyes}`);
+  // 前髪つきで描いても髪の長さの読みが変わらない
+  const imgF1006 = reading1006 ? vpose1006.renderBody(reading1006, 64, null, null, { frontHair: true }) : null;
+  const re1006 = imgF1006 ? vpose1006.analyzePose(imgF1006, 64, 64) : null;
+  check('P1006 前髪つきでも髪の長さが保たれる', re1006?.hair?.length === 'long', `hair=${re1006?.hair?.length}`);
+  const sum1006 = vpose1006.summary();
+  check('P1006 前髪の記録が残る', sum1006.frontHairOk >= 1, `ok=${sum1006.frontHairOk}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -480,15 +480,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; drillLevel: number; elementDrills: number; elementDrillsOk: number; plateaus: number; graduations: number; recentLeans: string[]; recentTempos: string[] } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; frontHair: number; frontHairOk: number; drillLevel: number; elementDrills: number; elementDrillsOk: number; plateaus: number; graduations: number; recentLeans: string[]; recentTempos: string[] } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; facesDrawn?: number; facesOk?: number; smooth?: number; smoothOk?: number; shaded?: number; shadedOk?: number; curved?: number; curvedOk?: number; outline?: number; outlineOk?: number; eyesDrawn?: number; eyesOk?: number; maskFill?: number; cel?: number; celOk?: number; hairDetail?: number; hairDetailOk?: number; bust?: number; bustOk?: number; targets?: number; drills?: number; drillsOk?: number; clothes?: number; clothesOk?: number; lineRole?: number; lineRoleOk?: number; regions?: number; drillLevel?: number; elementDrills?: number; elementDrillsOk?: number; plateaus?: number; graduations?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, facesDrawn: raw.facesDrawn || 0, facesOk: raw.facesOk || 0, smooth: raw.smooth || 0, smoothOk: raw.smoothOk || 0, shaded: raw.shaded || 0, shadedOk: raw.shadedOk || 0, curved: raw.curved || 0, curvedOk: raw.curvedOk || 0, outline: raw.outline || 0, outlineOk: raw.outlineOk || 0, eyesDrawn: raw.eyesDrawn || 0, eyesOk: raw.eyesOk || 0, maskFill: raw.maskFill || 0, cel: raw.cel || 0, celOk: raw.celOk || 0, hairDetail: raw.hairDetail || 0, hairDetailOk: raw.hairDetailOk || 0, bust: raw.bust || 0, bustOk: raw.bustOk || 0, targets: raw.targets || 0, drills: raw.drills || 0, drillsOk: raw.drillsOk || 0, clothes: raw.clothes || 0, clothesOk: raw.clothesOk || 0, lineRole: raw.lineRole || 0, lineRoleOk: raw.lineRoleOk || 0, regions: raw.regions || 0, drillLevel: raw.drillLevel || 1, elementDrills: raw.elementDrills || 0, elementDrillsOk: raw.elementDrillsOk || 0, plateaus: raw.plateaus || 0, graduations: raw.graduations || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; necks?: number; armLengths?: number; legLengths?: number; profiles?: number; bodies?: number; bodiesOk?: number; facesDrawn?: number; facesOk?: number; smooth?: number; smoothOk?: number; shaded?: number; shadedOk?: number; curved?: number; curvedOk?: number; outline?: number; outlineOk?: number; eyesDrawn?: number; eyesOk?: number; maskFill?: number; cel?: number; celOk?: number; hairDetail?: number; hairDetailOk?: number; bust?: number; bustOk?: number; targets?: number; drills?: number; drillsOk?: number; clothes?: number; clothesOk?: number; lineRole?: number; lineRoleOk?: number; regions?: number; frontHair?: number; frontHairOk?: number; drillLevel?: number; elementDrills?: number; elementDrillsOk?: number; plateaus?: number; graduations?: number; recentLeans?: string[]; recentTempos?: string[] } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, necks: raw.necks || 0, armLengths: raw.armLengths || 0, legLengths: raw.legLengths || 0, profiles: raw.profiles || 0, bodies: raw.bodies || 0, bodiesOk: raw.bodiesOk || 0, facesDrawn: raw.facesDrawn || 0, facesOk: raw.facesOk || 0, smooth: raw.smooth || 0, smoothOk: raw.smoothOk || 0, shaded: raw.shaded || 0, shadedOk: raw.shadedOk || 0, curved: raw.curved || 0, curvedOk: raw.curvedOk || 0, outline: raw.outline || 0, outlineOk: raw.outlineOk || 0, eyesDrawn: raw.eyesDrawn || 0, eyesOk: raw.eyesOk || 0, maskFill: raw.maskFill || 0, cel: raw.cel || 0, celOk: raw.celOk || 0, hairDetail: raw.hairDetail || 0, hairDetailOk: raw.hairDetailOk || 0, bust: raw.bust || 0, bustOk: raw.bustOk || 0, targets: raw.targets || 0, drills: raw.drills || 0, drillsOk: raw.drillsOk || 0, clothes: raw.clothes || 0, clothesOk: raw.clothesOk || 0, lineRole: raw.lineRole || 0, lineRoleOk: raw.lineRoleOk || 0, regions: raw.regions || 0, frontHair: raw.frontHair || 0, frontHairOk: raw.frontHairOk || 0, drillLevel: raw.drillLevel || 1, elementDrills: raw.elementDrills || 0, elementDrillsOk: raw.elementDrillsOk || 0, plateaus: raw.plateaus || 0, graduations: raw.graduations || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [], recentTempos: Array.isArray(raw.recentTempos) ? raw.recentTempos : [] };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, facesDrawn: 0, facesOk: 0, smooth: 0, smoothOk: 0, shaded: 0, shadedOk: 0, curved: 0, curvedOk: 0, outline: 0, outlineOk: 0, eyesDrawn: 0, eyesOk: 0, maskFill: 0, cel: 0, celOk: 0, hairDetail: 0, hairDetailOk: 0, bust: 0, bustOk: 0, targets: 0, drills: 0, drillsOk: 0, clothes: 0, clothesOk: 0, lineRole: 0, lineRoleOk: 0, regions: 0, drillLevel: 1, elementDrills: 0, elementDrillsOk: 0, plateaus: 0, graduations: 0, recentLeans: [], recentTempos: [] };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, necks: 0, armLengths: 0, legLengths: 0, profiles: 0, bodies: 0, bodiesOk: 0, facesDrawn: 0, facesOk: 0, smooth: 0, smoothOk: 0, shaded: 0, shadedOk: 0, curved: 0, curvedOk: 0, outline: 0, outlineOk: 0, eyesDrawn: 0, eyesOk: 0, maskFill: 0, cel: 0, celOk: 0, hairDetail: 0, hairDetailOk: 0, bust: 0, bustOk: 0, targets: 0, drills: 0, drillsOk: 0, clothes: 0, clothesOk: 0, lineRole: 0, lineRoleOk: 0, regions: 0, frontHair: 0, frontHairOk: 0, drillLevel: 1, elementDrills: 0, elementDrillsOk: 0, plateaus: 0, graduations: 0, recentLeans: [], recentTempos: [] };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; drillLevel: number; elementDrills: number; elementDrillsOk: number; plateaus: number; graduations: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; necks: number; armLengths: number; legLengths: number; profiles: number; bodies: number; bodiesOk: number; facesDrawn: number; facesOk: number; smooth: number; smoothOk: number; shaded: number; shadedOk: number; curved: number; curvedOk: number; outline: number; outlineOk: number; eyesDrawn: number; eyesOk: number; maskFill: number; cel: number; celOk: number; hairDetail: number; hairDetailOk: number; bust: number; bustOk: number; targets: number; drills: number; drillsOk: number; clothes: number; clothesOk: number; lineRole: number; lineRoleOk: number; regions: number; frontHair: number; frontHairOk: number; drillLevel: number; elementDrills: number; elementDrillsOk: number; plateaus: number; graduations: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null; qualityWindow: number; motionHabit: 'fast' | 'steady' | 'slow' | null } {
     const s = this.load();
     // P967: 姿勢の癖。最近20件の傾きのうち、10件以上あって
     // 6割以上が同じ向きなら、それを癖と読む。
@@ -512,7 +512,7 @@ class VisualPoseService {
       const top = (Object.entries(counts) as [keyof typeof counts, number][]).sort((a, b) => b[1] - a[1])[0];
       if (top && top[1] / s.recentTempos.length >= 0.6) motionHabit = top[0];
     }
-    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, facesDrawn: s.facesDrawn, facesOk: s.facesOk, smooth: s.smooth, smoothOk: s.smoothOk, shaded: s.shaded, shadedOk: s.shadedOk, curved: s.curved, curvedOk: s.curvedOk, outline: s.outline, outlineOk: s.outlineOk, eyesDrawn: s.eyesDrawn, eyesOk: s.eyesOk, maskFill: s.maskFill, cel: s.cel, celOk: s.celOk, hairDetail: s.hairDetail, hairDetailOk: s.hairDetailOk, bust: s.bust, bustOk: s.bustOk, targets: s.targets, drills: s.drills, drillsOk: s.drillsOk, clothes: s.clothes, clothesOk: s.clothesOk, lineRole: s.lineRole, lineRoleOk: s.lineRoleOk, regions: s.regions, drillLevel: s.drillLevel, elementDrills: s.elementDrills, elementDrillsOk: s.elementDrillsOk, plateaus: s.plateaus, graduations: s.graduations, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
+    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, necks: s.necks, armLengths: s.armLengths, legLengths: s.legLengths, profiles: s.profiles, bodies: s.bodies, bodiesOk: s.bodiesOk, facesDrawn: s.facesDrawn, facesOk: s.facesOk, smooth: s.smooth, smoothOk: s.smoothOk, shaded: s.shaded, shadedOk: s.shadedOk, curved: s.curved, curvedOk: s.curvedOk, outline: s.outline, outlineOk: s.outlineOk, eyesDrawn: s.eyesDrawn, eyesOk: s.eyesOk, maskFill: s.maskFill, cel: s.cel, celOk: s.celOk, hairDetail: s.hairDetail, hairDetailOk: s.hairDetailOk, bust: s.bust, bustOk: s.bustOk, targets: s.targets, drills: s.drills, drillsOk: s.drillsOk, clothes: s.clothes, clothesOk: s.clothesOk, lineRole: s.lineRole, lineRoleOk: s.lineRoleOk, regions: s.regions, frontHair: s.frontHair, frontHairOk: s.frontHairOk, drillLevel: s.drillLevel, elementDrills: s.elementDrills, elementDrillsOk: s.elementDrillsOk, plateaus: s.plateaus, graduations: s.graduations, leanWindow: s.recentLeans.length, habit, qualityWindow: s.recentTempos.length, motionHabit };
   }
 
   /**
@@ -592,7 +592,7 @@ class VisualPoseService {
    * P993: 髪も描く（読みの髪の長さに合わせ、照合にも含める）。
    * P995: 色の指定（髪は読みの色名から、体は指定色で描く）。
    */
-  public renderBody(reading: PoseReading, size = 64, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number } | null = null): Uint8Array | null {
+  public renderBody(reading: PoseReading, size = 64, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number; frontHair?: boolean } | null = null): Uint8Array | null {
     if (!reading.head || !reading.profileComplete) return null;
     const S = size;
     const prof = reading.bodyProfile;
@@ -722,13 +722,29 @@ class VisualPoseService {
     // 顔は頭より一回り小さく、少し下に描く（髪が上と脇に残る）。
     if (reading.hair) stamp(head.x * (S - 1), head.y * (S - 1) + Math.max(2, head.r * S) * 0.15, Math.max(2, head.r * S) * 0.8, SKIN);
     else stamp(head.x * (S - 1), head.y * (S - 1), Math.max(2, head.r * S), SKIN);
+    const hrPx = Math.max(2, head.r * S);
+    const faceR = reading.hair ? hrPx * 0.8 : hrPx;
+    const faceCy = head.y * (S - 1) + (reading.hair ? hrPx * 0.15 : 0);
+    const hxPx = head.x * (S - 1);
+    // P1006: 前髪。顔の上部に、房の先が下がる波形の下端で髪を描く。
+    // 房の境目は下端が上がって額の肌が見える（＝房の分かれ）。
+    // 顔の中身より先に描くので、眉と目は前髪の上から読める。
+    if (shape?.frontHair && reading.hair) {
+      const HAIR: [number, number, number] = colors?.hair ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
+      const hyPx = head.y * (S - 1);
+      const strandW = Math.max(3, faceR * 0.55);
+      for (let y = Math.round(faceCy - faceR); y <= Math.round(faceCy - faceR * 0.3); y++) {
+        const half = Math.sqrt(Math.max(0, hrPx * hrPx - (y - hyPx) * (y - hyPx)));
+        for (let x = Math.round(hxPx - Math.min(half, faceR)); x <= Math.round(hxPx + Math.min(half, faceR)); x++) {
+          const u = (((x - hxPx) % strandW) + strandW) % strandW / strandW;
+          const edge = faceCy - faceR * (0.78 - 0.33 * Math.sin(Math.PI * u));
+          if (y <= edge) set(x, y, HAIR);
+        }
+      }
+    }
     // P994: 顔の中身（目・眉・口）を指定どおりに描く。
     if (face) {
       const DARK: [number, number, number] = [30, 30, 30];
-      const hrPx = Math.max(2, head.r * S);
-      const faceR = reading.hair ? hrPx * 0.8 : hrPx;
-      const faceCy = head.y * (S - 1) + (reading.hair ? hrPx * 0.15 : 0);
-      const hxPx = head.x * (S - 1);
       const eyeY = faceCy - faceR * 0.1;
       const eyeDX = faceR * 0.42;
       const eyeR = face.eyeSize === 'large' ? faceR * 0.22 : face.eyeSize === 'small' ? faceR * 0.1 : faceR * 0.15;
@@ -817,7 +833,7 @@ class VisualPoseService {
    * 平均で縮小し、輪郭の階段を消す（アンチエイリアス）。
    * パラメータは解像度に依存しないので、読みはそのまま使える。
    */
-  public renderBodySmooth(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number } | null = null): Uint8Array | null {
+  public renderBodySmooth(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number; frontHair?: boolean } | null = null): Uint8Array | null {
     const SS = 3;
     const big = this.renderBody(reading, size * SS, face, colors, shape);
     if (!big) return null;
@@ -1127,7 +1143,7 @@ class VisualPoseService {
    * 触れている領域の色を濃くした色線にする（LIN-05）。
    * 線は輪郭の内側に引き、輪郭そのものは変えない。
    */
-  public renderBodyOutline(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number } | null = null): Uint8Array | null {
+  public renderBodyOutline(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number; frontHair?: boolean } | null = null): Uint8Array | null {
     const SS = 3;
     const B = size * SS;
     const big = this.renderBody(reading, B, face, colors, shape);
@@ -1233,7 +1249,7 @@ class VisualPoseService {
    * 影は色の領域として描く（グラデーションではない）。
    * 暗い特徴（目や口）は影に巻き込まない。
    */
-  public renderBodyCel(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number } | null = null): Uint8Array | null {
+  public renderBodyCel(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number; frontHair?: boolean } | null = null): Uint8Array | null {
     const base = this.renderBodySmooth(reading, size, face, colors, shape);
     if (!base) return null;
     const out = new Uint8Array(base);
@@ -1316,7 +1332,7 @@ class VisualPoseService {
    * P1001: 髪の作画部品。セル描画の髪に、ツヤの帯（頭の上の
    * 明るい帯）と房の分かれ目（影色の細い線）を入れる。
    */
-  public renderBodyHairDetail(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number } | null = null): Uint8Array | null {
+  public renderBodyHairDetail(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number; frontHair?: boolean } | null = null): Uint8Array | null {
     const base = this.renderBodyCel(reading, size, face, colors, shape);
     if (!base || !reading.head || !reading.hair) return base;
     const out = new Uint8Array(base);
@@ -1585,7 +1601,7 @@ class VisualPoseService {
    * 台形に広げて脚の分かれを隠し、ズボンは脚の輪郭を服色にする。
    * 髪と肌（手・脚）は服で塗らない。
    */
-  public renderClothes(reading: PoseReading, size = 192, garment: { top?: [number, number, number]; bottom?: 'skirt' | 'pants'; bottomColor?: [number, number, number] } | null = null, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number } | null = null): Uint8Array | null {
+  public renderClothes(reading: PoseReading, size = 192, garment: { top?: [number, number, number]; bottom?: 'skirt' | 'pants'; bottomColor?: [number, number, number] } | null = null, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number; frontHair?: boolean } | null = null): Uint8Array | null {
     const base = this.renderBodyCel(reading, size, face, colors, shape);
     if (!base || !garment || !reading.head) return base;
     const out = new Uint8Array(base);
@@ -1666,7 +1682,7 @@ class VisualPoseService {
    * P1002: 線の太さの役割別。外周の輪郭線は太く（2段）、
    * 内側の境界（髪と体の境目など色の変わり目）は細く薄く引く。
    */
-  public renderBodyOutlineRole(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number } | null = null): Uint8Array | null {
+  public renderBodyOutlineRole(reading: PoseReading, size = 192, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number; frontHair?: boolean } | null = null): Uint8Array | null {
     const SS = 3;
     const B = size * SS;
     const big = this.renderBody(reading, B, face, colors, shape);
@@ -1801,6 +1817,44 @@ class VisualPoseService {
     if (verified) state.eyesOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     return { verified, eyes: fr?.eyes ?? 0, eyeColor: fr?.eyeColor ?? null, image };
+  }
+
+  /**
+   * P1006: 前髪の照合。192で前髪つきで描き、額の帯（顔の上部）に
+   * 髪色の画素が房として入っているかと、頭の切り出しで目が
+   * 2つ読める（前髪が目を壊していない）かを確かめる。
+   */
+  public verifyFrontHair(reading: PoseReading, face: BodyFaceSpec): { verified: boolean; bangShare: number; eyes: number; image: Uint8Array } | null {
+    if (!reading.head || !reading.hair) return null;
+    const S = 192;
+    const image = this.renderBody(reading, S, face, null, { frontHair: true });
+    if (!image) return null;
+    const HAIR: [number, number, number] = EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
+    const SHADE = deriveShadow(HAIR);
+    const near = (i: number, c: [number, number, number]): boolean => Math.abs(image[i] - c[0]) + Math.abs(image[i + 1] - c[1]) + Math.abs(image[i + 2] - c[2]) <= 42;
+    const hrPx = Math.max(2, reading.head.r * S);
+    const faceR = hrPx * 0.8;
+    const faceCy = reading.head.y * (S - 1) + hrPx * 0.15;
+    const hxPx = reading.head.x * (S - 1);
+    let band = 0;
+    let bang = 0;
+    for (let y = Math.round(faceCy - faceR * 0.95); y <= Math.round(faceCy - faceR * 0.3); y++) {
+      for (let x = Math.round(hxPx - faceR * 0.7); x <= Math.round(hxPx + faceR * 0.7); x++) {
+        if (x < 0 || x >= S || y < 0 || y >= S) continue;
+        band++;
+        const i = (y * S + x) * 4;
+        if (near(i, HAIR) || near(i, SHADE)) bang++;
+      }
+    }
+    const bangShare = band > 0 ? bang / band : 0;
+    const crop = visualZoomService.cropAnalyze(image, S, S, reading.head.x, reading.head.y, reading.head.r * 3.4);
+    const fr = crop ? visualZoomService.analyzeFace(crop.pixels) : null;
+    const verified = bangShare >= 0.25 && fr?.eyes === 2;
+    const state = this.load();
+    state.frontHair++;
+    if (verified) state.frontHairOk++;
+    try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    return { verified, bangShare, eyes: fr?.eyes ?? 0, image };
   }
 
   /** P958: 姿勢読みから特徴署名を作る */
