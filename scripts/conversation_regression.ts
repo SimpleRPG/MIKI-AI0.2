@@ -6358,6 +6358,55 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P948検定 動画: 場面の文章化が3行そろう', vs948v.describeScenes(scenes948).split('\n').length === 3, 'describe');
 }
 
+// ---- P949 検定バッテリー第2弾（物らしい複合物と人のバリエーション） ----
+{
+  const { analyzeImagePixels: an949 } = await import('../src/miki/conversation/services/conversationImageObservationService');
+  const { visualScenePatternService: vsp949 } = await import('../src/miki/conversation/services/visualScenePatternService');
+  const { visualFigureService: vf949 } = await import('../src/miki/conversation/services/visualFigureService');
+  const W949 = 48, H949 = 48;
+  type RGB949 = [number, number, number];
+  const img949 = (fn: (x: number, y: number) => RGB949) => {
+    const a = new Uint8Array(W949 * H949 * 4);
+    for (let y = 0; y < H949; y++) for (let x = 0; x < W949; x++) {
+      const [r, g, b] = fn(x, y); const i = (y * W949 + x) * 4;
+      a[i] = r; a[i + 1] = g; a[i + 2] = b; a[i + 3] = 255;
+    }
+    return an949(a, W949, H949);
+  };
+  const BG949: RGB949 = [240, 240, 240];
+  // りんご風の複合物（赤い実＋茶色の茎＋緑の葉）: 教えれば名前で呼べる
+  const apple949 = (dx: number, dy: number, s: number) => (x: number, y: number): RGB949 => {
+    const cx = 24 + dx, cy = 28 + dy;
+    if (Math.abs(x - cx) <= Math.max(1, Math.round(2 * s)) && y >= 8 + dy && y <= 8 + dy + Math.round(10 * s)) return [120, 80, 40];
+    const lx = cx + 7 * s, ly = 12 + dy;
+    if (((x - lx) ** 2) / (36 * s * s) + ((y - ly) ** 2) / (9 * s * s) <= 1) return [60, 160, 60];
+    if ((x - cx) ** 2 + (y - cy) ** 2 <= 121 * s * s) return [210, 40, 40];
+    return BG949;
+  };
+  check('P949検定 物: りんご風の複合物を配置の見本として登録できる', vsp949.registerScene('検定りんご', img949(apple949(0, 0, 1)))?.name === '検定りんご', 'register-apple');
+  check('P949検定 物: 移動したりんごを同定できる', vsp949.matchScene(img949(apple949(4, 3, 1)))?.name === '検定りんご', 'apple-shifted');
+  check('P949検定 物: 少し大きくなったりんごも同定できる', vsp949.matchScene(img949(apple949(0, 0, 1.15)))?.name === '検定りんご', 'apple-scaled');
+  const redOnly949 = img949((x, y) => ((x - 24) ** 2 + (y - 28) ** 2 <= 121 ? [210, 40, 40] : BG949));
+  check('P949検定 物: 赤い丸だけではりんごと呼ばない', vsp949.matchScene(redOnly949)?.name !== '検定りんご', 'apple-negative');
+  // 人のバリエーション: 色が分かれていても、背が高くても低くても読める。座り姿は第1段の対象外
+  const twoColor949 = img949((x, y) => {
+    if ((x - 24) ** 2 + (y - 10) ** 2 <= 16) return [232, 190, 160] as RGB949;
+    if (Math.abs(x - 24) <= 6 && y >= 18 && y <= 41) return [60, 80, 180] as RGB949;
+    return BG949;
+  });
+  check('P949検定 人: 頭と体で色が分かれた人も読める', vf949.identifyFigure(twoColor949) !== null, 'person-two-color');
+  const tall949 = img949((x, y) => (((x - 24) ** 2 + (y - 8) ** 2 <= 16) || (Math.abs(x - 24) <= 4 && y >= 16 && y <= 44)) ? [30, 30, 30] : BG949);
+  check('P949検定 人: 背の高い細い人も読める', vf949.identifyFigure(tall949) !== null, 'person-tall');
+  const short949 = img949((x, y) => (((x - 24) ** 2 + (y - 12) ** 2 <= 16) || (Math.abs(x - 24) <= 9 && y >= 20 && y <= 36)) ? [30, 30, 30] : BG949);
+  check('P949検定 人: 背の低い人も読める', vf949.identifyFigure(short949) !== null, 'person-short');
+  const sitting949 = img949((x, y) => {
+    if ((x - 24) ** 2 + (y - 10) ** 2 <= 16) return [30, 30, 30] as RGB949;
+    if (Math.abs(x - 24) <= 12 && y >= 20 && y <= 30) return [30, 30, 30] as RGB949;
+    return BG949;
+  });
+  check('P949検定 人: 座った姿は立っている人として読まない（第1段の境界）', vf949.identifyFigure(sitting949) === null, 'person-sitting');
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

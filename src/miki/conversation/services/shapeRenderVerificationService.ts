@@ -62,7 +62,15 @@ export function compareRegionShape(
   target: ImageRegionFeature,
   rendered: ImageRegionFeature,
 ): boolean {
-  if (target.shape !== rendered.shape) return false;
+  if (target.shape !== rendered.shape) {
+    // P949: 小さい楕円は画素の粗さで円形度が境界（0.65）を
+    // またいで揺れ、「いびつな形」と「丸に近い」のラベルだけが
+    // 食い違うことがある。円形度そのものが近ければ（0.25以内）
+    // 境界の揺れとみなして通す。大きく違う形は従来どおり落とす。
+    const pair = [target.shape, rendered.shape].sort().join('/');
+    if (pair !== 'いびつな形/丸に近い') return false;
+    if (Math.abs(target.circularity - rendered.circularity) > 0.25) return false;
+  }
   const centroidDistance = Math.hypot(
     target.centroidX - rendered.centroidX,
     target.centroidY - rendered.centroidY,

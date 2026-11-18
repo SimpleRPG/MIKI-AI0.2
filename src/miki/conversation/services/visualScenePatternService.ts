@@ -26,6 +26,8 @@ export interface SceneRegionSignature {
   shareRatio: number;
   elongation: number;
   circularity: number;
+  /** P949: 外接矩形に対する埋まり具合（形ラベルの境界判定に使う） */
+  fillRatio: number;
 }
 
 export interface VisualScenePattern {
@@ -54,6 +56,7 @@ function toSignatures(regions: ImageRegionFeature[]): SceneRegionSignature[] {
     shareRatio: r.share / Math.max(0.001, main.share),
     elongation: r.elongation,
     circularity: r.circularity,
+    fillRatio: r.fillRatio,
   }));
 }
 
@@ -119,7 +122,18 @@ class VisualScenePatternService {
           if (used.has(i)) continue;
           const actual = signatures[i];
           let s = 1;
-          if (expected.shape !== actual.shape) s -= 0.45;
+          // P949: 形ラベルは画素の粗さで境界をまたいで揺れる
+          // （小さい楕円の円形度、細い棒の細長さ等）。ラベルの
+          // 一致/不一致だけで 0.45 を引くと、連続量が近い読み
+          // 同士まで落ちてしまう。まず連続量（円形度・埋まり
+          // 具合・細長さ）の距離で引き、ラベルが違う場合は
+          // 最低 0.12 だけ上乗せする。
+          const shapeDist = Math.abs(expected.circularity - actual.circularity) * 0.5
+            + Math.abs((expected.fillRatio ?? actual.fillRatio) - actual.fillRatio) * 0.4
+            + (Math.abs(expected.elongation - actual.elongation) / 3) * 0.3;
+          let shapePenalty = Math.min(0.45, shapeDist);
+          if (expected.shape !== actual.shape) shapePenalty = Math.max(shapePenalty, 0.12);
+          s -= shapePenalty;
           if (expected.colorName !== actual.colorName) s -= 0.15;
           s -= (Math.abs(expected.relDx - actual.relDx) + Math.abs(expected.relDy - actual.relDy)) * 0.8;
           s -= Math.abs(expected.shareRatio - actual.shareRatio) * 0.3;
