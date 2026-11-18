@@ -7420,6 +7420,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P980 自己点検の記録に耳（visualEars）が入っている', typeof insp980.visualEars === 'number' && insp980.visualEars >= 1, `visualEars=${insp980.visualEars}`);
 }
 
+// ---- P981 顔の形の第1段 ----
+{
+  const { visualZoomService: vzoom981 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi981 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB981 = [number, number, number];
+  const SKIN981: RGB981 = [232, 190, 160];
+  const HAIR981: RGB981 = [45, 32, 22];
+  const DARK981: RGB981 = [30, 30, 30];
+  const mk981 = () => { const px: RGB981[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]); return px; };
+  const fin981 = (px: RGB981[]) => { const o = new Uint8Array(48 * 48 * 4); px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; }); return o; };
+  const eyes981 = (px: RGB981[]) => { const disc = (cx: number, cy: number, r: number, c: RGB981) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; }; disc(17, 20, 3, DARK981); disc(31, 20, 3, DARK981); };
+  const roundPx = mk981();
+  for (let y = 6; y <= 12; y++) for (let x = 8; x <= 40; x++) roundPx[y * 48 + x] = HAIR981;
+  for (let y = 10; y <= 38; y++) for (let x = 10; x <= 38; x++) if (roundPx[y * 48 + x] !== HAIR981) roundPx[y * 48 + x] = SKIN981;
+  eyes981(roundPx);
+  const round981 = vzoom981.analyzeFace(fin981(roundPx));
+  check('P981 四角めの顔は丸いと読める', round981?.faceShape === 'round' && round981.faceShapeDescription === '顔は丸い', `shape=${round981?.faceShape}`);
+  const longPx = mk981();
+  for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) { const dx = (x - 24) / 11, dy = (y - 24) / 17; if (dx * dx + dy * dy <= 1) longPx[y * 48 + x] = SKIN981; }
+  for (let y = 4; y <= 9; y++) for (let x = 13; x <= 35; x++) longPx[y * 48 + x] = HAIR981;
+  eyes981(longPx);
+  const long981 = vzoom981.analyzeFace(fin981(longPx));
+  check('P981 縦長の顔は細長いと読める', long981?.faceShape === 'long', `shape=${long981?.faceShape}`);
+  const pointedPx = mk981();
+  for (let y = 10; y <= 38; y++) { const half = y <= 22 ? 14 : Math.round(14 - 11 * ((y - 22) / 16)); for (let x = 24 - half; x <= 24 + half; x++) pointedPx[y * 48 + x] = SKIN981; }
+  for (let y = 6; y <= 11; y++) for (let x = 9; x <= 39; x++) pointedPx[y * 48 + x] = HAIR981;
+  eyes981(pointedPx);
+  const pointed981 = vzoom981.analyzeFace(fin981(pointedPx));
+  check('P981 下へ細くなる顔はあごが尖っていると読める', pointed981?.faceShape === 'pointed', `shape=${pointed981?.faceShape}`);
+  const insp981 = ksi981.inspect();
+  check('P981 自己点検の記録に顔の形（visualFaceShape）が入っている', typeof insp981.visualFaceShape === 'number' && insp981.visualFaceShape >= 1, `visualFaceShape=${insp981.visualFaceShape}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
