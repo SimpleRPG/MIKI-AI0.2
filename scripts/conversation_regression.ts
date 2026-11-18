@@ -6645,6 +6645,41 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P954 自己点検の記録に顔の読み（visualFaces）が入っている', typeof insp954.visualFaces === 'number' && insp954.visualFaces >= 1, `visualFaces=${insp954.visualFaces}`);
 }
 
+// ---- P955 視点（正面・横向き・後ろ姿） ----
+{
+  const { visualZoomService: vzoom955 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi955 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const W955 = 96, H955 = 96;
+  type RGB955 = [number, number, number];
+  const HAIR955: RGB955 = [45, 32, 22];
+  const SKIN955: RGB955 = [232, 190, 160];
+  const DARK955: RGB955 = [30, 30, 30];
+  const base955 = (draw: (disc: (cx: number, cy: number, r: number, c: RGB955) => void) => void) => {
+    const px: RGB955[] = [];
+    for (let i = 0; i < W955 * H955; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB955) => { for (let y = 0; y < H955; y++) for (let x = 0; x < W955; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W955 + x] = c; };
+    draw(disc);
+    const out = new Uint8Array(W955 * H955 * 4);
+    px.forEach((c, i) => { out[i * 4] = c[0]; out[i * 4 + 1] = c[1]; out[i * 4 + 2] = c[2]; out[i * 4 + 3] = 255; });
+    return out;
+  };
+  const cues955 = (img: Uint8Array) => {
+    const z = vzoom955.cropAnalyze(img, W955, H955, 0.5, 0.52, 0.8);
+    const skin = z?.features.regions.find((r) => r.colorName === '肌色');
+    const face = z ? vzoom955.analyzeFace(z.pixels) : null;
+    return { eyes: face && face.verified ? face.eyes : null, headSkinShare: skin ? skin.share : 0 };
+  };
+  const front955 = base955((disc) => { disc(48, 40, 32, HAIR955); disc(48, 50, 28, SKIN955); disc(38, 44, 3, DARK955); disc(58, 44, 3, DARK955); });
+  const profile955 = base955((disc) => { disc(48, 40, 32, HAIR955); disc(48, 50, 28, SKIN955); disc(59, 44, 3, DARK955); });
+  const back955 = base955((disc) => { disc(48, 48, 30, HAIR955); });
+  check('P955 目が2つ見える顔は正面', vzoom955.classifyViewpoint(cues955(front955))?.viewpoint === 'front', '');
+  check('P955 目が1つだけの顔は横向き', vzoom955.classifyViewpoint(cues955(profile955))?.viewpoint === 'profile', '');
+  check('P955 頭に肌が無いのは後ろ姿', vzoom955.classifyViewpoint(cues955(back955))?.viewpoint === 'back', '');
+  check('P955 手がかりが無ければ向きを決めない', vzoom955.classifyViewpoint({ eyes: null, headSkinShare: 0.3 }) === null, '');
+  const insp955 = ksi955.inspect();
+  check('P955 自己点検の記録に向きの読み（visualViewpoints）が入っている', typeof insp955.visualViewpoints === 'number' && insp955.visualViewpoints >= 1, `visualViewpoints=${insp955.visualViewpoints}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

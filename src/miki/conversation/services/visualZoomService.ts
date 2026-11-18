@@ -25,6 +25,12 @@ export interface ZoomResult {
   pixels: Uint8Array;
 }
 
+/** P955: 向きの読み（正面・横向き・後ろ姿） */
+export interface ViewpointReading {
+  viewpoint: 'front' | 'profile' | 'back';
+  description: string;
+}
+
 /** P954: 顔の中身の読み（拡大した顔から目と口を読む） */
 export interface FaceReading {
   eyes: 0 | 1 | 2;
@@ -35,16 +41,38 @@ export interface FaceReading {
 }
 
 class VisualZoomService {
-  private load(): { analyzed: number; faces: number } {
+  private load(): { analyzed: number; faces: number; viewpoints: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, faces: 0 };
+    return { analyzed: 0, faces: 0, viewpoints: 0 };
   }
 
-  public summary(): { analyzed: number; faces: number } {
+  public summary(): { analyzed: number; faces: number; viewpoints: number } {
     return this.load();
+  }
+
+  /**
+   * P955: 向きを読む。目が2つ見えれば正面、1つなら横向き、
+   * 頭の拡大に肌色がまったく無ければ（髪に覆われた頭）
+   * 後ろ姿。どれにも当たらなければ決めない。
+   */
+  public classifyViewpoint(cues: { eyes: number | null; headSkinShare: number | null }): ViewpointReading | null {
+    let vp: ViewpointReading | null = null;
+    if (cues.eyes === 2) {
+      vp = { viewpoint: 'front', description: '正面を向いているように見える' };
+    } else if (cues.eyes === 1) {
+      vp = { viewpoint: 'profile', description: '横向きで、顔の片側が見えているように見える' };
+    } else if (cues.headSkinShare !== null && cues.headSkinShare < 0.02) {
+      vp = { viewpoint: 'back', description: '後ろ姿のように見える（頭に顔の肌が見えない）' };
+    }
+    if (vp) {
+      const state = this.load();
+      state.viewpoints++;
+      try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    }
+    return vp;
   }
 
   /**

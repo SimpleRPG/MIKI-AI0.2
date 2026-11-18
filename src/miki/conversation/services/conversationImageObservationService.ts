@@ -561,6 +561,7 @@ class ConversationImageObservationService {
           if (zoom) {
             const regions = zoom.features.regions;
             const skin = regions.find((r) => r.colorName === '肌色');
+            let faceEyes955: number | null = null;
             if (skin) {
               const above = regions
                 .filter((r) => r !== skin && r.borderTouch < 0.5 && r.centroidY < skin.centroidY - 0.05)
@@ -582,6 +583,7 @@ class ConversationImageObservationService {
               );
               if (faceZoom) {
                 const face = visualZoomService.analyzeFace(faceZoom.pixels);
+                if (face && face.verified) faceEyes955 = face.eyes;
                 if (face && face.verified && face.description) {
                   text = text.replace(
                     '具体的な物や文字までは読み取れない。',
@@ -589,6 +591,17 @@ class ConversationImageObservationService {
                   );
                 }
               }
+            }
+            // P955: 目の数と頭の肌の有無から向きを読む。
+            const viewpoint955 = visualZoomService.classifyViewpoint({
+              eyes: faceEyes955,
+              headSkinShare: skin ? skin.share : 0,
+            });
+            if (viewpoint955) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `向きは、${viewpoint955.description}。具体的な物や文字までは読み取れない。`,
+              );
             }
           }
         } catch { /* 拡大できなくても観察は返す */ }
