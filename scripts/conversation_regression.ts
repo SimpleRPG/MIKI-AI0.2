@@ -6909,6 +6909,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P961 自己点検の記録に真似（visualImitations）が入っている', typeof insp961.visualImitations === 'number' && insp961.visualImitations >= 1, `visualImitations=${insp961.visualImitations}`);
 }
 
+// ---- P962 重心の第1段 ----
+{
+  const { visualPoseService: vpose962 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi962 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB962 = [number, number, number];
+  const SKIN962: RGB962 = [232, 190, 160];
+  const HAIR962: RGB962 = [45, 32, 22];
+  const BLUE962: RGB962 = [40, 40, 120];
+  const RED962: RGB962 = [170, 40, 40];
+  const draw962 = (ballSide: 'none' | 'right' | 'left') => {
+    const px: RGB962[] = []; for (let i = 0; i < 56 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB962) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 56 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB962) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 56; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 56 + x] = c; };
+    disc(26, 9, 6, HAIR962); disc(26, 10, 5, SKIN962);
+    rect(20, 15, 32, 32, BLUE962);
+    rect(16, 16, 19, 30, BLUE962); rect(33, 16, 36, 30, BLUE962);
+    rect(20, 32, 25, 50, BLUE962); rect(27, 32, 32, 50, BLUE962);
+    if (ballSide === 'right') disc(41, 28, 8, RED962);
+    if (ballSide === 'left') disc(11, 28, 8, RED962);
+    const o = new Uint8Array(56 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const straight962 = vpose962.analyzePose(draw962('none'), 56, 56);
+  check('P962 左右対称の人は重心が真ん中と読める', straight962?.balance?.label === 'balanced', `lean=${straight962?.balance?.lean.toFixed(3)}`);
+  const right962 = vpose962.analyzePose(draw962('right'), 56, 56);
+  check('P962 右に重みがある人は重心が右と読める', right962?.balance?.label === 'right', `lean=${right962?.balance?.lean.toFixed(3)}`);
+  const left962 = vpose962.analyzePose(draw962('left'), 56, 56);
+  check('P962 左に重みがある人は重心が左と読める', left962?.balance?.label === 'left', `lean=${left962?.balance?.lean.toFixed(3)}`);
+  const insp962 = ksi962.inspect();
+  check('P962 自己点検の記録に重心（visualBalance）が入っている', typeof insp962.visualBalance === 'number' && insp962.visualBalance >= 1, `visualBalance=${insp962.visualBalance}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

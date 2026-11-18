@@ -552,6 +552,13 @@ class ConversationImageObservationService {
                 `服は、${pose953.clothingDescription}具体的な物や文字までは読み取れない。`,
               );
             }
+            // P962: 重心の傾きも添える。
+            if (pose953.balanceDescription) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `${pose953.balanceDescription}。具体的な物や文字までは読み取れない。`,
+              );
+            }
             // P960: 裸の状態も添える。
             if (pose953.bareDescription) {
               text = text.replace(

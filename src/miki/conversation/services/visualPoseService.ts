@@ -137,6 +137,9 @@ export interface PoseReading {
   /** P960: 服を着ていないらしいか（肌色率から。判定できなければ null） */
   bare: boolean | null;
   bareDescription: string;
+  /** P962: 重心（輪郭の重心と、足の支えの中心とのずれ） */
+  balance: { centroidX: number; centroidY: number; lean: number; label: 'balanced' | 'left' | 'right' } | null;
+  balanceDescription: string;
   verified: boolean;
   fit: number;
 }
@@ -186,15 +189,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number } {
     return this.load();
   }
 
@@ -831,6 +834,33 @@ class VisualPoseService {
     }
     const bareDescription = bare === true ? '服は着ていないようだ（肌が広く見えている）' : '';
 
+    // P962: 重心。輪郭の重心と、足の支えの中心とのずれで
+    // 傾きを読む。
+    let balance: PoseReading['balance'] = null;
+    {
+      let sx = 0;
+      let sy = 0;
+      let n = 0;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          if (mask[y * width + x]) { sx += x; sy += y; n++; }
+        }
+      }
+      if (n > 0 && figW > 0) {
+        const cxp = sx / n;
+        const cyp = sy / n;
+        const supportX = footL && footR ? (footL.x + footR.x) / 2 : figCx;
+        const lean = (cxp - supportX) / figW;
+        const label = Math.abs(lean) <= 0.06 ? 'balanced' : lean > 0 ? 'right' : 'left';
+        balance = { centroidX: cxp / (width - 1), centroidY: cyp / (height - 1), lean, label };
+      }
+    }
+    const balanceDescription = balance
+      ? balance.label === 'balanced'
+        ? '重心はほぼ真ん中で、まっすぐ立っている'
+        : balance.label === 'right' ? '重心が右に寄って傾いている' : '重心が左に寄って傾いている'
+      : '';
+
     // P958: 髪の色。頭の範囲で、肌色でない前景の最頻色。
     let hairColor: string | null = null;
     {
@@ -931,6 +961,7 @@ class VisualPoseService {
     if (clothingDescription) state.clothing++;
     if (extrasDescription) state.extras++;
     if (bare === true) state.bare++;
+    if (balance) state.balances++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
     const norm = (p: PosePoint | null): PosePoint | null =>
@@ -958,6 +989,8 @@ class VisualPoseService {
       hairColor,
       bare,
       bareDescription,
+      balance,
+      balanceDescription,
       verified,
       fit,
     };
