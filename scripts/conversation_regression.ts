@@ -7200,6 +7200,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P972 他の人の睡眠の話は横取りしない', r972c.reason !== 'presence_answer', `reason=${r972c.reason}`);
 }
 
+// ---- P973 髪の形の第1段 ----
+{
+  const { visualPoseService: vpose973 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi973 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB973 = [number, number, number];
+  const SKIN973: RGB973 = [232, 190, 160];
+  const HAIR973: RGB973 = [45, 32, 22];
+  const BLUE973: RGB973 = [40, 40, 120];
+  const person973 = (wavy: boolean) => {
+    const px: RGB973[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB973) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB973) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(22, 9, 6, HAIR973); disc(22, 10, 5, SKIN973);
+    rect(16, 15, 28, 32, BLUE973);
+    rect(12, 16, 15, 30, BLUE973); rect(29, 16, 32, 30, BLUE973);
+    rect(16, 32, 21, 50, BLUE973); rect(23, 32, 28, 50, BLUE973);
+    for (let x = 15; x <= 18; x++) rect(x, 6, x, wavy ? (x % 2 === 0 ? 34 : 42) : 42, HAIR973);
+    for (let x = 26; x <= 29; x++) rect(x, 6, x, wavy ? (x % 2 === 0 ? 42 : 34) : 42, HAIR973);
+    const o = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const straight973 = vpose973.analyzePose(person973(false), 48, 56);
+  check('P973 まっすぐな髪が読める', straight973?.hairShape === 'straight', `shape=${straight973?.hairShape}`);
+  const wavy973 = vpose973.analyzePose(person973(true), 48, 56);
+  check('P973 うねりの強い髪が読める', wavy973?.hairShape === 'curly', `shape=${wavy973?.hairShape}`);
+  const insp973 = ksi973.inspect();
+  check('P973 自己点検の記録に髪の形（visualHairShape）が入っている', typeof insp973.visualHairShape === 'number' && insp973.visualHairShape >= 1, `visualHairShape=${insp973.visualHairShape}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

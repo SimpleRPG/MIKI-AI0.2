@@ -136,6 +136,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualLeanWindow: number;
   visualFingerDetails: number;
   visualEyeColor: number;
+  visualHairShape: number;
   findings: string[];
 }
 
@@ -377,6 +378,7 @@ class KnowledgeSelfInspectionService {
     let visualLeanWindow = 0;
     let visualFingerDetails = 0;
     let visualEyeColor = 0;
+    let visualHairShape = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -630,6 +632,11 @@ class KnowledgeSelfInspectionService {
       if (visualCollarbone > 0) {
         findings.push(`鎖骨の影を${visualCollarbone}件読んだ`);
       }
+      // P973: 髪の形を読んだ回数。
+      visualHairShape = visualPoseService.summary().hairShapes;
+      if (visualHairShape > 0) {
+        findings.push(`髪の形を${visualHairShape}件読んだ`);
+      }
       // P967: 姿勢の癖（最近の傾きの偏り）。
       const poseSummary967 = visualPoseService.summary();
       visualLeanWindow = poseSummary967.leanWindow;
@@ -723,6 +730,7 @@ class KnowledgeSelfInspectionService {
       visualLeanWindow,
       visualFingerDetails,
       visualEyeColor,
+      visualHairShape,
       findings,
     };
 

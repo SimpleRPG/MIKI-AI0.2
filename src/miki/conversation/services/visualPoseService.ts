@@ -149,6 +149,9 @@ export interface PoseReading {
   /** P966: 鎖骨の影（肌の帯でのみ判定、読めなければ null） */
   collarbone: boolean | null;
   collarboneDescription: string;
+  /** P973: 髪の形（下端のばらつきから） */
+  hairShape: 'straight' | 'wavy' | 'curly' | null;
+  hairShapeDescription: string;
   verified: boolean;
   fit: number;
 }
@@ -198,15 +201,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; recentLeans: string[] } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; recentLeans: string[] } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; recentLeans?: string[] } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [] };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number; hairShapes?: number; recentLeans?: string[] } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0, hairShapes: raw.hairShapes || 0, recentLeans: Array.isArray(raw.recentLeans) ? raw.recentLeans : [] };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, recentLeans: [] };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0, hairShapes: 0, recentLeans: [] };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number; hairShapes: number; leanWindow: number; habit: 'left' | 'balanced' | 'right' | null } {
     const s = this.load();
     // P967: 姿勢の癖。最近20件の傾きのうち、10件以上あって
     // 6割以上が同じ向きなら、それを癖と読む。
@@ -219,7 +222,7 @@ class VisualPoseService {
       const top = (Object.entries(counts) as [keyof typeof counts, number][]).sort((a, b) => b[1] - a[1])[0];
       if (top && top[1] / s.recentLeans.length >= 0.6) habit = top[0];
     }
-    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, leanWindow: s.recentLeans.length, habit };
+    return { analyzed: s.analyzed, verified: s.verified, motions: s.motions, clothing: s.clothing, extras: s.extras, multi: s.multi, holding: s.holding, bare: s.bare, imitations: s.imitations, imitationsOk: s.imitationsOk, balances: s.balances, qualities: s.qualities, hairs: s.hairs, collarbones: s.collarbones, hairShapes: s.hairShapes, leanWindow: s.recentLeans.length, habit };
   }
 
   /**
@@ -998,6 +1001,34 @@ class VisualPoseService {
       ? hair.length === 'short' ? '髪は短い' : hair.length === 'medium' ? '髪は肩くらいまである' : '髪は長く垂れている'
       : '';
 
+    // P973: 髪の形。垂れた髪の下端が列ごとにどれだけ
+    // ばらつくかで、まっすぐか、うねっているかを読む。
+    // 短い髪では下端の形が意味を持たないので読まない。
+    let hairShape: PoseReading['hairShape'] = null;
+    if (hairBinKey && hair && hair.length !== 'short') {
+      const bandHalf = headR * 1.8;
+      const bottoms: number[] = [];
+      for (let x = Math.max(0, Math.floor(headCx - bandHalf)); x <= Math.min(width - 1, Math.ceil(headCx + bandHalf)); x++) {
+        let bottom = -1;
+        for (let y = Math.round(headCy + headR); y <= figBottom; y++) {
+          const p = y * width + x;
+          if (!mask[p]) continue;
+          const i = p * 4;
+          if (`${rgba[i] >> 6},${rgba[i + 1] >> 6},${rgba[i + 2] >> 6}` === hairBinKey) bottom = y;
+        }
+        if (bottom >= 0) bottoms.push(bottom);
+      }
+      if (bottoms.length >= 6 && figH > 0) {
+        const mean = bottoms.reduce((a, b) => a + b, 0) / bottoms.length;
+        const std = Math.sqrt(bottoms.reduce((a, b) => a + (b - mean) ** 2, 0) / bottoms.length);
+        const ratio = std / figH;
+        hairShape = ratio <= 0.02 ? 'straight' : ratio <= 0.05 ? 'wavy' : 'curly';
+      }
+    }
+    const hairShapeDescription = hairShape
+      ? hairShape === 'straight' ? '髪はまっすぐ垂れている' : hairShape === 'wavy' ? '髪は少しうねっている' : '髪はうねりが強い'
+      : '';
+
     // P957: 持ち物と重なり。体の最頻色（服）と肌色を除いて、
     // 手の周りや体の前にまとまった別の色があれば、それは
     // 持っている物や前に重なった物と読む。
@@ -1081,6 +1112,7 @@ class VisualPoseService {
     }
     if (hair) state.hairs++;
     if (collarbone === true) state.collarbones++;
+    if (hairShape) state.hairShapes++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
     const norm = (p: PosePoint | null): PosePoint | null =>
@@ -1114,6 +1146,8 @@ class VisualPoseService {
       hairDescription,
       collarbone,
       collarboneDescription,
+      hairShape,
+      hairShapeDescription,
       verified,
       fit,
     };

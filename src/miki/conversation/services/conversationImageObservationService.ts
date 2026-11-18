@@ -559,6 +559,13 @@ class ConversationImageObservationService {
                 `${pose953.collarboneDescription}。具体的な物や文字までは読み取れない。`,
               );
             }
+            // P973: 髪の形も添える。
+            if (pose953.hairShapeDescription) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `${pose953.hairShapeDescription}。具体的な物や文字までは読み取れない。`,
+              );
+            }
             // P964: 髪の長さも添える。
             if (pose953.hairDescription) {
               text = text.replace(
