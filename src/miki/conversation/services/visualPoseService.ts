@@ -331,14 +331,15 @@ class VisualPoseService {
    * 塗りのある体の輪郭を描く。描いた側を測り直してプロファイルが
    * 一致するかで照合する（verifyBody）。服はまだ着せない。
    * P993: 髪も描く（読みの髪の長さに合わせ、照合にも含める）。
+   * P995: 色の指定（髪は読みの色名から、体は指定色で描く）。
    */
-  public renderBody(reading: PoseReading, size = 64, face: BodyFaceSpec | null = null): Uint8Array | null {
+  public renderBody(reading: PoseReading, size = 64, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null): Uint8Array | null {
     if (!reading.head || !reading.profileComplete) return null;
     const S = size;
     const prof = reading.bodyProfile;
     const px: Array<[number, number, number]> = [];
     for (let i = 0; i < S * S; i++) px.push([245, 245, 245]);
-    const BODY: [number, number, number] = [40, 40, 120];
+    const BODY: [number, number, number] = colors?.body ?? [40, 40, 120];
     const SKIN: [number, number, number] = [232, 190, 160];
     const set = (x: number, y: number, c: [number, number, number]) => {
       const xi = Math.round(x), yi = Math.round(y);
@@ -408,8 +409,9 @@ class VisualPoseService {
     }
     // P993: 髪。読みの髪の長さに合わせて、頭の上と両脇を覆う。
     // 顔の部分は肌の頭を後から描いて出す。
+    // P995: 髪の色は読みの色名から引く（指定があればそちら）。
     if (reading.hair) {
-      const HAIR: [number, number, number] = [45, 32, 22];
+      const HAIR: [number, number, number] = colors?.hair ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
       const hairTopY = (head.y - head.r) * (S - 1);
       const hairBottomY = hairTopY + reading.hair.lengthRatio * figHn * (S - 1);
       const hx = head.x * (S - 1), hr = Math.max(2, head.r * S);
@@ -483,6 +485,11 @@ class VisualPoseService {
       if (reading.hair && re.hair) {
         compared++;
         if (reading.hair.length === re.hair.length) ok++;
+      }
+      // P995: 髪の色の一致も照合に含める。
+      if (reading.hairColor && re.hairColor) {
+        compared++;
+        if (reading.hairColor === re.hairColor) ok++;
       }
       if (compared >= 4) {
         score = ok / compared;

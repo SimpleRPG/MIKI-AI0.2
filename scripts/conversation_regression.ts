@@ -7875,6 +7875,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P994 自己点検の記録に顔の照合（visualDrawnFaces）が入っている', typeof insp994.visualDrawnFaces === 'number' && insp994.visualDrawnFaces >= 1, `visualDrawnFaces=${insp994.visualDrawnFaces}`);
 }
 
+// ---- P995 素体レンダラに色 ----
+{
+  const { visualPoseService: vpose995 } = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB995 = [number, number, number];
+  const SKIN995: RGB995 = [232, 190, 160];
+  const PINK995: RGB995 = [240, 150, 180];
+  const BLUE995: RGB995 = [40, 40, 120];
+  const px995: RGB995[] = []; for (let i = 0; i < 48 * 56; i++) px995.push([245, 245, 245]);
+  const rect995 = (x0: number, y0: number, x1: number, y1: number, c: RGB995) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px995[y * 48 + x] = c; };
+  const disc995 = (cx: number, cy: number, r: number, c: RGB995) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px995[y * 48 + x] = c; };
+  rect995(16, 15, 28, 32, BLUE995); rect995(12, 16, 15, 30, BLUE995); rect995(29, 16, 32, 30, BLUE995);
+  rect995(16, 32, 21, 50, BLUE995); rect995(23, 32, 28, 50, BLUE995);
+  rect995(13, 4, 31, 12, PINK995); rect995(13, 4, 15, 40, PINK995); rect995(29, 4, 31, 40, PINK995);
+  disc995(22, 10, 5, SKIN995);
+  const img995 = new Uint8Array(48 * 56 * 4);
+  px995.forEach((c, i) => { img995[i * 4] = c[0]; img995[i * 4 + 1] = c[1]; img995[i * 4 + 2] = c[2]; img995[i * 4 + 3] = 255; });
+  const reading995 = vpose995.analyzePose(img995, 48, 56);
+  check('P995 ピンクの髪が読める', reading995?.hairColor === 'ピンク', `hairColor=${reading995?.hairColor}`);
+  const verify995 = reading995 ? vpose995.verifyBody(reading995) : null;
+  check('P995 描いた素体の髪の色が一致して照合できる', verify995?.verified === true, `score=${verify995?.score}`);
+  const rendered995 = reading995 ? vpose995.renderBody(reading995) : null;
+  const re995 = rendered995 ? vpose995.analyzePose(rendered995, 64, 64) : null;
+  check('P995 描いた側の髪もピンクと読める', re995?.hairColor === 'ピンク', `hairColor=${re995?.hairColor}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
