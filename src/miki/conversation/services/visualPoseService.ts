@@ -54,6 +54,9 @@ export interface PoseMotionReading {
   wavingR: boolean;
   walking: boolean;
   jumping: boolean;
+  /** P963: 動きの質（速さとなめらかさ） */
+  quality: { speed: number; tempo: 'fast' | 'slow' | 'steady'; smoothness: 'smooth' | 'jerky' | 'normal' } | null;
+  qualityDescription: string;
 }
 
 /** P957: 持ち物と重なりの読み（色の名前が入る） */
@@ -189,15 +192,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number } {
     return this.load();
   }
 
@@ -1090,6 +1093,43 @@ class VisualPoseService {
     const headFeat = headTraj.length >= 4 ? motionPatternService.measure(headTraj) : null;
     const bodySway = !!headFeat && headFeat.kind === 'SWAY' && headFeat.rangeX >= 0.03 && !walking;
 
+    // P963: 動きの質。一番よく動いた関節の軌跡から、
+    // 速さ（経路÷時間）と、なめらかさ（方向転換の頻度）
+    // を読む。
+    let quality: PoseMotionReading['quality'] = null;
+    let qualityDescription = '';
+    {
+      const candidates = [handLTraj, handRTraj, headTraj].filter((t) => t.length >= 4);
+      let best: MotionSample[] | null = null;
+      let bestPath = 0;
+      for (const t of candidates) {
+        let p = 0;
+        for (let i = 1; i < t.length; i++) p += Math.hypot(t[i].x - t[i - 1].x, t[i].y - t[i - 1].y);
+        if (p > bestPath) { bestPath = p; best = t; }
+      }
+      if (best && bestPath >= 0.05) {
+        const durationS = Math.max(0.1, (best[best.length - 1].t - best[0].t) / 1000);
+        const speed = bestPath / durationS;
+        const tempo = speed >= 0.4 ? 'fast' : speed <= 0.3 ? 'slow' : 'steady';
+        const reversals = dirChanges(best.map((s) => s.x)) + dirChanges(best.map((s) => s.y));
+        const revRatio = reversals / Math.max(1, best.length - 1);
+        const smoothness = revRatio >= 0.5 ? 'jerky' : revRatio <= 0.3 ? 'smooth' : 'normal';
+        quality = { speed, tempo, smoothness };
+        const table: Record<string, string> = {
+          'fast/smooth': '速く、なめらかに動いている',
+          'fast/jerky': '速く、ぎくしゃくした動きだ',
+          'fast/normal': '速く動いている',
+          'slow/smooth': 'ゆっくり、なめらかに動いている',
+          'slow/jerky': 'ゆっくりだが、ぎくしゃくした動きだ',
+          'slow/normal': 'ゆっくり動いている',
+          'steady/smooth': 'なめらかに動いている',
+          'steady/jerky': 'ぎくしゃくした動きだ',
+          'steady/normal': '',
+        };
+        qualityDescription = table[`${tempo}/${smoothness}`] || '';
+      }
+    }
+
     const parts: string[] = [];
     if (jumping) parts.push('跳んでいる（足が地面から離れる）');
     if (walking) parts.push('歩いているような脚の動きをしている');
@@ -1098,10 +1138,12 @@ class VisualPoseService {
     if (handSwingL) parts.push('左腕を振っている');
     if (handSwingR) parts.push('右腕を振っている');
     if (bodySway) parts.push('上体が左右に揺れている');
+    if (qualityDescription) parts.push(qualityDescription);
     const description = (parts.length ? parts.join('。') : '大きな動きは見られない') + '。';
 
     const state = this.load();
     state.motions = (state.motions || 0) + 1;
+    if (quality) state.qualities = (state.qualities || 0) + 1;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
     return {
@@ -1110,6 +1152,8 @@ class VisualPoseService {
       verifiedFrames,
       description,
       handSwingL, handSwingR, wavingL, wavingR, walking, jumping,
+      quality,
+      qualityDescription,
     };
   }
 

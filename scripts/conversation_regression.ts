@@ -6942,6 +6942,38 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P962 自己点検の記録に重心（visualBalance）が入っている', typeof insp962.visualBalance === 'number' && insp962.visualBalance >= 1, `visualBalance=${insp962.visualBalance}`);
 }
 
+// ---- P963 動きの質の第1段 ----
+{
+  const { visualPoseService: vpose963 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi963 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB963 = [number, number, number];
+  const SKIN963: RGB963 = [232, 190, 160];
+  const HAIR963: RGB963 = [45, 32, 22];
+  const BLUE963: RGB963 = [40, 40, 120];
+  const frame963 = (ox: number) => {
+    const W = 56, H = 56, oy = 2;
+    const px: RGB963[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB963) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (x >= 0 && x < W) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB963) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(ox + 12, oy + 7, 6, HAIR963); disc(ox + 12, oy + 8, 5, SKIN963);
+    rect(ox + 6, oy + 13, ox + 18, oy + 30, BLUE963);
+    rect(ox + 2, oy + 14, ox + 5, oy + 28, BLUE963); rect(ox + 19, oy + 14, ox + 22, oy + 28, BLUE963);
+    rect(ox + 6, oy + 30, ox + 11, oy + 48, BLUE963); rect(ox + 13, oy + 30, ox + 18, oy + 48, BLUE963);
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return { rgba: o, width: W, height: H };
+  };
+  const seq963 = (shifts: number[], dt: number) => shifts.map((s, i) => ({ ...frame963(14 + s), t: i * dt }));
+  const fast963 = vpose963.analyzePoseMotion(seq963(Array.from({ length: 12 }, (_, i) => Math.round(5 * Math.sin(i * Math.PI / 3))), 100));
+  check('P963 速い波の動きは速くてなめらかと読める', fast963?.quality?.tempo === 'fast' && fast963?.quality?.smoothness === 'smooth', `q=${JSON.stringify(fast963?.quality)}`);
+  const jerky963 = vpose963.analyzePoseMotion(seq963([-3, 2, -1, 3, -2, 1, -3, 2, 0, -2, 3, -1], 100));
+  check('P963 乱れた動きはぎくしゃくと読める', jerky963?.quality?.smoothness === 'jerky', `q=${JSON.stringify(jerky963?.quality)}`);
+  const slow963 = vpose963.analyzePoseMotion(seq963(Array.from({ length: 24 }, (_, i) => Math.round(2 * Math.sin(i * Math.PI / 6))), 200));
+  check('P963 ゆっくりした波はゆっくりと読める', slow963?.quality?.tempo === 'slow', `q=${JSON.stringify(slow963?.quality)}`);
+  const insp963 = ksi963.inspect();
+  check('P963 自己点検の記録に動きの質（visualMotionQuality）が入っている', typeof insp963.visualMotionQuality === 'number' && insp963.visualMotionQuality >= 1, `visualMotionQuality=${insp963.visualMotionQuality}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -128,6 +128,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualBare: number;
   visualImitations: number;
   visualBalance: number;
+  visualMotionQuality: number;
   findings: string[];
 }
 
@@ -361,6 +362,7 @@ class KnowledgeSelfInspectionService {
     let visualBare = 0;
     let visualImitations = 0;
     let visualBalance = 0;
+    let visualMotionQuality = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -579,6 +581,11 @@ class KnowledgeSelfInspectionService {
       if (visualBalance > 0) {
         findings.push(`重心を${visualBalance}件読んだ`);
       }
+      // P963: 動きの質を読んだ回数。
+      visualMotionQuality = visualPoseService.summary().qualities;
+      if (visualMotionQuality > 0) {
+        findings.push(`動きの質を${visualMotionQuality}件読んだ`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -657,6 +664,7 @@ class KnowledgeSelfInspectionService {
       visualBare,
       visualImitations,
       visualBalance,
+      visualMotionQuality,
       findings,
     };
 
