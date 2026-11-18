@@ -55,18 +55,20 @@ export interface FaceReading {
   brows: boolean | null;
   /** P979: 鼻の影が見えるか（影が無くても鼻が無いとは言わない） */
   nose: boolean | null;
+  /** P980: 耳が見えるか（目の高さで横幅が上下より広いか） */
+  ears: boolean | null;
 }
 
 class VisualZoomService {
-  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number; brows: number; noses: number } {
+  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number; brows: number; noses: number; ears: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number; fingerDetails?: number; eyeColors?: number; brows?: number; noses?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0, fingerDetails: raw.fingerDetails || 0, eyeColors: raw.eyeColors || 0, brows: raw.brows || 0, noses: raw.noses || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number; fingerDetails?: number; eyeColors?: number; brows?: number; noses?: number; ears?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0, fingerDetails: raw.fingerDetails || 0, eyeColors: raw.eyeColors || 0, brows: raw.brows || 0, noses: raw.noses || 0, ears: raw.ears || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0, fingerDetails: 0, eyeColors: 0, brows: 0, noses: 0 };
+    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0, fingerDetails: 0, eyeColors: 0, brows: 0, noses: 0, ears: 0 };
   }
 
-  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number; brows: number; noses: number } {
+  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number; brows: number; noses: number; ears: number } {
     return this.load();
   }
 
@@ -291,6 +293,7 @@ class VisualZoomService {
     if (eyeColor) parts.push(`目の色は${eyeColor}`);
     if (raw.brows === true) parts.push('眉が見える');
     if (raw.nose === true) parts.push('鼻の影が見える');
+    if (raw.ears === true) parts.push('耳が見える');
     if (raw.mouthShape !== 'none') parts.push('口が見える');
     let description = parts.join('。');
     if (description) description += '。';
@@ -301,11 +304,12 @@ class VisualZoomService {
     if (eyeColor) state.eyeColors++;
     if (raw.brows === true) state.brows++;
     if (raw.nose === true) state.noses++;
+    if (raw.ears === true) state.ears++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     return { ...raw, verified, description, eyeColor };
   }
 
-  private measureFace(pixels: Uint8Array): { eyes: 0 | 1 | 2; mouthShape: FaceReading['mouthShape']; mouthWidthRatio: number; eyePts: { x: number; y: number }[]; mouthPts: { x: number; y: number }[]; brows: boolean | null; nose: boolean | null; faceBox: { x0: number; y0: number; x1: number; y1: number } } | null {
+  private measureFace(pixels: Uint8Array): { eyes: 0 | 1 | 2; mouthShape: FaceReading['mouthShape']; mouthWidthRatio: number; eyePts: { x: number; y: number }[]; mouthPts: { x: number; y: number }[]; brows: boolean | null; nose: boolean | null; ears: boolean | null; faceBox: { x0: number; y0: number; x1: number; y1: number } } | null {
     const S = OUT;
     const isSkin = (i: number) => {
       const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
@@ -412,6 +416,29 @@ class VisualZoomService {
         if (sMean > 0 && cMean <= sMean * 0.94) nose = true;
       }
     }
+    // P980: 耳。目の高さの帯で肌の横幅が、帯の上下の行より
+    // はっきり広ければ、横に張り出した耳と読む。楕円の顔は
+    // 中央が自然に一番広いので、上下との差で見る。
+    let ears: boolean | null = null;
+    {
+      const rowSpan = (y: number): number => {
+        let lo = -1, hi = -1;
+        for (let x = 0; x < S; x++) {
+          if (isSkin((y * S + x) * 4)) { if (lo < 0) lo = x; hi = x; }
+        }
+        return lo < 0 ? 0 : hi - lo + 1;
+      };
+      const bandTop = Math.round(sy0 + fh * 0.28);
+      const bandBot = Math.round(sy0 + fh * 0.52);
+      let earSpan = 0;
+      for (let y = bandTop; y <= bandBot; y++) earSpan = Math.max(earSpan, rowSpan(y));
+      const aboveRef = rowSpan(Math.round(sy0 + fh * 0.18));
+      const belowRef = rowSpan(Math.round(sy0 + fh * 0.62));
+      const refs = Math.max(aboveRef, belowRef);
+      const diff = earSpan - refs;
+      if (refs > 0 && diff >= Math.max(3, fw * 0.1)) ears = true;
+      else if (diff <= 2) ears = false;
+    }
     // 口：顔の下寄りの帯にある暗い点
     const mouthBand = { y0: sy0 + fh * 0.6, y1: sy0 + fh * 0.94 };
     const mouthPts: { x: number; y: number }[] = [];
@@ -438,7 +465,7 @@ class VisualZoomService {
         mouthShape = 'flat';
       }
     }
-    return { eyes, mouthShape, mouthWidthRatio, eyePts, mouthPts, brows, nose, faceBox: { x0: sx0, y0: sy0, x1: sx1, y1: sy1 } };
+    return { eyes, mouthShape, mouthWidthRatio, eyePts, mouthPts, brows, nose, ears, faceBox: { x0: sx0, y0: sy0, x1: sx1, y1: sy1 } };
   }
 
   /** 読み通りの模式図（肌色の四角＋目の点＋口の弧）を描く */

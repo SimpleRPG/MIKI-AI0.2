@@ -7393,6 +7393,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P979 自己点検の記録に鼻（visualNose）が入っている', typeof insp979.visualNose === 'number' && insp979.visualNose >= 1, `visualNose=${insp979.visualNose}`);
 }
 
+// ---- P980 耳の第1段 ----
+{
+  const { visualZoomService: vzoom980 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi980 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB980 = [number, number, number];
+  const SKIN980: RGB980 = [232, 190, 160];
+  const HAIR980: RGB980 = [45, 32, 22];
+  const DARK980: RGB980 = [30, 30, 30];
+  const face980 = (withEars: boolean) => {
+    const px: RGB980[] = []; for (let i = 0; i < 48 * 48; i++) px.push([245, 245, 245]);
+    const disc = (cx: number, cy: number, r: number, c: RGB980) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB980) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR980); disc(24, 24, 16, SKIN980);
+    if (withEars) { rect(3, 20, 9, 27, SKIN980); rect(39, 20, 45, 27, SKIN980); }
+    disc(17, 20, 3, DARK980); disc(31, 20, 3, DARK980);
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const with980 = vzoom980.analyzeFace(face980(true));
+  check('P980 耳のある顔で耳が読める', with980?.ears === true && with980.description.includes('耳が見える'), `ears=${with980?.ears}`);
+  const plain980 = vzoom980.analyzeFace(face980(false));
+  check('P980 普通の楕円の顔は耳なしと読む（自然な広がりと区別できる）', plain980?.ears === false, `ears=${plain980?.ears}`);
+  const insp980 = ksi980.inspect();
+  check('P980 自己点検の記録に耳（visualEars）が入っている', typeof insp980.visualEars === 'number' && insp980.visualEars >= 1, `visualEars=${insp980.visualEars}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
