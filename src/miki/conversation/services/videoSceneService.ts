@@ -6,6 +6,8 @@ import {
 import { visualPatternService } from './visualPatternService';
 import { visualScenePatternService } from './visualScenePatternService';
 import { visualFigureService } from './visualFigureService';
+import { selectMainObjectRegion } from './shapeRenderVerificationService';
+import { motionPatternService, type MotionSample } from '../../selfAwareness/services/motionPatternService';
 
 /**
  * P946: 動画理解・第3層の第1段「場面分解」。
@@ -19,6 +21,13 @@ import { visualFigureService } from './visualFigureService';
  *
  * これで「この場面では何が見えていて、何が話されていたか」
  * を並べて持てるようになる。画面の文字を読むのは次の段。
+ *
+ * P947: 第4段「動きの記述」。場面ごとに主対象（地でない最大の
+ * 領域）の重心軌跡を取り、動作部品（P941）と照合する。覚えた
+ * 動作に似ていればその名前で、無ければ測定の言葉（横揺れ・
+ * 静止など）で記述する。軌跡の点が8つ未満の場面は記述しない。
+ * 周期の読みには1周期あたり6点以上のサンプリングが要る
+ * （粗いと不規則と読む——実測で確認した彼女の物差しの限界）。
  *
  * 守る線:
  * - カット判定は硬い切り替わりだけ（距離 >= 0.42）。
@@ -52,6 +61,8 @@ export interface VideoScene {
   dominantColors: string[];
   identifications: string[];
   subtitleText: string;
+  /** P947: 場面内の主対象の動きの記述（軌跡が取れた場面だけ）。 */
+  motionText?: string;
 }
 
 /** 特徴量どうしの距離（0..1）。色・領域・明るさ・エッジの合成。 */
@@ -126,6 +137,22 @@ class VideoSceneService {
         .map((seg) => seg.text.trim())
         .filter(Boolean)
         .join(' ');
+      // P947: 場面内の主対象の重心軌跡を取り、動きを記述する。
+      let motionText: string | undefined;
+      try {
+        const samples: MotionSample[] = [];
+        for (let i = from; i <= to; i++) {
+          const main = selectMainObjectRegion(features[i]);
+          if (main) samples.push({ t: sorted[i].tMs, x: main.centroidX, y: main.centroidY });
+        }
+        if (samples.length >= 8) {
+          const matched = motionPatternService.match(samples);
+          const described = matched
+            ? `動きは覚えた動作「${matched.name}」に似ている`
+            : motionPatternService.describe(samples)?.replace(/。$/, '');
+          if (described) motionText = described;
+        }
+      } catch { /* 軌跡が取れなくても場面は残す */ }
       scenes.push({
         index: s,
         startMs,
@@ -134,6 +161,7 @@ class VideoSceneService {
         dominantColors: repFeatures.dominantColors.slice(0, 3).map((c) => c.name),
         identifications,
         subtitleText,
+        motionText,
       });
     }
 
@@ -141,6 +169,7 @@ class VideoSceneService {
       const state = this.loadState();
       state.runs += 1;
       state.scenesTotal += scenes.length;
+      state.motionsTotal += scenes.filter((sc) => sc.motionText).length;
       state.lastSceneCount = scenes.length;
       storageService.setItem(KEY, JSON.stringify(state));
     } catch { /* 台帳は補助経路 */ }
@@ -157,27 +186,29 @@ class VideoSceneService {
     return scenes.map((s) => {
       const parts = [`場面${s.index + 1}（${fmt(s.startMs)}–${fmt(s.endMs)}）: 主な色は${s.dominantColors.join('・') || '不明'}`];
       if (s.identifications.length) parts.push(s.identifications.join('。'));
+      if (s.motionText) parts.push(s.motionText);
       if (s.subtitleText) parts.push(`字幕「${s.subtitleText}」`);
       return parts.join('。');
     }).join('\n');
   }
 
-  private loadState(): { runs: number; scenesTotal: number; lastSceneCount: number } {
+  private loadState(): { runs: number; scenesTotal: number; motionsTotal: number; lastSceneCount: number } {
     try {
       const parsed = JSON.parse(storageService.getItem(KEY) || '{}');
       return {
         runs: Number(parsed.runs || 0),
         scenesTotal: Number(parsed.scenesTotal || 0),
+        motionsTotal: Number(parsed.motionsTotal || 0),
         lastSceneCount: Number(parsed.lastSceneCount || 0),
       };
     } catch {
-      return { runs: 0, scenesTotal: 0, lastSceneCount: 0 };
+      return { runs: 0, scenesTotal: 0, motionsTotal: 0, lastSceneCount: 0 };
     }
   }
 
-  public summary(): { runs: number; scenesTotal: number } {
+  public summary(): { runs: number; scenesTotal: number; motionsTotal: number } {
     const state = this.loadState();
-    return { runs: state.runs, scenesTotal: state.scenesTotal };
+    return { runs: state.runs, scenesTotal: state.scenesTotal, motionsTotal: state.motionsTotal };
   }
 }
 

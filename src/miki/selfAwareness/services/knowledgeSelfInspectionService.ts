@@ -112,6 +112,7 @@ export interface KnowledgeSelfInspectionRecord {
   swarmVerifications: number;
   visualFigures: number;
   videoScenes: number;
+  videoMotions: number;
   findings: string[];
 }
 
@@ -331,6 +332,7 @@ class KnowledgeSelfInspectionService {
     let swarmVerifications = 0;
     let visualFigures = 0;
     let videoScenes = 0;
+    let videoMotions = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -480,6 +482,11 @@ class KnowledgeSelfInspectionService {
       if (videoScenes > 0) {
         findings.push(`動画を${videoScenes}場面に切り分けた`);
       }
+      // P947: 動きを記述できた場面の総数。
+      videoMotions = videoSceneService.summary().motionsTotal;
+      if (videoMotions > 0) {
+        findings.push(`動画の${videoMotions}場面で動きを記述した`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -544,6 +551,7 @@ class KnowledgeSelfInspectionService {
       swarmVerifications,
       visualFigures,
       videoScenes,
+      videoMotions,
       findings,
     };
 

@@ -6224,6 +6224,38 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P946 自己点検に場面数が入る', insp946.videoScenes >= 3, `videoScenes=${insp946.videoScenes}`);
 }
 
+// ---- P947 動画理解・第3層 第4段（動きの記述） ----
+{
+  const { videoSceneService: vs947 } = await import('../src/miki/conversation/services/videoSceneService');
+  const W947 = 48, H947 = 48;
+  const frame947 = (tMs: number, left: number) => {
+    const rgba = new Uint8Array(W947 * H947 * 4);
+    for (let y = 0; y < H947; y++) for (let x = 0; x < W947; x++) {
+      const dark = x >= left && x <= left + 9 && y >= 19 && y <= 28;
+      const v = dark ? 20 : 240; const i = (y * W947 + x) * 4;
+      rgba[i] = v; rgba[i + 1] = v; rgba[i + 2] = v; rgba[i + 3] = 255;
+    }
+    return { tMs, rgba, width: W947, height: H947 };
+  };
+  const before947 = vs947.summary().motionsTotal;
+  const sway947 = Array.from({ length: 19 }, (_, i) => frame947(i * 100, Math.round(19 + 10 * Math.sin((2 * Math.PI * i * 100) / 900))));
+  const swayScenes947 = vs947.decompose(sway947 as any).scenes;
+  check('P947 横揺れを周期つきで記述できる', swayScenes947.length === 1 && String(swayScenes947[0].motionText || '').includes('横揺れ'), `motion=${JSON.stringify(swayScenes947[0]?.motionText)}`);
+  const drift947 = Array.from({ length: 19 }, (_, i) => frame947(i * 100, 4 + i));
+  const driftScenes947 = vs947.decompose(drift947 as any).scenes;
+  check('P947 一方向の移動を記述できる', driftScenes947.length === 1 && String(driftScenes947[0].motionText || '').includes('一方向へ移動'), `motion=${JSON.stringify(driftScenes947[0]?.motionText)}`);
+  const still947 = Array.from({ length: 10 }, (_, i) => frame947(i * 100, 19));
+  const stillScenes947 = vs947.decompose(still947 as any).scenes;
+  check('P947 静止も記述できる', stillScenes947.length === 1 && String(stillScenes947[0].motionText || '').includes('動いていない'), `motion=${JSON.stringify(stillScenes947[0]?.motionText)}`);
+  const short947 = Array.from({ length: 3 }, (_, i) => frame947(i * 100, 19));
+  const shortScenes947 = vs947.decompose(short947 as any).scenes;
+  check('P947 軌跡が短い場面は動きを記述しない', shortScenes947.length === 1 && shortScenes947[0].motionText === undefined, `motion=${JSON.stringify(shortScenes947[0]?.motionText)}`);
+  check('P947 記述が台帳に残る', vs947.summary().motionsTotal >= before947 + 3, `before=${before947} after=${vs947.summary().motionsTotal}`);
+  const { knowledgeSelfInspectionService: ksi947 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  const insp947: any = ksi947.inspect();
+  check('P947 自己点検に動きの記述数が入る', insp947.videoMotions >= 3, `videoMotions=${insp947.videoMotions}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
