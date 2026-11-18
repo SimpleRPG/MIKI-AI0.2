@@ -138,6 +138,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualEyeColor: number;
   visualHairShape: number;
   visualPromotedClaims: number;
+  visualMotionHabit: number;
   findings: string[];
 }
 
@@ -381,6 +382,7 @@ class KnowledgeSelfInspectionService {
     let visualEyeColor = 0;
     let visualHairShape = 0;
     let visualPromotedClaims = 0;
+    let visualMotionHabit = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -651,6 +653,12 @@ class KnowledgeSelfInspectionService {
         const habitText = poseSummary967.habit === 'right' ? '右に傾きがち' : poseSummary967.habit === 'left' ? '左に傾きがち' : 'まっすぐ立ちがち';
         findings.push(`姿勢の癖が見えてきた（${habitText}）`);
       }
+      // P975: 動きの癖（最近の速さの偏り）。
+      visualMotionHabit = poseSummary967.qualityWindow;
+      if (poseSummary967.motionHabit) {
+        const mhText = poseSummary967.motionHabit === 'fast' ? '速い動きがち' : poseSummary967.motionHabit === 'slow' ? 'ゆっくりな動きがち' : '一定の速さの動きがち';
+        findings.push(`動きの癖が見えてきた（${mhText}）`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -739,6 +747,7 @@ class KnowledgeSelfInspectionService {
       visualEyeColor,
       visualHairShape,
       visualPromotedClaims,
+      visualMotionHabit,
       findings,
     };
 

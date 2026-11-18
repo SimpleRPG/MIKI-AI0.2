@@ -7245,6 +7245,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P974 自己点検の記録に昇格数（visualPromotedClaims）が入っている', typeof insp974.visualPromotedClaims === 'number' && insp974.visualPromotedClaims >= 1, `visualPromotedClaims=${insp974.visualPromotedClaims}`);
 }
 
+// ---- P975 動きの癖の第1段 ----
+{
+  const { visualPoseService: vpose975 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi975 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB975 = [number, number, number];
+  const SKIN975: RGB975 = [232, 190, 160];
+  const HAIR975: RGB975 = [45, 32, 22];
+  const BLUE975: RGB975 = [40, 40, 120];
+  const frame975 = (ox: number) => {
+    const W = 56, H = 56, oy = 2;
+    const px: RGB975[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB975) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (x >= 0 && x < W) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB975) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(ox + 12, oy + 7, 6, HAIR975); disc(ox + 12, oy + 8, 5, SKIN975);
+    rect(ox + 6, oy + 13, ox + 18, oy + 30, BLUE975);
+    rect(ox + 2, oy + 14, ox + 5, oy + 28, BLUE975); rect(ox + 19, oy + 14, ox + 22, oy + 28, BLUE975);
+    rect(ox + 6, oy + 30, ox + 11, oy + 48, BLUE975); rect(ox + 13, oy + 30, ox + 18, oy + 48, BLUE975);
+    const o = new Uint8Array(W * H * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return { rgba: o, width: W, height: H };
+  };
+  const seq975 = Array.from({ length: 12 }, (_, i) => Math.round(5 * Math.sin(i * Math.PI / 3))).map((s, i) => ({ ...frame975(14 + s), t: i * 100 }));
+  for (let i = 0; i < 14; i++) vpose975.analyzePoseMotion(seq975);
+  const sum975 = vpose975.summary();
+  check('P975 速い動きが続くと動きの癖として読める', sum975.motionHabit === 'fast' && sum975.qualityWindow >= 10, `habit=${sum975.motionHabit} window=${sum975.qualityWindow}`);
+  const insp975 = ksi975.inspect();
+  check('P975 自己点検の記録に動きの癖の窓（visualMotionHabit）が入っている', typeof insp975.visualMotionHabit === 'number' && insp975.visualMotionHabit >= 10, `visualMotionHabit=${insp975.visualMotionHabit}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
