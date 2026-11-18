@@ -131,6 +131,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualMotionQuality: number;
   visualHair: number;
   visualNails: number;
+  visualCollarbone: number;
   findings: string[];
 }
 
@@ -367,6 +368,7 @@ class KnowledgeSelfInspectionService {
     let visualMotionQuality = 0;
     let visualHair = 0;
     let visualNails = 0;
+    let visualCollarbone = 0;
     let reasoningDeepestChain = 0;
     try {
       const codeItems = (reusableComponentFactoryService.list() as unknown as Array<Record<string, unknown>>).filter(
@@ -600,6 +602,11 @@ class KnowledgeSelfInspectionService {
       if (visualHair > 0) {
         findings.push(`髪の長さを${visualHair}件読んだ`);
       }
+      // P966: 鎖骨の影を読んだ回数。
+      visualCollarbone = visualPoseService.summary().collarbones;
+      if (visualCollarbone > 0) {
+        findings.push(`鎖骨の影を${visualCollarbone}件読んだ`);
+      }
     } catch { /* コードの棚卸しは補助経路 */ }
 
     const record: KnowledgeSelfInspectionRecord = {
@@ -681,6 +688,7 @@ class KnowledgeSelfInspectionService {
       visualMotionQuality,
       visualHair,
       visualNails,
+      visualCollarbone,
       findings,
     };
 

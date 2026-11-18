@@ -146,6 +146,9 @@ export interface PoseReading {
   /** P964: 髪の長さ */
   hair: { length: 'short' | 'medium' | 'long'; lengthRatio: number } | null;
   hairDescription: string;
+  /** P966: 鎖骨の影（肌の帯でのみ判定、読めなければ null） */
+  collarbone: boolean | null;
+  collarboneDescription: string;
   verified: boolean;
   fit: number;
 }
@@ -195,15 +198,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number; imitations?: number; imitationsOk?: number; balances?: number; qualities?: number; hairs?: number; collarbones?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0, imitations: raw.imitations || 0, imitationsOk: raw.imitationsOk || 0, balances: raw.balances || 0, qualities: raw.qualities || 0, hairs: raw.hairs || 0, collarbones: raw.collarbones || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0, imitations: 0, imitationsOk: 0, balances: 0, qualities: 0, hairs: 0, collarbones: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number; imitations: number; imitationsOk: number; balances: number; qualities: number; hairs: number; collarbones: number } {
     return this.load();
   }
 
@@ -867,6 +870,65 @@ class VisualPoseService {
         : balance.label === 'right' ? '重心が右に寄って傾いている' : '重心が左に寄って傾いている'
       : '';
 
+    // P966: 鎖骨の影。首の下の胸の帯が肌のとき、左右で
+    // 対称な位置にある暗い影（明るさの谷）を鎖骨と読む。
+    // 影でしか見えない部位の測り方の第1段。
+    let collarbone: boolean | null = null;
+    {
+      const isSkinPx966 = (i: number) => {
+        const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+        return r > 170 && g > 110 && g < 220 && b > 70 && b < 195 && r > g && g >= b - 5 && r - b > 35;
+      };
+      const lum966 = (i: number) => 0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2];
+      const by0 = Math.round(neckY + figH * 0.03);
+      const by1 = Math.round(neckY + figH * 0.16);
+      const bx0 = Math.round(headCx - figW * 0.34);
+      const bx1 = Math.round(headCx + figW * 0.34);
+      let skinN = 0;
+      let totN = 0;
+      for (let y = by0; y <= by1; y++) {
+        for (let x = bx0; x <= bx1; x++) {
+          if (x < 0 || y < 0 || x >= width || y >= height) continue;
+          totN++;
+          const p = y * width + x;
+          if (mask[p] && isSkinPx966(p * 4)) skinN++;
+        }
+      }
+      if (totN > 0 && skinN >= 30 && skinN / totN >= 0.4) {
+        // 基準は帯の中で一番明るい行（影のない肌の行）。
+        // 左右それぞれで、その行より1割以上暗い行が
+        // ほぼ同じ高さにあれば鎖骨の影と読む。
+        const rowMean = (y: number, xa: number, xb: number): number | null => {
+          let n = 0;
+          let s = 0;
+          for (let x = xa; x <= xb; x++) {
+            if (x < 0 || x >= width) continue;
+            const p = y * width + x;
+            if (mask[p] && isSkinPx966(p * 4)) { n++; s += lum966(p * 4); }
+          }
+          return n >= 5 ? s / n : null;
+        };
+        let baseline = 0;
+        for (let y = by0; y <= by1; y++) {
+          const v = rowMean(y, bx0, bx1);
+          if (v !== null && v > baseline) baseline = v;
+        }
+        const halfDip = (xa: number, xb: number): { y: number; v: number } | null => {
+          let best: { y: number; v: number } | null = null;
+          for (let y = by0; y <= by1; y++) {
+            const v = rowMean(y, xa, xb);
+            if (v !== null && (!best || v < best.v)) best = { y, v };
+          }
+          return best;
+        };
+        const midX = Math.round(headCx);
+        const dipL = halfDip(bx0, midX - 1);
+        const dipR = halfDip(midX + 1, bx1);
+        collarbone = !!(baseline > 0 && dipL && dipR && dipL.v <= baseline * 0.9 && dipR.v <= baseline * 0.9 && Math.abs(dipL.y - dipR.y) <= Math.max(2, figH * 0.05));
+      }
+    }
+    const collarboneDescription = collarbone === true ? '鎖骨の影が見える' : '';
+
     // P958: 髪の色。頭の範囲で、肌色でない前景の最頻色。
     let hairColor: string | null = null;
     let hairBinKey: string | null = null;
@@ -1001,6 +1063,7 @@ class VisualPoseService {
     if (bare === true) state.bare++;
     if (balance) state.balances++;
     if (hair) state.hairs++;
+    if (collarbone === true) state.collarbones++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
     const norm = (p: PosePoint | null): PosePoint | null =>
@@ -1032,6 +1095,8 @@ class VisualPoseService {
       balanceDescription,
       hair,
       hairDescription,
+      collarbone,
+      collarboneDescription,
       verified,
       fit,
     };

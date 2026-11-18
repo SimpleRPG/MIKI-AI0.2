@@ -7033,6 +7033,38 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P965 自己点検の記録に爪（visualNails）が入っている', typeof insp965.visualNails === 'number' && insp965.visualNails >= 1, `visualNails=${insp965.visualNails}`);
 }
 
+// ---- P966 鎖骨の影の第1段 ----
+{
+  const { visualPoseService: vpose966 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi966 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB966 = [number, number, number];
+  const SKIN966: RGB966 = [232, 190, 160];
+  const HAIR966: RGB966 = [45, 32, 22];
+  const BLUE966: RGB966 = [40, 40, 120];
+  const SHADE966: RGB966 = [200, 155, 125];
+  const person966 = (chest: RGB966, shade: boolean) => {
+    const px: RGB966[] = []; for (let i = 0; i < 48 * 56; i++) px.push([245, 245, 245]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB966) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB966) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(22, 9, 6, HAIR966); disc(22, 10, 5, SKIN966);
+    rect(16, 15, 28, 32, chest);
+    if (shade) { rect(17, 17, 21, 19, SHADE966); rect(23, 17, 27, 19, SHADE966); }
+    rect(12, 16, 15, 30, chest); rect(29, 16, 32, 30, chest);
+    rect(16, 32, 21, 50, chest); rect(23, 32, 28, 50, chest);
+    const o = new Uint8Array(48 * 56 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  const withShade966 = vpose966.analyzePose(person966(SKIN966, true), 48, 56);
+  check('P966 鎖骨の影が読める', withShade966?.collarbone === true, `collarbone=${withShade966?.collarbone}`);
+  const noShade966 = vpose966.analyzePose(person966(SKIN966, false), 48, 56);
+  check('P966 影のない胸は鎖骨なしと読める', noShade966?.collarbone === false, `collarbone=${noShade966?.collarbone}`);
+  const clothed966 = vpose966.analyzePose(person966(BLUE966, false), 48, 56);
+  check('P966 服の上からは鎖骨を決めない', clothed966?.collarbone === null, `collarbone=${clothed966?.collarbone}`);
+  const insp966 = ksi966.inspect();
+  check('P966 自己点検の記録に鎖骨（visualCollarbone）が入っている', typeof insp966.visualCollarbone === 'number' && insp966.visualCollarbone >= 1, `visualCollarbone=${insp966.visualCollarbone}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

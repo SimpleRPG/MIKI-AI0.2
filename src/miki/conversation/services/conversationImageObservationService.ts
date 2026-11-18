@@ -552,6 +552,13 @@ class ConversationImageObservationService {
                 `服は、${pose953.clothingDescription}具体的な物や文字までは読み取れない。`,
               );
             }
+            // P966: 鎖骨の影も添える。
+            if (pose953.collarboneDescription) {
+              text = text.replace(
+                '具体的な物や文字までは読み取れない。',
+                `${pose953.collarboneDescription}。具体的な物や文字までは読み取れない。`,
+              );
+            }
             // P964: 髪の長さも添える。
             if (pose953.hairDescription) {
               text = text.replace(
