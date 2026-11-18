@@ -134,6 +134,9 @@ export interface PoseReading {
   extrasDescription: string;
   /** P958: 髪の色の名前（頭の肌色でない部分の最頻色） */
   hairColor: string | null;
+  /** P960: 服を着ていないらしいか（肌色率から。判定できなければ null） */
+  bare: boolean | null;
+  bareDescription: string;
   verified: boolean;
   fit: number;
 }
@@ -183,15 +186,15 @@ function rowSpans(mask: Uint8Array, width: number, y: number): RowSpan {
 }
 
 class VisualPoseService {
-  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number } {
+  private load(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; verified?: number; motions?: number; clothing?: number; extras?: number; multi?: number; holding?: number; bare?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, verified: raw.verified || 0, motions: raw.motions || 0, clothing: raw.clothing || 0, extras: raw.extras || 0, multi: raw.multi || 0, holding: raw.holding || 0, bare: raw.bare || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0 };
+    return { analyzed: 0, verified: 0, motions: 0, clothing: 0, extras: 0, multi: 0, holding: 0, bare: 0 };
   }
 
-  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number } {
+  public summary(): { analyzed: number; verified: number; motions: number; clothing: number; extras: number; multi: number; holding: number; bare: number } {
     return this.load();
   }
 
@@ -721,6 +724,43 @@ class VisualPoseService {
     else if (clothing.twoPiece === false && clothing.bottom !== 'unknown') clothingParts.push('服は上下が同じ色');
     const clothingDescription = clothingParts.length ? clothingParts.join('。') + '。' : '';
 
+    // P960: 裸の状態。体全体の肌色率と、胴の帯の肌色率の
+    // 両方が高いときだけ「服を着ていない」と読む。水着の
+    // ように胴が覆われていれば、脚や腕が肌でも裸とは
+    // 読まない。肌色率が低ければ服を着ている。
+    let bare: boolean | null = null;
+    {
+      const isSkinPx = (i: number) => {
+        const r = rgba[i], g = rgba[i + 1], b = rgba[i + 2];
+        return r > 170 && g > 110 && g < 220 && b > 70 && b < 195 && r > g && g >= b - 5 && r - b > 35;
+      };
+      let skinN = 0;
+      let maskN = 0;
+      let torsoSkin = 0;
+      let torsoN = 0;
+      const hipRefB = neckY + figH * 0.45;
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          if (!mask[p]) continue;
+          maskN++;
+          const skin = isSkinPx(p * 4);
+          if (skin) skinN++;
+          if (y >= neckY && y <= hipRefB) {
+            torsoN++;
+            if (skin) torsoSkin++;
+          }
+        }
+      }
+      if (maskN > 0) {
+        const share = skinN / maskN;
+        const torsoShare = torsoN >= 20 ? torsoSkin / torsoN : 0;
+        if (share >= 0.5 && torsoShare >= 0.5) bare = true;
+        else if (share <= 0.35) bare = false;
+      }
+    }
+    const bareDescription = bare === true ? '服は着ていないようだ（肌が広く見えている）' : '';
+
     // P958: 髪の色。頭の範囲で、肌色でない前景の最頻色。
     let hairColor: string | null = null;
     {
@@ -820,6 +860,7 @@ class VisualPoseService {
     if (verified) state.verified++;
     if (clothingDescription) state.clothing++;
     if (extrasDescription) state.extras++;
+    if (bare === true) state.bare++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
 
     const norm = (p: PosePoint | null): PosePoint | null =>
@@ -845,6 +886,8 @@ class VisualPoseService {
       extras,
       extrasDescription,
       hairColor,
+      bare,
+      bareDescription,
       verified,
       fit,
     };

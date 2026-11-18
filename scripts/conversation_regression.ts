@@ -6852,6 +6852,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P959 自己点検の記録に手つなぎと手（visualHoldingHands・visualHands）が入っている', typeof insp959.visualHoldingHands === 'number' && insp959.visualHoldingHands >= 1 && typeof insp959.visualHands === 'number' && insp959.visualHands >= 1, `holding=${insp959.visualHoldingHands} hands=${insp959.visualHands}`);
 }
 
+// ---- P960 裸の状態の第1段 ----
+{
+  const { visualPoseService: vpose960 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { knowledgeSelfInspectionService: ksi960 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB960 = [number, number, number];
+  const SKIN960: RGB960 = [232, 190, 160];
+  const HAIR960: RGB960 = [45, 32, 22];
+  const BLUE960: RGB960 = [40, 40, 120];
+  const RED960: RGB960 = [170, 40, 40];
+  const draw960 = (px: RGB960[], W: number, ox: number, oy: number, torso: RGB960, arms: RGB960, legs: RGB960) => {
+    const H = px.length / W;
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB960) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB960) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(ox + 12, oy + 7, 6, HAIR960); disc(ox + 12, oy + 8, 5, SKIN960);
+    rect(ox + 6, oy + 13, ox + 18, oy + 30, torso);
+    rect(ox + 2, oy + 14, ox + 5, oy + 28, arms); rect(ox + 19, oy + 14, ox + 22, oy + 28, arms);
+    rect(ox + 6, oy + 30, ox + 11, oy + 48, legs); rect(ox + 13, oy + 30, ox + 18, oy + 48, legs);
+  };
+  const canvas960 = (W: number, H: number) => { const px: RGB960[] = []; for (let i = 0; i < W * H; i++) px.push([245, 245, 245]); return px; };
+  const toRgba960 = (px: RGB960[]) => { const o = new Uint8Array(px.length * 4); px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; }); return o; };
+  const nude960 = canvas960(48, 56); draw960(nude960, 48, 10, 2, SKIN960, SKIN960, SKIN960);
+  const rn960 = vpose960.analyzePose(toRgba960(nude960), 48, 56);
+  check('P960 肌が広い人は服を着ていないと読める', rn960?.bare === true && (rn960?.bareDescription || '').includes('服は着ていない'), `bare=${rn960?.bare}`);
+  const clothed960 = canvas960(48, 56); draw960(clothed960, 48, 10, 2, BLUE960, BLUE960, BLUE960);
+  const rc960 = vpose960.analyzePose(toRgba960(clothed960), 48, 56);
+  check('P960 服を着た人は裸とは読まない', rc960?.bare === false, `bare=${rc960?.bare}`);
+  const swim960 = canvas960(48, 56); draw960(swim960, 48, 10, 2, RED960, SKIN960, SKIN960);
+  const rs960 = vpose960.analyzePose(toRgba960(swim960), 48, 56);
+  check('P960 胴が覆われた水着姿は裸とは読まない（判定保留）', rs960?.bare !== true, `bare=${rs960?.bare}`);
+  const insp960 = ksi960.inspect();
+  check('P960 自己点検の記録に裸の状態（visualBare）が入っている', typeof insp960.visualBare === 'number' && insp960.visualBare >= 1, `visualBare=${insp960.visualBare}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
