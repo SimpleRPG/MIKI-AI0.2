@@ -7683,6 +7683,86 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P989 自己点検の記録に口の大きさ（visualMouthSize）が入っている', typeof insp989.visualMouthSize === 'number' && insp989.visualMouthSize >= 1, `visualMouthSize=${insp989.visualMouthSize}`);
 }
 
+// ---- P990 検定バッテリー第3弾（姿勢と顔の読み P950〜P989 の統合確認） ----
+{
+  const { visualPoseService: vpose990 } = await import('../src/miki/conversation/services/visualPoseService');
+  const { visualZoomService: vzoom990 } = await import('../src/miki/conversation/services/visualZoomService');
+  type RGB990 = [number, number, number];
+  const SKIN990: RGB990 = [232, 190, 160];
+  const HAIR990: RGB990 = [45, 32, 22];
+  const BLUE990: RGB990 = [40, 40, 120];
+  const DARK990: RGB990 = [30, 30, 30];
+  const BG990: RGB990 = [245, 245, 245];
+  const fin990 = (px: RGB990[], W: number, H: number) => { const o = new Uint8Array(W * H * 4); px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; }); return o; };
+  // 立つ人（P984/P986/P987で検証済みの描き方）
+  const person990 = (W: number, H: number, armBottom: number, legBottom: number) => {
+    const px: RGB990[] = []; for (let i = 0; i < W * H; i++) px.push([...BG990] as RGB990);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB990) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * W + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB990) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * W + x] = c; };
+    disc(22, 9, 6, HAIR990); disc(22, 10, 5, SKIN990);
+    rect(16, 15, 28, 32, BLUE990);
+    if (armBottom > 32) { rect(11, 16, 14, armBottom, BLUE990); rect(30, 16, 33, armBottom, BLUE990); }
+    else { rect(12, 16, 15, armBottom, BLUE990); rect(29, 16, 32, armBottom, BLUE990); }
+    rect(16, 32, 21, legBottom, BLUE990); rect(23, 32, 28, legBottom, BLUE990);
+    return px;
+  };
+  const std990 = vpose990.analyzePose(fin990(person990(48, 56, 30, 50), 48, 56), 48, 56);
+  check('P990 バッテリー：立つ人の姿勢と首', std990?.posture === 'STANDING' && std990.neck === true, `posture=${std990?.posture} neck=${std990?.neck}`);
+  check('P990 バッテリー：普通の腕と脚は言わない', std990?.armLength === null && std990?.legLength === null, `arm=${std990?.armLength} leg=${std990?.legLength}`);
+  const longArm990 = vpose990.analyzePose(fin990(person990(48, 56, 44, 50), 48, 56), 48, 56);
+  check('P990 バッテリー：長い腕', longArm990?.armLength === 'long', `arm=${longArm990?.armLength}`);
+  const longLeg990 = vpose990.analyzePose(fin990(person990(48, 68, 30, 62), 48, 68), 48, 68);
+  check('P990 バッテリー：長い脚', longLeg990?.legLength === 'long', `leg=${longLeg990?.legLength}`);
+  // 顔（P978〜P989で検証済みの描き方）
+  const faceBase990 = () => {
+    const px: RGB990[] = []; for (let i = 0; i < 48 * 48; i++) px.push([...BG990] as RGB990);
+    const disc = (cx: number, cy: number, r: number, c: RGB990) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    disc(24, 20, 16, HAIR990); disc(24, 24, 16, SKIN990);
+    disc(17, 20, 3, DARK990); disc(31, 20, 3, DARK990);
+    return px;
+  };
+  const rect990 = (px: RGB990[], x0: number, y0: number, x1: number, y1: number, c: RGB990) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+  const browPx990: RGB990[] = []; for (let i = 0; i < 48 * 48; i++) browPx990.push([...BG990] as RGB990);
+  const bdisc990 = (cx: number, cy: number, r: number, c: RGB990) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) browPx990[y * 48 + x] = c; };
+  bdisc990(24, 20, 16, HAIR990); bdisc990(24, 25, 14, SKIN990);
+  bdisc990(17, 22, 3, DARK990); bdisc990(31, 22, 3, DARK990);
+  rect990(browPx990, 12, 14, 22, 16, DARK990); rect990(browPx990, 26, 14, 36, 16, DARK990);
+  const brow990 = vzoom990.analyzeFace(fin990(browPx990, 48, 48));
+  check('P990 バッテリー：眉', brow990?.brows === true, `brows=${brow990?.brows}`);
+  const eyePx990 = faceBase990();
+  const eye990 = vzoom990.analyzeFace(fin990(eyePx990, 48, 48));
+  check('P990 バッテリー：目の大きさ', eye990?.eyeSize === 'large', `eyeSize=${eye990?.eyeSize}`);
+  const nosePx990 = faceBase990();
+  rect990(nosePx990, 22, 25, 26, 28, [203, 163, 133]);
+  const nose990 = vzoom990.analyzeFace(fin990(nosePx990, 48, 48));
+  check('P990 バッテリー：鼻の影', nose990?.nose === true, `nose=${nose990?.nose}`);
+  const earPx990 = faceBase990();
+  rect990(earPx990, 3, 20, 9, 27, SKIN990); rect990(earPx990, 39, 20, 45, 27, SKIN990);
+  const ear990 = vzoom990.analyzeFace(fin990(earPx990, 48, 48));
+  check('P990 バッテリー：耳', ear990?.ears === true, `ears=${ear990?.ears}`);
+  const cheekPx990 = faceBase990();
+  rect990(cheekPx990, 10, 27, 17, 33, [238, 150, 130]); rect990(cheekPx990, 31, 27, 38, 33, [238, 150, 130]);
+  const cheek990 = vzoom990.analyzeFace(fin990(cheekPx990, 48, 48));
+  check('P990 バッテリー：頬の赤み', cheek990?.cheekFlush === true, `cheekFlush=${cheek990?.cheekFlush}`);
+  const mouthPx990 = faceBase990();
+  rect990(mouthPx990, 15, 33, 33, 34, DARK990);
+  const mouth990 = vzoom990.analyzeFace(fin990(mouthPx990, 48, 48));
+  check('P990 バッテリー：口の大きさ', mouth990?.mouthSize === 'large', `mouthSize=${mouth990?.mouthSize}`);
+  const hlPx990: RGB990[] = []; for (let i = 0; i < 48 * 48; i++) hlPx990.push([...BG990] as RGB990);
+  rect990(hlPx990, 8, 4, 40, 15, HAIR990); rect990(hlPx990, 10, 16, 38, 44, SKIN990);
+  rect990(hlPx990, 10, 10, 16, 16, SKIN990); rect990(hlPx990, 32, 10, 38, 16, SKIN990);
+  const disc990 = (px: RGB990[], cx: number, cy: number, r: number, c: RGB990) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+  disc990(hlPx990, 17, 24, 3, DARK990); disc990(hlPx990, 31, 24, 3, DARK990);
+  const hl990 = vzoom990.analyzeFace(fin990(hlPx990, 48, 48));
+  check('P990 バッテリー：生え際はM字型', hl990?.hairline === 'm-shaped', `hairline=${hl990?.hairline}`);
+  const roundPx990: RGB990[] = []; for (let i = 0; i < 48 * 48; i++) roundPx990.push([...BG990] as RGB990);
+  rect990(roundPx990, 8, 6, 40, 12, HAIR990);
+  for (let y = 10; y <= 38; y++) for (let x = 10; x <= 38; x++) { const cur = roundPx990[y * 48 + x]; if (cur[0] === BG990[0] && cur[1] === BG990[1]) roundPx990[y * 48 + x] = SKIN990; }
+  disc990(roundPx990, 17, 20, 3, DARK990); disc990(roundPx990, 31, 20, 3, DARK990);
+  const round990 = vzoom990.analyzeFace(fin990(roundPx990, 48, 48));
+  check('P990 バッテリー：顔の形は丸い', round990?.faceShape === 'round', `faceShape=${round990?.faceShape}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
