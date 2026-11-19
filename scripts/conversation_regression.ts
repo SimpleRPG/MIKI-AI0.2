@@ -9783,6 +9783,58 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1077 上げた真っ直ぐな腕では肘を決めない', rRaS?.armL === 'RAISED' && rRaS?.elbowL === null, `armL=${rRaS?.armL} elbowL=${JSON.stringify(rRaS?.elbowL)}`);
   }
 
+
+  // P1078: 前の髪の帯4〜7。描く側の腕・手・前の髪の
+  // パネルが、実測の輪郭（人の外側の境界）からはみ出して
+  // いた（肩→手の直線＋半径と、肩幅に腕が混ざった
+  // パネルの縁）。輪郭がある読みでは、腕・手・パネルの
+  // 画素を輪郭の内側に制限する。本人のサンプルでは
+  // 帯4〜7の再読が平らな 0.139 から実測どおりの
+  // 0.073〜0.133 の成長に直り、中の線の照合も
+  // 0.833→0.917 に上がった（プローブで確認）。
+  {
+    const figW = 48, figH = 56; const fig = new Uint8Array(figW * figH * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * figW + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < figH; y++) for (let x = 0; x < figW; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * figW + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < figW * figH; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    const HAIR: [number, number, number] = [45, 32, 22];
+    const SKIN: [number, number, number] = [232, 190, 160];
+    const CLOTH: [number, number, number] = [40, 40, 120];
+    rect(19, 15, 29, 32, CLOTH);
+    rect(19, 32, 22, 50, CLOTH); rect(26, 32, 29, 50, CLOTH);
+    rect(30, 16, 33, 36, CLOTH); disc(33, 38, 2, SKIN);
+    rect(15, 16, 18, 36, CLOTH); disc(16, 38, 2, SKIN);
+    disc(24, 9, 6, HAIR); disc(24, 10, 5, SKIN);
+    const rSrc: any = await poseSvc().analyzePose(fig, figW, figH);
+    const S2 = 128;
+    const ren: Uint8Array | null = rSrc ? poseSvc().renderBody(rSrc, S2, null, null, null) : null;
+    let worst = -1;
+    if (rSrc && ren) {
+      const bg = [ren[0], ren[1], ren[2]];
+      const figHpN = Math.max(0.1, Math.max(rSrc.footL?.y ?? 0, rSrc.footR?.y ?? 0) - (rSrc.head.y - rSrc.headRh));
+      const figTopPx = (rSrc.head.y - rSrc.headRh) * (S2 - 1);
+      worst = 0;
+      for (let band = 4; band <= 7; band++) {
+        const lv = rSrc.contour?.l?.[band], rv = rSrc.contour?.r?.[band];
+        if (lv === null || lv === undefined || rv === null || rv === undefined) { worst = -1; break; }
+        const envL = (rSrc.head.x + lv * figHpN) * (S2 - 1);
+        const envR = (rSrc.head.x + rv * figHpN) * (S2 - 1);
+        const y = Math.round(figTopPx + ((band + 0.5) / 24) * figHpN * (S2 - 1));
+        for (let yy = y - 2; yy <= y + 2; yy++) {
+          for (let x = 0; x < S2; x++) {
+            const i = (yy * S2 + x) * 4;
+            if (ren[i] === bg[0] && ren[i + 1] === bg[1] && ren[i + 2] === bg[2]) continue;
+            worst = Math.max(worst, envL - x, x - envR, 0);
+          }
+        }
+      }
+    }
+    check('P1078 帯4〜7で描画が実測の輪郭からはみ出さない', worst >= 0 && worst <= 2, `worst=${worst.toFixed(1)}px`);
+    const pSrc2: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    const vcP: any = pSrc2 ? poseSvc().verifyBodyContour(pSrc2) : null;
+    check('P1078 淡色の輪郭照合は維持', !!vcP?.verified, `score=${vcP?.score}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -1297,6 +1297,49 @@ class VisualPoseService {
     }
     // 腕：肩から手へ太い線。P1001: 肩側を太く手首側を細く（テーパー）。
     const armR0 = Math.max(1.4, figHn * S * 0.03);
+    // P1078: 輪郭（実測の人の外側の境界）がある読みでは、
+    // 腕と手がその外へはみ出さないようにする。肩→手の
+    // 直線＋半径は上部（帯4〜7）で後ろ髪の面の縁より外へ
+    // 出て、再読の輪郭が実物より広く平らに張っていた。
+    // 輪郭は頭中心・図の高さ単位なので、面（P1073）と
+    // 同じ枠で画素へ戻す。
+    const figHpArm = Math.max(0.1, (Math.max(reading.footL?.y ?? 0, reading.footR?.y ?? 0) || footY) - (head.y - headRh));
+    const ctrArm = reading.contour && reading.contour.l.length === 24 && reading.contour.r.length === 24 ? reading.contour : null;
+    const armEdgeAt = (yPx: number): { l: number; r: number } | null => {
+      if (!ctrArm) return null;
+      const figT = (yPx / (S - 1) - (head.y - headRh)) / figHpArm;
+      const pos = Math.min(23.999, Math.max(0, figT * 24 - 0.5));
+      const i0 = Math.floor(pos);
+      const fr = pos - i0;
+      const pick = (arr: (number | null)[]): number | null => {
+        const a = arr[i0];
+        const b = arr[Math.min(23, i0 + 1)];
+        if (a !== null && b !== null) return a + (b - a) * fr;
+        return a ?? b ?? null;
+      };
+      const l = pick(ctrArm.l);
+      const r = pick(ctrArm.r);
+      if (l === null || r === null) return null;
+      return { l: (head.x + l * figHpArm) * (S - 1), r: (head.x + r * figHpArm) * (S - 1) };
+    };
+    const stampArm = (cx: number, cy: number, r: number, c: [number, number, number]) => {
+      if (!ctrArm) { stamp(cx, cy, r, c); return; }
+      // 丸いスタンプは1つの筆の塊として扱い、中心の行の
+      // 輪郭で切る。行ごとに切ると、肩の関節の丸みが
+      // 「腕が始まる前の行の輪郭（頭や首の幅）」で切れて
+      // 肩付近の肌の量が実物より減る（鎖骨の読みが落ちた）。
+      // 縦幅いっぱいの最大幅で許すと、輪郭が急に広がる
+      // 帯（面の広がり始め）で緩みすぎる。
+      const e = armEdgeAt(cy);
+      if (!e) { stamp(cx, cy, r, c); return; }
+      for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(S - 1, Math.ceil(cy + r)); y++) {
+        for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(S - 1, Math.ceil(cx + r)); x++) {
+          if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+          if (x < e.l - 0.5 || x > e.r + 0.5) continue;
+          px[y * S + x] = c;
+        }
+      }
+    };
     const seg = (a: { x: number; y: number } | null, b: { x: number; y: number } | null, gap = false) => {
       if (!a || !b) return;
       const ax = a.x * (S - 1), ay = a.y * (S - 1), bx = b.x * (S - 1), by = b.y * (S - 1);
@@ -1309,7 +1352,7 @@ class VisualPoseService {
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const sh = gapShift * Math.min(1, t / 0.22);
-        stamp(ax + (bx - ax) * t + dir * sh, ay + (by - ay) * t, Math.max(1.1, armR0 * (1.18 - 0.48 * t)), separated ? SKIN : BODY);
+        stampArm(ax + (bx - ax) * t + dir * sh, ay + (by - ay) * t, Math.max(1.1, armR0 * (1.18 - 0.48 * t)), separated ? SKIN : BODY);
       }
     };
     seg(reading.shoulderL, reading.handL, reading.armGap?.l === true);
@@ -1328,7 +1371,9 @@ class VisualPoseService {
       const hs = reading.handSize ? Math.max(0.75, Math.min(1.7, 0.55 + 1.45 * reading.handSize)) : 1;
       const rx = armR0 * 0.95 * hs, ry = armR0 * 1.7 * hs;
       for (let y = Math.round(hy - ry); y <= Math.round(hy + ry); y++) {
+        const he = armEdgeAt(y);
         for (let x = Math.round(hx - rx); x <= Math.round(hx + rx); x++) {
+          if (he && (x < he.l - 0.5 || x > he.r + 0.5)) continue;
           if (((x - hx) / rx) ** 2 + ((y - hy) / ry) ** 2 <= 1) set(x, y, SKIN);
         }
       }
@@ -1337,7 +1382,9 @@ class VisualPoseService {
       const inward = hx < cxN * (S - 1) ? 1 : -1;
       const tx = hx + inward * rx * 0.8, ty = hy - ry * 0.15, tr = Math.max(1, rx * 0.38);
       for (let y = Math.round(ty - tr); y <= Math.round(ty + tr); y++) {
+        const he = armEdgeAt(y);
         for (let x = Math.round(tx - tr); x <= Math.round(tx + tr); x++) {
+          if (he && (x < he.l - 0.5 || x > he.r + 0.5)) continue;
           if (((x - tx) / tr) ** 2 + ((y - ty) / tr) ** 2 <= 1) set(x, y, SKIN);
         }
       }
@@ -1406,7 +1453,12 @@ class VisualPoseService {
             const xa = Math.round(Math.min(innerAbs, outerAbs));
             const xb = Math.round(Math.max(innerAbs, outerAbs));
             const centerAbs = (innerAbs + outerAbs) / 2;
+            // P1078: 前の髪のパネルも実測の輪郭の外へは
+            // 出さない（肩幅の統計が腕まで含むと、帯4〜7で
+            // パネルが輪郭より広く張るため）。
+            const he = armEdgeAt(y);
             for (let x = xa; x <= xb; x++) {
+              if (he && (x < he.l - 0.5 || x > he.r + 0.5)) continue;
               if (t > 0.88 && Math.abs(x - centerAbs) <= Math.max(1, hr * 0.06)) continue;
               const frac = Math.abs(x - innerAbs) / panelW;
               set(x, y, frac > 0.7 ? HAIR_SH2 : HAIR);
