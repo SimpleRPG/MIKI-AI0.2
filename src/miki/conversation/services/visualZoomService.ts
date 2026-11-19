@@ -599,15 +599,31 @@ class VisualZoomService {
           // 横に長い塊（線・前髪の縁）と縦に細い塊（髪の筋）は目ではない
           if (bw < 2 || bw > fw * 0.45 || bh > bw * 1.6 + 2) continue;
           const belowH = Math.max(2, bh);
+          // P1083: 下の肌の見方を直す。目の下半分は色の薄い
+          // 虹彩が続くことがあり（飽和が候補の閾値に届かない
+          // 淡いピンク等）、そこを「肌でない」と数えると本物の
+          // 目が落ちる。色のついた非肌・非暗の画素は目自身の
+          // 続きとみて中立（数えない）にし、肌は緩い定義でも
+          // 数える。数えられる画素が集まるまで少し下まで見る。
+          const isEyeHuePx = (x: number, y: number): boolean => {
+            const i = (y * S + x) * 4;
+            if (isSkinStrict(i) || isSkinLoose(i) || isDark(i)) return false;
+            const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+            const lum = r * 0.3 + g * 0.59 + b * 0.11;
+            if (lum >= 240) return false;
+            return Math.max(r, g, b) - Math.min(r, g, b) >= 24;
+          };
           let skinN = 0;
           let totN = 0;
-          for (let y = by1 + 1; y <= Math.min(S - 1, by1 + belowH); y++) {
+          for (let y = by1 + 1; y <= Math.min(S - 1, by1 + belowH + 4); y++) {
             for (let x = bx0; x <= bx1; x++) {
+              if (isEyeHuePx(x, y)) continue;
               totN++;
-              if (skinMask[y * S + x]) skinN++;
+              if (skinMask[y * S + x] || isSkinLoose((y * S + x) * 4)) skinN++;
             }
+            if (totN >= belowH * bw) break;
           }
-          if (totN === 0 || skinN / totN < 0.5) continue;
+          if (totN < 2 || skinN / totN < 0.5) continue;
           // 救済の対象は色のある目。暗いだけの塊（髪と紛らわしい）は、
           // 下がほぼ肌の時だけ認める。
           let coloredN = 0;

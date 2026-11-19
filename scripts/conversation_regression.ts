@@ -9951,6 +9951,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1082 脚に膝のくびれが出る', kneeW1082 > 0 && calfW1082 > 0 && kneeW1082 < calfW1082 && kneeW1082 <= 22, `knee=${kneeW1082} calf=${calfW1082}`);
   }
 
+  // P1083: 淡いピンクの目が読めるようにする。本人の目の
+  // 上半分は色が濃いが、下半分は飽和の低い淡い虹彩で、
+  // 「目の下が肌か」の検査で虹彩自身を肌でないと数えて
+  // 目が落ちていた（顔の測定が付かず、描く顔が既定の
+  // 黒い点目になっていた）。色のついた非肌・非暗の画素は
+  // 目自身の続きとして中立に数え、肌は緩い定義でも数える。
+  {
+    const { visualZoomService: vzoom1083 } = await import('../src/miki/conversation/services/visualZoomService');
+    const S1083 = 48;
+    const px1083 = new Uint8Array(S1083 * S1083 * 4);
+    const set1083 = (x: number, y: number, c: [number, number, number]) => { const i = (y * S1083 + x) * 4; px1083[i] = c[0]; px1083[i + 1] = c[1]; px1083[i + 2] = c[2]; px1083[i + 3] = 255; };
+    for (let y = 0; y < S1083; y++) for (let x = 0; x < S1083; x++) set1083(x, y, [45, 32, 22]);
+    for (let y = 12; y <= 44; y++) for (let x = 14; x <= 34; x++) set1083(x, y, [232, 190, 160]);
+    for (const ex1083 of [18, 27]) {
+      for (let x = ex1083; x <= ex1083 + 2; x++) {
+        set1083(x, 20, [205, 153, 168]);
+        set1083(x, 21, [217, 186, 193]);
+        set1083(x, 22, [217, 186, 193]);
+      }
+    }
+    const fr1083: any = vzoom1083.analyzeFace(px1083);
+    check('P1083 淡いピンクの目が2つ読めて色も付く', fr1083?.eyes === 2 && fr1083?.eyeColor === 'ピンク', `eyes=${fr1083?.eyes} color=${fr1083?.eyeColor}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
