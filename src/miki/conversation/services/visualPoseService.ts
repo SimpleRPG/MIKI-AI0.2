@@ -2460,6 +2460,95 @@ class VisualPoseService {
    * 各段で左右両端が 0.07 以内なら一致とし、16段以上比べて
    * 75%以上一致で verified。
    */
+  /**
+   * P1076: 横向きの描き直し。depthProfile（24段の前・後の縁）を
+   * 読み手と同じ軸（頭の中心→腰の中心）・同じ枠（頭のてっぺん→
+   * 足元）で再生する。頭は髪の円＋前にずらした肌の円で作る
+   * （横向きの読みが顔側を肌として拾うため）。つま先の伸びは
+   * 最下段の前の縁として帯の中に既に入っている。
+   */
+  public renderBodySide(reading: PoseReading, size = 128): Uint8Array | null {
+    const dp = reading.depthProfile;
+    if (!dp || !dp.facing || !reading.head) return null;
+    const S = size;
+    const fig = new Uint8Array(S * S * 4);
+    const BG: [number, number, number] = [245, 245, 245];
+    for (let i = 0; i < S * S; i++) { fig[i * 4] = BG[0]; fig[i * 4 + 1] = BG[1]; fig[i * 4 + 2] = BG[2]; fig[i * 4 + 3] = 255; }
+    const BODY: [number, number, number] = reading.clothing?.topRgb ?? reading.skinColor ?? [150, 160, 190];
+    const SKIN: [number, number, number] = reading.skinColor ?? [232, 190, 160];
+    const HAIR: [number, number, number] = reading.hairRgb ?? EXTRA_COLORS[reading.hairColor ?? ''] ?? [45, 32, 22];
+    const paint = (x: number, y: number, c: [number, number, number]) => {
+      if (x < 0 || x >= S || y < 0 || y >= S) return;
+      const i = (y * S + x) * 4;
+      fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255;
+    };
+    const headRh = reading.headRh ?? reading.head.r;
+    // 枠は読みの正規化座標のままではなく、図がキャンバスの
+    // 大きな割合を占めるよう置き直す（細い柱のままだと読み手の
+    // 領域ゲートで図として拾われない）。depthProfile は軸と
+    // 図の高さに対する相対量なので、枠の置き直しでは壊れない。
+    // 縦の位置関係（頭の中心・腰の高さ）は元の枠での図の高さ比
+    // を保つ。軸は縦に置く（元の傾きは帯の許容 0.07 に対して
+    // 小さい）。
+    const footYn = Math.max(reading.footL?.y ?? 0, reading.footR?.y ?? 0);
+    const srcTopN = reading.head.y - headRh;
+    const srcHpN = Math.max(0.05, (footYn > 0 ? footYn : 0.98) - srcTopN);
+    const figTop = 0.03 * (S - 1);
+    const figBottom = 0.97 * (S - 1);
+    const figHp = Math.max(1, figBottom - figTop);
+    const headCx = 0.5 * (S - 1);
+    const headCy = figTop + (headRh / srcHpN) * figHp;
+    const hipY = figTop + (((reading.hipL?.y ?? 0.6) - srcTopN) / srcHpN) * figHp;
+    const axisX = (_y: number): number => headCx;
+    const interp = (arr: (number | null)[], pos: number): number | null => {
+      const i0 = Math.floor(pos);
+      const frac = pos - i0;
+      const at = (i: number): number | null => (i < 0 || i >= arr.length ? null : arr[i]);
+      const v0 = at(i0);
+      const v1 = at(i0 + 1);
+      if (v0 !== null && v1 !== null) return v0 + (v1 - v0) * frac;
+      if (v0 !== null) return v0;
+      if (v1 !== null) return v1;
+      for (let d = 1; d < arr.length; d++) {
+        const a = at(i0 - d);
+        if (a !== null) return a;
+        const b = at(i0 + 1 + d);
+        if (b !== null) return b;
+      }
+      return null;
+    };
+    const rPx = Math.max(2, (headRh / srcHpN) * figHp);
+    for (let y = 0; y < S; y++) {
+      // 帯の枠（頭のてっぺん〜足元）の外は描かない。外まで
+      // 引き延ばすと図が見切れた形になり、読みが打ち切られる。
+      if (y < figTop || y > figBottom) continue;
+      // 頭の帯は描かない。帯の縁と円を重ねると頭が二重に
+      // 広がり、読み手の肩の検出が頭の中に入って横向き判定が
+      // 壊れる。頭は下の円（髪＋肌）だけで作る。
+      if (y < headCy + rPx * 0.35) continue;
+      const pos = ((y - figTop) / figHp) * 24 - 0.5;
+      const f = interp(dp.front, pos);
+      const b = interp(dp.back, pos);
+      if (f === null || b === null) continue;
+      const ax = axisX(y);
+      const frontX = dp.facing === 'l' ? ax - f * figHp : ax + f * figHp;
+      const backX = dp.facing === 'l' ? ax + b * figHp : ax - b * figHp;
+      const x0 = Math.round(Math.min(frontX, backX));
+      const x1 = Math.round(Math.max(frontX, backX));
+      for (let x = x0; x <= x1; x++) paint(x, y, BODY);
+    }
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => {
+      for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+        for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+          if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) paint(x, y, c);
+        }
+      }
+    };
+    disc(headCx, headCy, rPx, HAIR);
+    disc(headCx + (dp.facing === 'l' ? -0.3 * rPx : 0.3 * rPx), headCy + 0.1 * rPx, rPx * 0.83, SKIN);
+    return fig;
+  }
+
   public verifyBodyContour(reading: PoseReading): { score: number; verified: boolean; compared: number } | null {
     if (!reading.contour || !reading.head) return null;
     // P1027: 長い髪の輪郭は後ろ髪の面を含めて測られている。
@@ -2487,6 +2576,36 @@ class VisualPoseService {
     state.contours++;
     if (verified) state.contoursOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
+    return { score, verified, compared };
+  }
+
+  /**
+   * P1076: 横向きの奥行きの往復照合。depthProfile から描き
+   * 直して測り直し、24段の前・後の縁が再現されるか比べる。
+   * 向きが同じで、16段以上比べて75%以上が 0.07 以内なら
+   * verified。
+   */
+  public verifySideDepth(reading: PoseReading): { score: number; verified: boolean; compared: number } | null {
+    const dp = reading.depthProfile;
+    if (!dp || !dp.facing || !reading.head) return null;
+    const image = this.renderBodySide(reading, 128);
+    if (!image) return null;
+    const re = this.analyzePose(image, 128, 128);
+    if (!re || !re.depthProfile || re.depthProfile.facing !== dp.facing) return null;
+    let compared = 0;
+    let ok = 0;
+    for (let i = 0; i < 24; i++) {
+      const a = dp.front[i];
+      const b = dp.back[i];
+      const c = re.depthProfile.front[i];
+      const d = re.depthProfile.back[i];
+      if (a === null || a === undefined || b === null || b === undefined || c === null || c === undefined || d === null || d === undefined) continue;
+      compared++;
+      if (Math.abs(a - c) <= 0.07 + 1e-9 && Math.abs(b - d) <= 0.07 + 1e-9) ok++;
+    }
+    if (compared === 0) return null;
+    const score = ok / compared;
+    const verified = compared >= 16 && score >= 0.75;
     return { score, verified, compared };
   }
 
@@ -5530,7 +5649,22 @@ class VisualPoseService {
             else if (x > torsoRight + 1) bandR++;
           }
         }
-        viewpoint = bandL === 0 || bandR === 0 ? 'side' : 'front';
+        // P1076: 張り出しの「幅」でも見る。横向きの胸の縁は
+        // 胴の中央値の幅より少し外に出る（解像度が上がると
+        // 数pxの spill になり、画素数だけでは正面と誤る）。
+        // 腕や後ろ髪の面の張り出しは図の高さの 4.5% を超える
+        // ので、spill の最大幅が両側ともそれを超えた時だけ
+        // 正面とする。
+        let extL = 0;
+        let extR = 0;
+        for (let y = bandTop; y <= bandBot; y++) {
+          const row = rows[y];
+          if (!row || row.minX < 0) continue;
+          if (row.minX < torsoLeft - 1) extL = Math.max(extL, torsoLeft - 1 - row.minX);
+          if (row.maxX > torsoRight + 1) extR = Math.max(extR, row.maxX - (torsoRight + 1));
+        }
+        const extT = figH * 0.045;
+        viewpoint = (bandL === 0 || bandR === 0) || !(extL > extT && extR > extT) ? 'side' : 'front';
       } else viewpoint = 'front';
     }
     const profileKind: 'width' | 'depth' = viewpoint === 'side' ? 'depth' : 'width';

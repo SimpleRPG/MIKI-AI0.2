@@ -9691,6 +9691,49 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1075 張り出しが説明文に入る', (both?.description ?? '').includes('お腹が前に張り出している') && (both?.description ?? '').includes('お尻が後ろに張り出している'), `desc=${both?.description ?? ''}`);
   }
 
+  // P1076: 横向きの描画側。depthProfile から描き直して
+  // 測り直し、前・後の縁が往復するかを見る。あわせて
+  // 横向き判定の spill を画素数だけでなく幅でも見るよう
+  // 直した（横向きの胸の縁は胴の中央値より少し外に出て、
+  // 解像度が上がると正面と誤っていた）。
+  {
+    const buildSide = (opt: { facing: 'l' | 'r'; belly: boolean; buttocks: boolean; toe: boolean }): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const HAIR: [number, number, number] = [45, 32, 22];
+      const SKIN: [number, number, number] = [232, 190, 160];
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      const L = opt.facing === 'l';
+      rect(18, 15, 27, 32, CLOTH); rect(19, 32, 26, 50, CLOTH);
+      if (L) rect(19, 16, 22, 30, SKIN); else rect(17, 16, 20, 30, SKIN);
+      disc(22, 9, 6, HAIR); disc(L ? 20 : 24, 10, 5, SKIN);
+      if (opt.toe) { if (L) rect(15, 48, 26, 50, CLOTH); else rect(19, 48, 30, 50, CLOTH); }
+      if (opt.belly) { if (L) rect(14, 24, 17, 29, CLOTH); else rect(28, 24, 31, 29, CLOTH); }
+      if (opt.buttocks) { if (L) rect(28, 30, 31, 34, CLOTH); else rect(14, 30, 17, 34, CLOTH); }
+      return fig;
+    };
+    const srcL: any = await poseSvc().analyzePose(buildSide({ facing: 'l', belly: true, buttocks: true, toe: true }), 48, 56);
+    const vL: any = srcL ? await poseSvc().verifySideDepth(srcL) : null;
+    check('P1076 左向きの横向きが描き直しで往復する', vL?.verified === true && (vL?.score ?? 0) >= 0.9, `v=${JSON.stringify(vL)}`);
+    const srcR: any = await poseSvc().analyzePose(buildSide({ facing: 'r', belly: true, buttocks: true, toe: true }), 48, 56);
+    const vR: any = srcR ? await poseSvc().verifySideDepth(srcR) : null;
+    check('P1076 右向きの横向きが描き直しで往復する', vR?.verified === true && (vR?.score ?? 0) >= 0.9, `v=${JSON.stringify(vR)}`);
+    const srcF: any = await poseSvc().analyzePose(buildSide({ facing: 'l', belly: false, buttocks: false, toe: true }), 48, 56);
+    const vF: any = srcF ? await poseSvc().verifySideDepth(srcF) : null;
+    check('P1076 張り出しなしの横向きも往復する', vF?.verified === true, `v=${JSON.stringify(vF)}`);
+    let flatStay = false;
+    if (srcF) {
+      const imgF: any = await poseSvc().renderBodySide(srcF, 128);
+      const reF: any = imgF ? await poseSvc().analyzePose(imgF, 128, 128) : null;
+      flatStay = !!reF?.depthProfile && (reF.depthProfile.belly ?? 1) <= 0.02 && (reF.depthProfile.buttocks ?? 1) <= 0.02;
+    }
+    check('P1076 描き直しで張り出しが勝手に付かない', flatStay, 'flat');
+    const rp: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    check('P1076 正面の読みでは横向き描画・照合はしない', !!rp && (await poseSvc().renderBodySide(rp, 128)) === null && (await poseSvc().verifySideDepth(rp)) === null, 'front');
+  }
+
 
 // ---- 結果 ----
 let fail = 0;
