@@ -9425,6 +9425,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 
 
+  // P1072: サンプルの足の広がりの再読ずれ。足首から徐々に
+  // 広がる足（サンプルの素足の形）は、旧版の最下行と3%上の
+  // 1行比較では広がり域の中で比が1.0になり false と読めた。
+  // 下の帯の最大幅と、脚の下部の帯の2番目に小さい幅（足首）
+  // で比べると読める。描き直しの再読も保たれること。
+  {
+    const buildGradual = (flare: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+      rect(16, 32, 21, 44, CLOTH); rect(23, 32, 28, 44, CLOTH);
+      if (flare) {
+        rect(15, 45, 21, 46, CLOTH); rect(23, 45, 29, 46, CLOTH);
+        rect(14, 47, 21, 48, CLOTH); rect(23, 47, 30, 48, CLOTH);
+        rect(13, 49, 21, 50, CLOTH); rect(23, 49, 31, 50, CLOTH);
+      } else {
+        rect(16, 45, 21, 50, CLOTH); rect(23, 45, 28, 50, CLOTH);
+      }
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+      return fig;
+    };
+    const gf: any = await poseSvc().analyzePose(buildGradual(true), 48, 56);
+    check('P1072 徐々に広がる足が広がりありと読める', gf?.footFlare?.l === true && gf?.footFlare?.r === true, JSON.stringify(gf?.footFlare));
+    const vgf: any = await poseSvc().verifyFootFlare(gf);
+    check('P1072 徐々に広がる足の描き直しが読み返せる', vgf?.verified === true, JSON.stringify(vgf));
+    const gs: any = await poseSvc().analyzePose(buildGradual(false), 48, 56);
+    check('P1072 まっすぐな足は広がりなしと読める', gs?.footFlare?.l === false && gs?.footFlare?.r === false, JSON.stringify(gs?.footFlare));
+  }
+
+
   // P1050-P1060: 分割と構造化描画の錨（淡色の長い髪で確認する）
   {
     const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);

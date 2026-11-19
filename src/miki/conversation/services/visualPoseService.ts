@@ -1182,10 +1182,19 @@ class VisualPoseService {
         // 切り落とさない。
         // P1047: 足首の統計を足の広がり域より上で測るよう
         // 分離したので、広がりの描画を読みに連動させる。
+        // P1072: 読みの検出下限（1.12倍＋0.5px）を下回らない
+        // よう、外側への張り出しは最低2pxにする。細い脚では
+        // 22%だけでは1pxにしかならず、描き直しの再読で
+        // 広がりが消えていた（サンプルの再読ずれ）。
+        // 張り出しは両側へ：片側だけだと脚の中心が足先へ
+        // 寄る分（cxp の移動）で内側の縁も外へずれ、測った
+        // 幅が広がらない（右足で実際に起きた）。足は足首より
+        // 両側へ広いのが実物（サンプルは足幅89に対し足首55）
+        // とも合う。脚が触れる時は後の隙間あけが中心を開く。
         const flareOn = reading.footFlare ? (sideSign < 0 ? reading.footFlare.l : reading.footFlare.r) : false;
-        const footExt = t >= 0.94 && flareOn ? Math.round(w * 0.22) : 0;
-        const fx0 = Math.round(cxp - w / 2) - (sideSign < 0 ? footExt : 0);
-        const fx1 = Math.round(cxp + w / 2) + (sideSign > 0 ? footExt : 0);
+        const footExt = t >= 0.94 && flareOn ? Math.max(2, Math.round(w * 0.22)) : 0;
+        const fx0 = Math.round(cxp - w / 2) - footExt;
+        const fx1 = Math.round(cxp + w / 2) + footExt;
         const rowC: [number, number, number] = y === legBottom ? deriveShadow(legCol) : legCol;
         for (let x = fx0; x <= fx1; x++) set(x, y, rowC);
         const rec = legSpanRows.get(y) ?? {};
@@ -4112,21 +4121,75 @@ class VisualPoseService {
       if (rowsN >= 4) armGap = { l: gapL >= rowsN * 0.4, r: gapR >= rowsN * 0.4 };
     }
 
-    // P1034: 足の末端の広がり。一番下の行の脚の span と、
-    // 少し上の脚の span の幅を比べる。脚は中心に近い2本
+    // P1034: 足の末端の広がり。下の帯の脚の span と、広がり域
+    // より上の足首の帯の幅を比べる。脚は中心に近い2本
     // （長い髪が一番下まで届く場合は外側に髪の span が来る）。
+    // P1072: 旧版は最下行1行と3%上の1行の比較だったが、
+    // サンプルでは3%上はまだ広がり域の中（足幅が足首から
+    // 徐々に広がり、底で最大）で比が1.0前後にしかならず、
+    // 実測で広がりあり（原寸で足幅89に対し足首55）なのに
+    // false と読め、64x128 では左右でずれて再読も不一致
+    // だった。原因は3層——①比較行が広がり域の中にある
+    // ②領域分割（v2）の体マスクでは脚の間の隙間が埋まって
+    // 下脚が1本の span になり、足首の帯がそもそも測れない
+    // （採用される fine 試行では測れる）③描き直しでは
+    // 中の線（肌の影色）が背景に近くマスクで抜け、広げた
+    // 足が1pxの隙間で割れて中心側の1pxが脚として選ばれた。
+    // 下は広がり域全体（底から5%）の最大幅、上は広がり域の
+    // 直上から脚の下部（25%幅）の帯で、足首はその帯の2番目に
+    // 小さい幅（最小値は1行の欠けに弱く、中央値や狭い帯では
+    // ふくらはぎの太さを拾う。脚はふくらはぎから足首へ細く
+    // なるので、帯の小さい方が足首に当たる）で比べる。1px
+    // 以下の幅は欠けとして除く。3本以上の span がある行
+    // （縦の線で脚が割れている等）は曖昧なので使わない。
+    // しきい値は不変。
     let footFlare: PoseReading['footFlare'] = null;
     if (!figTruncated) {
-      const yB = figBottom;
-      const yA = Math.max(0, figBottom - Math.max(2, Math.round(figH * 0.03)));
-      const legSpansAt = (y: number) => (rows[y]?.spans ?? []).slice().sort((a, b) => Math.abs((a.minX + a.maxX) / 2 - headCx) - Math.abs((b.minX + b.maxX) / 2 - headCx)).slice(0, 2);
-      const spansB = legSpansAt(yB);
-      const spansA = legSpansAt(yA);
-      if (spansB.length === 2 && spansA.length === 2) {
-        const flareFor = (sb: { minX: number; maxX: number }, sa: { minX: number; maxX: number }) => (sb.maxX - sb.minX) > (sa.maxX - sa.minX) * 1.12 + 0.5;
+      const bandB = Math.max(2, Math.round(figH * 0.05));
+      const ankleH = Math.max(3, Math.round(figH * 0.25));
+      const yBotA = figBottom - bandB;
+      const yTopA = figBottom - bandB - ankleH;
+      const widthAt = (y: number): [number, number] | null => {
+        // 1px の線で脚が切れている時は繋ぐ。ただし両脚の間の
+        // 1pxの隙間まで繋ぐと1本になってしまうため、頭中心の
+        // 同じ側にある断片だけを繋ぐ（中心をまたぐ span は
+        // 繋がない）。描き直しでは中の線（肌の影色）が背景に
+        // 近くマスクで抜け、広げた足が1pxの隙間で割れて中心側
+        // の1pxが「中心に近い脚」として選ばれ、幅が潰れていた。
+        const raw = (rows[y]?.spans ?? []).slice().sort((a, b) => a.minX - b.minX);
+        const merged: { minX: number; maxX: number }[] = [];
+        const sideOf = (s: { minX: number; maxX: number }): 'l' | 'r' | 'c' => (s.maxX < headCx ? 'l' : s.minX > headCx ? 'r' : 'c');
+        for (const s of raw) {
+          const last = merged[merged.length - 1];
+          if (last && s.minX - last.maxX - 1 <= 1 && sideOf(last) !== 'c' && sideOf(last) === sideOf(s)) last.maxX = Math.max(last.maxX, s.maxX);
+          else merged.push({ minX: s.minX, maxX: s.maxX });
+        }
+        const sp = merged.slice().sort((a, b) => Math.abs((a.minX + a.maxX) / 2 - headCx) - Math.abs((b.minX + b.maxX) / 2 - headCx)).slice(0, 2);
+        if (merged.length !== 2 || sp.length !== 2) return null;
         const byCenter = (arr: { minX: number; maxX: number }[]) => arr.slice().sort((a, b) => (a.minX + a.maxX) - (b.minX + b.maxX));
-        const bS = byCenter(spansB), aS = byCenter(spansA);
-        footFlare = { l: flareFor(bS[0], aS[0]), r: flareFor(bS[1], aS[1]) };
+        const s = byCenter(sp);
+        return [s[0].maxX - s[0].minX, s[1].maxX - s[1].minX];
+      };
+      const bottomW: [number[], number[]] = [[], []];
+      for (let y = figBottom; y > figBottom - bandB && y >= 0; y--) {
+        const w = widthAt(y);
+        if (w) { bottomW[0].push(w[0]); bottomW[1].push(w[1]); }
+      }
+      const ankleW: [number[], number[]] = [[], []];
+      for (let y = yBotA; y >= yTopA && y >= 0; y--) {
+        const w = widthAt(y);
+        if (w) { ankleW[0].push(w[0]); ankleW[1].push(w[1]); }
+      }
+      // 足首は帯の2番目に小さい幅（1px以下の欠けは除く）。
+      // 最小値だけだと1行の欠けに引っ張られる。
+      const ankleVal = (a: number[]): number | null => {
+        const s = a.filter((v) => v >= 2).sort((x, y) => x - y);
+        if (!s.length) return null;
+        return s[Math.min(1, s.length - 1)];
+      };
+      if (bottomW[0].length && bottomW[1].length) {
+        const flareFor = (b: number[], a: number | null) => a !== null && a >= 2 && Math.max(...b) > a * 1.12 + 0.5;
+        footFlare = { l: flareFor(bottomW[0], ankleVal(ankleW[0])), r: flareFor(bottomW[1], ankleVal(ankleW[1])) };
       }
     }
 
