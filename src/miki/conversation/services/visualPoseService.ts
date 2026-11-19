@@ -795,6 +795,7 @@ function deriveShadow(c: [number, number, number]): [number, number, number] {
 const TARGET_KEY = 'miki_visual_target_v1';
 const CORRECTION_KEY = 'miki_visual_corrections_v1';
 const CONTOUR_CORRECTION_KEY = 'miki_visual_contour_corrections_v1';
+const JOINT_CORRECTION_KEY = 'miki_visual_joint_corrections_v1';
 
 /** P1001: 目標の素体（見本を測って保存したパラメータ） */
 export interface BodyTarget {
@@ -805,6 +806,10 @@ export interface BodyTarget {
   // P1027: 輪郭も目標に持つ（幅の合計だけでは寄せられない形）
   contour?: { l: (number | null)[]; r: (number | null)[] } | null;
   silhouetteWidth?: number | null;
+  // P1086: 関節の位置も目標に持つ（横だけ。手の縦は
+  // 読みが鎖の末端で決まり描いても動かず、足の縦は
+  // 両足の平均でしか動かないため、縦は対象外）。
+  joints?: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null;
 }
 
 /** P1001: マスクの詰まり具合（前景画素 ÷ 外接矩形の面積）。輪郭の細切れ検出に使う */
@@ -1012,6 +1017,14 @@ class VisualPoseService {
     const contourUse = reading.contour && ctrCorr
       ? { l: reading.contour.l.map((v, i) => (v === null || v === undefined ? v : v + (ctrCorr.l[i] ?? 0))), r: reading.contour.r.map((v, i) => (v === null || v === undefined ? v : v + (ctrCorr.r[i] ?? 0))) }
       : reading.contour;
+    // P1086: 関節の横位置にも描く側の癖をかける（手と足の
+    // 横だけ。縦は読みが追わないので描く側では直せない）。
+    // 枠の基準（足の平均の高さや胴の中心）は元の読みの
+    // ままにして、関節の描く位置だけずらす。
+    const jCorr = this.getJointCorrections();
+    const handLUse = reading.handL && jCorr ? { x: reading.handL.x + jCorr.handLx, y: reading.handL.y } : reading.handL;
+    const handRUse = reading.handR && jCorr ? { x: reading.handR.x + jCorr.handRx, y: reading.handR.y } : reading.handR;
+    const footXOff = (sgn: number): number => (jCorr ? (sgn < 0 ? jCorr.footLx : jCorr.footRx) : 0);
     const prof: PoseReading['bodyProfile'] = {
       shoulder: reading.bodyProfile.shoulder === null ? null : reading.bodyProfile.shoulder * corrTbl.shoulder,
       chest: reading.bodyProfile.chest === null ? null : reading.bodyProfile.chest * corrTbl.chest,
@@ -1266,7 +1279,7 @@ class VisualPoseService {
     for (const sideSign of [-1, 1]) {
       const foot = sideSign < 0 ? reading.footL : reading.footR;
       const hipX = cxN * (S - 1) + sideSign * legSpread;
-      const footX = foot ? foot.x * (S - 1) : hipX;
+      const footX = foot ? (foot.x + footXOff(sideSign)) * (S - 1) : hipX;
       for (let y = legTop; y <= legBottom; y++) {
         const t = legBottom > legTop ? (y - legTop) / (legBottom - legTop) : 0;
         const w = legWAt(t);
@@ -1423,15 +1436,15 @@ class VisualPoseService {
         stampArm(ax + (bx - ax) * t + dir * sh, ay + (by - ay) * t, Math.max(1.1, armR0 * (1.18 - 0.48 * t)), armCol);
       }
     };
-    seg(reading.shoulderL, reading.handL, reading.armGap?.l === true);
-    seg(reading.shoulderR, reading.handR, reading.armGap?.r === true);
+    seg(reading.shoulderL, handLUse, reading.armGap?.l === true);
+    seg(reading.shoulderR, handRUse, reading.armGap?.r === true);
     // P1001: 手。腕の先に肌色の楕円＋指の分かれ目を描く。
     // P1016: 指の分かれ目は固定の赤茶でなく本人の肌色の影で
     // 描く（赤い爪のように見えないように）。
     const FINGER: [number, number, number] = deriveShadow(SKIN);
-    for (const hand of [reading.handL, reading.handR]) {
+    for (const hand of [handLUse, handRUse]) {
       if (!hand) continue;
-      const gapH = hand === reading.handL ? reading.armGap?.l === true : reading.armGap?.r === true;
+      const gapH = hand === handLUse ? reading.armGap?.l === true : reading.armGap?.r === true;
       const hDir = hand.x >= cxN ? 1 : -1;
       const hx = hand.x * (S - 1) + (gapH ? hDir * (armR0 * 0.85 + 1.5) : 0), hy = hand.y * (S - 1);
       // P1045: 手の大きさ。読みの比が 0.31 で従来の大きさに
@@ -1532,7 +1545,7 @@ class VisualPoseService {
             } else {
               const foot = sgn < 0 ? reading.footL : reading.footR;
               const hipX = cxPx + sgn * legSpread;
-              const footX = foot ? foot.x * (S - 1) : hipX;
+              const footX = foot ? (foot.x + footXOff(sgn)) * (S - 1) : hipX;
               const legBottom = Math.round(footY * (S - 1));
               const lt = Math.min(1, (y - y1) / Math.max(1, legBottom - y1));
               const cxp = lerp(hipX, footX, lt);
@@ -3002,6 +3015,7 @@ class VisualPoseService {
       build: reading.build?.label ?? null,
       contour: reading.contour ?? null,
       silhouetteWidth: reading.silhouetteWidth ?? null,
+      joints: { handL: reading.handL ?? null, handR: reading.handR ?? null, footL: reading.footL ?? null, footR: reading.footR ?? null },
     };
     try {
       storageService.setItem(TARGET_KEY, JSON.stringify(target));
@@ -3059,6 +3073,24 @@ class VisualPoseService {
     } catch { /* 保存できなくても本流は止めない */ }
   }
 
+  /** P1086: 関節の横位置の描く側の癖を読む（手と足の横だけ） */
+  public getJointCorrections(): { handLx: number; handRx: number; footLx: number; footRx: number } | null {
+    try {
+      const raw = storageService.getJson(JOINT_CORRECTION_KEY, null) as { handLx?: unknown; handRx?: unknown; footLx?: unknown; footRx?: unknown } | null;
+      if (!raw) return null;
+      const pick = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-0.04, Math.min(0.04, v)) : 0);
+      return { handLx: pick(raw.handLx), handRx: pick(raw.handRx), footLx: pick(raw.footLx), footRx: pick(raw.footRx) };
+    } catch { return null; }
+  }
+
+  /** P1086: 関節の横位置の描く側の癖を保存する（null で消す） */
+  public setJointCorrections(c: { handLx: number; handRx: number; footLx: number; footRx: number } | null): void {
+    try {
+      if (c === null) storageService.setItem(JOINT_CORRECTION_KEY, '');
+      else storageService.setItem(JOINT_CORRECTION_KEY, JSON.stringify(c));
+    } catch { /* 保存できなくても本流は止めない */ }
+  }
+
   /**
    * P1063: 描く側の癖を学ぶドリル。旧ドリル（drillToTarget）は
    * 入力の寸法をずらして詰めたため、数字は少し良くなっても
@@ -3068,13 +3100,28 @@ class VisualPoseService {
    * 「目標÷実測」の比で補正を更新する。輪郭の差が悪化する
    * 周は採用しない（形が崩れたら差し戻す守り）。
    */
-  public drillCorrections(start: PoseReading, maxRounds = 10): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; corrections: { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number }; contourDiffInitial: number | null; contourDiffFinal: number | null; contourCorrections: { l: number[]; r: number[] } | null } | null {
+  public drillCorrections(start: PoseReading, maxRounds = 10): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; corrections: { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number }; contourDiffInitial: number | null; contourDiffFinal: number | null; contourCorrections: { l: number[]; r: number[] } | null; jointDiffInitial: number | null; jointDiffFinal: number | null; jointCorrections: { handLx: number; handRx: number; footLx: number; footRx: number } | null } | null {
     const target = this.getTarget();
     if (!target || !start.head) return null;
     if (start.profileKind === 'depth') return null;
     const keys = ['shoulder', 'chest', 'waist', 'hip', 'thigh', 'calf', 'ankle'] as const;
     type Corr = { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number };
     const contourGoal = target.contour ?? null;
+    const jointGoal = target.joints ?? null;
+    // P1086: 関節の横位置の差。手と足の横だけ（縦は読みが
+    // 追わない）。3つ以上の関節が揃った時だけ使う。
+    const jointDiffOf = (j: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null): number | null => {
+      if (!j || !jointGoal) return null;
+      let sum = 0;
+      let n = 0;
+      const pairs: Array<[{ x: number; y: number } | null, { x: number; y: number } | null]> = [[jointGoal.handL, j.handL], [jointGoal.handR, j.handR], [jointGoal.footL, j.footL], [jointGoal.footR, j.footR]];
+      for (const [g, m] of pairs) {
+        if (!g || !m) continue;
+        sum += Math.abs(g.x - m.x);
+        n++;
+      }
+      return n >= 3 ? sum / n : null;
+    };
     const contourDiffOf = (c: PoseReading['contour']): number | null => {
       if (!c || !contourGoal) return null;
       let sum = 0;
@@ -3090,7 +3137,7 @@ class VisualPoseService {
       }
       return n >= 12 ? sum / n : null;
     };
-    const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile']; contour: PoseReading['contour'] } | null => {
+    const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile']; contour: PoseReading['contour']; joints: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null } | null => {
       this.setDrawingCorrections(corr);
       // P1067: 測定はパレット経路（平坦な双子＋パレットの
       // 体マスク、128px）を優先する。64pxの通常読みは粗く
@@ -3116,13 +3163,15 @@ class VisualPoseService {
       if (n < 3) return null;
       let contourDiff: number | null = null;
       let contourRe: PoseReading['contour'] = null;
-      if (contourGoal) {
+      let jointsRe: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null = null;
+      if (contourGoal || jointGoal) {
         const cImg = this.renderBodyStructured(start, 128, null, null, { backHair: true });
         const cRe = cImg ? this.analyzePose(cImg, 128, 128) : null;
         contourDiff = cRe ? contourDiffOf(cRe.contour) : null;
         contourRe = cRe?.contour ?? null;
+        jointsRe = cRe ? { handL: cRe.handL ?? null, handR: cRe.handR ?? null, footL: cRe.footL ?? null, footR: cRe.footR ?? null } : null;
       }
-      return { diff: sum, contourDiff, measured: re.bodyProfile, contour: contourRe };
+      return { diff: sum, contourDiff, measured: re.bodyProfile, contour: contourRe, joints: jointsRe };
     };
     let corr: Corr = this.getDrawingCorrections();
     const first = measure(corr);
@@ -3203,12 +3252,66 @@ class VisualPoseService {
       this.setContourCorrections(off);
       contourCorrOut = off;
     }
+    // P1086: 関節の横位置のドリル。輪郭が落ち着いたら、手と
+    // 足の横位置も段ごとに学習する：面ありで描いて測り直
+    // し、関節ごとの横のずれの0.8倍をオフセットに足す
+    // （1周の移動は±0.01、累計は±0.04で止める）。関節の
+    // 差が改善し、寸法と輪郭が悪化しない周だけ採用する。
+    let jointCorrOut: { handLx: number; handRx: number; footLx: number; footRx: number } | null = this.getJointCorrections();
+    if (jointGoal && best.joints) {
+      let off: { handLx: number; handRx: number; footLx: number; footRx: number } = jointCorrOut ?? { handLx: 0, handRx: 0, footLx: 0, footRx: 0 };
+      let curJD = jointDiffOf(best.joints);
+      let curJoints = best.joints;
+      if (curJD !== null) {
+        for (let round = 0; round < 4; round++) {
+          const next: { handLx: number; handRx: number; footLx: number; footRx: number } = { ...off };
+          let moved = false;
+          const pairs: Array<['handLx' | 'handRx' | 'footLx' | 'footRx', { x: number; y: number } | null, { x: number; y: number } | null]> = [
+            ['handLx', jointGoal.handL, curJoints.handL],
+            ['handRx', jointGoal.handR, curJoints.handR],
+            ['footLx', jointGoal.footL, curJoints.footL],
+            ['footRx', jointGoal.footR, curJoints.footR],
+          ];
+          for (const [key, g, m] of pairs) {
+            if (!g || !m) continue;
+            const d = Math.max(-0.01, Math.min(0.01, (g.x - m.x) * 0.8));
+            if (Math.abs(d) > 0.0005) { next[key] = Math.max(-0.04, Math.min(0.04, next[key] + d)); moved = true; }
+          }
+          if (!moved) break;
+          this.setJointCorrections(next);
+          const cand = measure(bestCorr);
+          if (!cand || !cand.joints) { this.setJointCorrections(off); break; }
+          const nextCorr: Corr = { ...bestCorr };
+          for (const k of keys) {
+            const m = cand.measured[k];
+            const g = target.profile[k];
+            if (m === null || g === null || m <= 0.01) continue;
+            const ratio = Math.max(0.75, Math.min(1.33, g / m));
+            nextCorr[k] = Math.max(0.5, Math.min(2.5, bestCorr[k] * (1 + (ratio - 1) * 0.8)));
+          }
+          const cand2 = measure(nextCorr);
+          if (!cand2 || !cand2.joints) { this.setJointCorrections(off); break; }
+          const jd2 = jointDiffOf(cand2.joints);
+          const contourOk = best.contourDiff === null || cand2.contourDiff === null || cand2.contourDiff <= best.contourDiff + 0.02;
+          if (jd2 !== null && jd2 < curJD - 0.0015 && cand2.diff <= best.diff + 0.02 && contourOk) {
+            off = next;
+            curJD = jd2;
+            curJoints = cand2.joints;
+            best = cand2;
+            bestCorr = nextCorr;
+            this.setDrawingCorrections(bestCorr);
+          } else { this.setJointCorrections(off); break; }
+        }
+        this.setJointCorrections(off);
+        jointCorrOut = off;
+      }
+    }
     const state = this.load();
     state.drills++;
     const improved = best.diff < first.diff * 0.8;
     if (improved) state.drillsOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
-    return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff, contourCorrections: contourCorrOut };
+    return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff, contourCorrections: contourCorrOut, jointDiffInitial: jointDiffOf(first.joints), jointDiffFinal: jointDiffOf(best.joints), jointCorrections: jointCorrOut };
   }
 
   /**

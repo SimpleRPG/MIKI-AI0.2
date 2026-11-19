@@ -10020,6 +10020,46 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1085 輪郭の補正が残る', okOff, detail1085);
   }
 
+// ---- P1086: ドリルの補正を関節の横位置へ広げる ----
+  {
+    const W1086 = 48, H1086 = 56;
+    const fig1086 = new Uint8Array(W1086 * H1086 * 4);
+    const rect1086 = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W1086 + x) * 4; fig1086[i] = c[0]; fig1086[i + 1] = c[1]; fig1086[i + 2] = c[2]; fig1086[i + 3] = 255; } };
+    const disc1086 = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H1086; y++) for (let x = 0; x < W1086; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W1086 + x) * 4; fig1086[i] = c[0]; fig1086[i + 1] = c[1]; fig1086[i + 2] = c[2]; fig1086[i + 3] = 255; } };
+    for (let i = 0; i < W1086 * H1086; i++) { fig1086[i * 4] = 245; fig1086[i * 4 + 1] = 245; fig1086[i * 4 + 2] = 245; fig1086[i * 4 + 3] = 255; }
+    rect1086(16, 15, 28, 32, [40, 40, 120]); rect1086(12, 16, 15, 30, [40, 40, 120]); rect1086(29, 16, 32, 30, [40, 40, 120]);
+    rect1086(16, 32, 21, 50, [40, 40, 120]); rect1086(23, 32, 28, 50, [40, 40, 120]);
+    disc1086(22, 9, 6, [45, 32, 22]); disc1086(22, 10, 5, [232, 190, 160]);
+    const t1086: any = poseSvc().analyzePose(fig1086, W1086, H1086);
+    let okInit = false;
+    let okFinal = false;
+    let okOff = false;
+    let detail1086 = '';
+    if (t1086?.handL && t1086?.footL) {
+      poseSvc().setTarget(t1086);
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      const s1086: any = JSON.parse(JSON.stringify(t1086));
+      s1086.handL = { x: t1086.handL.x + 0.05, y: t1086.handL.y };
+      s1086.handR = { x: t1086.handR.x + 0.05, y: t1086.handR.y };
+      s1086.footL = { x: t1086.footL.x - 0.06, y: t1086.footL.y };
+      s1086.footR = { x: t1086.footR.x + 0.06, y: t1086.footR.y };
+      const res1086: any = poseSvc().drillCorrections(s1086);
+      okInit = !!res1086 && res1086.jointDiffInitial !== null && res1086.jointDiffInitial > 0.04;
+      okFinal = !!res1086 && res1086.jointDiffFinal !== null && res1086.jointDiffInitial !== null && res1086.jointDiffFinal < res1086.jointDiffInitial * 0.8;
+      const jc1086: any = poseSvc().getJointCorrections();
+      okOff = !!jc1086 && Math.max(Math.abs(jc1086.handLx), Math.abs(jc1086.handRx), Math.abs(jc1086.footLx), Math.abs(jc1086.footRx)) > 0.005;
+      detail1086 = `init=${res1086?.jointDiffInitial} final=${res1086?.jointDiffFinal}`;
+      poseSvc().setJointCorrections(null);
+      poseSvc().setContourCorrections(null);
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    }
+    check('P1086 関節の横のずれを測れる', okInit, detail1086);
+    check('P1086 ドリルで関節の横の差が縮む', okFinal, detail1086);
+    check('P1086 関節の補正が残る', okOff, detail1086);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
