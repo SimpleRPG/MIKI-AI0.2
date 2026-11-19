@@ -9993,6 +9993,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1084 輪郭を入れても腕が下向きに読み直せる', rr1084?.armL === 'DOWN' && rr1084?.armR === 'DOWN', `armL=${rr1084?.armL} armR=${rr1084?.armR}`);
   }
 
+// ---- P1085: ドリルの補正を輪郭へ広げる（段ごとのオフセット学習） ----
+  {
+    const t1085: any = poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let okInit = false;
+    let okFinal = false;
+    let okOff = false;
+    let detail1085 = '';
+    if (t1085?.contour) {
+      poseSvc().setTarget(t1085);
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      const s1085: any = JSON.parse(JSON.stringify(t1085));
+      s1085.contour = { l: t1085.contour.l.map((v: number | null) => (v === null ? null : v * 1.18)), r: t1085.contour.r.map((v: number | null) => (v === null ? null : v * 1.18)) };
+      const res1085: any = poseSvc().drillCorrections(s1085);
+      okInit = !!res1085 && res1085.contourDiffInitial !== null && res1085.contourDiffInitial > 0.02;
+      okFinal = !!res1085 && res1085.contourDiffFinal !== null && res1085.contourDiffInitial !== null && res1085.contourDiffFinal < res1085.contourDiffInitial * 0.75;
+      const cc1085: any = poseSvc().getContourCorrections();
+      okOff = !!cc1085 && Math.max(...cc1085.l.map((v: number) => Math.abs(v)), ...cc1085.r.map((v: number) => Math.abs(v))) > 0.005;
+      detail1085 = `init=${res1085?.contourDiffInitial} final=${res1085?.contourDiffFinal}`;
+      poseSvc().setContourCorrections(null);
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    }
+    check('P1085 輪郭のずれを測れる', okInit, detail1085);
+    check('P1085 ドリルで輪郭の差が縮む', okFinal, detail1085);
+    check('P1085 輪郭の補正が残る', okOff, detail1085);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

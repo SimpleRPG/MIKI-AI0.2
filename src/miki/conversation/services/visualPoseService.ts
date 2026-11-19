@@ -794,6 +794,7 @@ function deriveShadow(c: [number, number, number]): [number, number, number] {
 
 const TARGET_KEY = 'miki_visual_target_v1';
 const CORRECTION_KEY = 'miki_visual_corrections_v1';
+const CONTOUR_CORRECTION_KEY = 'miki_visual_contour_corrections_v1';
 
 /** P1001: 目標の素体（見本を測って保存したパラメータ） */
 export interface BodyTarget {
@@ -1004,6 +1005,13 @@ class VisualPoseService {
     // 描いたのに測るとずれる」分を描く側で吸収するために
     // 学んだもので、読み取り値そのものは汚さない。
     const corrTbl = this.getDrawingCorrections();
+    // P1085: 輪郭にも描く側の癖（段ごとのオフセット）を
+    // かける。読み取り値そのものは汚さず、描く時に使う
+    // 輪郭だけをずらす（面の縁と腕の制限が従う）。
+    const ctrCorr = this.getContourCorrections();
+    const contourUse = reading.contour && ctrCorr
+      ? { l: reading.contour.l.map((v, i) => (v === null || v === undefined ? v : v + (ctrCorr.l[i] ?? 0))), r: reading.contour.r.map((v, i) => (v === null || v === undefined ? v : v + (ctrCorr.r[i] ?? 0))) }
+      : reading.contour;
     const prof: PoseReading['bodyProfile'] = {
       shoulder: reading.bodyProfile.shoulder === null ? null : reading.bodyProfile.shoulder * corrTbl.shoulder,
       chest: reading.bodyProfile.chest === null ? null : reading.bodyProfile.chest * corrTbl.chest,
@@ -1116,7 +1124,7 @@ class VisualPoseService {
       // （面が輪郭を決めている所までが面の範囲）。
       const figHpN = Math.max(0.1, (Math.max(reading.footL?.y ?? 0, reading.footR?.y ?? 0) || footY) - (head.y - headRh));
       const figHpPx = figHpN * (S - 1);
-      const ctr = reading.contour && reading.contour.l.length === 24 && reading.contour.r.length === 24 ? reading.contour : null;
+      const ctr = contourUse && contourUse.l.length === 24 && contourUse.r.length === 24 ? contourUse : null;
       const ctrAt = (figT: number): { l: number; r: number } | null => {
         if (!ctr) return null;
         const pos = Math.min(23.999, Math.max(0, figT * 24 - 0.5));
@@ -1327,7 +1335,7 @@ class VisualPoseService {
     // 輪郭は頭中心・図の高さ単位なので、面（P1073）と
     // 同じ枠で画素へ戻す。
     const figHpArm = Math.max(0.1, (Math.max(reading.footL?.y ?? 0, reading.footR?.y ?? 0) || footY) - (head.y - headRh));
-    const ctrArm = reading.contour && reading.contour.l.length === 24 && reading.contour.r.length === 24 ? reading.contour : null;
+    const ctrArm = contourUse && contourUse.l.length === 24 && contourUse.r.length === 24 ? contourUse : null;
     const armEdgeAt = (yPx: number): { l: number; r: number } | null => {
       if (!ctrArm) return null;
       const figT = (yPx / (S - 1) - (head.y - headRh)) / figHpArm;
@@ -3033,6 +3041,24 @@ class VisualPoseService {
     try { storageService.setItem(CORRECTION_KEY, JSON.stringify(c)); } catch { /* 保存できなくても本流は止めない */ }
   }
 
+  /** P1085: 輪郭の描く側の癖（24段ごとの左右オフセット）を読む */
+  public getContourCorrections(): { l: number[]; r: number[] } | null {
+    try {
+      const raw = storageService.getJson(CONTOUR_CORRECTION_KEY, null) as { l?: unknown; r?: unknown } | null;
+      if (!raw || !Array.isArray(raw.l) || !Array.isArray(raw.r) || raw.l.length !== 24 || raw.r.length !== 24) return null;
+      const pick = (a: unknown[]): number[] => a.map((v) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-0.08, Math.min(0.08, v)) : 0));
+      return { l: pick(raw.l), r: pick(raw.r) };
+    } catch { return null; }
+  }
+
+  /** P1085: 輪郭の描く側の癖を保存する（null で消す） */
+  public setContourCorrections(c: { l: number[]; r: number[] } | null): void {
+    try {
+      if (c === null) storageService.setItem(CONTOUR_CORRECTION_KEY, '');
+      else storageService.setItem(CONTOUR_CORRECTION_KEY, JSON.stringify(c));
+    } catch { /* 保存できなくても本流は止めない */ }
+  }
+
   /**
    * P1063: 描く側の癖を学ぶドリル。旧ドリル（drillToTarget）は
    * 入力の寸法をずらして詰めたため、数字は少し良くなっても
@@ -3042,7 +3068,7 @@ class VisualPoseService {
    * 「目標÷実測」の比で補正を更新する。輪郭の差が悪化する
    * 周は採用しない（形が崩れたら差し戻す守り）。
    */
-  public drillCorrections(start: PoseReading, maxRounds = 10): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; corrections: { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number }; contourDiffInitial: number | null; contourDiffFinal: number | null } | null {
+  public drillCorrections(start: PoseReading, maxRounds = 10): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; corrections: { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number }; contourDiffInitial: number | null; contourDiffFinal: number | null; contourCorrections: { l: number[]; r: number[] } | null } | null {
     const target = this.getTarget();
     if (!target || !start.head) return null;
     if (start.profileKind === 'depth') return null;
@@ -3064,7 +3090,7 @@ class VisualPoseService {
       }
       return n >= 12 ? sum / n : null;
     };
-    const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile'] } | null => {
+    const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile']; contour: PoseReading['contour'] } | null => {
       this.setDrawingCorrections(corr);
       // P1067: 測定はパレット経路（平坦な双子＋パレットの
       // 体マスク、128px）を優先する。64pxの通常読みは粗く
@@ -3089,12 +3115,14 @@ class VisualPoseService {
       }
       if (n < 3) return null;
       let contourDiff: number | null = null;
+      let contourRe: PoseReading['contour'] = null;
       if (contourGoal) {
         const cImg = this.renderBodyStructured(start, 128, null, null, { backHair: true });
         const cRe = cImg ? this.analyzePose(cImg, 128, 128) : null;
         contourDiff = cRe ? contourDiffOf(cRe.contour) : null;
+        contourRe = cRe?.contour ?? null;
       }
-      return { diff: sum, contourDiff, measured: re.bodyProfile };
+      return { diff: sum, contourDiff, measured: re.bodyProfile, contour: contourRe };
     };
     let corr: Corr = this.getDrawingCorrections();
     const first = measure(corr);
@@ -3119,12 +3147,68 @@ class VisualPoseService {
       else break;
     }
     this.setDrawingCorrections(bestCorr);
+    // P1085: 輪郭のドリル。寸法の補正が落ち着いたら、輪郭も
+    // 段ごとに学習する：面ありで描いて測り直し、段ごとの
+    // ずれ（目標−実測）の0.8倍をオフセットに足す（1周の
+    // 移動は±0.02、累計は±0.08で止める）。輪郭の差が
+    // 改善し、寸法の差が悪化しない周だけ採用する。
+    let contourCorrOut: { l: number[]; r: number[] } | null = this.getContourCorrections();
+    if (contourGoal && best.contourDiff !== null && best.contour) {
+      let off: { l: number[]; r: number[] } = contourCorrOut ?? { l: Array(24).fill(0), r: Array(24).fill(0) };
+      let curCD = best.contourDiff;
+      let curContour = best.contour;
+      for (let round = 0; round < 4; round++) {
+        const next: { l: number[]; r: number[] } = { l: [...off.l], r: [...off.r] };
+        let moved = false;
+        for (let i = 0; i < 24; i++) {
+          const gl = contourGoal.l[i];
+          const gr = contourGoal.r[i];
+          const ml = curContour.l[i];
+          const mr = curContour.r[i];
+          if (gl !== null && gl !== undefined && ml !== null && ml !== undefined) {
+            const d = Math.max(-0.02, Math.min(0.02, (gl - ml) * 0.8));
+            if (Math.abs(d) > 0.0005) { next.l[i] = Math.max(-0.08, Math.min(0.08, next.l[i] + d)); moved = true; }
+          }
+          if (gr !== null && gr !== undefined && mr !== null && mr !== undefined) {
+            const d = Math.max(-0.02, Math.min(0.02, (gr - mr) * 0.8));
+            if (Math.abs(d) > 0.0005) { next.r[i] = Math.max(-0.08, Math.min(0.08, next.r[i] + d)); moved = true; }
+          }
+        }
+        if (!moved) break;
+        this.setContourCorrections(next);
+        const cand = measure(bestCorr);
+        if (!cand || cand.contourDiff === null || !cand.contour) { this.setContourCorrections(off); break; }
+        // 輪郭を動かすと腕の制限経由で寸法の測りもずれる。
+        // ずれた分は寸法の補正を1周回して吸収してから
+        // 判定する（輪郭の改善と寸法の維持をセットで見る）。
+        const nextCorr: Corr = { ...bestCorr };
+        for (const k of keys) {
+          const m = cand.measured[k];
+          const g = target.profile[k];
+          if (m === null || g === null || m <= 0.01) continue;
+          const ratio = Math.max(0.75, Math.min(1.33, g / m));
+          nextCorr[k] = Math.max(0.5, Math.min(2.5, bestCorr[k] * (1 + (ratio - 1) * 0.8)));
+        }
+        const cand2 = measure(nextCorr);
+        if (!cand2 || cand2.contourDiff === null || !cand2.contour) { this.setContourCorrections(off); break; }
+        if (cand2.contourDiff < curCD - 0.002 && cand2.diff <= best.diff + 0.02) {
+          off = next;
+          curCD = cand2.contourDiff;
+          curContour = cand2.contour;
+          best = cand2;
+          bestCorr = nextCorr;
+          this.setDrawingCorrections(bestCorr);
+        } else { this.setContourCorrections(off); break; }
+      }
+      this.setContourCorrections(off);
+      contourCorrOut = off;
+    }
     const state = this.load();
     state.drills++;
     const improved = best.diff < first.diff * 0.8;
     if (improved) state.drillsOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
-    return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff };
+    return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff, contourCorrections: contourCorrOut };
   }
 
   /**
