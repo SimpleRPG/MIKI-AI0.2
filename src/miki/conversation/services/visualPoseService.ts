@@ -1021,10 +1021,17 @@ class VisualPoseService {
     const HAIR0: [number, number, number] = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
     const distBg = (c: [number, number, number]): number => Math.abs(c[0] - 245) + Math.abs(c[1] - 245) + Math.abs(c[2] - 245);
     const topRgb = reading.clothing?.topRgb ?? (reading.clothing?.topColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing.topColor)?.rgb : undefined);
-    const BODY: [number, number, number] = colors?.body ?? (topRgb && distBg(topRgb) > 40 ? topRgb : (reading.skinColor ?? [40, 40, 120]));
+    // P1081: 服色を肌で代用するかは「白への距離」でなく
+    // 「実際に使う板の色への距離」で決める。淡いピンクの
+    // 水着（白まで距離40ちょうど）が肌色に化けて、上の服が
+    // 描かれていなかった。板は本人の色が白に近ければ灰に
+    // 落ちるので、その板との距離なら服は十分に離れている。
+    const bodyCand: [number, number, number] = colors?.body ?? topRgb ?? (reading.skinColor ?? [40, 40, 120]);
     // 本人の色が背景に近い時は描く板の色を落とす（白い水着や
     // 薄い肌が白い板に溶けて測れなくなるのを防ぐ）。
-    const BG_COL: [number, number, number] = Math.min(distBg(BODY), distBg(SKIN), distBg(HAIR0)) <= 60 ? [168, 168, 172] : [245, 245, 245];
+    const BG_COL: [number, number, number] = Math.min(distBg(bodyCand), distBg(SKIN), distBg(HAIR0)) <= 60 ? [168, 168, 172] : [245, 245, 245];
+    const distBoard = (c: [number, number, number]): number => Math.abs(c[0] - BG_COL[0]) + Math.abs(c[1] - BG_COL[1]) + Math.abs(c[2] - BG_COL[2]);
+    const BODY: [number, number, number] = colors?.body ?? (topRgb && distBoard(topRgb) > 40 ? topRgb : (reading.skinColor ?? [40, 40, 120]));
     const px: Array<[number, number, number]> = [];
     for (let i = 0; i < S * S; i++) px.push(BG_COL);
     // P1025: 上下が分かれた服は服として描く（胸の帯＝上の色、
@@ -2141,6 +2148,17 @@ class VisualPoseService {
     // 別の作り方にすると一族から外れて色もツヤも読めなくなる。
     const HAIRc: [number, number, number] | null = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? null;
     const SKINc: [number, number, number] = reading.skinColor ?? [232, 190, 160];
+    // P1081: 服の色が髪に近い人（淡いピンクの水着と桜色の髪
+    // など）では、服の画素まで髪の影で作ると服が灰色に
+    // 化ける。服の色（上下とその影）に近い画素は髪扱い
+    // しない。
+    const GARMc: Array<[number, number, number]> = [];
+    {
+      const tG = reading.clothing?.topRgb ?? (reading.clothing?.topColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing.topColor)?.rgb : undefined);
+      const bG = reading.clothing?.bottomRgb ?? (reading.clothing?.bottomColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing.bottomColor)?.rgb : undefined);
+      if (tG) { GARMc.push(tG); GARMc.push(deriveShadow(tG)); }
+      if (bG) { GARMc.push(bG); GARMc.push(deriveShadow(bG)); }
+    }
     const bg: [number, number, number] = [base[0], base[1], base[2]];
     const isFg = (i: number): boolean => Math.abs(out[i] - bg[0]) + Math.abs(out[i + 1] - bg[1]) + Math.abs(out[i + 2] - bg[2]) > 12;
     for (let y = 0; y < size; y++) {
@@ -2167,7 +2185,9 @@ class VisualPoseService {
           if (HAIRc) {
             const dHair = Math.abs(out[i] - HAIRc[0]) + Math.abs(out[i + 1] - HAIRc[1]) + Math.abs(out[i + 2] - HAIRc[2]);
             const dSkin = Math.abs(out[i] - SKINc[0]) + Math.abs(out[i + 1] - SKINc[1]) + Math.abs(out[i + 2] - SKINc[2]);
-            isHairPx = dHair <= 42 && dHair < dSkin;
+            let dGarm = Infinity;
+            for (const g of GARMc) dGarm = Math.min(dGarm, Math.abs(out[i] - g[0]) + Math.abs(out[i + 1] - g[1]) + Math.abs(out[i + 2] - g[2]));
+            isHairPx = dHair <= 42 && dHair < dSkin && dHair <= dGarm;
           }
           const sh: [number, number, number] = lum >= 180 && !isHairPx
             ? [Math.round(out[i] * 0.82), Math.round(out[i + 1] * 0.82), Math.round(out[i + 2] * 0.82)]
@@ -2252,7 +2272,11 @@ class VisualPoseService {
     // 縦縞になる（全身サンプルで実際に起きた）。
     const SKINc: [number, number, number] = reading.skinColor ?? [232, 190, 160];
     const topRgbC = reading.clothing?.topRgb ?? (reading.clothing?.topColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing.topColor)?.rgb : undefined);
-    const BODYc: [number, number, number] = colors?.body ?? (topRgbC && Math.abs(topRgbC[0] - 245) + Math.abs(topRgbC[1] - 245) + Math.abs(topRgbC[2] - 245) > 40 ? topRgbC : SKINc);
+    // P1081: 除外の参照に使うだけなので、白に近い服色でも
+    // そのまま使う（代用すると淡い服が髪に紛れる）。下の
+    // 服と上下の影色も除外に入れる。
+    const BODYc: [number, number, number] = colors?.body ?? topRgbC ?? SKINc;
+    const botRgbC = reading.clothing?.bottomRgb ?? (reading.clothing?.bottomColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing.bottomColor)?.rgb : undefined);
     const SKIN_SH = deriveShadow(SKINc);
     const BODY_SH = deriveShadow(BODYc);
     const distTo = (i: number, c: [number, number, number]): number => Math.abs(out[i] - c[0]) + Math.abs(out[i + 1] - c[1]) + Math.abs(out[i + 2] - c[2]);
@@ -2261,7 +2285,8 @@ class VisualPoseService {
       // 距離で切ると、髪と肌が本当に近い色の人で髪が消える）。
       const dHair = Math.min(distTo(i, HAIR), distTo(i, HAIR_SH));
       if (dHair > 42) return false;
-      const dBody = Math.min(distTo(i, SKINc), distTo(i, SKIN_SH), distTo(i, BODYc), distTo(i, BODY_SH));
+      let dBody = Math.min(distTo(i, SKINc), distTo(i, SKIN_SH), distTo(i, BODYc), distTo(i, BODY_SH));
+      if (botRgbC) dBody = Math.min(dBody, distTo(i, botRgbC), distTo(i, deriveShadow(botRgbC)));
       return dHair < dBody;
     };
     const footY = reading.footL && reading.footR ? (reading.footL.y + reading.footR.y) / 2 : 0.95;
@@ -2413,9 +2438,12 @@ class VisualPoseService {
     const HAIR0: [number, number, number] = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? [45, 32, 22];
     const distBg = (c: [number, number, number]): number => Math.abs(c[0] - 245) + Math.abs(c[1] - 245) + Math.abs(c[2] - 245);
     const topRgb = reading.clothing?.topRgb ?? (reading.clothing?.topColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing.topColor)?.rgb : undefined);
-    const BODY: [number, number, number] = colors?.body ?? (topRgb && distBg(topRgb) > 40 ? topRgb : (reading.skinColor ?? [40, 40, 120]));
+    // P1081: renderBody と同じく、板の色への距離で決める。
+    const bodyCand: [number, number, number] = colors?.body ?? topRgb ?? (reading.skinColor ?? [40, 40, 120]);
+    const BG_COL: [number, number, number] = Math.min(distBg(bodyCand), distBg(SKIN), distBg(HAIR0)) <= 60 ? [168, 168, 172] : [245, 245, 245];
+    const distBoard = (c: [number, number, number]): number => Math.abs(c[0] - BG_COL[0]) + Math.abs(c[1] - BG_COL[1]) + Math.abs(c[2] - BG_COL[2]);
+    const BODY: [number, number, number] = colors?.body ?? (topRgb && distBoard(topRgb) > 40 ? topRgb : (reading.skinColor ?? [40, 40, 120]));
     const BOTC: [number, number, number] = reading.clothing?.bottomRgb ?? (reading.clothing?.bottomColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing.bottomColor)?.rgb : undefined) ?? BODY;
-    const BG_COL: [number, number, number] = Math.min(distBg(BODY), distBg(SKIN), distBg(HAIR0)) <= 60 ? [168, 168, 172] : [245, 245, 245];
     const SH_H = deriveShadow(HAIR0);
     const HAIR_BK: [number, number, number] = [Math.round(HAIR0[0] + (SH_H[0] - HAIR0[0]) * 0.35), Math.round(HAIR0[1] + (SH_H[1] - HAIR0[1]) * 0.35), Math.round(HAIR0[2] + (SH_H[2] - HAIR0[2]) * 0.35)];
     const hairSet: Array<[number, number, number]> = [HAIR0, HAIR_BK, SH_H];

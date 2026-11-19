@@ -9891,6 +9891,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1080 流れを付けても髪色とツヤが読める', re1080?.hairColor === 'ピンク' && re1080?.hair?.shine === true, `color=${re1080?.hairColor} shine=${re1080?.hair?.shine}`);
   }
 
+  // P1081: 淡い服色が肌に化ける／髪に紛れる問題。白への距離が
+  // 40ちょうどの淡ピンクの服が「背景に近い」と判定されて
+  // 肌色で描かれ（上の服が消える）、構造化の段では下の服が
+  // 髪と誤認されて房の陰影で砕けていた。判定を「実際に使う
+  // 板の色への距離」に変え、髪の処理からは服色（上下と影）を
+  // 除外する。淡色フィギュアの読みに本人の水着の色を着せて
+  // 描画側だけで確認する（読み側の服検出は実サンプルの
+  // チェックが担う）。
+  {
+    const r1081: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    if (r1081) {
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      r1081.clothing = { bottom: 'split', twoPiece: true, separated: true, topColor: '桜色', bottomColor: '桜色', topRgb: [245, 222, 228], bottomRgb: [231, 203, 210] };
+      r1081.skinColor = [244, 228, 223]; r1081.hairRgb = [244, 206, 216]; r1081.hairColor = '桜色';
+      const cnt1081 = (im: Uint8Array, tr: number, tg: number, tb: number): number => { let n = 0; for (let p = 0; p < 128 * 128; p++) { const i = p * 4; if (im[i] === tr && im[i + 1] === tg && im[i + 2] === tb) n++; } return n; };
+      const pl1081: Uint8Array | null = poseSvc().renderBody(r1081, 128);
+      check('P1081 淡い上の服が肌に化けず描かれる', pl1081 ? cnt1081(pl1081, 245, 222, 228) >= 200 : false, `top=${pl1081 ? cnt1081(pl1081, 245, 222, 228) : -1}`);
+      const st1081: Uint8Array | null = poseSvc().renderBodyStructured(r1081, 128);
+      check('P1081 構造化でも上下の服が残る', st1081 ? cnt1081(st1081, 245, 222, 228) >= 150 && cnt1081(st1081, 231, 203, 210) >= 100 : false, `top=${st1081 ? cnt1081(st1081, 245, 222, 228) : -1} bot=${st1081 ? cnt1081(st1081, 231, 203, 210) : -1}`);
+      check('P1081 下の服が髪の陰影で砕けない', st1081 ? cnt1081(st1081, 224, 197, 204) <= 2 : false, `frag=${st1081 ? cnt1081(st1081, 224, 197, 204) : -1}`);
+    } else {
+      check('P1081 淡い上の服が肌に化けず描かれる', false, 'no reading');
+      check('P1081 構造化でも上下の服が残る', false, 'no reading');
+      check('P1081 下の服が髪の陰影で砕けない', false, 'no reading');
+    }
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
