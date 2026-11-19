@@ -135,6 +135,7 @@ export interface KnowledgeSelfInspectionRecord {
   visualCollarbone: number;
   visualLeanWindow: number;
   visualFingerDetails: number;
+  visualHandShapes: number;
   visualEyeColor: number;
   visualHairShape: number;
   visualPromotedClaims: number;
@@ -414,6 +415,7 @@ class KnowledgeSelfInspectionService {
     let visualCollarbone = 0;
     let visualLeanWindow = 0;
     let visualFingerDetails = 0;
+    let visualHandShapes = 0;
     let visualEyeColor = 0;
     let visualHairShape = 0;
     let visualPromotedClaims = 0;
@@ -675,6 +677,11 @@ class KnowledgeSelfInspectionService {
       visualFingerDetails = visualZoomService.summary().fingerDetails;
       if (visualFingerDetails > 0) {
         findings.push(`指の本数を${visualFingerDetails}件読んだ`);
+      }
+      // P1069: 手の形を読んだ回数。
+      visualHandShapes = visualZoomService.summary().handShapes;
+      if (visualHandShapes > 0) {
+        findings.push(`手の形を${visualHandShapes}件読んだ`);
       }
       // P969: 目の色を読んだ回数。
       visualEyeColor = visualZoomService.summary().eyeColors;
@@ -989,6 +996,7 @@ class KnowledgeSelfInspectionService {
       visualCollarbone,
       visualLeanWindow,
       visualFingerDetails,
+      visualHandShapes,
       visualEyeColor,
       visualHairShape,
       visualPromotedClaims,

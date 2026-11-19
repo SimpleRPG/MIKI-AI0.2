@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1848,
     "sourceFileCount": 1401,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1312,
-    "relativeImportCandidateCount": 4757,
-    "resolvedRelativeImportCandidateCount": 4741,
+    "relativeImportCandidateCount": 4759,
+    "resolvedRelativeImportCandidateCount": 4743,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 789548,
-      "lines": 9385,
-      "sha256": "92184f0c36423a589708cd097e80f80ac1d34c1b0a8b9888039bc56a7d70e6be",
+      "bytes": 793577,
+      "lines": 9444,
+      "sha256": "06f3e11dcd4d2723654991d561e8f0d2e58f38bf35580e0f0f9e4ecaee6fcd77",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4402,403 +4402,403 @@
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7145,
-          "specifier": "../src/miki/conversation/services/videoSceneService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/videoSceneService.ts"
-        },
-        {
-          "line": 7146,
-          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
-        },
-        {
-          "line": 7171,
+          "line": 7180,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 7192,
+          "line": 7181,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7204,
+          "specifier": "../src/miki/conversation/services/videoSceneService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/videoSceneService.ts"
+        },
+        {
+          "line": 7205,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7230,
+          "specifier": "../src/miki/conversation/services/visualZoomService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
+        },
+        {
+          "line": 7251,
           "specifier": "../src/miki/selfAwareness/services/avatarPresenceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/avatarPresenceService.ts"
         },
         {
-          "line": 7205,
+          "line": 7264,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7206,
+          "line": 7265,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7235,
+          "line": 7294,
           "specifier": "../src/miki/conversation/services/videoSceneService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/videoSceneService.ts"
         },
         {
-          "line": 7236,
+          "line": 7295,
           "specifier": "../src/miki/memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
         },
         {
-          "line": 7237,
+          "line": 7296,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7250,
+          "line": 7309,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7251,
+          "line": 7310,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7279,
+          "line": 7338,
           "specifier": "../src/miki/conversation/services/conversationImageObservationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/conversationImageObservationService.ts"
         },
         {
-          "line": 7280,
+          "line": 7339,
           "specifier": "../src/miki/conversation/services/visualFigureService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualFigureService.ts"
         },
         {
-          "line": 7306,
+          "line": 7365,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7343,
+          "line": 7402,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 7344,
+          "line": 7403,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7370,
+          "line": 7429,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 7371,
+          "line": 7430,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7398,
+          "line": 7457,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
-        },
-        {
-          "line": 7399,
-          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
-        },
-        {
-          "line": 7425,
-          "specifier": "../src/miki/conversation/services/visualZoomService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
-        },
-        {
-          "line": 7426,
-          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
           "line": 7458,
-          "specifier": "../src/miki/conversation/services/visualZoomService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
-        },
-        {
-          "line": 7459,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7486,
+          "line": 7484,
+          "specifier": "../src/miki/conversation/services/visualZoomService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
+        },
+        {
+          "line": 7485,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7517,
+          "specifier": "../src/miki/conversation/services/visualZoomService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
+        },
+        {
+          "line": 7518,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7545,
           "specifier": "../src/miki/conversation/services/videoSceneService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/videoSceneService.ts"
         },
         {
-          "line": 7487,
+          "line": 7546,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
-        },
-        {
-          "line": 7515,
-          "specifier": "../src/miki/conversation/services/visualPoseService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
-        },
-        {
-          "line": 7516,
-          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
-        },
-        {
-          "line": 7543,
-          "specifier": "../src/miki/conversation/services/visualZoomService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
-        },
-        {
-          "line": 7544,
-          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
-        },
-        {
-          "line": 7573,
-          "specifier": "../src/miki/conversation/services/visualPoseService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
           "line": 7574,
-          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
-        },
-        {
-          "line": 7604,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7605,
+          "line": 7575,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7602,
+          "specifier": "../src/miki/conversation/services/visualZoomService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
+        },
+        {
+          "line": 7603,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7632,
+          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
           "line": 7633,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7663,
+          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
+        },
+        {
+          "line": 7664,
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
+        },
+        {
+          "line": 7692,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 7634,
+          "line": 7693,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7660,
+          "line": 7719,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 7661,
+          "line": 7720,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7688,
+          "line": 7747,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7689,
+          "line": 7748,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 7768,
+          "line": 7827,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7769,
+          "line": 7828,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7801,
+          "line": 7860,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7802,
+          "line": 7861,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7826,
+          "line": 7885,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7854,
+          "line": 7913,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7855,
+          "line": 7914,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7880,
+          "line": 7939,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7905,
+          "line": 7964,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7906,
+          "line": 7965,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7935,
+          "line": 7994,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7936,
+          "line": 7995,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7961,
+          "line": 8020,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7962,
+          "line": 8021,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 7987,
+          "line": 8046,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 7988,
+          "line": 8047,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 8013,
+          "line": 8072,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8014,
+          "line": 8073,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 8039,
+          "line": 8098,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8040,
+          "line": 8099,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 8110,
+          "line": 8169,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8111,
+          "line": 8170,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 8139,
-          "specifier": "../src/miki/conversation/services/visualPoseService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
-        },
-        {
-          "line": 8140,
-          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
-        },
-        {
-          "line": 8173,
+          "line": 8198,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
           "line": 8199,
-          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
+          "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 8230,
+          "line": 8232,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
@@ -4810,88 +4810,88 @@
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8287,
+          "line": 8289,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8314,
+          "line": 8317,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8343,
+          "line": 8346,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8367,
+          "line": 8373,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8368,
+          "line": 8402,
+          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
+        },
+        {
+          "line": 8426,
+          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
+        },
+        {
+          "line": 8427,
           "specifier": "../src/miki/selfAwareness/services/knowledgeSelfInspectionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts"
         },
         {
-          "line": 8414,
+          "line": 8473,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8448,
+          "line": 8507,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8479,
+          "line": 8538,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8514,
+          "line": 8573,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8551,
+          "line": 8610,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8595,
+          "line": 8654,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8622,
+          "line": 8681,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
-        },
-        {
-          "line": 8653,
-          "specifier": "../src/miki/conversation/services/visualPoseService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
-        },
-        {
-          "line": 8695,
-          "specifier": "../src/miki/conversation/services/visualZoomService",
-          "resolution": "RESOLVED",
-          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
           "line": 8712,
@@ -4900,26 +4900,38 @@
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 9098,
+          "line": 8754,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 9120,
+          "line": 8771,
+          "specifier": "../src/miki/conversation/services/visualPoseService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
+        },
+        {
+          "line": 9157,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 9181,
+          "line": 9179,
+          "specifier": "../src/miki/conversation/services/visualZoomService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
+        },
+        {
+          "line": 9240,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         }
       ],
-      "relativeImportCandidateCount": 533,
-      "resolvedRelativeImportCount": 533,
+      "relativeImportCandidateCount": 535,
+      "resolvedRelativeImportCount": 535,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -15652,9 +15664,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualZoomService.ts",
-      "bytes": 44056,
-      "lines": 859,
-      "sha256": "5bba0b29bc47320fd0212c2c4070d434c6a03ad05a6208f2b9a37c424905edf7",
+      "bytes": 48068,
+      "lines": 929,
+      "sha256": "d2a0ab53cbda641791c6b0af54194024d0675126acfc86c3890ccf37502b1eeb",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -33053,9 +33065,9 @@
     },
     {
       "path": "src/miki/selfAwareness/services/knowledgeSelfInspectionService.ts",
-      "bytes": 48225,
-      "lines": 1098,
-      "sha256": "bc62d83073db5c6273abee9a7ddab08c858ad7f9a56f68b2868ae678d0f59712",
+      "bytes": 48531,
+      "lines": 1106,
+      "sha256": "af9f81e6f7f08364fa0903bbb985ce7723649fc8a3d9607285fadd9b04e5ced5",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -34,6 +34,11 @@ export interface HandReading {
   nails: { present: boolean; colorLabel: string | null };
   /** P968: 指の本数・広がり・一番長い指の位置 */
   fingers: { count: number; spread: number; longest: 'left' | 'center' | 'right' | null };
+  /** P1069: 手の形そのもの。伸びた指の本数からの分類（open=開いた手 / fist=握った手 / pointing=指さし / peace=ピース） */
+  shape: 'open' | 'fist' | 'pointing' | 'peace' | 'unknown';
+  shapeDescription: string | null;
+  /** P1069: 手のひらの縦横。width=腕側の肌の最大幅、length=中心から手首までの長さ（腕が切り出し端まで続く時は測れないので null）。aspect=幅÷長さ */
+  palm: { width: number; length: number | null; aspect: number | null; shape: 'wide' | 'square' | 'long' | null };
 }
 
 /** P955: 向きの読み（正面・横向き・後ろ姿） */
@@ -83,15 +88,15 @@ export interface FaceReading {
 }
 
 class VisualZoomService {
-  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number; brows: number; noses: number; ears: number; faceShapes: number; cheekFlushes: number; hairlines: number; eyeSizes: number; mouthSizes: number } {
+  private load(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number; brows: number; noses: number; ears: number; faceShapes: number; cheekFlushes: number; hairlines: number; eyeSizes: number; mouthSizes: number; handShapes: number } {
     try {
-      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number; fingerDetails?: number; eyeColors?: number; brows?: number; noses?: number; ears?: number; faceShapes?: number; cheekFlushes?: number; hairlines?: number; eyeSizes?: number; mouthSizes?: number } | null;
-      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0, fingerDetails: raw.fingerDetails || 0, eyeColors: raw.eyeColors || 0, brows: raw.brows || 0, noses: raw.noses || 0, ears: raw.ears || 0, faceShapes: raw.faceShapes || 0, cheekFlushes: raw.cheekFlushes || 0, hairlines: raw.hairlines || 0, eyeSizes: raw.eyeSizes || 0, mouthSizes: raw.mouthSizes || 0 };
+      const raw = storageService.getJson(KEY, null) as { analyzed?: number; faces?: number; viewpoints?: number; hands?: number; nails?: number; fingerDetails?: number; eyeColors?: number; brows?: number; noses?: number; ears?: number; faceShapes?: number; cheekFlushes?: number; hairlines?: number; eyeSizes?: number; mouthSizes?: number; handShapes?: number } | null;
+      if (raw) return { analyzed: raw.analyzed || 0, faces: raw.faces || 0, viewpoints: raw.viewpoints || 0, hands: raw.hands || 0, nails: raw.nails || 0, fingerDetails: raw.fingerDetails || 0, eyeColors: raw.eyeColors || 0, brows: raw.brows || 0, noses: raw.noses || 0, ears: raw.ears || 0, faceShapes: raw.faceShapes || 0, cheekFlushes: raw.cheekFlushes || 0, hairlines: raw.hairlines || 0, eyeSizes: raw.eyeSizes || 0, mouthSizes: raw.mouthSizes || 0, handShapes: raw.handShapes || 0 };
     } catch { /* fall through */ }
-    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0, fingerDetails: 0, eyeColors: 0, brows: 0, noses: 0, ears: 0, faceShapes: 0, cheekFlushes: 0, hairlines: 0, eyeSizes: 0, mouthSizes: 0 };
+    return { analyzed: 0, faces: 0, viewpoints: 0, hands: 0, nails: 0, fingerDetails: 0, eyeColors: 0, brows: 0, noses: 0, ears: 0, faceShapes: 0, cheekFlushes: 0, hairlines: 0, eyeSizes: 0, mouthSizes: 0, handShapes: 0 };
   }
 
-  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number; brows: number; noses: number; ears: number; faceShapes: number; cheekFlushes: number; hairlines: number; eyeSizes: number; mouthSizes: number } {
+  public summary(): { analyzed: number; faces: number; viewpoints: number; hands: number; nails: number; fingerDetails: number; eyeColors: number; brows: number; noses: number; ears: number; faceShapes: number; cheekFlushes: number; hairlines: number; eyeSizes: number; mouthSizes: number; handShapes: number } {
     return this.load();
   }
 
@@ -145,6 +150,9 @@ class VisualZoomService {
     // よく見える走査線の並びを指の列とし、各指について
     // 肌がどこまで続くか（その指の先端）を測る。
     let fingers: HandReading['fingers'] = { count: 0, spread: 0, longest: null };
+    // P1069: 指ごとの先端（分かれ線からの伸び）。伸びた指の
+    // 本数で手の形を分けるための材料。
+    const fingerTips: number[] = [];
     if (bestCenters.length > 0) {
       const spread = bestCenters.length >= 2
         ? (bestCenters[bestCenters.length - 1] - bestCenters[0]) / S
@@ -158,6 +166,7 @@ class VisualZoomService {
           const sy = Math.round(cy + away.y * d + perp.y * t);
           if (isSkin(sx, sy)) ownTip = d;
         }
+        fingerTips.push(ownTip);
         if (ownTip > longestTip) { longestTip = ownTip; longestT = t; }
       }
       fingers = {
@@ -166,6 +175,63 @@ class VisualZoomService {
         longest: longestT === null ? null : Math.abs(longestT) <= 5 ? 'center' : longestT < 0 ? 'left' : 'right',
       };
     }
+
+    // P1069: 手の形そのもの。指の本数だけでは握った手と
+    // 指さしが区別できない（どちらも走査が1本にまとまる）
+    // ので、分かれ線から先端までの伸びで数え直す。合成図
+    // での実測は、握った手の伸びが4、伸びた指は13以上で、
+    // しきい値7はその間にある。
+    const extended = fingerTips.filter((tip) => tip - bestD >= 7).length;
+    let shape: HandReading['shape'] = 'unknown';
+    let shapeDescription: string | null = null;
+    if (bestCenters.length > 0) {
+      if (extended >= 3) { shape = 'open'; shapeDescription = '開いた手のように見える'; }
+      else if (extended === 2) { shape = 'peace'; shapeDescription = 'ピースのように見える（指が2本伸びている）'; }
+      else if (extended === 1) { shape = 'pointing'; shapeDescription = '指さしのように見える（指が1本伸びている）'; }
+      else { shape = 'fist'; shapeDescription = '握った手のように見える'; }
+    }
+
+    // P1069: 手のひらの縦横。幅は腕側（分かれ線の反対側）
+    // での肌の最大幅。指の付け根の行（d=-1〜-5）は指と
+    // 手のひらがつながって幅が広く見えるので、幅の走査は
+    // d=-6より腕側だけにする。長さは中心から腕の方へ肌が
+    // 続く距離。中心線上に腕側の肌が無い時や、腕が切り出
+    // しの端まで続く時（手首が見えない時）は決めない
+    // （length・aspect・shape とも null）。
+    let palmWidth = 0;
+    for (let d = -18; d <= -6; d++) {
+      const lx = cx + away.x * d;
+      const ly = cy + away.y * d;
+      let run = 0;
+      let best = 0;
+      for (let t = -23; t <= 23; t++) {
+        if (isSkin(Math.round(lx + perp.x * t), Math.round(ly + perp.y * t))) { run++; if (run > best) best = run; }
+        else run = 0;
+      }
+      if (best > palmWidth) palmWidth = best;
+    }
+    let palmLength: number | null = null;
+    let censored = false;
+    let armSkinStarted = false;
+    for (let d = 0; d <= 23; d++) {
+      const sx = Math.round(cx + axisToArm.x * d);
+      const sy = Math.round(cy + axisToArm.y * d);
+      if (!armSkinStarted) {
+        // 中心が指の隙間にあって腕側に肌が無い行から
+        // 始まることがあるので、最初の肌まで読み飛ばす。
+        if (!isSkin(sx, sy)) continue;
+        armSkinStarted = true;
+      }
+      if (isSkin(sx, sy)) palmLength = d;
+      else break;
+      if (d === 23) censored = true;
+    }
+    if (censored) palmLength = null;
+    const palmAspect = palmLength !== null && palmLength >= 5 && palmWidth > 0
+      ? palmWidth / palmLength : null;
+    const palmShape: HandReading['palm']['shape'] = palmAspect === null ? null
+      : palmAspect >= 1.3 ? 'wide' : palmAspect <= 0.9 ? 'long' : 'square';
+    const palm: HandReading['palm'] = { width: palmWidth, length: palmLength, aspect: palmAspect, shape: palmShape };
 
     // P965: 爪。爪は肌の走査が止まる先端の、少し先にある。
     // 先端の2〜4先で、肌でも背景でもない色のパッチが
@@ -210,12 +276,16 @@ class VisualZoomService {
     state.hands++;
     if (nails.present) state.nails++;
     if (fingers.count >= 2) state.fingerDetails++;
+    if (shape !== 'unknown') state.handShapes++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     return {
       fingersSeparated,
       maxRuns,
       nails,
       fingers,
+      shape,
+      shapeDescription,
+      palm,
       description: fingersSeparated ? '指が分かれて見える' : '指は分かれて見えない（握っているか、指がくっついているようだ）',
     };
   }

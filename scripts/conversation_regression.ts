@@ -7116,6 +7116,65 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P968 自己点検の記録に指の本数（visualFingerDetails）が入っている', typeof insp968.visualFingerDetails === 'number' && insp968.visualFingerDetails >= 1, `visualFingerDetails=${insp968.visualFingerDetails}`);
 }
 
+// ---- P1069 手の形そのもの（伸びた指の本数＋手のひらの縦横） ----
+{
+  const { visualZoomService: vzoom1069 } = await import('../src/miki/conversation/services/visualZoomService');
+  const { knowledgeSelfInspectionService: ksi1069 } = await import('../src/miki/selfAwareness/services/knowledgeSelfInspectionService');
+  type RGB1069 = [number, number, number];
+  const SKIN1069: RGB1069 = [232, 190, 160];
+  const hand1069 = (draw: (rect: (x0: number, y0: number, x1: number, y1: number, c: RGB1069) => void, disc: (cx: number, cy: number, r: number, c: RGB1069) => void) => void) => {
+    const px: RGB1069[] = []; for (let i = 0; i < 48 * 48; i++) px.push([250, 250, 250]);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB1069) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px[y * 48 + x] = c; };
+    const disc = (cx: number, cy: number, r: number, c: RGB1069) => { for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px[y * 48 + x] = c; };
+    draw(rect, disc);
+    const o = new Uint8Array(48 * 48 * 4);
+    px.forEach((c, i) => { o[i * 4] = c[0]; o[i * 4 + 1] = c[1]; o[i * 4 + 2] = c[2]; o[i * 4 + 3] = 255; });
+    return o;
+  };
+  // 腕は下（axisToArm {x:0,y:1}）、指は上向き。手のひらは y=24〜42。
+  const open1069 = hand1069((rect) => {
+    rect(14, 24, 34, 42, SKIN1069);
+    for (const fx of [12, 19, 26, 33]) rect(fx, fx === 19 ? 4 : 8, fx + 3, 26, SKIN1069);
+  });
+  const fist1069 = hand1069((rect, disc) => {
+    disc(24, 25, 9, SKIN1069);
+    rect(20, 33, 27, 47, SKIN1069);
+  });
+  const pointing1069 = hand1069((rect) => {
+    rect(14, 24, 34, 42, SKIN1069);
+    rect(22, 4, 25, 26, SKIN1069);
+  });
+  const peace1069 = hand1069((rect) => {
+    rect(14, 24, 34, 42, SKIN1069);
+    rect(16, 6, 19, 26, SKIN1069);
+    rect(28, 6, 31, 26, SKIN1069);
+  });
+  const wide1069 = hand1069((rect) => {
+    rect(8, 26, 40, 42, SKIN1069);
+    for (const fx of [10, 18, 26, 34]) rect(fx, 8, fx + 3, 28, SKIN1069);
+  });
+  const narrow1069 = hand1069((rect) => {
+    rect(18, 24, 30, 42, SKIN1069);
+    for (const fx of [18, 22, 26, 30]) rect(fx, 8, fx + 2, 26, SKIN1069);
+  });
+  const rOpen1069 = vzoom1069.analyzeHand(open1069, { x: 0, y: 1 });
+  check('P1069 開いた手は形が open と読める', rOpen1069?.shape === 'open', `shape=${rOpen1069?.shape}`);
+  const rFist1069 = vzoom1069.analyzeHand(fist1069, { x: 0, y: 1 });
+  check('P1069 握った手は形が fist と読める', rFist1069?.shape === 'fist', `shape=${rFist1069?.shape}`);
+  const rPoint1069 = vzoom1069.analyzeHand(pointing1069, { x: 0, y: 1 });
+  check('P1069 指さしは形が pointing と読める', rPoint1069?.shape === 'pointing', `shape=${rPoint1069?.shape}`);
+  const rPeace1069 = vzoom1069.analyzeHand(peace1069, { x: 0, y: 1 });
+  check('P1069 ピースは形が peace と読める', rPeace1069?.shape === 'peace', `shape=${rPeace1069?.shape}`);
+  check('P1069 普通の手のひらは縦横が square と読める', rOpen1069?.palm.shape === 'square', `palm=${JSON.stringify(rOpen1069?.palm)}`);
+  const rWide1069 = vzoom1069.analyzeHand(wide1069, { x: 0, y: 1 });
+  check('P1069 横に広い手のひらは wide と読める', rWide1069?.palm.shape === 'wide', `palm=${JSON.stringify(rWide1069?.palm)}`);
+  const rNarrow1069 = vzoom1069.analyzeHand(narrow1069, { x: 0, y: 1 });
+  check('P1069 細長い手のひらは long と読める', rNarrow1069?.palm.shape === 'long', `palm=${JSON.stringify(rNarrow1069?.palm)}`);
+  check('P1069 腕が切り出し端まで続く握り拳は手のひらの長さを決めない', rFist1069?.palm.length === null && rFist1069?.palm.shape === null, `palm=${JSON.stringify(rFist1069?.palm)}`);
+  const insp1069 = ksi1069.inspect();
+  check('P1069 自己点検の記録に手の形（visualHandShapes）が入っている', typeof insp1069.visualHandShapes === 'number' && insp1069.visualHandShapes >= 1, `visualHandShapes=${insp1069.visualHandShapes}`);
+}
+
 // ---- P969 目の色の第1段 ----
 {
   const { visualZoomService: vzoom969 } = await import('../src/miki/conversation/services/visualZoomService');
