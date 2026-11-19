@@ -10113,6 +10113,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1088 胸の丸みの影が描かれる', mound1088 >= 40, `mound=${mound1088}`);
   }
 
+// ---- P1089: ドリルの吸収候補が保存側に残らない（常駐で発散した原因） ----
+  {
+    const target1089: any = poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let stable1089 = false;
+    let storedOk1089 = false;
+    if (target1089?.head && target1089?.contour) {
+      poseSvc().setTarget(target1089);
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections({ l: target1089.contour.l.map((x: any) => (typeof x === 'number' ? x * 1.18 : x)), r: target1089.contour.r.map((x: any) => (typeof x === 'number' ? x * 1.18 : x)) });
+      poseSvc().setJointCorrections(null);
+      poseSvc().setOverlapCorrections(null);
+      const r1: any = poseSvc().drillCorrections(target1089);
+      const stored1089: any = poseSvc().getDrawingCorrections();
+      if (r1 && stored1089) storedOk1089 = ['shoulder', 'chest', 'waist', 'hip', 'thigh', 'calf', 'ankle'].every((k) => Math.abs(stored1089[k] - r1.corrections[k]) < 1e-9);
+      const r2: any = r1 ? poseSvc().drillCorrections(target1089) : null;
+      if (r1 && r2) stable1089 = Math.abs(r2.initialDiff - r1.finalDiff) <= 0.01;
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      poseSvc().setOverlapCorrections(null);
+    }
+    check('P1089 ドリル後の保存補正が返り値の最良と一致する', storedOk1089, `storedOk=${storedOk1089}`);
+    check('P1089 ドリルを繰り返しても初期差が跳ねない', stable1089, `stable=${stable1089}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

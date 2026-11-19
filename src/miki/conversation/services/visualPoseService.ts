@@ -3404,6 +3404,10 @@ class VisualPoseService {
       }
       this.setContourCorrections(off);
       contourCorrOut = off;
+      // P1089: 吸収の測りは候補の寸法補正を保存側へ書き込む
+      // ため、不採用で終わった周の候補が残らないよう、
+      // 段の終わりでは必ず最良の補正に戻す。
+      this.setDrawingCorrections(bestCorr);
     }
     // P1086: 関節の横位置のドリル。輪郭が落ち着いたら、手と
     // 足の横位置も段ごとに学習する：面ありで描いて測り直
@@ -3460,8 +3464,14 @@ class VisualPoseService {
         }
         this.setJointCorrections(off);
         jointCorrOut = off;
+        // P1089: 輪郭の段と同じく、吸収候補の残留を戻す。
+        this.setDrawingCorrections(bestCorr);
       }
     }
+    // P1089: ドリルを抜ける時は、保存側の寸法補正が
+    // 返り値の最良と一致していることを保証する（どの段の
+    // どの経路で終わっても、測りの副作用を残さない）。
+    this.setDrawingCorrections(bestCorr);
     const state = this.load();
     state.drills++;
     const improved = best.diff < first.diff * 0.8;
