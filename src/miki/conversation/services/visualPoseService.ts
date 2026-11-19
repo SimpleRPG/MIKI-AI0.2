@@ -2245,26 +2245,59 @@ class VisualPoseService {
     const image = this.renderBodyStructured(reading, size);
     if (!image) return null;
     const re = this.analyzePose(image, size, size);
+    // P1066: 自分の描画に限っては、どの画素が髪でどれが
+    // 体かは描いた側のパレットで正確に分かる。仕上げ済み
+    // の描画は髪の作画（ツヤ・房の影）でパレット外の色に
+    // 化けるため、構造の測り直しは平坦な双子＋パレット
+    // 分割の体マスクでも行い、プロファイルが揃っている
+    // 時はそちらの値を優先する（写真で領域分割の読みが
+    // 採用されるのと同じ段を、自分の絵では正確なマスク
+    // で行う）。同系色の髪と服は通常の再読では分かれず、
+    // 肩や髪色が実物と無関係に外れていた。
+    let rePal: PoseReading | null = null;
+    const flat = this.renderBodyStructuredTwin(reading, size);
+    if (flat) {
+      const pal = this.segmentTwinPalette(flat, size, reading);
+      if (pal) {
+        let bn = 0, minX = size, maxX = -1, minY = size, maxY = -1;
+        for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+          if (!pal.body[y * size + x]) continue;
+          bn++;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+        const dens = bn / Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
+        rePal = this.analyzePoseWithMask(flat, size, size, pal.body, 'fine', dens, pal.hair);
+        if (rePal && !rePal.profileComplete) rePal = null;
+      }
+    }
+    const effProfile = (k: 'shoulder' | 'chest' | 'waist' | 'hip' | 'thigh' | 'calf' | 'ankle'): number | null =>
+      (rePal?.bodyProfile[k] ?? null) !== null ? rePal!.bodyProfile[k] : (re?.bodyProfile[k] ?? null);
+    const effHair = rePal?.hair ?? re?.hair ?? null;
+    const effHairColor = rePal?.hairColor ?? re?.hairColor ?? null;
+    const effKind = rePal?.profileKind ?? re?.profileKind;
     let score = 0;
     let verified = false;
-    if (re && (reading.profileKind ?? 'width') === (re.profileKind ?? 'width')) {
+    if ((re || rePal) && (reading.profileKind ?? 'width') === (effKind ?? 'width')) {
       const keys = ['shoulder', 'chest', 'waist', 'hip', 'thigh', 'calf', 'ankle'] as const;
       let ok = 0;
       let compared = 0;
       for (const k of keys) {
         const a = reading.bodyProfile[k];
-        const b = re.bodyProfile[k];
+        const b = effProfile(k);
         if (a === null || b === null) continue;
         compared++;
         if (Math.abs(a - b) <= 0.09 + 1e-9) ok++;
       }
-      if (reading.hair && re.hair) {
+      if (reading.hair && effHair) {
         compared++;
-        if (reading.hair.length === re.hair.length) ok++;
+        if (reading.hair.length === effHair.length) ok++;
       }
-      if (reading.hairColor && re.hairColor) {
+      if (reading.hairColor && effHairColor) {
         compared++;
-        if (reading.hairColor === re.hairColor) ok++;
+        if (reading.hairColor === effHairColor) ok++;
       }
       if (compared >= 4) {
         score = ok / compared;

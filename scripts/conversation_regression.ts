@@ -9321,6 +9321,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     await poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
   }
 
+  // P1066: 自分の描画の測り直しにパレット分離を配線する
+  // （平坦な双子＋パレットの体マスクで構造を読む。髪と服が
+  // 同系色だと通常の再読では肩と髪色が外れる件への対処）
+  {
+    const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    const ver: any = r ? await poseSvc().verifyBodyStructured(r) : null;
+    check('P1066 パレット分離の配線で淡色の構造化照合が上がる', ver?.verified === true && (ver?.score ?? 0) >= 0.89, `score=${ver?.score}`);
+  }
+
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
