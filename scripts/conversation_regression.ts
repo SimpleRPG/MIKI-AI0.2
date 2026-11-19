@@ -10060,6 +10060,43 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1086 関節の補正が残る', okOff, detail1086);
   }
 
+// ---- P1087: ドリルに重なり（中の境界線）の物差しと守りを入れる ----
+  {
+    const t1087: any = poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let okMeasure = false;
+    let okGuard = false;
+    let okDraw = false;
+    let detail1087 = '';
+    if (t1087?.head) {
+      poseSvc().setTarget(t1087);
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      poseSvc().setOverlapCorrections({ panelK: 1.35 });
+      const res1087: any = poseSvc().drillCorrections(t1087);
+      okMeasure = !!res1087 && res1087.innerDiffInitial !== null && res1087.innerDiffFinal !== null;
+      okGuard = okMeasure && res1087.innerDiffFinal <= res1087.innerDiffInitial + 0.01;
+      detail1087 = `init=${res1087?.innerDiffInitial} final=${res1087?.innerDiffFinal}`;
+      poseSvc().setOverlapCorrections({ panelK: 1 });
+      const imgA: any = poseSvc().renderBody(t1087, 128, null, null, { backHair: true });
+      poseSvc().setOverlapCorrections({ panelK: 1.35 });
+      const imgB: any = poseSvc().renderBody(t1087, 128, null, null, { backHair: true });
+      if (imgA && imgB) {
+        let d = 0;
+        for (let i = 0; i < imgA.length; i += 4) if (imgA[i] !== imgB[i] || imgA[i + 1] !== imgB[i + 1] || imgA[i + 2] !== imgB[i + 2]) d++;
+        okDraw = d > 100;
+        detail1087 += ` pix=${d}`;
+      }
+      poseSvc().setOverlapCorrections(null);
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    }
+    check('P1087 重なりのずれを測れる', okMeasure, detail1087);
+    check('P1087 他の段が重なりを大きく壊さない', okGuard, detail1087);
+    check('P1087 パネルの幅の補正が描画に効く', okDraw, detail1087);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

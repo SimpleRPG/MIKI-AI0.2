@@ -796,6 +796,7 @@ const TARGET_KEY = 'miki_visual_target_v1';
 const CORRECTION_KEY = 'miki_visual_corrections_v1';
 const CONTOUR_CORRECTION_KEY = 'miki_visual_contour_corrections_v1';
 const JOINT_CORRECTION_KEY = 'miki_visual_joint_corrections_v1';
+const OVERLAP_CORRECTION_KEY = 'miki_visual_overlap_corrections_v1';
 
 /** P1001: 目標の素体（見本を測って保存したパラメータ） */
 export interface BodyTarget {
@@ -810,6 +811,8 @@ export interface BodyTarget {
   // 読みが鎖の末端で決まり描いても動かず、足の縦は
   // 両足の平均でしか動かないため、縦は対象外）。
   joints?: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null;
+  // P1087: 中の境界線（重なりの目標）も持つ
+  innerLines?: (number[] | null)[] | null;
 }
 
 /** P1001: マスクの詰まり具合（前景画素 ÷ 外接矩形の面積）。輪郭の細切れ検出に使う */
@@ -1025,6 +1028,9 @@ class VisualPoseService {
     const handLUse = reading.handL && jCorr ? { x: reading.handL.x + jCorr.handLx, y: reading.handL.y } : reading.handL;
     const handRUse = reading.handR && jCorr ? { x: reading.handR.x + jCorr.handRx, y: reading.handR.y } : reading.handR;
     const footXOff = (sgn: number): number => (jCorr ? (sgn < 0 ? jCorr.footLx : jCorr.footRx) : 0);
+    // P1087: 髪のパネルが体へ重なる幅にも描く側の癖を
+    // かける（パネルの幅は頭の半径からの固定式だった）。
+    const panelK = this.getOverlapCorrections()?.panelK ?? 1;
     const prof: PoseReading['bodyProfile'] = {
       shoulder: reading.bodyProfile.shoulder === null ? null : reading.bodyProfile.shoulder * corrTbl.shoulder,
       chest: reading.bodyProfile.chest === null ? null : reading.bodyProfile.chest * corrTbl.chest,
@@ -1531,7 +1537,7 @@ class VisualPoseService {
           // （半径の0.55〜0.95倍）は胴の正面を板で削り、
           // 体から離した配置は浮いた板と余分な柱を作った。
           const t = Math.min(1, (y - hy) / Math.max(1, hairBottomY - hy));
-          const panelW = Math.max(1.5, hr * 0.45 * (1 - 0.3 * t));
+          const panelW = Math.max(1.5, hr * 0.45 * (1 - 0.3 * t)) * panelK;
           const HAIR_SH2 = deriveShadow(HAIR);
           const cxPx = cxN * (S - 1);
           for (const sgn of [-1, 1]) {
@@ -3016,6 +3022,7 @@ class VisualPoseService {
       contour: reading.contour ?? null,
       silhouetteWidth: reading.silhouetteWidth ?? null,
       joints: { handL: reading.handL ?? null, handR: reading.handR ?? null, footL: reading.footL ?? null, footR: reading.footR ?? null },
+      innerLines: reading.innerLines ?? null,
     };
     try {
       storageService.setItem(TARGET_KEY, JSON.stringify(target));
@@ -3091,6 +3098,23 @@ class VisualPoseService {
     } catch { /* 保存できなくても本流は止めない */ }
   }
 
+  /** P1087: 重なりの描く側の癖（髪のパネルの幅の倍率）を読む */
+  public getOverlapCorrections(): { panelK: number } | null {
+    try {
+      const raw = storageService.getJson(OVERLAP_CORRECTION_KEY, null) as { panelK?: unknown } | null;
+      if (!raw || typeof raw.panelK !== 'number' || !Number.isFinite(raw.panelK)) return null;
+      return { panelK: Math.max(0.7, Math.min(1.4, raw.panelK)) };
+    } catch { return null; }
+  }
+
+  /** P1087: 重なりの描く側の癖を保存する（null で消す） */
+  public setOverlapCorrections(c: { panelK: number } | null): void {
+    try {
+      if (c === null) storageService.setItem(OVERLAP_CORRECTION_KEY, '');
+      else storageService.setItem(OVERLAP_CORRECTION_KEY, JSON.stringify(c));
+    } catch { /* 保存できなくても本流は止めない */ }
+  }
+
   /**
    * P1063: 描く側の癖を学ぶドリル。旧ドリル（drillToTarget）は
    * 入力の寸法をずらして詰めたため、数字は少し良くなっても
@@ -3100,7 +3124,7 @@ class VisualPoseService {
    * 「目標÷実測」の比で補正を更新する。輪郭の差が悪化する
    * 周は採用しない（形が崩れたら差し戻す守り）。
    */
-  public drillCorrections(start: PoseReading, maxRounds = 10): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; corrections: { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number }; contourDiffInitial: number | null; contourDiffFinal: number | null; contourCorrections: { l: number[]; r: number[] } | null; jointDiffInitial: number | null; jointDiffFinal: number | null; jointCorrections: { handLx: number; handRx: number; footLx: number; footRx: number } | null } | null {
+  public drillCorrections(start: PoseReading, maxRounds = 10): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; corrections: { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number }; contourDiffInitial: number | null; contourDiffFinal: number | null; contourCorrections: { l: number[]; r: number[] } | null; jointDiffInitial: number | null; jointDiffFinal: number | null; jointCorrections: { handLx: number; handRx: number; footLx: number; footRx: number } | null; innerDiffInitial: number | null; innerDiffFinal: number | null; overlapCorrections: { panelK: number } | null } | null {
     const target = this.getTarget();
     if (!target || !start.head) return null;
     if (start.profileKind === 'depth') return null;
@@ -3108,6 +3132,31 @@ class VisualPoseService {
     type Corr = { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number };
     const contourGoal = target.contour ?? null;
     const jointGoal = target.joints ?? null;
+    const innerGoal = target.innerLines ?? null;
+    // P1087: 中の境界線の差（連続値）。照合の物差し
+    // （0.05以内か否か）は粗くて、パネルの幅の変化が
+    // 埋もれてしまうため、ドリルでは点ごとの最寄り
+    // 距離の平均で測る（輪郭の差と同じ流儀）。
+    const innerDiffOf = (inner: PoseReading['innerLines']): number | null => {
+      if (!inner || !innerGoal) return null;
+      let sum = 0;
+      let bands = 0;
+      for (let i = 0; i < 24; i++) {
+        const a = innerGoal[i];
+        if (!a || a.length === 0) continue;
+        const b = inner[i] ?? [];
+        let d = 0;
+        for (const v of a) {
+          let bestD = 0.1;
+          for (const w of b) bestD = Math.min(bestD, Math.abs(v - w));
+          d += bestD;
+        }
+        d = d / a.length + 0.01 * Math.abs(a.length - b.length);
+        sum += d;
+        bands++;
+      }
+      return bands >= 8 ? sum / bands : null;
+    };
     // P1086: 関節の横位置の差。手と足の横だけ（縦は読みが
     // 追わない）。3つ以上の関節が揃った時だけ使う。
     const jointDiffOf = (j: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null): number | null => {
@@ -3137,7 +3186,7 @@ class VisualPoseService {
       }
       return n >= 12 ? sum / n : null;
     };
-    const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile']; contour: PoseReading['contour']; joints: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null } | null => {
+    const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile']; contour: PoseReading['contour']; joints: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null; inner: PoseReading['innerLines']; sDiff: number | null } | null => {
       this.setDrawingCorrections(corr);
       // P1067: 測定はパレット経路（平坦な双子＋パレットの
       // 体マスク、128px）を優先する。64pxの通常読みは粗く
@@ -3164,14 +3213,29 @@ class VisualPoseService {
       let contourDiff: number | null = null;
       let contourRe: PoseReading['contour'] = null;
       let jointsRe: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null = null;
-      if (contourGoal || jointGoal) {
+      let innerRe: PoseReading['innerLines'] = null;
+      let sDiff: number | null = null;
+      if (contourGoal || jointGoal || innerGoal) {
         const cImg = this.renderBodyStructured(start, 128, null, null, { backHair: true });
         const cRe = cImg ? this.analyzePose(cImg, 128, 128) : null;
         contourDiff = cRe ? contourDiffOf(cRe.contour) : null;
         contourRe = cRe?.contour ?? null;
         jointsRe = cRe ? { handL: cRe.handL ?? null, handR: cRe.handR ?? null, footL: cRe.footL ?? null, footR: cRe.footR ?? null } : null;
+        innerRe = cRe?.innerLines ?? null;
+        if (cRe) {
+          let sSum = 0;
+          let sN = 0;
+          for (const k of keys) {
+            const m = cRe.bodyProfile[k];
+            const g = target.profile[k];
+            if (m === null || g === null) continue;
+            sSum += Math.abs(m - g);
+            sN++;
+          }
+          sDiff = sN >= 3 ? sSum : null;
+        }
       }
-      return { diff: sum, contourDiff, measured: re.bodyProfile, contour: contourRe, joints: jointsRe };
+      return { diff: sum, contourDiff, measured: re.bodyProfile, contour: contourRe, joints: jointsRe, inner: innerRe, sDiff };
     };
     let corr: Corr = this.getDrawingCorrections();
     const first = measure(corr);
@@ -3196,6 +3260,56 @@ class VisualPoseService {
       else break;
     }
     this.setDrawingCorrections(bestCorr);
+    // P1087: 重なりのドリル。髪のパネルが体へ重なる幅
+    // （panelK）を、中の境界線の差で学習する：今の幅と
+    // ±0.12 を測り比べ、差が縮む方へ寄せる。守りは
+    // 面あり経路の寸法・輪郭・関節で見る（パレット経路
+    // の寸法は双子にパネルが混ざって揺れるため、この段
+    // の物差しには使わない）。最後にパレット経路の寸法
+    // が段の前より悪化していたら幅ごと差し戻す。
+    // 実測の注意：パネルの内側の縁は胴の縁（寸法と輪郭
+    // の段が持つ）に追随するため、幅だけの独立した信号
+    // は小さい。この段は残差の微調整であり、ノイズ域
+    // （改善0.0005未満）では動かないのが正しい。
+    let overlapCorrOut: { panelK: number } | null = this.getOverlapCorrections();
+    if (innerGoal && best.inner) {
+      const preBest = best;
+      const preK = overlapCorrOut?.panelK ?? 1;
+      let curK = preK;
+      let curDiff = innerDiffOf(best.inner);
+      if (curDiff !== null) {
+        for (let round = 0; round < 3; round++) {
+          let bestCand: { k: number; m: NonNullable<ReturnType<typeof measure>>; diff: number } | null = null;
+          for (const dk of [0.12, -0.12]) {
+            const k = Math.max(0.7, Math.min(1.4, curK + dk));
+            if (Math.abs(k - curK) < 0.001) continue;
+            this.setOverlapCorrections({ panelK: k });
+            const cand = measure(bestCorr);
+            if (!cand) continue;
+            const df = innerDiffOf(cand.inner);
+            if (df === null) continue;
+            const profOk = cand.sDiff === null || best.sDiff === null || cand.sDiff <= best.sDiff + 0.02;
+            const contourOk = best.contourDiff === null || cand.contourDiff === null || cand.contourDiff <= best.contourDiff + 0.02;
+            const jdC = jointDiffOf(cand.joints);
+            const jdB = jointDiffOf(best.joints);
+            const jointOk = jdC === null || jdB === null || jdC <= jdB + 0.01;
+            if (df < curDiff - 0.0005 && profOk && contourOk && jointOk && (bestCand === null || df < bestCand.diff)) bestCand = { k, m: cand, diff: df };
+          }
+          if (!bestCand) { this.setOverlapCorrections({ panelK: curK }); break; }
+          curK = bestCand.k;
+          curDiff = bestCand.diff;
+          best = bestCand.m;
+          this.setOverlapCorrections({ panelK: curK });
+        }
+        if (curK !== preK && best.diff > preBest.diff + 0.02) {
+          // パレット経路の寸法が悪化した：幅ごと差し戻す
+          this.setOverlapCorrections({ panelK: preK });
+          best = preBest;
+          curK = preK;
+        }
+        overlapCorrOut = { panelK: curK };
+      }
+    }
     // P1085: 輪郭のドリル。寸法の補正が落ち着いたら、輪郭も
     // 段ごとに学習する：面ありで描いて測り直し、段ごとの
     // ずれ（目標−実測）の0.8倍をオフセットに足す（1周の
@@ -3240,7 +3354,10 @@ class VisualPoseService {
         }
         const cand2 = measure(nextCorr);
         if (!cand2 || cand2.contourDiff === null || !cand2.contour) { this.setContourCorrections(off); break; }
-        if (cand2.contourDiff < curCD - 0.002 && cand2.diff <= best.diff + 0.02) {
+        const idBc = innerDiffOf(best.inner);
+        const idCc = innerDiffOf(cand2.inner);
+        const innerOkC = idBc === null || idCc === null || idCc <= idBc + 0.004;
+        if (cand2.contourDiff < curCD - 0.002 && cand2.diff <= best.diff + 0.02 && innerOkC) {
           off = next;
           curCD = cand2.contourDiff;
           curContour = cand2.contour;
@@ -3293,7 +3410,10 @@ class VisualPoseService {
           if (!cand2 || !cand2.joints) { this.setJointCorrections(off); break; }
           const jd2 = jointDiffOf(cand2.joints);
           const contourOk = best.contourDiff === null || cand2.contourDiff === null || cand2.contourDiff <= best.contourDiff + 0.02;
-          if (jd2 !== null && jd2 < curJD - 0.0015 && cand2.diff <= best.diff + 0.02 && contourOk) {
+          const idBj = innerDiffOf(best.inner);
+          const idCj = innerDiffOf(cand2.inner);
+          const innerOkJ = idBj === null || idCj === null || idCj <= idBj + 0.004;
+          if (jd2 !== null && jd2 < curJD - 0.0015 && cand2.diff <= best.diff + 0.02 && contourOk && innerOkJ) {
             off = next;
             curJD = jd2;
             curJoints = cand2.joints;
@@ -3311,7 +3431,7 @@ class VisualPoseService {
     const improved = best.diff < first.diff * 0.8;
     if (improved) state.drillsOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
-    return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff, contourCorrections: contourCorrOut, jointDiffInitial: jointDiffOf(first.joints), jointDiffFinal: jointDiffOf(best.joints), jointCorrections: jointCorrOut };
+    return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff, contourCorrections: contourCorrOut, jointDiffInitial: jointDiffOf(first.joints), jointDiffFinal: jointDiffOf(best.joints), jointCorrections: jointCorrOut, innerDiffInitial: innerDiffOf(first.inner), innerDiffFinal: innerDiffOf(best.inner), overlapCorrections: overlapCorrOut };
   }
 
   /**
