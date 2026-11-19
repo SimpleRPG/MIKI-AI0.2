@@ -8998,6 +8998,52 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 
 
+  // P1070: 桜の飾り（髪・顔と色が近い淡色の花びら）を髪・顔から分けて読む・描いて読み返せる
+  // 既知の残り：淡色で顔の縁にかかる飾りは読み取れない（色が髪と同色で出っ張りも小さい）。
+  // 淡色の往復は描き直しの髪色 hairRgb が淡色でブレンドして区別が消えるため通らない
+  // （描く側の髪の基準色の問題で、読み取り側ではない）。顔の縁の往復も花びらが描いた
+  // 首とつながって読み返せない。いずれも読み取りの分離そのものはできている。
+  {
+    const W = 48, H = 56;
+    const SAKURA: [number, number, number] = [244, 206, 216];
+    const CLOTH: [number, number, number] = [40, 40, 120];
+    const base = (hair: [number, number, number], skin: [number, number, number], bg: [number, number, number]): Uint8Array => {
+      const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = bg[0]; fig[i * 4 + 1] = bg[1]; fig[i * 4 + 2] = bg[2]; fig[i * 4 + 3] = 255; }
+      rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+      rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+      disc(22, 9, 6, hair); disc(22, 10, 5, skin);
+      return fig;
+    };
+    const addDisc = (fig: Uint8Array, cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const HAIR: [number, number, number] = [45, 32, 22]; const SKIN: [number, number, number] = [232, 190, 160];
+    const PALE_HAIR: [number, number, number] = [243, 205, 215]; const PALE_SKIN: [number, number, number] = [243, 222, 205];
+    const hasSakura = (r: any) => Array.isArray(r?.accessories) && r.accessories.some((a: any) => a.side === 'l' && a.kind === 'ornament' && Math.abs(a.rgb[0] - 244) <= 12 && Math.abs(a.rgb[1] - 206) <= 12);
+    const nd: any = await poseSvc().analyzePose(base(HAIR, SKIN, [245, 245, 245]), W, H);
+    check('P1070 飾りなし（濃色）は装飾品を読まない', nd?.accessories == null, JSON.stringify(nd?.accessories));
+    const np: any = await poseSvc().analyzePose(base(PALE_HAIR, PALE_SKIN, [208, 210, 212]), W, H);
+    check('P1070 飾りなし（淡色）は装飾品を読まない', np?.accessories == null, JSON.stringify(np?.accessories));
+    const dp = base(HAIR, SKIN, [245, 245, 245]); addDisc(dp, 14, 9, 3, SAKURA);
+    const rd: any = await poseSvc().analyzePose(dp, W, H);
+    check('P1070 髪からはみ出す桜の飾り（濃色）が読める', hasSakura(rd), JSON.stringify(rd?.accessories));
+    const vd: any = await poseSvc().verifyAccessories(rd);
+    check('P1070 桜の飾り（濃色）の描き直しが読み返せる', vd?.verified === true, JSON.stringify(vd));
+    const pp = base(PALE_HAIR, PALE_SKIN, [208, 210, 212]); addDisc(pp, 14, 9, 3, SAKURA);
+    const rp: any = await poseSvc().analyzePose(pp, W, H);
+    check('P1070 髪からはみ出す桜の飾り（淡色、髪と同色）が読める', hasSakura(rp), JSON.stringify(rp?.accessories));
+    const ih = base(HAIR, SKIN, [245, 245, 245]); addDisc(ih, 18, 6, 3, SAKURA);
+    const ri: any = await poseSvc().analyzePose(ih, W, H);
+    check('P1070 髪の中の桜の飾り（濃色）が読める', hasSakura(ri), JSON.stringify(ri?.accessories));
+    const vi: any = await poseSvc().verifyAccessories(ri);
+    check('P1070 髪の中の桜の飾り（濃色）の描き直しが読み返せる', vi?.verified === true, JSON.stringify(vi));
+    const fe = base(HAIR, SKIN, [245, 245, 245]); addDisc(fe, 17, 12, 3, SAKURA);
+    const rf: any = await poseSvc().analyzePose(fe, W, H);
+    check('P1070 顔の縁にかかる桜の飾り（濃色）が読める', hasSakura(rf), JSON.stringify(rf?.accessories));
+  }
+
+
   // P1032: 鎖骨の影を読む・描いて読み返せる
   {
     const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);

@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 793577,
-      "lines": 9444,
-      "sha256": "06f3e11dcd4d2723654991d561e8f0d2e58f38bf35580e0f0f9e4ecaee6fcd77",
+      "bytes": 798126,
+      "lines": 9490,
+      "sha256": "9476b7054db35c754243125feb1a66806ad9c7b36decd3b9415779f7addfa5a7",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4912,19 +4912,19 @@
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 9157,
+          "line": 9203,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 9179,
+          "line": 9225,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 9240,
+          "line": 9286,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
@@ -15594,9 +15594,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 317286,
-      "lines": 5816,
-      "sha256": "01068c622748ae7e2c0cb60bcc0101fe20449a8ce50d540a5f25c98b41c72f87",
+      "bytes": 325623,
+      "lines": 5946,
+      "sha256": "4c81a36a59d063cadf4abab2f1e04ed948cb4234db4aeac7bcce4e9d3ef8b89d",
       "relativeImportCandidates": [
         {
           "line": 1,

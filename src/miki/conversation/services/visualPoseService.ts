@@ -3368,7 +3368,13 @@ class VisualPoseService {
         const mh = bboxH(m);
         // 別の取り方で図が縦に伸びる＝色ビンでは頭など一部が消えていた。
         const moreComplete = mh > chosenBBoxH * 1.15;
-        if (!chosen || (r.verified && !chosen.verified) || (r.verified === chosen.verified && (d > chosenDensity || moreComplete))) {
+        if (!chosen || (r.verified && !chosen.verified) || (r.verified === chosen.verified && (d > chosenDensity || moreComplete ||
+          // P1070: 密度がほぼ同じ（誤差範囲）で、片方だけ装飾品を
+          // 見つけているならそちらを採る。粗いビンでは桜色の飾りが
+          // 背景と同じビンに落ちて見えなくなる（密度はむしろ粗い方
+          // が高く出る）が、飾りは図の一部であり、見つけた試行の
+          // 方が図を正直に捉えている。
+          (Math.abs(d - chosenDensity) < 0.02 && (r.accessories?.length ?? 0) > (chosen.accessories?.length ?? 0))))) {
           chosen = r;
           chosenMask = m;
           chosenMethod = method;
@@ -5362,22 +5368,59 @@ class VisualPoseService {
     // その人たらしめる手がかりなので、読みに持たせる。
     let accessories: PoseReading['accessories'] = null;
     {
-      // 髪の代表色は頭頂の帯の平均で取る（色名の代表色では
-      // 本人の髪とずれるため）。
-      let hr = 0, hg = 0, hb = 0, hn = 0;
+      // 髪の代表色は頭頂の帯で取る（色名の代表色では本人の髪と
+      // ずれるため）。帯には顔の上部（肌）も入るので、平均では
+      // 髪色が肌に引っ張られる。P1070: 帯の中で一番多い色ビン
+      // （髪が多数派）の平均を髪色とする。平均のままだと髪その
+      // ものが「肌でも髪でもない色」と読め、髪の縁が装飾品に
+      // 誤読された（P1031の図でも髪色の device が出ていた）。
+      // 帯は頭の中心寄りの列だけに限る（耳横の飾り・装置や首元の
+      // 服が帯に入ると、髪より多くなって髪色を奪うため。飾りは
+      // 頭の中心から 0.7 半径より外にある）。
+      const hairBins = new Map<number, { n: number; r: number; g: number; b: number }>();
+      const hairBandX0 = Math.max(0, Math.floor(headCx - headR * 0.7));
+      const hairBandX1 = Math.min(width - 1, Math.ceil(headCx + headR * 0.7));
       for (let y = Math.max(0, Math.round(figTop)); y <= Math.min(height - 1, Math.round(figTop + figH * 0.06)); y++) {
-        for (let x = 0; x < width; x++) {
+        for (let x = hairBandX0; x <= hairBandX1; x++) {
           if (!mask[y * width + x]) continue;
           const i = (y * width + x) * 4;
-          hr += rgba[i]; hg += rgba[i + 1]; hb += rgba[i + 2]; hn++;
+          const key = ((rgba[i] >> 3) << 10) | ((rgba[i + 1] >> 3) << 5) | (rgba[i + 2] >> 3);
+          let e = hairBins.get(key);
+          if (!e) { e = { n: 0, r: 0, g: 0, b: 0 }; hairBins.set(key, e); }
+          e.n++; e.r += rgba[i]; e.g += rgba[i + 1]; e.b += rgba[i + 2];
         }
       }
-      const hairRef: [number, number, number] | null = hn >= 10 ? [hr / hn, hg / hn, hb / hn] : null;
+      let hairRef: [number, number, number] | null = null;
+      {
+        // P1070: 肌らしいビンを除く案はやめた。暖かい淡色の髪
+        // （描き直しの髪色 [243,214,210] など）は肌の判定
+        // （r>190・g>=b・r-b>=12）に当てはまってしまい、髪色が
+        // 取れなくなった。帯は頭の中心寄り・頭頂だけに限ってある
+        // ので、多数派は髪であり、肌が多数派になるのは髪が無い図
+        // だけ（その場合は髪色＝肌色でも飾りは読める）ため、素直
+        // に最頻ビンを髪色とする。
+        let bestN = 0;
+        for (const e of hairBins.values()) {
+          if (e.n <= bestN) continue;
+          bestN = e.n;
+          hairRef = [e.r / e.n, e.g / e.n, e.b / e.n];
+        }
+        // P1070: 帯が狭く髪の色が影色に分かれる描き直しでは、最頻
+        // ビンが10pxに届かず髪色が取れないことがある（淡色の描き
+        // 直しの再読で実際に起きた）。5pxまで緩める。帯は中心寄
+        // りに限ってあるので、5pxの最頻ビンが飾りや服になることは
+        // ない。
+        if (bestN < 5) hairRef = null;
+      }
       const skinRefA = skinColor ?? [232, 190, 160];
       if (hairRef) {
         const cand = new Set<number>();
         // 範囲は耳の高さまで（首から下は肩や腕の服を拾うため）。
-        const yEnd = Math.min(height - 1, Math.round(headCy + headR * 0.9));
+        // P1070: 0.9 だと首元の服の上端が入り、顔の縁にかかる
+        // 飾りとくっついて1つの塊になり、色の2群分けの30%規則
+        // で弾かれて飾りごと消えた。耳の高さは頭の中心から
+        // 0.65 半径までで足りる（P1031 の装置は 0.36 半径）。
+        const yEnd = Math.min(height - 1, Math.round(headCy + headR * 0.65));
         for (let y = Math.max(0, Math.round(figTop)); y <= yEnd; y++) {
           for (let x = 0; x < width; x++) {
             const p = y * width + x;
@@ -5432,6 +5475,14 @@ class VisualPoseService {
             let dev = 0;
             for (const p of group) { const i = p * 4; dev += Math.abs(rgba[i] - rgb[0]) + Math.abs(rgba[i + 1] - rgb[1]) + Math.abs(rgba[i + 2] - rgb[2]); }
             if (dev / n > 45) return;
+            // P1070: 細い線（描き直しの中の線など）は装飾品では
+            // ない。外接矩形に対してまばらな塊は、線の集まりと
+            // みなして数えない（花びらの丸の集まりは 0.5 以上。顔の縁に
+            // かかる飾りは候補範囲で下半分が切れて 0.3 台になるため、
+            // 0.3 まで緩める。線の集まりは 0.2 未満なので弾ける）。
+            let gx0 = width, gx1 = -1, gy0 = height, gy1 = -1;
+            for (const p of group) { const px = p % width, py = Math.floor(p / width); if (px < gx0) gx0 = px; if (px > gx1) gx1 = px; if (py < gy0) gy0 = py; if (py > gy1) gy1 = py; }
+            if (n < 0.3 * (gx1 - gx0 + 1) * (gy1 - gy0 + 1)) return;
             const spread = Math.max(rgb[0], rgb[1], rgb[2]) - Math.min(rgb[0], rgb[1], rgb[2]);
             found.push({ side: sx / n < headCx ? 'l' : 'r', y: Math.round(((sy / n) / Math.max(1, height - 1)) * 1000) / 1000, rgb, kind: spread < 28 ? 'device' : 'ornament' });
           };
@@ -5450,12 +5501,91 @@ class VisualPoseService {
               const avg = (g: number[]): [number, number, number] => { let r = 0, gg = 0, b = 0; for (const p of g) { const c = colOf(p); r += c[0]; gg += c[1]; b += c[2]; } return [r / g.length, gg / g.length, b / g.length]; };
               seedA = avg(gA); seedB = avg(gB);
             }
-            if (gA.length >= Math.max(5, pts.length * 0.3) && gB.length >= Math.max(5, pts.length * 0.3) && dCol(seedA, seedB) >= 70) {
+            // P1070: 分ける側の最小を30%から15%へ。描き直しの中の
+            // 線が飾りにくっついたとき、線は飾りの2割ほどしか
+            // なく、30%では分けられず飾りごと消えた（往復が通ら
+            // なかった）。分けた後の細い線の群は、上のまばらさ
+            // の検査で弾く。
+            if (gA.length >= Math.max(5, pts.length * 0.15) && gB.length >= Math.max(5, pts.length * 0.15) && dCol(seedA, seedB) >= 70) {
               emitAcc(gA); emitAcc(gB);
               continue;
             }
           }
           emitAcc(pts);
+        }
+        // P1070: 桜の飾りの形での分離。淡色の髪では飾りの色が髪と
+        // ほぼ同じ（色の差3）で、色では髪から分けられない。頭の高さ
+        // の帯で、左右それぞれの輪郭の外端を上下になぞる。飾りは
+        // 髪の輪郭から外へ張り出した膨らみなので、その行の外端が
+        // 前後4行の中央値（滑らかな髪の輪郭）より1.5px以上外へ出た
+        // 行を種にし、1px以上の行でつなげて run とする。頭の円から
+        // の距離では、髪の中の飾りが頭の中心をずらして髪の縁その
+        // ものを膨らみと誤読したため、輪郭の形だけを見る。房は下へ
+        // 続くので膨らみの戻りが無く、頭頂の丸みは中央値に吸収され
+        // て種にならない。色で見つかった飾り・装置と重なるものは
+        // 重複として出さない。
+        {
+          const bandEnd = Math.round(headCy + headR);
+          const edgeLo = Math.max(0, Math.round(figTop));
+          const edgeHi = Math.min(height - 1, bandEnd + 4);
+          const leftEdge = new Map<number, number>();
+          const rightEdge = new Map<number, number>();
+          for (let y = edgeLo; y <= edgeHi; y++) {
+            let mn = -1, mx = -1;
+            for (let x = 0; x < width; x++) if (mask[y * width + x]) { if (mn < 0) mn = x; mx = x; }
+            if (mn >= 0) { leftEdge.set(y, mn); rightEdge.set(y, mx); }
+          }
+          const maxSpan = Math.max(4, Math.round(figH * 0.18));
+          for (const [edges, dir] of [[leftEdge, -1], [rightEdge, 1]] as const) {
+            const baseline = (y: number): number | null => {
+              const vals: number[] = [];
+              for (let d = -4; d <= 4; d++) {
+                if (d >= -1 && d <= 1) continue;
+                const v = edges.get(y + d);
+                if (v !== undefined) vals.push(v);
+              }
+              if (vals.length < 3) return null;
+              vals.sort((a, b) => a - b);
+              return (vals[(vals.length - 1) >> 1] + vals[vals.length >> 1]) / 2;
+            };
+            const dent = (y: number): number | null => {
+              const e = edges.get(y);
+              const b = baseline(y);
+              if (e === undefined || b === null) return null;
+              return dir < 0 ? b - e : e - b;
+            };
+            const candRows: number[] = [];
+            for (let y = edgeLo; y <= bandEnd; y++) {
+              const d = dent(y);
+              if (d !== null && d >= 1) candRows.push(y);
+            }
+            const runs: number[][] = [];
+            for (const y of candRows) {
+              if (runs.length && y === runs[runs.length - 1][runs[runs.length - 1].length - 1] + 1) runs[runs.length - 1].push(y);
+              else runs.push([y]);
+            }
+            for (const run of runs) {
+              if (run.length < 2 || run.length > maxSpan) continue;
+              if (!run.some((y) => (dent(y) ?? 0) >= 1.5)) continue;
+              let sr = 0, sg = 0, sb = 0, sx = 0, sy = 0, n = 0;
+              for (const y of run) {
+                const b = baseline(y);
+                if (b === null) continue;
+                for (let x = 0; x < width; x++) {
+                  if (!mask[y * width + x]) continue;
+                  if (dir < 0 ? x >= b : x <= b) continue;
+                  const i = (y * width + x) * 4;
+                  sr += rgba[i]; sg += rgba[i + 1]; sb += rgba[i + 2];
+                  sx += x; sy += y; n++;
+                }
+              }
+              if (n < minSize) continue;
+              const cyN = Math.round(((sy / n) / Math.max(1, height - 1)) * 1000) / 1000;
+              const side = sx / n < headCx ? 'l' : 'r';
+              if (found.some((a) => a.side === side && Math.abs(a.y - cyN) <= 0.08)) continue;
+              found.push({ side, y: cyN, rgb: [Math.round(sr / n), Math.round(sg / n), Math.round(sb / n)], kind: 'ornament' });
+            }
+          }
         }
         found.sort((a, b) => a.side.localeCompare(b.side) || a.y - b.y);
         if (found.length) accessories = found.slice(0, 4);
