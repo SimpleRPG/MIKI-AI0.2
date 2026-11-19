@@ -231,6 +231,11 @@ export interface PoseReading {
   footFlare?: { l: boolean; r: boolean } | null;
   /** P1035: アホ毛（頭頂から細く突き出た毛束）があるか */
   ahoge?: boolean | null;
+  /** P1075: 横向きの奥行きの縁。24段の前の縁・後ろの縁
+   * （体の軸からの距離・図の高さ比）と、腰帯でのお腹の
+   * 張り出し・尻帯でのお尻の張り出し、つま先で決めた向き。
+   * 横向き以外、または向きが決まらない時は null。 */
+  depthProfile?: { front: (number | null)[]; back: (number | null)[]; belly: number | null; buttocks: number | null; facing: 'l' | 'r' | null } | null;
   /** P1045: 手の大きさ（腕の島の下端の幅 ÷ 頭の幅） */
   handSize?: number | null;
   /** P1046: 膝の位置（脚の付け根→足首を 0..1 とした時の節の位置、左右別） */
@@ -3648,6 +3653,105 @@ class VisualPoseService {
       }
       chosen = { ...chosen, innerLines: inner };
     }
+    // P1075: 横向きの奥行きの縁（depthProfile）。24段で前の縁・
+    // 後ろの縁を体の軸（首→腰の線）からの距離（図の高さ比）で
+    // 持つ。お腹は腰帯で前の縁が胸の基準より前に出た最大量、
+    // お尻は尻帯で後ろの縁が胸の背中側の基準より後ろに出た最大量。
+    // 向き（どちらが前か）は足のつま先の伸びで決める。お腹・
+    // お尻そのもので向きを決めると循環するので使わない。
+    // つま先が見えなければ向きは null で、前・後ろの縁も
+    // 決めない（測れたふりをしない）。
+    if (chosen && chosen.head && chosen.profileComplete && !chosen.truncated && chosen.profileKind === 'depth' && chosenMask) {
+      const figTopD = (chosen.head.y - (chosen.headRh ?? chosen.head.r)) * (height - 1);
+      const footYnD = Math.max(chosen.footL?.y ?? 0, chosen.footR?.y ?? 0);
+      const figBottomD = (footYnD > 0 ? footYnD : 0.98) * (height - 1);
+      const figHpD = Math.max(1, figBottomD - figTopD);
+      const headCxD = chosen.head.x * (width - 1);
+      const headCyD = chosen.head.y * (height - 1);
+      const hipCxD = (((chosen.hipL?.x ?? chosen.head.x) + (chosen.hipR?.x ?? chosen.head.x)) / 2) * (width - 1);
+      const hipYd = (chosen.hipL?.y ?? 0.6) * (height - 1);
+      // 体の軸：頭の中心→腰の中心の線。頭より上は頭の中心の
+      // 真下、腰より下は腰の中心の真下へ延ばす。
+      const axisX = (y: number): number => {
+        if (y <= headCyD) return headCxD;
+        if (y >= hipYd) return hipCxD;
+        const t = (y - headCyD) / Math.max(1, hipYd - headCyD);
+        return headCxD + (hipCxD - headCxD) * t;
+      };
+      const rowSpan = (y: number): { minX: number; maxX: number } | null => {
+        const yy = Math.max(0, Math.min(height - 1, Math.round(y)));
+        let minX = -1; let maxX = -1;
+        for (let x = 0; x < width; x++) if (chosenMask[yy * width + x]) { if (minX < 0) minX = x; maxX = x; }
+        return minX < 0 ? null : { minX, maxX };
+      };
+      // つま先：足首の帯と最下行の帯を比べ、長く伸びた側が前。
+      // 両側とも伸びる（足の広がり）なら向きは決めない。
+      let facing: 'l' | 'r' | null = null;
+      {
+        const ankle = rowSpan(figBottomD - figHpD * 0.07);
+        const foot = rowSpan(figBottomD - 1);
+        if (ankle && foot) {
+          const extL = ankle.minX - foot.minX;
+          const extR = foot.maxX - ankle.maxX;
+          const need = 2;
+          if (extL >= need && extL - extR >= need) facing = 'l';
+          else if (extR >= need && extR - extL >= need) facing = 'r';
+        }
+      }
+      const front: (number | null)[] = [];
+      const back: (number | null)[] = [];
+      for (let i = 0; i < 24; i++) {
+        const y = Math.max(0, Math.min(height - 1, Math.round(figTopD + ((i + 0.5) / 24) * figHpD)));
+        const sp = rowSpan(y);
+        if (!sp || facing === null) { front.push(null); back.push(null); continue; }
+        const ax = axisX(y);
+        const r3 = (v: number): number => Math.round(v * 1000) / 1000;
+        if (facing === 'l') { front.push(r3((ax - sp.minX) / figHpD)); back.push(r3((sp.maxX - ax) / figHpD)); }
+        else { front.push(r3((sp.maxX - ax) / figHpD)); back.push(r3((ax - sp.minX) / figHpD)); }
+      }
+      // お腹・お尻：帯の代表値の差で測る。軸のずれは差で消える。
+      // 基準は胸帯の下位四分位（お腹・お尻の膨らみが胸帯の
+      // 下部にかかっても、中央値では基準が膨らみ側に寄って
+      // 差が潰れるため。下位四分位なら胸の縁そのものが残る）。
+      const bandOf = (yPx: number): number => Math.max(0, Math.min(23, Math.floor(((yPx - figTopD) / figHpD) * 24)));
+      const shoulderYd = (chosen.shoulderL?.y ?? 0.25) * (height - 1);
+      const chestB0 = bandOf(shoulderYd + (hipYd - shoulderYd) * 0.1);
+      const chestB1 = bandOf(shoulderYd + (hipYd - shoulderYd) * 0.4);
+      const waistB0 = bandOf(hipYd - figHpD * 0.18);
+      const waistB1 = bandOf(hipYd - figHpD * 0.02);
+      const hipB0 = bandOf(hipYd - figHpD * 0.15);
+      const hipB1 = bandOf(hipYd + figHpD * 0.01);
+      const q25 = (vals: number[]): number | null => {
+        if (!vals.length) return null;
+        const s = [...vals].sort((a, b) => a - b);
+        return s[Math.floor((s.length - 1) * 0.25)];
+      };
+      const pick = (arr: (number | null)[], b0: number, b1: number): number[] => {
+        const out: number[] = [];
+        for (let i = Math.min(b0, b1); i <= Math.max(b0, b1); i++) { const v = arr[i]; if (v !== null) out.push(v); }
+        return out;
+      };
+      let belly: number | null = null;
+      let buttocks: number | null = null;
+      if (facing !== null) {
+        const chestFront = q25(pick(front, chestB0, chestB1));
+        const waistFront = pick(front, waistB0, waistB1);
+        if (chestFront !== null && waistFront.length) {
+          belly = Math.round(Math.max(0, Math.max(...waistFront) - chestFront) * 1000) / 1000;
+        }
+        // お尻の基準は胸の背中側の縁。腰帯の背中側は尻の
+        // 膨らみの上端にかかるため、腰帯の中央値では膨らみ
+        // 自体が基準に入って差が潰れる（実際に0になった）。
+        const chestBack = q25(pick(back, chestB0, chestB1));
+        const hipBack = pick(back, hipB0, hipB1);
+        if (chestBack !== null && hipBack.length) {
+          buttocks = Math.round(Math.max(0, Math.max(...hipBack) - chestBack) * 1000) / 1000;
+        }
+      }
+      chosen = { ...chosen, depthProfile: { front, back, belly, buttocks, facing } };
+      if (belly !== null && belly >= 0.03) chosen = { ...chosen, description: `${chosen.description}お腹が前に張り出している。` };
+      if (buttocks !== null && buttocks >= 0.03) chosen = { ...chosen, description: `${chosen.description}お尻が後ろに張り出している。` };
+    }
     // P1035: アホ毛は、選ばれたマスクから測る（パスの途中では
     // マスクの取り方で頭の形が揺れて誤検出するため）。
     if (chosen && chosen.head && chosenMask) {
@@ -5411,7 +5515,15 @@ class VisualPoseService {
       else if (legs === 'TOGETHER' && clothing.bottom !== 'flare') {
         let bandL = 0;
         let bandR = 0;
-        for (let y = Math.round(shoulderY); y <= Math.round(hipY); y++) {
+        // P1075: 腕の出っ張りは肩の付け根（帯の上1/3）で見る。
+        // お腹・お尻の張り出しは腰・尻帯（帯の下部）に来るため、
+        // 帯全体で数えると横向きの体まで「両側に出っ張りがある
+        // 正面」と誤る（張り出しつきの横向き図で実際に起きた）。
+        // 腕は肩から出るので、帯の上1/3だけ見れば正面の腕は
+        // 両側とも拾える。
+        const bandTop = Math.round(shoulderY);
+        const bandBot = Math.max(bandTop, Math.round(shoulderY + (hipY - shoulderY) / 3));
+        for (let y = bandTop; y <= bandBot; y++) {
           for (let x = 0; x < width; x++) {
             if (!mask[y * width + x]) continue;
             if (x < torsoLeft - 1) bandL++;

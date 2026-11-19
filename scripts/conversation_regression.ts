@@ -9651,6 +9651,46 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1074 淡色（髪の板＋真っ直ぐな腕）でも肘を決めない', !!rp && rp.elbowL === null && rp.elbowR === null, `L=${JSON.stringify(rp?.elbowL)} R=${JSON.stringify(rp?.elbowR)}`);
   }
 
+  // P1075: 横向きのお腹とお尻（奥行きの縁）。24段で前の縁・
+  // 後ろの縁を体の軸からの距離で持ち、お腹は腰帯の前の縁の
+  // 胸基準からの出、尻は尻帯の後ろの縁の胸基準からの出。
+  // 向きはつま先の伸びで決める。お腹・お尻の張り出しは
+  // 向き判定の帯（肩〜腰）の下部に来るため、向き判定は
+  // 帯の上1/3だけ見る（帯全体では張り出しつき横向きを
+  // 正面と誤った）。
+  {
+    const buildSide = (opt: { facing: 'l' | 'r'; belly: boolean; buttocks: boolean; toe: boolean }): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const HAIR: [number, number, number] = [45, 32, 22];
+      const SKIN: [number, number, number] = [232, 190, 160];
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      const L = opt.facing === 'l';
+      rect(18, 15, 27, 32, CLOTH); rect(19, 32, 26, 50, CLOTH);
+      if (L) rect(19, 16, 22, 30, SKIN); else rect(17, 16, 20, 30, SKIN);
+      disc(22, 9, 6, HAIR); disc(L ? 20 : 24, 10, 5, SKIN);
+      if (opt.toe) { if (L) rect(15, 48, 26, 50, CLOTH); else rect(19, 48, 30, 50, CLOTH); }
+      if (opt.belly) { if (L) rect(14, 24, 17, 29, CLOTH); else rect(28, 24, 31, 29, CLOTH); }
+      if (opt.buttocks) { if (L) rect(28, 30, 31, 34, CLOTH); else rect(14, 30, 17, 34, CLOTH); }
+      return fig;
+    };
+    const both: any = await poseSvc().analyzePose(buildSide({ facing: 'l', belly: true, buttocks: true, toe: true }), 48, 56);
+    check('P1075 張り出しつき横向きが横向き・奥行きと読める', both?.viewpoint === 'side' && both?.profileKind === 'depth', `view=${both?.viewpoint} kind=${both?.profileKind}`);
+    check('P1075 張り出しつき横向きでお腹・お尻が読める', !!both?.depthProfile && both.depthProfile.facing === 'l' && (both.depthProfile.belly ?? 0) >= 0.05 && (both.depthProfile.buttocks ?? 0) >= 0.05, `dp=${JSON.stringify(both?.depthProfile && { facing: both.depthProfile.facing, belly: both.depthProfile.belly, buttocks: both.depthProfile.buttocks })}`);
+    const bothR: any = await poseSvc().analyzePose(buildSide({ facing: 'r', belly: true, buttocks: true, toe: true }), 48, 56);
+    check('P1075 右向きの張り出しつき横向きで向きが右と読める', !!bothR?.depthProfile && bothR.depthProfile.facing === 'r' && (bothR.depthProfile.belly ?? 0) >= 0.05 && (bothR.depthProfile.buttocks ?? 0) >= 0.05, `dp=${JSON.stringify(bothR?.depthProfile && { facing: bothR.depthProfile.facing, belly: bothR.depthProfile.belly, buttocks: bothR.depthProfile.buttocks })}`);
+    const flat: any = await poseSvc().analyzePose(buildSide({ facing: 'l', belly: false, buttocks: false, toe: true }), 48, 56);
+    check('P1075 張り出しなしの横向きではお腹・お尻は出ない', !!flat?.depthProfile && flat.depthProfile.facing === 'l' && (flat.depthProfile.belly ?? 1) <= 0.02 && (flat.depthProfile.buttocks ?? 1) <= 0.02, `dp=${JSON.stringify(flat?.depthProfile && { belly: flat.depthProfile.belly, buttocks: flat.depthProfile.buttocks })}`);
+    const bellyOnly: any = await poseSvc().analyzePose(buildSide({ facing: 'l', belly: true, buttocks: false, toe: true }), 48, 56);
+    const buttOnly: any = await poseSvc().analyzePose(buildSide({ facing: 'l', belly: false, buttocks: true, toe: true }), 48, 56);
+    check('P1075 お腹だけ・お尻だけが別々に読める', (bellyOnly?.depthProfile?.belly ?? 0) >= 0.05 && (bellyOnly?.depthProfile?.buttocks ?? 1) <= 0.02 && (buttOnly?.depthProfile?.belly ?? 1) <= 0.02 && (buttOnly?.depthProfile?.buttocks ?? 0) >= 0.05, `bellyOnly=${JSON.stringify(bellyOnly?.depthProfile && { belly: bellyOnly.depthProfile.belly, buttocks: bellyOnly.depthProfile.buttocks })} buttOnly=${JSON.stringify(buttOnly?.depthProfile && { belly: buttOnly.depthProfile.belly, buttocks: buttOnly.depthProfile.buttocks })}`);
+    const noToe: any = await poseSvc().analyzePose(buildSide({ facing: 'l', belly: true, buttocks: true, toe: false }), 48, 56);
+    check('P1075 つま先がなければ向き・お腹・お尻を決めない', !!noToe?.depthProfile && noToe.depthProfile.facing === null && noToe.depthProfile.belly === null && noToe.depthProfile.buttocks === null, `dp=${JSON.stringify(noToe?.depthProfile && { facing: noToe.depthProfile.facing, belly: noToe.depthProfile.belly, buttocks: noToe.depthProfile.buttocks })}`);
+    check('P1075 張り出しが説明文に入る', (both?.description ?? '').includes('お腹が前に張り出している') && (both?.description ?? '').includes('お尻が後ろに張り出している'), `desc=${both?.description ?? ''}`);
+  }
+
 
 // ---- 結果 ----
 let fail = 0;
