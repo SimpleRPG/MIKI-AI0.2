@@ -1394,7 +1394,12 @@ class VisualPoseService {
     }
     // 首と頭。首は影の色で描く（肌色で描くと顔の読みで
     // 顔の範囲に首が混ざり、目と口の帯がずれるため）。
-    const NECK: [number, number, number] = [168, 118, 92];
+    // P1079: 固定の茶色でなく、その人の肌を一律に落とした影色にする
+    // （淡い肌だと固定色が茶色い塊に見えた）。チャンネルごとに違う
+    // 率で落とすと、淡い肌では読み側の「肌」判定（r>170 かつ
+    // r-b>35）に首が入ってしまい、顔や鎖骨の読みが壊れるため、
+    // 比率を保ったまま暗くして肌判定の外に置く。
+    const NECK: [number, number, number] = [Math.round(SKIN[0] * 0.68), Math.round(SKIN[1] * 0.68), Math.round(SKIN[2] * 0.68)];
     const neckW = shoulderW * 0.3;
     for (let y = Math.round(head.y * (S - 1)); y <= y0; y++) {
       for (let x = Math.round(cxN * (S - 1) - neckW / 2); x <= Math.round(cxN * (S - 1) + neckW / 2); x++) set(x, y, NECK);
@@ -2131,6 +2136,11 @@ class VisualPoseService {
     const base = baseIn ?? this.renderBodySmooth(reading, size, face, colors, shape);
     if (!base) return null;
     const out = new Uint8Array(base);
+    // P1079: 髪の画素の影は髪の一族の影色（deriveShadow）で作る。
+    // 読み側は髪を「地・影・ツヤ」の一族で測っており、影だけ
+    // 別の作り方にすると一族から外れて色もツヤも読めなくなる。
+    const HAIRc: [number, number, number] | null = colors?.hair ?? reading.hairRgb ?? EXTRA_COLORS.find((c) => c.name === reading.hairColor)?.rgb ?? null;
+    const SKINc: [number, number, number] = reading.skinColor ?? [232, 190, 160];
     const bg: [number, number, number] = [base[0], base[1], base[2]];
     const isFg = (i: number): boolean => Math.abs(out[i] - bg[0]) + Math.abs(out[i + 1] - bg[1]) + Math.abs(out[i + 2] - bg[2]) > 12;
     for (let y = 0; y < size; y++) {
@@ -2146,7 +2156,19 @@ class VisualPoseService {
           const i = (y * size + sx) * 4;
           const lum = out[i] * 0.3 + out[i + 1] * 0.59 + out[i + 2] * 0.11;
           if (lum < 95) continue;
-          const sh = deriveShadow([out[i], out[i + 1], out[i + 2]]);
+          // P1079: 淡い色（lum>=180）は色相を保ったまま一律に落とす。
+          // deriveShadow のチャンネルずらしは淡い色ほど灰色に寄り、
+          // 淡いパレットの彼女では胴がグレーの面になっていた。
+          // ただし髪の画素は一族の影色で作る（上の注記）。
+          let isHairPx = false;
+          if (HAIRc) {
+            const dHair = Math.abs(out[i] - HAIRc[0]) + Math.abs(out[i + 1] - HAIRc[1]) + Math.abs(out[i + 2] - HAIRc[2]);
+            const dSkin = Math.abs(out[i] - SKINc[0]) + Math.abs(out[i + 1] - SKINc[1]) + Math.abs(out[i + 2] - SKINc[2]);
+            isHairPx = dHair <= 42 && dHair < dSkin;
+          }
+          const sh: [number, number, number] = lum >= 180 && !isHairPx
+            ? [Math.round(out[i] * 0.82), Math.round(out[i + 1] * 0.82), Math.round(out[i + 2] * 0.82)]
+            : deriveShadow([out[i], out[i + 1], out[i + 2]]);
           out[i] = sh[0]; out[i + 1] = sh[1]; out[i + 2] = sh[2];
         }
         x = x1 + 1;
@@ -2281,7 +2303,11 @@ class VisualPoseService {
     const out = new Uint8Array(img);
     const darken = (x: number, y: number, f: number) => {
       const i = (y * size + x) * 4;
-      out[i] = Math.round(img[i] * f); out[i + 1] = Math.round(img[i + 1] * f); out[i + 2] = Math.round(img[i + 2] * f);
+      // P1079: 淡い画素は線を弱める。細くて淡い彼女の体では
+      // ×0.42 の線が胴の幅の大半を占め、灰茶に潰れて見えた。
+      const lum = img[i] * 0.3 + img[i + 1] * 0.59 + img[i + 2] * 0.11;
+      const ff = lum >= 190 ? f + (1 - f) * 0.45 : f;
+      out[i] = Math.round(img[i] * ff); out[i + 1] = Math.round(img[i + 1] * ff); out[i + 2] = Math.round(img[i + 2] * ff);
     };
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {

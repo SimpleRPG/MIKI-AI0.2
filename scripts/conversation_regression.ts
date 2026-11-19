@@ -9835,6 +9835,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1078 淡色の輪郭照合は維持', !!vcP?.verified, `score=${vcP?.score}`);
   }
 
+  // P1079: 淡いパレットの色の忠実度。構造化描画の影と線が
+  // 淡い色を灰色に潰していた（セルの影は deriveShadow の
+  // チャンネルずらし、輪郭線は ×0.42、首は固定の茶色）。
+  // 淡い画素では影は色相を保って ×0.82、線は弱め、首は
+  // その人の肌から落とした影色で描く。
+  {
+    const pSrc: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    const celImg: Uint8Array | null = pSrc ? poseSvc().renderBodyCel(pSrc, 192) : null;
+    let oldSh = 0, newSh = 0;
+    if (celImg) for (let p = 0; p < 192 * 192; p++) { const i = p * 4; if (celImg[i] === 164 && celImg[i + 1] === 155 && celImg[i + 2] === 158) oldSh++; if (celImg[i] === 199 && celImg[i + 1] === 182 && celImg[i + 2] === 168) newSh++; }
+    check('P1079 淡い肌のセル影は灰色でなく色相を保つ', oldSh === 0 && newSh >= 20, `old=${oldSh} new=${newSh}`);
+    const celV: any = pSrc ? poseSvc().verifyBodyCel(pSrc) : null;
+    const olV: any = pSrc ? poseSvc().verifyBodyOutline(pSrc) : null;
+    check('P1079 淡色のセル照合と輪郭照合は維持', !!celV?.verified && !!olV?.verified, `cel=${celV?.score} outline=${olV?.score}`);
+    // 描画補正はプロセス共有の状態で、前のブロックのドリルが
+    // 残した値だと胴の形が変わって首の位置がずれる。恒等に戻す。
+    poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const renP: Uint8Array | null = pSrc ? poseSvc().renderBody(pSrc, 128, null, null, { backHair: true, frontHair: true }) : null;
+    let neckOk = false;
+    if (pSrc && renP) {
+      const cx = Math.round(pSrc.head.x * 127);
+      const yN = Math.round((pSrc.head.y + pSrc.headRh) * 127);
+      const i = (yN * 128 + cx) * 4;
+      neckOk = Math.abs(renP[i] - 165) <= 6 && Math.abs(renP[i + 1] - 151) <= 6 && Math.abs(renP[i + 2] - 139) <= 6;
+    }
+    check('P1079 首は肌から落とした影色で描く', neckOk, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
