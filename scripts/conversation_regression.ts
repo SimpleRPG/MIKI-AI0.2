@@ -9863,6 +9863,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1079 首は肌から落とした影色で描く', neckOk, '');
   }
 
+  // P1080: 髪の流れ。房の分かれ目を真っ直ぐ落とさず揺らし、
+  // 上では弱く下ほどはっきり分かれるようにし、房の内側に
+  // 幅広の柔らかい陰影を入れる。幅の広い面ではセルの影の
+  // 境界もぼかす。読み側の均衡（ツヤ・房・髪色）が壊れて
+  // いないことを、ピンク髪の合成フィギュアで確認する。
+  {
+    type RGB1080 = [number, number, number];
+    const SKIN1080: RGB1080 = [232, 190, 160]; const PINK1080: RGB1080 = [240, 150, 180]; const BLUE1080: RGB1080 = [40, 40, 120];
+    const px1080: RGB1080[] = []; for (let i = 0; i < 48 * 56; i++) px1080.push([240, 240, 240]);
+    const rect1080 = (x0: number, y0: number, x1: number, y1: number, c: RGB1080) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) px1080[y * 48 + x] = c; };
+    const disc1080 = (cx: number, cy: number, r: number, c: RGB1080) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) px1080[y * 48 + x] = c; };
+    rect1080(16, 15, 28, 32, BLUE1080); rect1080(12, 16, 15, 30, BLUE1080); rect1080(29, 16, 32, 30, BLUE1080);
+    rect1080(16, 32, 21, 50, BLUE1080); rect1080(23, 32, 28, 50, BLUE1080);
+    rect1080(13, 4, 31, 12, PINK1080); rect1080(13, 4, 15, 40, PINK1080); rect1080(29, 4, 31, 40, PINK1080);
+    disc1080(22, 9, 6, PINK1080); disc1080(22, 10, 5, SKIN1080);
+    const img1080 = new Uint8Array(48 * 56 * 4);
+    px1080.forEach((c, i) => { img1080[i * 4] = c[0]; img1080[i * 4 + 1] = c[1]; img1080[i * 4 + 2] = c[2]; img1080[i * 4 + 3] = 255; });
+    const r1080: any = await poseSvc().analyzePose(img1080, 48, 56);
+    const hd1080: Uint8Array | null = r1080 ? poseSvc().renderBodyHairDetail(r1080, 192) : null;
+    let odd1080 = 0;
+    if (hd1080) for (let p = 0; p < 192 * 192; p++) { const i = p * 4; if (hd1080[i] === 233 && hd1080[i + 1] === 146 && hd1080[i + 2] === 175) odd1080++; }
+    check('P1080 房の内側に柔らかい陰影が入る', odd1080 >= 1, `odd=${odd1080}`);
+    const vh1080: any = r1080 ? poseSvc().verifyBodyHairDetail(r1080) : null;
+    check('P1080 髪の作画照合（ツヤと房）は維持', vh1080?.verified === true, `shine=${vh1080?.shine} clumps=${vh1080?.clumps}`);
+    const re1080: any = hd1080 ? await poseSvc().analyzePose(hd1080, 192, 192) : null;
+    check('P1080 流れを付けても髪色とツヤが読める', re1080?.hairColor === 'ピンク' && re1080?.hair?.shine === true, `color=${re1080?.hairColor} shine=${re1080?.hair?.shine}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

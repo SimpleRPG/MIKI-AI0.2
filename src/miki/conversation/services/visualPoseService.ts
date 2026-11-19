@@ -2156,6 +2156,9 @@ class VisualPoseService {
           const i = (y * size + sx) * 4;
           const lum = out[i] * 0.3 + out[i + 1] * 0.59 + out[i + 2] * 0.11;
           if (lum < 95) continue;
+          // P1080: 幅の広い面では影の境界を2pxだけぼかす
+          // （髪の面の右側に硬い直線の境目が出ていた）。
+          const feather = spanW >= 40 ? (sx === shadowFrom ? 0.45 : sx === shadowFrom + 1 ? 0.75 : 1) : 1;
           // P1079: 淡い色（lum>=180）は色相を保ったまま一律に落とす。
           // deriveShadow のチャンネルずらしは淡い色ほど灰色に寄り、
           // 淡いパレットの彼女では胴がグレーの面になっていた。
@@ -2169,7 +2172,13 @@ class VisualPoseService {
           const sh: [number, number, number] = lum >= 180 && !isHairPx
             ? [Math.round(out[i] * 0.82), Math.round(out[i + 1] * 0.82), Math.round(out[i + 2] * 0.82)]
             : deriveShadow([out[i], out[i + 1], out[i + 2]]);
-          out[i] = sh[0]; out[i + 1] = sh[1]; out[i + 2] = sh[2];
+          if (feather < 1) {
+            out[i] = Math.round(out[i] + (sh[0] - out[i]) * feather);
+            out[i + 1] = Math.round(out[i + 1] + (sh[1] - out[i + 1]) * feather);
+            out[i + 2] = Math.round(out[i + 2] + (sh[2] - out[i + 2]) * feather);
+          } else {
+            out[i] = sh[0]; out[i + 1] = sh[1]; out[i + 2] = sh[2];
+          }
         }
         x = x1 + 1;
       }
@@ -2278,11 +2287,25 @@ class VisualPoseService {
             out[i + 1] = Math.round(out[i + 1] + (255 - out[i + 1]) * 0.45);
             out[i + 2] = Math.round(out[i + 2] + (255 - out[i + 2]) * 0.45);
           } else if (y > bandY1) {
-            // 房の分かれ目：境界の近くを影色に
-            const pos = (sx - x) % clumpW;
-            if (pos <= 1) {
+            // P1080: 房の流れ。分かれ目を真っ直ぐ落とさず、
+            // 房ごとに位相の違う揺れを持たせ、上では弱く
+            // 下ほどはっきり分かれるよう混ぜ率を上げる。
+            // 房の内側にも幅広の柔らかい陰影（奇数の房を
+            // 僅かに暗く）を入れ、面の平坦さとカーテン状の
+            // 縦縞を消す。
+            const tFlow = Math.min(1, (y - bandY1) / Math.max(1, figHn * (size - 1) * 0.3));
+            const fade = 0.3 + 0.7 * tFlow;
+            const k = Math.floor((sx - x) / clumpW);
+            const localX = sx - x - k * clumpW;
+            const wob = Math.round(Math.sin(y / Math.max(6, size * 0.045) + k * 2.4) * clumpW * 0.07);
+            const bx = localX - wob;
+            if (bx <= 0) {
               const sh = deriveShadow([out[i], out[i + 1], out[i + 2]]);
-              out[i] = sh[0]; out[i + 1] = sh[1]; out[i + 2] = sh[2];
+              out[i] = Math.round(out[i] + (sh[0] - out[i]) * fade);
+              out[i + 1] = Math.round(out[i + 1] + (sh[1] - out[i + 1]) * fade);
+              out[i + 2] = Math.round(out[i + 2] + (sh[2] - out[i + 2]) * fade);
+            } else if (k % 2 === 1) {
+              out[i] = Math.round(out[i] * 0.97); out[i + 1] = Math.round(out[i + 1] * 0.97); out[i + 2] = Math.round(out[i + 2] * 0.97);
             }
           }
         }
