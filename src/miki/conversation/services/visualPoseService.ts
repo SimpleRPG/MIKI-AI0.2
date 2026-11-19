@@ -1372,10 +1372,47 @@ class VisualPoseService {
       // 開くように）。手の位置も同じだけずらす。
       const dir = bx >= cxN * (S - 1) ? 1 : -1;
       const gapShift = gap ? armR0 * 0.85 + 1.5 : 0;
+      const armCol: [number, number, number] = separated ? SKIN : BODY;
+      // P1084: 腕の下に少し大きい影色のスタンプを敷いて、
+      // 1pxの輪郭線として覗かせる。淡い肌と淡い髪は色の
+      // 距離が小さく（本人は約25）、内部エッジの輪郭検査
+      // （色差90超）にも届かないため、腕が髪の面に溶けて
+      // 消えていた。線の色は腕色を一律に落とした色（色相を
+      // 保つ。deriveShadow の灰色は P1079 の検査と衝突）。
+      // 線は「下の色が腕と違う所」にだけ引く（同色の胴に
+      // 重なる所に線を発明しない。P1024 の中の線と衝突）。
+      // 輪郭クランプは行ごと（中心行だけだと上下の行で
+      // 実測の輪郭からはみ出す。P1078 と衝突）。
+      const rimCol: [number, number, number] = [Math.round(armCol[0] * 0.72), Math.round(armCol[1] * 0.72), Math.round(armCol[2] * 0.72)];
+      // 線の太さは描く大きさに比例させる（structured の
+      // 双子は3倍で描いて最頻値で縮小するため、固定1.2px
+      // では縮小で消えてしまう）。
+      const rimW = Math.max(1.2, S * 0.006);
+      const stampArmRim = (cx: number, cy: number, r: number) => {
+        for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(S - 1, Math.ceil(cy + r)); y++) {
+          const e = ctrArm ? armEdgeAt(y) : null;
+          for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(S - 1, Math.ceil(cx + r)); x++) {
+            if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+            if (e && (x < e.l - 0.5 || x > e.r + 0.5)) continue;
+            const cur = px[y * S + x];
+            // 背景との境目は輪郭線の担当（既にある）なので
+            // 引かない。線は姿の内側の重なりだけに引く。
+            if (cur[0] === BG_COL[0] && cur[1] === BG_COL[1] && cur[2] === BG_COL[2]) continue;
+            const d = Math.abs(cur[0] - armCol[0]) + Math.abs(cur[1] - armCol[1]) + Math.abs(cur[2] - armCol[2]);
+            if (d <= 4) continue;
+            px[y * S + x] = rimCol;
+          }
+        }
+      };
       for (let i = 0; i <= steps; i++) {
         const t = i / steps;
         const sh = gapShift * Math.min(1, t / 0.22);
-        stampArm(ax + (bx - ax) * t + dir * sh, ay + (by - ay) * t, Math.max(1.1, armR0 * (1.18 - 0.48 * t)), separated ? SKIN : BODY);
+        stampArmRim(ax + (bx - ax) * t + dir * sh, ay + (by - ay) * t, Math.max(1.1, armR0 * (1.18 - 0.48 * t)) + rimW);
+      }
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const sh = gapShift * Math.min(1, t / 0.22);
+        stampArm(ax + (bx - ax) * t + dir * sh, ay + (by - ay) * t, Math.max(1.1, armR0 * (1.18 - 0.48 * t)), armCol);
       }
     };
     seg(reading.shoulderL, reading.handL, reading.armGap?.l === true);
@@ -1393,6 +1430,24 @@ class VisualPoseService {
       // なるよう合わせ、読みが大きい手は大きく描く。
       const hs = reading.handSize ? Math.max(0.75, Math.min(1.7, 0.55 + 1.45 * reading.handSize)) : 1;
       const rx = armR0 * 0.95 * hs, ry = armR0 * 1.7 * hs;
+      // P1084: 手も腕と同じ影色の輪郭を敷く（少し大きい
+      // 楕円を先に描いて縁だけ覗かせる）。太さは腕と同じ
+      // く描く大きさに比例させ、線の色は肌を一律に落と
+      // した色。下の色が肌と同じ所には引かない。
+      const rimH: [number, number, number] = [Math.round(SKIN[0] * 0.72), Math.round(SKIN[1] * 0.72), Math.round(SKIN[2] * 0.72)];
+      const rimWH = Math.max(1.2, S * 0.006);
+      for (let y = Math.round(hy - ry - rimWH); y <= Math.round(hy + ry + rimWH); y++) {
+        const he = armEdgeAt(y);
+        for (let x = Math.round(hx - rx - rimWH); x <= Math.round(hx + rx + rimWH); x++) {
+          if (he && (x < he.l - 0.5 || x > he.r + 0.5)) continue;
+          if (((x - hx) / (rx + rimWH)) ** 2 + ((y - hy) / (ry + rimWH)) ** 2 > 1) continue;
+          const cur = px[y * S + x];
+          if (cur[0] === BG_COL[0] && cur[1] === BG_COL[1] && cur[2] === BG_COL[2]) continue;
+          const d = Math.abs(cur[0] - SKIN[0]) + Math.abs(cur[1] - SKIN[1]) + Math.abs(cur[2] - SKIN[2]);
+          if (d <= 4) continue;
+          set(x, y, rimH);
+        }
+      }
       for (let y = Math.round(hy - ry); y <= Math.round(hy + ry); y++) {
         const he = armEdgeAt(y);
         for (let x = Math.round(hx - rx); x <= Math.round(hx + rx); x++) {

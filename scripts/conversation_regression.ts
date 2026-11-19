@@ -9975,6 +9975,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1083 淡いピンクの目が2つ読めて色も付く', fr1083?.eyes === 2 && fr1083?.eyeColor === 'ピンク', `eyes=${fr1083?.eyes} color=${fr1083?.eyeColor}`);
   }
 
+  // P1084: 腕と手に輪郭線を敷く。淡い肌と淡い髪は色の
+  // 距離が小さく、腕が髪の面に溶けて消えていた。腕色の
+  // 影色で少し大きいスタンプを下に敷き、1pxの線として
+  // 覗かせる（太さは描く大きさに比例。structured の双子は
+  // 3倍→最頻値縮小なので固定幅では消える）。肌の影色の
+  // 画素数で線の存在を見て、腕の再読が保てることも見る。
+  {
+    poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const r1084: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    if (r1084) r1084.clothing = { ...(r1084.clothing ?? {}), topRgb: [245, 222, 228], bottomRgb: [231, 203, 210], separated: true };
+    const img1084: Uint8Array | null = r1084 ? poseSvc().renderBody(r1084, 256) : null;
+    let rim1084 = 0;
+    if (img1084) for (let i = 0; i < img1084.length; i += 4) if (img1084[i] === 175 && img1084[i + 1] === 160 && img1084[i + 2] === 148) rim1084++;
+    check('P1084 腕と手の輪郭線（肌を一律に落とした色）が描かれる', rim1084 >= 40, `rim=${rim1084}`);
+    const rr1084: any = img1084 ? await poseSvc().analyzePose(img1084, 256, 256) : null;
+    check('P1084 輪郭を入れても腕が下向きに読み直せる', rr1084?.armL === 'DOWN' && rr1084?.armR === 'DOWN', `armL=${rr1084?.armL} armR=${rr1084?.armR}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
