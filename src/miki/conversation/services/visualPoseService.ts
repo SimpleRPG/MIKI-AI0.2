@@ -4211,7 +4211,7 @@ class VisualPoseService {
     else if (figH >= figW * 0.9 && legs !== 'UNKNOWN') posture = 'STANDING';
 
     // 腕：側帯（胴の外側）にある前景の出方で読む。
-    const armFor = (side: 'L' | 'R'): { state: ArmState; hand: PosePoint | null; elbow: PosePoint | null } => {
+    const armFor = (side: 'L' | 'R'): { state: ArmState; hand: PosePoint | null; elbow: PosePoint | null; chainEnd?: PosePoint | null; chainBroke?: boolean; chainInnerX?: number | null } => {
       const isSide = (x: number) => (side === 'L' ? x < torsoLeft - 0.5 : x > torsoRight + 0.5);
       // 上がっている：頭のてっぺんより上に、頭の横帯より外の前景。
       let topPt: PosePoint | null = null;
@@ -4257,6 +4257,12 @@ class VisualPoseService {
       let lowPt: PosePoint | null = null;
       const yLimit = Math.min(crotchY > 0 ? crotchY : figBottom, Math.floor(hipY + figH * 0.1));
       let prevSide: { minX: number; maxX: number } | null = null;
+      // P1077: 鎖が上限まで届かず途中で切れたか（前腕が内側へ
+      // 曲がると側帯から外れて鎖が切れる）。切れた所が肘の
+      // 高さの手がかりになる。chainEnd は鎖の最終行の外縁。
+      let chainBroke = false;
+      let chainEnd: PosePoint | null = null;
+      let chainInnerX: number | null = null;
       for (let y = Math.floor(shoulderY); y < yLimit; y++) {
         let rowMin = Infinity;
         let rowMax = -Infinity;
@@ -4264,13 +4270,16 @@ class VisualPoseService {
         for (let x = 0; x < width; x++) {
           if (mask[y * width + x] && isSide(x)) { if (x < rowMin) rowMin = x; if (x > rowMax) rowMax = x; lastX = x; }
         }
-        if (rowMin === Infinity) { if (prevSide) break; continue; }
-        if (prevSide && (rowMin > prevSide.maxX + 3 || rowMax < prevSide.minX - 3)) break;
+        if (rowMin === Infinity) { if (prevSide) { chainBroke = true; break; } continue; }
+        if (prevSide && (rowMin > prevSide.maxX + 3 || rowMax < prevSide.minX - 3)) { chainBroke = true; break; }
         prevSide = { minX: rowMin, maxX: rowMax };
         lowPt = { x: lastX, y };
+        chainEnd = { x: side === 'L' ? rowMin : rowMax, y };
+        chainInnerX = side === 'L' ? rowMax : rowMin;
       }
-      if (lowPt) return { state: 'DOWN', hand: lowPt, elbow: null };
-      return { state: 'UNKNOWN', hand: null, elbow: null };
+      if (chainEnd && yLimit - chainEnd.y <= figH * 0.06) chainBroke = false;
+      if (lowPt) return { state: 'DOWN', hand: lowPt, elbow: null, chainEnd, chainBroke, chainInnerX };
+      return { state: 'UNKNOWN', hand: null, elbow: null, chainEnd: null, chainBroke: false, chainInnerX: null };
     };
     let armL = armFor('L');
     let armR = armFor('R');
@@ -4281,8 +4290,8 @@ class VisualPoseService {
     // 縁のような緩やかな曲線は傾きの変化が小さいので、折れと
     // 傾きの段差の両方が立った行だけを肘とする。真っ直ぐな
     // 腕では決めない（null のまま）。
-    const elbowFor = (arm: { state: ArmState; hand: PosePoint | null }, side: 'L' | 'R'): PosePoint | null => {
-      if (arm.state !== 'DOWN' || !arm.hand) return null;
+    const downKink = (arm: { state: ArmState; hand: PosePoint | null }, side: 'L' | 'R'): PosePoint | null => {
+      if (!arm.hand) return null;
       const y0 = Math.floor(shoulderY);
       const y1 = Math.floor(arm.hand.y);
       if (y1 - y0 < 10) return null;
@@ -4321,11 +4330,106 @@ class VisualPoseService {
       }
       return bestPt ? { x: bestPt.outer, y: bestPt.y } : null;
     };
+    // P1077: 肘の残り。状態ごとに決め方を分ける。
+    const elbowFor = (arm: { state: ArmState; hand: PosePoint | null; chainEnd?: PosePoint | null; chainBroke?: boolean; chainInnerX?: number | null }, side: 'L' | 'R'): PosePoint | null => {
+      if (arm.state === 'DOWN') {
+        const kink = downKink(arm, side);
+        if (kink) return kink;
+        // (a) 前腕が内側へ曲がる：側帯の鎖が途中で切れ、
+        // 手（肌の島、無ければ補正後の手）が鎖の内側の端
+        // より内側にある。鎖が切れた所が肘。
+        // 鎖が肩の行で即切れただけの場合は上腕をたどれて
+        // いないので対象外。また手の島は首より下にある
+        // こと（顔の肌の漏れを手と誤らないため）。
+        if (arm.chainBroke && arm.chainEnd && arm.hand && arm.chainInnerX !== null && arm.chainInnerX !== undefined
+          && arm.chainEnd.y - Math.floor(shoulderY) >= figH * 0.12) {
+          const med = skinPt[side] ?? arm.hand;
+          const inward = side === 'L' ? med.x - arm.chainInnerX : arm.chainInnerX - med.x;
+          if (inward >= Math.max(2, figH * 0.03) && med.y >= arm.chainEnd.y - figH * 0.05 && med.y >= neckY) return arm.chainEnd;
+        }
+        return null;
+      }
+      if (arm.state === 'SPREAD' && arm.hand) {
+        // (b) 横に広げた腕：列ごとの腕の中心の軌跡の折れ。
+        // 窓は首から下（上に曲がる前腕は髪の柱と見分けが
+        // つかず状態自体が DOWN になるため、ここでは
+        // 下への折れと真っ直ぐな腕だけが相手）。
+        const dir = side === 'L' ? -1 : 1;
+        const xStart = Math.floor(side === 'L' ? torsoLeft - 1 : torsoRight + 1);
+        const xEnd = Math.floor(arm.hand.x);
+        const yTop = Math.floor(neckY) - 1;
+        const yBot = Math.floor(shoulderY + figH * 0.18);
+        const traj: { x: number; cy: number }[] = [];
+        for (let x = xStart; dir < 0 ? x >= xEnd : x <= xEnd; x += dir) {
+          let mn = Infinity, mx = -Infinity;
+          for (let y = yTop; y <= yBot; y++) if (mask[y * width + x]) { if (y < mn) mn = y; if (y > mx) mx = y; }
+          if (mn === Infinity) { if (traj.length) break; continue; }
+          traj.push({ x, cy: (mn + mx) / 2 });
+        }
+        if (traj.length >= 9) {
+          const a = traj[0]; const b = traj[traj.length - 1];
+          const dx = b.x - a.x; const dy = b.cy - a.cy;
+          const len = Math.max(1, Math.hypot(dx, dy));
+          const W3 = 3;
+          let bestScore = 0; let bestPt: { x: number; cy: number } | null = null;
+          for (let i = W3; i < traj.length - W3; i++) {
+            const frac = Math.abs((traj[i].x - a.x) / (dx || 1));
+            if (frac < 0.15 || frac > 0.85) continue;
+            const slopeBefore = (traj[i].cy - traj[i - W3].cy) / (Math.abs(traj[i].x - traj[i - W3].x) || 1);
+            const slopeAfter = (traj[i + W3].cy - traj[i].cy) / (Math.abs(traj[i + W3].x - traj[i].x) || 1);
+            const step = Math.abs(slopeAfter - slopeBefore);
+            const dev = Math.abs((traj[i].cy - a.cy) * dx - (traj[i].x - a.x) * dy) / len;
+            if (step > 0.3 && dev > Math.max(2, figH * 0.025) && step > bestScore) { bestScore = step; bestPt = traj[i]; }
+          }
+          if (bestPt) return { x: bestPt.x, y: bestPt.cy };
+        }
+        return null;
+      }
+      if (arm.state === 'RAISED' && arm.hand) {
+        // (c) 上げた腕：上腕は縦の柱なので外縁はほぼ一定。
+        // 前腕が横へ出ると上部の外縁だけが柱とずれる。
+        // 肘は外縁が柱の値に収まって続く最初の行。
+        // 真っ直ぐな上げ腕や髪の面では上下の差が出ない
+        // ので決めない。
+        const y0 = Math.floor(arm.hand.y);
+        const y1 = Math.floor(shoulderY);
+        if (y1 - y0 >= 10) {
+          const traj: { y: number; outer: number }[] = [];
+          for (let y = y0; y <= y1; y++) {
+            const row = rows[y];
+            if (!row || row.minX < 0) continue;
+            traj.push({ y, outer: side === 'L' ? row.minX : row.maxX });
+          }
+          if (traj.length >= 10) {
+            const tailN = Math.max(3, Math.floor(traj.length / 3));
+            const tail = traj.slice(-tailN).map((q) => q.outer).sort((m, n) => m - n);
+            const plateau = tail[Math.floor(tail.length / 2)];
+            const head3 = traj.slice(0, 3).map((q) => q.outer).sort((m, n) => m - n);
+            const topMed = head3[Math.floor(head3.length / 2)];
+            if (Math.abs(topMed - plateau) >= Math.max(2.5, figH * 0.05)) {
+              const span = Math.max(1, traj[traj.length - 1].y - traj[0].y);
+              for (let i = 0; i < traj.length; i++) {
+                if ((traj[i].y - traj[0].y) / span < 0.2) continue;
+                let ok = true;
+                for (let k = 0; k < 3 && i + k < traj.length; k++) if (Math.abs(traj[i + k].outer - plateau) > 1.5) { ok = false; break; }
+                if (ok) return { x: traj[i].outer, y: traj[i].y };
+              }
+            }
+          }
+        }
+        return null;
+      }
+      return null;
+    };
     // 肘の確定は肌の島による手の補正（P1044）が済んでから
     // 下で行う。輪郭の手は髪や脚に引っ張られていることが
     // あるため、その手の位置で軌跡を切ると面の縁を肘と
     // 誤る。
 
+    // P1077: 肌の島の重心を側ごとに残す。手の置き換えが
+    // 起きなかった場合でも、内側にある手の島は「前腕が
+    // 内側へ曲がった」ことの証拠として肘の判定で使う。
+    const skinPt: Record<'L' | 'R', PosePoint | null> = { L: null, R: null };
     // P951: 肌の色の島で補強する。手の島は領域の2%床より
     // 小さいことが多いので、画素を直接数える。肌が図の
     // 大部分を占める場合は「島」ではないので使わない
@@ -4409,6 +4513,7 @@ class VisualPoseService {
           }).filter((c) => c.cy >= shoulderY && c.cy <= hipY + figH * 0.3);
           if (!usable.length) return false;
           const { cx, cy } = usable[0];
+          skinPt[side] = { x: cx, y: cy };
           if (side === 'L') handSizePx.l = usable[0].w; else handSizePx.r = usable[0].w;
           if (arm.hand) {
             if (Math.hypot(cx - arm.hand.x, cy - arm.hand.y) <= 8) { arm.hand = { x: cx, y: cy }; return true; }

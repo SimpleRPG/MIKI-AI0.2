@@ -9735,6 +9735,54 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 
 
+
+  // P1077: 肘の残り。前腕が内側へ曲がる場合は側帯の鎖が
+  // 切れた所＋内側の手の島で決める。広げた腕は列ごとの
+  // 中心の軌跡の折れ、上げた腕は外縁が上腕の柱に収まる
+  // 行で決める。真っ直ぐな腕ではどれも決めない。
+  // 上へ曲がる前腕は垂れた髪の柱と見分けがつかず状態が
+  // DOWN になるため対象外（状態判定自体の限界）。
+  {
+    const buildElbowFig = (draw: (rect: (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => void, disc: (cx: number, cy: number, r: number, c: [number, number, number]) => void) => void): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const HAIR: [number, number, number] = [45, 32, 22];
+      const SKIN: [number, number, number] = [232, 190, 160];
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(19, 15, 29, 32, CLOTH);
+      rect(19, 32, 22, 50, CLOTH); rect(26, 32, 29, 50, CLOTH);
+      rect(30, 16, 33, 36, CLOTH); disc(33, 38, 2, SKIN);
+      disc(24, 9, 6, HAIR); disc(24, 10, 5, SKIN);
+      draw(rect, disc);
+      return fig;
+    };
+    const SKIN2: [number, number, number] = [232, 190, 160];
+    const CLOTH2: [number, number, number] = [40, 40, 120];
+    const rIn: any = await poseSvc().analyzePose(buildElbowFig((rect, disc) => {
+      rect(15, 16, 18, 24, CLOTH2); rect(16, 25, 22, 27, CLOTH2); disc(21, 26, 2, SKIN2);
+    }), 48, 56);
+    check('P1077 前腕が内側へ曲がる腕で肘が取れる', !!rIn?.elbowL && Math.abs(rIn.elbowL.y - 26 / 55) <= 0.07 && rIn.elbowL.x <= 0.36, `elbowL=${JSON.stringify(rIn?.elbowL)}`);
+    check('P1077 内側の腕でも真っ直ぐな右腕では決めない', !!rIn && rIn.elbowR === null, `elbowR=${JSON.stringify(rIn?.elbowR)}`);
+    const rSp: any = await poseSvc().analyzePose(buildElbowFig((rect, disc) => {
+      rect(4, 16, 18, 19, CLOTH2); rect(6, 20, 9, 29, CLOTH2); disc(7, 30, 2, SKIN2);
+    }), 48, 56);
+    check('P1077 広げて下へ曲がる腕で肘が取れる', rSp?.armL === 'SPREAD' && !!rSp?.elbowL && Math.abs(rSp.elbowL.x - 8 / 47) <= 0.06 && Math.abs(rSp.elbowL.y - 19 / 55) <= 0.07, `armL=${rSp?.armL} elbowL=${JSON.stringify(rSp?.elbowL)}`);
+    const rSpS: any = await poseSvc().analyzePose(buildElbowFig((rect, disc) => {
+      rect(4, 16, 18, 19, CLOTH2); disc(5, 17, 2, SKIN2);
+    }), 48, 56);
+    check('P1077 広げた真っ直ぐな腕では肘を決めない', rSpS?.armL === 'SPREAD' && rSpS?.elbowL === null, `armL=${rSpS?.armL} elbowL=${JSON.stringify(rSpS?.elbowL)}`);
+    const rRa: any = await poseSvc().analyzePose(buildElbowFig((rect, disc) => {
+      rect(13, 4, 16, 15, CLOTH2); rect(7, 2, 12, 5, CLOTH2); disc(6, 3, 2, SKIN2);
+    }), 48, 56);
+    check('P1077 上げて外へ曲がる腕で肘が取れる', rRa?.armL === 'RAISED' && !!rRa?.elbowL && Math.abs(rRa.elbowL.x - 13 / 47) <= 0.06 && Math.abs(rRa.elbowL.y - 5 / 55) <= 0.07, `armL=${rRa?.armL} elbowL=${JSON.stringify(rRa?.elbowL)}`);
+    const rRaS: any = await poseSvc().analyzePose(buildElbowFig((rect, disc) => {
+      rect(13, 2, 16, 15, CLOTH2); disc(14, 2, 2, SKIN2);
+    }), 48, 56);
+    check('P1077 上げた真っ直ぐな腕では肘を決めない', rRaS?.armL === 'RAISED' && rRaS?.elbowL === null, `armL=${rRaS?.armL} elbowL=${JSON.stringify(rRaS?.elbowL)}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
