@@ -2239,6 +2239,31 @@ class VisualPoseService {
     return this.applyOutlineLines(base, size);
   }
 
+  /**
+   * P1066/P1067: 自分の描画（平坦な双子）を、描いた側の
+   * パレットで体と髪に分けて読み直す。自分の絵に限っては
+   * 役割が正確に分かるので、写真向けの領域分割より確かな
+   * 物差しになる。プロファイルが揃わない時は null。
+   */
+  private paletteReRead(reading: PoseReading, size = 128): PoseReading | null {
+    const flat = this.renderBodyStructuredTwin(reading, size);
+    if (!flat) return null;
+    const pal = this.segmentTwinPalette(flat, size, reading);
+    if (!pal) return null;
+    let bn = 0, minX = size, maxX = -1, minY = size, maxY = -1;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      if (!pal.body[y * size + x]) continue;
+      bn++;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const dens = bn / Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
+    const re = this.analyzePoseWithMask(flat, size, size, pal.body, 'fine', dens, pal.hair);
+    return re && re.profileComplete ? re : null;
+  }
+
   /** P1018: 構造化した描画の照合（プロファイルの一致で見る） */
   public verifyBodyStructured(reading: PoseReading): { score: number; verified: boolean; image: Uint8Array; size: number } | null {
     const size = 128;
@@ -2254,25 +2279,7 @@ class VisualPoseService {
     // 採用されるのと同じ段を、自分の絵では正確なマスク
     // で行う）。同系色の髪と服は通常の再読では分かれず、
     // 肩や髪色が実物と無関係に外れていた。
-    let rePal: PoseReading | null = null;
-    const flat = this.renderBodyStructuredTwin(reading, size);
-    if (flat) {
-      const pal = this.segmentTwinPalette(flat, size, reading);
-      if (pal) {
-        let bn = 0, minX = size, maxX = -1, minY = size, maxY = -1;
-        for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-          if (!pal.body[y * size + x]) continue;
-          bn++;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-        const dens = bn / Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
-        rePal = this.analyzePoseWithMask(flat, size, size, pal.body, 'fine', dens, pal.hair);
-        if (rePal && !rePal.profileComplete) rePal = null;
-      }
-    }
+    const rePal = this.paletteReRead(reading, size);
     const effProfile = (k: 'shoulder' | 'chest' | 'waist' | 'hip' | 'thigh' | 'calf' | 'ankle'): number | null =>
       (rePal?.bodyProfile[k] ?? null) !== null ? rePal!.bodyProfile[k] : (re?.bodyProfile[k] ?? null);
     const effHair = rePal?.hair ?? re?.hair ?? null;
@@ -2589,10 +2596,18 @@ class VisualPoseService {
     };
     const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile'] } | null => {
       this.setDrawingCorrections(corr);
-      const img = this.renderBody(start, 64);
-      if (!img) return null;
-      const re = this.analyzePose(img, 64, 64);
-      if (!re) return null;
+      // P1067: 測定はパレット経路（平坦な双子＋パレットの
+      // 体マスク、128px）を優先する。64pxの通常読みは粗く
+      // て補正に反応せず、P1063では学習が成立しなかった。
+      // パレット経路は寸法の摂動に単調に応答する（実測で
+      // 確認済み）。使えない時だけ従来経路に落とす。
+      let re = this.paletteReRead(start, 128);
+      if (!re) {
+        const img = this.renderBody(start, 64);
+        if (!img) return null;
+        re = this.analyzePose(img, 64, 64);
+        if (!re) return null;
+      }
       let sum = 0;
       let n = 0;
       for (const k of keys) {

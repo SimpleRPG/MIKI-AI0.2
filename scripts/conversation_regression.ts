@@ -9331,6 +9331,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 
 
+  // P1067: 補正ドリルの測定をパレット経路に寄せる
+  // （平坦な双子＋パレットの体マスクで測り直す。64pxの
+  // 通常読みでは補正に反応せず学習が成立しなかった）
+  {
+    const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let drill: any = null;
+    if (r) {
+      await poseSvc().setTarget(r);
+      await poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      drill = await poseSvc().drillCorrections(r);
+      await poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    }
+    check('P1067 パレット経路で補正ドリルが学習する', drill?.improved === true && (drill?.finalDiff ?? 9) < (drill?.initialDiff ?? 0), `init=${drill?.initialDiff} final=${drill?.finalDiff}`);
+  }
+
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
