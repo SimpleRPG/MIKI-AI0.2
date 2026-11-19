@@ -1468,15 +1468,21 @@ class VisualPoseService {
     const image = new Uint8Array(S * S * 4);
     // P1035: アホ毛。頭頂から立ち上がって横へ流れる細い束を
     // 二次曲線で描く。
+    // P1071: 先端を最高点にする。旧形は制御点が頂点より高く
+    // 曲線が途中で水平に寝て、頂点の行が横に広がり読みの
+    // narrow カウントが0になった（往復で読めない）。先端を
+    // 最高点にすると各行の束は細いまま残り、読み返せる。
+    // 横への流れは控えめにし、ほぼ真上に立つ束にする
+    // （横に寝ると先端の行が広がり、同じ理由で読めない）。
     if (reading.ahoge === true) {
       const topY = (head.y - headRh) * (S - 1);
       const cxp = head.x * (S - 1);
       const p0: [number, number] = [cxp, topY + headRh * S * 0.15];
-      const p1: [number, number] = [cxp + headRh * S * 0.3, topY - headRh * S * 0.38];
-      const p2: [number, number] = [cxp + headRh * S * 0.88, topY - headRh * S * 0.02];
+      const p1: [number, number] = [cxp + headRh * S * 0.1, topY - headRh * S * 0.55];
+      const p2: [number, number] = [cxp + headRh * S * 0.3, topY - headRh * S * 0.6];
       const aR = Math.max(1, S * 0.009);
-      for (let i = 0; i <= 14; i++) {
-        const t = i / 14;
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24;
         const bx = (1 - t) * (1 - t) * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0];
         const by = (1 - t) * (1 - t) * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1];
         stamp(bx, by, aR, HAIR0);
@@ -2458,6 +2464,19 @@ class VisualPoseService {
     const re = this.analyzePose(image, 128, 128);
     if (!re || !re.footFlare) return null;
     return { l: reading.footFlare.l, r: reading.footFlare.r, reL: re.footFlare.l, reR: re.footFlare.r, verified: re.footFlare.l === reading.footFlare.l && re.footFlare.r === reading.footFlare.r };
+  }
+
+  /** P1071: アホ毛の読み返し照合。P1035では解像度限界のため
+   * 対象外だったが、描く側の曲線を先端最高点に直したことで
+   * 128でも細い束が頭頂の上に残り、読み返せるようになった。
+   * あって読める／なくて読めない、の両方を照合する。 */
+  public verifyAhoge(reading: PoseReading): { ahoge: boolean; reAhoge: boolean | null; verified: boolean } | null {
+    if (reading.ahoge === null || reading.ahoge === undefined) return null;
+    const image = this.renderBody(reading, 128);
+    if (!image) return null;
+    const re = this.analyzePose(image, 128, 128);
+    if (!re || re.ahoge === null || re.ahoge === undefined) return null;
+    return { ahoge: reading.ahoge, reAhoge: re.ahoge, verified: re.ahoge === reading.ahoge };
   }
 
   public verifyBodyInnerLines(reading: PoseReading): { score: number; verified: boolean; compared: number } | null {
@@ -3581,13 +3600,28 @@ class VisualPoseService {
         for (let y = maskTop; y <= Math.min(height - 1, Math.round(headCyPx)); y++) capW = Math.max(capW, rowW[y]);
         let narrow = 0;
         let firstWideW = 0;
+        let wideY = -1;
         // アホ毛は太さがほぼ均一。頭頂の丸みは行ごとに
-        // どんどん広がるので、太さの上限は最初の行の幅でも縛る。
-        const wCap = Math.min(capW * 0.35, Math.max(2, rowW[maskTop] * 1.6));
+        // どんどん広がるので、太さの上限は束の太さでも縛る。
+        // P1071: 束の太さは先端の1行では測れない（先端の行は
+        // 円の端が欠けて細く出る）。先端3行の最大値で測る。
+        let strandW = 0;
+        for (let y = maskTop; y <= Math.min(height - 1, maskTop + 2); y++) strandW = Math.max(strandW, rowW[y]);
+        const wCap = Math.min(capW * 0.35, Math.max(2, strandW * 1.3));
         for (let y = maskTop; y <= Math.min(height - 1, Math.round(headCyPx)); y++) {
           if (rowW[y] === 0) break;
           if (rowW[y] <= wCap) narrow++;
-          else { firstWideW = rowW[y]; break; }
+          else { firstWideW = rowW[y]; wideY = y; break; }
+        }
+        // P1071: 頭は円なので頂点の行は細く、wCap を超えた
+        // 直後の行はまだ頭幅の半分に届かない。細い束の下に
+        // 頭があることの確認は、数行下までの最大幅で見る。
+        // ない時のガードは narrow の長さが担う（変わらず）。
+        if (wideY >= 0 && firstWideW < capW * 0.5) {
+          for (let y = wideY + 1; y <= Math.min(height - 1, Math.round(headCyPx), wideY + 4); y++) {
+            if (rowW[y] === 0) break;
+            firstWideW = Math.max(firstWideW, rowW[y]);
+          }
         }
         const ahogeV = capW > 0 && narrow >= Math.max(2, Math.round(height * 0.02)) && firstWideW >= capW * 0.5;
         chosen = { ...chosen, ahoge: ahogeV };

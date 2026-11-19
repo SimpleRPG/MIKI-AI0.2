@@ -9115,6 +9115,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 
 
+  // P1071: アホ毛の読み返し照合（P1035では解像度限界のため
+  // 対象外だった経路）。描く側の曲線を先端最高点・ほぼ真上
+  // に直し、読む側は束の太さを先端3行で測る＋頭幅の確認を
+  // 数行下まで見ることで、128でも往復できる。
+  {
+    const buildAhoge = (strand: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120]; const HAIR: [number, number, number] = [45, 32, 22];
+      rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+      rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+      disc(22, 9, 6, HAIR); disc(22, 10, 5, [232, 190, 160]);
+      if (strand) { rect(21, 0, 22, 3, HAIR); rect(23, 0, 24, 1, HAIR); }
+      return fig;
+    };
+    const t: any = await poseSvc().analyzePose(buildAhoge(true), 48, 56);
+    const vt: any = await poseSvc().verifyAhoge(t);
+    check('P1071 アホ毛ありの描き直しが読み返せる', vt?.verified === true && vt?.reAhoge === true, JSON.stringify(vt));
+    const f: any = await poseSvc().analyzePose(buildAhoge(false), 48, 56);
+    const vf: any = await poseSvc().verifyAhoge(f);
+    check('P1071 アホ毛なしの描き直しが読み返せる', vf?.verified === true && vf?.reAhoge === false, JSON.stringify(vf));
+    const n: any = await poseSvc().verifyAhoge({ ...t, ahoge: null });
+    check('P1071 アホ毛が未定の読みは照合しない', n === null, JSON.stringify(n));
+  }
+
+
   // P1036: 頬の赤み・鼻・耳を顔に描く（顔の指定で描き分ける）
   {
     const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
