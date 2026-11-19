@@ -1073,10 +1073,26 @@ class VisualPoseService {
     const ankleW = W(prof.ankle, calfW) * 0.42;
     const legSpread = W(prof.thigh, hipW) * 0.27;
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    // P1082: 胴と脚の輪郭を折れ線でなく曲線にする。アンカー
+    // （実測の幅）の値はそのままに、区間のつなぎを smoothstep
+    // に変えると、アンカー付近に留まって中間で移る曲線になり、
+    // ウエストのくびれや胸の張りが折れ目なく出る。
+    const sstep = (u: number) => { const x = Math.min(1, Math.max(0, u)); return x * x * (3 - 2 * x); };
+    const smooth = (a: number, b: number, u: number) => a + (b - a) * sstep(u);
     // P1065: 腰の幅は最下行でようやく届く形ではなく、手前で
     // 届いて台地になるようにした。股の位置から測る腰の帯が
     // 斜面の途中ばかり拾って細く読めていたため。
-    const torsoW = (t: number) => (t < 0.3 ? lerp(shoulderW, chestW, t / 0.3) : t < 0.55 ? lerp(chestW, waistW, (t - 0.3) / 0.25) : t < 0.78 ? waistW : t < 0.93 ? lerp(waistW, hipW, (t - 0.78) / 0.15) : hipW);
+    const torsoW = (t: number) => (t < 0.3 ? smooth(shoulderW, chestW, t / 0.3) : t < 0.55 ? smooth(chestW, waistW, (t - 0.3) / 0.25) : t < 0.78 ? waistW : t < 0.93 ? smooth(waistW, hipW, (t - 0.78) / 0.15) : hipW);
+    // P1082: 脚の幅も実測アンカーの位置に合わせる（太もも→
+    // 膝→ふくらはぎ→足首）。読み側はふくらはぎを足元から
+    // 0.16、足首を0.07 の高さで測るので、描く側のアンカーも
+    // 脚の丈に対して同じあたり（0.63 / 0.86）に置く。膝は
+    // 実測に無いので、太ももとふくらはぎの細い方の0.9倍を
+    // 膝のくびれとして置く。ただし足首より細くはしない
+    // （読み側の足首帯は脚の下30%で最小幅を取るので、膝が
+    // 足首を下回ると足の広がりと誤読される。P1082）。
+    const kneeW = Math.max(Math.min(thighW, calfW) * 0.9, ankleW);
+    const legWAt = (lt: number) => (lt < 0.48 ? smooth(thighW, kneeW, lt / 0.48) : lt < 0.63 ? smooth(kneeW, calfW, (lt - 0.48) / 0.15) : lt < 0.86 ? smooth(calfW, ankleW, (lt - 0.63) / 0.23) : ankleW);
     // P1022: 体の後ろに広がる髪の層。長い髪は体の横の板ではなく、
     // 後ろに垂れて下で広がる面として最初に描く（体はその上に
     // 描かれる）。広がりは読みの輪郭幅から取る：サンプルの
@@ -1128,7 +1144,7 @@ class VisualPoseService {
           else if (yB <= y1p) bodyHalfPx = torsoW(y1p > y0p ? (yB - y0p) / (y1p - y0p) : 0) / 2;
           else {
             const lt = Math.min(1, Math.max(0, (yB - y1p) / Math.max(1, footP - y1p)));
-            const legW = lt < 0.5 ? lerp(thighW, calfW, lt / 0.5) : lerp(calfW, ankleW, (lt - 0.5) / 0.5);
+            const legW = legWAt(lt);
             bodyHalfPx = legSpread + legW / 2;
           }
           if (Math.max(-lv, rv) * figHpPx > bodyHalfPx + Math.max(2, figHpPx * 0.015)) {
@@ -1245,7 +1261,7 @@ class VisualPoseService {
       const footX = foot ? foot.x * (S - 1) : hipX;
       for (let y = legTop; y <= legBottom; y++) {
         const t = legBottom > legTop ? (y - legTop) / (legBottom - legTop) : 0;
-        const w = t < 0.6 ? lerp(thighW, calfW, t / 0.6) : lerp(calfW, ankleW, (t - 0.6) / 0.4);
+        const w = legWAt(t);
         const cxp = lerp(hipX, footX, t);
         // P1025: 下の服は脚の付け根だけ（分かれ形）。裾に線。
         let legCol: [number, number, number] = BODY;
@@ -1457,7 +1473,7 @@ class VisualPoseService {
               const legBottom = Math.round(footY * (S - 1));
               const lt = Math.min(1, (y - y1) / Math.max(1, legBottom - y1));
               const cxp = lerp(hipX, footX, lt);
-              const w = lt < 0.6 ? lerp(thighW, calfW, lt / 0.6) : lerp(calfW, ankleW, (lt - 0.6) / 0.4);
+              const w = legWAt(lt);
               edgeAbs = cxp + sgn * (w / 2);
             }
             const outerAbs = edgeAbs + sgn * 1;

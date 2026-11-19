@@ -9918,6 +9918,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     }
   }
 
+  // P1082: 胴と脚の輪郭を折れ線でなく曲線にする。胴の幅の
+  // つなぎを smoothstep にし、脚は実測アンカーの位置に合わせて
+  // 太もも→膝→ふくらはぎ→足首の曲線にした（膝は細い方の
+  // 0.9倍のくびれ）。寸法の上書きした読みで、脚の膝が
+  // ふくらはぎより細く出ることと、構造化の照合が保てる
+  // ことを見る。
+  {
+    poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const r1082: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    if (r1082) r1082.bodyProfile = { shoulder: 0.30, chest: 0.46, waist: 0.30, hip: 0.42, thigh: 0.30, calf: 0.24, ankle: 0.18 };
+    const vs1082: any = r1082 ? poseSvc().verifyBodyStructured(r1082) : null;
+    check('P1082 曲線にしても構造化の照合が保てる', vs1082?.verified === true, `score=${vs1082?.score}`);
+    const r1082b: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let kneeW1082 = -1, calfW1082 = -1;
+    if (r1082b) {
+      r1082b.bodyProfile = { shoulder: 0.30, chest: 0.46, waist: 0.30, hip: 0.42, thigh: 0.30, calf: 0.24, ankle: 0.18 };
+      r1082b.hair = { length: 'short', lengthRatio: 0.2, shine: false, clumps: 0 };
+      const im1082: Uint8Array | null = poseSvc().renderBody(r1082b, 256);
+      if (im1082) {
+        const bgR = im1082[0], bgG = im1082[1], bgB = im1082[2];
+        const isBg1082 = (x: number, y: number): boolean => { const i = (y * 256 + x) * 4; return Math.abs(im1082[i] - bgR) + Math.abs(im1082[i + 1] - bgG) + Math.abs(im1082[i + 2] - bgB) <= 12; };
+        const spans1082 = (y: number): number[] => { const out: number[] = []; let x = 0; while (x < 256) { if (isBg1082(x, y)) { x++; continue; } let x1 = x; while (x1 + 1 < 256 && !isBg1082(x1 + 1, y)) x1++; if (x1 - x > 4) out.push(x1 - x + 1); x = x1 + 1; } return out; };
+        let legTop = -1, legBottom = -1;
+        for (let y = 100; y < 256; y++) { if (spans1082(y).length >= 2) { if (legTop < 0) legTop = y; legBottom = y; } }
+        if (legTop >= 0 && legBottom > legTop) {
+          const at1082 = (lt: number): number => { const sp = spans1082(Math.round(legTop + lt * (legBottom - legTop))); return sp.length ? Math.min(...sp) : -1; };
+          kneeW1082 = at1082(0.48); calfW1082 = at1082(0.63);
+        }
+      }
+    }
+    check('P1082 脚に膝のくびれが出る', kneeW1082 > 0 && calfW1082 > 0 && kneeW1082 < calfW1082 && kneeW1082 <= 22, `knee=${kneeW1082} calf=${calfW1082}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
