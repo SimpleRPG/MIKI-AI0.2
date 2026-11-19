@@ -1072,6 +1072,55 @@ class VisualPoseService {
         ? reading.silhouetteWidth * figHn * (S - 1) * 0.5 * 0.94
         : Math.max(hipW, shoulderW) * 0.72;
       const bkCx = cxN * (S - 1);
+      // P1073: 面の標準化。輪郭（P1023の24段の左右端）があれば、
+      // 面の形は固定の広がり曲線ではなく実測の輪郭から取る。
+      // 曲線は実物と3か所でずれていた：上部は広がりすぎ（帯4〜8）、
+      // 腰から下は先細りしすぎ（帯14〜19）、下端は実物より下まで
+      // 垂れていた（帯20〜23は実物では脚だけの輪郭なのに面が
+      // 残っていた）。輪郭は頭中心・図の高さ単位で測ってある
+      // ので、描く側の同じ枠（頭頂→足の最大y）へ戻して使う。
+      // 面の下端は「輪郭が体だけの幅より広い」最下の帯で決める
+      // （面が輪郭を決めている所までが面の範囲）。
+      const figHpN = Math.max(0.1, (Math.max(reading.footL?.y ?? 0, reading.footR?.y ?? 0) || footY) - (head.y - headRh));
+      const figHpPx = figHpN * (S - 1);
+      const ctr = reading.contour && reading.contour.l.length === 24 && reading.contour.r.length === 24 ? reading.contour : null;
+      const ctrAt = (figT: number): { l: number; r: number } | null => {
+        if (!ctr) return null;
+        const pos = Math.min(23.999, Math.max(0, figT * 24 - 0.5));
+        const i0 = Math.floor(pos);
+        const fr = pos - i0;
+        const pick = (arr: (number | null)[]): number | null => {
+          const a = arr[i0];
+          const b = arr[Math.min(23, i0 + 1)];
+          if (a !== null && b !== null) return a + (b - a) * fr;
+          return a ?? b ?? null;
+        };
+        const l = pick(ctr.l);
+        const r = pick(ctr.r);
+        return l === null || r === null ? null : { l, r };
+      };
+      let ctrBottomY = -1;
+      if (ctr) {
+        const y0p = shoulderY * (S - 1), y1p = hipY * (S - 1), footP = footY * (S - 1);
+        for (let i = 0; i < 24; i++) {
+          const lv = ctr.l[i], rv = ctr.r[i];
+          if (lv === null || rv === null) continue;
+          const yB = bkTopY + ((i + 0.5) / 24) * figHpPx;
+          let bodyHalfPx: number;
+          if (yB < y0p) bodyHalfPx = headHalf;
+          else if (yB <= y1p) bodyHalfPx = torsoW(y1p > y0p ? (yB - y0p) / (y1p - y0p) : 0) / 2;
+          else {
+            const lt = Math.min(1, Math.max(0, (yB - y1p) / Math.max(1, footP - y1p)));
+            const legW = lt < 0.5 ? lerp(thighW, calfW, lt / 0.5) : lerp(calfW, ankleW, (lt - 0.5) / 0.5);
+            bodyHalfPx = legSpread + legW / 2;
+          }
+          if (Math.max(-lv, rv) * figHpPx > bodyHalfPx + Math.max(2, figHpPx * 0.015)) {
+            ctrBottomY = bkTopY + ((i + 1) / 24) * figHpPx;
+          }
+        }
+      }
+      const useCtr = ctrBottomY > bkTopY;
+      const sheetBottomY = useCtr ? Math.max(ctrBottomY, bkTopY + figHpPx * 0.3) : bkBottomY;
       // 後ろの髪は少し落とした色の面として描く（実物でも後ろ髪は
       // 暗く落ちる。前の髪と同色だと、体との境界に壁が立たず、
       // 自分の描画を測り直す時に髪と体が分離できない。落とし
@@ -1079,15 +1128,31 @@ class VisualPoseService {
       const SH = deriveShadow(HAIR0);
       const HAIR_BK: [number, number, number] = [Math.round(HAIR0[0] + (SH[0] - HAIR0[0]) * 0.35), Math.round(HAIR0[1] + (SH[1] - HAIR0[1]) * 0.35), Math.round(HAIR0[2] + (SH[2] - HAIR0[2]) * 0.35)];
       const HAIR_BK2 = SH;
-      for (let y = Math.round(bkTopY); y <= Math.round(Math.min(S - 1, bkBottomY)); y++) {
-        const t = Math.min(1, Math.max(0, (y - bkTopY) / Math.max(1, bkBottomY - bkTopY)));
+      for (let y = Math.round(bkTopY); y <= Math.round(Math.min(S - 1, sheetBottomY)); y++) {
+        const t = Math.min(1, Math.max(0, (y - bkTopY) / Math.max(1, sheetBottomY - bkTopY)));
         const spread = t < 0.55 ? lerp(headHalf, maxHalf, (t / 0.55) ** 1.2) : t < 0.78 ? lerp(maxHalf, maxHalf * 0.8, (t - 0.55) / 0.23) : lerp(maxHalf * 0.8, maxHalf * 0.42, (t - 0.78) / 0.22);
-        for (let x = Math.round(bkCx - spread); x <= Math.round(bkCx + spread); x++) {
+        // P1073: 輪郭がある行は左右の端を輪郭から取る（非対称も
+        // そのまま）。取れない行だけ従来の曲線に倒す。
+        let xFrom = Math.round(bkCx - spread);
+        let xTo = Math.round(bkCx + spread);
+        let halfL = spread;
+        let halfR = spread;
+        if (useCtr) {
+          const c = ctrAt(Math.min(1, Math.max(0, (y - bkTopY) / figHpPx)));
+          if (c) {
+            xFrom = Math.round((head.x + c.l * figHpN) * (S - 1));
+            xTo = Math.round((head.x + c.r * figHpN) * (S - 1));
+            halfL = Math.max(1, bkCx - xFrom);
+            halfR = Math.max(1, xTo - bkCx);
+          }
+        }
+        for (let x = xFrom; x <= xTo; x++) {
+          const sideHalf = x < bkCx ? halfL : halfR;
           if (t > 0.92) {
-            const notch = Math.max(2, Math.round(spread / 3));
+            const notch = Math.max(2, Math.round(sideHalf / 3));
             if (Math.round(Math.abs(x - bkCx)) % notch === 0) continue;
           }
-          const edge = Math.abs(x - bkCx) / Math.max(1, spread);
+          const edge = Math.abs(x - bkCx) / Math.max(1, sideHalf);
           // 腰から上は素の髪色（体に隠れる部分が多く、色の
           // 代表を影に奪われないため）。影の面は腰から下と縁。
           const aboveHip = y < hipY * (S - 1);

@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 802906,
-      "lines": 9551,
-      "sha256": "e55111228032cf8b163f14f36b8cb6eec3a7ae6e11dab992d4c5c6deaf79bada",
+      "bytes": 808592,
+      "lines": 9628,
+      "sha256": "edd2ecb1e22f196468bee85e61ff500e6a37159cd31a104fe03952eb4714637c",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -15594,9 +15594,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 332135,
-      "lines": 6043,
-      "sha256": "f484988b9581e013161a19e40cc20b316b1e14d71003e9af4dc4775df7764178",
+      "bytes": 335627,
+      "lines": 6108,
+      "sha256": "f72150d0b4a91ab207eadc1da6b7a109466efcbd460ad4976b316278f1f3f5fd",
       "relativeImportCandidates": [
         {
           "line": 1,

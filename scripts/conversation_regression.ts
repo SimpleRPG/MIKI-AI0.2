@@ -9535,6 +9535,83 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 
 
+  // P1073: 後ろ髪の面の標準化。面の形を固定の広がり曲線では
+  // なく実測の輪郭（24段の左右端）から取る。曲線は上部で
+  // 広がりすぎ、腰から下で先細りしすぎ、下端が実物より下まで
+  // 垂れていた。輪郭がある読みでは左右別々に再生し、下端は
+  // 「輪郭が体だけの幅より広い」最下の帯で決める。輪郭が
+  // 無い読みでは従来の曲線に倒れる。
+  {
+    const buildSheet = (): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const HAIR: [number, number, number] = [45, 32, 22];
+      const SKIN: [number, number, number] = [232, 190, 160];
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(12, 6, 35, 40, HAIR); // 後ろ髪の面（下端は y=40）
+      rect(18, 16, 29, 33, CLOTH); rect(15, 17, 17, 31, CLOTH); rect(30, 17, 32, 31, CLOTH);
+      rect(18, 33, 22, 52, CLOTH); rect(25, 33, 29, 52, CLOTH);
+      disc(23, 10, 6, HAIR); disc(23, 11, 5, SKIN);
+      return fig;
+    };
+    const sr: any = await poseSvc().analyzePose(buildSheet(), 48, 56);
+    check('P1073 面のある読みが輪郭つきで取れる', !!sr && sr.hair?.length === 'long' && !!sr.contour, `hair=${sr?.hair?.length} contour=${!!sr?.contour}`);
+    const vc: any = sr ? await poseSvc().verifyBodyContour(sr) : null;
+    check('P1073 輪郭どおりに面を描いて照合が通る', vc?.verified === true && (vc?.score ?? 0) >= 0.9, `score=${vc?.score}`);
+    let lowOk = false;
+    let midOk = false;
+    if (sr) {
+      const ren: any = await poseSvc().renderBody(sr, 128, null, null, { backHair: true });
+      const re: any = ren ? await poseSvc().analyzePose(ren, 128, 128) : null;
+      if (re?.contour && sr.contour) {
+        let midMax = 0;
+        for (let i = 14; i <= 17; i++) {
+          midMax = Math.max(midMax, Math.abs((re.contour.l[i] ?? 0) - (sr.contour.l[i] ?? 0)), Math.abs((re.contour.r[i] ?? 0) - (sr.contour.r[i] ?? 0)));
+        }
+        midOk = midMax <= 0.04;
+        let lowMax = 0;
+        for (let i = 20; i <= 23; i++) {
+          lowMax = Math.max(lowMax, Math.max(Math.abs(re.contour.l[i] ?? 0), Math.abs(re.contour.r[i] ?? 0)) - Math.max(Math.abs(sr.contour.l[i] ?? 0), Math.abs(sr.contour.r[i] ?? 0)));
+        }
+        lowOk = lowMax <= 0.05;
+      }
+    }
+    check('P1073 面の帯（14〜17）で輪郭が再現される', midOk, 'mid');
+    check('P1073 面の下端より下に面が垂れない', lowOk, 'low');
+    let fbOk = false;
+    {
+      // フォールバックの物差しは P1022 の細身フィギュアを使う
+      // （面フィギュアは髪の塊が素の描画でも広く、総幅では
+      // 層の追加を測れないため）。
+      const W = 48, H = 56; const nf = new Uint8Array(W * H * 4);
+      const BG: [number, number, number] = [208, 210, 212]; const SKIN: [number, number, number] = [243, 222, 205];
+      const HAIR: [number, number, number] = [243, 205, 215]; const CLOTH: [number, number, number] = [150, 160, 190];
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; nf[i] = c[0]; nf[i + 1] = c[1]; nf[i + 2] = c[2]; nf[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; nf[i] = c[0]; nf[i + 1] = c[1]; nf[i + 2] = c[2]; nf[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { nf[i * 4] = BG[0]; nf[i * 4 + 1] = BG[1]; nf[i * 4 + 2] = BG[2]; nf[i * 4 + 3] = 255; }
+      rect(13, 4, 31, 12, HAIR); rect(15, 13, 16, 40, HAIR); rect(27, 13, 28, 40, HAIR);
+      rect(19, 15, 25, 32, CLOTH);
+      rect(17, 16, 18, 30, CLOTH); rect(26, 16, 27, 30, CLOTH);
+      rect(19, 32, 21, 50, CLOTH); rect(23, 32, 25, 50, CLOTH);
+      disc(22, 9, 6, HAIR); disc(22, 10, 5, SKIN);
+      const rn: any = await poseSvc().analyzePose(nf, 48, 56);
+      const noCtr: any = rn ? { ...rn, contour: null } : null;
+      const plain: any = noCtr ? await poseSvc().renderBody(noCtr, 128) : null;
+      const sheeted: any = noCtr ? await poseSvc().renderBody(noCtr, 128, null, null, { backHair: true }) : null;
+      const widthOf = (px: Uint8Array, Sz: number): number => {
+        const bg = [px[0], px[1], px[2]];
+        let x0 = Sz, x1 = -1;
+        for (let y = 0; y < Sz; y++) for (let x = 0; x < Sz; x++) { const i = (y * Sz + x) * 4; if (Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 30) { if (x < x0) x0 = x; if (x > x1) x1 = x; } }
+        return x1 - x0 + 1;
+      };
+      fbOk = !!plain && !!sheeted && widthOf(sheeted, 128) > widthOf(plain, 128) + 4;
+    }
+    check('P1073 輪郭なしの読みは従来の曲線で面が広がる', fbOk, 'fallback');
+  }
+
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
