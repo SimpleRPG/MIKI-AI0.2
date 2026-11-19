@@ -1279,6 +1279,42 @@ class VisualPoseService {
         set(x, by + dip + 1, SHADE);
       }
     }
+    // P1088: 胸の「形」。幅のふくらみと下の線だけでは平らに
+    // 見えるため、2つの丸みの下側に沿う影と、中央の谷の
+    // 線を描く。色は色相を保つ一様な倍率で落とす（淡色の
+    // 服で影色が別色相に化けないため）。胸として読める
+    // 大きさ（0.5以上）の時だけ。
+    if (bustAmt >= 0.5) {
+      const peakY = y0 + (y1 - y0) * bustC;
+      const bwF = torsoW(bustC) * (1 + bustAmt * 0.16) * 0.34;
+      const moundR = Math.max(2, bwF * 0.52);
+      const moundShade: [number, number, number] = [Math.round(BODY[0] * 0.86), Math.round(BODY[1] * 0.86), Math.round(BODY[2] * 0.86)];
+      const valleyShade: [number, number, number] = [Math.round(BODY[0] * 0.74), Math.round(BODY[1] * 0.74), Math.round(BODY[2] * 0.74)];
+      const isBodyPx = (x: number, y: number): boolean => {
+        if (x < 0 || y < 0 || x >= S || y >= S) return false;
+        const p = px[y * S + x];
+        return Math.abs(p[0] - BODY[0]) + Math.abs(p[1] - BODY[1]) + Math.abs(p[2] - BODY[2]) < 30 || Math.abs(p[0] - SKIN[0]) + Math.abs(p[1] - SKIN[1]) + Math.abs(p[2] - SKIN[2]) < 30;
+      };
+      const yTop = Math.round(peakY - moundR * 1.1);
+      const yBot = Math.round(peakY + moundR * 1.5);
+      for (let y = yTop; y <= yBot; y++) {
+        for (const sgn of [-1, 1]) {
+          const mcx = cxN * (S - 1) + sgn * bwF * 0.52;
+          for (let x = Math.round(mcx - moundR * 1.15); x <= Math.round(mcx + moundR * 1.15); x++) {
+            const dx = (x - mcx) / moundR;
+            const dy = (y - peakY) / moundR;
+            const d2 = dx * dx + dy * dy;
+            // 丸みの下半分の外周に沿う帯だけ落とす
+            if (d2 > 0.5 && d2 < 1.2 && dy > -0.15 && isBodyPx(x, y)) set(x, y, moundShade);
+          }
+        }
+      }
+      // 中央の谷：頂点の少し下から下の線まで
+      const cxp = Math.round(cxN * (S - 1));
+      for (let y = Math.round(peakY + moundR * 0.25); y <= Math.round(peakY + moundR * 1.25); y++) {
+        if (isBodyPx(cxp, y)) set(cxp, y, valleyShade);
+      }
+    }
     // 脚：腰から足先へ、太もも→ふくらはぎ→足首と細くする
     const legTop = y1, legBottom = Math.round(footY * (S - 1));
     const legSpanRows = new Map<number, { l?: [number, number]; r?: [number, number] }>();

@@ -10097,6 +10097,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1087 パネルの幅の補正が描画に効く', okDraw, detail1087);
   }
 
+// ---- P1088: 胸の形（丸みの影と中央の谷） ----
+  {
+    const base1088: any = poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let mound1088 = 0;
+    if (base1088?.head) {
+      const r1088: any = { ...base1088, bust: 1, bustPeak: 0.39, clothing: { ...(base1088.clothing ?? {}), separated: true, topRgb: [245, 222, 228], bottomRgb: [231, 203, 210] } };
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      poseSvc().setOverlapCorrections(null);
+      const img1088: any = poseSvc().renderBody(r1088, 256, null, null, { backHair: true, frontHair: true });
+      if (img1088) for (let i = 0; i < img1088.length; i += 4) if (img1088[i] === 211 && img1088[i + 1] === 191 && img1088[i + 2] === 196) mound1088++;
+    }
+    check('P1088 胸の丸みの影が描かれる', mound1088 >= 40, `mound=${mound1088}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
