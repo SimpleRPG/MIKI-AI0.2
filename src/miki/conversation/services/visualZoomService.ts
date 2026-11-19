@@ -65,6 +65,15 @@ export interface FaceReading {
   /** P985: 生え際の形（m-shaped=M字型 / straight=まっすぐ / round=丸い） */
   hairline: 'm-shaped' | 'straight' | 'round' | null;
   hairlineDescription: string | null;
+  /** P1040: 髪の分け目（前髪の肌の上端が狭い範囲で上がる位置） */
+  parting: 'center' | 'left' | 'right' | null;
+  partingDescription: string | null;
+  /** P1041: 目の形（tareme=目尻が下がる / tsurime=目尻が上がる） */
+  eyeShape: 'tareme' | 'tsurime' | null;
+  eyeShapeDescription: string | null;
+  /** P1043: 眉の角度（眉頭側−眉尻側の高さ差÷眉幅。正=眉頭が下がる怒り寄り、負=眉尻が下がる困り寄り） */
+  browAngle: number | null;
+  browAngleDescription: string | null;
   /** P988: 目の大きさ（large=大きい / small=小さい / null=普通は言わない） */
   eyeSize: 'large' | 'small' | null;
   eyeSizeDescription: string | null;
@@ -318,6 +327,12 @@ class VisualZoomService {
     if (raw.cheekFlush === true) parts.push('頬が赤みを帯びている');
     const hairlineDescription = raw.hairline === 'm-shaped' ? '生え際はM字型' : raw.hairline === 'straight' ? '生え際はまっすぐ' : raw.hairline === 'round' ? '生え際は丸い' : null;
     if (hairlineDescription) parts.push(hairlineDescription);
+    const partingDescription = raw.parting === 'center' ? '髪の分け目は中央' : raw.parting === 'left' ? '髪の分け目は左寄り' : raw.parting === 'right' ? '髪の分け目は右寄り' : null;
+    if (partingDescription) parts.push(partingDescription);
+    const eyeShapeDescription = raw.eyeShape === 'tareme' ? '垂れ目' : raw.eyeShape === 'tsurime' ? 'つり目' : null;
+    if (eyeShapeDescription) parts.push(eyeShapeDescription);
+    const browAngleDescription = raw.browAngle !== null && raw.browAngle >= 0.22 ? '眉頭が下がっている' : raw.browAngle !== null && raw.browAngle <= -0.22 ? '眉尻が下がっている' : null;
+    if (browAngleDescription) parts.push(browAngleDescription);
     const eyeSizeDescription = raw.eyeSize === 'large' ? '目が大きい' : raw.eyeSize === 'small' ? '目が小さい' : null;
     if (eyeSizeDescription) parts.push(eyeSizeDescription);
     const mouthSize: 'large' | 'small' | null = raw.mouthWidthRatio >= 0.34 ? 'large' : raw.mouthWidthRatio > 0 && raw.mouthWidthRatio <= 0.16 ? 'small' : null;
@@ -340,33 +355,47 @@ class VisualZoomService {
     if (raw.eyeSize) state.eyeSizes++;
     if (mouthSize) state.mouthSizes++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
-    return { ...raw, verified, description, eyeColor, faceShapeDescription, hairlineDescription, eyeSizeDescription, mouthSize, mouthSizeDescription };
+    return { ...raw, verified, description, eyeColor, faceShapeDescription, hairlineDescription, partingDescription, eyeShapeDescription, browAngleDescription, eyeSizeDescription, mouthSize, mouthSizeDescription };
   }
 
-  private measureFace(pixels: Uint8Array): { eyes: 0 | 1 | 2; mouthShape: FaceReading['mouthShape']; mouthWidthRatio: number; eyePts: { x: number; y: number }[]; eyeColorPts: { x: number; y: number }[]; mouthPts: { x: number; y: number }[]; brows: boolean | null; nose: boolean | null; ears: boolean | null; faceShape: 'round' | 'long' | 'pointed' | null; cheekFlush: boolean | null; hairline: 'm-shaped' | 'straight' | 'round' | null; eyeSize: 'large' | 'small' | null; faceBox: { x0: number; y0: number; x1: number; y1: number } } | null {
+  private measureFace(pixels: Uint8Array): { eyes: 0 | 1 | 2; mouthShape: FaceReading['mouthShape']; mouthWidthRatio: number; eyePts: { x: number; y: number }[]; eyeColorPts: { x: number; y: number }[]; mouthPts: { x: number; y: number }[]; brows: boolean | null; nose: boolean | null; ears: boolean | null; faceShape: 'round' | 'long' | 'pointed' | null; cheekFlush: boolean | null; hairline: 'm-shaped' | 'straight' | 'round' | null; parting: 'center' | 'left' | 'right' | null; eyeShape: 'tareme' | 'tsurime' | null; browAngle: number | null; eyeSize: 'large' | 'small' | null; faceBox: { x0: number; y0: number; x1: number; y1: number } } | null {
     const S = OUT;
-    const isSkin = (i: number) => {
+    const isSkinStrict = (i: number) => {
       const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
       return r > 170 && g > 110 && g < 220 && b > 70 && b < 195 && r > g && g >= b - 5 && r - b > 35;
     };
+    // P1017: 薄い肌（緑・青の成分が高く、厳しい肌判定の外に
+    // 出る色）でも顔を読めるよう、緩い肌判定を用意する
+    // （P1011の向き判定で使った物差しと同じ）。
+    const isSkinLoose = (i: number) => {
+      const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+      return r > 190 && g >= b && r - b >= 12;
+    };
+    let isSkin = isSkinStrict;
     const isDark = (i: number) => {
       const lum = pixels[i] * 0.3 + pixels[i + 1] * 0.59 + pixels[i + 2] * 0.11;
       return lum < 95 && !isSkin(i);
     };
     let sx0 = S, sy0 = S, sx1 = -1, sy1 = -1, skinCount = 0;
     const skinMask = new Uint8Array(S * S);
-    for (let y = 0; y < S; y++) {
-      for (let x = 0; x < S; x++) {
-        if (isSkin((y * S + x) * 4)) {
-          skinMask[y * S + x] = 1;
-          skinCount++;
-          if (x < sx0) sx0 = x;
-          if (x > sx1) sx1 = x;
-          if (y < sy0) sy0 = y;
-          if (y > sy1) sy1 = y;
+    const buildSkin = () => {
+      sx0 = S; sy0 = S; sx1 = -1; sy1 = -1; skinCount = 0;
+      skinMask.fill(0);
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          if (isSkin((y * S + x) * 4)) {
+            skinMask[y * S + x] = 1;
+            skinCount++;
+            if (x < sx0) sx0 = x;
+            if (x > sx1) sx1 = x;
+            if (y < sy0) sy0 = y;
+            if (y > sy1) sy1 = y;
+          }
         }
       }
-    }
+    };
+    buildSkin();
+    if (skinCount < 40) { isSkin = isSkinLoose; buildSkin(); }
     if (skinCount < 40 || sx1 - sx0 < 9 || sy1 - sy0 < 9) return null;
     // P1010: 顔の箱は「中心につながった肌の塊」で取る。頭の切り出しに
     // 首・肩・腕の肌が入ると、肌全体の外接箱では箱が縦に伸びて
@@ -453,9 +482,87 @@ class VisualZoomService {
         else if (isFacialDark(x, y)) eyePts.push({ x, y });
       }
     }
-    const leftEyes = eyePts.filter((p) => p.x < cx);
-    const rightEyes = eyePts.filter((p) => p.x >= cx);
-    const eyes = ((leftEyes.length >= 2 ? 1 : 0) + (rightEyes.length >= 2 ? 1 : 0)) as 0 | 1 | 2;
+    let leftEyes = eyePts.filter((p) => p.x < cx);
+    let rightEyes = eyePts.filter((p) => p.x >= cx);
+    let eyes = ((leftEyes.length >= 2 ? 1 : 0) + (rightEyes.length >= 2 ? 1 : 0)) as 0 | 1 | 2;
+    // P1021: 薄い色の目の救済。線画や写真では、目の周りの肌が
+    // 線・髪・影で細切れになり、輪の肌率（0.7）に届かず目が
+    // 数えられない（全身サンプルの目が実際に読めなかった）。
+    // 輪でなく「塊」で見る：色・暗の点の塊があり、その下が
+    // 肌なら（頬の上に乗っているなら）目とみなす。縦に細い
+    // 塊（髪の筋）は形で除く。
+    if (eyes < 2) {
+      const cand = new Uint8Array(S * S);
+      for (let y = Math.floor(eyeBand.y0); y <= Math.ceil(eyeBand.y1); y++) {
+        for (let x = sx0; x <= sx1; x++) {
+          if (isColoredEyePx(x, y) || isDark((y * S + x) * 4)) cand[y * S + x] = 1;
+        }
+      }
+      const seen = new Uint8Array(S * S);
+      let addL = false;
+      let addR = false;
+      for (let sy = 0; sy < S; sy++) {
+        for (let sx = 0; sx < S; sx++) {
+          const start = sy * S + sx;
+          if (!cand[start] || seen[start]) continue;
+          const stack = [start];
+          seen[start] = 1;
+          const pts: { x: number; y: number }[] = [];
+          let bx0 = S, by0 = S, bx1 = -1, by1 = -1;
+          while (stack.length) {
+            const p = stack.pop() as number;
+            const x = p % S;
+            const y = (p / S) | 0;
+            pts.push({ x, y });
+            if (x < bx0) bx0 = x;
+            if (x > bx1) bx1 = x;
+            if (y < by0) by0 = y;
+            if (y > by1) by1 = y;
+            if (x > 0 && cand[p - 1] && !seen[p - 1]) { seen[p - 1] = 1; stack.push(p - 1); }
+            if (x < S - 1 && cand[p + 1] && !seen[p + 1]) { seen[p + 1] = 1; stack.push(p + 1); }
+            if (y > 0 && cand[p - S] && !seen[p - S]) { seen[p - S] = 1; stack.push(p - S); }
+            if (y < S - 1 && cand[p + S] && !seen[p + S]) { seen[p + S] = 1; stack.push(p + S); }
+          }
+          const bw = bx1 - bx0 + 1;
+          const bh = by1 - by0 + 1;
+          if (pts.length < 2 || pts.length > 80) continue;
+          // 横に長い塊（線・前髪の縁）と縦に細い塊（髪の筋）は目ではない
+          if (bw < 2 || bw > fw * 0.45 || bh > bw * 1.6 + 2) continue;
+          const belowH = Math.max(2, bh);
+          let skinN = 0;
+          let totN = 0;
+          for (let y = by1 + 1; y <= Math.min(S - 1, by1 + belowH); y++) {
+            for (let x = bx0; x <= bx1; x++) {
+              totN++;
+              if (skinMask[y * S + x]) skinN++;
+            }
+          }
+          if (totN === 0 || skinN / totN < 0.5) continue;
+          // 救済の対象は色のある目。暗いだけの塊（髪と紛らわしい）は、
+          // 下がほぼ肌の時だけ認める。
+          let coloredN = 0;
+          for (const p of pts) if (isColoredEyePx(p.x, p.y)) coloredN++;
+          if (coloredN < 2 && skinN / totN < 0.75) continue;
+          const ccx = (bx0 + bx1) / 2;
+          // 顔の縁にある髪の塊を除く：塊の外側（顔の中心と反対側）
+          // 2つ先が暗い髪・線なら、それは目の位置ではない。
+          const midY = Math.round((by0 + by1) / 2);
+          const outX = ccx < cx ? bx0 - 2 : bx1 + 2;
+          if (outX < 0 || outX >= S) continue;
+          if (isDark((midY * S + outX) * 4)) continue;
+          for (const p of pts) {
+            eyePts.push(p);
+            if (isColoredEyePx(p.x, p.y)) coloredEyePts.push(p);
+          }
+          if (ccx < cx) addL = true; else addR = true;
+        }
+      }
+      if (addL || addR) {
+        leftEyes = eyePts.filter((p) => p.x < cx);
+        rightEyes = eyePts.filter((p) => p.x >= cx);
+        eyes = (((leftEyes.length >= 2 || addL) ? 1 : 0) + ((rightEyes.length >= 2 || addR) ? 1 : 0)) as 0 | 1 | 2;
+      }
+    }
     // P988: 目の大きさ。左右の目の点の横幅を顔幅と比べる。
     // P1010: 虹彩の色画素がある目は、まつ毛線や瞳孔（暗い点）に
     // 引っ張られないよう、色画素だけの横幅で測る。部品描きの目は
@@ -489,14 +596,39 @@ class VisualZoomService {
     // 輪が髪だらけになるため、この条件で落ちる。
     let browL = 0;
     let browR = 0;
+    const browPtsL: { x: number; y: number }[] = [];
+    const browPtsR: { x: number; y: number }[] = [];
     for (let y = Math.ceil(sy0 + fh * 0.02); y <= Math.floor(eyeBand.y0 - 1); y++) {
       for (let x = sx0; x <= sx1; x++) {
         if (isDark((y * S + x) * 4) && ringSkinShare(x, y) >= 0.5) {
-          if (x < cx) browL++; else browR++;
+          if (x < cx) { browL++; browPtsL.push({ x, y }); } else { browR++; browPtsR.push({ x, y }); }
         }
       }
     }
     const brows: boolean | null = browL >= 3 && browR >= 3 ? true : browL === 0 && browR === 0 ? false : null;
+    // P1043: 眉の角度。眉頭側と眉尻側で点の重心の高さを比べる。
+    let browAngle: number | null = null;
+    {
+      const diffs: number[] = [];
+      for (const pts of [browPtsL, browPtsR]) {
+        if (pts.length < 6) continue;
+        const xs = pts.map((p) => p.x);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const w = maxX - minX + 1;
+        if (w < 5) continue;
+        const cols = Array.from({ length: w }, (_, i) => minX + i);
+        const byInner = [...cols].sort((a, b) => Math.abs(a - cx) - Math.abs(b - cx));
+        const third = Math.max(1, Math.floor(w / 3));
+        const meanY = (cs: number[]): number => {
+          const sel = pts.filter((p) => cs.includes(p.x));
+          return sel.length ? sel.reduce((a, p) => a + p.y, 0) / sel.length : NaN;
+        };
+        const innerY = meanY(byInner.slice(0, third));
+        const outerY = meanY(byInner.slice(-third));
+        if (Number.isFinite(innerY) && Number.isFinite(outerY)) diffs.push((innerY - outerY) / w);
+      }
+      if (diffs.length > 0) browAngle = Math.round((diffs.reduce((a, b) => a + b, 0) / diffs.length) * 1000) / 1000;
+    }
     // P979: 鼻。目と口の間の中心の帯で、肌の明るさが
     // 両脇（頬）より落ちていれば、鼻筋・鼻の下の影と読む。
     // 影が無くても鼻が無いとは言えないので、読めない時は null。
@@ -578,6 +710,7 @@ class VisualZoomService {
     // 後退したM字型。中央が上なら丸い生え際。揃えばまっすぐ。
     // 肌の上に髪らしい暗い点がある列だけを数える。
     let hairline: 'm-shaped' | 'straight' | 'round' | null = null;
+    let parting: 'center' | 'left' | 'right' | null = null;
     {
       const skinTopAt = (x: number): number => {
         for (let y = 0; y < S; y++) if (isSkin((y * S + x) * 4)) return y;
@@ -603,6 +736,25 @@ class VisualZoomService {
         if (diff >= Math.max(2, fh * 0.08)) hairline = 'm-shaped';
         else if (diff <= -Math.max(2, fh * 0.08)) hairline = 'round';
         else if (Math.abs(diff) <= Math.max(1.5, fh * 0.04)) hairline = 'straight';
+      }
+      // P1040: 分け目。肌の上端が「狭い範囲でだけ」大きく
+      // 上がる列があれば、そこで髪が分かれている。広い範囲で
+      // 上がるのは生え際の丸み（上の判定）なので分けない。
+      const tops: { x: number; top: number }[] = [];
+      for (let x = sx0; x <= sx1; x++) {
+        const top = skinTopAt(x);
+        if (top >= 2 && isHairAbove(x, top)) tops.push({ x, top });
+      }
+      if (tops.length >= 8) {
+        const sorted = [...tops].map((t) => t.top).sort((a, b) => a - b);
+        const med = sorted[Math.floor(sorted.length / 2)];
+        const dip = Math.max(2.5, fh * 0.1);
+        const raised = tops.filter((t) => t.top <= med - dip);
+        if (raised.length >= 1 && raised.length <= Math.max(2, fw * 0.25)) {
+          const px = raised.reduce((a, t) => a + t.x, 0) / raised.length;
+          const off = (px - cx) / Math.max(1, fw);
+          if (Math.abs(off) <= 0.38) parting = Math.abs(off) <= 0.12 ? 'center' : off < 0 ? 'left' : 'right';
+        }
       }
     }
     // 口：顔の下寄りの帯にある暗い点
@@ -631,7 +783,42 @@ class VisualZoomService {
         mouthShape = 'flat';
       }
     }
-    return { eyes, mouthShape, mouthWidthRatio, eyePts, eyeColorPts: coloredEyePts, mouthPts, brows, nose, ears, faceShape, cheekFlush, hairline, eyeSize, faceBox: { x0: sx0, y0: sy0, x1: sx1, y1: sy1 } };
+    // P1041: 目の形。目頭側と目尻側で暗い点の上端の高さを
+    // 比べる（目尻側が低ければ垂れ目、高ければつり目）。
+    let eyeShape: 'tareme' | 'tsurime' | null = null;
+    {
+      const ratios: number[] = [];
+      for (const pts of [eyePts.filter((p) => p.x < cx), eyePts.filter((p) => p.x >= cx)]) {
+        if (pts.length < 6) continue;
+        const xs = pts.map((p) => p.x);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const w = maxX - minX + 1;
+        if (w < 5) continue;
+        const cc = (minX + maxX) / 2;
+        const topMean = (cols: number[]): number => {
+          let sum = 0, n = 0;
+          for (const x of cols) {
+            let top = Infinity;
+            for (const p of pts) if (p.x === x) top = Math.min(top, p.y);
+            if (top < Infinity) { sum += top; n++; }
+          }
+          return n > 0 ? sum / n : NaN;
+        };
+        const allCols = Array.from({ length: w }, (_, i) => minX + i);
+        const byInner = [...allCols].sort((a, b) => Math.abs(a - cx) - Math.abs(b - cx));
+        const third = Math.max(1, Math.floor(w / 3));
+        const innerTop = topMean(byInner.slice(0, third));
+        const outerTop = topMean(byInner.slice(-third));
+        if (Number.isFinite(innerTop) && Number.isFinite(outerTop)) ratios.push((outerTop - innerTop) / w);
+        void cc;
+      }
+      if (ratios.length > 0) {
+        const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+        if (avg >= 0.18) eyeShape = 'tareme';
+        else if (avg <= -0.18) eyeShape = 'tsurime';
+      }
+    }
+    return { eyes, mouthShape, mouthWidthRatio, eyePts, eyeColorPts: coloredEyePts, mouthPts, brows, browAngle, nose, ears, faceShape, cheekFlush, hairline, parting, eyeShape, eyeSize, faceBox: { x0: sx0, y0: sy0, x1: sx1, y1: sy1 } };
   }
 
   /** 読み通りの模式図（肌色の四角＋目の点＋口の弧）を描く */

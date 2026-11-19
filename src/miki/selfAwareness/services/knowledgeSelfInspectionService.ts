@@ -162,6 +162,9 @@ export interface KnowledgeSelfInspectionRecord {
   visualMaskFill: number;
   visualCelBodies: number;
   visualHairDetails: number;
+  visualStructuredBodies: number;
+  visualContours: number;
+  visualInnerLines: number;
   visualBusts: number;
   visualDrills: number;
   visualClothes: number;
@@ -438,6 +441,9 @@ class KnowledgeSelfInspectionService {
     let visualMaskFill = 0;
     let visualCelBodies = 0;
     let visualHairDetails = 0;
+    let visualStructuredBodies = 0;
+    let visualContours = 0;
+    let visualInnerLines = 0;
     let visualBusts = 0;
     let visualDrills = 0;
     let visualClothes = 0;
@@ -790,6 +796,21 @@ class KnowledgeSelfInspectionService {
       if (visualHairDetails > 0) {
         findings.push(`髪の房とツヤを描いて${visualHairDetails}件照合できた`);
       }
+      // P1018: 線と陰影まで通した描き方で照合できた回数。
+      visualStructuredBodies = visualPoseService.summary().structuredOk;
+      if (visualStructuredBodies > 0) {
+        findings.push(`線と陰影まで入れて素体を描いて${visualStructuredBodies}件照合できた`);
+      }
+      // P1023: 輪郭の曲線で照合できた回数。
+      visualContours = visualPoseService.summary().contoursOk;
+      if (visualContours > 0) {
+        findings.push(`輪郭の曲線で素体を描いて${visualContours}件照合できた`);
+      }
+      // P1024: 中の境界線で照合できた回数。
+      visualInnerLines = visualPoseService.summary().innerLinesOk;
+      if (visualInnerLines > 0) {
+        findings.push(`中の境界線まで素体を描いて${visualInnerLines}件照合できた`);
+      }
       // P1001: 胸の曲線を描いて照合できた回数。
       visualBusts = visualPoseService.summary().bustOk;
       if (visualBusts > 0) {
@@ -995,6 +1016,9 @@ class KnowledgeSelfInspectionService {
       visualMaskFill,
       visualCelBodies,
       visualHairDetails,
+      visualStructuredBodies,
+      visualContours,
+      visualInnerLines,
       visualBusts,
       visualDrills,
       visualClothes,

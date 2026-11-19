@@ -8533,7 +8533,10 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1015 薄い人の肌色と服色の実測が入る', near(rp?.skinColor, [243, 222, 205], 6) && near(rp?.clothing?.topRgb, [150, 160, 190], 42), `skin=${JSON.stringify(rp?.skinColor)} top=${JSON.stringify(rp?.clothing?.topRgb)}`);
   const renP: any = rp ? svc.renderBody(rp, 48) : null;
   const pxP = (x: number, y: number) => renP ? [renP[(y * 48 + x) * 4], renP[(y * 48 + x) * 4 + 1], renP[(y * 48 + x) * 4 + 2]] : null;
-  check('P1015 薄い人を描くと本人の服色と肌色になる（青くない）', near(pxP(22, 22), [150, 160, 190], 18) && near(pxP(22, 10), [243, 222, 205], 6) && !near(pxP(22, 22), [40, 40, 120], 100), `chest=${JSON.stringify(pxP(22, 22))} face=${JSON.stringify(pxP(22, 10))}`);
+  // P1065: 顔の見本点は (22,9) に移した。(22,10) は現在の顔の描画では口の角に
+  // ちょうど重なる（口は顔中心+0.55Rに幅0.45Rで描かれる）。顔が本人の肌色で
+  // 描かれること自体は変わっていないので、目と口の間の肌の点を採る。
+  check('P1015 薄い人を描くと本人の服色と肌色になる（青くない）', near(pxP(22, 22), [150, 160, 190], 18) && near(pxP(22, 9), [243, 222, 205], 6) && !near(pxP(22, 22), [40, 40, 120], 100), `chest=${JSON.stringify(pxP(22, 22))} face=${JSON.stringify(pxP(22, 9))}`);
   const white = mkPerson([244, 228, 223], [243, 205, 215], [150, 160, 190], [208, 210, 212]);
   const rw: any = svc.analyzePose(white.a, white.W, white.H);
   const renW: any = rw ? svc.renderBody(rw, 48) : null;
@@ -8542,6 +8545,781 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   const vbP: any = rp ? svc.verifyBody(rp) : null;
   check('P1015 薄い人は本人の色で描いても照合が通る', vbP?.verified === true, `score=${vbP?.score}`);
 }
+
+// P1016: 描く側の見た目セット（関節・髪の先細り・顔・指の影色）
+{
+  const pose = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB = [number, number, number];
+  const BGc: RGB = [245, 245, 245], SKINc: RGB = [232, 190, 160], HAIRc: RGB = [45, 32, 22], CLOTHc: RGB = [40, 40, 120];
+  const mkCanvas = (W: number, H: number) => { const a = new Uint8Array(W * H * 4); for (let i = 0; i < W * H; i++) { a[i * 4] = BGc[0]; a[i * 4 + 1] = BGc[1]; a[i * 4 + 2] = BGc[2]; a[i * 4 + 3] = 255; } return a; };
+  const rectIn = (a: Uint8Array, W: number, x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+  const discIn = (a: Uint8Array, W: number, H: number, cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+  // 腕を真横に広げた人は広げていると読む（髪の柱の抑制が効きすぎない）
+  const tp = mkCanvas(48, 56);
+  rectIn(tp, 48, 16, 15, 28, 32, CLOTHc); rectIn(tp, 48, 2, 17, 15, 20, CLOTHc); rectIn(tp, 48, 29, 17, 45, 20, CLOTHc);
+  rectIn(tp, 48, 16, 32, 21, 50, CLOTHc); rectIn(tp, 48, 23, 32, 28, 50, CLOTHc);
+  discIn(tp, 48, 56, 22, 9, 6, HAIRc); discIn(tp, 48, 56, 22, 10, 5, SKINc);
+  const rt = pose.visualPoseService.analyzePose(tp, 48, 56);
+  check('P1016 腕を広げた人は広げていると読む', rt?.armL === 'SPREAD' && rt?.armR === 'SPREAD', `${rt?.armL}/${rt?.armR}`);
+  // 腕を下ろした人は下ろしていると読む
+  const dn = mkCanvas(48, 56);
+  rectIn(dn, 48, 16, 15, 28, 32, CLOTHc); rectIn(dn, 48, 12, 16, 15, 30, CLOTHc); rectIn(dn, 48, 29, 16, 32, 30, CLOTHc);
+  rectIn(dn, 48, 16, 32, 21, 50, CLOTHc); rectIn(dn, 48, 23, 32, 28, 50, CLOTHc);
+  discIn(dn, 48, 56, 22, 9, 6, HAIRc); discIn(dn, 48, 56, 22, 10, 5, SKINc);
+  const rd = pose.visualPoseService.analyzePose(dn, 48, 56);
+  check('P1016 腕を下ろした人は下ろしていると読む', rd?.armL === 'DOWN' && rd?.armR === 'DOWN', `${rd?.armL}/${rd?.armR}`);
+  // 長い髪の垂れを「広げた腕」と誤らない
+  const lh = mkCanvas(48, 56);
+  rectIn(lh, 48, 16, 15, 28, 32, CLOTHc); rectIn(lh, 48, 12, 16, 15, 30, CLOTHc); rectIn(lh, 48, 29, 16, 32, 30, CLOTHc);
+  rectIn(lh, 48, 16, 32, 21, 50, CLOTHc); rectIn(lh, 48, 23, 32, 28, 50, CLOTHc);
+  rectIn(lh, 48, 13, 4, 31, 12, HAIRc); rectIn(lh, 48, 13, 12, 15, 40, HAIRc); rectIn(lh, 48, 29, 12, 31, 40, HAIRc);
+  discIn(lh, 48, 56, 22, 10, 5, SKINc);
+  const rl = pose.visualPoseService.analyzePose(lh, 48, 56);
+  check('P1016 長い髪を広げた腕と誤らない', rl !== null && rl.armL !== 'SPREAD' && rl.armR !== 'SPREAD', `${rl?.armL}/${rl?.armR}`);
+  // 描画：顔の指定が無くても目と口があり、指の影は旧固定色でない
+  const ren = rl ? pose.visualPoseService.renderBody(rl, 96) : null;
+  let faceDark = 0; let oldFinger = 0;
+  if (ren) {
+    for (let y = 8; y <= 26; y++) for (let x = 30; x <= 66; x++) { const i = (y * 96 + x) * 4; if (ren[i] === 30 && ren[i + 1] === 30 && ren[i + 2] === 30) faceDark++; }
+    for (let i = 0; i < 96 * 96; i++) if (ren[i * 4] === 150 && ren[i * 4 + 1] === 110 && ren[i * 4 + 2] === 82) oldFinger++;
+  }
+  check('P1016 顔の指定が無くても目と口を描く', faceDark >= 10, `dark=${faceDark}`);
+  check('P1016 指の分かれ目は肌の影色で描く', ren !== null && oldFinger === 0, `old=${oldFinger}`);
+  // 髪のサイドパネルは毛先に向けて細くなる
+  const hairAt = (y: number) => { let n = 0; if (ren) for (let x = 0; x < 96; x++) { const i = (y * 96 + x) * 4; if (ren[i] === HAIRc[0] && ren[i + 1] === HAIRc[1] && ren[i + 2] === HAIRc[2]) n++; } return n; };
+  check('P1016 髪は毛先に向けて先細りする', hairAt(30) >= 6 && hairAt(66) < hairAt(30), `mid=${hairAt(30)} tip=${hairAt(66)}`);
+}
+
+// P1017: 顔の測定値を読みに持たせ、既定の顔は本人の測定値で描く
+{
+  const pose = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB = [number, number, number];
+  const BGc: RGB = [245, 245, 245], HAIRc: RGB = [45, 32, 22], CLOTHc: RGB = [40, 40, 120], DARKc: RGB = [30, 30, 30];
+  const mkFig = (skin: RGB, eyeC: RGB) => {
+    const W = 48, H = 56; const a = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { a[i * 4] = BGc[0]; a[i * 4 + 1] = BGc[1]; a[i * 4 + 2] = BGc[2]; a[i * 4 + 3] = 255; }
+    rect(16, 15, 28, 32, CLOTHc); rect(12, 16, 15, 30, CLOTHc); rect(29, 16, 32, 30, CLOTHc);
+    rect(16, 32, 21, 50, CLOTHc); rect(23, 32, 28, 50, CLOTHc);
+    disc(22, 9, 6, HAIRc); disc(22, 10, 5, skin);
+    disc(20, 10, 1, eyeC); disc(25, 10, 1, eyeC);
+    return a;
+  };
+  // 薄い肌（厳しい肌判定の外の色）でも顔の測定が読みに乗る
+  const rp = pose.visualPoseService.analyzePose(mkFig([255, 236, 230], DARKc), 48, 56);
+  check('P1017 薄い肌でも顔の測定が読みに乗る', rp?.face != null && rp.face.eyeColor === '黒', JSON.stringify(rp?.face ?? null));
+  // 茶色の目は、既定の描画でも茶色の虹彩で描かれる
+  const rb = pose.visualPoseService.analyzePose(mkFig([232, 190, 160], [140, 90, 50]), 48, 56);
+  const renB = rb ? pose.visualPoseService.renderBody(rb, 96) : null;
+  let irisPx = 0;
+  if (renB) for (let y = 10; y <= 34; y++) for (let x = 28; x <= 68; x++) { const i = (y * 96 + x) * 4; if (renB[i] === 140 && renB[i + 1] === 90 && renB[i + 2] === 50) irisPx++; }
+  check('P1017 既定の顔は本人の目の色で描く', rb?.face?.eyeColor === '茶色' && irisPx >= 4, `face=${JSON.stringify(rb?.face ?? null)} iris=${irisPx}`);
+}
+
+// P1018: 構造化した描画（線＋陰影＋髪の房）が土台として照合を通る
+{
+  const pose = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB = [number, number, number];
+  const BGc: RGB = [245, 245, 245], SKINc: RGB = [232, 190, 160], HAIRc: RGB = [45, 32, 22], CLOTHc: RGB = [40, 40, 120];
+  const W = 48, H = 56; const a = new Uint8Array(W * H * 4);
+  const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+  const disc = (cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+  for (let i = 0; i < W * H; i++) { a[i * 4] = BGc[0]; a[i * 4 + 1] = BGc[1]; a[i * 4 + 2] = BGc[2]; a[i * 4 + 3] = 255; }
+  rect(16, 15, 28, 32, CLOTHc); rect(12, 16, 15, 30, CLOTHc); rect(29, 16, 32, 30, CLOTHc);
+  rect(16, 32, 21, 50, CLOTHc); rect(23, 32, 28, 50, CLOTHc);
+  disc(22, 9, 6, HAIRc); disc(22, 10, 5, SKINc);
+  const rd = pose.visualPoseService.analyzePose(a, W, H);
+  const vs = rd ? pose.visualPoseService.verifyBodyStructured(rd) : null;
+  check('P1018 構造化した描画が照合を通る', vs?.verified === true, `score=${vs?.score}`);
+  // 髪と肌が近い色の人でも、髪の房とツヤが消えず体に縞が出ない側：
+  // 髪の照合（ツヤ・房の検出）が薄い色の髪でも通る
+  const BGp: RGB = [208, 210, 212], SKINp: RGB = [243, 222, 205], HAIRp: RGB = [243, 205, 215], CLOTHp: RGB = [150, 160, 190];
+  const b = new Uint8Array(W * H * 4);
+  const rectB = (x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; b[i] = c[0]; b[i + 1] = c[1]; b[i + 2] = c[2]; b[i + 3] = 255; } };
+  const discB = (cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; b[i] = c[0]; b[i + 1] = c[1]; b[i + 2] = c[2]; b[i + 3] = 255; } };
+  for (let i = 0; i < W * H; i++) { b[i * 4] = BGp[0]; b[i * 4 + 1] = BGp[1]; b[i * 4 + 2] = BGp[2]; b[i * 4 + 3] = 255; }
+  rectB(16, 15, 28, 32, CLOTHp); rectB(12, 16, 15, 30, CLOTHp); rectB(29, 16, 32, 30, CLOTHp);
+  rectB(16, 32, 21, 50, CLOTHp); rectB(23, 32, 28, 50, CLOTHp);
+  rectB(13, 4, 31, 12, HAIRp); rectB(13, 12, 15, 40, HAIRp); rectB(29, 12, 31, 40, HAIRp);
+  discB(22, 10, 5, SKINp);
+  const rp2 = pose.visualPoseService.analyzePose(b, W, H);
+  const vh = rp2 ? pose.visualPoseService.verifyBodyHairDetail(rp2) : null;
+  check('P1018 薄い色の髪でも房とツヤが描ける', vh?.verified === true, `shine=${vh?.shine} clumps=${vh?.clumps}`);
+}
+
+// P1019/P1020: 胸の測定を読みに持たせる／髪の裏側と毛先の割れ＋構造化照合が本人系でも通る
+{
+  const pose = await import('../src/miki/conversation/services/visualPoseService');
+  type RGB = [number, number, number];
+  const BGc: RGB = [245, 245, 245], SKINc: RGB = [232, 190, 160], HAIRc: RGB = [45, 32, 22], CLOTHc: RGB = [40, 40, 120];
+  const mkBase = () => {
+    const W = 48, H = 56; const a = new Uint8Array(W * H * 4);
+    for (let i = 0; i < W * H; i++) { a[i * 4] = BGc[0]; a[i * 4 + 1] = BGc[1]; a[i * 4 + 2] = BGc[2]; a[i * 4 + 3] = 255; }
+    return a;
+  };
+  const rect = (a: Uint8Array, x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * 48 + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+  const disc = (a: Uint8Array, cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * 48 + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+  // 胸が広く腰が細い胴は bust が立つ
+  const tp = mkBase();
+  rect(tp, 16, 15, 28, 22, CLOTHc); rect(tp, 17, 23, 27, 26, CLOTHc); rect(tp, 19, 27, 25, 32, CLOTHc);
+  rect(tp, 12, 16, 15, 30, CLOTHc); rect(tp, 29, 16, 32, 30, CLOTHc);
+  rect(tp, 16, 32, 21, 50, CLOTHc); rect(tp, 23, 32, 28, 50, CLOTHc);
+  disc(tp, 22, 9, 6, HAIRc); disc(tp, 22, 10, 5, SKINc);
+  const rt = pose.visualPoseService.analyzePose(tp, 48, 56);
+  check('P1019 胸と腰の差から胸のふくらみを測る', (rt?.bust ?? 0) >= 0.3, `bust=${rt?.bust}`);
+  // まっすぐな胴は bust が立たない
+  const st = mkBase();
+  rect(st, 16, 15, 28, 32, CLOTHc); rect(st, 12, 16, 15, 30, CLOTHc); rect(st, 29, 16, 32, 30, CLOTHc);
+  rect(st, 16, 32, 21, 50, CLOTHc); rect(st, 23, 32, 28, 50, CLOTHc);
+  disc(st, 22, 9, 6, HAIRc); disc(st, 22, 10, 5, SKINc);
+  const rs = pose.visualPoseService.analyzePose(st, 48, 56);
+  check('P1019 まっすぐな胴では胸のふくらみは立たない', rs?.bust === 0, `bust=${rs?.bust}`);
+  // P1020: 薄い色の長い髪の人でも、構造化した描画（線＋陰影＋髪の裏側）が照合を通る
+  const BGp: RGB = [208, 210, 212], SKINp: RGB = [243, 222, 205], HAIRp: RGB = [243, 205, 215], CLOTHp: RGB = [150, 160, 190];
+  const b = new Uint8Array(48 * 56 * 4);
+  for (let i = 0; i < 48 * 56; i++) { b[i * 4] = BGp[0]; b[i * 4 + 1] = BGp[1]; b[i * 4 + 2] = BGp[2]; b[i * 4 + 3] = 255; }
+  const rectB = (x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * 48 + x) * 4; b[i] = c[0]; b[i + 1] = c[1]; b[i + 2] = c[2]; b[i + 3] = 255; } };
+  const discB = (cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < 56; y++) for (let x = 0; x < 48; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * 48 + x) * 4; b[i] = c[0]; b[i + 1] = c[1]; b[i + 2] = c[2]; b[i + 3] = 255; } };
+  rectB(16, 15, 28, 32, CLOTHp); rectB(12, 16, 15, 30, CLOTHp); rectB(29, 16, 32, 30, CLOTHp);
+  rectB(16, 32, 21, 50, CLOTHp); rectB(23, 32, 28, 50, CLOTHp);
+  rectB(13, 4, 31, 12, HAIRp); rectB(13, 12, 15, 40, HAIRp); rectB(29, 12, 31, 40, HAIRp);
+  discB(22, 10, 5, SKINp);
+  const rp2 = pose.visualPoseService.analyzePose(b, 48, 56);
+  const vs2 = rp2 ? pose.visualPoseService.verifyBodyStructured(rp2) : null;
+  check('P1020 薄い色の長い髪でも構造化した描画が照合を通る', vs2?.verified === true, `score=${vs2?.score}`);
+}
+
+// P1021: 薄い色の目を「塊」で読む（輪の肌率に届かない線画・写真の目）
+{
+  const vz = await import('../src/miki/conversation/services/visualZoomService');
+  type RGB = [number, number, number];
+  const HAIRc: RGB = [45, 32, 22], SKINc: RGB = [255, 236, 231], EYEp: RGB = [205, 153, 168], DARKc: RGB = [30, 30, 30];
+  const S = 48; const a = new Uint8Array(S * S * 4);
+  const rect = (x0: number, y0: number, x1: number, y1: number, c: RGB) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * S + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+  const disc = (cx: number, cy: number, r: number, c: RGB) => { for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * S + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+  disc(24, 22, 17, HAIRc); disc(24, 24, 15, SKINc);
+  rect(10, 8, 38, 13, HAIRc); // 前髪
+  rect(13, 14, 14, 30, HAIRc); rect(33, 14, 34, 30, HAIRc); // 顔にかかる髪の筋
+  rect(10, 20, 38, 20, DARKc); rect(10, 26, 38, 26, DARKc); // 線画の線（目の輪を壊す）
+  disc(17, 23, 2, EYEp); disc(31, 23, 2, EYEp); // 薄いピンクの目
+  const fr: any = vz.visualZoomService.analyzeFace(a);
+  check('P1021 薄いピンクの目が2つ読める', fr?.eyes === 2 && fr?.eyeColor === 'ピンク', `eyes=${fr?.eyes} eyeColor=${fr?.eyeColor}`);
+}
+
+
+
+  const { visualPoseService: poseSvcInst } = await import('../src/miki/conversation/services/visualPoseService');
+  const poseSvc = () => poseSvcInst;
+
+  // 淡色の長い髪の人（48×56）。薄い色は色ビンで背景に溶けるため、
+  // P1003以降の領域分割と細かいビンの検証に使う共通の見本。
+  const paleLongHair48 = (): Uint8Array => {
+    const W = 48, H = 56; const a = new Uint8Array(W * H * 4);
+    const BG: [number, number, number] = [208, 210, 212]; const SKIN: [number, number, number] = [243, 222, 205];
+    const HAIR: [number, number, number] = [243, 205, 215]; const CLOTH: [number, number, number] = [150, 160, 190];
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { a[i * 4] = BG[0]; a[i * 4 + 1] = BG[1]; a[i * 4 + 2] = BG[2]; a[i * 4 + 3] = 255; }
+    rect(13, 4, 31, 12, HAIR); rect(15, 13, 16, 40, HAIR); rect(27, 13, 28, 40, HAIR);
+    rect(16, 15, 28, 32, CLOTH);
+    rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+    rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+    disc(22, 9, 6, HAIR); disc(22, 10, 5, SKIN);
+    return a;
+  };
+
+  // P1022: 頭の大きさは高さ比で測る＋後ろ髪の層（形の指定で重ねる）
+  {
+    const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    const widthOf = (px: Uint8Array, S: number): number => {
+      const bg = [px[0], px[1], px[2]];
+      let x0 = S, x1 = -1;
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const i = (y * S + x) * 4; if (Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 30) { if (x < x0) x0 = x; if (x > x1) x1 = x; } }
+      return x1 - x0 + 1;
+    };
+    check('P1022 頭の半径は高さ比でも持つ（縦長で幅比とずれる）', r?.headRh !== null && r?.headRh !== undefined && Math.abs((r?.headRh ?? 0) - (r?.head?.r ?? 0)) > 0.005, JSON.stringify({ headR: r?.head?.r, headRh: r?.headRh }));
+    check('P1022 輪郭幅を持つ', typeof r?.silhouetteWidth === 'number' && (r?.silhouetteWidth ?? 0) > 0.2, `silW=${r?.silhouetteWidth}`);
+    // P1065 再ベース：広がりの検査は淡色フィギュアから細身の
+    // 合成フィギュアへ移した。淡色フィギュアは輪郭幅0.44が
+    // 腕の張り出しで決まっており（胸も0.44）、輪郭幅×0.94で
+    // 描く後ろ髪の層（約45px）は腕の幅（約54px）より狭く、
+    // 前提（層が輪郭を広げる）が実測で成り立たなかった。
+    // 細身フィギュアは輪郭幅が髪で決まる（0.40）ため、
+    // 層の広がりを素直に測れる。+4pxの閾値と0.94倍は不変。
+    const narrow1022 = (() => {
+      const W = 48, H = 56; const a = new Uint8Array(W * H * 4);
+      const BG: [number, number, number] = [208, 210, 212]; const SKIN: [number, number, number] = [243, 222, 205];
+      const HAIR: [number, number, number] = [243, 205, 215]; const CLOTH: [number, number, number] = [150, 160, 190];
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; a[i] = c[0]; a[i + 1] = c[1]; a[i + 2] = c[2]; a[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { a[i * 4] = BG[0]; a[i * 4 + 1] = BG[1]; a[i * 4 + 2] = BG[2]; a[i * 4 + 3] = 255; }
+      rect(13, 4, 31, 12, HAIR); rect(15, 13, 16, 40, HAIR); rect(27, 13, 28, 40, HAIR);
+      rect(19, 15, 25, 32, CLOTH);
+      rect(17, 16, 18, 30, CLOTH); rect(26, 16, 27, 30, CLOTH);
+      rect(19, 32, 21, 50, CLOTH); rect(23, 32, 25, 50, CLOTH);
+      disc(22, 9, 6, HAIR); disc(22, 10, 5, SKIN);
+      return a;
+    })();
+    const rn: any = await poseSvc().analyzePose(narrow1022, 48, 56);
+    const plain = await poseSvc().renderBody(rn, 128);
+    const sheeted = await poseSvc().renderBody(rn, 128, null, null, { backHair: true });
+    check('P1022 後ろ髪の層で輪郭が広がる', !!plain && !!sheeted && widthOf(sheeted, 128) > widthOf(plain, 128) + 4, `plain=${plain ? widthOf(plain, 128) : 0} sheeted=${sheeted ? widthOf(sheeted, 128) : 0}`);
+  }
+
+
+  // P1023: 輪郭（外側の境界）を24段で測り、曲線で照合する
+  {
+    const W = 48, H = 56;
+    const fig = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    rect(16, 15, 28, 32, [40, 40, 120]); rect(12, 16, 15, 30, [40, 40, 120]); rect(29, 16, 32, 30, [40, 40, 120]);
+    rect(16, 32, 21, 50, [40, 40, 120]); rect(23, 32, 28, 50, [40, 40, 120]);
+    disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+    const r: any = await poseSvc().analyzePose(fig, W, H);
+    check('P1023 輪郭を24段で持つ', Array.isArray(r?.contour?.l) && r.contour.l.length === 24 && Array.isArray(r?.contour?.r), `len=${r?.contour?.l?.length}`);
+    const vc: any = await poseSvc().verifyBodyContour(r);
+    check('P1023 輪郭の曲線で照合できる', vc?.verified === true && (vc?.compared ?? 0) >= 16, JSON.stringify(vc));
+  }
+
+
+  // P1024: 中の境界線を抽出して照合する
+  {
+    const r: any = await poseSvc().analyzePose((() => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      rect(16, 15, 28, 32, [40, 40, 120]); rect(12, 16, 15, 30, [40, 40, 120]); rect(29, 16, 32, 30, [40, 40, 120]);
+      rect(16, 32, 21, 50, [40, 40, 120]); rect(23, 32, 28, 50, [40, 40, 120]);
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+      return fig;
+    })(), 48, 56);
+    check('P1024 中の境界線を24段で持つ', Array.isArray(r?.innerLines) && r.innerLines.length === 24, `len=${r?.innerLines?.length}`);
+    const vi: any = await poseSvc().verifyBodyInnerLines(r);
+    check('P1024 中の境界線で照合できる', vi?.verified === true && (vi?.compared ?? 0) >= 12, JSON.stringify(vi));
+  }
+
+
+  // P1025: 上下に分かれた服を読む（服の色・腹の肌・境目の線）
+  {
+    const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    const SKIN: [number, number, number] = [232, 190, 160]; const RED: [number, number, number] = [200, 60, 60];
+    rect(16, 15, 28, 21, RED); rect(16, 22, 28, 27, SKIN); rect(16, 28, 28, 32, RED);
+    rect(12, 16, 15, 30, SKIN); rect(29, 16, 32, 30, SKIN);
+    rect(16, 32, 21, 36, RED); rect(23, 32, 28, 36, RED);
+    rect(16, 37, 21, 50, SKIN); rect(23, 37, 28, 50, SKIN);
+    disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, SKIN);
+    const r: any = await poseSvc().analyzePose(fig, W, H);
+    check('P1025 上下に分かれた服と読める', r?.clothing?.separated === true, JSON.stringify(r?.clothing));
+    check('P1025 服の色を肌と分けて読む', Array.isArray(r?.clothing?.topRgb) && Math.abs((r?.clothing?.topRgb?.[0] ?? 0) - 200) <= 12 && Array.isArray(r?.clothing?.bottomRgb) && Math.abs((r?.clothing?.bottomRgb?.[0] ?? 0) - 200) <= 12, JSON.stringify({ top: r?.clothing?.topRgb, bottom: r?.clothing?.bottomRgb }));
+    const vb: any = await poseSvc().verifyBody(r);
+    check('P1025 分かれた服でも素体の照合は通る', vb?.verified === true, JSON.stringify(vb && { score: vb.score }));
+  }
+
+
+  // P1026: 分かれた服は裸と取り違えず、描き直しでも読み返せる
+  {
+    const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    const SKIN: [number, number, number] = [232, 190, 160]; const RED: [number, number, number] = [200, 60, 60];
+    rect(16, 15, 28, 21, RED); rect(16, 22, 28, 27, SKIN); rect(16, 28, 28, 32, RED);
+    rect(12, 16, 15, 30, SKIN); rect(29, 16, 32, 30, SKIN);
+    rect(16, 32, 21, 36, RED); rect(23, 32, 28, 36, RED);
+    rect(16, 37, 21, 50, SKIN); rect(23, 37, 28, 50, SKIN);
+    disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, SKIN);
+    const r: any = await poseSvc().analyzePose(fig, W, H);
+    check('P1026 水着のような服を裸と読まない', r?.clothing?.separated === true && r?.bare === false, JSON.stringify({ separated: r?.clothing?.separated, bare: r?.bare }));
+    const img = await poseSvc().renderBody(r, 128);
+    const re: any = img ? await poseSvc().analyzePose(img, 128, 128) : null;
+    check('P1026 描き直しでも服の分かれが読み返せる', re?.clothing?.separated === true, JSON.stringify(re?.clothing));
+  }
+
+
+  // P1027: 輪郭も目標に持ち、ドリルに輪郭の経路がある
+  {
+    const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    check('P1027 長い髪の読みに輪郭と広がりがある', !!r?.contour && typeof r?.silhouetteWidth === 'number', JSON.stringify({ silW: r?.silhouetteWidth }));
+    const okSet: any = await poseSvc().setTarget(r);
+    const t: any = await poseSvc().getTarget();
+    check('P1027 目標に輪郭が保存される', okSet === true && !!t?.contour && Array.isArray(t?.contour?.l), JSON.stringify({ has: !!t?.contour }));
+    const d: any = await poseSvc().drillToTarget({ ...r, silhouetteWidth: 0.25 });
+    check('P1027 ドリルに輪郭の差分が返る', d !== null && typeof d?.contourDiffInitial === 'number', JSON.stringify({ ci: d?.contourDiffInitial, cf: d?.contourDiffFinal }));
+  }
+
+
+  // P1028: 肩の傾きを読む（水平な肩と、なだらかな肩）
+  {
+    const buildFig = (sloped: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      if (!sloped) rect(16, 15, 28, 32, CLOTH);
+      else for (let y = 15; y <= 32; y++) { const t = (y - 15) / 17; const hw = Math.round(2 + t * 4); rect(22 - hw, y, 22 + hw, y, CLOTH); }
+      rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+      rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+      return fig;
+    };
+    const flat: any = await poseSvc().analyzePose(buildFig(false), 48, 56);
+    check('P1028 水平な肩は傾き0', flat?.shoulderSlope === 0, JSON.stringify({ slope: flat?.shoulderSlope }));
+    const sloped: any = await poseSvc().analyzePose(buildFig(true), 48, 56);
+    check('P1028 なだらかな肩は傾きが読める', typeof sloped?.shoulderSlope === 'number' && (sloped?.shoulderSlope ?? 0) > 0.15, JSON.stringify({ slope: sloped?.shoulderSlope }));
+    const vs: any = await poseSvc().verifyShoulderSlope(flat);
+    check('P1028 水平な肩の描き直しは照合が通る', vs?.verified === true, JSON.stringify(vs));
+  }
+
+
+  // P1029: 足の末端につま先の線が入り、手足の形でも照合が崩れない
+  {
+    const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    const img: any = await poseSvc().renderBody(r, 128);
+    let toePx = 0;
+    if (img) {
+      // 最下行付近で、脚の色の影（つま先の線）を数える
+      for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+        const i = (y * 128 + x) * 4;
+        if (Math.abs(img[i] - 99) <= 8 && Math.abs(img[i + 1] - 112) <= 8 && Math.abs(img[i + 2] - 147) <= 8) toePx++;
+      }
+    }
+    check('P1029 足の末端につま先の線が描かれる', toePx >= 4, JSON.stringify({ toePx }));
+    const vs: any = await poseSvc().verifyBodyStructured(r);
+    check('P1029 手足の形を入れても構造化の照合は通る', vs?.verified === true, JSON.stringify(vs && { score: vs.score }));
+  }
+
+
+  // P1030: 腕と胴の隙間を読む（離れた腕と、くっついた腕）
+  {
+    const buildFig = (gapped: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120]; const SKIN: [number, number, number] = [232, 190, 160];
+      rect(18, 15, 28, 32, CLOTH);
+      if (gapped) { rect(12, 16, 14, 30, SKIN); rect(32, 16, 34, 30, SKIN); }
+      else { rect(15, 16, 17, 30, CLOTH); rect(29, 16, 31, 30, CLOTH); }
+      rect(18, 32, 22, 50, CLOTH); rect(24, 32, 28, 50, CLOTH);
+      disc(23, 9, 6, [45, 32, 22]); disc(23, 10, 5, SKIN);
+      return fig;
+    };
+    const g: any = await poseSvc().analyzePose(buildFig(true), 48, 56);
+    check('P1030 離れた腕は隙間ありと読める', g?.armGap?.l === true && g?.armGap?.r === true, JSON.stringify(g?.armGap));
+    const t: any = await poseSvc().analyzePose(buildFig(false), 48, 56);
+    check('P1030 くっついた腕は隙間なしと読める', t?.armGap?.l === false && t?.armGap?.r === false, JSON.stringify(t?.armGap));
+    const vg: any = await poseSvc().verifyArmGap(t);
+    check('P1030 隙間なしの描き直しは照合が通る', vg?.verified === true, JSON.stringify(vg));
+  }
+
+
+  // P1031: 頭の横の装飾品（装置）を読む・描いて読み返せる
+  {
+    const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    const CLOTH: [number, number, number] = [40, 40, 120];
+    rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+    rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+    disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+    rect(13, 7, 16, 12, [120, 120, 125]);
+    const r: any = await poseSvc().analyzePose(fig, W, H);
+    check('P1031 耳の横の装置が装飾品として読める', Array.isArray(r?.accessories) && r.accessories.some((a: any) => a.side === 'l' && a.kind === 'device' && Math.abs(a.rgb[0] - 120) <= 12), JSON.stringify(r?.accessories));
+    const va: any = await poseSvc().verifyAccessories(r);
+    check('P1031 装飾品の描き直しが読み返せる', va?.verified === true, JSON.stringify(va));
+  }
+
+
+  // P1032: 鎖骨の影を読む・描いて読み返せる
+  {
+    const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    const SKIN: [number, number, number] = [232, 190, 160]; const DIP: [number, number, number] = [190, 150, 125]; const CLOTH: [number, number, number] = [40, 40, 120];
+    rect(16, 15, 28, 32, SKIN);
+    rect(17, 19, 21, 20, DIP); rect(23, 19, 27, 20, DIP);
+    rect(12, 16, 15, 30, SKIN); rect(29, 16, 32, 30, SKIN);
+    rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+    disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, SKIN);
+    const r: any = await poseSvc().analyzePose(fig, W, H);
+    check('P1032 鎖骨の影が読める', r?.collarbone === true, JSON.stringify(r?.collarbone));
+    const img = await poseSvc().renderBody(r, 128);
+    const re: any = img ? await poseSvc().analyzePose(img, 128, 128) : null;
+    check('P1032 描いた鎖骨の線が読み返せる', re?.collarbone === true, JSON.stringify(re?.collarbone));
+  }
+
+
+  // P1034: 足の末端の広がりを読む
+  {
+    const buildLegs = (flare: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+      rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+      if (flare) { rect(14, 49, 21, 50, CLOTH); rect(23, 49, 30, 50, CLOTH); }
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+      return fig;
+    };
+    const f: any = await poseSvc().analyzePose(buildLegs(true), 48, 56);
+    check('P1034 広がった足が読める', f?.footFlare?.l === true && f?.footFlare?.r === true, JSON.stringify(f?.footFlare));
+    const vf: any = await poseSvc().verifyFootFlare(f);
+    check('P1034 足の広がりの描き直しが読み返せる', vf?.verified === true, JSON.stringify(vf));
+    const st: any = await poseSvc().analyzePose(buildLegs(false), 48, 56);
+    check('P1034 まっすぐな足は広がりなしと読める', st?.footFlare?.l === false && st?.footFlare?.r === false, JSON.stringify(st?.footFlare));
+  }
+
+
+  // P1035: アホ毛を読む・描く（読み返し照合は解像度限界のため対象外）
+  {
+    const buildAhoge = (strand: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120]; const HAIR: [number, number, number] = [45, 32, 22];
+      rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+      rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+      disc(22, 9, 6, HAIR); disc(22, 10, 5, [232, 190, 160]);
+      if (strand) { rect(21, 0, 22, 3, HAIR); rect(23, 0, 24, 1, HAIR); }
+      return fig;
+    };
+    const t: any = await poseSvc().analyzePose(buildAhoge(true), 48, 56);
+    check('P1035 アホ毛が読める', t?.ahoge === true, JSON.stringify(t?.ahoge));
+    const f: any = await poseSvc().analyzePose(buildAhoge(false), 48, 56);
+    check('P1035 アホ毛なしも読める', f?.ahoge === false, JSON.stringify(f?.ahoge));
+    const img = await poseSvc().renderBody(t, 128);
+    let above = 0;
+    if (img && t?.head) {
+      const topY = Math.round((t.head.y - (t.headRh ?? t.head.r)) * 127);
+      for (let y = 0; y < topY; y++) for (let x = 0; x < 128; x++) { const i = (y * 128 + x) * 4; if (Math.abs(img[i] - 45) < 12 && Math.abs(img[i + 1] - 32) < 12 && Math.abs(img[i + 2] - 22) < 12) above++; }
+    }
+    check('P1035 アホ毛が頭頂の上に描ける', above >= 8, `above=${above}`);
+  }
+
+
+  // P1036: 頬の赤み・鼻・耳を顔に描く（顔の指定で描き分ける）
+  {
+    const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    const CLOTH: [number, number, number] = [40, 40, 120];
+    rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+    rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+    disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+    const r: any = await poseSvc().analyzePose(fig, W, H);
+    const img = await poseSvc().renderBody(r, 128, { eyeSize: null, brows: false, mouthSize: null, blush: true, nose: true, ears: true });
+    let nb = 0;
+    if (img) for (let i = 0; i < 128 * 128; i++) { if (Math.abs(img[i * 4] - 238) <= 2 && Math.abs(img[i * 4 + 1] - 179) <= 2 && Math.abs(img[i * 4 + 2] - 165) <= 2) nb++; }
+    check('P1036 頬の赤みが描ける', nb >= 10, `blushPx=${nb}`);
+    check('P1036 顔の読みに耳の項目が載る', r !== null && (r.face === null || r.face === undefined || typeof r.face.ears === 'boolean' || r.face.ears === null), JSON.stringify(r?.face));
+  }
+
+
+  // P1037: 胸の頂点の位置を読む（高い胸と低い胸で位置が変わる）
+  {
+    const buildBust = (peakRow: number): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(18, 15, 27, 32, CLOTH);
+      rect(15, peakRow, 30, peakRow + 3, CLOTH);
+      rect(12, 16, 14, 30, CLOTH); rect(31, 16, 33, 30, CLOTH);
+      rect(17, 32, 21, 50, CLOTH); rect(24, 32, 28, 50, CLOTH);
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+      return fig;
+    };
+    const hi: any = await poseSvc().analyzePose(buildBust(17), 48, 56);
+    const lo: any = await poseSvc().analyzePose(buildBust(26), 48, 56);
+    check('P1037 胸の頂点の位置が上下で変わる', typeof hi?.bustPeak === 'number' && typeof lo?.bustPeak === 'number' && hi.bustPeak < lo.bustPeak && lo.bustPeak > 0.3, JSON.stringify({ hi: hi?.bustPeak, lo: lo?.bustPeak }));
+  }
+
+
+  // P1038: 首の長さを読む（見える首の長さ ÷ 全身）
+  {
+    const buildNeck = (neckGap: number): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120]; const SKIN: [number, number, number] = [232, 190, 160];
+      const torsoY = 15 + neckGap;
+      rect(20, 15, 25, torsoY - 1, SKIN);
+      rect(16, torsoY, 28, 38, CLOTH); rect(12, torsoY + 1, 15, torsoY + 15, CLOTH); rect(29, torsoY + 1, 32, torsoY + 15, CLOTH);
+      rect(16, 38, 21, 54, CLOTH); rect(23, 38, 28, 54, CLOTH);
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, SKIN);
+      return fig;
+    };
+    const sn: any = await poseSvc().analyzePose(buildNeck(0), 48, 56);
+    const ln: any = await poseSvc().analyzePose(buildNeck(6), 48, 56);
+    check('P1038 首の長さが読める', sn?.neckLength === 0 && typeof ln?.neckLength === 'number' && ln.neckLength >= 0.06, JSON.stringify({ short: sn?.neckLength, long: ln?.neckLength }));
+  }
+
+
+  // P1039: 胸の張りを読む（鋭い丸みとなだらかな丸みで変わる）
+  {
+    const buildFirm = (sharp: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(18, 15, 27, 32, CLOTH);
+      if (sharp) rect(15, 21, 30, 23, CLOTH);
+      else { rect(16, 18, 29, 20, CLOTH); rect(15, 21, 30, 24, CLOTH); rect(16, 25, 29, 28, CLOTH); }
+      rect(12, 16, 14, 30, CLOTH); rect(31, 16, 33, 30, CLOTH);
+      rect(17, 32, 21, 50, CLOTH); rect(24, 32, 28, 50, CLOTH);
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+      return fig;
+    };
+    const sh: any = await poseSvc().analyzePose(buildFirm(true), 48, 56);
+    const so: any = await poseSvc().analyzePose(buildFirm(false), 48, 56);
+    check('P1039 胸の張りが読み分けられる', typeof sh?.bustFirm === 'number' && typeof so?.bustFirm === 'number' && sh.bustFirm > so.bustFirm + 0.2, JSON.stringify({ sharp: sh?.bustFirm, soft: so?.bustFirm }));
+  }
+
+
+  // P1040: 髪の分け目を読む（中央分けと分け目なし）
+  {
+    const { visualZoomService: vzoom1040 } = await import('../src/miki/conversation/services/visualZoomService');
+    const buildFace1040 = (part: boolean): Uint8Array => {
+      const S = 48; const fig = new Uint8Array(S * S * 4);
+      const set = (x: number, y: number, c: [number, number, number]) => { const i = (y * S + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; };
+      const SKIN: [number, number, number] = [232, 190, 160]; const HAIR: [number, number, number] = [45, 32, 22]; const DARK: [number, number, number] = [30, 30, 30];
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) set(x, y, [245, 245, 245]);
+      for (let y = 4; y < 44; y++) for (let x = 10; x < 38; x++) set(x, y, SKIN);
+      for (let y = 0; y < 16; y++) for (let x = 8; x < 40; x++) set(x, y, HAIR);
+      if (part) for (let y = 8; y < 16; y++) for (let x = 23; x < 25; x++) set(x, y, SKIN);
+      for (const ex of [18, 29]) for (let y = 24; y < 28; y++) for (let x = ex - 2; x <= ex + 2; x++) set(x, y, DARK);
+      for (let x = 21; x < 27; x++) set(x, 36, DARK);
+      return fig;
+    };
+    const zp: any = vzoom1040.analyzeFace(buildFace1040(true));
+    check('P1040 中央分けが読める', zp?.parting === 'center', JSON.stringify(zp?.parting));
+    const zn: any = vzoom1040.analyzeFace(buildFace1040(false));
+    check('P1040 分け目なしは null', zn !== null && zn.parting === null, JSON.stringify(zn?.parting));
+  }
+
+
+  // P1041: 目の形を読む（垂れ目・つり目・まっすぐ）
+  {
+    const { visualZoomService: vzoom1041 } = await import('../src/miki/conversation/services/visualZoomService');
+    const buildFace1041 = (mode: 'tareme' | 'tsurime' | 'flat'): Uint8Array => {
+      const S = 48; const fig = new Uint8Array(S * S * 4);
+      const set = (x: number, y: number, c: [number, number, number]) => { const i = (y * S + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; };
+      const SKIN: [number, number, number] = [232, 190, 160]; const DARK: [number, number, number] = [30, 30, 30];
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) set(x, y, [245, 245, 245]);
+      for (let y = 4; y < 44; y++) for (let x = 10; x < 38; x++) set(x, y, SKIN);
+      for (let y = 0; y < 16; y++) for (let x = 8; x < 40; x++) set(x, y, [45, 32, 22]);
+      const slope = mode === 'tareme' ? 0.5 : mode === 'tsurime' ? -0.5 : 0;
+      for (const sgn of [-1, 1]) {
+        const cxE = 24 + sgn * 7;
+        for (let dx = -4; dx <= 4; dx++) {
+          const yC = 25 + Math.round(dx * sgn * slope);
+          for (let dy = 0; dy < 3; dy++) set(cxE + dx, yC + dy, DARK);
+        }
+      }
+      for (let x = 21; x < 27; x++) set(x, 36, DARK);
+      return fig;
+    };
+    const zt: any = vzoom1041.analyzeFace(buildFace1041('tareme'));
+    check('P1041 垂れ目が読める', zt?.eyeShape === 'tareme', JSON.stringify(zt?.eyeShape));
+    const zu: any = vzoom1041.analyzeFace(buildFace1041('tsurime'));
+    check('P1041 つり目が読める', zu?.eyeShape === 'tsurime', JSON.stringify(zu?.eyeShape));
+    const zf: any = vzoom1041.analyzeFace(buildFace1041('flat'));
+    check('P1041 まっすぐな目は null', zf !== null && zf.eyeShape === null, JSON.stringify(zf?.eyeShape));
+  }
+
+
+  // P1042: 口の形（笑いの弧）が描き分けられる
+  {
+    const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    const CLOTH: [number, number, number] = [40, 40, 120];
+    rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+    rect(16, 32, 21, 50, CLOTH); rect(23, 32, 28, 50, CLOTH);
+    disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, [232, 190, 160]);
+    const r: any = await poseSvc().analyzePose(fig, W, H);
+    const curve = (img: Uint8Array): number => {
+      const S = 256; const hx = Math.round(r.head.x * (S - 1)); const hy = Math.round(r.head.y * (S - 1));
+      const cols = new Map<number, number[]>();
+      for (let y = hy + 10; y < hy + 26; y++) for (let x = hx - 7; x <= hx + 7; x++) {
+        const i = (y * S + x) * 4;
+        if (img[i] < 60 && img[i + 1] < 60 && img[i + 2] < 60) { if (!cols.has(x)) cols.set(x, []); cols.get(x)!.push(y); }
+      }
+      const xs = [...cols.keys()].sort((p2, q2) => p2 - q2);
+      if (xs.length < 5) return NaN;
+      const mean = (arr: number[]) => arr.reduce((sm, v) => sm + v, 0) / arr.length;
+      const centerY = mean(xs.slice(Math.floor(xs.length * 0.4), Math.ceil(xs.length * 0.6)).flatMap((x) => cols.get(x)!));
+      const edgeY = mean([...xs.slice(0, 2), ...xs.slice(-2)].flatMap((x) => cols.get(x)!));
+      return edgeY - centerY;
+    };
+    const smileImg = await poseSvc().renderBody(r, 256, { eyeSize: null, brows: false, mouthSize: null, mouthForm: 'smile' });
+    const flatImg = await poseSvc().renderBody(r, 256, { eyeSize: null, brows: false, mouthSize: null });
+    check('P1042 笑いの口は口角が上がる', !!smileImg && !!flatImg && curve(smileImg) < curve(flatImg) - 1, JSON.stringify({ smile: smileImg ? curve(smileImg) : null, flat: flatImg ? curve(flatImg) : null }));
+  }
+
+
+  // P1043: 眉の角度を読む（眉頭が下がる／眉尻が下がる／水平）
+  {
+    const { visualZoomService: vzoom1043 } = await import('../src/miki/conversation/services/visualZoomService');
+    const buildFace1043 = (mode: 'angry' | 'worried' | 'flat'): Uint8Array => {
+      const S = 48; const fig = new Uint8Array(S * S * 4);
+      const set = (x: number, y: number, c: [number, number, number]) => { const i = (y * S + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; };
+      const SKIN: [number, number, number] = [232, 190, 160]; const DARK: [number, number, number] = [30, 30, 30];
+      for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) set(x, y, [245, 245, 245]);
+      for (let y = 4; y < 44; y++) for (let x = 10; x < 38; x++) set(x, y, SKIN);
+      for (let y = 0; y < 14; y++) for (let x = 8; x < 40; x++) set(x, y, [45, 32, 22]);
+      const slope = mode === 'angry' ? 0.45 : mode === 'worried' ? -0.45 : 0;
+      for (const sgn of [-1, 1]) {
+        const bx = 24 + sgn * 7;
+        for (let dx = -4; dx <= 4; dx++) {
+          const yC = 19 + Math.round(-dx * sgn * slope);
+          for (let dy = 0; dy < 2; dy++) set(bx + dx, yC + dy, DARK);
+        }
+        for (let dx = -4; dx <= 4; dx++) for (let dy = 0; dy < 3; dy++) set(bx + dx, 26 + dy, DARK);
+      }
+      for (let x = 21; x < 27; x++) set(x, 37, DARK);
+      return fig;
+    };
+    const za: any = vzoom1043.analyzeFace(buildFace1043('angry'));
+    check('P1043 眉頭が下がる眉は正の角度', typeof za?.browAngle === 'number' && za.browAngle > 0.08, JSON.stringify(za?.browAngle));
+    const zw: any = vzoom1043.analyzeFace(buildFace1043('worried'));
+    check('P1043 眉尻が下がる眉は負の角度', typeof zw?.browAngle === 'number' && zw.browAngle < -0.08, JSON.stringify(zw?.browAngle));
+    const zf: any = vzoom1043.analyzeFace(buildFace1043('flat'));
+    check('P1043 水平な眉は角度ゼロ', zf?.browAngle === 0, JSON.stringify(zf?.browAngle));
+  }
+
+
+  // P1044: 手の位置が脚の肌に引っ張られない（肌の島を塊に分けて使う）
+  {
+    const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+    for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+    const SKIN: [number, number, number] = [232, 190, 160]; const RED: [number, number, number] = [200, 60, 60];
+    rect(16, 15, 28, 21, RED); rect(16, 22, 28, 27, SKIN); rect(16, 28, 28, 32, RED);
+    rect(12, 16, 15, 30, SKIN); rect(29, 16, 32, 30, SKIN);
+    rect(16, 32, 21, 36, RED); rect(23, 32, 28, 36, RED);
+    rect(16, 37, 21, 50, SKIN); rect(23, 37, 28, 50, SKIN);
+    disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, SKIN);
+    const r: any = await poseSvc().analyzePose(fig, W, H);
+    check('P1044 手が太ももまで引っ張られない', !!r?.handL && !!r?.handR && r.handL.y < 0.6 && r.handR.y < 0.6 && r.skinCues?.handL === true, JSON.stringify({ handL: r?.handL, handR: r?.handR }));
+  }
+
+
+  // P1045: 手の大きさを読む（大きな手の塊がある図で大きくなる）
+  {
+    const buildHand = (bigHand: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const SKIN: [number, number, number] = [232, 190, 160]; const RED: [number, number, number] = [200, 60, 60];
+      rect(16, 15, 28, 21, RED); rect(16, 22, 28, 27, SKIN); rect(16, 28, 28, 32, RED);
+      rect(12, 16, 15, 30, SKIN); rect(29, 16, 32, 30, SKIN);
+      if (bigHand) { rect(10, 27, 17, 33, SKIN); rect(27, 27, 34, 33, SKIN); }
+      rect(16, 32, 21, 36, RED); rect(23, 32, 28, 36, RED);
+      rect(16, 37, 21, 50, SKIN); rect(23, 37, 28, 50, SKIN);
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, SKIN);
+      return fig;
+    };
+    const hn: any = await poseSvc().analyzePose(buildHand(false), 48, 56);
+    const hb: any = await poseSvc().analyzePose(buildHand(true), 48, 56);
+    check('P1045 手の大きさが読み分けられる', typeof hn?.handSize === 'number' && typeof hb?.handSize === 'number' && hb.handSize > hn.handSize + 0.2, JSON.stringify({ normal: hn?.handSize, big: hb?.handSize }));
+  }
+
+
+  // P1046: 膝の位置（脚の幅の窪み。左右が合う時だけ採用）
+  {
+    const buildKnee = (kneed: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const SKIN: [number, number, number] = [232, 190, 160]; const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+      if (kneed) {
+        rect(15, 32, 21, 39, SKIN); rect(23, 32, 29, 39, SKIN);
+        rect(17, 40, 20, 42, SKIN); rect(24, 40, 27, 42, SKIN);
+        rect(16, 43, 21, 47, SKIN); rect(23, 43, 28, 47, SKIN);
+        rect(17, 48, 20, 50, SKIN); rect(24, 48, 27, 50, SKIN);
+      } else { rect(16, 32, 21, 50, SKIN); rect(23, 32, 28, 50, SKIN); }
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, SKIN);
+      return fig;
+    };
+    const kk: any = await poseSvc().analyzePose(buildKnee(true), 48, 56);
+    const kp: any = await poseSvc().analyzePose(buildKnee(false), 48, 56);
+    check('P1046 膝の窪みが読め、無い脚はnull', typeof kk?.legKnee?.l === 'number' && kk.legKnee.l > 0.35 && kk.legKnee.l < 0.6 && kp?.legKnee?.l === null, JSON.stringify({ kneed: kk?.legKnee, plain: kp?.legKnee }));
+  }
+
+
+  // P1047: 足首の統計を足と分離し、足の広がりの描画が読みに連動しても照合が保たれる
+  {
+    const buildFlare = (flared: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const SKIN: [number, number, number] = [232, 190, 160]; const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(16, 15, 28, 32, CLOTH); rect(12, 16, 15, 30, CLOTH); rect(29, 16, 32, 30, CLOTH);
+      rect(16, 32, 21, 50, SKIN); rect(23, 32, 28, 50, SKIN);
+      if (flared) { rect(14, 49, 21, 50, SKIN); rect(23, 49, 30, 50, SKIN); }
+      disc(22, 9, 6, [45, 32, 22]); disc(22, 10, 5, SKIN);
+      return fig;
+    };
+    const ff: any = await poseSvc().analyzePose(buildFlare(true), 48, 56);
+    const fs: any = await poseSvc().analyzePose(buildFlare(false), 48, 56);
+    const vf: any = await poseSvc().verifyFootFlare(ff);
+    const vsf: any = await poseSvc().verifyFootFlare(fs);
+    check('P1047 足の広がりの読み連動描画で照合が保たれる', vf?.verified === true && vsf?.verified === true, JSON.stringify({ flared: vf, straight: vsf }));
+  }
+
+
+  // P1050-P1060: 分割と構造化描画の錨（淡色の長い髪で確認する）
+  {
+    const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    check('P1055 淡色の読みがプロファイル完備で取れる', r?.profileComplete === true, JSON.stringify(r?.bodyProfile));
+    const vs: any = await poseSvc().verifyBodyStructured(r);
+    check('P1057 構造化照合が淡色でも通る（平らな土台）', vs?.verified === true, JSON.stringify(vs?.score));
+    const twin: any = await poseSvc().renderBodyStructuredTwin(r, 128);
+    check('P1060 測定用の双子が描ける', !!twin && twin.length === 128 * 128 * 4, `len=${twin?.length}`);
+    const seg: any = twin ? await poseSvc().segmentTwinPalette(twin, 128, r) : null;
+    let nb = 0, nh = 0;
+    if (seg) { for (let i = 0; i < seg.body.length; i++) nb += seg.body[i]; for (let i = 0; i < seg.hair.length; i++) nh += seg.hair[i]; }
+    check('P1062 双子がパレットで体と髪に分かれる', nb > 100 && nh > 100, `body=${nb} hair=${nh}`);
+  }
+
+
+  // P1063: 描く側の補正表（既定は等倍、クランプが効く、ドリルが回る）
+  {
+    const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    const c0: any = await poseSvc().getDrawingCorrections();
+    check('P1063 補正の既定は全て等倍', !!c0 && c0.shoulder === 1 && c0.chest === 1 && c0.waist === 1 && c0.hip === 1 && c0.thigh === 1 && c0.calf === 1 && c0.ankle === 1, JSON.stringify(c0));
+    await poseSvc().setDrawingCorrections({ shoulder: 99, chest: 0.01 });
+    const c1: any = await poseSvc().getDrawingCorrections();
+    check('P1063 補正は範囲内に丸められる', c1?.shoulder === 2.5 && c1?.chest === 0.5, JSON.stringify(c1));
+    await poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const dr: any = await poseSvc().drillCorrections(r, 3);
+    check('P1063 補正ドリルが回って有限の差で返る', !!dr && typeof dr.finalDiff === 'number' && Number.isFinite(dr.finalDiff), JSON.stringify(dr?.finalDiff));
+    await poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+  }
 
 // ---- 結果 ----
 let fail = 0;
