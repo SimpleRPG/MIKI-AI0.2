@@ -9611,6 +9611,46 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1073 輪郭なしの読みは従来の曲線で面が広がる', fbOk, 'fallback');
   }
 
+  // P1074: 肘の検出。下りた腕の輪郭の外縁の軌跡の折れ
+  // （傾きの段差＋直線からの外れ）で肘を取る。真っ直ぐな
+  // 腕と、後ろ髪の面の縁（緩やかな曲線）では決めない。
+  // 肘の確定は肌の島による手の補正の後に行う（輪郭の手は
+  // 髪に引っ張られるため）。
+  {
+    const buildArm = (bent: boolean): Uint8Array => {
+      const W = 48, H = 56; const fig = new Uint8Array(W * H * 4);
+      const rect = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      const disc = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W + x) * 4; fig[i] = c[0]; fig[i + 1] = c[1]; fig[i + 2] = c[2]; fig[i + 3] = 255; } };
+      for (let i = 0; i < W * H; i++) { fig[i * 4] = 245; fig[i * 4 + 1] = 245; fig[i * 4 + 2] = 245; fig[i * 4 + 3] = 255; }
+      const HAIR: [number, number, number] = [45, 32, 22];
+      const SKIN: [number, number, number] = [232, 190, 160];
+      const CLOTH: [number, number, number] = [40, 40, 120];
+      rect(19, 15, 29, 32, CLOTH);
+      rect(19, 32, 22, 50, CLOTH); rect(26, 32, 29, 50, CLOTH);
+      rect(30, 16, 33, 36, CLOTH);
+      disc(33, 38, 2, SKIN);
+      if (bent) {
+        rect(15, 16, 18, 27, CLOTH);
+        rect(13, 28, 17, 30, CLOTH);
+        rect(11, 31, 15, 33, CLOTH);
+        rect(9, 34, 13, 36, CLOTH);
+        disc(10, 38, 2, SKIN);
+      } else {
+        rect(15, 16, 18, 36, CLOTH);
+        disc(16, 38, 2, SKIN);
+      }
+      disc(24, 9, 6, HAIR); disc(24, 10, 5, SKIN);
+      return fig;
+    };
+    const rb: any = await poseSvc().analyzePose(buildArm(true), 48, 56);
+    check('P1074 曲がった腕で肘が取れる', !!rb?.elbowL && Math.abs(rb.elbowL.y - 28 / 55) <= 0.07 && rb.elbowL.x <= 0.36, `elbowL=${JSON.stringify(rb?.elbowL)}`);
+    check('P1074 真っ直ぐな右腕では肘を決めない', !!rb && rb.elbowR === null, `elbowR=${JSON.stringify(rb?.elbowR)}`);
+    const rs: any = await poseSvc().analyzePose(buildArm(false), 48, 56);
+    check('P1074 真っ直ぐな腕では両肘とも決めない', !!rs && rs.elbowL === null && rs.elbowR === null, `L=${JSON.stringify(rs?.elbowL)} R=${JSON.stringify(rs?.elbowR)}`);
+    const rp: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    check('P1074 淡色（髪の板＋真っ直ぐな腕）でも肘を決めない', !!rp && rp.elbowL === null && rp.elbowR === null, `L=${JSON.stringify(rp?.elbowL)} R=${JSON.stringify(rp?.elbowR)}`);
+  }
+
 
 // ---- 結果 ----
 let fail = 0;

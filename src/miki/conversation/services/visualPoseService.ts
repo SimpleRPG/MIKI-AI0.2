@@ -145,6 +145,11 @@ export interface PoseReading {
   headRh?: number | null;
   handL: PosePoint | null;
   handR: PosePoint | null;
+  /** P1074: 肘関節。下りた腕の側帯の鎖の折れ（外縁の軌跡が
+   * 肩→手の直線から最も外れる行）で検出する。真っ直ぐな腕
+   * には折れが無いので null（推定で埋めない）。 */
+  elbowL?: PosePoint | null;
+  elbowR?: PosePoint | null;
   /** P959: 肩の位置（手の向き＝腕の軸の算出に使う） */
   shoulderL: PosePoint | null;
   shoulderR: PosePoint | null;
@@ -3983,7 +3988,7 @@ class VisualPoseService {
     else if (figH >= figW * 0.9 && legs !== 'UNKNOWN') posture = 'STANDING';
 
     // 腕：側帯（胴の外側）にある前景の出方で読む。
-    const armFor = (side: 'L' | 'R'): { state: ArmState; hand: PosePoint | null } => {
+    const armFor = (side: 'L' | 'R'): { state: ArmState; hand: PosePoint | null; elbow: PosePoint | null } => {
       const isSide = (x: number) => (side === 'L' ? x < torsoLeft - 0.5 : x > torsoRight + 0.5);
       // 上がっている：頭のてっぺんより上に、頭の横帯より外の前景。
       let topPt: PosePoint | null = null;
@@ -3994,7 +3999,7 @@ class VisualPoseService {
           }
         }
       }
-      if (topPt) return { state: 'RAISED', hand: topPt };
+      if (topPt) return { state: 'RAISED', hand: topPt, elbow: null };
       // 横に広がっている：肩の高さで、胴幅の6割以上も外へ
       // 張り出す（体に付いて下りた腕の数pxの張り出しと区別）。
       let spreadPt: PosePoint | null = null;
@@ -4020,7 +4025,7 @@ class VisualPoseService {
           }
           if (colAll > 0 && colFg / colAll >= 0.5) hanging = true;
         }
-        if (!hanging) return { state: 'SPREAD', hand: spreadPt };
+        if (!hanging) return { state: 'SPREAD', hand: spreadPt, elbow: null };
       }
       // 下りている：脚の外側で、腰の少し下までに側帯の前景の末端がある。
       // P1065: 側帯の画素は肩からつながる鎖としてたどる。
@@ -4041,11 +4046,62 @@ class VisualPoseService {
         prevSide = { minX: rowMin, maxX: rowMax };
         lowPt = { x: lastX, y };
       }
-      if (lowPt) return { state: 'DOWN', hand: lowPt };
-      return { state: 'UNKNOWN', hand: null };
+      if (lowPt) return { state: 'DOWN', hand: lowPt, elbow: null };
+      return { state: 'UNKNOWN', hand: null, elbow: null };
     };
     let armL = armFor('L');
     let armR = armFor('R');
+
+    // P1074: 肘の検出。下りた腕について、肩から手までの行ごとの
+    // 輪郭の外縁（その行の最も外側の画素）の軌跡を見る。肘で
+    // 曲がった腕は外縁の傾きが急に変わる（折れ）。後ろ髪の面の
+    // 縁のような緩やかな曲線は傾きの変化が小さいので、折れと
+    // 傾きの段差の両方が立った行だけを肘とする。真っ直ぐな
+    // 腕では決めない（null のまま）。
+    const elbowFor = (arm: { state: ArmState; hand: PosePoint | null }, side: 'L' | 'R'): PosePoint | null => {
+      if (arm.state !== 'DOWN' || !arm.hand) return null;
+      const y0 = Math.floor(shoulderY);
+      const y1 = Math.floor(arm.hand.y);
+      if (y1 - y0 < 10) return null;
+      const traj: { y: number; outer: number }[] = [];
+      for (let y = y0; y <= y1; y++) {
+        const row = rows[y];
+        if (!row || row.minX < 0) break;
+        traj.push({ y, outer: side === 'L' ? row.minX : row.maxX });
+      }
+      if (traj.length < 10) return null;
+      // 外縁が腕ではなく後ろ髪の面の縁である場合は見ない。
+      // 面は手より外側まで広がるので、軌跡の末尾で外縁が
+      // 手の位置より大きく外にあれば、それは面の縁。
+      const tail = traj.slice(-Math.min(5, traj.length));
+      const gaps = tail.map((p) => (side === 'L' ? arm.hand!.x - p.outer : p.outer - arm.hand!.x)).sort((m, n) => m - n);
+      if (gaps[Math.floor(gaps.length / 2)] > width * 0.08) return null;
+      const a = traj[0];
+      const b = traj[traj.length - 1];
+      const dx = b.outer - a.outer;
+      const dy = Math.max(1, b.y - a.y);
+      const len = Math.max(1, Math.hypot(dx, dy));
+      const W4 = 4;
+      let bestScore = 0;
+      let bestPt: { y: number; outer: number } | null = null;
+      for (let i = W4; i < traj.length - W4; i++) {
+        const frac = (traj[i].y - a.y) / dy;
+        if (frac < 0.15 || frac > 0.85) continue;
+        const slopeBefore = (traj[i].outer - traj[i - W4].outer) / W4;
+        const slopeAfter = (traj[i + W4].outer - traj[i].outer) / W4;
+        const step = Math.abs(slopeAfter - slopeBefore);
+        const dev = Math.abs((traj[i].outer - a.outer) * dy - (traj[i].y - a.y) * dx) / len;
+        if (step > 0.3 && dev > Math.max(2, figH * 0.025) && step > bestScore) {
+          bestScore = step;
+          bestPt = traj[i];
+        }
+      }
+      return bestPt ? { x: bestPt.outer, y: bestPt.y } : null;
+    };
+    // 肘の確定は肌の島による手の補正（P1044）が済んでから
+    // 下で行う。輪郭の手は髪や脚に引っ張られていることが
+    // あるため、その手の位置で軌跡を切ると面の縁を肘と
+    // 誤る。
 
     // P951: 肌の色の島で補強する。手の島は領域の2%床より
     // 小さいことが多いので、画素を直接数える。肌が図の
@@ -4150,6 +4206,9 @@ class VisualPoseService {
         skinCues.handR = skinHand('R', armR);
       }
     }
+    // P1074: 手の位置が確定したので、ここで肘を決める。
+    armL = { ...armL, elbow: elbowFor(armL, 'L') };
+    armR = { ...armR, elbow: elbowFor(armR, 'R') };
     // P1045: 手の大きさ（頭の幅との比）
     let handSize: number | null = null;
     {
@@ -5822,6 +5881,8 @@ class VisualPoseService {
       bangsEdge: bangsEdgeOut,
       handL: normHand(armL.hand),
       handR: normHand(armR.hand),
+      elbowL: normHand(armL.elbow),
+      elbowR: normHand(armR.elbow),
       shoulderL: norm(joints.shoulderL),
       shoulderR: norm(joints.shoulderR),
       hipL: norm(joints.hipL),
