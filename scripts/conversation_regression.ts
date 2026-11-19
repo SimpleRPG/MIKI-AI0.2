@@ -9347,6 +9347,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   }
 
 
+  // P1068: 中の線の往復（読み→描く→測り直し）。
+  // 読みに持つだけだった内側の境界を描き戻し、行の
+  // 範囲全体を見る走査で測り直せるようにした。
+  {
+    const r: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let bands = 0;
+    let recovered = 0;
+    if (r) {
+      const ren: any = await poseSvc().renderBody(r, 128, null, null, { backHair: true });
+      const re: any = ren ? await poseSvc().analyzePose(ren, 128, 128) : null;
+      for (let i = 0; i < 24; i++) {
+        const sp = r.innerLines?.[i];
+        if (!sp || sp.length === 0) continue;
+        bands++;
+        const rp = re?.innerLines?.[i];
+        if (rp && sp.every((p: number) => rp.some((q: number) => Math.abs(p - q) <= 0.05))) recovered++;
+      }
+    }
+    check('P1068 中の線が描き戻されて測り直せる', bands >= 5 && recovered === bands, `bands=${bands} recovered=${recovered}`);
+  }
+
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

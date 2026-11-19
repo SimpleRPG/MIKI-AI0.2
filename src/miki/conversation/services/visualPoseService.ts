@@ -946,6 +946,46 @@ class VisualPoseService {
    * P993: 髪も描く（読みの髪の長さに合わせ、照合にも含める）。
    * P995: 色の指定（髪は読みの色名から、体は指定色で描く）。
    */
+  /**
+   * P1068: 中の線を描く。読みに残っている内側の境界
+   * （髪の房の分かれ・服の縁）を、測った位置に影色の
+   * 線で描き戻す。今までは読みに持つだけで描く側が
+   * 使わず、測り直しで線がほぼ消えて中の線の照合が
+   * 成立しなかった。線の色は左隣の色の影色（セル画の
+   * 境目の流儀）で、背景の上には描かない。
+   */
+  private stampInnerLines(img: Uint8Array, S: number, reading: PoseReading): void {
+    if (!reading.innerLines || !reading.head) return;
+    const headRh = reading.headRh ?? reading.head.r;
+    const topPx = (reading.head.y - headRh) * (S - 1);
+    const footYn = Math.max(reading.footL?.y ?? 0, reading.footR?.y ?? 0);
+    const figHpPx = Math.max(1, ((footYn > 0 ? footYn : 0.98) - (reading.head.y - headRh)) * (S - 1));
+    const cxPx = reading.head.x * (S - 1);
+    const bandHalf = figHpPx / 48;
+    const bg: [number, number, number] = [img[0], img[1], img[2]];
+    const isBg = (x: number, y: number): boolean => {
+      const i = (y * S + x) * 4;
+      return Math.abs(img[i] - bg[0]) <= 10 && Math.abs(img[i + 1] - bg[1]) <= 10 && Math.abs(img[i + 2] - bg[2]) <= 10;
+    };
+    for (let i = 0; i < 24; i++) {
+      const pts = reading.innerLines[i];
+      if (!pts) continue;
+      const yC = topPx + ((i + 0.5) / 24) * figHpPx;
+      for (const v of pts) {
+        const xC = Math.round(cxPx + v * figHpPx);
+        if (xC < 1 || xC >= S) continue;
+        for (let y = Math.round(yC - bandHalf); y <= Math.round(yC + bandHalf); y++) {
+          if (y < 0 || y >= S || isBg(xC, y)) continue;
+          const li = (y * S + xC - 1) * 4;
+          const ci = (y * S + xC) * 4;
+          const base: [number, number, number] = isBg(xC - 1, y) ? [img[ci], img[ci + 1], img[ci + 2]] : [img[li], img[li + 1], img[li + 2]];
+          const sh = deriveShadow(base);
+          img[ci] = sh[0]; img[ci + 1] = sh[1]; img[ci + 2] = sh[2];
+        }
+      }
+    }
+  }
+
   public renderBody(reading: PoseReading, size = 64, face: BodyFaceSpec | null = null, colors: { hair?: [number, number, number]; body?: [number, number, number] } | null = null, shape: { bust?: number; bustPeak?: number; bustFirm?: number; frontHair?: boolean; backHair?: boolean; shoulderSlope?: number } | null = null): Uint8Array | null {
     if (!reading.head || !reading.profileComplete) return null;
     const S = size;
@@ -1473,6 +1513,8 @@ class VisualPoseService {
       }
     }
     px.forEach((c, i) => { image[i * 4] = c[0]; image[i * 4 + 1] = c[1]; image[i * 4 + 2] = c[2]; image[i * 4 + 3] = 255; });
+    // P1068: 中の線（読みの内側の境界を描き戻す）
+    this.stampInnerLines(image, S, reading);
     return image;
   }
 
@@ -2236,7 +2278,10 @@ class VisualPoseService {
     if (!flat) return null;
     const base = this.renderBodyHairDetail(reading, size, face, colors, shape, flat);
     if (!base) return null;
-    return this.applyOutlineLines(base, size);
+    const outlined = this.applyOutlineLines(base, size);
+    // P1068: 中の線（平坦な双子には残らないので仕上げで描く）
+    this.stampInnerLines(outlined, size, reading);
+    return outlined;
   }
 
   /**
@@ -2417,7 +2462,10 @@ class VisualPoseService {
 
   public verifyBodyInnerLines(reading: PoseReading): { score: number; verified: boolean; compared: number } | null {
     if (!reading.innerLines || !reading.head) return null;
-    const image = this.renderBody(reading, 128);
+    // P1068: 長い髪は後ろ髪の面込みで描く（輪郭の照合と
+    // 同じ。面の内側にある境界線は、面が無いと描く場所
+    // 自体が無い）。
+    const image = this.renderBody(reading, 128, null, null, reading.hair?.length === 'long' ? { backHair: true } : null);
     if (!image) return null;
     const re = this.analyzePose(image, 128, 128);
     if (!re || !re.innerLines) return null;
@@ -3479,7 +3527,10 @@ class VisualPoseService {
         if (minX < 0 || maxX - minX < 4) { inner.push(null); continue; }
         const pts: number[] = [];
         for (let x = minX + 1; x < maxX; x++) {
-          if (!chosenMask[y * width + x] || !chosenMask[y * width + x - 1]) continue;
+          // P1068: マスクの内側の穴（色ビンの抜け）で走査を
+          // 止めない。輪郭と同じく、その行の図の範囲全体を
+          // 内側として色の境界を見る。薄い色の体がビンから
+          // 抜けた行で、体の中の境界が丸ごと消えていた。
           const a = (y * width + x - 1) * 4;
           const b = (y * width + x) * 4;
           const d = Math.abs(rgba[a] - rgba[b]) + Math.abs(rgba[a + 1] - rgba[b + 1]) + Math.abs(rgba[a + 2] - rgba[b + 2]);
@@ -4966,15 +5017,29 @@ class VisualPoseService {
         if (x1 - x0 >= 8 && yBot - yTop >= 8) {
           const maxSepW = Math.max(2, (x1 - x0) * 0.12);
           const runSupport = new Map<number, number>();
+          const wIn = Math.max(2, Math.ceil(maxSepW));
           for (let y = yTop; y <= yBot; y++) {
-            let runs = 0, cur = 0, hasHair = false;
+            let cur = 0, curStart = -1, hasHair = false;
+            const spans: Array<[number, number]> = [];
             for (let x = x0; x <= x1; x++) {
-              if (!isHairFam(x, y)) { if (cur > 0) { if (cur <= maxSepW) runs++; cur = 0; } continue; }
+              if (!isHairFam(x, y)) { if (cur > 0) { spans.push([curStart, x - 1]); cur = 0; } continue; }
               hasHair = true;
-              if (lumAt(x, y) <= baseLum - 22) cur++;
-              else if (cur > 0) { if (cur <= maxSepW) runs++; cur = 0; }
+              if (lumAt(x, y) <= baseLum - 22) { if (cur === 0) curStart = x; cur++; }
+              else if (cur > 0) { spans.push([curStart, x - 1]); cur = 0; }
             }
-            if (cur > 0 && cur <= maxSepW) runs++;
+            if (cur > 0) spans.push([curStart, x1]);
+            // P1068: 房の境目は「両側に髪がある」線だけを数える。
+            // パネルの内側の縁に描かれた線（片側は肌や体）は
+            // 中の線であって房の分かれではないのに、影色の
+            // ランとして数えられ、平らな髪が房ありに化けた。
+            let runs = 0;
+            for (const [sx, ex] of spans) {
+              if (ex - sx + 1 > maxSepW) continue;
+              let leftHair = false, rightHair = false;
+              for (let x = Math.max(x0, sx - wIn); x < sx; x++) if (isHairFam(x, y)) { leftHair = true; break; }
+              for (let x = ex + 1; x <= Math.min(x1, ex + wIn); x++) if (isHairFam(x, y)) { rightHair = true; break; }
+              if (leftHair && rightHair) runs++;
+            }
             if (hasHair) runSupport.set(runs, (runSupport.get(runs) ?? 0) + 1);
           }
           let boundaries = 0;
