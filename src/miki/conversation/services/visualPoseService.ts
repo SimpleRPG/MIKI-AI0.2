@@ -1119,7 +1119,7 @@ class VisualPoseService {
     // （読み側の足首帯は脚の下30%で最小幅を取るので、膝が
     // 足首を下回ると足の広がりと誤読される。P1082）。
     const kneeW = Math.max(Math.min(thighW, calfW) * 0.9, ankleW);
-    const legWAt = (lt: number) => (lt < 0.48 ? smooth(thighW, kneeW, lt / 0.48) : lt < 0.63 ? smooth(kneeW, calfW, (lt - 0.48) / 0.15) : lt < 0.86 ? smooth(calfW, ankleW, (lt - 0.63) / 0.23) : ankleW);
+    const legWAt = (lt: number) => (lt < 0.48 ? smooth(thighW, kneeW, lt / 0.48) : lt < 0.63 ? smooth(kneeW, calfW, (lt - 0.48) / 0.15) : lt < 0.86 ? smooth(calfW, ankleW, (lt - 0.63) / 0.23) : lt < 0.94 ? lerp(ankleW, ankleW * 0.88, (lt - 0.86) / 0.08) : ankleW * 0.88);
     // P1022: 体の後ろに広がる髪の層。長い髪は体の横の板ではなく、
     // 後ろに垂れて下で広がる面として最初に描く（体はその上に
     // 描かれる）。広がりは読みの輪郭幅から取る：サンプルの
@@ -1353,10 +1353,14 @@ class VisualPoseService {
         // 両側へ広いのが実物（サンプルは足幅89に対し足首55）
         // とも合う。脚が触れる時は後の隙間あけが中心を開く。
         const flareOn = reading.footFlare ? (sideSign < 0 ? reading.footFlare.l : reading.footFlare.r) : false;
-        const footExt = t >= 0.94 && flareOn ? Math.max(2, Math.round(w * 0.22)) : 0;
+        // P1091: 足は末端で一段広がるのではなく、下へ向けて
+        // 徐々に広がる台形にして「柱の切り口」ではなく足の
+        // 土台として読めるようにする。影色は最下行だけでなく
+        // 下2行に分けて、つま先側へ倒れる感じを出す。
+        const footExt = t >= 0.90 && flareOn ? Math.round(Math.max(2, Math.round(w * 0.45)) * (0.25 + 0.75 * ((t - 0.90) / 0.10))) : 0;
         const fx0 = Math.round(cxp - w / 2) - footExt;
         const fx1 = Math.round(cxp + w / 2) + footExt;
-        const rowC: [number, number, number] = y === legBottom ? deriveShadow(legCol) : legCol;
+        const rowC: [number, number, number] = y === legBottom || (y === legBottom - 1 && flareOn) ? deriveShadow(legCol) : legCol;
         for (let x = fx0; x <= fx1; x++) set(x, y, rowC);
         const rec = legSpanRows.get(y) ?? {};
         if (sideSign < 0) rec.l = [fx0, fx1]; else rec.r = [fx0, fx1];

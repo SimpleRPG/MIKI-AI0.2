@@ -10166,6 +10166,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1090 項目ごとの詰めで差が0.10以下まで下がる', final1090 >= 0 && final1090 <= 0.10, `final=${final1090}`);
   }
 
+// ---- P1091: 足首のくびれと足の台形（柱の切り口にしない） ----
+  {
+    const base1091: any = poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let flareOk1091 = false;
+    if (base1091?.head) {
+      const forced1091: any = { ...base1091, footFlare: { l: true, r: true } };
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      poseSvc().setOverlapCorrections(null);
+      const vf1091: any = poseSvc().verifyFootFlare(forced1091);
+      flareOk1091 = !!vf1091?.verified;
+    }
+    check('P1091 足を台形に広げても足の広がりの読みが保たれる', flareOk1091, `flareOk=${flareOk1091}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
