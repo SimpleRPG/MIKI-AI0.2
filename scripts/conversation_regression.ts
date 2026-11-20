@@ -10223,6 +10223,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1092 配線後も髪の詳細検証が合格する', hairOk1092, `hairOk=${hairOk1092}`);
   }
 
+// ---- P1093: 土台の部品パック（教師製を彼女の棚へ） ----
+  {
+    const { clamp01 } = await import('../src/miki/core/parts/clamp01Part');
+    const { lerp } = await import('../src/miki/core/parts/lerpPart');
+    const { smoothstep01 } = await import('../src/miki/core/parts/smoothstep01Part');
+    const { mulberry32 } = await import('../src/miki/core/parts/mulberry32Part');
+    const { weightedGaps } = await import('../src/miki/core/parts/weightedGapsPart');
+    const { sinePhase } = await import('../src/miki/core/parts/sinePhasePart');
+    const { taperAlpha } = await import('../src/miki/core/parts/taperAlphaPart');
+    const eq1093 = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+    check('P1093 clamp01とlerpが仕様どおり', clamp01(-0.5) === 0 && clamp01(0.3) === 0.3 && clamp01(1.7) === 1 && eq1093(lerp(2, 6, 0.25), 3) && eq1093(lerp(10, 0, 0.5), 5), '');
+    check('P1093 smoothstep01が仕様どおり', eq1093(smoothstep01(0.25), 0.15625) && eq1093(smoothstep01(0.5), 0.5) && eq1093(smoothstep01(0.75), 0.84375) && smoothstep01(-1) === 0 && smoothstep01(2) === 1, '');
+    const ra1093 = mulberry32(42); const seqA1093 = [ra1093(), ra1093(), ra1093()];
+    const rb1093 = mulberry32(42); const seqB1093 = [rb1093(), rb1093(), rb1093()];
+    check('P1093 mulberry32が決定的で範囲内', seqA1093.every((v, i) => v === seqB1093[i] && v >= 0 && v < 1), seqA1093.join(','));
+    check('P1093 weightedGapsが仕様どおり', JSON.stringify(weightedGaps([1, 1, 1, 1], 40)) === '[0,10,20,30]' && JSON.stringify(weightedGaps([1, 3], 8)) === '[0,2]', '');
+    check('P1093 sinePhaseとtaperAlphaが仕様どおり', eq1093(sinePhase(10, 40, 0, 2), 2) && eq1093(sinePhase(30, 40, 0, 2), -2) && taperAlpha(0, 140, 0.8) === 0 && eq1093(taperAlpha(70, 140, 0.8), 0.8) && taperAlpha(140, 140, 0.8) === 0, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
