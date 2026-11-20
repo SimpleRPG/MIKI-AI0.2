@@ -10266,6 +10266,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1095 運転手が試行を記録し解決を覚える', !att1.record.solved && att2.record.solved && att2.record.attempts === 2 && codeDrillService.getLedger().length === 1, `ledger=${codeDrillService.getLedger().length}`);
   }
 
+// ---- P1096: 教師検証（TVE）ラウンドの受け入れと改ざん検出 ----
+  {
+    const { teacherVerificationEvidenceService } = await import('../src/miki/verification/services/teacherVerificationEvidenceService');
+    const { canonicalSha256 } = await import('../src/miki/core/services/canonicalSha256Service');
+    const content1096 = 'export function clamp01(x: number): number { return Math.min(1, Math.max(0, x)); }';
+    const round1096 = {
+      verifier: 'Claude',
+      verifiedAt: '2026-11-20T00:00:00.000Z',
+      implementationSha256: canonicalSha256(content1096),
+      targetPath: 'src/miki/core/parts/clamp01Part.ts',
+      checks: [
+        { kind: 'IMPORT_CHECK', command: 'node scripts/check_imports.mjs', exitCode: 0, passed: true, outputSha256: 'a'.repeat(64), outputExcerpt: 'imports ok' },
+        { kind: 'SMOKE_EXECUTION', testCase: 'NORMAL', command: 'npx tsx scripts/tve/smoke_clamp01.ts', exitCode: 0, passed: true, outputSha256: 'b'.repeat(64), outputExcerpt: 'SMOKE_PASS_NORMAL: clamp01 spec OK' },
+      ],
+    };
+    const parsed1096 = teacherVerificationEvidenceService.parseRound(round1096, { candidateContent: content1096, targetPaths: ['src/miki/core/parts/clamp01Part.ts'] });
+    check('P1096 TVEラウンドが正しい形で受理される', parsed1096.ok === true, parsed1096.ok ? '' : parsed1096.reason);
+    if (parsed1096.ok) {
+      check('P1096 TVEの静的チェック判定が通る', teacherVerificationEvidenceService.staticChecksPassed(parsed1096.round), '');
+    }
+    const tampered1096 = { ...round1096, implementationSha256: 'c'.repeat(64) };
+    const parsedBad1096 = teacherVerificationEvidenceService.parseRound(tampered1096, { candidateContent: content1096, targetPaths: ['src/miki/core/parts/clamp01Part.ts'] });
+    check('P1096 ハッシュの合わないTVEは拒否される', parsedBad1096.ok === false, '');
+    const badCmd1096 = { ...round1096, checks: [{ kind: 'SMOKE_EXECUTION', testCase: 'NORMAL', command: 'rm -rf /', exitCode: 0, passed: true, outputSha256: 'b'.repeat(64), outputExcerpt: 'x' }] };
+    const parsedBadCmd1096 = teacherVerificationEvidenceService.parseRound(badCmd1096, { candidateContent: content1096, targetPaths: ['src/miki/core/parts/clamp01Part.ts'] });
+    check('P1096 allow-list外のコマンドは拒否される', parsedBadCmd1096.ok === false, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

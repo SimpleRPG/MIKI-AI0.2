@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1858,
-    "sourceFileCount": 1411,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1322,
-    "relativeImportCandidateCount": 4776,
-    "resolvedRelativeImportCandidateCount": 4760,
+    "trackedPathCountExcludingControlPaths": 1865,
+    "sourceFileCount": 1418,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1329,
+    "relativeImportCandidateCount": 4785,
+    "resolvedRelativeImportCandidateCount": 4769,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 860023,
-      "lines": 10282,
-      "sha256": "a7f022c2e58d6d2e301df4a3963de4e379c1756bdb35ee8dba08f82a1f854de9",
+      "bytes": 862390,
+      "lines": 10310,
+      "sha256": "d3b520602bdc8e3d65c4c745a34ebd4f1e0d3748a84791b46191481243084969",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5000,10 +5000,22 @@
           "specifier": "../src/miki/core/parts/clamp01Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/clamp01Part.ts"
+        },
+        {
+          "line": 10271,
+          "specifier": "../src/miki/verification/services/teacherVerificationEvidenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/verification/services/teacherVerificationEvidenceService.ts"
+        },
+        {
+          "line": 10272,
+          "specifier": "../src/miki/core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         }
       ],
-      "relativeImportCandidateCount": 547,
-      "resolvedRelativeImportCount": 547,
+      "relativeImportCandidateCount": 549,
+      "resolvedRelativeImportCount": 549,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -5368,6 +5380,125 @@
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_clamp01.ts",
+      "bytes": 369,
+      "lines": 6,
+      "sha256": "e472a9023bc8c5de8499615948e8758be5ab1cf2156e225ba8f648a8a3b61de5",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../src/miki/core/parts/clamp01Part",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/clamp01Part.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_lerp.ts",
+      "bytes": 416,
+      "lines": 6,
+      "sha256": "df7d51c5aed38b8080cc390da43f89cf6d60cac5250f427828dd361941a23cef",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../src/miki/core/parts/lerpPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/lerpPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_mulberry32.ts",
+      "bytes": 586,
+      "lines": 12,
+      "sha256": "7858a28a2c963e599fee75433cce9be9973484d0d6439b251e17d7723a6b42d7",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../src/miki/core/parts/mulberry32Part",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/mulberry32Part.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_sinePhase.ts",
+      "bytes": 431,
+      "lines": 6,
+      "sha256": "75fc2c8842916e9feecdaa378f7230941ebb70923ab288b9aa1f52ab66086418",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../src/miki/core/parts/sinePhasePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/sinePhasePart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_smoothstep01.ts",
+      "bytes": 450,
+      "lines": 6,
+      "sha256": "e7e9f6b443402598563fd2975f1497cc0d9d06f525292afbb4d7bbdba9f3bc88",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../src/miki/core/parts/smoothstep01Part",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/smoothstep01Part.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_taperAlpha.ts",
+      "bytes": 434,
+      "lines": 6,
+      "sha256": "e8fa3992afb077ab3aefc37a66bf5f518fa8f089fbdfca973e7c9b58e5601533",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../src/miki/core/parts/taperAlphaPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/taperAlphaPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_weightedGaps.ts",
+      "bytes": 402,
+      "lines": 5,
+      "sha256": "ab202ddf6193625de89f2a0f0d0ef7ecbe435fa1e3dbdc12d1b2ce2be4f0e7de",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../src/miki/core/parts/weightedGapsPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/weightedGapsPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
       "unresolvedRelativeImportCount": 0
     },
     {
