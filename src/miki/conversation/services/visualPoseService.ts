@@ -5,6 +5,7 @@ import {
 } from './conversationImageObservationService';
 import { visualFigureService } from './visualFigureService';
 import { visualZoomService } from './visualZoomService';
+import { softenHairStrands } from './hairStrandSofteningService';
 
 /** P994: 素体に描く顔の指定 */
 export interface BodyFaceSpec {
@@ -2432,9 +2433,54 @@ class VisualPoseService {
     const hairTopY = (reading.head.y - (reading.headRh ?? reading.head.r)) * (size - 1);
     const bandY0 = hairTopY + figHn * (size - 1) * 0.03;
     const bandY1 = hairTopY + figHn * (size - 1) * 0.11;
+    // P1092: 房線の配置は部品（softenHairStrands）に任せる。
+    // スパンは行ごとに切れるので、先に全行のスパンを拾って
+    // 縦の重なりで同一視し、物理的な髪の塊ごとに ID を振る。
+    const flowY0 = Math.floor(bandY1) + 1;
+    const flowH = Math.max(1, size - flowY0);
+    const baseSeed = HAIR[0] * 3 + HAIR[1] * 5 + HAIR[2] * 7;
+    type SpanRec = { x0: number; x1: number; id: number };
+    const spanRows: SpanRec[][] = [];
+    let prevSpans: SpanRec[] = [];
+    let nextSpanId = 1;
+    for (let y = 0; y < size; y++) {
+      const spans: SpanRec[] = [];
+      if (y >= flowY0) {
+        let sx = 0;
+        while (sx < size) {
+          if (!nearHair((y * size + sx) * 4)) { sx++; continue; }
+          let sx1 = sx;
+          while (sx1 + 1 < size && nearHair((y * size + sx1 + 1) * 4)) sx1++;
+          let id = 0;
+          for (const p of prevSpans) {
+            const ov = Math.min(sx1, p.x1) - Math.max(sx, p.x0) + 1;
+            if (ov >= Math.min(sx1 - sx + 1, p.x1 - p.x0 + 1) * 0.5) { id = p.id; break; }
+          }
+          if (!id) id = nextSpanId++;
+          spans.push({ x0: sx, x1: sx1, id });
+          sx = sx1 + 1;
+        }
+      }
+      spanRows.push(spans);
+      prevSpans = spans;
+    }
+    const layoutCache = new Map<string, ReturnType<typeof softenHairStrands>['strands']>();
+    const layoutFor = (spanW: number, id: number) => {
+      // 実スパンが狭いと部品の間隔が詰まりすぎるので、最低 28px の
+      // 仮想幅で引いて、スパン内に来た線だけを使う。
+      const vw = Math.max(spanW, 28);
+      const key = `${vw}|${flowH}|${id}`;
+      let v = layoutCache.get(key);
+      if (!v) {
+        v = softenHairStrands({ spanWidth: vw, spanHeight: flowH, seed: baseSeed + id * 7919 }).strands;
+        layoutCache.set(key, v);
+      }
+      return v;
+    };
     for (let y = 0; y < size; y++) {
       // 行ごとの髪スパンを房に分ける
       let x = 0;
+      let spanIdx = 0;
       while (x < size) {
         const i0 = (y * size + x) * 4;
         if (!nearHair(i0)) { x++; continue; }
@@ -2442,6 +2488,8 @@ class VisualPoseService {
         while (x1 + 1 < size && nearHair((y * size + x1 + 1) * 4)) x1++;
         const spanW = x1 - x + 1;
         const clumpW = Math.max(6, spanW / 4);
+        const spanRec = spanRows[y]?.[spanIdx];
+        spanIdx++;
         for (let sx = x; sx <= x1; sx++) {
           const i = (y * size + sx) * 4;
           if (y >= bandY0 && y <= bandY1) {
@@ -2450,6 +2498,33 @@ class VisualPoseService {
             out[i + 1] = Math.round(out[i + 1] + (255 - out[i + 1]) * 0.45);
             out[i + 2] = Math.round(out[i + 2] + (255 - out[i + 2]) * 0.45);
           } else if (y > bandY1) {
+            if (spanW >= 7 && spanRec) {
+              // P1092: 部品の点列で線を引く。線の間の帯は
+              // 奇数番を僅かに暗くし、面の平坦さを消す。
+              const strands = layoutFor(spanW, spanRec.id);
+              const yL = Math.min(flowH - 1, y - flowY0);
+              const localX = sx - x;
+              let band = 0;
+              let bestD = Infinity;
+              let bestA = 0;
+              let bestW = 1;
+              for (const s of strands) {
+                const px = s.points[yL];
+                if (px.x >= spanW) continue;
+                if (px.x <= localX) band++;
+                const d = Math.abs(localX - px.x);
+                if (d < bestD) { bestD = d; bestA = px.alpha; bestW = s.width; }
+              }
+              if (bestD <= Math.max(0.8, bestW * 0.6)) {
+                const sh = deriveShadow([out[i], out[i + 1], out[i + 2]]);
+                const f = bestA * 0.9;
+                out[i] = Math.round(out[i] + (sh[0] - out[i]) * f);
+                out[i + 1] = Math.round(out[i + 1] + (sh[1] - out[i + 1]) * f);
+                out[i + 2] = Math.round(out[i + 2] + (sh[2] - out[i + 2]) * f);
+              } else if (band % 2 === 1) {
+                out[i] = Math.round(out[i] * 0.97); out[i + 1] = Math.round(out[i + 1] * 0.97); out[i + 2] = Math.round(out[i + 2] * 0.97);
+              }
+            } else {
             // P1080: 房の流れ。分かれ目を真っ直ぐ落とさず、
             // 房ごとに位相の違う揺れを持たせ、上では弱く
             // 下ほどはっきり分かれるよう混ぜ率を上げる。
@@ -2469,6 +2544,7 @@ class VisualPoseService {
               out[i + 2] = Math.round(out[i + 2] + (sh[2] - out[i + 2]) * fade);
             } else if (k % 2 === 1) {
               out[i] = Math.round(out[i] * 0.97); out[i + 1] = Math.round(out[i + 1] * 0.97); out[i + 2] = Math.round(out[i + 2] * 0.97);
+            }
             }
           }
         }

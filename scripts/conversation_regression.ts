@@ -10182,6 +10182,47 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1091 足を台形に広げても足の広がりの読みが保たれる', flareOk1091, `flareOk=${flareOk1091}`);
   }
 
+// ---- P1092: 髪の柔らかさ部品（彼女の部品第1号）と描画への配線 ----
+  {
+    const { softenHairStrands } = await import('../src/miki/conversation/services/hairStrandSofteningService');
+    const inp1092 = { spanWidth: 48, spanHeight: 140, seed: 42 };
+    const out1092: any = softenHairStrands(inp1092);
+    const strands1092: any[] = out1092?.strands || [];
+    const ranges1092 = strands1092.map((s: any) => Math.max(...s.points.map((p: any) => p.x)) - Math.min(...s.points.map((p: any) => p.x)));
+    const rangeMean1092 = ranges1092.length ? ranges1092.reduce((a: number, b: number) => a + b, 0) / ranges1092.length : 0;
+    let stepMax1092 = 0;
+    for (const s of strands1092) for (let i = 1; i < s.points.length; i++) stepMax1092 = Math.max(stepMax1092, Math.abs(s.points[i].x - s.points[i - 1].x));
+    const midY1092 = Math.floor(140 / 2);
+    const xsMid1092 = strands1092.map((s: any) => s.points[midY1092]?.x ?? 0).sort((a: number, b: number) => a - b);
+    const gaps1092: number[] = [];
+    for (let i = 1; i < xsMid1092.length; i++) gaps1092.push(xsMid1092[i] - xsMid1092[i - 1]);
+    const gMean1092 = gaps1092.length ? gaps1092.reduce((a: number, b: number) => a + b, 0) / gaps1092.length : 0;
+    const gSd1092 = gaps1092.length ? Math.sqrt(gaps1092.reduce((a: number, b: number) => a + (b - gMean1092) * (b - gMean1092), 0) / gaps1092.length) : 0;
+    const gapCv1092 = gMean1092 > 0 ? gSd1092 / gMean1092 : 0;
+    let taperOk1092 = 0;
+    for (const s of strands1092) {
+      const p = s.points;
+      if (p.length >= 8 && p[0].alpha < p[Math.floor(p.length / 2)].alpha * 0.85 && p[p.length - 1].alpha < p[Math.floor(p.length / 2)].alpha * 0.85) taperOk1092++;
+    }
+    const taper1092 = strands1092.length ? taperOk1092 / strands1092.length : 0;
+    const coverage1092 = xsMid1092.length > 1 ? (xsMid1092[xsMid1092.length - 1] - xsMid1092[0]) / 48 : 0;
+    check('P1092 部品の線が滑らかに曲がる', rangeMean1092 >= 3 && stepMax1092 <= 1, `range=${rangeMean1092.toFixed(2)} step=${stepMax1092.toFixed(2)}`);
+    check('P1092 部品の線の間隔が不均一で幅を覆う', gapCv1092 >= 0.25 && coverage1092 >= 0.6, `cv=${gapCv1092.toFixed(2)} cov=${coverage1092.toFixed(2)}`);
+    check('P1092 部品の線の濃さが両端で細る', taper1092 >= 0.8, `taper=${taper1092.toFixed(2)}`);
+    check('P1092 部品が決定的（同じ入力で同じ出力）', JSON.stringify(softenHairStrands(inp1092)) === JSON.stringify(out1092), '');
+    const base1092: any = poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    let hairOk1092 = false;
+    if (base1092?.head) {
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      poseSvc().setOverlapCorrections(null);
+      const vh1092: any = poseSvc().verifyBodyHairDetail(base1092);
+      hairOk1092 = vh1092?.verified === true;
+    }
+    check('P1092 配線後も髪の詳細検証が合格する', hairOk1092, `hairOk=${hairOk1092}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
