@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1895,
     "sourceFileCount": 1448,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1359,
-    "relativeImportCandidateCount": 4848,
-    "resolvedRelativeImportCandidateCount": 4832,
+    "relativeImportCandidateCount": 4852,
+    "resolvedRelativeImportCandidateCount": 4836,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 872604,
-      "lines": 10433,
-      "sha256": "a57be67d07175515b3162cae2dcdbb0071690ce3e5e2cf4a96877d67bfc0918e",
+      "bytes": 874460,
+      "lines": 10452,
+      "sha256": "21a681d0021a2d8d8c3a0c1c2c2644ad9b7bfd13b85ed50e686281f32d041ddb",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5174,10 +5174,22 @@
           "specifier": "../src/miki/core/parts/glowPulsePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/glowPulsePart.ts"
+        },
+        {
+          "line": 10422,
+          "specifier": "../src/miki/selfDevelopment/services/compositionSearchService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/compositionSearchService.ts"
+        },
+        {
+          "line": 10423,
+          "specifier": "../src/miki/core/parts/lerpPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/lerpPart.ts"
         }
       ],
-      "relativeImportCandidateCount": 576,
-      "resolvedRelativeImportCount": 576,
+      "relativeImportCandidateCount": 578,
+      "resolvedRelativeImportCount": 578,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -36430,9 +36442,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/compositionDrillService.ts",
-      "bytes": 4255,
+      "bytes": 4374,
       "lines": 101,
-      "sha256": "0e7ffb4a5ad0e3d614b944a9e0627e1885f1da99f58ac865fe3ee50cf9da33a2",
+      "sha256": "6835afc6f06972e93f6ad1c6b931b7157d87ee7f8952e72152b05f562184dc7f",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -36465,91 +36477,103 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/compositionSearchService.ts",
-      "bytes": 7647,
-      "lines": 134,
-      "sha256": "95ee9933c237d784b80ff197ee5336085427c9e24b92f1e9b1afe9993695bc50",
+      "bytes": 13500,
+      "lines": 257,
+      "sha256": "400b4c57e90ae0ec04184fbbe02d677900634b0cf2a9b29cdea9202389a77e97",
       "relativeImportCandidates": [
         {
-          "line": 11,
+          "line": 18,
           "specifier": "../../core/parts/clamp01Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/clamp01Part.ts"
         },
         {
-          "line": 12,
+          "line": 19,
           "specifier": "../../core/parts/lerpPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/lerpPart.ts"
         },
         {
-          "line": 13,
+          "line": 20,
           "specifier": "../../core/parts/smoothstep01Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/smoothstep01Part.ts"
         },
         {
-          "line": 14,
+          "line": 21,
           "specifier": "../../core/parts/clampRangePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/clampRangePart.ts"
         },
         {
-          "line": 15,
+          "line": 22,
           "specifier": "../../core/parts/remapPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/remapPart.ts"
         },
         {
-          "line": 16,
+          "line": 23,
           "specifier": "../../core/parts/gaussFalloffPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/gaussFalloffPart.ts"
         },
         {
-          "line": 17,
+          "line": 24,
           "specifier": "../../core/parts/taperAlphaPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/taperAlphaPart.ts"
         },
         {
-          "line": 18,
+          "line": 25,
           "specifier": "../../core/parts/sinePhasePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/sinePhasePart.ts"
         },
         {
-          "line": 19,
+          "line": 26,
           "specifier": "../../core/parts/easeOutCubicPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/easeOutCubicPart.ts"
         },
         {
-          "line": 20,
+          "line": 27,
           "specifier": "../../core/parts/moveTowardsPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/moveTowardsPart.ts"
         },
         {
-          "line": 21,
+          "line": 28,
           "specifier": "../../core/parts/snapToGridPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/snapToGridPart.ts"
         },
         {
-          "line": 22,
+          "line": 29,
           "specifier": "../../core/parts/easeInQuadPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/easeInQuadPart.ts"
         },
         {
-          "line": 23,
+          "line": 30,
           "specifier": "../../core/parts/glowPulsePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/glowPulsePart.ts"
+        },
+        {
+          "line": 31,
+          "specifier": "../../core/parts/manhattanDistancePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/manhattanDistancePart.ts"
+        },
+        {
+          "line": 32,
+          "specifier": "../../core/parts/euclideanDistancePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/euclideanDistancePart.ts"
         }
       ],
-      "relativeImportCandidateCount": 13,
-      "resolvedRelativeImportCount": 13,
+      "relativeImportCandidateCount": 15,
+      "resolvedRelativeImportCount": 15,
       "unresolvedRelativeImportCount": 0
     },
     {

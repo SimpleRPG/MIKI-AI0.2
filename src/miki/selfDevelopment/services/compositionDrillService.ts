@@ -53,7 +53,7 @@ class CompositionDrillService {
       maxDepth: input.maxDepth,
     });
     const source = compositionSearchService.buildSelfContainedSource(
-      { found: search.found, entryPoint: search.entryPoint, expression: search.expression, usedParts: search.usedParts, maxError: search.maxError, source: search.source },
+      { found: search.found, entryPoint: search.entryPoint, expression: search.expression, usedParts: search.usedParts, variables: search.variables, maxError: search.maxError, source: search.source },
       (name) => this.partSource(name),
     );
     if (source === null) {
@@ -79,7 +79,7 @@ class CompositionDrillService {
         tests: `${input.task.entryPoint} の受け入れケース ${input.task.cases.length} 件を全て通すこと`,
         validation: `合成探索が式 ${search.expression} を見つけ、コードドリルの実行判定を全件通過した`,
         componentType: 'FUNCTION',
-        inputs: ['number'],
+        inputs: new Array(Math.max(1, input.task.cases.length ? input.task.cases[0].args.length : 1)).fill('number'),
         outputs: ['number'],
         exports: [input.task.entryPoint],
         entryPoint: input.task.entryPoint,

@@ -10370,7 +10370,7 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     const tpCases1102 = [0, 35, 70, 105, 140].map((x) => ({ args: [x], expected: taperAlpha(x, 140, 0.8) }));
     const rTp1102 = compositionSearchService.search({ entryPoint: 'foundTaper', cases: tpCases1102 });
     check('P1102 探索が定数束縛つきの taper を再導出する', rTp1102.found && rTp1102.expression === 'taperAlpha(x, 140, 0.8)', rTp1102.expression);
-    const cubic1102 = compositionSearchService.search({ entryPoint: 'cubic', cases: [0, 0.5, 1].map((x) => ({ args: [x], expected: x * x * x })) });
+    const cubic1102 = compositionSearchService.search({ entryPoint: 'taperRestricted', cases: tpCases1102, partNames: ['clamp01', 'smoothstep01', 'lerp'] });
     check('P1102 語彙外の課題は解けないと返す', cubic1102.found === false && cubic1102.maxError > 0.001, `${cubic1102.maxError}`);
     const fileOf1102: Record<string, string> = { taperAlpha: 'taperAlphaPart.ts' };
     const selfContained1102 = compositionSearchService.buildSelfContainedSource(rTp1102, (n) => fs1102.readFileSync(`src/miki/core/parts/${fileOf1102[n]}`, 'utf-8'));
@@ -10415,6 +10415,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1104 easeInQuad は二乗カーブの仕様どおり', easeInQuad(0) === 0 && easeInQuad(0.5) === 0.25 && easeInQuad(1) === 1 && easeInQuad(0.25) === 0.0625, '');
     const g1104 = Math.exp(-2); const u1104 = 1 - g1104;
     check('P1104 glowPulse は中心1・縁の値・左右対称が仕様どおり', glowPulse(50) === 1 && Math.abs(glowPulse(0) - (1 - u1104 * u1104 * u1104)) < 1e-12 && glowPulse(25) === glowPulse(75), '');
+  }
+
+// ---- P1105: 合成探索の多変数化 ----
+  {
+    const { compositionSearchService } = await import('../src/miki/selfDevelopment/services/compositionSearchService');
+    const { lerp } = await import('../src/miki/core/parts/lerpPart');
+    const grid1105 = [0, 2, 5, 10];
+    const lerpCases1105 = grid1105.flatMap((x) => grid1105.map((y) => ({ args: [x, y], expected: lerp(x, y, 0.3) })));
+    const rLerp1105 = compositionSearchService.search({ entryPoint: 'lerpMix1105', cases: lerpCases1105 });
+    check('P1105 2変数の探索が lerp(x, y, 0.3) を再発見する（定数の連続微調整つき）', rLerp1105.found && rLerp1105.expression === 'lerp(x, y, 0.3)', rLerp1105.expression);
+    const manhCases1105 = [[0, 0], [3, 4], [-1, 2], [5, -5]].map(([x, y]) => ({ args: [x, y], expected: Math.abs(x) + Math.abs(y) }));
+    const rManh1105 = compositionSearchService.search({ entryPoint: 'manh1105', cases: manhCases1105 });
+    check('P1105 2変数の探索が |x|+|y| を距離部品で再発見する', rManh1105.found && rManh1105.usedParts.includes('manhattanDistance'), rManh1105.expression);
+    const sinCases1105 = [[0.5, 0.5], [1, 2], [2, 0.25]].map(([x, y]) => ({ args: [x, y], expected: Math.sin(x * y) }));
+    const rSin1105 = compositionSearchService.search({ entryPoint: 'sinxy1105', cases: sinCases1105 });
+    check('P1105 語彙外の2変数課題は解けないと返す', rSin1105.found === false && rSin1105.maxError > 1e-6, `${rSin1105.maxError}`);
+    const cubicCases1105 = [0, 0.25, 0.5, 0.75, 1].map((x) => ({ args: [x], expected: x * x * x }));
+    const rCubic1105 = compositionSearchService.search({ entryPoint: 'cubic1105', cases: cubicCases1105 });
+    check('P1105 三乗が lerp の入れ子で厳密に合成できる', rCubic1105.found && rCubic1105.maxError === 0, rCubic1105.expression);
   }
 
 // ---- 結果 ----
