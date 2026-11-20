@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1865,
-    "sourceFileCount": 1418,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1329,
-    "relativeImportCandidateCount": 4794,
-    "resolvedRelativeImportCandidateCount": 4778,
+    "trackedPathCountExcludingControlPaths": 1889,
+    "sourceFileCount": 1442,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1353,
+    "relativeImportCandidateCount": 4818,
+    "resolvedRelativeImportCandidateCount": 4802,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 864300,
-      "lines": 10338,
-      "sha256": "ab94e96b7bbba9acdc773b2c8e6af581380d8a49e2b45363097c3209e7ecc88c",
+      "bytes": 867009,
+      "lines": 10365,
+      "sha256": "0c692d4652784e7cbd13c633c6552f0b0b823051b6f603216235dff7b2a89cc5",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5036,10 +5036,82 @@
           "specifier": "../src/miki/core/parts/sinePhasePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/sinePhasePart.ts"
+        },
+        {
+          "line": 10327,
+          "specifier": "../src/miki/core/parts/clampRangePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/clampRangePart.ts"
+        },
+        {
+          "line": 10328,
+          "specifier": "../src/miki/core/parts/remapPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/remapPart.ts"
+        },
+        {
+          "line": 10329,
+          "specifier": "../src/miki/core/parts/gaussFalloffPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/gaussFalloffPart.ts"
+        },
+        {
+          "line": 10330,
+          "specifier": "../src/miki/core/parts/mixColorPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/mixColorPart.ts"
+        },
+        {
+          "line": 10331,
+          "specifier": "../src/miki/core/parts/scaleColorPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/scaleColorPart.ts"
+        },
+        {
+          "line": 10332,
+          "specifier": "../src/miki/core/parts/easeOutCubicPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/easeOutCubicPart.ts"
+        },
+        {
+          "line": 10333,
+          "specifier": "../src/miki/core/parts/manhattanDistancePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/manhattanDistancePart.ts"
+        },
+        {
+          "line": 10334,
+          "specifier": "../src/miki/core/parts/euclideanDistancePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/euclideanDistancePart.ts"
+        },
+        {
+          "line": 10335,
+          "specifier": "../src/miki/core/parts/randomIntPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/randomIntPart.ts"
+        },
+        {
+          "line": 10336,
+          "specifier": "../src/miki/core/parts/chanceRollPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/chanceRollPart.ts"
+        },
+        {
+          "line": 10337,
+          "specifier": "../src/miki/core/parts/moveTowardsPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/moveTowardsPart.ts"
+        },
+        {
+          "line": 10338,
+          "specifier": "../src/miki/core/parts/snapToGridPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/snapToGridPart.ts"
         }
       ],
-      "relativeImportCandidateCount": 553,
-      "resolvedRelativeImportCount": 553,
+      "relativeImportCandidateCount": 565,
+      "resolvedRelativeImportCount": 565,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -5407,6 +5479,23 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "scripts/tve/smoke_chanceRoll.ts",
+      "bytes": 507,
+      "lines": 4,
+      "sha256": "4165aceb2e28f998a22950adf5d2d515d395c9763d3f6d4f7f08203d84ef73d4",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/chanceRollPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/chanceRollPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "scripts/tve/smoke_clamp01.ts",
       "bytes": 369,
       "lines": 6,
@@ -5417,6 +5506,74 @@
           "specifier": "../../src/miki/core/parts/clamp01Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/clamp01Part.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_clampRange.ts",
+      "bytes": 420,
+      "lines": 4,
+      "sha256": "f8da13c1abd0fb0fa412b8aba01a82726669c3a52f2aa0abb8bf605aa6c3dccd",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/clampRangePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/clampRangePart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_easeOutCubic.ts",
+      "bytes": 384,
+      "lines": 4,
+      "sha256": "6b6c74440c170500fa4177ac0206b44f06eba9fd4199032d70c1a29b6be01720",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/easeOutCubicPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/easeOutCubicPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_euclideanDistance.ts",
+      "bytes": 389,
+      "lines": 4,
+      "sha256": "b55e1dc67a0e5fb0a31c3b1d98b32bc41757313dd7a36604b616b6693537ae3d",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/euclideanDistancePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/euclideanDistancePart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_gaussFalloff.ts",
+      "bytes": 455,
+      "lines": 4,
+      "sha256": "860445ab442932ec5ea8dc95012b41c81dc926a4b224f02535805dd19004b358",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/gaussFalloffPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/gaussFalloffPart.ts"
         }
       ],
       "relativeImportCandidateCount": 1,
@@ -5441,6 +5598,57 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "scripts/tve/smoke_manhattanDistance.ts",
+      "bytes": 389,
+      "lines": 4,
+      "sha256": "50745cecca8cb55228f96fe198e98e0029d56122a8508951e236e6e7bb16da90",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/manhattanDistancePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/manhattanDistancePart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_mixColor.ts",
+      "bytes": 455,
+      "lines": 4,
+      "sha256": "bbaa97368f5b32000ccd2ed4ffae6959d162035ae89d36a8d9d6de8d21aee06f",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/mixColorPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/mixColorPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_moveTowards.ts",
+      "bytes": 441,
+      "lines": 4,
+      "sha256": "f5e75dd17b14805bde4166f47f5d2e8e36d7ac02671c34e58ae6357e3caf8476",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/moveTowardsPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/moveTowardsPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "scripts/tve/smoke_mulberry32.ts",
       "bytes": 586,
       "lines": 12,
@@ -5451,6 +5659,57 @@
           "specifier": "../../src/miki/core/parts/mulberry32Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/mulberry32Part.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_randomInt.ts",
+      "bytes": 583,
+      "lines": 4,
+      "sha256": "35917c31dc54dd2002615d0cfc10509c83e202337b21579ccb10768eb58b6720",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/randomIntPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/randomIntPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_remap.ts",
+      "bytes": 436,
+      "lines": 4,
+      "sha256": "254c54eceace9210244c3b4425d4c7f9c683a3b2233e53e371670d77651bd78d",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/remapPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/remapPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_scaleColor.ts",
+      "bytes": 434,
+      "lines": 4,
+      "sha256": "4370bc7c47ae81fe59086d38d385387e5de3d430237ca3ade4f9511b47c71137",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/scaleColorPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/scaleColorPart.ts"
         }
       ],
       "relativeImportCandidateCount": 1,
@@ -5485,6 +5744,23 @@
           "specifier": "../../src/miki/core/parts/smoothstep01Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/smoothstep01Part.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "scripts/tve/smoke_snapToGrid.ts",
+      "bytes": 362,
+      "lines": 4,
+      "sha256": "39ab257d0e1a6f0ddeaba85e74b983e971174647b4bf77ab5486a99dd81a757b",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../src/miki/core/parts/snapToGridPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/snapToGridPart.ts"
         }
       ],
       "relativeImportCandidateCount": 1,
@@ -16855,10 +17131,60 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/core/parts/chanceRollPart.ts",
+      "bytes": 662,
+      "lines": 15,
+      "sha256": "0af62ccbf034afdcef9bd304cceea9dfe6203e824b624a4e8f6a361fc055a4f2",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/core/parts/clamp01Part.ts",
       "bytes": 376,
       "lines": 8,
       "sha256": "acd8e3d286e88df8489b9e60d9f7e21a3c5607a982a619ea90a5b87ba74322b0",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/clampRangePart.ts",
+      "bytes": 342,
+      "lines": 8,
+      "sha256": "4a602ffd1de2a98e19eb35c8b6fe6315958c5ecd7c04e7a1675d54e9d9492a9a",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/easeOutCubicPart.ts",
+      "bytes": 386,
+      "lines": 10,
+      "sha256": "682a0fa3d7b1a6bc2af9235462f83780e3de48a7637a4f9f8f8a36e5cc715efe",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/euclideanDistancePart.ts",
+      "bytes": 300,
+      "lines": 9,
+      "sha256": "128e45e3003393375bef4fa985ae66a3aad0895e5db78c92abc5e6b73b29572e",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/gaussFalloffPart.ts",
+      "bytes": 507,
+      "lines": 11,
+      "sha256": "d68a8720367347645b627a76c49d197e741ab7bd2460595141e20beb65be35ab",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -16875,10 +17201,70 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/core/parts/manhattanDistancePart.ts",
+      "bytes": 367,
+      "lines": 8,
+      "sha256": "40bcd0c6bb08c2ba29871bd7dcba103168dc32daaa840cc668edb8a13fbd5107",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/mixColorPart.ts",
+      "bytes": 507,
+      "lines": 13,
+      "sha256": "c54739142572efd7ee81d31e1348abbc026ff4acaa255fb492d0d54ecd059ae6",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/moveTowardsPart.ts",
+      "bytes": 537,
+      "lines": 12,
+      "sha256": "02b774487079cb4a183a4ffaa70a1a0833001fe3986c8f307b6908a08a34b413",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/core/parts/mulberry32Part.ts",
       "bytes": 543,
       "lines": 14,
       "sha256": "57cdda35b06f2f7736a52b915938c0f532a62ccc6df0fd29d0f4d453d331b245",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/randomIntPart.ts",
+      "bytes": 729,
+      "lines": 17,
+      "sha256": "d36a9445831cf811b3359132f4ac25dba10849ba4e573847e099a94f9f2ec742",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/remapPart.ts",
+      "bytes": 593,
+      "lines": 11,
+      "sha256": "73bf1344525046ba4241becaf254ccf30b8eec415f48d617210a27f17e682139",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/scaleColorPart.ts",
+      "bytes": 482,
+      "lines": 12,
+      "sha256": "fd3c5d1d3ffbceb136f6c708d43bb5401ccf3a9e3470ab4278b5a9c206404885",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -16899,6 +17285,16 @@
       "bytes": 544,
       "lines": 11,
       "sha256": "d641952f773292a65b568198dd36601020f676170cd20fbbc8c9c992a147a5d4",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/snapToGridPart.ts",
+      "bytes": 396,
+      "lines": 9,
+      "sha256": "e28dc1006b89ce079d5a88a9b71cac9c01ed62c9fe0c263d65765ffddbb2ac03",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,

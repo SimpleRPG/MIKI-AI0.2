@@ -10322,6 +10322,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1098 減衰の形が taperAlpha の性質と一致する', alphaOk1098, '');
   }
 
+// ---- P1099: 教師パック第2弾（12部品）の仕様 ----
+  {
+    const { clampRange } = await import('../src/miki/core/parts/clampRangePart');
+    const { remap } = await import('../src/miki/core/parts/remapPart');
+    const { gaussFalloff } = await import('../src/miki/core/parts/gaussFalloffPart');
+    const { mixColor } = await import('../src/miki/core/parts/mixColorPart');
+    const { scaleColor } = await import('../src/miki/core/parts/scaleColorPart');
+    const { easeOutCubic } = await import('../src/miki/core/parts/easeOutCubicPart');
+    const { manhattanDistance } = await import('../src/miki/core/parts/manhattanDistancePart');
+    const { euclideanDistance } = await import('../src/miki/core/parts/euclideanDistancePart');
+    const { randomInt } = await import('../src/miki/core/parts/randomIntPart');
+    const { chanceRoll } = await import('../src/miki/core/parts/chanceRollPart');
+    const { moveTowards } = await import('../src/miki/core/parts/moveTowardsPart');
+    const { snapToGrid } = await import('../src/miki/core/parts/snapToGridPart');
+    check('P1099 clampRange が範囲に収める', clampRange(5, 0, 3) === 3 && clampRange(-1, 0, 3) === 0 && clampRange(2, 0, 3) === 2, '');
+    check('P1099 remap が範囲を写す', remap(5, 0, 10, 0, 100) === 50 && remap(-5, 0, 10, 0, 100) === 0 && remap(3, 2, 2, 7, 9) === 7, '');
+    check('P1099 gaussFalloff の形が正しい', gaussFalloff(0, 0, 1) === 1 && Math.abs(gaussFalloff(1, 0, 1) - Math.exp(-0.5)) < 1e-12 && gaussFalloff(5, 0, 0) === 0, '');
+    check('P1099 mixColor が色を混ぜる', JSON.stringify(mixColor([0, 0, 0], [100, 200, 255], 0.5)) === '[50,100,127.5]', '');
+    check('P1099 scaleColor が色を拡縮する', JSON.stringify(scaleColor([200, 10, 10], 2)) === '[255,20,20]', '');
+    check('P1099 easeOutCubic の形が正しい', easeOutCubic(0) === 0 && easeOutCubic(1) === 1 && Math.abs(easeOutCubic(0.5) - 0.875) < 1e-12, '');
+    check('P1099 格子距離と直線距離が正しい', manhattanDistance(0, 0, 3, 4) === 7 && euclideanDistance(0, 0, 3, 4) === 5, '');
+    check('P1099 randomInt が決定的で範囲内', randomInt(42, 5, 5) === 5 && randomInt(7, 1, 6) === randomInt(7, 1, 6) && randomInt(7, 1, 6) >= 1 && randomInt(7, 1, 6) <= 6, '');
+    check('P1099 chanceRoll の端が正しい', chanceRoll(3, 0) === false && chanceRoll(3, 1) === true && chanceRoll(3, 0.5) === chanceRoll(3, 0.5), '');
+    check('P1099 moveTowards が行き過ぎない', moveTowards(0, 10, 3) === 3 && moveTowards(0, 2, 3) === 2 && moveTowards(10, 0, 4) === 6, '');
+    check('P1099 snapToGrid が吸着する', snapToGrid(13, 5) === 15 && snapToGrid(12, 5) === 10 && snapToGrid(7, 0) === 7, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
