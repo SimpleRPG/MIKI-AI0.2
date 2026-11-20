@@ -12,46 +12,34 @@
  *
  * 役割は「線の置き方」だけ。ピクセルへの書き込みはしない。
  * 純関数・決定的（seed から mulberry32 で乱数を引く）。
+ *
+ * P1098: 土台部品（P1093）の合成で作り直した。乱数・間隔割り・
+ * サイン波・減衰・clamp は src/miki/core/parts/ の部品を使い、
+ * 出力は従来実装と全点一致（差は浮動小数の末桁のみ）であることを
+ * プローブで確認済み。これにより描画のたびに土台部品が実利用される。
  */
+import { mulberry32 } from '../../core/parts/mulberry32Part';
+import { weightedGaps } from '../../core/parts/weightedGapsPart';
+import { sinePhase } from '../../core/parts/sinePhasePart';
+import { taperAlpha } from '../../core/parts/taperAlphaPart';
+import { clamp01 } from '../../core/parts/clamp01Part';
+
 export interface HairStrandPoint { x: number; y: number; alpha: number }
 export interface HairStrand { points: HairStrandPoint[]; width: number }
 export interface HairStrandSofteningInput { spanWidth: number; spanHeight: number; seed: number }
 export interface HairStrandSofteningResult { strands: HairStrand[] }
 
-function mulberry32(a: number): () => number {
-  return () => {
-    a |= 0; a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function smoothstep01(t: number): number {
-  const c = Math.max(0, Math.min(1, t));
-  return c * c * (3 - 2 * c);
-}
-
 export function softenHairStrands(input: HairStrandSofteningInput): HairStrandSofteningResult {
   const rand = mulberry32(input.seed);
   const n = 4 + Math.floor(rand() * 4);
   const weights: number[] = [];
-  let total = 0;
+  for (let i = 0; i <= n; i++) weights.push(0.3 + rand());
 
-  for (let i = 0; i <= n; i++) {
-    const w = 0.3 + rand();
-    weights.push(w);
-    total += w;
-  }
-
-  const scale = (input.spanWidth - 6) / total;
+  // weightedGaps は「開始位置」の列を返す。この部品の baseX は
+  // 自分の重みを含めた累積なので、1つ先の開始位置が対応する。
+  const gaps = weightedGaps(weights, input.spanWidth - 6);
   const baseX: number[] = [];
-  let sum = 0;
-
-  for (let k = 0; k <= n; k++) {
-    sum += weights[k];
-    baseX.push(3 + scale * sum);
-  }
+  for (let i = 0; i < n; i++) baseX.push(3 + gaps[i + 1]);
 
   const strands: HairStrand[] = [];
 
@@ -68,11 +56,9 @@ export function softenHairStrands(input: HairStrandSofteningInput): HairStrandSo
     const points: HairStrandPoint[] = [];
 
     for (let y = 0; y < input.spanHeight; y++) {
-      const x = baseX[i] + amp1 * Math.sin(2 * Math.PI * y / period1 + phase1) + amp2 * Math.sin(2 * Math.PI * y / period2 + phase2);
-      const clampedX = Math.min(Math.max(0, x), input.spanWidth - 1);
-      const rise = smoothstep01(y / (0.15 * input.spanHeight));
-      const fall = 1 - smoothstep01((y - 0.70 * input.spanHeight) / (0.30 * input.spanHeight));
-      const alpha = peak * rise * fall;
+      const x = baseX[i] + sinePhase(y, period1, phase1, amp1) + sinePhase(y, period2, phase2, amp2);
+      const clampedX = input.spanWidth > 1 ? clamp01(x / (input.spanWidth - 1)) * (input.spanWidth - 1) : 0;
+      const alpha = taperAlpha(y, input.spanHeight, peak);
 
       points.push({ x: clampedX, y, alpha });
     }

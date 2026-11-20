@@ -10294,6 +10294,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1096 allow-list外のコマンドは拒否される', parsedBadCmd1096.ok === false, '');
   }
 
+// ---- P1098: softenHairStrands の部品合成版が従来出力と一致する ----
+  {
+    const { softenHairStrands } = await import('../src/miki/conversation/services/hairStrandSofteningService');
+    const { mulberry32 } = await import('../src/miki/core/parts/mulberry32Part');
+    const { weightedGaps } = await import('../src/miki/core/parts/weightedGapsPart');
+    const { sinePhase } = await import('../src/miki/core/parts/sinePhasePart');
+    const out1098 = softenHairStrands({ spanWidth: 48, spanHeight: 140, seed: 42 });
+    // 部品から独立に組み直した期待値と比較する
+    const rand1098 = mulberry32(42);
+    const n1098 = 4 + Math.floor(rand1098() * 4);
+    const weights1098: number[] = [];
+    for (let i = 0; i <= n1098; i++) weights1098.push(0.3 + rand1098());
+    const gaps1098 = weightedGaps(weights1098, 48 - 6);
+    let expectedFirstX = 0;
+    {
+      const p1 = 40 + rand1098() * 120; const p2 = 40 + rand1098() * 120;
+      const ph1 = rand1098() * 2 * Math.PI; const ph2 = rand1098() * 2 * Math.PI;
+      const a1 = 1.5 + rand1098() * 2; const a2 = 0.5 + rand1098() * 1.5;
+      void rand1098(); void rand1098();
+      expectedFirstX = (3 + gaps1098[1]) + sinePhase(0, p1, ph1, a1) + sinePhase(0, p2, ph2, a2);
+    }
+    const firstX1098 = Math.min(...out1098.strands.map((s) => s.points[0].x));
+    check('P1098 合成版の毛束数が部品側の計算と一致する', out1098.strands.length === n1098, `${out1098.strands.length} vs ${n1098}`);
+    check('P1098 合成版の配置が部品の合成と一致する', Math.abs(firstX1098 - Math.max(0, Math.min(47, expectedFirstX))) < 1e-6, `${firstX1098} vs ${expectedFirstX}`);
+    const alphaOk1098 = out1098.strands.every((s) => s.points[0].alpha === 0 && s.points[139].alpha < 0.02 && s.points[70].alpha > 0);
+    check('P1098 減衰の形が taperAlpha の性質と一致する', alphaOk1098, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
