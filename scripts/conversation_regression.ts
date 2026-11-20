@@ -10138,6 +10138,34 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1089 ドリルを繰り返しても初期差が跳ねない', stable1089, `stable=${stable1089}`);
   }
 
+// ---- P1090: ドリルの項目ごとの詰め（連動する項目の相殺を解く） ----
+  {
+    const W1090 = 48, H1090 = 56;
+    const fig1090 = new Uint8Array(W1090 * H1090 * 4);
+    const rect1090 = (x0: number, y0: number, x1: number, y1: number, c: [number, number, number]) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = (y * W1090 + x) * 4; fig1090[i] = c[0]; fig1090[i + 1] = c[1]; fig1090[i + 2] = c[2]; fig1090[i + 3] = 255; } };
+    const disc1090 = (cx: number, cy: number, r: number, c: [number, number, number]) => { for (let y = 0; y < H1090; y++) for (let x = 0; x < W1090; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) { const i = (y * W1090 + x) * 4; fig1090[i] = c[0]; fig1090[i + 1] = c[1]; fig1090[i + 2] = c[2]; fig1090[i + 3] = 255; } };
+    for (let i = 0; i < W1090 * H1090; i++) { fig1090[i * 4] = 240; fig1090[i * 4 + 1] = 240; fig1090[i * 4 + 2] = 240; fig1090[i * 4 + 3] = 255; }
+    rect1090(16, 15, 28, 32, [40, 40, 120]); rect1090(12, 16, 15, 30, [40, 40, 120]); rect1090(29, 16, 32, 30, [40, 40, 120]);
+    rect1090(16, 32, 21, 50, [40, 40, 120]); rect1090(23, 32, 28, 50, [40, 40, 120]);
+    disc1090(22, 9, 6, [45, 32, 22]); disc1090(22, 10, 5, [232, 190, 160]);
+    const target1090: any = poseSvc().analyzePose(fig1090, W1090, H1090);
+    let final1090 = -1;
+    if (target1090?.head) {
+      poseSvc().setTarget(target1090);
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      poseSvc().setOverlapCorrections(null);
+      const r1090: any = poseSvc().drillCorrections(target1090);
+      if (r1090) final1090 = r1090.finalDiff;
+      poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+      poseSvc().setContourCorrections(null);
+      poseSvc().setJointCorrections(null);
+      poseSvc().setOverlapCorrections(null);
+    }
+    check('P1090 項目ごとの詰めで差が0.10以下まで下がる', final1090 >= 0 && final1090 <= 0.10, `final=${final1090}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

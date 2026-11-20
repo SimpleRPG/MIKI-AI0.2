@@ -3296,6 +3296,31 @@ class VisualPoseService {
       else break;
     }
     this.setDrawingCorrections(bestCorr);
+    // P1090: 項目ごとの詰め。比率の一斉更新は、連動する
+    // 項目（腰と太もも等）が逆向きに動くべき場面で相殺
+    // して止まる（実測：サンプルで 0.180 の頭打ちが、
+    // 1項目ずつの探索では 0.040 まで下がった）。差が
+    // 0.10 を超えて残っている時だけ、1項目ずつ候補を
+    // 測って改善する手を取り続ける。
+    if (best.diff > 0.10) {
+      const steps1090 = [0.85, 0.93, 1.07, 1.18];
+      for (let pass = 0; pass < 3; pass++) {
+        let improved1090 = false;
+        for (const k of keys) {
+          for (const f of steps1090) {
+            const candCorr: Corr = { ...bestCorr };
+            candCorr[k] = Math.max(0.5, Math.min(2.5, bestCorr[k] * f));
+            if (candCorr[k] === bestCorr[k]) continue;
+            const candM = measure(candCorr);
+            if (!candM) continue;
+            const contourOk1090 = candM.contourDiff === null || best.contourDiff === null || candM.contourDiff <= best.contourDiff + 0.02;
+            if (candM.diff < best.diff - 0.004 && contourOk1090) { best = candM; bestCorr = candCorr; improved1090 = true; }
+          }
+        }
+        this.setDrawingCorrections(bestCorr);
+        if (!improved1090) break;
+      }
+    }
     // P1087: 重なりのドリル。髪のパネルが体へ重なる幅
     // （panelK）を、中の境界線の差で学習する：今の幅と
     // ±0.12 を測り比べ、差が縮む方へ寄せる。守りは
