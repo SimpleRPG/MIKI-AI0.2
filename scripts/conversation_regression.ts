@@ -10436,6 +10436,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1105 三乗が lerp の入れ子で厳密に合成できる', rCubic1105.found && rCubic1105.maxError === 0, rCubic1105.expression);
   }
 
+// ---- P1106: ドリル課題の自動生成と自動セッション ----
+  {
+    const fs1106 = await import('fs');
+    const zip1106 = fs1106.readFileSync('public/self-code-seed.zip');
+    const origFetch1106 = globalThis.fetch;
+    (globalThis as any).fetch = async (url: any, init?: any) => {
+      if (String(url).includes('self-code-seed.zip')) return new Response(new Uint8Array(zip1106), { status: 200, headers: { 'Content-Type': 'application/zip' } });
+      return origFetch1106(url, init);
+    };
+    const { selfCodeSpaceService } = await import('../src/miki/core/services/selfCodeSpaceService');
+    await (selfCodeSpaceService as any).initializeBundledSeed(true);
+    (globalThis as any).fetch = origFetch1106;
+    const { drillTaskGenerationService } = await import('../src/miki/selfDevelopment/services/drillTaskGenerationService');
+    const { compositionDrillService } = await import('../src/miki/selfDevelopment/services/compositionDrillService');
+    const { codeDrillService } = await import('../src/miki/selfDevelopment/services/codeDrillService');
+    const genA1106 = drillTaskGenerationService.generateTasks(42, 8);
+    const genB1106 = drillTaskGenerationService.generateTasks(42, 8);
+    check('P1106 課題生成は seed 決定的で件数が返る', genA1106.length === 8 && JSON.stringify(genA1106.map((t) => t.generatingExpression)) === JSON.stringify(genB1106.map((t) => t.generatingExpression)), `${genA1106.length}`);
+    check('P1106 生成課題は自明でなくケースを持つ', genA1106.every((t) => t.cases.length >= 10 && new Set(t.cases.map((c) => Math.round(c.expected * 1e6))).size >= 2), '');
+    codeDrillService.resetLedger();
+    const session1106 = await compositionDrillService.runAutoSession(42, 6, true);
+    const solvedRecs1106 = codeDrillService.getLedger().filter((r) => r.taskId.startsWith('auto-42-') && r.solved);
+    check('P1106 自動セッションが生成→解題→登録まで回る', session1106.generated === 6 && session1106.solved >= 3 && session1106.registered >= 3 && solvedRecs1106.length === session1106.solved, `${session1106.generated}/${session1106.solved}/${session1106.registered}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

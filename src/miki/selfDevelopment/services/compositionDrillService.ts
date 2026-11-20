@@ -1,5 +1,6 @@
 import { compositionSearchService, type CompositionCase } from './compositionSearchService';
 import { codeDrillService, type CodeDrillTask } from './codeDrillService';
+import { drillTaskGenerationService } from './drillTaskGenerationService';
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
 import { selfCodeSpaceService } from '../../core/services/selfCodeSpaceService';
 
@@ -95,6 +96,32 @@ class CompositionDrillService {
       attempts: attempt.record.attempts,
       componentId,
     };
+  }
+
+  /*
+   * P1106: 自動セッション。課題を自動生成（P1106 生成サービス）して
+   * 全部解題に回し、解けたものは部品登録する。彼女が自分で課題を作って
+   * 解く循環の1周分。結果は件数と内訳で返す（解けなかった課題も
+   * 台帳に失敗として残る）。
+   */
+  public async runAutoSession(seed: number, count: number, registerAsPart = true): Promise<{
+    generated: number; solved: number; registered: number;
+    results: Array<{ taskId: string; solved: boolean; expression?: string; reason?: string }>;
+  }> {
+    const tasks = drillTaskGenerationService.generateTasks(seed, count);
+    const results: Array<{ taskId: string; solved: boolean; expression?: string; reason?: string }> = [];
+    let solved = 0;
+    let registered = 0;
+    for (const t of tasks) {
+      const r = await this.solveAndRegister({
+        task: { taskId: t.taskId, title: t.title, entryPoint: t.entryPoint, cases: t.cases },
+        registerAsPart,
+      });
+      if (r.solved) solved++;
+      if (r.componentId) registered++;
+      results.push({ taskId: t.taskId, solved: r.solved, expression: r.expression, reason: r.reason });
+    }
+    return { generated: tasks.length, solved, registered, results };
   }
 }
 
