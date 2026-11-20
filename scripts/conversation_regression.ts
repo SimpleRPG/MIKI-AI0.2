@@ -10461,6 +10461,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1106 自動セッションが生成→解題→登録まで回る', session1106.generated === 6 && session1106.solved >= 3 && session1106.registered >= 3 && solvedRecs1106.length === session1106.solved, `${session1106.generated}/${session1106.solved}/${session1106.registered}`);
   }
 
+// ---- P1107: 腕の縁の柔らかさ（スタンプと rim のブレンド帯） ----
+  {
+    const r1107: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    poseSvc().setContourCorrections(null); poseSvc().setJointCorrections(null); poseSvc().setOverlapCorrections(null);
+    const vs1107: any = await poseSvc().verifyBodyStructured(r1107);
+    const vc1107: any = await poseSvc().verifyBodyContour(r1107);
+    check('P1107 腕を柔らかくしても構造と輪郭の照合は通る', vs1107?.verified === true && vc1107?.verified === true, JSON.stringify({ s: vs1107?.score, c: vc1107?.score }));
+    const img1107: any = await poseSvc().renderBody(r1107, 192);
+    let trans1107 = 0;
+    if (img1107) {
+      for (let y = 30; y < 130; y++) for (let x = 1; x < 192; x++) {
+        const i = (y * 192 + x) * 4; const j = (y * 192 + x - 1) * 4;
+        const d = Math.abs(img1107[i] - img1107[j]) + Math.abs(img1107[i + 1] - img1107[j + 1]) + Math.abs(img1107[i + 2] - img1107[j + 2]);
+        if (d >= 5 && d <= 60) trans1107++;
+      }
+    }
+    check('P1107 縁になだらかな遷移画素が現れる', trans1107 > 50, `trans=${trans1107}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

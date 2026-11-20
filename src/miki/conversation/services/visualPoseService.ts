@@ -1423,11 +1423,24 @@ class VisualPoseService {
       // 帯（面の広がり始め）で緩みすぎる。
       const e = armEdgeAt(cy);
       if (!e) { stamp(cx, cy, r, c); return; }
+      // P1107: 縁の帯では下の色からブレンドして書く（二値の
+      // スタンプは階段状の境界になって硬く見える）。スタンプが
+      // 密に重なるため、帯の画素は部分被覆が積み上がって
+      // 自然な AA になる。内側は従来どおり全量。
+      const soft = Math.max(1.0, S * 0.01);
       for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(S - 1, Math.ceil(cy + r)); y++) {
         for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(S - 1, Math.ceil(cx + r)); x++) {
-          if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+          const d = Math.hypot(x - cx, y - cy);
+          if (d > r) continue;
           if (x < e.l - 0.5 || x > e.r + 0.5) continue;
-          px[y * S + x] = c;
+          if (d <= r - soft) { px[y * S + x] = c; continue; }
+          const a = Math.min(1, (r - d) / soft);
+          const cur = px[y * S + x];
+          px[y * S + x] = [
+            Math.round(cur[0] + (c[0] - cur[0]) * a),
+            Math.round(cur[1] + (c[1] - cur[1]) * a),
+            Math.round(cur[2] + (c[2] - cur[2]) * a),
+          ];
         }
       }
     };
@@ -1456,11 +1469,16 @@ class VisualPoseService {
       // 双子は3倍で描いて最頻値で縮小するため、固定1.2px
       // では縮小で消えてしまう）。
       const rimW = Math.max(1.2, S * 0.006);
+      // P1107: rim は全量書きのままにする。外側をフェードさせると
+      // 肩付近で肌と rim 色の中間色が広がり、鎖骨の読み（帯の
+      // 最も明るい行を基準にする）が壊れたため。柔らかさは
+      // stampArm 側のブレンドで担う。
       const stampArmRim = (cx: number, cy: number, r: number) => {
         for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(S - 1, Math.ceil(cy + r)); y++) {
           const e = ctrArm ? armEdgeAt(y) : null;
           for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(S - 1, Math.ceil(cx + r)); x++) {
-            if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue;
+            const dist = Math.hypot(x - cx, y - cy);
+            if (dist > r) continue;
             if (e && (x < e.l - 0.5 || x > e.r + 0.5)) continue;
             const cur = px[y * S + x];
             // 背景との境目は輪郭線の担当（既にある）なので
