@@ -10242,6 +10242,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1093 sinePhaseとtaperAlphaが仕様どおり', eq1093(sinePhase(10, 40, 0, 2), 2) && eq1093(sinePhase(30, 40, 0, 2), -2) && taperAlpha(0, 140, 0.8) === 0 && eq1093(taperAlpha(70, 140, 0.8), 0.8) && taperAlpha(140, 140, 0.8) === 0, '');
   }
 
+// ---- P1094・P1095: コードドリルの実行器と運転手 ----
+  {
+    const { pureCodeExecutionService } = await import('../src/miki/selfDevelopment/services/pureCodeExecutionService');
+    const { codeDrillService } = await import('../src/miki/selfDevelopment/services/codeDrillService');
+    const { clamp01 } = await import('../src/miki/core/parts/clamp01Part');
+    void clamp01;
+    const fs1094 = await import('fs');
+    const clampSrc1094 = fs1094.readFileSync('src/miki/core/parts/clamp01Part.ts', 'utf-8');
+    const clampCases1094 = [
+      { args: [-0.5], expected: 0 }, { args: [0.3], expected: 0.3 }, { args: [1.7], expected: 1 },
+    ];
+    const evOk1094 = pureCodeExecutionService.execute(clampSrc1094, 'clamp01', clampCases1094);
+    check('P1094 実行器が正しい部品を合格にする', evOk1094.passed && evOk1094.passedCount === 3, `${evOk1094.passedCount}/3`);
+    const evBad1094 = pureCodeExecutionService.execute('export function clamp01(x: number): number { return x + 1; }', 'clamp01', clampCases1094);
+    check('P1094 実行器が壊れた部品を落とす', !evBad1094.passed && evBad1094.passedCount === 0, '');
+    const evEvil1094 = pureCodeExecutionService.execute('export function f(x: number): number { return fetch("https://example.com") as unknown as number; }', 'f', [{ args: [1], expected: 1 }]);
+    check('P1094 実行器が禁止グローバルを実行前に弾く', !evEvil1094.passed && evEvil1094.failureReasons.includes('PROHIBITED_GLOBAL'), evEvil1094.failureReasons.join(','));
+    codeDrillService.resetLedger();
+    const drillTask1095 = { taskId: 'drill-suite-clamp01', title: 'clamp01', entryPoint: 'clamp01', cases: clampCases1094 };
+    const att1 = codeDrillService.runAttempt(drillTask1095, 'export function clamp01(x: number): number { return x + 1; }');
+    const att2 = codeDrillService.runAttempt(drillTask1095, clampSrc1094);
+    check('P1095 運転手が試行を記録し解決を覚える', !att1.record.solved && att2.record.solved && att2.record.attempts === 2 && codeDrillService.getLedger().length === 1, `ledger=${codeDrillService.getLedger().length}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

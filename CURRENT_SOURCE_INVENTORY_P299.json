@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1856,
-    "sourceFileCount": 1409,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1320,
-    "relativeImportCandidateCount": 4769,
-    "resolvedRelativeImportCandidateCount": 4753,
+    "trackedPathCountExcludingControlPaths": 1858,
+    "sourceFileCount": 1411,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1322,
+    "relativeImportCandidateCount": 4776,
+    "resolvedRelativeImportCandidateCount": 4760,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 857877,
-      "lines": 10258,
-      "sha256": "f2532016d3523e98c0af4f150f526975f9c019cade9fb29e4f45d3aa4b4c74fb",
+      "bytes": 860023,
+      "lines": 10282,
+      "sha256": "a7f022c2e58d6d2e301df4a3963de4e379c1756bdb35ee8dba08f82a1f854de9",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4982,10 +4982,28 @@
           "specifier": "../src/miki/core/parts/taperAlphaPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/taperAlphaPart.ts"
+        },
+        {
+          "line": 10247,
+          "specifier": "../src/miki/selfDevelopment/services/pureCodeExecutionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/pureCodeExecutionService.ts"
+        },
+        {
+          "line": 10248,
+          "specifier": "../src/miki/selfDevelopment/services/codeDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/codeDrillService.ts"
+        },
+        {
+          "line": 10249,
+          "specifier": "../src/miki/core/parts/clamp01Part",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/clamp01Part.ts"
         }
       ],
-      "relativeImportCandidateCount": 544,
-      "resolvedRelativeImportCount": 544,
+      "relativeImportCandidateCount": 547,
+      "resolvedRelativeImportCount": 547,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -35454,6 +35472,35 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/selfDevelopment/services/codeDrillService.ts",
+      "bytes": 3129,
+      "lines": 89,
+      "sha256": "5bc122806d17d29425391060a1a94823561d29e8faa12e65f1887d6c98683c6d",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "../../core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "./pureCodeExecutionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/pureCodeExecutionService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 3,
+      "resolvedRelativeImportCount": 3,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/selfDevelopment/services/codeMapService.ts",
       "bytes": 14783,
       "lines": 303,
@@ -38055,6 +38102,23 @@
       ],
       "relativeImportCandidateCount": 9,
       "resolvedRelativeImportCount": 9,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/selfDevelopment/services/pureCodeExecutionService.ts",
+      "bytes": 5423,
+      "lines": 125,
+      "sha256": "d9bfb1aa4d481c35776054465cd459f42eb490afec0d302496ba455133526869",
+      "relativeImportCandidates": [
+        {
+          "line": 2,
+          "specifier": "../../core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 1,
+      "resolvedRelativeImportCount": 1,
       "unresolvedRelativeImportCount": 0
     },
     {
