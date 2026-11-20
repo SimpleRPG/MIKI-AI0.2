@@ -10378,6 +10378,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1102 合成の自己完結ソースが実行器を通る', !!ev1102 && ev1102.passed, ev1102 ? `${ev1102.passedCount}/${ev1102.total}` : 'no source');
   }
 
+// ---- P1103: 合成ドリル（探索→解題→登録の運転手） ----
+  {
+    const fs1103 = await import('fs');
+    const zip1103 = fs1103.readFileSync('public/self-code-seed.zip');
+    const origFetch1103 = globalThis.fetch;
+    (globalThis as any).fetch = async (url: any, init?: any) => {
+      if (String(url).includes('self-code-seed.zip')) return new Response(new Uint8Array(zip1103), { status: 200, headers: { 'Content-Type': 'application/zip' } });
+      return origFetch1103(url, init);
+    };
+    const { selfCodeSpaceService } = await import('../src/miki/core/services/selfCodeSpaceService');
+    await (selfCodeSpaceService as any).initializeBundledSeed(true);
+    (globalThis as any).fetch = origFetch1103;
+    const { compositionDrillService } = await import('../src/miki/selfDevelopment/services/compositionDrillService');
+    const { codeDrillService } = await import('../src/miki/selfDevelopment/services/codeDrillService');
+    const { taperAlpha } = await import('../src/miki/core/parts/taperAlphaPart');
+    const tpCases1103 = [0, 35, 70, 105, 140].map((x) => ({ args: [x], expected: taperAlpha(x, 140, 0.8) }));
+    const rA1103 = await compositionDrillService.solveAndRegister({
+      task: { taskId: 'p1103-suite-taper', title: '両端で細る減衰を合成する', entryPoint: 'foundTaper1103', cases: tpCases1103 },
+      registerAsPart: true,
+    });
+    check('P1103 運転手が探索→解題→登録まで回す', rA1103.solved && !!rA1103.componentId && rA1103.expression === 'taperAlpha(x, 140, 0.8)', `${rA1103.solved}/${rA1103.expression}`);
+    const rB1103 = await compositionDrillService.solveAndRegister({
+      task: { taskId: 'p1103-suite-mono', title: '単調な部品だけで両端減衰を作る', entryPoint: 'taperMono1103', cases: tpCases1103 },
+      registerAsPart: true,
+      partNames: ['clamp01', 'smoothstep01', 'lerp'],
+    });
+    const recB1103 = codeDrillService.getRecord('p1103-suite-mono');
+    check('P1103 解けない課題は失敗として台帳に残り登録されない', !rB1103.solved && rB1103.reason === 'NOT_FOUND_IN_VOCABULARY' && !rB1103.componentId && !!recB1103 && !recB1103.solved, `${rB1103.reason}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

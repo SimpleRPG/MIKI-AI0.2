@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1892,
-    "sourceFileCount": 1445,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1356,
-    "relativeImportCandidateCount": 4836,
-    "resolvedRelativeImportCandidateCount": 4820,
+    "trackedPathCountExcludingControlPaths": 1893,
+    "sourceFileCount": 1446,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1357,
+    "relativeImportCandidateCount": 4844,
+    "resolvedRelativeImportCandidateCount": 4828,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 869683,
-      "lines": 10394,
-      "sha256": "f5588bee50c423d2d0d892a52b2bc3e82ac1e51361e7e7363c4c7b1ab8654cf3",
+      "bytes": 871883,
+      "lines": 10424,
+      "sha256": "fc4062e215ef404d0d896fa2ab2910e6bfa14b0746fce182456a2f3f49fac2cc",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5138,10 +5138,34 @@
           "specifier": "../src/miki/core/parts/taperAlphaPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/taperAlphaPart.ts"
+        },
+        {
+          "line": 10390,
+          "specifier": "../src/miki/core/services/selfCodeSpaceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
+        },
+        {
+          "line": 10393,
+          "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
+        },
+        {
+          "line": 10394,
+          "specifier": "../src/miki/selfDevelopment/services/codeDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/codeDrillService.ts"
+        },
+        {
+          "line": 10395,
+          "specifier": "../src/miki/core/parts/taperAlphaPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/taperAlphaPart.ts"
         }
       ],
-      "relativeImportCandidateCount": 570,
-      "resolvedRelativeImportCount": 570,
+      "relativeImportCandidateCount": 574,
+      "resolvedRelativeImportCount": 574,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -36356,6 +36380,41 @@
       ],
       "relativeImportCandidateCount": 9,
       "resolvedRelativeImportCount": 9,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/selfDevelopment/services/compositionDrillService.ts",
+      "bytes": 4255,
+      "lines": 101,
+      "sha256": "0e7ffb4a5ad0e3d614b944a9e0627e1885f1da99f58ac865fe3ee50cf9da33a2",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "./compositionSearchService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/compositionSearchService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "./codeDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/codeDrillService.ts"
+        },
+        {
+          "line": 3,
+          "specifier": "../../core/services/reusableComponentFactoryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/reusableComponentFactoryService.ts"
+        },
+        {
+          "line": 4,
+          "specifier": "../../core/services/selfCodeSpaceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 4,
+      "resolvedRelativeImportCount": 4,
       "unresolvedRelativeImportCount": 0
     },
     {

@@ -1,0 +1,101 @@
+import { compositionSearchService, type CompositionCase } from './compositionSearchService';
+import { codeDrillService, type CodeDrillTask } from './codeDrillService';
+import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
+import { selfCodeSpaceService } from '../../core/services/selfCodeSpaceService';
+
+/*
+ * P1103: 合成ドリルの運転手。
+ * 課題を受け取ると、合成探索（P1102）で候補を作り、コードドリル（P1095）で
+ * 解題として通し、解けたら部品として登録する。探索→解題→登録を
+ * 彼女自身の仕組みの中で一続きに回すための接続。
+ *
+ * 部品のソースは自分のコード空間（selfCodeSpaceService）から読む。
+ * 読めない部品が合成に含まれていたら、その候補は自己完結化できないので
+ * 解題には進まず、理由を返して台帳にも残さない（測れないものを測った
+ * ことにしない）。
+ * 解けない課題は、最良の候補をドリルに1回だけ通して失敗を台帳に残す
+ * （失敗の記録も彼女の到達点の記録）。
+ */
+
+export interface CompositionDrillInput {
+  task: CodeDrillTask;
+  partNames?: string[];
+  maxDepth?: 1 | 2;
+  registerAsPart?: boolean;
+}
+
+export interface CompositionDrillResult {
+  solved: boolean;
+  expression?: string;
+  usedParts: string[];
+  maxError: number;
+  attempts: number;
+  componentId?: string;
+  reason?: string;
+}
+
+class CompositionDrillService {
+  private partSource(name: string): string | null {
+    try {
+      const file = selfCodeSpaceService.readFile(`src/miki/core/parts/${name}Part.ts`);
+      return file?.content ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  public async solveAndRegister(input: CompositionDrillInput): Promise<CompositionDrillResult> {
+    const cases: CompositionCase[] = input.task.cases.map((c) => ({ args: c.args as number[], expected: c.expected as number }));
+    const search = compositionSearchService.search({
+      entryPoint: input.task.entryPoint,
+      cases,
+      partNames: input.partNames,
+      maxDepth: input.maxDepth,
+    });
+    const source = compositionSearchService.buildSelfContainedSource(
+      { found: search.found, entryPoint: search.entryPoint, expression: search.expression, usedParts: search.usedParts, maxError: search.maxError, source: search.source },
+      (name) => this.partSource(name),
+    );
+    if (source === null) {
+      return { solved: false, usedParts: search.usedParts, maxError: search.maxError, attempts: 0, reason: 'PART_SOURCE_UNAVAILABLE' };
+    }
+    const attempt = codeDrillService.runAttempt(input.task, source);
+    if (!attempt.record.solved) {
+      return {
+        solved: false,
+        expression: search.expression,
+        usedParts: search.usedParts,
+        maxError: search.maxError,
+        attempts: attempt.record.attempts,
+        reason: search.found ? 'DRILL_NOT_PASSED' : 'NOT_FOUND_IN_VOCABULARY',
+      };
+    }
+    let componentId: string | undefined;
+    if (input.registerAsPart) {
+      const reg = await reusableComponentFactoryService.createCodeComponentCandidate({
+        purpose: `合成部品 ${input.task.entryPoint}: ${input.task.title}（合成探索＋コードドリルで解題・P1103）`,
+        implementation: source,
+        targetPath: `src/miki/core/parts/${input.task.entryPoint}Part.ts`,
+        tests: `${input.task.entryPoint} の受け入れケース ${input.task.cases.length} 件を全て通すこと`,
+        validation: `合成探索が式 ${search.expression} を見つけ、コードドリルの実行判定を全件通過した`,
+        componentType: 'FUNCTION',
+        inputs: ['number'],
+        outputs: ['number'],
+        exports: [input.task.entryPoint],
+        entryPoint: input.task.entryPoint,
+        supportedEnvironments: ['LOCAL'],
+      });
+      componentId = (reg as { componentId?: string }).componentId;
+    }
+    return {
+      solved: true,
+      expression: search.expression,
+      usedParts: search.usedParts,
+      maxError: search.maxError,
+      attempts: attempt.record.attempts,
+      componentId,
+    };
+  }
+}
+
+export const compositionDrillService = new CompositionDrillService();
