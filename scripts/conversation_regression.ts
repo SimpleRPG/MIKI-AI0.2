@@ -10408,6 +10408,15 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1103 解けない課題は失敗として台帳に残り登録されない', !rB1103.solved && rB1103.reason === 'NOT_FOUND_IN_VOCABULARY' && !rB1103.componentId && !!recB1103 && !recB1103.solved, `${rB1103.reason}`);
   }
 
+// ---- P1104: 合成部品2件の仕様（smoke＋TVE で CLOUD_TESTED 到達はプローブ実証） ----
+  {
+    const { easeInQuad } = await import('../src/miki/core/parts/easeInQuadPart');
+    const { glowPulse } = await import('../src/miki/core/parts/glowPulsePart');
+    check('P1104 easeInQuad は二乗カーブの仕様どおり', easeInQuad(0) === 0 && easeInQuad(0.5) === 0.25 && easeInQuad(1) === 1 && easeInQuad(0.25) === 0.0625, '');
+    const g1104 = Math.exp(-2); const u1104 = 1 - g1104;
+    check('P1104 glowPulse は中心1・縁の値・左右対称が仕様どおり', glowPulse(50) === 1 && Math.abs(glowPulse(0) - (1 - u1104 * u1104 * u1104)) < 1e-12 && glowPulse(25) === glowPulse(75), '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
