@@ -10358,6 +10358,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1101 glowPulse は中心で1・縁で合成どおりに落ちる', glowPulse(50) === 1 && Math.abs(glowPulse(0) - (1 - u0 * u0 * u0)) < 1e-12 && glowPulse(25) === glowPulse(75), '');
   }
 
+// ---- P1102: 合成探索サービス ----
+  {
+    const { compositionSearchService } = await import('../src/miki/selfDevelopment/services/compositionSearchService');
+    const { pureCodeExecutionService } = await import('../src/miki/selfDevelopment/services/pureCodeExecutionService');
+    const fs1102 = await import('fs');
+    const ssCases1102 = [-1, 0, 0.25, 0.5, 0.75, 1, 2].map((x) => { const c = Math.min(1, Math.max(0, x)); return { args: [x], expected: c * c * (3 - 2 * c) }; });
+    const rSs1102 = compositionSearchService.search({ entryPoint: 'foundSmooth', cases: ssCases1102 });
+    check('P1102 探索が smoothstep を再発見する', rSs1102.found && rSs1102.expression === 'smoothstep01(x)' && rSs1102.maxError === 0, rSs1102.expression);
+    const { taperAlpha } = await import('../src/miki/core/parts/taperAlphaPart');
+    const tpCases1102 = [0, 35, 70, 105, 140].map((x) => ({ args: [x], expected: taperAlpha(x, 140, 0.8) }));
+    const rTp1102 = compositionSearchService.search({ entryPoint: 'foundTaper', cases: tpCases1102 });
+    check('P1102 探索が定数束縛つきの taper を再導出する', rTp1102.found && rTp1102.expression === 'taperAlpha(x, 140, 0.8)', rTp1102.expression);
+    const cubic1102 = compositionSearchService.search({ entryPoint: 'cubic', cases: [0, 0.5, 1].map((x) => ({ args: [x], expected: x * x * x })) });
+    check('P1102 語彙外の課題は解けないと返す', cubic1102.found === false && cubic1102.maxError > 0.001, `${cubic1102.maxError}`);
+    const fileOf1102: Record<string, string> = { taperAlpha: 'taperAlphaPart.ts' };
+    const selfContained1102 = compositionSearchService.buildSelfContainedSource(rTp1102, (n) => fs1102.readFileSync(`src/miki/core/parts/${fileOf1102[n]}`, 'utf-8'));
+    const ev1102 = selfContained1102 ? pureCodeExecutionService.execute(selfContained1102, 'foundTaper', tpCases1102) : null;
+    check('P1102 合成の自己完結ソースが実行器を通る', !!ev1102 && ev1102.passed, ev1102 ? `${ev1102.passedCount}/${ev1102.total}` : 'no source');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
