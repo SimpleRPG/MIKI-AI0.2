@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1889,
-    "sourceFileCount": 1442,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1353,
-    "relativeImportCandidateCount": 4818,
-    "resolvedRelativeImportCandidateCount": 4802,
+    "trackedPathCountExcludingControlPaths": 1891,
+    "sourceFileCount": 1444,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1355,
+    "relativeImportCandidateCount": 4820,
+    "resolvedRelativeImportCandidateCount": 4804,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 867009,
-      "lines": 10365,
-      "sha256": "0c692d4652784e7cbd13c633c6552f0b0b823051b6f603216235dff7b2a89cc5",
+      "bytes": 867625,
+      "lines": 10374,
+      "sha256": "4e9c72287357cb2e090dfb48f064bb7cc53062517d1a3d7c1b739387b1c0521e",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5108,10 +5108,22 @@
           "specifier": "../src/miki/core/parts/snapToGridPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/snapToGridPart.ts"
+        },
+        {
+          "line": 10354,
+          "specifier": "../src/miki/core/parts/easeInQuadPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/easeInQuadPart.ts"
+        },
+        {
+          "line": 10355,
+          "specifier": "../src/miki/core/parts/glowPulsePart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/glowPulsePart.ts"
         }
       ],
-      "relativeImportCandidateCount": 565,
-      "resolvedRelativeImportCount": 565,
+      "relativeImportCandidateCount": 567,
+      "resolvedRelativeImportCount": 567,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -17161,6 +17173,16 @@
       "unresolvedRelativeImportCount": 0
     },
     {
+      "path": "src/miki/core/parts/easeInQuadPart.ts",
+      "bytes": 438,
+      "lines": 9,
+      "sha256": "3dd2de0911336243548936f5a9f1e578e647e988d5f3f8f6e6387c497b92ec79",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
       "path": "src/miki/core/parts/easeOutCubicPart.ts",
       "bytes": 386,
       "lines": 10,
@@ -17185,6 +17207,16 @@
       "bytes": 507,
       "lines": 11,
       "sha256": "d68a8720367347645b627a76c49d197e741ab7bd2460595141e20beb65be35ab",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/glowPulsePart.ts",
+      "bytes": 785,
+      "lines": 21,
+      "sha256": "9f99e87dbb1dfe7bea306c6e29bc1f3091dc523ba16129a1212d3589a0a6688b",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,

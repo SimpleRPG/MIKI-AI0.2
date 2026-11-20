@@ -10349,6 +10349,15 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1099 snapToGrid が吸着する', snapToGrid(13, 5) === 15 && snapToGrid(12, 5) === 10 && snapToGrid(7, 0) === 7, '');
   }
 
+// ---- P1101: 彼女自身の合成部品（easeInQuad・glowPulse） ----
+  {
+    const { easeInQuad } = await import('../src/miki/core/parts/easeInQuadPart');
+    const { glowPulse } = await import('../src/miki/core/parts/glowPulsePart');
+    check('P1101 easeInQuad は二乗である', easeInQuad(0) === 0 && easeInQuad(0.5) === 0.25 && easeInQuad(1) === 1, '');
+    const g0 = Math.exp(-2); const u0 = 1 - g0;
+    check('P1101 glowPulse は中心で1・縁で合成どおりに落ちる', glowPulse(50) === 1 && Math.abs(glowPulse(0) - (1 - u0 * u0 * u0)) < 1e-12 && glowPulse(25) === glowPulse(75), '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
