@@ -1688,6 +1688,17 @@ class VisualPoseService {
     if (faceEff) {
       const face = faceEff;
       const DARK: [number, number, number] = [30, 30, 30];
+      // P1108: まつげ・眉・口の色は真っ黒でなく、本人の虹彩を
+      // 暗くした色にする（真っ黒の太い線は怒った顔に見える）。
+      // 読み側の暗色判定（輝度95未満）に届く範囲で抑える。
+      // 瞳孔だけは一番暗いままにして目の芯を残す。
+      const featCol: [number, number, number] = (() => {
+        if (!face.iris) return [72, 58, 60];
+        let c: [number, number, number] = [Math.round(face.iris[0] * 0.42), Math.round(face.iris[1] * 0.42), Math.round(face.iris[2] * 0.42)];
+        const lum = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
+        if (lum > 85) { const k = 85 / lum; c = [Math.round(c[0] * k), Math.round(c[1] * k), Math.round(c[2] * k)]; }
+        return c;
+      })();
       const eyeY = faceCy - faceR * 0.1;
       const eyeDX = faceR * 0.42;
       const eyeR = face.eyeSize === 'large' ? faceR * 0.22 : face.eyeSize === 'small' ? faceR * 0.1 : faceR * 0.15;
@@ -1698,14 +1709,14 @@ class VisualPoseService {
           const ex = hxPx + sgn * eyeDX;
           // まつげ線：目の上の太い線（眉の帯と混ざらないよう目に寄せる）
           const lashY = eyeY - eyeR * 1.05;
-          const lashT = Math.max(1, eyeR * 0.4);
+          const lashT = Math.max(1, eyeR * 0.3);
           // P1041: 目の形。まつげ線を目尻側へ傾ける（垂れ目は
           // 目尻が下がり、つり目は上がる）。
           const away = Math.sign(ex - hxPx) || 1;
           const tilt = face.eyeShape === 'tareme' ? 0.35 : face.eyeShape === 'tsurime' ? -0.35 : 0;
           for (let x = Math.round(ex - eyeR * 1.05); x <= Math.round(ex + eyeR * 1.05); x++) {
             const ly = lashY + (x - ex) * away * tilt;
-            for (let y = Math.round(ly - lashT / 2); y <= Math.round(ly + lashT / 2); y++) set(x, y, DARK);
+            for (let y = Math.round(ly - lashT / 2); y <= Math.round(ly + lashT / 2); y++) set(x, y, featCol);
           }
           stamp(ex, eyeY, eyeR, face.iris);
           stamp(ex, eyeY, Math.max(1, eyeR * 0.4), DARK);
@@ -1724,7 +1735,7 @@ class VisualPoseService {
           const bx = hxPx + sgn * eyeDX;
           for (let x = Math.round(bx - faceR * 0.24); x <= Math.round(bx + faceR * 0.24); x++) {
             const ly = browY - (x - bx) * sgn * bSlope;
-            for (let y = Math.round(ly - browT / 2); y <= Math.round(ly + browT / 2); y++) set(x, y, DARK);
+            for (let y = Math.round(ly - browT / 2); y <= Math.round(ly + browT / 2); y++) set(x, y, featCol);
           }
         }
       }
@@ -1761,13 +1772,13 @@ class VisualPoseService {
       }
       const mw = face.mouthSize === 'large' ? faceR * 0.8 : face.mouthSize === 'small' ? faceR * 0.22 : faceR * 0.45;
       const mouthY = faceCy + faceR * 0.55;
-      const mouthT = Math.max(1, faceR * 0.12);
+      const mouthT = Math.max(1, faceR * 0.07);
       // P1042: 口の形。笑いは口角が上がる弧、への字は逆の弧。
       const arc = face.mouthForm === 'smile' ? faceR * 0.16 : face.mouthForm === 'frown' ? -faceR * 0.16 : 0;
       for (let x = Math.round(hxPx - mw / 2); x <= Math.round(hxPx + mw / 2); x++) {
         const dxn = (x - hxPx) / Math.max(1, mw / 2);
         const yc = mouthY - (dxn * dxn - 0.33) * arc;
-        for (let y = Math.round(yc - mouthT / 2); y <= Math.round(yc + mouthT / 2); y++) set(x, y, DARK);
+        for (let y = Math.round(yc - mouthT / 2); y <= Math.round(yc + mouthT / 2); y++) set(x, y, featCol);
       }
     }
     const image = new Uint8Array(S * S * 4);

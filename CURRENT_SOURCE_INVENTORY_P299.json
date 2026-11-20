@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 877917,
-      "lines": 10497,
-      "sha256": "26e454f319971b03add8476488df3d8db470ba7c458b7c9cca9f26b7a6046795",
+      "bytes": 880042,
+      "lines": 10523,
+      "sha256": "341c51d04bc72cb08c51e07d14d07e1dc6d2c36cd5c9b45939f98a9dd3272259",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -4882,331 +4882,331 @@
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8654,
+          "line": 8657,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8681,
+          "line": 8684,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8712,
+          "line": 8715,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 8754,
+          "line": 8757,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 8771,
+          "line": 8774,
           "specifier": "../src/miki/conversation/services/visualPoseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualPoseService.ts"
         },
         {
-          "line": 9231,
+          "line": 9234,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 9253,
+          "line": 9256,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 9314,
+          "line": 9319,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 9961,
+          "line": 9966,
           "specifier": "../src/miki/conversation/services/visualZoomService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualZoomService.ts"
         },
         {
-          "line": 10187,
+          "line": 10192,
           "specifier": "../src/miki/conversation/services/hairStrandSofteningService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/hairStrandSofteningService.ts"
         },
         {
-          "line": 10228,
+          "line": 10233,
           "specifier": "../src/miki/core/parts/clamp01Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/clamp01Part.ts"
         },
         {
-          "line": 10229,
+          "line": 10234,
           "specifier": "../src/miki/core/parts/lerpPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/lerpPart.ts"
         },
         {
-          "line": 10230,
+          "line": 10235,
           "specifier": "../src/miki/core/parts/smoothstep01Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/smoothstep01Part.ts"
         },
         {
-          "line": 10231,
+          "line": 10236,
           "specifier": "../src/miki/core/parts/mulberry32Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/mulberry32Part.ts"
         },
         {
-          "line": 10232,
+          "line": 10237,
           "specifier": "../src/miki/core/parts/weightedGapsPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/weightedGapsPart.ts"
         },
         {
-          "line": 10233,
+          "line": 10238,
           "specifier": "../src/miki/core/parts/sinePhasePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/sinePhasePart.ts"
         },
         {
-          "line": 10234,
+          "line": 10239,
           "specifier": "../src/miki/core/parts/taperAlphaPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/taperAlphaPart.ts"
         },
         {
-          "line": 10247,
+          "line": 10252,
           "specifier": "../src/miki/selfDevelopment/services/pureCodeExecutionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/pureCodeExecutionService.ts"
         },
         {
-          "line": 10248,
+          "line": 10253,
           "specifier": "../src/miki/selfDevelopment/services/codeDrillService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/codeDrillService.ts"
         },
         {
-          "line": 10249,
+          "line": 10254,
           "specifier": "../src/miki/core/parts/clamp01Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/clamp01Part.ts"
         },
         {
-          "line": 10271,
+          "line": 10276,
           "specifier": "../src/miki/verification/services/teacherVerificationEvidenceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/teacherVerificationEvidenceService.ts"
         },
         {
-          "line": 10272,
+          "line": 10277,
           "specifier": "../src/miki/core/services/canonicalSha256Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         },
         {
-          "line": 10299,
+          "line": 10304,
           "specifier": "../src/miki/conversation/services/hairStrandSofteningService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/hairStrandSofteningService.ts"
         },
         {
-          "line": 10300,
+          "line": 10305,
           "specifier": "../src/miki/core/parts/mulberry32Part",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/mulberry32Part.ts"
         },
         {
-          "line": 10301,
+          "line": 10306,
           "specifier": "../src/miki/core/parts/weightedGapsPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/weightedGapsPart.ts"
         },
         {
-          "line": 10302,
+          "line": 10307,
           "specifier": "../src/miki/core/parts/sinePhasePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/sinePhasePart.ts"
         },
         {
-          "line": 10327,
+          "line": 10332,
           "specifier": "../src/miki/core/parts/clampRangePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/clampRangePart.ts"
         },
         {
-          "line": 10328,
+          "line": 10333,
           "specifier": "../src/miki/core/parts/remapPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/remapPart.ts"
         },
         {
-          "line": 10329,
+          "line": 10334,
           "specifier": "../src/miki/core/parts/gaussFalloffPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/gaussFalloffPart.ts"
         },
         {
-          "line": 10330,
+          "line": 10335,
           "specifier": "../src/miki/core/parts/mixColorPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/mixColorPart.ts"
         },
         {
-          "line": 10331,
+          "line": 10336,
           "specifier": "../src/miki/core/parts/scaleColorPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/scaleColorPart.ts"
         },
         {
-          "line": 10332,
+          "line": 10337,
           "specifier": "../src/miki/core/parts/easeOutCubicPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/easeOutCubicPart.ts"
         },
         {
-          "line": 10333,
+          "line": 10338,
           "specifier": "../src/miki/core/parts/manhattanDistancePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/manhattanDistancePart.ts"
         },
         {
-          "line": 10334,
+          "line": 10339,
           "specifier": "../src/miki/core/parts/euclideanDistancePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/euclideanDistancePart.ts"
         },
         {
-          "line": 10335,
+          "line": 10340,
           "specifier": "../src/miki/core/parts/randomIntPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/randomIntPart.ts"
         },
         {
-          "line": 10336,
+          "line": 10341,
           "specifier": "../src/miki/core/parts/chanceRollPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/chanceRollPart.ts"
         },
         {
-          "line": 10337,
+          "line": 10342,
           "specifier": "../src/miki/core/parts/moveTowardsPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/moveTowardsPart.ts"
         },
         {
-          "line": 10338,
+          "line": 10343,
           "specifier": "../src/miki/core/parts/snapToGridPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/snapToGridPart.ts"
         },
         {
-          "line": 10354,
+          "line": 10359,
           "specifier": "../src/miki/core/parts/easeInQuadPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/easeInQuadPart.ts"
         },
         {
-          "line": 10355,
+          "line": 10360,
           "specifier": "../src/miki/core/parts/glowPulsePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/glowPulsePart.ts"
         },
         {
-          "line": 10363,
+          "line": 10368,
           "specifier": "../src/miki/selfDevelopment/services/compositionSearchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/compositionSearchService.ts"
         },
         {
-          "line": 10364,
+          "line": 10369,
           "specifier": "../src/miki/selfDevelopment/services/pureCodeExecutionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/pureCodeExecutionService.ts"
         },
         {
-          "line": 10369,
+          "line": 10374,
           "specifier": "../src/miki/core/parts/taperAlphaPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/taperAlphaPart.ts"
         },
         {
-          "line": 10390,
+          "line": 10395,
           "specifier": "../src/miki/core/services/selfCodeSpaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
         },
         {
-          "line": 10393,
+          "line": 10398,
           "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
         },
         {
-          "line": 10394,
+          "line": 10399,
           "specifier": "../src/miki/selfDevelopment/services/codeDrillService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/codeDrillService.ts"
         },
         {
-          "line": 10395,
+          "line": 10400,
           "specifier": "../src/miki/core/parts/taperAlphaPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/taperAlphaPart.ts"
         },
         {
-          "line": 10413,
+          "line": 10418,
           "specifier": "../src/miki/core/parts/easeInQuadPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/easeInQuadPart.ts"
         },
         {
-          "line": 10414,
+          "line": 10419,
           "specifier": "../src/miki/core/parts/glowPulsePart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/glowPulsePart.ts"
         },
         {
-          "line": 10422,
+          "line": 10427,
           "specifier": "../src/miki/selfDevelopment/services/compositionSearchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/compositionSearchService.ts"
         },
         {
-          "line": 10423,
+          "line": 10428,
           "specifier": "../src/miki/core/parts/lerpPart",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/parts/lerpPart.ts"
         },
         {
-          "line": 10448,
+          "line": 10453,
           "specifier": "../src/miki/core/services/selfCodeSpaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
         },
         {
-          "line": 10451,
+          "line": 10456,
           "specifier": "../src/miki/selfDevelopment/services/drillTaskGenerationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/drillTaskGenerationService.ts"
         },
         {
-          "line": 10452,
+          "line": 10457,
           "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
         },
         {
-          "line": 10453,
+          "line": 10458,
           "specifier": "../src/miki/selfDevelopment/services/codeDrillService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/codeDrillService.ts"
@@ -16274,9 +16274,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 401155,
-      "lines": 7196,
-      "sha256": "0720d20c38c49fb9c9667d3b5a0d23cf07f1f2a73da49af7e187491da8203307",
+      "bytes": 401951,
+      "lines": 7207,
+      "sha256": "e4763879d062b67b4a08311d9040099ff3a477d2b9dd7f7ae92b44a93368dada",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -8636,10 +8636,13 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   const rl = pose.visualPoseService.analyzePose(lh, 48, 56);
   check('P1016 長い髪を広げた腕と誤らない', rl !== null && rl.armL !== 'SPREAD' && rl.armR !== 'SPREAD', `${rl?.armL}/${rl?.armR}`);
   // 描画：顔の指定が無くても目と口があり、指の影は旧固定色でない
+  // P1108: 口は真っ黒でなく既定の柔らかい色 [72,58,60] で描くため、
+  // 数え方は「目 [30,30,30] ＋ 口の色」の合計にする（目だけだと
+  // 9個で閾値に届かず、口が無ければ落ちることは維持）。
   const ren = rl ? pose.visualPoseService.renderBody(rl, 96) : null;
   let faceDark = 0; let oldFinger = 0;
   if (ren) {
-    for (let y = 8; y <= 26; y++) for (let x = 30; x <= 66; x++) { const i = (y * 96 + x) * 4; if (ren[i] === 30 && ren[i + 1] === 30 && ren[i + 2] === 30) faceDark++; }
+    for (let y = 8; y <= 26; y++) for (let x = 30; x <= 66; x++) { const i = (y * 96 + x) * 4; if ((ren[i] === 30 && ren[i + 1] === 30 && ren[i + 2] === 30) || (ren[i] === 72 && ren[i + 1] === 58 && ren[i + 2] === 60)) faceDark++; }
     for (let i = 0; i < 96 * 96; i++) if (ren[i * 4] === 150 && ren[i * 4 + 1] === 110 && ren[i * 4 + 2] === 82) oldFinger++;
   }
   check('P1016 顔の指定が無くても目と口を描く', faceDark >= 10, `dark=${faceDark}`);
@@ -9294,7 +9297,9 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
       const cols = new Map<number, number[]>();
       for (let y = hy + 10; y < hy + 26; y++) for (let x = hx - 7; x <= hx + 7; x++) {
         const i = (y * S + x) * 4;
-        if (img[i] < 60 && img[i + 1] < 60 && img[i + 2] < 60) { if (!cols.has(x)) cols.set(x, []); cols.get(x)!.push(y); }
+        // P1108: 口の色は真っ黒でなくなったため、暗さの物差しは
+        // 顔の読み側の isDark（輝度95未満）に合わせる。
+        if (img[i] * 0.3 + img[i + 1] * 0.59 + img[i + 2] * 0.11 < 95) { if (!cols.has(x)) cols.set(x, []); cols.get(x)!.push(y); }
       }
       const xs = [...cols.keys()].sort((p2, q2) => p2 - q2);
       if (xs.length < 5) return NaN;
@@ -10479,6 +10484,27 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
       }
     }
     check('P1107 縁になだらかな遷移画素が現れる', trans1107 > 50, `trans=${trans1107}`);
+  }
+
+// ---- P1108: 顔の印象（まつげ・眉・口は真っ黒でなく本人の色を暗くした色で、細く） ----
+  {
+    const r1108: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    poseSvc().setContourCorrections(null); poseSvc().setJointCorrections(null); poseSvc().setOverlapCorrections(null);
+    const spec1108 = { eyeSize: 'large' as const, brows: true, mouthSize: null, iris: [240, 150, 180] as [number, number, number], irisName: 'ピンク' };
+    const ve1108: any = poseSvc().verifyEyeDetail(r1108, spec1108);
+    check('P1108 柔らかい色でも目と目の色は読み返せる', ve1108?.eyes === 2 && ve1108?.eyeColor === 'ピンク', JSON.stringify(ve1108 && { eyes: ve1108.eyes, eyeColor: ve1108.eyeColor }));
+    const img1108: any = await poseSvc().renderBody(r1108, 192, spec1108);
+    let dark1108 = 0;
+    if (img1108 && r1108?.head) {
+      const hx1108 = r1108.head.x * 191, hy1108 = r1108.head.y * 191, hr1108 = (r1108.headRh ?? r1108.head.r) * 192;
+      for (let y = Math.round(hy1108 - hr1108 * 1.7); y <= Math.round(hy1108 + hr1108 * 1.7); y++) for (let x = Math.round(hx1108 - hr1108 * 1.7); x <= Math.round(hx1108 + hr1108 * 1.7); x++) {
+        if (x < 0 || y < 0 || x >= 192 || y >= 192) continue;
+        const i = (y * 192 + x) * 4;
+        if (img1108[i] === 30 && img1108[i + 1] === 30 && img1108[i + 2] === 30) dark1108++;
+      }
+    }
+    check('P1108 頭部に残る真っ黒は瞳孔だけ', dark1108 > 0 && dark1108 < 20, `dark=${dark1108}`);
   }
 
 // ---- 結果 ----
