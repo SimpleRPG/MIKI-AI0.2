@@ -10622,6 +10622,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1115 「こんにちは」は相槌でなく挨拶で返る', String(g1115c?.reason || '').includes('casual_chat_resolved') && String(g1115c?.replyText || '').includes('こんにちは') && !String(g1115c?.replyText || '').includes('なるほど'), JSON.stringify({ reason: g1115c?.reason, reply: String(g1115c?.replyText || '').slice(0, 40) }));
   }
 
+// ---- P1116: 感情語彙の正本化（状態記録と反応生成で同じ物を読む） ----
+  {
+    const { userStateLexicon } = await import('../src/miki/conversation/services/userStateTrailService');
+    check('P1116 正本の前向き語彙にワクワク・ドキドキ・楽しみが入っている', userStateLexicon.positive.test('ワクワクする') && userStateLexicon.positive.test('ドキドキ') && userStateLexicon.positive.test('楽しみだね'), '');
+    check('P1116 正本の疲労語彙にしんどい・つらいが入っている', userStateLexicon.fatigue.test('しんどい') && userStateLexicon.fatigue.test('つらい'), '');
+    const w1116: any = await conversationCoreService.execute({ prompt: 'ワクワクする', memories: [], recentMessages: [], conversationId: 'p1116' } as any);
+    const wr1116 = String(w1116?.replyText || '');
+    check('P1116 ワクワクは反響でなく前向きに返る', !wr1116.includes('、そうなんですね') && !wr1116.includes('の話ですね') && /いいですね|楽しそう|よかった|素敵|すてき/.test(wr1116), wr1116.slice(0, 60));
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

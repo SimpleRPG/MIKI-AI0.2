@@ -86,7 +86,7 @@ import { runtimeConversationCompositionService } from '../../conversation/servic
 import { conversationOpenTopicService } from '../../conversation/services/conversationOpenTopicService';
 import { paragraphCompositionService } from '../../conversation/services/paragraphCompositionService';
 import { hypothesisGlossService } from '../../conversation/services/hypothesisGlossService';
-import { userStateTrailService } from '../../conversation/services/userStateTrailService';
+import { userStateTrailService, userStateLexicon } from '../../conversation/services/userStateTrailService';
 import { hybridConversationEngineService } from '../../conversation/services/hybridConversationEngineService';
 import { implementationSelectionService } from '../../strategy/services/implementationSelectionService';
 import { nonLlmCodeSynthesisService, describeGapReason } from '../../selfDevelopment/services/nonLlmCodeSynthesisService';
@@ -8272,7 +8272,11 @@ export class ConversationCoreService {
     // 「いいですね！」のような形が彼女の声にならなかった）。
     let bibi = false;
     try { bibi = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibi = false; }
-    if (/嬉しい|うれしい|楽しい|よかった|すごい|やった|最高|面白い|かわいい|可愛い|美味しい|おいしい|気持ちいい|ワクワク|ドキドキ|楽しみ/.test(prompt)) {
+    // P1116: 前向きの語彙は状態記録側の正本（userStateLexicon）を
+    // 読む。ここの別リストだけに無い語（ワクワク等）が無分類に
+    // 落ちて反響になっていた（P697）。正本に無い分（褒め・味覚）
+    // だけをここに足す。
+    if (userStateLexicon.positive.test(prompt) || /すごい|かわいい|可愛い|美味しい|おいしい/.test(prompt)) {
       return pick(bibi ? [
         `${term}、いいね！`,
         `わーい、${term}だ！`,
@@ -8285,7 +8289,7 @@ export class ConversationCoreService {
         `${term}、素敵ですね。`,
       ], 'positive');
     }
-    if (/大変|つらい|しんどい|悲しい|残念|ひどい|困った/.test(prompt)) {
+    if (userStateLexicon.fatigue.test(prompt) || /大変|悲しい|残念|ひどい|困った/.test(prompt)) {
       return pick(bibi ? [
         `${term}、たいへんだったね…`,
         `${term}、しんどかったね。無理しないでね。`,

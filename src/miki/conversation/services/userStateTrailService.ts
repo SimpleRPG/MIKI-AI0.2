@@ -40,6 +40,20 @@ const THIRST_PATTERN = /(?:喉乾いた|のど乾いた|喉かわいた|喉が�
 // （「飼いたい」「買いたい」のような〜たい（希望）に誤爆していた）。
 const PAIN_PATTERN = /(?:頭痛|腹痛|歯痛|腰痛|肩こり|痛い|痛み|痛く|ズキズキ|疼|(?:^|[がはも、。！!？?\s])いたい)/;
 
+// P1116: 状態語彙の正本。反応生成など他の消費側はこの
+// パターンを読む。場所ごとに別リストを持つと片方にだけ
+// 語が増えて受け止めがずれる（P697 ワクワクの件：状態側
+// では前向き、反応側では無分類で反響に落ちていた）。
+export const userStateLexicon = {
+  positive: POSITIVE_PATTERN,
+  fatigue: FATIGUE_PATTERN,
+  anxiety: ANXIETY_PATTERN,
+  hunger: HUNGER_PATTERN,
+  loneliness: LONELINESS_PATTERN,
+  thirst: THIRST_PATTERN,
+  pain: PAIN_PATTERN,
+} as const;
+
 // P620: 状態語が否定されている箇所（痛くない・不安じゃない・心配ない等）は
 // 兆候として数えない。否定の形の知識は共有の特徴サービス（P615）に寄せ、
 // 状態語の語彙だけをここに持ち、否定された言及を取り除いてから
