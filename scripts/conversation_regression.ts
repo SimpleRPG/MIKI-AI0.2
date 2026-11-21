@@ -10794,6 +10794,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1124 構造と輪郭の照合は維持', Boolean(vs1124?.verified) && Boolean(vc1124?.verified), `structured=${vs1124?.verified} contour=${vc1124?.verified}`);
   }
 
+// ---- P1125: 候補生成と部品供給の ensure を既定（マニフェスト）経路へ ----
+  {
+    const { githubSyncService } = await import('../src/services/githubSyncService');
+    const { selfCodeSpaceService } = await import('../src/miki/core/services/selfCodeSpaceService');
+    const { selfCodeUnderstandingService } = await import('../src/miki/core/services/selfCodeUnderstandingService');
+    const { canonicalSha256 } = await import('../src/miki/core/services/canonicalSha256Service');
+    const { candidateCodeGenerationService } = await import('../src/miki/core/services/candidateCodeGenerationService');
+    const prevSettings1125 = selfCodeSpaceService.getGitHubSettings();
+    try {
+      selfCodeSpaceService.saveGitHubSettings({ repository: 'p1125/probe', branch: 'main' });
+      const a1125 = 'export function alphaFn(): number { return betaFn(); }\nexport function betaFn(): number { return 1; }\n';
+      const b1125 = 'export const valueB = 2;\n';
+      githubSyncService.applyBundledSeed('p1125/probe', 'main', {
+        files: [
+          { path: 'src/a.ts', content: a1125, sha256: canonicalSha256(a1125) },
+          { path: 'src/b.ts', content: b1125, sha256: canonicalSha256(b1125) },
+        ],
+        commitSha: 'p1125c1', seedRevision: 'p1125-1',
+      });
+      const contract1125: any = (candidateCodeGenerationService as any).buildGapContract(['src/a.ts'], []);
+      const target1125 = contract1125?.targets?.find((t: any) => t.path === 'src/a.ts');
+      check('P1125 ギャップ契約が既定経路の索引で対象をカバーする', Boolean(target1125), JSON.stringify(contract1125 && { targets: (contract1125.targets || []).map((t: any) => t.path) }));
+      const snap1125: any = selfCodeUnderstandingService.getSnapshot();
+      check('P1125 索引の組み立てが override でなく既定の木で共有される', Boolean(snap1125) && !String(snap1125.treeKey || '').startsWith('override|'), `treeKey=${snap1125?.treeKey}`);
+    } finally {
+      selfCodeSpaceService.saveGitHubSettings(prevSettings1125);
+    }
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

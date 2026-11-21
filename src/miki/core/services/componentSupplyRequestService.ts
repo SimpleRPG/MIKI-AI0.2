@@ -419,7 +419,7 @@ class ComponentSupplyRequestService {
     }
 
     // 自己コード索引: 期待インターフェースと関連ファイルの材料。
-    const understanding = selfCodeUnderstandingService.ensure(targetPaths, selfCodeSpaceService.listSourceFiles());
+    const understanding = selfCodeUnderstandingService.ensure(targetPaths);
     const snapshot = selfCodeUnderstandingService.getSnapshot();
     const entriesByPath = new Map((snapshot?.entries ?? []).map((entry) => [entry.path, entry]));
 

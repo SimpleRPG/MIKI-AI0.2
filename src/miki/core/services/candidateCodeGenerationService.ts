@@ -2008,7 +2008,7 @@ class CandidateCodeGenerationService {
     let snapshot=selfCodeUnderstandingService.getSnapshot();
     const coversTargets=(snap:typeof snapshot):boolean=>Boolean(snap?.entries.some(entry=>targetPaths.includes(entry.path)));
     if(!coversTargets(snapshot)){
-      selfCodeUnderstandingService.ensure(targetPaths,selfCodeSpaceService.listSourceFiles());
+      selfCodeUnderstandingService.ensure(targetPaths);
       snapshot=selfCodeUnderstandingService.getSnapshot();
     }
     const entriesByPath=new Map((snapshot?.entries??[]).map(entry=>[entry.path,entry]));

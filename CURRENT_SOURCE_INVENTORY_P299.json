@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1900,
     "sourceFileCount": 1453,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1364,
-    "relativeImportCandidateCount": 4907,
-    "resolvedRelativeImportCandidateCount": 4889,
+    "relativeImportCandidateCount": 4912,
+    "resolvedRelativeImportCandidateCount": 4894,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 908343,
-      "lines": 10810,
-      "sha256": "dee832eab019e0824e3d833797b97f9db1e9242c2d6fc96c41694ee2bb4f2caa",
+      "bytes": 910421,
+      "lines": 10839,
+      "sha256": "4ba4b9c505797811854df2ed4aa3a8b9f46fea3f40b94e89849f6de065bb46fb",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5358,10 +5358,40 @@
           "specifier": "../src/miki/conversation/services/visualLikenessService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
+        },
+        {
+          "line": 10799,
+          "specifier": "../src/services/githubSyncService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/githubSyncService.ts"
+        },
+        {
+          "line": 10800,
+          "specifier": "../src/miki/core/services/selfCodeSpaceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
+        },
+        {
+          "line": 10801,
+          "specifier": "../src/miki/core/services/selfCodeUnderstandingService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/selfCodeUnderstandingService.ts"
+        },
+        {
+          "line": 10802,
+          "specifier": "../src/miki/core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        },
+        {
+          "line": 10803,
+          "specifier": "../src/miki/core/services/candidateCodeGenerationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/candidateCodeGenerationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 607,
-      "resolvedRelativeImportCount": 605,
+      "relativeImportCandidateCount": 612,
+      "resolvedRelativeImportCount": 610,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -18244,9 +18274,9 @@
     },
     {
       "path": "src/miki/core/services/candidateCodeGenerationService.ts",
-      "bytes": 120400,
+      "bytes": 120361,
       "lines": 2643,
-      "sha256": "2c3ba9ae8e55eb7136a90c528ad4143784b1a2d5dcec02791d448a017f8fbb23",
+      "sha256": "27374dd4f3e99ad1f0ab2483b34e331398f8aaff3825182af3e29ba110ea098a",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -19143,9 +19173,9 @@
     },
     {
       "path": "src/miki/core/services/componentSupplyRequestService.ts",
-      "bytes": 48744,
+      "bytes": 48704,
       "lines": 923,
-      "sha256": "0d51e166516065c3279829681d5aa9de90850992ad8a4673f9435885df537415",
+      "sha256": "3dc3e9347e840c8389389772acd5fb337b0f7ed15aa8cc77f8f3470be7b30aab",
       "relativeImportCandidates": [
         {
           "line": 2,
