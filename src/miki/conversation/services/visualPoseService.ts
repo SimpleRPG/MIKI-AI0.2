@@ -2835,12 +2835,21 @@ class VisualPoseService {
         while (runEnd + 1 < size && pal.body[y * size + runEnd + 1]) runEnd++;
         const runLen = runEnd - x + 1;
         for (let k = 0; k < runLen; k++) {
-          const dist = Math.min(k, runLen - 1 - k);
-          if (dist >= 4) continue;
           const i = (y * size + x + k) * 4;
           if (!(flat[i] === skin[0] && flat[i + 1] === skin[1] && flat[i + 2] === skin[2])) continue;
-          const shade = (1 - dist / 4) * 0.10;
-          for (let c = 0; c < 3; c++) out[i + c] = Math.round(out[i + c] * (1 - shade));
+          const dist = Math.min(k, runLen - 1 - k);
+          if (dist < 4) {
+            const shade = (1 - dist / 4) * 0.10;
+            for (let c = 0; c < 3; c++) out[i + c] = Math.round(out[i + c] * (1 - shade));
+          }
+          // P1128: 面の丸み。帯域測定（P1128 準備）では脚まわりが
+          // 最も平らだった。水平ランの内側に正弦の階調を足して、
+          // 中央が持ち上がり端が落ちる円柱めいた面にする。
+          if (runLen >= 6) {
+            const t = k / (runLen - 1);
+            const lift = Math.round(Math.sin(Math.PI * t) * 7) - 2;
+            if (lift !== 0) for (let c = 0; c < 3; c++) out[i + c] = Math.max(0, Math.min(255, out[i + c] + lift));
+          }
         }
         x = runEnd + 1;
       }

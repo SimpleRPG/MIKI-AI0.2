@@ -10876,6 +10876,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     }
   }
 
+// ---- P1128: 仕上げの面の丸み（水平ランの内側に正弦の階調） ----
+  {
+    const svc1128 = poseSvc() as any;
+    const img1128 = paleLongHair48();
+    const reading1128 = svc1128.analyzePose(img1128, 48, 56);
+    svc1128.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+    const render1128 = reading1128 ? svc1128.renderBodyStructured(reading1128, 128, null, null, { backHair: true }) : null;
+    const prof1128 = render1128 ? visualLikenessService.perceptualProfile(render1128, 128, 128) : null;
+    check('P1128 面の丸みを足しても仕上げの柔らかさは落ちない', Boolean(prof1128) && (prof1128 as any).softRatio > 0.26, `softRatio=${(prof1128 as any)?.softRatio}`);
+    const vs1128 = reading1128 ? svc1128.verifyBodyStructured(reading1128) : null;
+    check('P1128 構造照合は維持', Boolean(vs1128?.verified), `structured=${vs1128?.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
