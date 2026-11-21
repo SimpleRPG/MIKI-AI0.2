@@ -10597,6 +10597,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     svc1113.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
   }
 
+// ---- P1114: 仕上げの柔らかさ（体内側の硬い境界を帯でなだらかに） ----
+  {
+    const svc1114 = poseSvc() as any;
+    const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+    const img1114 = paleLongHair48();
+    const reading1114 = svc1114.analyzePose(img1114, 48, 56);
+    svc1114.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const render1114 = reading1114 ? svc1114.renderBodyStructured(reading1114, 128, null, null, { backHair: true }) : null;
+    const prof1114 = render1114 ? visualLikenessService.perceptualProfile(render1114, 128, 128) : null;
+    check('P1114 仕上げ描画の柔らかさが上がっている', Boolean(prof1114) && (prof1114 as any).softRatio > 0.22, `softRatio=${(prof1114 as any)?.softRatio}`);
+    const vs1114 = reading1114 ? svc1114.verifyBodyStructured(reading1114) : null;
+    const vc1114 = reading1114 ? svc1114.verifyBodyContour(reading1114) : null;
+    check('P1114 構造と輪郭の照合は維持', Boolean(vs1114?.verified) && Boolean(vc1114?.verified), `structured=${vs1114?.verified} contour=${vc1114?.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
