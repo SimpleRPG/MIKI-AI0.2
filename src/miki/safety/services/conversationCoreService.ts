@@ -22,6 +22,7 @@ import { answerContentIrService } from '../../conversation/services/answerConten
 import { unknownResearchConversationBridgeService, selectUnverifiedPresentation, buildUnverifiedConclusion } from '../../conversation/services/unknownResearchConversationBridgeService';
 import { conversationUnknownVocabularyService } from '../../conversation/services/conversationUnknownVocabularyService';
 import { missedFormLearningService } from '../../conversation/services/missedFormLearningService';
+import { bodyEditByWordsService } from '../../conversation/services/bodyEditByWordsService';
 import { conversationImageObservationService } from '../../conversation/services/conversationImageObservationService';
 import { scopedVersionedMemoryService } from '../../memory/services/scopedVersionedMemoryService';
 import { conversationUserFactRecallService, looksInterrogative, UserFactIntakeSummary } from '../../conversation/services/conversationUserFactRecallService';
@@ -667,6 +668,12 @@ export class ConversationCoreService {
       const unitAnswer = this.unitConversionAnswer(prompt);
       if (unitAnswer) {
         return this.buildResult('RESOLVED', 'unit_conversion_answer', unitAnswer, state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P1109: 「足をちょっと太くして」——言葉による部位編集は
+      // 描く側の補正にその場で反映する。
+      const bodyEdit = this.bodyEditAnswer(prompt);
+      if (bodyEdit) {
+        return this.buildResult('RESOLVED', 'body_edit_answer', this.applyPersonaVoice(bodyEdit), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P677: 数の比較と文字数も、決定的に答えられる。
       const compareAnswer = this.comparisonAndCountAnswer(prompt);
@@ -3718,6 +3725,11 @@ export class ConversationCoreService {
       }
     }
     return undefined;
+  }
+
+  private bodyEditAnswer(prompt: string): string | undefined {
+    const r = bodyEditByWordsService.applyEdit(prompt);
+    return r ? r.reply : undefined;
   }
 
   private arithmeticAnswer(prompt: string): string | undefined {

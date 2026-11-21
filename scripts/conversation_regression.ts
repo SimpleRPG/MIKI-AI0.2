@@ -10507,6 +10507,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1108 頭部に残る真っ黒は瞳孔だけ', dark1108 > 0 && dark1108 < 20, `dark=${dark1108}`);
   }
 
+// ---- P1109: 言葉による部位編集 ----
+  {
+    const { bodyEditByWordsService: edit1109 } = await import('../src/miki/conversation/services/bodyEditByWordsService');
+    poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const p1109a: any = edit1109.parseEdit('足をちょっと太くして');
+    const p1109b: any = edit1109.parseEdit('ふくらはぎを細くしたい');
+    check('P1109 言葉が部位と量に解釈される', p1109a?.keys?.[0] === 'thigh' && Math.abs(p1109a.factor - 1.08) < 0.001 && p1109b?.keys?.[0] === 'calf' && p1109b.factor < 1, JSON.stringify({ a: p1109a && { k: p1109a.keys, f: p1109a.factor }, b: p1109b && { k: p1109b.keys, f: p1109b.factor } }));
+    check('P1109 質問や雑談は編集と解釈しない', edit1109.parseEdit('足が太い？') === null && edit1109.parseEdit('今日は暑いね') === null, '');
+    const conv1109: any = await conversationCoreService.execute({ prompt: 'ふくらはぎをちょっと細くして', memories: [], recentMessages: [], conversationId: 'p1109' } as any);
+    const corr1109 = poseSvc().getDrawingCorrections();
+    check('P1109 会話から補正が変わり、返事が部位を名指す', conv1109?.reason === 'body_edit_answer' && String(conv1109?.replyText || '').includes('ふくらはぎ') && corr1109.calf < 0.95, JSON.stringify({ reason: conv1109?.reason, calf: corr1109.calf }));
+    poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    poseSvc().setContourCorrections(null); poseSvc().setJointCorrections(null); poseSvc().setOverlapCorrections(null);
+    const r1109: any = await poseSvc().analyzePose(paleLongHair48(), 48, 56);
+    const prof1109 = async () => { const img: any = await poseSvc().renderBody(r1109, 128); const rr: any = await poseSvc().analyzePose(img, 128, 128); return rr?.bodyProfile ?? null; };
+    const before1109 = await prof1109();
+    edit1109.applyEdit('太ももをぐっと太くして');
+    const after1109 = await prof1109();
+    check('P1109 編集が描画の太もも寸法にだけ効く', !!before1109 && !!after1109 && (after1109.thigh ?? 0) > (before1109.thigh ?? 0) + 0.03 && after1109.chest === before1109.chest && after1109.waist === before1109.waist, JSON.stringify({ b: before1109, a: after1109 }));
+    poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
