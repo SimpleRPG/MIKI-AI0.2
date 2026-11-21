@@ -1771,10 +1771,16 @@ export class ConversationCoreService {
         casualConclusion = fx('fx_morning',
           ['おはようございます！今日も一日頑張りましょう。', 'おはようございます。今日もよろしくお願いします。', 'おはようございます！いい朝ですね。'],
           ['おはよう！今日も一日がんばろうね。', 'おはよー！今日もよろしくね。', 'おはよう！いい朝だね。']);
-      } else if (/元気/.test(prompt)) {
+      } else if (/元気|げんき/.test(prompt)) {
         casualConclusion = fx('fx_genki',
           ['元気ですよ！声をかけてくれてありがとうございます。', '元気です！今日も頑張りますね。', 'はい、元気ですよ。ご心配ありがとうございます。'],
           ['元気だよ！声をかけてくれてありがとう！', 'げんきげんき！今日もがんばるよ。', '元気だよ！心配してくれてありがとう。']);
+      } else if (/^(やぁ|やあ|やっほー|ヤッホー)/.test(prompt)) {
+        // P1115: 「やぁ」がどの型にも当たらず断片反響（「やぁの
+        // 話ですね」）に落ちていた。呼びかけの挨拶として受ける。
+        casualConclusion = fx('fx_yaa',
+          ['やぁ！今日もよろしくお願いします。', 'やぁ！声をかけてくれてありがとうございます。', 'やぁ、こんにちは！何かあれば声をかけてくださいね。'],
+          ['やぁ！今日もよろしくね。', 'やぁ！待ってたよ。', 'やぁ、こんにちは！']);
       } else {
         casualConclusion = fx('fx_greeting',
           ['こんにちは！本日もよろしくお願いいたします。準備万全です。', 'こんにちは。今日もよろしくお願いします。', 'こんにちは！何かあれば声をかけてくださいね。'],
@@ -1791,7 +1797,7 @@ export class ConversationCoreService {
       // P521: 定型の挨拶で終わらせず、内容のある雑談には内容へ
       // 反応する（主題語＋感情の手がかり）。挨拶・感謝・疲労など
       // の決まった受け止めが要る言い方では従来の文を優先する。
-      const isPhatic = isFatigue || closingFamily || /お疲れ|おつかれ|ありがと(?:う|ー)?|感謝|ごめん|すみません|申し訳|おはよ(?:う|ー)?|元気|起きた|目覚めた/.test(prompt);
+      const isPhatic = isFatigue || closingFamily || /お疲れ|おつかれ|ありがと(?:う|ー)?|感謝|ごめん|すみません|申し訳|おはよ(?:う|ー)?|元気|げんき|こんにちは|こんばんは|やぁ|やあ|起きた|目覚めた/.test(prompt);
       if (!isPhatic) {
         const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
         if (reaction) casualConclusion = reaction;
@@ -8266,7 +8272,7 @@ export class ConversationCoreService {
     // 「いいですね！」のような形が彼女の声にならなかった）。
     let bibi = false;
     try { bibi = personaProfileService.get().profileId === BIBI_PROFILE_ID; } catch { bibi = false; }
-    if (/嬉しい|うれしい|楽しい|よかった|すごい|やった|最高|面白い|かわいい|可愛い|美味しい|おいしい|気持ちいい/.test(prompt)) {
+    if (/嬉しい|うれしい|楽しい|よかった|すごい|やった|最高|面白い|かわいい|可愛い|美味しい|おいしい|気持ちいい|ワクワク|ドキドキ|楽しみ/.test(prompt)) {
       return pick(bibi ? [
         `${term}、いいね！`,
         `わーい、${term}だ！`,

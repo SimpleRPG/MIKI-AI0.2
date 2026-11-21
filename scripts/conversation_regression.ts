@@ -10612,6 +10612,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1114 構造と輪郭の照合は維持', Boolean(vs1114?.verified) && Boolean(vc1114?.verified), `structured=${vs1114?.verified} contour=${vc1114?.verified}`);
   }
 
+// ---- P1115: 挨拶のカナ表記（げんき？・やぁ・こんにちは） ----
+  {
+    const g1115a: any = await conversationCoreService.execute({ prompt: 'やぁ', memories: [], recentMessages: [], conversationId: 'p1115' } as any);
+    check('P1115 「やぁ」は反響でなく挨拶で返る', String(g1115a?.reason || '').includes('casual_chat_resolved') && !String(g1115a?.replyText || '').includes('の話ですね'), JSON.stringify({ reason: g1115a?.reason, reply: String(g1115a?.replyText || '').slice(0, 40) }));
+    const g1115b: any = await conversationCoreService.execute({ prompt: 'げんき？', memories: [], recentMessages: [], conversationId: 'p1115' } as any);
+    check('P1115 「げんき？」は知識レーンでなく挨拶で返る', String(g1115b?.reason || '').includes('casual_chat_resolved') && /元気|げんき/.test(String(g1115b?.replyText || '')) && !String(g1115b?.replyText || '').includes('答えられない'), JSON.stringify({ reason: g1115b?.reason, reply: String(g1115b?.replyText || '').slice(0, 40) }));
+    const g1115c: any = await conversationCoreService.execute({ prompt: 'こんにちは', memories: [], recentMessages: [], conversationId: 'p1115' } as any);
+    check('P1115 「こんにちは」は相槌でなく挨拶で返る', String(g1115c?.reason || '').includes('casual_chat_resolved') && String(g1115c?.replyText || '').includes('こんにちは') && !String(g1115c?.replyText || '').includes('なるほど'), JSON.stringify({ reason: g1115c?.reason, reply: String(g1115c?.replyText || '').slice(0, 40) }));
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
