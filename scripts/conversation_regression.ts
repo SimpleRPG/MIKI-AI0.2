@@ -10841,6 +10841,41 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1126 構造と輪郭の照合は維持', Boolean(vs1126?.verified) && Boolean(vc1126?.verified), `structured=${vs1126?.verified} contour=${vc1126?.verified}`);
   }
 
+// ---- P1127: dirty スナップショットの分割保存（マニフェスト＋ファイル別キー） ----
+  {
+    const { githubSyncService } = await import('../src/services/githubSyncService');
+    const { selfCodeSpaceService } = await import('../src/miki/core/services/selfCodeSpaceService');
+    const { canonicalSha256 } = await import('../src/miki/core/services/canonicalSha256Service');
+    const { storageService } = await import('../src/services/storageService');
+    const prevSettings1127 = selfCodeSpaceService.getGitHubSettings();
+    try {
+      selfCodeSpaceService.saveGitHubSettings({ repository: 'p1127/probe', branch: 'main' });
+      const a1127 = 'export function alphaFn(): number { return 1; }\n';
+      const b1127 = 'export const valueB = 2;\n';
+      githubSyncService.applyBundledSeed('p1127/probe', 'main', {
+        files: [
+          { path: 'src/a.ts', content: a1127, sha256: canonicalSha256(a1127) },
+          { path: 'src/b.ts', content: b1127, sha256: canonicalSha256(b1127) },
+        ],
+        commitSha: 'p1127c1', seedRevision: 'p1127-1',
+      });
+      const clean1127: any = selfCodeSpaceService.get();
+      const aSha1127 = clean1127.files.find((f: any) => f.path === 'src/a.ts').sha256;
+      const changed1127 = 'export function alphaFn(): number { return 2; }\n';
+      selfCodeSpaceService.applyCandidate([{ path: 'src/a.ts', baselineSha256: aSha1127, candidateContent: changed1127 }]);
+      check('P1127 dirty が分割保存される（旧キーは消える）', !storageService.getItem('miki_self_code_space_v1') && Boolean(storageService.getItem('miki_self_code_space_dirty_manifest_v1')), '');
+      const back1127: any = selfCodeSpaceService.get();
+      check('P1127 分割から組み立てた dirty が等価', back1127?.dirty === true && back1127.files.find((f: any) => f.path === 'src/a.ts')?.content === changed1127 && back1127.files.find((f: any) => f.path === 'src/b.ts')?.content === b1127, '');
+      check('P1127 dirty 中もファイル単位で読める', selfCodeSpaceService.readSourceFileContent('src/b.ts') === b1127 && selfCodeSpaceService.listSourceFileManifest().length === 2, '');
+      const rawA1127 = storageService.getItem('miki_self_code_space_dirty_file_v1_' + encodeURIComponent('src/a.ts'));
+      const bSha1127 = back1127.files.find((f: any) => f.path === 'src/b.ts').sha256;
+      selfCodeSpaceService.applyCandidate([{ path: 'src/b.ts', baselineSha256: bSha1127, candidateContent: 'export const valueB = 3;\n' }]);
+      check('P1127 変わったファイルだけ書き直す', storageService.getItem('miki_self_code_space_dirty_file_v1_' + encodeURIComponent('src/a.ts')) === rawA1127, '');
+    } finally {
+      selfCodeSpaceService.saveGitHubSettings(prevSettings1127);
+    }
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -54,6 +54,10 @@ export interface SelfCodeLightChangeset {
 }
 
 const KEY = 'miki_self_code_space_v1';
+// P1127: dirty snapshot の分割保存。マニフェスト（内容なし）と
+// ファイル別キーに分け、編集のたびの全量書き直しをやめる。
+const DIRTY_MANIFEST_KEY = 'miki_self_code_space_dirty_manifest_v1';
+const DIRTY_FILE_PREFIX = 'miki_self_code_space_dirty_file_v1_';
 const LIGHT_KEY = 'miki_self_code_light_manifest_v1';
 const LIGHT_CHANGESET_KEY = 'miki_self_code_light_changeset_v1';
 const SETTINGS_KEY = 'miki_self_code_github_settings_v1';
@@ -135,6 +139,24 @@ class SelfCodeSpaceService {
         repository: settings.repository,
         branch: settings.branch,
         fileCount: 0,
+        recordedAt: Date.now(),
+      };
+      this.saveWorkspaceDiagnostic(diagnostic);
+      return diagnostic;
+    }
+
+    // P1127: 分割保存の dirty はマニフェストだけで判定する。
+    const splitManifest = this.readDirtyManifest();
+    if (splitManifest) {
+      const diagnostic: SelfCodeWorkspaceDiagnostic = {
+        status: 'DIRTY',
+        diagnosticCode: 'SELF_CODE_WORKSPACE_DIRTY',
+        summary: '自己コードWorkspaceに未反映の変更があります。',
+        nextAction: '変更内容を保持したまま検証・PUSH判断を行います。',
+        backend,
+        repository: settings.repository,
+        branch: settings.branch,
+        fileCount: splitManifest.files.length,
         recordedAt: Date.now(),
       };
       this.saveWorkspaceDiagnostic(diagnostic);
@@ -702,7 +724,8 @@ class SelfCodeSpaceService {
 
     // 正常PULL時の正本は githubSyncService に一本化する。
     // clean snapshot を別KEYへJSON.stringifyして二重保存しない。
-    storageService.removeItem(KEY);
+    // P1127: 分割保存の dirty も残さない。
+    this.clearDirtyStorage();
     this.recordLightManifest(files);
 
     return snapshot;
@@ -710,20 +733,10 @@ class SelfCodeSpaceService {
 
   get(): SelfCodeSnapshot | undefined {
     try {
-      const raw = storageService.getItem(KEY);
-
       // dirty snapshot は自己改善中の作業状態なので最優先で保持する。
-      if (raw) {
-        const value = JSON.parse(raw);
-        if (value?.files && value?.dirty === true) {
-          return this.clone(value);
-        }
-
-        // 旧バージョンのclean snapshotが残っている場合は一度だけ削除。
-        if (value?.files && value?.dirty !== true) {
-          storageService.removeItem(KEY);
-        }
-      }
+      // P1127: 分割保存から組み立てる（旧単一キーは読み時に移行）。
+      const dirty = this.readDirtySnapshot();
+      if (dirty) return this.clone(dirty);
 
       // clean状態はGitHub同期サービスを唯一の正本として読む。
       const settings = this.getGitHubSettings();
@@ -788,6 +801,14 @@ class SelfCodeSpaceService {
   // 既定の入力で、全体の内容を組み立てない。dirty な作業状態がある間は
   // そちらが正本。
   listSourceFileManifest(): Array<{ path: string; contentHash: string }> {
+    // P1127: dirty はマニフェストだけから返す（内容は読まない）。
+    const splitManifest = this.readDirtyManifest();
+    if (splitManifest) {
+      return splitManifest.files.map(file => ({
+        path: file.path,
+        contentHash: file.sha256,
+      }));
+    }
     try {
       const raw = storageService.getItem(KEY);
       if (raw) {
@@ -814,6 +835,19 @@ class SelfCodeSpaceService {
 
   // P1123: 1ファイルの内容だけを読む（全体の組み立てをしない）。
   readSourceFileContent(path: string): string | undefined {
+    // P1127: dirty はファイル別キーだけを読む。
+    const splitManifest = this.readDirtyManifest();
+    if (splitManifest) {
+      if (!splitManifest.files.some(file => file.path === path)) return undefined;
+      try {
+        const raw = storageService.getItem(this.dirtyFileKey(path));
+        if (!raw) return undefined;
+        const parsed = JSON.parse(raw);
+        return typeof parsed?.content === 'string' ? parsed.content : undefined;
+      } catch {
+        return undefined;
+      }
+    }
     try {
       const raw = storageService.getItem(KEY);
       if (raw) {
@@ -847,7 +881,8 @@ class SelfCodeSpaceService {
       return change ? {...file,content:change.candidateContent,sha256:canonicalSha256(change.candidateContent)} : {...file};
     });
     const updated:SelfCodeSnapshot={...snapshot,files:next,repoSha256:canonicalSha256(next.map(file=>({path:file.path,sha256:file.sha256}))),syncedAt:Date.now(),dirty:true,baseRepoSha256:snapshot.baseRepoSha256||snapshot.repoSha256};
-    storageService.setItem(KEY,JSON.stringify(updated));
+    // P1127: dirty は分割保存へ（変わったファイルだけ書く）。
+    this.writeDirtySnapshot(updated);
     return this.clone(updated);
   }
 
@@ -1364,7 +1399,9 @@ class SelfCodeSpaceService {
     if(!current) throw new Error("SELF_CODE_SPACE_NOT_SYNCED");
     if(current.repoSha256!==expectedCurrentRepoSha256) throw new Error("SELF_CODE_SPACE_RESTORE_CONFLICT");
     if(snapshot.repository!==current.repository||snapshot.branch!==current.branch) throw new Error("SELF_CODE_SPACE_RESTORE_TARGET_MISMATCH");
-    storageService.setItem(KEY,JSON.stringify(snapshot));
+    // P1127: dirty な復元は分割保存へ、clean は従来の単一キーへ。
+    if (snapshot.dirty) this.writeDirtySnapshot(snapshot);
+    else storageService.setItem(KEY,JSON.stringify(snapshot));
     return this.clone(snapshot);
   }
 
@@ -1382,6 +1419,113 @@ class SelfCodeSpaceService {
       ...snapshot,
       files: snapshot.files.map(file => ({ ...file })),
     };
+  }
+
+  // ---- P1127: dirty snapshot の分割保存 ----
+  private dirtyFileKey(path: string): string {
+    return DIRTY_FILE_PREFIX + encodeURIComponent(path);
+  }
+
+  private readDirtyManifest(): { repository: string; branch: string; repoSha256: string; baseRepoSha256?: string; syncedAt: number; source?: 'BUNDLED_SEED' | 'GITHUB'; files: Array<{ path: string; sha256: string; blobSha?: string }> } | null {
+    try {
+      const raw = storageService.getItem(DIRTY_MANIFEST_KEY);
+      if (!raw) return null;
+      const value = JSON.parse(raw);
+      if (!value?.files || !Array.isArray(value.files)) return null;
+      return value;
+    } catch {
+      return null;
+    }
+  }
+
+  private writeDirtySnapshot(snapshot: SelfCodeSnapshot): void {
+    const previous = this.readDirtyManifest();
+    const previousSha = new Map((previous?.files ?? []).map(f => [f.path, f.sha256]));
+    const nextPaths = new Set(snapshot.files.map(f => f.path));
+    for (const file of snapshot.files) {
+      if (previousSha.get(file.path) !== file.sha256) {
+        storageService.setItem(this.dirtyFileKey(file.path), JSON.stringify({ content: file.content, ...(file.blobSha ? { blobSha: file.blobSha } : {}) }));
+      }
+    }
+    for (const old of previous?.files ?? []) {
+      if (!nextPaths.has(old.path)) storageService.removeItem(this.dirtyFileKey(old.path));
+    }
+    storageService.setItem(DIRTY_MANIFEST_KEY, JSON.stringify({
+      repository: snapshot.repository,
+      branch: snapshot.branch,
+      repoSha256: snapshot.repoSha256,
+      ...(snapshot.baseRepoSha256 ? { baseRepoSha256: snapshot.baseRepoSha256 } : {}),
+      syncedAt: snapshot.syncedAt,
+      ...(snapshot.source ? { source: snapshot.source } : {}),
+      files: snapshot.files.map(f => ({ path: f.path, sha256: f.sha256, ...(f.blobSha ? { blobSha: f.blobSha } : {}) })),
+    }));
+    storageService.removeItem(KEY);
+  }
+
+  private clearDirtyStorage(): void {
+    const manifest = this.readDirtyManifest();
+    for (const f of manifest?.files ?? []) storageService.removeItem(this.dirtyFileKey(f.path));
+    storageService.removeItem(DIRTY_MANIFEST_KEY);
+    storageService.removeItem(KEY);
+  }
+
+  /** 分割側に dirty があれば組み立てて返す。旧単一キーの dirty は
+   * ここで分割へ移行する。旧 clean が残っていれば従来どおり削除。 */
+  private readDirtySnapshot(): SelfCodeSnapshot | undefined {
+    const manifest = this.readDirtyManifest();
+    if (manifest) {
+      const files: SelfCodeFile[] = [];
+      for (const entry of manifest.files) {
+        try {
+          const raw = storageService.getItem(this.dirtyFileKey(entry.path));
+          if (!raw) return undefined;
+          const parsed = JSON.parse(raw);
+          if (typeof parsed?.content !== 'string') return undefined;
+          files.push({ path: entry.path, content: parsed.content, sha256: entry.sha256, ...(entry.blobSha || parsed.blobSha ? { blobSha: entry.blobSha || parsed.blobSha } : {}) });
+        } catch {
+          return undefined;
+        }
+      }
+      return {
+        repository: manifest.repository,
+        branch: manifest.branch,
+        repoSha256: manifest.repoSha256,
+        files,
+        syncedAt: manifest.syncedAt,
+        dirty: true,
+        ...(manifest.baseRepoSha256 ? { baseRepoSha256: manifest.baseRepoSha256 } : {}),
+        ...(manifest.source ? { source: manifest.source } : {}),
+      };
+    }
+    try {
+      const raw = storageService.getItem(KEY);
+      if (!raw) return undefined;
+      const value = JSON.parse(raw);
+      if (value?.files && value?.dirty === true) {
+        const snapshot = value as SelfCodeSnapshot;
+        this.writeDirtySnapshot(snapshot);
+        return snapshot;
+      }
+      if (value?.files && value?.dirty !== true) {
+        storageService.removeItem(KEY);
+      }
+    } catch { /* 読めない旧値は無いものとして扱う */ }
+    return undefined;
+  }
+
+  /** dirty の有無と件数だけを軽く見る（診断用・内容は読まない） */
+  private dirtyInfo(): { fileCount: number } | null {
+    const manifest = this.readDirtyManifest();
+    if (manifest) return { fileCount: manifest.files.length };
+    try {
+      const raw = storageService.getItem(KEY);
+      if (!raw) return null;
+      const value = JSON.parse(raw);
+      if (value?.files && value?.dirty === true) {
+        return { fileCount: Array.isArray(value.files) ? value.files.length : 0 };
+      }
+    } catch { return null; }
+    return null;
   }
 }
 
