@@ -38,6 +38,19 @@ interface NativeWorkspacePlugin {
     engine: string;
     api_version: number;
   }>;
+  writeWorkspaceFile(input: { relative_path: string; content: string }): Promise<{
+    relative_path: string;
+    sha256: string;
+    byte_length: number;
+    engine: string;
+    api_version: number;
+  }>;
+  deleteWorkspaceFile(input: { relative_path: string }): Promise<{
+    relative_path: string;
+    deleted: boolean;
+    engine: string;
+    api_version: number;
+  }>;
 }
 
 const Native = registerPlugin<NativeWorkspacePlugin>('MIKINativeRunner');
@@ -70,6 +83,32 @@ class NativeWorkspaceBridgeService {
       if (!(await this.available())) return undefined;
       const result = await Native.readWorkspaceFile({ relative_path: relativePath });
       return typeof result.content === 'string' ? result.content : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * P1131: ワークスペース内の1ファイルへ書く（第3段の受け口）。
+   * 書けたら sha256 とバイト数を返す。使えない環境では undefined。
+   */
+  public async writeFile(relativePath: string, content: string): Promise<{ sha256: string; byteLength: number } | undefined> {
+    try {
+      if (!(await this.available())) return undefined;
+      const result = await Native.writeWorkspaceFile({ relative_path: relativePath, content });
+      if (result.engine !== 'RUST' || typeof result.sha256 !== 'string') return undefined;
+      return { sha256: result.sha256, byteLength: result.byte_length };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** P1131: ワークスペース内の1ファイルを消す。消えたら true。 */
+  public async deleteFile(relativePath: string): Promise<boolean | undefined> {
+    try {
+      if (!(await this.available())) return undefined;
+      const result = await Native.deleteWorkspaceFile({ relative_path: relativePath });
+      return result.engine === 'RUST' ? result.deleted === true : undefined;
     } catch {
       return undefined;
     }

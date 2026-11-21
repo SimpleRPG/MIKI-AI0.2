@@ -846,6 +846,76 @@ class MIKINativeRunnerPlugin : Plugin() {
         }.start()
     }
 
+    // P1131: 第3段（同期の書き込み）の受け口。ワークスペース内の
+    // 1ファイルへ書き、sha256 を Rust で取って返す。読み側の上限と
+    // 揃えて 4MB を超える内容は受けない。消費側の本経路化は次段。
+    @PluginMethod
+    fun writeWorkspaceFile(call: PluginCall) {
+        val relativePath = call.getString("relative_path")?.trim()
+        val content = call.getString("content")
+        if (relativePath.isNullOrEmpty()) {
+            call.reject("RELATIVE_PATH_REQUIRED")
+            return
+        }
+        if (content == null) {
+            call.reject("CONTENT_REQUIRED")
+            return
+        }
+        if (content.toByteArray(Charsets.UTF_8).size > 4_000_000) {
+            call.reject("WRITE_TARGET_TOO_LARGE")
+            return
+        }
+        val workspaceRoot = File(context.filesDir, "miki/workspaces").canonicalFile
+        val target = File(workspaceRoot, relativePath).canonicalFile
+        if (!target.path.startsWith(workspaceRoot.path + File.separator)) {
+            call.reject("WORKSPACE_PATH_ESCAPE_REJECTED")
+            return
+        }
+        Thread {
+            try {
+                target.parentFile?.mkdirs()
+                target.writeText(content, Charsets.UTF_8)
+                val result = JSObject()
+                result.put("relative_path", relativePath)
+                result.put("sha256", MIKINativeCore.sha256File(target))
+                result.put("byte_length", target.length())
+                result.put("engine", "RUST")
+                result.put("api_version", MIKINativeCore.health().apiVersion)
+                call.resolve(result)
+            } catch (error: Throwable) {
+                call.reject("WRITE_WORKSPACE_FILE_FAILED", error.toCapacitorException())
+            }
+        }.start()
+    }
+
+    // P1131: ワークスペース内の1ファイルを消す（第3段の受け口）。
+    @PluginMethod
+    fun deleteWorkspaceFile(call: PluginCall) {
+        val relativePath = call.getString("relative_path")?.trim()
+        if (relativePath.isNullOrEmpty()) {
+            call.reject("RELATIVE_PATH_REQUIRED")
+            return
+        }
+        val workspaceRoot = File(context.filesDir, "miki/workspaces").canonicalFile
+        val target = File(workspaceRoot, relativePath).canonicalFile
+        if (!target.path.startsWith(workspaceRoot.path + File.separator)) {
+            call.reject("WORKSPACE_PATH_ESCAPE_REJECTED")
+            return
+        }
+        Thread {
+            try {
+                val result = JSObject()
+                result.put("relative_path", relativePath)
+                result.put("deleted", target.isFile && target.delete())
+                result.put("engine", "RUST")
+                result.put("api_version", MIKINativeCore.health().apiVersion)
+                call.resolve(result)
+            } catch (error: Throwable) {
+                call.reject("DELETE_WORKSPACE_FILE_FAILED", error.toCapacitorException())
+            }
+        }.start()
+    }
+
     @PluginMethod
     fun execute(call: PluginCall) {
         val requestId = call.getString("request_id")

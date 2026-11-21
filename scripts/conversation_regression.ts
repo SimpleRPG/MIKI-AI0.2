@@ -10919,6 +10919,15 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1130 構造と輪郭の照合は維持', Boolean(vs1130?.verified) && Boolean(vc1130?.verified), `structured=${vs1130?.verified} contour=${vc1130?.verified}`);
   }
 
+// ---- P1131: Rust 第3段の受け口（ネイティブ書き込み・削除） ----
+  {
+    const { nativeWorkspaceBridgeService } = await import('../src/miki/execution/services/nativeWorkspaceBridgeService');
+    check('P1131 ネイティブの無い環境では橋は静かに無効になる', (await nativeWorkspaceBridgeService.available()) === false, '');
+    const w1131 = await nativeWorkspaceBridgeService.writeFile('probe/p1131.txt', 'x');
+    const d1131 = await nativeWorkspaceBridgeService.deleteFile('probe/p1131.txt');
+    check('P1131 橋が無い環境では書き込み・削除とも undefined（JS 経路のまま）', w1131 === undefined && d1131 === undefined, `write=${String(w1131)} delete=${String(d1131)}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

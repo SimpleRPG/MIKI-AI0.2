@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1901,
     "sourceFileCount": 1454,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1365,
-    "relativeImportCandidateCount": 4924,
-    "resolvedRelativeImportCandidateCount": 4906,
+    "relativeImportCandidateCount": 4925,
+    "resolvedRelativeImportCandidateCount": 4907,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -176,9 +176,9 @@
     },
     {
       "path": "android/app/src/main/java/com/miki/ai/MIKINativeRunnerPlugin.kt",
-      "bytes": 51792,
-      "lines": 1004,
-      "sha256": "014e63910226cafd0d095594ec7088c87b1183bfdd9f20c15b5e25dd9ed61afd",
+      "bytes": 54832,
+      "lines": 1074,
+      "sha256": "b13285aa51d2cdc6b36374937e6ad338844d0a1eaad70b8bcfeb5fdee2cdf820",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 918250,
-      "lines": 10935,
-      "sha256": "6285089ab3be27c362fc32e902e03fb182dcc4cdd8daf627cd2a7c3062abbc9b",
+      "bytes": 918991,
+      "lines": 10944,
+      "sha256": "0f7b0bd20bd5227f27d89083b94b8a3044c16cd0f7162e10f138cee0bf905458",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5442,10 +5442,16 @@
           "specifier": "../src/miki/conversation/services/visualLikenessService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
+        },
+        {
+          "line": 10924,
+          "specifier": "../src/miki/execution/services/nativeWorkspaceBridgeService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/execution/services/nativeWorkspaceBridgeService.ts"
         }
       ],
-      "relativeImportCandidateCount": 621,
-      "resolvedRelativeImportCount": 619,
+      "relativeImportCandidateCount": 622,
+      "resolvedRelativeImportCount": 620,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -26465,9 +26471,9 @@
     },
     {
       "path": "src/miki/execution/services/nativeWorkspaceBridgeService.ts",
-      "bytes": 2800,
-      "lines": 79,
-      "sha256": "b0aead5ea0c78188199b38081c7248292be1aea4db181871473ba33c5b2489c1",
+      "bytes": 4313,
+      "lines": 118,
+      "sha256": "71e928f704fca1350d054c631d2fc50c6119c36bf04a41d62a6c2564807184fb",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
