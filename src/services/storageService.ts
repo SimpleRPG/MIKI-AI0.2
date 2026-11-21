@@ -358,6 +358,7 @@ class StorageService {
   private diagnosticKeyClass(key: string): string {
     if (key === 'miki_self_code_space_v1') return 'self_code_space';
     if (key.startsWith('miki_github_sync_v2_')) return 'github_sync';
+    if (key.startsWith('miki_github_sync_manifest_v3_') || key.startsWith('miki_github_sync_file_v3_')) return 'github_sync';
     if (key === 'miki_domain_router_history_v1') return 'domain_router_history';
     if (key === 'gamecraft_memories') return 'memory_records';
     if (key === 'miki_runtime_memory_diagnostics_v1') return 'runtime_memory';

@@ -46,6 +46,29 @@ export interface GitHubSyncDiagnostic {
 
 
 const KEY_PREFIX = 'miki_github_sync_v2_';
+// P1118: 分割保存（P1112方式）。従来はワークスペース全体を1キーに
+// JSON で丸ごと保存しており（実機で約21.5M）、読み書きのたびに全体の
+// パースと書き戻しが走っていた。マニフェスト（メタのみ）＋ファイル
+// 単位キーに分け、保存は変更ファイルだけに、読みは必要時だけにする。
+const MANIFEST_PREFIX = 'miki_github_sync_manifest_v3_';
+const FILE_PREFIX = 'miki_github_sync_file_v3_';
+
+interface SplitManifestFile {
+  path: string;
+  sha256: string;
+  blobSha?: string;
+}
+
+interface SplitManifest {
+  repository: string;
+  branch: string;
+  commitSha: string;
+  treeSha: string;
+  complete: boolean;
+  source?: 'GITHUB' | 'BUNDLED_SEED';
+  syncedAt: number;
+  files: SplitManifestFile[];
+}
 
 function normalizeRepository(repository: string): string {
   return repository
@@ -57,6 +80,14 @@ function normalizeRepository(repository: string): string {
 
 function makeKey(repository: string, branch: string): string {
   return `${KEY_PREFIX}${encodeURIComponent(normalizeRepository(repository))}_${encodeURIComponent(branch.trim())}`;
+}
+
+function makeManifestKey(repository: string, branch: string): string {
+  return `${MANIFEST_PREFIX}${encodeURIComponent(normalizeRepository(repository))}_${encodeURIComponent(branch.trim())}`;
+}
+
+function makeFileKey(repository: string, branch: string, path: string): string {
+  return `${FILE_PREFIX}${encodeURIComponent(normalizeRepository(repository))}_${encodeURIComponent(branch.trim())}:${encodeURIComponent(path)}`;
 }
 
 function hashContent(content: string): string {
@@ -96,6 +127,109 @@ function normalizeFiles(
 
 class GitHubSyncService {
   get(repository: string, branch: string): GitHubSyncState | undefined {
+    // P1118: 分割保存があればそちらから読む。無ければ旧キー（丸ごと
+    // 保存）を読み、初回に分割へ移行して旧キーを消す。
+    const split = this.readSplitState(repository, branch);
+    if (split) return split;
+    const legacy = this.readLegacyState(repository, branch);
+    if (legacy) {
+      try {
+        this.writeSplit(legacy);
+        storageService.removeItem(makeKey(repository, branch));
+      } catch { /* 移行は補助経路：読めた内容はそのまま返す */ }
+      return legacy;
+    }
+    return undefined;
+  }
+
+  private readManifest(repository: string, branch: string): SplitManifest | undefined {
+    try {
+      const raw = storageService.getItem(makeManifestKey(repository, branch));
+      if (!raw) return undefined;
+      const value = JSON.parse(raw);
+      if (!value || !Array.isArray(value.files)) return undefined;
+      const files = value.files.filter(
+        (file: any) => file && typeof file.path === 'string' && typeof file.sha256 === 'string'
+      );
+      if (files.length !== value.files.length) return undefined;
+      return {
+        repository: normalizeRepository(repository),
+        branch: branch.trim(),
+        commitSha: String(value.commitSha || ''),
+        treeSha: String(value.treeSha || ''),
+        complete: value.complete === true,
+        source: value.source === 'BUNDLED_SEED' ? 'BUNDLED_SEED' : 'GITHUB',
+        syncedAt: Number(value.syncedAt || 0),
+        files: files.map((file: any) => ({
+          path: file.path,
+          sha256: file.sha256,
+          blobSha: typeof file.blobSha === 'string' ? file.blobSha : undefined,
+        })),
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private readSplitState(repository: string, branch: string): GitHubSyncState | undefined {
+    const manifest = this.readManifest(repository, branch);
+    if (!manifest) return undefined;
+    try {
+      const files: GitHubSyncFile[] = [];
+      for (const entry of manifest.files) {
+        const raw = storageService.getItem(makeFileKey(repository, branch, entry.path));
+        if (!raw) return undefined;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed.content !== 'string') return undefined;
+        files.push({ path: entry.path, content: parsed.content, sha256: entry.sha256, blobSha: entry.blobSha });
+      }
+      return {
+        repository: manifest.repository,
+        branch: manifest.branch,
+        commitSha: manifest.commitSha,
+        treeSha: manifest.treeSha,
+        complete: manifest.complete,
+        source: manifest.source,
+        files,
+        syncedAt: manifest.syncedAt,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private writeSplit(state: GitHubSyncState): void {
+    const previous = this.readManifest(state.repository, state.branch);
+    const previousSha = new Map<string, string>((previous?.files || []).map((f) => [f.path, f.sha256]));
+    const nextPaths = new Set<string>();
+    for (const file of state.files) {
+      nextPaths.add(file.path);
+      if (previousSha.get(file.path) !== file.sha256) {
+        storageService.setItem(
+          makeFileKey(state.repository, state.branch, file.path),
+          JSON.stringify({ content: file.content })
+        );
+      }
+    }
+    for (const old of previous?.files || []) {
+      if (!nextPaths.has(old.path)) {
+        storageService.removeItem(makeFileKey(state.repository, state.branch, old.path));
+      }
+    }
+    const manifest: SplitManifest = {
+      repository: normalizeRepository(state.repository),
+      branch: state.branch.trim(),
+      commitSha: state.commitSha,
+      treeSha: state.treeSha,
+      complete: state.complete,
+      source: state.source,
+      syncedAt: state.syncedAt,
+      files: state.files.map((file) => ({ path: file.path, sha256: file.sha256, blobSha: file.blobSha })),
+    };
+    storageService.setItem(makeManifestKey(state.repository, state.branch), JSON.stringify(manifest));
+  }
+
+  private readLegacyState(repository: string, branch: string): GitHubSyncState | undefined {
     try {
       const raw = storageService.getItem(makeKey(repository, branch));
       if (!raw) return undefined;
@@ -143,10 +277,14 @@ class GitHubSyncService {
   }
 
   private save(state: GitHubSyncState): GitHubSyncState {
-    storageService.setItem(
-      makeKey(state.repository, state.branch),
-      JSON.stringify(state)
-    );
+    // P1118: 分割保存へ書く（変更ファイル＋マニフェストのみ）。
+    // 旧キーが残っていたら移行済みとして消す。
+    this.writeSplit(state);
+    try {
+      if (storageService.getItem(makeKey(state.repository, state.branch))) {
+        storageService.removeItem(makeKey(state.repository, state.branch));
+      }
+    } catch { /* 旧キーの掃除は補助経路 */ }
 
     return state;
   }
@@ -155,6 +293,83 @@ class GitHubSyncService {
     const key = makeKey(repository, branch);
     const normalizedRepository = normalizeRepository(repository);
     const normalizedBranch = branch.trim();
+
+    // P1118: 分割保存があればマニフェスト＋ファイルキーの実在で診断する。
+    const manifestKey = makeManifestKey(repository, branch);
+    let manifestRaw: string | null = null;
+    try { manifestRaw = storageService.getItem(manifestKey); } catch { manifestRaw = null; }
+    if (manifestRaw) {
+      const manifest = this.readManifest(repository, branch);
+      if (!manifest) {
+        return {
+          status: 'JSON_INVALID',
+          diagnosticCode: 'SELF_CODE_SYNC_STATE_JSON_INVALID',
+          key: manifestKey,
+          repository: normalizedRepository,
+          branch: normalizedBranch,
+          backend: storageService.getBackendName(),
+          rawPresent: true,
+          complete: false,
+          fileCount: 0,
+        };
+      }
+      let validCount = 0;
+      for (const entry of manifest.files) {
+        try {
+          const fr = storageService.getItem(makeFileKey(repository, branch, entry.path));
+          if (fr && typeof JSON.parse(fr)?.content === 'string') validCount++;
+        } catch { /* 数えない */ }
+      }
+      if (manifest.complete !== true) {
+        return {
+          status: 'INCOMPLETE',
+          diagnosticCode: 'SELF_CODE_SYNC_STATE_INCOMPLETE',
+          key: manifestKey,
+          repository: normalizedRepository,
+          branch: normalizedBranch,
+          backend: storageService.getBackendName(),
+          rawPresent: true,
+          complete: false,
+          fileCount: manifest.files.length,
+          source: manifest.source,
+          commitSha: manifest.commitSha,
+          treeSha: manifest.treeSha,
+          syncedAt: manifest.syncedAt,
+        };
+      }
+      if (!validCount) {
+        return {
+          status: 'FILES_EMPTY',
+          diagnosticCode: 'SELF_CODE_SYNC_FILES_EMPTY',
+          key: manifestKey,
+          repository: normalizedRepository,
+          branch: normalizedBranch,
+          backend: storageService.getBackendName(),
+          rawPresent: true,
+          complete: true,
+          fileCount: 0,
+          source: manifest.source,
+          commitSha: manifest.commitSha,
+          treeSha: manifest.treeSha,
+          syncedAt: manifest.syncedAt,
+        };
+      }
+      return {
+        status: 'READY',
+        diagnosticCode: 'SELF_CODE_WORKSPACE_READY',
+        key: manifestKey,
+        repository: normalizedRepository,
+        branch: normalizedBranch,
+        backend: storageService.getBackendName(),
+        rawPresent: true,
+        complete: true,
+        fileCount: validCount,
+        source: manifest.source,
+        commitSha: manifest.commitSha,
+        treeSha: manifest.treeSha,
+        syncedAt: manifest.syncedAt,
+      };
+    }
 
     let raw: string | null = null;
 

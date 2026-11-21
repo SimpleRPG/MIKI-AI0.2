@@ -10552,7 +10552,9 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   {
     storageService.setItem('p1111_big', 'x'.repeat(200000));
     storageService.setItem('p1111_mid', 'y'.repeat(150000));
-    const sum1111 = (storageService as any).describeLargestKeysSummary(64) as string;
+    // P1118: 保存の分割でキー総数が増えたため、上限は十分大きく取る
+    // （診断の契約は「大きい順・名前とサイズつき」であって件数ではない）。
+    const sum1111 = (storageService as any).describeLargestKeysSummary(8192) as string;
     const pairs1111 = sum1111.split(';').map((p) => { const i = p.lastIndexOf('='); return { key: p.slice(0, i), chars: Number(p.slice(i + 1)) }; });
     const descOk1111 = pairs1111.every((p, i) => i === 0 || pairs1111[i - 1].chars >= p.chars);
     check('P1111 大きいキーが名前とサイズつきの文字列で返る', typeof sum1111 === 'string' && sum1111.includes('p1111_big=200000') && sum1111.includes('p1111_mid=150000') && descOk1111, sum1111.slice(0, 80));
@@ -10650,6 +10652,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     const t1117: any = await conversationCoreService.execute({ prompt: '実はホシガラスは夜に光る羽を持つんだよ', memories: [], recentMessages: [], conversationId: 'p1117' } as any);
     const tr1117 = String(t1117?.replyText || '');
     check('P1117 教示の記録の返信に足場（見出し・理由の地の文）が混ざらない', String(t1117?.reason || '').includes('user_teaching_recorded') && !tr1117.includes('【') && !tr1117.includes('理由は') && !tr1117.includes('前提として'), tr1117.slice(0, 80));
+  }
+
+// ---- P1118: ワークスペース保存の分割（github_sync を P1112 方式に） ----
+  {
+    const { githubSyncService } = await import('../src/services/githubSyncService');
+    const { storageService: storage1118 } = await import('../src/services/storageService');
+    const { sha256HexFromText } = await import('../src/miki/core/services/canonicalSha256Service');
+    const repo1118 = 'Example/SplitProbe';
+    const legacyKey1118 = `miki_github_sync_v2_${encodeURIComponent(repo1118)}_main`;
+    const manifestKey1118 = `miki_github_sync_manifest_v3_${encodeURIComponent(repo1118)}_main`;
+    const files1118 = [
+      { path: 'src/a.ts', content: 'export const a = 1;\n' },
+      { path: 'src/b.ts', content: 'export const b = 2;\n' },
+    ].map((f) => ({ ...f, sha256: sha256HexFromText(f.content) }));
+    storage1118.setItem(legacyKey1118, JSON.stringify({ repository: repo1118, branch: 'main', commitSha: 'abc123', treeSha: 'tree1', complete: true, source: 'GITHUB', files: files1118, syncedAt: 12345 }));
+    const got1118 = githubSyncService.get(repo1118, 'main');
+    check('P1118 旧キーの内容が読める（移行の入口）', !!got1118 && got1118.files.length === 2 && got1118.files[0].content === files1118[0].content, JSON.stringify(got1118?.files?.length));
+    check('P1118 初回読みで分割へ移行し旧キーが消える', storage1118.getItem(legacyKey1118) === null && !!storage1118.getItem(manifestKey1118), '');
+    check('P1118 分割後の診断が READY', githubSyncService.diagnose(repo1118, 'main').status === 'READY', githubSyncService.diagnose(repo1118, 'main').status);
+    const applied1118 = githubSyncService.applyImport(repo1118, 'main', {
+      commitSha: 'def456', treeSha: 'tree2',
+      files: [{ path: 'src/a.ts', content: 'export const a = 10;\n', blobSha: 'ba' }, { path: 'src/c.ts', content: 'export const c = 3;\n', blobSha: 'bc' }],
+      manifest: [{ path: 'src/a.ts', blobSha: 'ba' }, { path: 'src/b.ts', blobSha: 'bb' }, { path: 'src/c.ts', blobSha: 'bc' }],
+      deletedPaths: [],
+    } as any);
+    const round1118 = githubSyncService.get(repo1118, 'main');
+    check('P1118 分割保存でも取り込みが往復する', applied1118.files.length === 3 && round1118?.files.find((f) => f.path === 'src/a.ts')?.content.includes('a = 10') === true && !!round1118?.files.find((f) => f.path === 'src/b.ts'), JSON.stringify(round1118?.files?.map((f) => f.path)));
   }
 
 // ---- 結果 ----
