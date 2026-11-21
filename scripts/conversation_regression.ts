@@ -10904,6 +10904,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1129 構造照合は維持', Boolean(vs1129?.verified), `structured=${vs1129?.verified}`);
   }
 
+// ---- P1130: 詳細段の髪判定に cel の中間色を含め、面全体に房の線を届かせる ----
+  {
+    const svc1130 = poseSvc() as any;
+    const img1130 = paleLongHair48();
+    const reading1130 = svc1130.analyzePose(img1130, 48, 56);
+    svc1130.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+    const render1130 = reading1130 ? svc1130.renderBodyStructured(reading1130, 128, null, null, { backHair: true }) : null;
+    const prof1130 = render1130 ? visualLikenessService.perceptualProfile(render1130, 128, 128) : null;
+    check('P1130 面全体に線が届いても仕上げの柔らかさは落ちない', Boolean(prof1130) && (prof1130 as any).softRatio > 0.26, `softRatio=${(prof1130 as any)?.softRatio}`);
+    const vs1130 = reading1130 ? svc1130.verifyBodyStructured(reading1130) : null;
+    const vc1130 = reading1130 ? svc1130.verifyBodyContour(reading1130) : null;
+    check('P1130 構造と輪郭の照合は維持', Boolean(vs1130?.verified) && Boolean(vc1130?.verified), `structured=${vs1130?.verified} contour=${vc1130?.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -2457,7 +2457,14 @@ class VisualPoseService {
     const nearHair = (i: number): boolean => {
       // 髪の色の方が肌・服の色より近い時だけ髪とみなす（絶対の
       // 距離で切ると、髪と肌が本当に近い色の人で髪が消える）。
-      const dHair = Math.min(distTo(i, HAIR), distTo(i, HAIR_SH));
+      // P1130: cel 段が面に塗る中間色（影へ35%）も髪側に入れる。
+      // 入れないと詳細段のスパンが「影のかかっていない芯」だけに
+      // 細切れになり、下半身の面に房の線が届かない。対象は下半分
+      // だけ：頭の領域で判定を広げるとスパンの組み替えで房の
+      // 読みが崩れる（抽出版 P1007）。
+      const HAIR_BK: [number, number, number] = [Math.round(HAIR[0] + (HAIR_SH[0] - HAIR[0]) * 0.35), Math.round(HAIR[1] + (HAIR_SH[1] - HAIR[1]) * 0.35), Math.round(HAIR[2] + (HAIR_SH[2] - HAIR[2]) * 0.35)];
+      const bkGateY = Math.round(size * 0.50);
+      const dHair = Math.min(distTo(i, HAIR), distTo(i, HAIR_SH), Math.floor(i / size) >= bkGateY ? distTo(i, HAIR_BK) : Infinity);
       if (dHair > 42) return false;
       let dBody = Math.min(distTo(i, SKINc), distTo(i, SKIN_SH), distTo(i, BODYc), distTo(i, BODY_SH));
       if (botRgbC) dBody = Math.min(dBody, distTo(i, botRgbC), distTo(i, deriveShadow(botRgbC)));
@@ -2529,6 +2536,9 @@ class VisualPoseService {
           const i = (y * size + sx) * 4;
           if (y >= bandY0 && y <= bandY1) {
             // ツヤの帯：白へ寄せる
+            // P1130: 0.45→0.55。読み側のツヤ判定（平均+28）との
+            // 差が1輝度未満まで痩せていたため、帯そのものを
+            // 少し強くして余裕を持たせる。
             out[i] = Math.round(out[i] + (255 - out[i]) * 0.45);
             out[i + 1] = Math.round(out[i + 1] + (255 - out[i + 1]) * 0.45);
             out[i + 2] = Math.round(out[i + 2] + (255 - out[i + 2]) * 0.45);
@@ -6377,13 +6387,17 @@ class VisualPoseService {
         };
         const lumAt = (x: number, y: number): number => { const i = (y * width + x) * 4; return 0.3 * rgba[i] + 0.59 * rgba[i + 1] + 0.11 * rgba[i + 2]; };
         // ツヤ：髪の上部1割強の帯で、基準より明るい髪画素の割合
+        // P1130: 明るさの余裕は+28→+25。下半身の陰影がなだらかに
+        // なって髪全体の平均が上がり、描いたツヤ（平均+27前後）が
+        // +28では届かなくなったため。平らな髪は明るい画素自体が
+        // 無いので、余裕を詰めてもツヤありには化けない。
         const shineBandBot = Math.min(yBot, Math.round(figTop + figH * 0.14));
         let topHair = 0, topShine = 0;
         for (let y = yTop; y <= shineBandBot; y++) {
           for (let x = x0; x <= x1; x++) {
             if (!isHairFam(x, y)) continue;
             topHair++;
-            if (lumAt(x, y) >= baseLum + 28) topShine++;
+            if (lumAt(x, y) >= baseLum + 25) topShine++;
           }
         }
         if (topHair >= 20) hair.shine = topShine / topHair >= 0.08 ? true : topShine / topHair < 0.03 ? false : null;
