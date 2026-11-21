@@ -10562,6 +10562,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     storageService.removeItem('p1111_mid');
   }
 
+// ---- P1112: コード理解スナップショットをファイル単位キーへ分割 ----
+  {
+    const { selfCodeUnderstandingService } = await import('../src/miki/core/services/selfCodeUnderstandingService');
+    const { canonicalSha256 } = await import('../src/miki/core/services/canonicalSha256Service');
+    const files1112 = [
+      { path: 'src/p1112a.ts', content: "import { b } from './p1112b';\nexport function a(): number { return b(); }\n", contentHash: '' },
+      { path: 'src/p1112b.ts', content: 'export function b(): number { return 42; }\n', contentHash: '' },
+    ].map((f) => ({ ...f, contentHash: canonicalSha256(f.content) }));
+    const r1112 = selfCodeUnderstandingService.ensure(['src/p1112a.ts'], files1112);
+    const entryKey1112 = (p: string) => 'miki_code_understanding_entry_v1:' + encodeURIComponent(p);
+    check('P1112 旧来の単一キーには書かれない', r1112.ready && storageService.getItem('miki_code_understanding_snapshot') === null, '');
+    check('P1112 マニフェストとファイル単位キーが書かれる', Boolean(storageService.getItem('miki_code_understanding_manifest_v1')) && Boolean(storageService.getItem(entryKey1112('src/p1112a.ts'))) && Boolean(storageService.getItem(entryKey1112('src/p1112b.ts'))), '');
+    const snap1112 = selfCodeUnderstandingService.getSnapshot();
+    check('P1112 分割保存からスナップショットが復元できる', snap1112?.schemaVersion === 3 && snap1112.entries.some((e) => e.path === 'src/p1112a.ts') && snap1112.entries.some((e) => e.path === 'src/p1112b.ts'), String(snap1112?.entries.length ?? -1));
+    const before1112 = storageService.getItem(entryKey1112('src/p1112a.ts'));
+    selfCodeUnderstandingService.stampSourceCommit('p1112stamp');
+    check('P1112 スタンプはエントリを書き直さない', storageService.getItem(entryKey1112('src/p1112a.ts')) === before1112 && selfCodeUnderstandingService.getSnapshot()?.sourceCommitSha === 'p1112stamp', '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

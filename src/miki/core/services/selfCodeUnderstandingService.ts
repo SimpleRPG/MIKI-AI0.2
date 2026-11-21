@@ -99,6 +99,12 @@ export interface CodeUnderstandingResult {
 }
 
 const KEY='miki_code_understanding_snapshot';
+// P1112: the snapshot was one JSON value of ~57M chars on device —
+// every flush rewrote all of it and every read parsed all of it.
+// Entries now live one file per key; a small manifest carries the
+// snapshot-level fields plus each entry's content hash.
+const MANIFEST_KEY='miki_code_understanding_manifest_v1';
+const ENTRY_PREFIX='miki_code_understanding_entry_v1:';
 const TEST_PATH=/(?:^|\/)(?:test|tests|__tests__|scripts\/verify)[^/]*|\.(?:spec|test)\.[cm]?[jt]sx?$/i;
 const COMMAND_CALLS=new Set(['latestBusinessResult','latestOperationError','lastOperationFailed','operationInstanceFor']);
 const EVENT_PUBLISH_METHODS=new Set(['emit','publish','dispatch','notify']);
@@ -136,16 +142,82 @@ class SelfCodeUnderstandingService {
   }>();
   private resultCache=new Map<string,CodeUnderstandingResult>();
 
-  get():CodeUnderstandingSnapshot|undefined {
-    try {
+  private entryKey(path:string):string{return ENTRY_PREFIX+encodeURIComponent(path);}
+
+  private writeManifest(snapshot:CodeUnderstandingSnapshot):void{
+    const entryHashes:Record<string,string>={};
+    for(const entry of snapshot.entries)entryHashes[entry.path]=entry.contentHash;
+    storageService.setItem(MANIFEST_KEY,JSON.stringify({
+      schemaVersion:snapshot.schemaVersion,
+      repoSha256:snapshot.repoSha256,
+      snapshotSha256:snapshot.snapshotSha256,
+      createdAt:snapshot.createdAt,
+      updatedAt:snapshot.updatedAt,
+      targetFingerprints:snapshot.targetFingerprints,
+      sourceCommitSha:snapshot.sourceCommitSha,
+      entryHashes
+    }));
+  }
+
+  private persistSnapshot(snapshot:CodeUnderstandingSnapshot):void{
+    let oldPaths:string[]=[];
+    try{
+      const raw=storageService.getItem(MANIFEST_KEY);
+      if(raw)oldPaths=Object.keys((JSON.parse(raw) as {entryHashes?:Record<string,string>}).entryHashes||{});
+    }catch{oldPaths=[];}
+    const keep=new Set(snapshot.entries.map(entry=>entry.path));
+    for(const entry of snapshot.entries){
+      const serialized=JSON.stringify(entry);
+      if(storageService.getItem(this.entryKey(entry.path))!==serialized){
+        storageService.setItem(this.entryKey(entry.path),serialized);
+      }
+    }
+    for(const path of oldPaths)if(!keep.has(path))storageService.removeItem(this.entryKey(path));
+    this.writeManifest(snapshot);
+  }
+
+  private loadSnapshot():CodeUnderstandingSnapshot|undefined{
+    try{
+      const rawManifest=storageService.getItem(MANIFEST_KEY);
+      if(rawManifest){
+        const manifest=JSON.parse(rawManifest) as {
+          schemaVersion?:number;repoSha256?:string;snapshotSha256?:string;
+          createdAt?:number;updatedAt?:number;targetFingerprints?:Record<string,string>;
+          sourceCommitSha?:string;entryHashes?:Record<string,string>;
+        };
+        if(manifest.schemaVersion!==3||!manifest.entryHashes)return undefined;
+        const entries:CodeUnderstandingEntry[]=[];
+        for(const path of Object.keys(manifest.entryHashes)){
+          const raw=storageService.getItem(this.entryKey(path));
+          if(!raw)return undefined;
+          entries.push(JSON.parse(raw) as CodeUnderstandingEntry);
+        }
+        entries.sort((a,b)=>a.path.localeCompare(b.path));
+        const snapshot:CodeUnderstandingSnapshot={
+          schemaVersion:3,
+          repoSha256:manifest.repoSha256||'',
+          snapshotSha256:manifest.snapshotSha256||'',
+          entries,
+          createdAt:manifest.createdAt||0,
+          updatedAt:manifest.updatedAt||0,
+          targetFingerprints:manifest.targetFingerprints||{}
+        };
+        if(manifest.sourceCommitSha)snapshot.sourceCommitSha=manifest.sourceCommitSha;
+        return snapshot;
+      }
       const raw=storageService.getItem(KEY);
       if(!raw)return undefined;
-      const parsed=JSON.parse(raw) as Partial<CodeUnderstandingSnapshot>;
-      if(parsed.schemaVersion!==3||!Array.isArray(parsed.entries))return undefined;
-      return parsed as CodeUnderstandingSnapshot;
-    } catch {
-      return undefined;
-    }
+      const parsed=JSON.parse(raw) as CodeUnderstandingSnapshot;
+      if(parsed?.schemaVersion!==3||!Array.isArray(parsed.entries))return undefined;
+      // One-time migration from the legacy single-key layout.
+      this.persistSnapshot(parsed);
+      storageService.removeItem(KEY);
+      return parsed;
+    }catch{return undefined;}
+  }
+
+  get():CodeUnderstandingSnapshot|undefined {
+    return this.loadSnapshot();
   }
 
   private resolve(m:Map<string,CodeUnderstandingEntry>,from:string,raw:string):string|undefined {
@@ -407,13 +479,14 @@ class SelfCodeUnderstandingService {
       .sort((a,b)=>`${a.from}|${a.kind}|${a.to}`.localeCompare(`${b.from}|${b.kind}|${b.to}`));
   }
 
-  public getSnapshot():CodeUnderstandingSnapshot|undefined{try{const raw=storageService.getItem(KEY);if(!raw)return undefined;const parsed=JSON.parse(raw) as CodeUnderstandingSnapshot;return parsed?.schemaVersion===3?parsed:undefined;}catch{return undefined;}}
+  public getSnapshot():CodeUnderstandingSnapshot|undefined{return this.loadSnapshot();}
 
   /** P363: record which commit the stored index was built from. */
   public stampSourceCommit(commitSha:string):void{
     if(!commitSha)return;
     const snapshot=this.getSnapshot();if(!snapshot||snapshot.sourceCommitSha===commitSha)return;
-    try{storageService.setItem(KEY,JSON.stringify({...snapshot,sourceCommitSha:commitSha,updatedAt:Date.now()}));}catch{}
+    // P1112: only the manifest changes; entries are not rewritten.
+    try{this.writeManifest({...snapshot,sourceCommitSha:commitSha,updatedAt:Date.now()});}catch{}
   }
 
   public exportsOf(path:string,content:string):string[]{return this.parse({path,content,contentHash:''}).exports;}
@@ -584,7 +657,7 @@ class SelfCodeUnderstandingService {
     };
     const targetFingerprintChanged=previous?.targetFingerprints?.[key]!==fingerprint;
     const snapshotChanged=previous?.snapshotSha256!==snapshot.snapshotSha256;
-    if(!previous||snapshotChanged||targetFingerprintChanged)storageService.setItem(KEY,JSON.stringify(snapshot));
+    if(!previous||snapshotChanged||targetFingerprintChanged)this.persistSnapshot(snapshot);
     if(this.assemblyCache.size>=3)this.assemblyCache.clear();
     this.assemblyCache.set(treeKey,{entries,contractIndex,contractOwners,knownCalleeNames,snapshot});
 

@@ -39,9 +39,9 @@
     "trackedPathCountExcludingControlPaths": 1898,
     "sourceFileCount": 1451,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1362,
-    "relativeImportCandidateCount": 4877,
-    "resolvedRelativeImportCandidateCount": 4861,
-    "unresolvedRelativeImportCandidateCount": 16
+    "relativeImportCandidateCount": 4880,
+    "resolvedRelativeImportCandidateCount": 4863,
+    "unresolvedRelativeImportCandidateCount": 17
   },
   "records": [
     {
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 885222,
-      "lines": 10578,
-      "sha256": "42d107ed830e6fc15432d6700c85d4d9364c0cc09b00c11b87aec10d750a2b02",
+      "bytes": 887213,
+      "lines": 10597,
+      "sha256": "ebe7983cbaf9102a88cffd5a5334b6ed852b6d0b4077c352c235843985544058",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5222,11 +5222,28 @@
           "specifier": "../src/miki/conversation/services/visualLikenessService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
+        },
+        {
+          "line": 10567,
+          "specifier": "../src/miki/core/services/selfCodeUnderstandingService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/selfCodeUnderstandingService.ts"
+        },
+        {
+          "line": 10568,
+          "specifier": "../src/miki/core/services/canonicalSha256Service",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
+        },
+        {
+          "line": 10570,
+          "specifier": "./p1112b",
+          "resolution": "UNRESOLVED_CANDIDATE"
         }
       ],
-      "relativeImportCandidateCount": 584,
-      "resolvedRelativeImportCount": 584,
-      "unresolvedRelativeImportCount": 0
+      "relativeImportCandidateCount": 587,
+      "resolvedRelativeImportCount": 586,
+      "unresolvedRelativeImportCount": 1
     },
     {
       "path": "scripts/diagnose_production_build.mjs",
@@ -23771,9 +23788,9 @@
     },
     {
       "path": "src/miki/core/services/selfCodeUnderstandingService.ts",
-      "bytes": 33429,
-      "lines": 666,
-      "sha256": "3fe7ff15cb5ebe4f4940512ea7535d1eb5eea9234aa70983a1805b5a737c9ebc",
+      "bytes": 36541,
+      "lines": 739,
+      "sha256": "d60a07f3f2ecbf535d0b75e9a29ccc48d37f2bde47e26023711cad9c580873b1",
       "relativeImportCandidates": [
         {
           "line": 2,
