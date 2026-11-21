@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1898,
     "sourceFileCount": 1451,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1362,
-    "relativeImportCandidateCount": 4880,
-    "resolvedRelativeImportCandidateCount": 4863,
+    "relativeImportCandidateCount": 4881,
+    "resolvedRelativeImportCandidateCount": 4864,
     "unresolvedRelativeImportCandidateCount": 17
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 887213,
-      "lines": 10597,
-      "sha256": "ebe7983cbaf9102a88cffd5a5334b6ed852b6d0b4077c352c235843985544058",
+      "bytes": 888596,
+      "lines": 10613,
+      "sha256": "e5ca68435ac46a834005bc9bba616db3c3381ddf53e20268f25cbe4c7b387362",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -16330,9 +16330,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 401951,
-      "lines": 7207,
-      "sha256": "e4763879d062b67b4a08311d9040099ff3a477d2b9dd7f7ae92b44a93368dada",
+      "bytes": 404227,
+      "lines": 7236,
+      "sha256": "ea4a163756562be4e89df7a6f43c8a095ba9ec2716fe66b777a14667ebe844ac",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -16365,14 +16365,20 @@
           "resolvedPath": "src/miki/conversation/services/hairStrandSofteningService.ts"
         },
         {
-          "line": 30,
+          "line": 9,
+          "specifier": "./visualLikenessService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
+        },
+        {
+          "line": 31,
           "specifier": "../../selfAwareness/services/motionPatternService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/motionPatternService.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {

@@ -6,6 +6,7 @@ import {
 import { visualFigureService } from './visualFigureService';
 import { visualZoomService } from './visualZoomService';
 import { softenHairStrands } from './hairStrandSofteningService';
+import { visualLikenessService, type PerceptualProfile, type PerceptualDiff } from './visualLikenessService';
 
 /** P994: 素体に描く顔の指定 */
 export interface BodyFaceSpec {
@@ -814,6 +815,10 @@ export interface BodyTarget {
   joints?: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null;
   // P1087: 中の境界線（重なりの目標）も持つ
   innerLines?: (number[] | null)[] | null;
+  // P1113: 見た目の目標（知覚プロファイル）。画素つきで目標を
+  // 保存した時だけ入る。ドリルが寸法と並べて「見た目の差」を
+  // 測るための受け口で、補正の合否にはまだ混ぜない。
+  perceptual?: { whole: PerceptualProfile; head: PerceptualProfile | null } | null;
 }
 
 /** P1001: マスクの詰まり具合（前景画素 ÷ 外接矩形の面積）。輪郭の細切れ検出に使う */
@@ -3155,10 +3160,19 @@ class VisualPoseService {
     return { verified, w0, w1 };
   }
 
-  /** P1001: 見本の読みを目標として保存する */
-  public setTarget(reading: PoseReading): boolean {
+  /** P1001: 見本の読みを目標として保存する。P1113: 画素も渡されたら知覚プロファイルも目標に添付する */
+  public setTarget(reading: PoseReading, pixels?: { rgba: Uint8Array; width: number; height: number }): boolean {
     // P1011: 横向きの奥行きプロファイルは目標にしない（正面の幅の目標と混ざる）。
     if (reading.profileKind === 'depth') return false;
+    let perceptual: BodyTarget['perceptual'] = null;
+    if (pixels) {
+      try {
+        const whole = visualLikenessService.perceptualProfile(pixels.rgba, pixels.width, pixels.height);
+        const region = visualLikenessService.headRegion(reading, Math.max(pixels.width, pixels.height));
+        const head = region ? visualLikenessService.perceptualProfile(pixels.rgba, pixels.width, pixels.height, region) : null;
+        perceptual = { whole, head };
+      } catch { perceptual = null; }
+    }
     const target: BodyTarget = {
       profile: { ...reading.bodyProfile },
       hairLength: reading.hair?.length ?? null,
@@ -3168,6 +3182,7 @@ class VisualPoseService {
       silhouetteWidth: reading.silhouetteWidth ?? null,
       joints: { handL: reading.handL ?? null, handR: reading.handR ?? null, footL: reading.footL ?? null, footR: reading.footR ?? null },
       innerLines: reading.innerLines ?? null,
+      perceptual,
     };
     try {
       storageService.setItem(TARGET_KEY, JSON.stringify(target));
@@ -3269,7 +3284,7 @@ class VisualPoseService {
    * 「目標÷実測」の比で補正を更新する。輪郭の差が悪化する
    * 周は採用しない（形が崩れたら差し戻す守り）。
    */
-  public drillCorrections(start: PoseReading, maxRounds = 10): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; corrections: { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number }; contourDiffInitial: number | null; contourDiffFinal: number | null; contourCorrections: { l: number[]; r: number[] } | null; jointDiffInitial: number | null; jointDiffFinal: number | null; jointCorrections: { handLx: number; handRx: number; footLx: number; footRx: number } | null; innerDiffInitial: number | null; innerDiffFinal: number | null; overlapCorrections: { panelK: number } | null } | null {
+  public drillCorrections(start: PoseReading, maxRounds = 10): { initialDiff: number; finalDiff: number; improved: boolean; rounds: number; corrections: { shoulder: number; chest: number; waist: number; hip: number; thigh: number; calf: number; ankle: number }; contourDiffInitial: number | null; contourDiffFinal: number | null; contourCorrections: { l: number[]; r: number[] } | null; jointDiffInitial: number | null; jointDiffFinal: number | null; jointCorrections: { handLx: number; handRx: number; footLx: number; footRx: number } | null; innerDiffInitial: number | null; innerDiffFinal: number | null; overlapCorrections: { panelK: number } | null; perceptualInitial: { whole: PerceptualDiff; head: PerceptualDiff | null } | null; perceptualFinal: { whole: PerceptualDiff; head: PerceptualDiff | null } | null } | null {
     const target = this.getTarget();
     if (!target || !start.head) return null;
     if (start.profileKind === 'depth') return null;
@@ -3331,7 +3346,7 @@ class VisualPoseService {
       }
       return n >= 12 ? sum / n : null;
     };
-    const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile']; contour: PoseReading['contour']; joints: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null; inner: PoseReading['innerLines']; sDiff: number | null } | null => {
+    const measure = (corr: Corr): { diff: number; contourDiff: number | null; measured: PoseReading['bodyProfile']; contour: PoseReading['contour']; joints: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null; inner: PoseReading['innerLines']; sDiff: number | null; perc: { whole: PerceptualDiff; head: PerceptualDiff | null } | null } | null => {
       this.setDrawingCorrections(corr);
       // P1067: 測定はパレット経路（平坦な双子＋パレットの
       // 体マスク、128px）を優先する。64pxの通常読みは粗く
@@ -3360,9 +3375,23 @@ class VisualPoseService {
       let jointsRe: { handL: { x: number; y: number } | null; handR: { x: number; y: number } | null; footL: { x: number; y: number } | null; footR: { x: number; y: number } | null } | null = null;
       let innerRe: PoseReading['innerLines'] = null;
       let sDiff: number | null = null;
+      let perc: { whole: PerceptualDiff; head: PerceptualDiff | null } | null = null;
       if (contourGoal || jointGoal || innerGoal) {
         const cImg = this.renderBodyStructured(start, 128, null, null, { backHair: true });
         const cRe = cImg ? this.analyzePose(cImg, 128, 128) : null;
+        // P1113: 描画の知覚プロファイルを目標と比べる（報告のみ。
+        // 補正の合否には混ぜない）。
+        if (cImg && cRe && target.perceptual) {
+          try {
+            const wholeP = visualLikenessService.perceptualProfile(cImg, 128, 128);
+            const hRegion = visualLikenessService.headRegion(cRe, 128);
+            const headP = hRegion ? visualLikenessService.perceptualProfile(cImg, 128, 128, hRegion) : null;
+            perc = {
+              whole: visualLikenessService.comparePerceptual(target.perceptual.whole, wholeP),
+              head: target.perceptual.head && headP ? visualLikenessService.comparePerceptual(target.perceptual.head, headP) : null,
+            };
+          } catch { perc = null; }
+        }
         contourDiff = cRe ? contourDiffOf(cRe.contour) : null;
         contourRe = cRe?.contour ?? null;
         jointsRe = cRe ? { handL: cRe.handL ?? null, handR: cRe.handR ?? null, footL: cRe.footL ?? null, footR: cRe.footR ?? null } : null;
@@ -3380,7 +3409,7 @@ class VisualPoseService {
           sDiff = sN >= 3 ? sSum : null;
         }
       }
-      return { diff: sum, contourDiff, measured: re.bodyProfile, contour: contourRe, joints: jointsRe, inner: innerRe, sDiff };
+      return { diff: sum, contourDiff, measured: re.bodyProfile, contour: contourRe, joints: jointsRe, inner: innerRe, sDiff, perc };
     };
     let corr: Corr = this.getDrawingCorrections();
     const first = measure(corr);
@@ -3611,7 +3640,7 @@ class VisualPoseService {
     const improved = best.diff < first.diff * 0.8;
     if (improved) state.drillsOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
-    return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff, contourCorrections: contourCorrOut, jointDiffInitial: jointDiffOf(first.joints), jointDiffFinal: jointDiffOf(best.joints), jointCorrections: jointCorrOut, innerDiffInitial: innerDiffOf(first.inner), innerDiffFinal: innerDiffOf(best.inner), overlapCorrections: overlapCorrOut };
+    return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff, contourCorrections: contourCorrOut, jointDiffInitial: jointDiffOf(first.joints), jointDiffFinal: jointDiffOf(best.joints), jointCorrections: jointCorrOut, innerDiffInitial: innerDiffOf(first.inner), innerDiffFinal: innerDiffOf(best.inner), overlapCorrections: overlapCorrOut, perceptualInitial: first.perc, perceptualFinal: best.perc };
   }
 
   /**

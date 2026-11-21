@@ -10581,6 +10581,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1112 スタンプはエントリを書き直さない', storageService.getItem(entryKey1112('src/p1112a.ts')) === before1112 && selfCodeUnderstandingService.getSnapshot()?.sourceCommitSha === 'p1112stamp', '');
   }
 
+// ---- P1113: 見た目の物差しをドリルへ（知覚差の計測・報告） ----
+  {
+    const svc1113 = poseSvc() as any;
+    const img1113 = paleLongHair48();
+    const reading1113 = svc1113.analyzePose(img1113, 48, 56);
+    svc1113.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const okSet1113 = reading1113 ? svc1113.setTarget(reading1113, { rgba: img1113, width: 48, height: 56 }) : false;
+    const target1113 = svc1113.getTarget();
+    check('P1113 画素つきの目標に知覚プロファイルが付く', okSet1113 && target1113?.perceptual?.whole?.pixels === 48 * 56 && Boolean(target1113?.perceptual?.head), JSON.stringify(target1113?.perceptual?.whole?.pixels ?? -1));
+    const drill1113 = reading1113 ? svc1113.drillCorrections(reading1113, 10) : null;
+    check('P1113 ドリル結果に知覚差が載る', Boolean(drill1113?.perceptualFinal) && Number.isFinite(drill1113?.perceptualFinal?.whole?.softRatio) && Boolean(drill1113?.perceptualFinal?.head), JSON.stringify(drill1113?.perceptualFinal ?? null).slice(0, 120));
+    if (reading1113) svc1113.setTarget(reading1113);
+    check('P1113 画素なしの目標は従来通り（知覚なし）', !svc1113.getTarget()?.perceptual, '');
+    svc1113.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
