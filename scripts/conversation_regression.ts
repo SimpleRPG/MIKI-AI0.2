@@ -10986,6 +10986,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     }
   }
 
+// ---- P1134: 仕様の切り出しを彼女側へ（仕様点→ケース化＋弁別力チェック＋合成探索） ----
+  {
+    const { specDraftService } = await import('../src/miki/selfDevelopment/services/specDraftService');
+    const strong1134 = specDraftService.draftAndSolve({
+      name: 'falloffProbe1134',
+      description: '0で1、1で0、真ん中がなだらかな落ち込み',
+      points: [
+        { x: 0, y: 1 },
+        { x: 0.25, y: 0.8536 },
+        { x: 0.5, y: 0.5 },
+        { x: 0.75, y: 0.1464 },
+        { x: 1, y: 0 },
+      ],
+    });
+    check('P1134 なだらかな落ち込みの仕様は弁別力が強く、彼女の探索で解ける', strong1134?.discrimination === 'STRONG' && strong1134.found, `disc=${strong1134?.discrimination} found=${strong1134?.found} err=${strong1134?.maxError}`);
+    const weak1134 = specDraftService.draftAndSolve({
+      name: 'linearProbe1134',
+      description: 'まっすぐ増える',
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ],
+    });
+    check('P1134 直線で通ってしまう仕様は弱いと印が付く', weak1134?.discrimination === 'WEAK', `disc=${weak1134?.discrimination} trivial=${weak1134?.trivialMaxError}`);
+    check('P1134 仕様の台帳に両方残る', specDraftService.list().some((r) => r.name === 'falloffProbe1134') && specDraftService.list().some((r) => r.name === 'linearProbe1134'), `ledger=${specDraftService.list().length}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1901,
-    "sourceFileCount": 1454,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1365,
-    "relativeImportCandidateCount": 4933,
-    "resolvedRelativeImportCandidateCount": 4915,
+    "trackedPathCountExcludingControlPaths": 1902,
+    "sourceFileCount": 1455,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
+    "relativeImportCandidateCount": 4936,
+    "resolvedRelativeImportCandidateCount": 4918,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 922513,
-      "lines": 11002,
-      "sha256": "80781c5dcca7e08114347233da943ae2f2b01fc5846f6ef313069f1ada1ef9e9",
+      "bytes": 923983,
+      "lines": 11029,
+      "sha256": "5eeb5147c808464f950310355f67d4d146618b42433cfed27e390728865ad3da",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5484,10 +5484,16 @@
           "specifier": "../src/services/storageService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 10991,
+          "specifier": "../src/miki/selfDevelopment/services/specDraftService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/specDraftService.ts"
         }
       ],
-      "relativeImportCandidateCount": 628,
-      "resolvedRelativeImportCount": 626,
+      "relativeImportCandidateCount": 629,
+      "resolvedRelativeImportCount": 627,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -40650,6 +40656,29 @@
       ],
       "relativeImportCandidateCount": 7,
       "resolvedRelativeImportCount": 7,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/selfDevelopment/services/specDraftService.ts",
+      "bytes": 4208,
+      "lines": 109,
+      "sha256": "b7ee49c731e20c4ce597cf6db48b7376988c62f35b78fa28ef6aca2dd380c28e",
+      "relativeImportCandidates": [
+        {
+          "line": 1,
+          "specifier": "../../../services/storageService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/services/storageService.ts"
+        },
+        {
+          "line": 2,
+          "specifier": "./compositionSearchService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/compositionSearchService.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {
