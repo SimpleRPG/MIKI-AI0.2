@@ -10704,6 +10704,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1119 メモリ圧 NEAR_LIMIT では自律成長サイクルを見送る', report1119.promotedCount === 0 && report1119.totalGenerated === 0 && report1119.summary.includes('見送り'), report1119.summary);
   }
 
+// ---- P1120: 人格の経験特性（測るだけの台帳） ----
+  {
+    const { personaExperienceService } = await import('../src/miki/conversation/services/personaExperienceService');
+    const pid1120 = 'persona-sandbox-1120';
+    check('P1120 長さへの不満を数える', personaExperienceService.recordFromText('説明が長いよ、もっと短くして', pid1120).includes('verbosityDown'), '');
+    check('P1120 詳しくの求めを数える', personaExperienceService.recordFromText('もっと詳しく教えて', pid1120).includes('verbosityUp'), '');
+    check('P1120 敬語不要を数える', personaExperienceService.recordFromText('敬語いらないよ、タメ口でいい', pid1120).includes('formalityDown'), '');
+    check('P1120 感謝や内容への言及は数えない', personaExperienceService.recordFromText('丁寧に教えてくれてありがとう', pid1120).length === 0 && personaExperienceService.recordFromText('髪が長いね', pid1120).length === 0 && personaExperienceService.recordFromText('敬語で話すべき？', pid1120).length === 0, '');
+    const sum1120 = personaExperienceService.summary(pid1120);
+    check('P1120 台帳の集計が読める', sum1120.events === 3 && sum1120.verbosityNet === 0 && sum1120.formalityNet === -1, JSON.stringify(sum1120));
+    const beforeCore1120 = personaExperienceService.summary('persona-default').verbosityDown;
+    await conversationCoreService.execute({ prompt: '説明が長いよ、もっと短くして', memories: [], recentMessages: [], conversationId: 'p1120' } as any);
+    check('P1120 会話の実行でもアクティブな人格に記録される', personaExperienceService.summary('persona-default').verbosityDown === beforeCore1120 + 1, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

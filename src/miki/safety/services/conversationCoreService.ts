@@ -37,6 +37,7 @@ import { dialogueExampleRecallService } from '../../memory/services/dialogueExam
 import { fixedReplyStatsService } from '../../memory/services/fixedReplyStatsService';
 import { activationService } from '../../memory/services/activationService';
 import { personaProfileService, BIBI_PROFILE_ID } from '../../conversation/services/personaProfileService';
+import { personaExperienceService } from '../../conversation/services/personaExperienceService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
 import { shiritoriService } from '../../conversation/services/shiritoriService';
 import { userMemoService } from '../../conversation/services/userMemoService';
@@ -207,6 +208,14 @@ export class ConversationCoreService {
         selfPreferenceService.observeTerms(personaProfileService.get().profileId, japaneseAnalysis.contentTokens);
       }
     } catch { /* 頻度の記録は補助経路 */ }
+
+    // P1120: 話し方への明示フィードバック（長さ・丁寧さ）を人格
+    // ごとの経験として数える。生成にはまだ効かせない（測るだけ）。
+    try {
+      if (prompt && !roleplaySessionService.isActive()) {
+        personaExperienceService.recordFromText(prompt, personaProfileService.get().profileId);
+      }
+    } catch { /* 経験の記録は補助経路 */ }
 
     if (!prompt) {
       return this.buildResult('RESOLVED', 'empty_input', '入力が空です。', state, 'CASUAL_CHAT', 0, [], started, stages);
