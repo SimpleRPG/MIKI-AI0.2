@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1900,
     "sourceFileCount": 1453,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1364,
-    "relativeImportCandidateCount": 4906,
-    "resolvedRelativeImportCandidateCount": 4888,
+    "relativeImportCandidateCount": 4907,
+    "resolvedRelativeImportCandidateCount": 4889,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 906798,
-      "lines": 10793,
-      "sha256": "bb952b5ff3701f1cd91e4341c516663697dd729358845aab0a14d030d6b4fb8e",
+      "bytes": 908343,
+      "lines": 10810,
+      "sha256": "dee832eab019e0824e3d833797b97f9db1e9242c2d6fc96c41694ee2bb4f2caa",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5352,10 +5352,16 @@
           "line": 10752,
           "specifier": "./b",
           "resolution": "UNRESOLVED_CANDIDATE"
+        },
+        {
+          "line": 10782,
+          "specifier": "../src/miki/conversation/services/visualLikenessService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
         }
       ],
-      "relativeImportCandidateCount": 606,
-      "resolvedRelativeImportCount": 604,
+      "relativeImportCandidateCount": 607,
+      "resolvedRelativeImportCount": 605,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -16409,9 +16415,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualLikenessService.ts",
-      "bytes": 3568,
-      "lines": 98,
-      "sha256": "227d91154f5ec3ed25ffe82a1fa2c377cc6cc73ad1b1a0fa2666426bacd892d7",
+      "bytes": 3923,
+      "lines": 102,
+      "sha256": "0aa7d0f70d287fa08eb95a917da7199978f8da7d979cf9887ef4984ec4191b95",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
@@ -16448,9 +16454,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 405962,
-      "lines": 7270,
-      "sha256": "732fc8da77c60b9928554768d8a107b2ff3351faf69a60c2c0f44a92953e4677",
+      "bytes": 408779,
+      "lines": 7327,
+      "sha256": "90b90438e5a4f982fa495fe1f7499cea651b17cc5865f6f736ef3f873b211f26",
       "relativeImportCandidates": [
         {
           "line": 1,

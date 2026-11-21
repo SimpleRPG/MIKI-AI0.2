@@ -2752,7 +2752,12 @@ class VisualPoseService {
     // 従来通り。知覚プロファイル全体 softRatio の差
     // （見本 0.58 vs 描画 0.15）への対策の第一段。
     const finished = this.applyBodyFinishBlend(base, flat, size, reading);
-    const outlined = this.applyOutlineLines(finished, size);
+    // P1124: 面の中の階調。髪にはツヤの帯、体には輪郭際の柔らかい
+    // 陰を仕上げで足す（双子は計測の土台なので触らない）。見本の
+    // 面内は一様でなく、帯域ごとの softRatio でも見本 0.52〜0.62 に
+    // 対し描画 0.09〜0.22 と開きが残っていた部分への対策。
+    const graded = this.applyBodyFinishGradients(finished, flat, size, reading);
+    const outlined = this.applyOutlineLines(graded, size);
     // P1068: 中の線（平坦な双子には残らないので仕上げで描く）
     this.stampInnerLines(outlined, size, reading);
     return outlined;
@@ -2780,6 +2785,58 @@ class VisualPoseService {
         if (!body[y * size + x]) continue;
         if (x + 1 < size && body[y * size + x + 1]) blendAt(x, y, x + 1, y);
         if (y + 1 < size && body[(y + 1) * size + x]) blendAt(x, y, x, y + 1);
+      }
+    }
+    return out;
+  }
+
+  /** P1124: 仕上げの面内階調（髪のツヤ帯＋体の輪郭際の陰） */
+  private applyBodyFinishGradients(base: Uint8Array, flat: Uint8Array, size: number, reading: PoseReading): Uint8Array {
+    const pal = this.segmentTwinPalette(flat, size, reading);
+    if (!pal) return base;
+    const out = new Uint8Array(base);
+    // 髪のツヤ: 髪の縦範囲の上寄りに、横に広がる柔らかい帯を足す。
+    let hairTop = size, hairBottom = -1;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      if (!pal.hair[y * size + x]) continue;
+      if (y < hairTop) hairTop = y;
+      if (y > hairBottom) hairBottom = y;
+    }
+    if (hairBottom > hairTop) {
+      const span = hairBottom - hairTop;
+      for (let y = hairTop; y <= hairBottom; y++) {
+        const t = (y - hairTop) / span;
+        const band = Math.exp(-((t - 0.30) * (t - 0.30)) / (2 * 0.11 * 0.11));
+        if (band < 0.02) continue;
+        const add = band * 15;
+        for (let x = 0; x < size; x++) {
+          if (!pal.hair[y * size + x]) continue;
+          const i = (y * size + x) * 4;
+          for (let c = 0; c < 3; c++) out[i + c] = Math.min(255, Math.round(out[i + c] + add));
+        }
+      }
+    }
+    // 体の陰: 体マスクの横の端から内側4画素にかけて、最大で
+    // 1割落とす。面の内側に緩やかな陰影の層ができる。
+    // P1124-1: 服の色は描画の同一性信号（P1081 は厳密な色数で
+    // 数える）なので、肌色の画素だけを対象にする。服色には触れない。
+    const skin = reading.skinColor ?? [232, 190, 160];
+    for (let y = 0; y < size; y++) {
+      let x = 0;
+      while (x < size) {
+        if (!pal.body[y * size + x]) { x++; continue; }
+        let runEnd = x;
+        while (runEnd + 1 < size && pal.body[y * size + runEnd + 1]) runEnd++;
+        const runLen = runEnd - x + 1;
+        for (let k = 0; k < runLen; k++) {
+          const dist = Math.min(k, runLen - 1 - k);
+          if (dist >= 4) continue;
+          const i = (y * size + x + k) * 4;
+          if (!(flat[i] === skin[0] && flat[i + 1] === skin[1] && flat[i + 2] === skin[2])) continue;
+          const shade = (1 - dist / 4) * 0.10;
+          for (let c = 0; c < 3; c++) out[i + c] = Math.round(out[i + c] * (1 - shade));
+        }
+        x = runEnd + 1;
       }
     }
     return out;
@@ -3202,7 +3259,7 @@ class VisualPoseService {
     if (pixels) {
       try {
         const whole = visualLikenessService.perceptualProfile(pixels.rgba, pixels.width, pixels.height);
-        const region = visualLikenessService.headRegion(reading, Math.max(pixels.width, pixels.height));
+        const region = visualLikenessService.headRegion(reading, pixels.width, pixels.height);
         const head = region ? visualLikenessService.perceptualProfile(pixels.rgba, pixels.width, pixels.height, region) : null;
         perceptual = { whole, head };
       } catch { perceptual = null; }

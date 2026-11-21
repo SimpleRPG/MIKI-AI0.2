@@ -10777,6 +10777,23 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     }
   }
 
+// ---- P1124: 頭部領域の換算修正＋仕上げの面内階調（髪のツヤ・体の陰） ----
+  {
+    const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+    const region1124 = visualLikenessService.headRegion({ head: { x: 0.5, y: 0.1, r: 0.05 }, headRh: 0.08 }, 128, 256);
+    check('P1124 頭部の中心 x は幅で換算される（縦長画像でずれない）', Boolean(region1124) && (region1124 as any).x0 < 40 && (region1124 as any).x1 > 85, JSON.stringify(region1124));
+    const svc1124 = poseSvc() as any;
+    const img1124 = paleLongHair48();
+    const reading1124 = svc1124.analyzePose(img1124, 48, 56);
+    svc1124.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const render1124 = reading1124 ? svc1124.renderBodyStructured(reading1124, 128, null, null, { backHair: true }) : null;
+    const prof1124 = render1124 ? visualLikenessService.perceptualProfile(render1124, 128, 128) : null;
+    check('P1124 面内階調で仕上げの柔らかさがさらに上がる', Boolean(prof1124) && (prof1124 as any).softRatio > 0.26, `softRatio=${(prof1124 as any)?.softRatio}`);
+    const vs1124 = reading1124 ? svc1124.verifyBodyStructured(reading1124) : null;
+    const vc1124 = reading1124 ? svc1124.verifyBodyContour(reading1124) : null;
+    check('P1124 構造と輪郭の照合は維持', Boolean(vs1124?.verified) && Boolean(vc1124?.verified), `structured=${vs1124?.verified} contour=${vc1124?.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

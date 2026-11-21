@@ -80,12 +80,16 @@ class VisualLikenessService {
     };
   }
 
-  /** 頭の切り出し（顔の読みと同じ倍率）に対応する画素の箱 */
-  public headRegion(reading: { head: { x: number; y: number; r: number } | null; headRh?: number | null }, size: number): { x0: number; y0: number; x1: number; y1: number } | null {
+  /** 頭の切り出し（顔の読みと同じ倍率）に対応する画素の箱。
+   * P1124: 中心 x は幅比、中心 y と半径は高さ比（headRh は高さ比で
+   * 測る決まり）で別々に換算する。以前は最大辺で全部を換算して
+   * いたため、縦長の見本（128×256）では中心 x がずれて頭部の
+   * 知覚比較が額面通り読めなかった。 */
+  public headRegion(reading: { head: { x: number; y: number; r: number } | null; headRh?: number | null }, width: number, height: number = width): { x0: number; y0: number; x1: number; y1: number } | null {
     if (!reading.head) return null;
-    const hr = (reading.headRh ?? reading.head.r) * size * 1.7;
-    const cx = reading.head.x * (size - 1);
-    const cy = reading.head.y * (size - 1);
+    const hr = (reading.headRh ?? reading.head.r) * height * 1.7;
+    const cx = reading.head.x * (width - 1);
+    const cy = reading.head.y * (height - 1);
     return {
       x0: Math.round(cx - hr),
       y0: Math.round(cy - hr),
