@@ -1350,15 +1350,24 @@ class SelfCodeSpaceService {
   // index-first mode hashes the manifest (path + blobSha), which is
   // stable no matter which files are currently hydrated.
   getSourceSnapshotSha256(): string {
-    const files = this.listSourceFiles();
-    if (files.length > 0) {
+    // P1133: ハッシュは目録（パス＋内容ハッシュ）から作れる。
+    // 全体の内容を組み立てるのは、目録で表せない旧・不完全な
+    // 状態の時だけにする（結果は従来と一致させる）。
+    const manifestFiles = this.listSourceFileManifest();
+    if (manifestFiles.length > 0) {
       return canonicalSha256(
-        files.map(file => ({ path: file.path, sha256: file.contentHash }))
+        manifestFiles.map(file => ({ path: file.path, sha256: file.contentHash }))
       );
     }
     const manifest = this.getLightManifest();
     if (manifest && manifest.files.length > 0) {
       return this.lightRevisionSha256(manifest, this.getLightChangeset());
+    }
+    const files = this.listSourceFiles();
+    if (files.length > 0) {
+      return canonicalSha256(
+        files.map(file => ({ path: file.path, sha256: file.contentHash }))
+      );
     }
     return '';
   }

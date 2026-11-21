@@ -10274,7 +10274,7 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
 // ---- P1096: 教師検証（TVE）ラウンドの受け入れと改ざん検出 ----
   {
     const { teacherVerificationEvidenceService } = await import('../src/miki/verification/services/teacherVerificationEvidenceService');
-    const { canonicalSha256 } = await import('../src/miki/core/services/canonicalSha256Service');
+    const { canonicalSha256, sha256HexFromText } = await import('../src/miki/core/services/canonicalSha256Service');
     const content1096 = 'export function clamp01(x: number): number { return Math.min(1, Math.max(0, x)); }';
     const round1096 = {
       verifier: 'Claude',
@@ -10951,6 +10951,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     });
     const m1132b = githubSyncService.manifest('p1132/probe', 'main');
     check('P1132 削除を含む取り込みでも正本は正しく縮む', (m1132b?.files.length ?? 0) === 1 && m1132b?.files[0].path === 'src/a.ts', `files=${m1132b?.files.length}`);
+  }
+
+// ---- P1133: 全量読みの卒業（対象ファイルだけ読む） ----
+  {
+    const { githubSyncService } = await import('../src/services/githubSyncService');
+    const { selfCodeSpaceService } = await import('../src/miki/core/services/selfCodeSpaceService');
+    const { canonicalSha256, sha256HexFromText } = await import('../src/miki/core/services/canonicalSha256Service');
+    const prevSettings1133 = selfCodeSpaceService.getGitHubSettings();
+    try {
+      // 前のブロックが残した未保存の作業状態があると、そちらが正本に
+      // なって種が見えない。マニフェストだけ外して正本を同期側へ戻す。
+      const { storageService } = await import('../src/services/storageService');
+      storageService.removeItem('miki_self_code_space_dirty_manifest_v1');
+      selfCodeSpaceService.saveGitHubSettings({ repository: 'p1133/probe', branch: 'main' });
+      const a1133 = 'export const a1133 = 1;\n';
+      const b1133 = 'export const b1133 = 2;\n';
+      githubSyncService.applyBundledSeed('p1133/probe', 'main', {
+        files: [
+          { path: 'src/a.ts', content: a1133, sha256: canonicalSha256(a1133) },
+          { path: 'src/b.ts', content: b1133, sha256: canonicalSha256(b1133) },
+        ],
+        commitSha: 'p1133c1', seedRevision: 'p1133-1',
+      });
+      const h1133 = selfCodeSpaceService.getSourceSnapshotSha256();
+      const expect1133 = canonicalSha256([
+        { path: 'src/a.ts', sha256: sha256HexFromText(a1133) },
+        { path: 'src/b.ts', sha256: sha256HexFromText(b1133) },
+      ]);
+      check('P1133 スナップショットのハッシュは目録から作っても従来と一致', h1133 === expect1133 && h1133 !== '', `hash=${h1133.slice(0, 8)}`);
+      check('P1133 対象ファイルの内容はファイル単位で読める', selfCodeSpaceService.readSourceFileContent('src/b.ts') === b1133, '');
+    } finally {
+      selfCodeSpaceService.saveGitHubSettings(prevSettings1133);
+    }
   }
 
 // ---- 結果 ----

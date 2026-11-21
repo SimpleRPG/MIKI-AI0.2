@@ -91,9 +91,15 @@ export interface CandidateGenerationLedgerSummary {
 class CandidateCodeGenerationService {
  async generate(runId:string):Promise<CandidateGenerationOutcome>{
   const run=improvementIntakeRouterService.get(runId);if(!run)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};
-  let currentSourceFiles=selfCodeSpaceService.listSourceFiles();
-  const lightMode=currentSourceFiles.length===0&&Boolean(selfCodeSpaceService.getLightManifest());
-  if(currentSourceFiles.length===0&&!lightMode)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_EMPTY']};
+  // P1133: 全体の内容は組み立てない。空かどうかは目録で判定し、
+  // 目録に出ない旧・不完全な状態の時だけ従来の全体読みで確かめる。
+  let currentSourceFiles:ReturnType<typeof selfCodeSpaceService.listSourceFiles>=[];
+  const classicEmpty=selfCodeSpaceService.listSourceFileManifest().length===0;
+  const lightMode=classicEmpty&&Boolean(selfCodeSpaceService.getLightManifest());
+  if(classicEmpty&&!lightMode){
+   currentSourceFiles=selfCodeSpaceService.listSourceFiles();
+   if(currentSourceFiles.length===0)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_EMPTY']};
+  }
 
   const currentSourceSnapshotSha256=selfCodeSpaceService.getSourceSnapshotSha256();
 
@@ -167,6 +173,15 @@ class CandidateCodeGenerationService {
       },[]);
     }
     return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
+  }
+  // P1133: 対象が決まったら、そのファイルだけを読み戻す。
+  if(!sourceOverride&&currentSourceFiles.length===0){
+   const hydrated:typeof currentSourceFiles=[];
+   for(const path of targetPaths){
+    const content=selfCodeSpaceService.readSourceFileContent(path);
+    if(content!==undefined)hydrated.push(selfCodeSpaceService.toSourceFile(path,content));
+   }
+   currentSourceFiles=hydrated;
   }
   const sources=new Map(currentSourceFiles.map(file=>[file.path,file]));const targetFiles=targetPaths.map(path=>sources.get(path)).filter((value):value is NonNullable<typeof value>=>Boolean(value));
   if(targetFiles.length!==targetPaths.length){

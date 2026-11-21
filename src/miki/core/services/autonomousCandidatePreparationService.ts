@@ -21,6 +21,23 @@ export interface AutonomousImplementationPlan {
  rationale:string[];
  confidence:number;
 }
+// P1133: 対象ファイルだけを目録＋ファイル単位読みで集める。
+// listSourceFiles の evidenceIds は常に [] なので toSourceFile で
+// 同じ形になり、全体の内容を組み立てずに済む。
+function sourceMapForPaths(paths:string[],override?:ReturnType<typeof selfCodeSpaceService.listSourceFiles>){
+ if(override)return new Map(override.map(file=>[file.path,file] as const));
+ const wanted=new Set(paths);const map=new Map<string,ReturnType<typeof selfCodeSpaceService.toSourceFile>>();
+ if(wanted.size===0)return map;
+ const known=new Set(selfCodeSpaceService.listSourceFileManifest().map(entry=>entry.path));
+ for(const path of wanted){
+  if(!known.has(path))continue;
+  const content=selfCodeSpaceService.readSourceFileContent(path);
+  if(content===undefined)continue;
+  map.set(path,selfCodeSpaceService.toSourceFile(path,content));
+ }
+ return map;
+}
+
 class AutonomousCandidatePreparationService {
  buildImplementationPlan(issue:DiscoveredIssue,resolution:TargetResolution):AutonomousImplementationPlan{
   const stepsByKind:Record<DiscoveredIssueKind,string[]>={
@@ -65,7 +82,7 @@ class AutonomousCandidatePreparationService {
 
  async prepare(issueId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>,targetPaths?:string[]):Promise<CandidateWorkspace|undefined>{
   const issue=autonomousIssueDiscoveryService.list(500).find(x=>x.id===issueId);if(!issue)return undefined;
-  const resolvedTargetPaths=[...(targetPaths||[])].filter(Boolean);const sourceMap=new Map(selfCodeSpaceService.listSourceFiles().map(file=>[file.path,file]));
+  const resolvedTargetPaths=[...(targetPaths||[])].filter(Boolean);const sourceMap=sourceMapForPaths(resolvedTargetPaths);
   if(resolvedTargetPaths.length===0)return undefined;
   const supplied=new Map((aiCandidates||[]).map(x=>[x.path,x]));const drafts:CandidateDraft[]=[];
   for(const path of resolvedTargetPaths){const source=sourceMap.get(path);if(!source)continue;const candidate=supplied.get(path);const candidateContent=candidate?.candidateContent||this.safeTemplate(source.content,issue);if(candidateContent.trim()===source.content.trim())continue;drafts.push({issueId,targetPath:path,baselineContent:source.content,candidateContent,evidenceIds:[...new Set([...source.evidenceIds,...(candidate?.evidenceIds||[])])],generationMode:candidate?'AI_SUPPLIED':'SAFE_TEMPLATE'});}
@@ -73,7 +90,9 @@ class AutonomousCandidatePreparationService {
  }
 
  async prepareForRun(runId:string,aiCandidates?:Array<{path:string;candidateContent:string;evidenceIds?:string[]}>,sourceFilesOverride?:ReturnType<typeof selfCodeSpaceService.listSourceFiles>):Promise<{workspaceId?:string;targetPaths:string[];missingPaths:string[];reason?:string}>{
-  const { improvementIntakeRouterService }=await import('./improvementIntakeRouterService');const run=improvementIntakeRouterService.get(runId);const sourceMap=new Map((sourceFilesOverride||selfCodeSpaceService.listSourceFiles()).map(file=>[file.path,file]));if(!run)return {targetPaths:[],missingPaths:[],reason:'IMPROVEMENT_RUN_NOT_FOUND'};
+  const { improvementIntakeRouterService }=await import('./improvementIntakeRouterService');const run=improvementIntakeRouterService.get(runId);if(!run)return {targetPaths:[],missingPaths:[],reason:'IMPROVEMENT_RUN_NOT_FOUND'};
+  const wantedPaths=Array.isArray(run.payload.targetFiles)?run.payload.targetFiles.filter((value):value is string=>typeof value==='string').map(value=>value.trim()).filter(Boolean):[];
+  const sourceMap=sourceMapForPaths(wantedPaths,sourceFilesOverride);
   if(run.runType==='EXTERNAL_DIRECTIVE'){
    const targetPaths=Array.isArray(run.payload.targetFiles)?run.payload.targetFiles.filter((value):value is string=>typeof value==='string'):[];const missingPaths=targetPaths.filter(path=>!sourceMap.has(path));if(targetPaths.length===0)return {targetPaths:[],missingPaths:[],reason:'EXTERNAL_DIRECTIVE_TARGETS_MISSING'};if(missingPaths.length>0)return {targetPaths,missingPaths,reason:'EXTERNAL_DIRECTIVE_TARGET_NOT_FOUND'};
    const supplied=new Map((aiCandidates||[]).map(candidate=>[candidate.path,candidate]));const drafts=[] as Array<{path:string;baselineContent:string;candidateContent:string;evidenceIds:string[]}>;
