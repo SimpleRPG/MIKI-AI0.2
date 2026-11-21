@@ -10529,6 +10529,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     poseSvc().setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
   }
 
+// ---- P1110: 見た目の物差し（知覚プロファイル） ----
+  {
+    const { visualLikenessService: like1110 } = await import('../src/miki/conversation/services/visualLikenessService');
+    const grad = new Uint8Array(32 * 32 * 4);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) { const i = (y * 32 + x) * 4; const v = 100 + x * 4; grad[i] = v; grad[i + 1] = v; grad[i + 2] = v; grad[i + 3] = 255; }
+    const blocks = new Uint8Array(32 * 32 * 4);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) { const i = (y * 32 + x) * 4; const v = x < 16 ? 60 : 220; blocks[i] = v; blocks[i + 1] = v; blocks[i + 2] = v; blocks[i + 3] = 255; }
+    const black = new Uint8Array(32 * 32 * 4);
+    for (let i = 0; i < 32 * 32; i++) { black[i * 4 + 3] = 255; }
+    const pg = like1110.perceptualProfile(grad, 32, 32);
+    const pb = like1110.perceptualProfile(blocks, 32, 32);
+    const pk = like1110.perceptualProfile(black, 32, 32);
+    check('P1110 なだらかな画像は柔らかいと測れる', pg.softRatio > 0.8 && pg.hardEdges === 0, JSON.stringify(pg));
+    check('P1110 硬い境界の画像は硬いと測れる', pb.softRatio < 0.3 && pb.hardEdges > 20, JSON.stringify(pb));
+    check('P1110 真っ黒な平坦色の割合が測れる', pk.darkFlatShare === 1 && pb.darkFlatShare === 0, JSON.stringify({ k: pk.darkFlatShare, b: pb.darkFlatShare }));
+    const d1110 = like1110.comparePerceptual(pg, pb);
+    check('P1110 比較は符号つきで返る', d1110.softRatio < -0.5 && d1110.hardEdges > 0, JSON.stringify(d1110));
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

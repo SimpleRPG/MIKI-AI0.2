@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1897,
-    "sourceFileCount": 1450,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1361,
-    "relativeImportCandidateCount": 4876,
-    "resolvedRelativeImportCandidateCount": 4860,
+    "trackedPathCountExcludingControlPaths": 1898,
+    "sourceFileCount": 1451,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1362,
+    "relativeImportCandidateCount": 4877,
+    "resolvedRelativeImportCandidateCount": 4861,
     "unresolvedRelativeImportCandidateCount": 16
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 882525,
-      "lines": 10545,
-      "sha256": "3fa8789e79e426a0ed9886982da6bb4b905b326754ad857c2e9d17dff1e3ab8d",
+      "bytes": 884093,
+      "lines": 10564,
+      "sha256": "a705783fbe871d9c80ec887c510a51710c5fa47908fc839e68eb42bb42cd532d",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5216,10 +5216,16 @@
           "specifier": "../src/miki/conversation/services/bodyEditByWordsService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/bodyEditByWordsService.ts"
+        },
+        {
+          "line": 10534,
+          "specifier": "../src/miki/conversation/services/visualLikenessService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
         }
       ],
-      "relativeImportCandidateCount": 583,
-      "resolvedRelativeImportCount": 583,
+      "relativeImportCandidateCount": 584,
+      "resolvedRelativeImportCount": 584,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -16264,6 +16270,16 @@
       ],
       "relativeImportCandidateCount": 3,
       "resolvedRelativeImportCount": 3,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/conversation/services/visualLikenessService.ts",
+      "bytes": 3568,
+      "lines": 98,
+      "sha256": "227d91154f5ec3ed25ffe82a1fa2c377cc6cc73ad1b1a0fa2666426bacd892d7",
+      "relativeImportCandidates": [],
+      "relativeImportCandidateCount": 0,
+      "resolvedRelativeImportCount": 0,
       "unresolvedRelativeImportCount": 0
     },
     {
