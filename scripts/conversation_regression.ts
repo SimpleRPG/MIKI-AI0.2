@@ -10928,6 +10928,31 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1131 橋が無い環境では書き込み・削除とも undefined（JS 経路のまま）', w1131 === undefined && d1131 === undefined, `write=${String(w1131)} delete=${String(d1131)}`);
   }
 
+// ---- P1132: 同期の保存後にネイティブへ書き写す（初段） ----
+  {
+    const { githubSyncService } = await import('../src/services/githubSyncService');
+    const { canonicalSha256 } = await import('../src/miki/core/services/canonicalSha256Service');
+    const a1132 = 'export const a1132 = 1;\n';
+    const b1132 = 'export const b1132 = 2;\n';
+    githubSyncService.applyBundledSeed('p1132/probe', 'main', {
+      files: [
+        { path: 'src/a.ts', content: a1132, sha256: canonicalSha256(a1132) },
+        { path: 'src/b.ts', content: b1132, sha256: canonicalSha256(b1132) },
+      ],
+      commitSha: 'p1132c1', seedRevision: 'p1132-1',
+    });
+    const m1132 = githubSyncService.manifest('p1132/probe', 'main');
+    check('P1132 書き写しの付いた保存でもマニフェストと内容は従来どおり', (m1132?.files.length ?? 0) === 2 && githubSyncService.readFileContent('p1132/probe', 'main', 'src/a.ts') === a1132, `files=${m1132?.files.length}`);
+    githubSyncService.applyImport('p1132/probe', 'main', {
+      files: [],
+      manifest: [{ path: 'src/a.ts', blobSha: 'x', sha256: canonicalSha256(a1132) }],
+      deletedPaths: ['src/b.ts'],
+      commitSha: 'p1132c2', treeSha: 'p1132t2',
+    });
+    const m1132b = githubSyncService.manifest('p1132/probe', 'main');
+    check('P1132 削除を含む取り込みでも正本は正しく縮む', (m1132b?.files.length ?? 0) === 1 && m1132b?.files[0].path === 'src/a.ts', `files=${m1132b?.files.length}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

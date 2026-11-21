@@ -1,4 +1,5 @@
 import { storageService } from './storageService';
+import { systemLogger } from './systemLogger';
 import { sha256HexFromText } from '../miki/core/services/canonicalSha256Service';
 
 export interface GitHubSyncFile {
@@ -312,6 +313,9 @@ class GitHubSyncService {
   }
 
   private save(state: GitHubSyncState): GitHubSyncState {
+    // P1132: ネイティブへの書き写し用に、保存前のマニフェストを覚える。
+    let prevFiles: Array<{ path: string; sha256: string }> = [];
+    try { prevFiles = this.readManifest(state.repository, state.branch)?.files ?? []; } catch { prevFiles = []; }
     // P1118: 分割保存へ書く（変更ファイル＋マニフェストのみ）。
     // 旧キーが残っていたら移行済みとして消す。
     this.writeSplit(state);
@@ -320,8 +324,49 @@ class GitHubSyncService {
         storageService.removeItem(makeKey(state.repository, state.branch));
       }
     } catch { /* 旧キーの掃除は補助経路 */ }
+    this.mirrorToNative(state, prevFiles);
 
     return state;
+  }
+
+  /**
+   * P1132: 保存後の状態をネイティブのワークスペースへ書き写す。
+   * 正本は IndexedDB の分割保存のままで、こちらは実機のディスクを
+   * 追いつかせるための写し（差分のみ・非同期・失敗しても同期は
+   * 壊さない）。読みのディスク優先化は、実機ログで写しの一致が
+   * 確認できてから別段で行う。
+   */
+  private mirrorToNative(state: GitHubSyncState, prevFiles: Array<{ path: string; sha256: string }>): void {
+    void (async () => {
+      try {
+        const { nativeWorkspaceBridgeService } = await import('../miki/execution/services/nativeWorkspaceBridgeService');
+        if (!(await nativeWorkspaceBridgeService.available())) return;
+        const prev = new Map(prevFiles.map((file) => [file.path, file.sha256]));
+        const next = new Set(state.files.map((file) => file.path));
+        let written = 0;
+        let deleted = 0;
+        let failed = 0;
+        for (const file of state.files) {
+          if (prev.get(file.path) === file.sha256) continue;
+          const result = await nativeWorkspaceBridgeService.writeFile(file.path, file.content);
+          if (result && result.sha256 === file.sha256) written++;
+          else failed++;
+        }
+        for (const path of prev.keys()) {
+          if (next.has(path)) continue;
+          const result = await nativeWorkspaceBridgeService.deleteFile(path);
+          if (result !== undefined) deleted++;
+          else failed++;
+        }
+        systemLogger.recordRuntimeDiagnostic('NATIVE_SYNC_MIRROR', {
+          repository: state.repository,
+          branch: state.branch,
+          written,
+          deleted,
+          failed,
+        });
+      } catch { /* 写しは補助経路 */ }
+    })();
   }
 
   diagnose(repository: string, branch: string): GitHubSyncDiagnostic {
