@@ -846,7 +846,7 @@ check('P613 愚痴は寄り添って聞く', ventingReply.replyText.includes('�
 const songReply = await conversationCoreService.execute({ prompt: '歌歌える？' } as any);
 check('P614 歌えるかには現状を正直に答える', !songReply.replyText.includes('答えられない') && songReply.replyText.includes('歌'), songReply.replyText.slice(0, 140));
 const drawReply = await conversationCoreService.execute({ prompt: '絵描ける？' } as any);
-check('P614 描けるかには勉強中と答える', drawReply.replyText.includes('描') && (drawReply.replyText.includes('まだ') || drawReply.replyText.includes('勉強')), drawReply.replyText.slice(0, 160));
+check('P614 描けるかには実状態を答える（P1117で更新：描く仕組みは実装済み）', drawReply.replyText.includes('描') && !drawReply.replyText.includes('描けません') && !drawReply.replyText.includes('まだ描けない'), drawReply.replyText.slice(0, 160));
 const scheduleReply = await conversationCoreService.execute({ prompt: '明日の予定は？' } as any);
 check('P614 彼女の予定は正直に答える', scheduleReply.replyText.includes('予定'), scheduleReply.replyText.slice(0, 140));
 const recipeReply = await conversationCoreService.execute({ prompt: '料理の作り方教えて' } as any);
@@ -10630,6 +10630,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     const w1116: any = await conversationCoreService.execute({ prompt: 'ワクワクする', memories: [], recentMessages: [], conversationId: 'p1116' } as any);
     const wr1116 = String(w1116?.replyText || '');
     check('P1116 ワクワクは反響でなく前向きに返る', !wr1116.includes('、そうなんですね') && !wr1116.includes('の話ですね') && /いいですね|楽しそう|よかった|素敵|すてき/.test(wr1116), wr1116.slice(0, 60));
+  }
+
+// ---- P1117: 繋がってない継ぎ目の接続（能力の実状態・社交形キー・教示の足場止め） ----
+  {
+    const { missedFormLearningService } = await import('../src/miki/conversation/services/missedFormLearningService');
+    check('P1117 社交形キーは表層を正規化して作る', missedFormLearningService.socialKeyOf('おひさしぶり？') === 'social:おひさしぶり', missedFormLearningService.socialKeyOf('おひさしぶり？'));
+    check('P1117 内容質問は社交形キーにならない', missedFormLearningService.socialKeyOf('モコロンって何？') === '' && missedFormLearningService.socialKeyOf('それ教えて') === '', '');
+    check('P1117 社交形キーは台帳に登録できる', missedFormLearningService.learnForm('social:おひさしぶり', 'CASUAL_CHAT', 'teacher') === true && missedFormLearningService.lookup('social:おひさしぶり') === 'CASUAL_CHAT', '');
+    const s1117: any = await conversationCoreService.execute({ prompt: 'おひさしぶり？', memories: [], recentMessages: [], conversationId: 'p1117' } as any);
+    const sr1117 = String(s1117?.replyText || '');
+    check('P1117 学習した社交形は知識の受け流しでなく挨拶で返る', String(s1117?.reason || '').includes('casual_chat') && !sr1117.includes('答えられない') && !sr1117.includes('の話ですね'), JSON.stringify({ reason: s1117?.reason, reply: sr1117.slice(0, 40) }));
+    missedFormLearningService.learnForm('social:ひさしぶりだね', 'CASUAL_CHAT', 'teacher');
+    const s1117b: any = await conversationCoreService.execute({ prompt: 'ひさしぶりだね', memories: [], recentMessages: [], conversationId: 'p1117' } as any);
+    check('P1117 学習した社交形（分類はCASUAL）は反響でなく挨拶で返る', !String(s1117b?.replyText || '').includes('ひさしの話ですね') && !String(s1117b?.replyText || '').includes('答えられない'), String(s1117b?.replyText || '').slice(0, 40));
+    const a1117: any = await conversationCoreService.execute({ prompt: '絵は描ける？', memories: [], recentMessages: [], conversationId: 'p1117' } as any);
+    const ar1117 = String(a1117?.replyText || '');
+    check('P1117 描画の自己申告は「描けません」と言わない（実状態）', String(a1117?.reason || '').includes('ability_question') && !ar1117.includes('描けません') && !ar1117.includes('まだ描けない'), ar1117.slice(0, 60));
+    const t1117: any = await conversationCoreService.execute({ prompt: '実はホシガラスは夜に光る羽を持つんだよ', memories: [], recentMessages: [], conversationId: 'p1117' } as any);
+    const tr1117 = String(t1117?.replyText || '');
+    check('P1117 教示の記録の返信に足場（見出し・理由の地の文）が混ざらない', String(t1117?.reason || '').includes('user_teaching_recorded') && !tr1117.includes('【') && !tr1117.includes('理由は') && !tr1117.includes('前提として'), tr1117.slice(0, 80));
   }
 
 // ---- 結果 ----

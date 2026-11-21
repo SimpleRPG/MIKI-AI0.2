@@ -19,6 +19,7 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { longTermMemoryService } from '../../memory/services/longTermMemoryService';
 import { latentIntentMiningService } from '../../unknown/services/latentIntentMiningService';
 import { answerContentIrService } from '../../conversation/services/answerContentIrService';
+import { visualPoseService } from '../../conversation/services/visualPoseService';
 import { unknownResearchConversationBridgeService, selectUnverifiedPresentation, buildUnverifiedConclusion } from '../../conversation/services/unknownResearchConversationBridgeService';
 import { conversationUnknownVocabularyService } from '../../conversation/services/conversationUnknownVocabularyService';
 import { missedFormLearningService } from '../../conversation/services/missedFormLearningService';
@@ -278,10 +279,19 @@ export class ConversationCoreService {
     // 本ターンが強い行為として通り内容語が重なるときに限り、
     // その形と行為の対応を台帳へ昇格する。台帳にある形が陳述に
     // 落ちたら、台帳の行為で解釈する（積極判定は上書きしない）。
+    let learnedCasualForm = false;
     try {
       const missedKey = params.conversationId || state.conversationId || 'active';
       const skeleton = missedFormLearningService.skeletonOf(japaneseAnalysis);
+      // P1117: 純粋な社交形は骨格が空になり台帳に載らなかった。骨格の
+      // 有無によらず、表層キーも併せて引く（内容質問はキーにならない）。
+      const socialKey = missedFormLearningService.socialKeyOf(params.prompt);
       const pendingMiss = missedFormLearningService.pendingFor(missedKey);
+      if (pendingMiss && pendingMiss.skeleton.startsWith('social:') && dialogueAct === 'CASUAL_CHAT') {
+        // P1117: 社交形は内容語が無いので、言い直しが CASUAL に
+        // 通ったこと自体を昇格の合図にする。
+        missedFormLearningService.promote(missedKey, dialogueAct);
+      }
       if (pendingMiss && dialogueAct !== 'STATEMENT' && dialogueAct !== 'CASUAL_CHAT') {
         const overlap = (japaneseAnalysis.contentTokens || []).some((t) => pendingMiss.contentTokens.includes(t));
         if (overlap) missedFormLearningService.promote(missedKey, dialogueAct);
@@ -291,17 +301,40 @@ export class ConversationCoreService {
         if (learnedAct) {
           dialogueAct = learnedAct;
           stages.missedFormApplied = 1;
+          if (learnedAct === 'CASUAL_CHAT') learnedCasualForm = true;
         } else {
           // P914: 完全一致が無ければ保守的な類推一般化を試す。
           const similarAct = missedFormLearningService.lookupSimilar(skeleton);
           if (similarAct) {
             dialogueAct = similarAct;
             stages.missedFormApplied = 2;
+            if (similarAct === 'CASUAL_CHAT') learnedCasualForm = true;
           }
         }
       }
+      // P1117: 社交形キーは表層の完全一致なので、行為が STATEMENT /
+      // QUESTION に落ちていても台帳の行為で解釈する（積極判定の
+      // 上書きはしない：強い行為は対象に含めない）。
+      if (socialKey && (dialogueAct === 'STATEMENT' || dialogueAct === 'QUESTION')) {
+        const learnedSocialAct = missedFormLearningService.lookup(socialKey);
+        if (learnedSocialAct) {
+          dialogueAct = learnedSocialAct;
+          stages.missedFormApplied = 3;
+          if (learnedSocialAct === 'CASUAL_CHAT') learnedCasualForm = true;
+        }
+      }
+      // P1117: 既に CASUAL に分類されている形でも、台帳に社交形として
+      // 学習済みなら受け口の差し替え対象にする。
+      if (socialKey && dialogueAct === 'CASUAL_CHAT') {
+        if (missedFormLearningService.lookup(socialKey) === 'CASUAL_CHAT') learnedCasualForm = true;
+      }
       if (dialogueAct === 'STATEMENT' && interpretation.llmFallbackNeeded && skeleton) {
         missedFormLearningService.noteMiss(missedKey, skeleton, japaneseAnalysis.contentTokens || []);
+      }
+      // P1117: 社交形の保留は骨格が空のときだけ（骨格の外し記録・昇格の
+      // 流れと競合させない）。
+      if (interpretation.llmFallbackNeeded && !skeleton && socialKey) {
+        missedFormLearningService.noteSocialMiss(missedKey, socialKey);
       }
     } catch { /* 形の学習は補助経路 */ }
     // P856: P214 の談話スタックへ、通常会話の話題も供給する。
@@ -998,7 +1031,9 @@ export class ConversationCoreService {
       if (provenance && !multiPart) {
         return this.buildResult('RESOLVED', 'knowledge_provenance_answer', this.applyPersonaVoice(provenance), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
-      const termKnowledge = this.termKnowledgeAnswer(prompt, state, recentMessages);
+      // P1117: 学習した社交形が CASUAL と教えている場合は、用語知識
+      // レーンに奪わせない（形の学習がレーン選択に届くための継ぎ目）。
+      const termKnowledge = learnedCasualForm ? undefined : this.termKnowledgeAnswer(prompt, state, recentMessages);
       if (termKnowledge) {
         return this.buildResult('RESOLVED', 'term_knowledge_answer', this.applyPersonaVoice(termKnowledge), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -1660,13 +1695,11 @@ export class ConversationCoreService {
       ir = answerContentIrService.buildAnswerIR({
         conclusion: teachingResult.message || `「${teachingResult.extractedStatement}」を新しい知識候補として記録しました。`,
         target: 'ユーザー教示の記録と検証準備',
-        reasons: [
-          `ユーザーからの直接教示を検知: 「${teachingResult.extractedStatement}」`,
-          '主張DBへ CANDIDATE 状態で安全に登録しました (自己証明禁止のため複数回の一貫した確認を経て昇格)',
-        ],
-        conditions: ['前提として、今後の対話や検証を経て確定知識へ昇格します。'],
+        // P1117: 理由・条件は監査用の足場（検知経緯・昇格手順）で、返信に
+        // 混入していた（実機スクショで確認：節見出しや「理由は…」の地の文）。
+        // 結論文が利用者向けの内容を言い切っているので、IR には載せない。
         certainty: 'CERTAIN',
-        detailLevel: 'STANDARD',
+        detailLevel: 'BRIEF',
       });
       skeleton = 'GENERAL_ANSWER';
       status = 'RESOLVED';
@@ -1798,9 +1831,10 @@ export class ConversationCoreService {
       // 反応する（主題語＋感情の手がかり）。挨拶・感謝・疲労など
       // の決まった受け止めが要る言い方では従来の文を優先する。
       const isPhatic = isFatigue || closingFamily || /お疲れ|おつかれ|ありがと(?:う|ー)?|感謝|ごめん|すみません|申し訳|おはよ(?:う|ー)?|元気|げんき|こんにちは|こんばんは|やぁ|やあ|起きた|目覚めた/.test(prompt);
+      let genericCasualReaction: string | null = null;
       if (!isPhatic) {
         const reaction = this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens);
-        if (reaction) casualConclusion = reaction;
+        if (reaction) { casualConclusion = reaction; genericCasualReaction = reaction; }
         // P591: つまらなさ・退屈は、主題の断片（「つまの話ですね」）で
         // なく気持ちとして受ける（CASUAL 側にも受け止めを置く）。
         if (/つまら|退屈/.test(prompt)) {
@@ -1824,6 +1858,12 @@ export class ConversationCoreService {
           const selfLike = this.selfLikeReaction(prompt);
           if (selfLike) casualConclusion = selfLike;
         }
+      }
+      // P1117: 学習した社交形で来たのに、結論が汎用の反応（反響）の
+      // ままなら、挨拶として受け直す。固有の受け口（疲労・褒め・
+      // 教わった好き等）が決めた結論は上書きしない。
+      if (learnedCasualForm && genericCasualReaction && casualConclusion === genericCasualReaction) {
+        casualConclusion = this.pickFixedReply('fx_learned_social', ['おひさしぶりです！元気でしたか？', 'やぁ、声をかけてくれて嬉しいです。', 'こんにちは！何かあれば声をかけてくださいね。']);
       }
       // P522: 前の日以前に開いた話題が残っていれば、挨拶のときに
       // 一度だけ拾う。
@@ -1999,6 +2039,8 @@ export class ConversationCoreService {
                       ? this.pickFixedReply('fx_agree', ['そうですよね。', 'うんうん、分かります。', 'そうですね。同感です。'])
                       : (this.buildCasualReaction(prompt, japaneseAnalysis.contentTokens)
                         ?? 'そうなんですね。話してくれてありがとう。'));
+      // P1117: 固有の受け口が上書きしたか判定するため、汎用の反応を控える。
+      const genericReactionBase = reactionBase;
       // P578: 教わった「自分の好きなもの」の話なら、自分の好きとして受ける。
       if (!taughtAck && !fallthroughFatigue && !fallthroughAnxiety && !fallthroughHunger && !fallthroughLoneliness && !fallthroughThirst && !fallthroughPain && !fallthroughClosing) {
         const like = this.selfLikeReaction(prompt);
@@ -2213,6 +2255,12 @@ export class ConversationCoreService {
           // ですね」と返していた）。引き受けた上で、続きは相手に委ねる。
           reactionBase = ffx('fx_request_ack', ['うん、いいよ。任せて。', '分かりました。やってみますね。', 'はい、いいですよ。'], ['うん、いいよ！まかせて！', '分かった、やってみるね！', 'うん、いいよー。']);
         }
+      }
+      // P1117: 学習した社交形で CASUAL に来たのに、受け口が汎用の
+      // 反応（反響）のままなら、反響ではなく挨拶として受ける。
+      // 形の学習が返信に届くための最後の受け口。
+      if (learnedCasualForm && reactionBase === genericReactionBase) {
+        reactionBase = this.pickFixedReply('fx_learned_social', ['おひさしぶりです！元気でしたか？', 'やぁ、声をかけてくれて嬉しいです。', 'こんにちは！何かあれば声をかけてくださいね。']);
       }
       // P526: なりチャ中は、場面の地の文を1文添えて段落にする
       // （創作の層の中だけ。場面が無ければ何も付かない）。
@@ -7504,7 +7552,13 @@ export class ConversationCoreService {
       return this.pickFixedReply('fx_ability_song', ['歌は、まだ歌えません。歌詞を考えるくらいならできますよ。', '歌声はまだ持っていないんです。いつか歌えるようになりたいです。']);
     }
     if (/絵|イラスト|お絵描き/.test(prompt) && /(?:描ける|描けます)/.test(prompt)) {
-      return this.pickFixedReply('fx_ability_draw', ['絵は、今はまだ描けません。絵の知識をルールに分けて、自分で描けるようになる方法を勉強中です。', 'まだ描けないんです。でも、描き方を知識として分解して学んでいるところです。']);
+      // P1117: 自己申告は実状態から。描画の仕組みは実装済みで、「描けません」
+      // は事実と矛盾するため廃止。見本（目標）が読み込まれていれば練習の
+      // 段階まで、無ければ仕組みの有無までを正直に言う。
+      if (visualPoseService.getTarget()) {
+        return this.pickFixedReply('fx_ability_draw', ['描けますよ。自分の姿を描いて、見本と測り比べて直す練習を続けているところです。', '描けます。寸法は測って合わせられるようになってきました。似せの方はまだ練習中です。']);
+      }
+      return this.pickFixedReply('fx_ability_draw_ready', ['描く仕組みは持っています。見本を読み込めば、自分の姿を描く練習ができます。', '描けますよ。見本を読み込んで、測って描いて直す、という進め方で練習します。']);
     }
     if (/英語/.test(prompt) && /(?:話せる|話せます|できる|できます|分かる|わかる)/.test(prompt)) {
       return this.pickFixedReply('fx_ability_english', ['英語の文章を読むくらいはできます。会話は文字だけですけどね。', '読み書きなら少し。話す声は持っていないんです。']);

@@ -73,6 +73,29 @@ class MissedFormLearningService {
     return parts.join('|');
   }
 
+  /**
+   * P1117: 社交形キー。純粋な社交の形（「おひさしぶり？」等）は
+   * 内容語を持たず骨格が空になり、従来は台帳に載らなかった。
+   * 正規化した表層そのものをキーにして、同じ台帳に載せる。
+   */
+  public socialKeyOf(text: string): string {
+    const normalized = String(text || '').replace(/[\s　]/g, '').replace(/[？！?!。、…]+$/g, '').trim();
+    if (!normalized || normalized.length > 25) return '';
+    // 内容のある質問（用語・知識・依頼）は社交形ではないのでキーにしない。
+    if (/何|なに|誰|どこ|いつ|どう|なぜ|知ってる|教えて|して|ください/.test(normalized)) return '';
+    return `social:${normalized}`;
+  }
+
+  /** P1117: 社交形の外しは内容語が無いので、専用の保留記録を使う。
+   * 骨格側の保留が既にある場合は上書きしない（昇格の流れを壊さない）。 */
+  public noteSocialMiss(key: string, socialKey: string): void {
+    if (!socialKey || !socialKey.startsWith('social:')) return;
+    const store = this.load();
+    if (store.pending[key]) return;
+    store.pending[key] = { skeleton: socialKey, contentTokens: [], at: Date.now() };
+    this.save(store);
+  }
+
   public noteMiss(key: string, skeleton: string, contentTokens: string[]): void {
     if (!skeleton || !contentTokens || contentTokens.length === 0) return;
     const store = this.load();
@@ -132,7 +155,9 @@ class MissedFormLearningService {
     const skel = (skeleton || '').trim();
     const a = (act || '').trim();
     if (!skel || !a) return false;
-    if (skel.split('|').filter(Boolean).length < 3) return false;
+    // P1117: 社交形キー（social:）は表層そのものがキーなので、骨格の
+    // 部品数チェックの対象外。
+    if (!skel.startsWith('social:') && skel.split('|').filter(Boolean).length < 3) return false;
     const store = this.load();
     const existing = store.learned.find((l) => l.skeleton === skel);
     if (existing) {
