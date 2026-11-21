@@ -10719,6 +10719,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1120 会話の実行でもアクティブな人格に記録される', personaExperienceService.summary('persona-default').verbosityDown === beforeCore1120 + 1, '');
   }
 
+// ---- P1121: Rust データプレーン第1段（橋と種のディスク用意） ----
+  {
+    const { nativeWorkspaceBridgeService } = await import('../src/miki/execution/services/nativeWorkspaceBridgeService');
+    check('P1121 ネイティブの無い環境では橋は静かに無効になる', (await nativeWorkspaceBridgeService.available()) === false, '');
+    check('P1121 種のネイティブ展開は使えない環境では undefined（JS 経路に落ちる）', (await nativeWorkspaceBridgeService.extractSeed()) === undefined, '');
+    check('P1121 ファイル読みも使えない環境では undefined', (await nativeWorkspaceBridgeService.readFile('src/index.ts')) === undefined, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

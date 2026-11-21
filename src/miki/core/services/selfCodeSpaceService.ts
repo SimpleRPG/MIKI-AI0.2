@@ -7,6 +7,7 @@ import {
 import { canonicalSha256, sha256HexFromText } from './canonicalSha256Service';
 import { githubSyncService } from '../../../services/githubSyncService';
 import type { GitHubSyncDiagnosticStatus } from '../../../services/githubSyncService';
+import { nativeWorkspaceBridgeService } from '../../execution/services/nativeWorkspaceBridgeService';
 
 export interface SelfCodeFile {
   path: string;
@@ -530,6 +531,24 @@ class SelfCodeSpaceService {
       checkpoint('WORKSPACE_DIAGNOSTIC_FLUSH_COMPLETE', { fileCount: total });
 
       checkpoint('COMPLETE', { status: 'SEEDED', fileCount: total, totalContentChars, maxFileChars });
+
+      // P1121: ネイティブ側のディスク・ワークスペースも用意する
+      // （種の展開＋Rust ハッシュ）。読み経路はまだ JS 側で、これは
+      // 第2段の土台と件数照合のため。失敗しても種の成立に影響させない。
+      void nativeWorkspaceBridgeService.extractSeed()
+        .then((native) => {
+          if (native) {
+            checkpoint('NATIVE_SEED_EXTRACT', {
+              nativeFileCount: native.file_count,
+              nativeTotalBytes: native.total_bytes,
+              nativeDurationMs: native.duration_ms,
+              jsFileCount: total,
+              fileCountMatch: native.file_count === total,
+            });
+          }
+        })
+        .catch(() => { /* ネイティブの用意は補助経路 */ });
+
       report({
         phase: 'COMPLETE',
         completed: total,

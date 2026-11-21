@@ -757,6 +757,95 @@ class MIKINativeRunnerPlugin : Plugin() {
 
     private fun ByteArray.toHex(): String = joinToString(separator = "") { byte -> "%02x".format(byte) }
 
+    // P1121: 種 zip（アプリ同梱アセット）を JS を経由せずにワークスペースへ
+    // 展開し、全ファイルの sha256 を Rust で取る。JS へ返すのは
+    // マニフェスト（パス・sha256・サイズ）だけで、内容は橋を渡らない。
+    // 読み経路の置き換えは第2段で、ここではディスク側の用意と照合まで。
+    @PluginMethod
+    fun extractSeedWorkspace(call: PluginCall) {
+        val assetPath = call.getString("asset_path")?.trim()?.takeIf { it.isNotEmpty() } ?: "public/self-code-seed.zip"
+        if (assetPath.startsWith("/") || assetPath.split('/').contains("..")) {
+            call.reject("SEED_ASSET_PATH_INVALID")
+            return
+        }
+        val workspaceRoot = File(context.filesDir, "miki/workspaces").canonicalFile
+        Thread {
+            try {
+                val startedAt = System.nanoTime()
+                if (!workspaceRoot.exists()) workspaceRoot.mkdirs()
+                val items = ArrayList<JSObject>()
+                var totalBytes = 0L
+                context.assets.open(assetPath).use { input ->
+                    java.util.zip.ZipInputStream(input).use { zip ->
+                        var entry = zip.nextEntry
+                        while (entry != null) {
+                            val name = entry.name.replace('\\', '/')
+                            if (!entry.isDirectory && !name.startsWith("/") && !name.split('/').contains("..")) {
+                                val target = File(workspaceRoot, name).canonicalFile
+                                if (target.path.startsWith(workspaceRoot.path + File.separator)) {
+                                    target.parentFile?.mkdirs()
+                                    target.outputStream().use { out -> zip.copyTo(out) }
+                                    val item = JSObject()
+                                    item.put("path", name)
+                                    item.put("sha256", MIKINativeCore.sha256File(target))
+                                    item.put("byte_length", target.length())
+                                    items.add(item)
+                                    totalBytes += target.length()
+                                }
+                            }
+                            zip.closeEntry()
+                            entry = zip.nextEntry
+                        }
+                    }
+                }
+                items.sortBy { it.getString("path") }
+                val files = JSArray()
+                for (item in items) files.put(item)
+                val result = JSObject()
+                result.put("engine", "RUST")
+                result.put("api_version", MIKINativeCore.health().apiVersion)
+                result.put("file_count", items.size)
+                result.put("total_bytes", totalBytes)
+                result.put("duration_ms", (System.nanoTime() - startedAt) / 1_000_000)
+                result.put("files", files)
+                call.resolve(result)
+            } catch (error: Throwable) {
+                call.reject("SEED_EXTRACT_FAILED", error.toCapacitorException())
+            }
+        }.start()
+    }
+
+    // P1121: ワークスペース内の1ファイルを JS へ返す（第2段の部分読み用）。
+    @PluginMethod
+    fun readWorkspaceFile(call: PluginCall) {
+        val relativePath = call.getString("relative_path")?.trim()
+        if (relativePath.isNullOrEmpty()) {
+            call.reject("RELATIVE_PATH_REQUIRED")
+            return
+        }
+        val workspaceRoot = File(context.filesDir, "miki/workspaces").canonicalFile
+        val target = File(workspaceRoot, relativePath).canonicalFile
+        if (target != workspaceRoot && !target.path.startsWith(workspaceRoot.path + File.separator)) {
+            call.reject("WORKSPACE_PATH_ESCAPE_REJECTED")
+            return
+        }
+        Thread {
+            try {
+                if (!target.isFile) throw IllegalArgumentException("READ_TARGET_NOT_FILE:$relativePath")
+                if (target.length() > 4_000_000L) throw IllegalArgumentException("READ_TARGET_TOO_LARGE:$relativePath")
+                val result = JSObject()
+                result.put("relative_path", relativePath)
+                result.put("content", target.readText(Charsets.UTF_8))
+                result.put("byte_length", target.length())
+                result.put("engine", "RUST")
+                result.put("api_version", MIKINativeCore.health().apiVersion)
+                call.resolve(result)
+            } catch (error: Throwable) {
+                call.reject("READ_WORKSPACE_FILE_FAILED", error.toCapacitorException())
+            }
+        }.start()
+    }
+
     @PluginMethod
     fun execute(call: PluginCall) {
         val requestId = call.getString("request_id")
