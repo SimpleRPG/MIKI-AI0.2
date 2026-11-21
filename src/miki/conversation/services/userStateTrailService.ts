@@ -108,8 +108,39 @@ export class UserStateTrailService {
 
   private save(entries: UserStateTrailEntry[]): void {
     try {
-      storageService.setItem(STORAGE_KEY, JSON.stringify(entries.slice(-MAX_ENTRIES)));
+      storageService.setItem(STORAGE_KEY, JSON.stringify(this.trim(entries)));
     } catch { /* 記録は補助経路 */ }
+  }
+
+  /**
+   * P1119: 保持の切り捨てを重要度つきにする。従来は単純な FIFO で、
+   * 継続判定に効く記録も古い順に黙って消えていた。落とす順は
+   * ①解消済みで解消より前の記録（継続判定では既に数えない物）
+   * ②前向きの記録の溢れ（直近10件を超える分。継続の受け止めには
+   * 使わない）③それでも溢れたら古い順。
+   * 並び順（時系列）は変えない。
+   */
+  private trim(entries: UserStateTrailEntry[]): UserStateTrailEntry[] {
+    if (entries.length <= MAX_ENTRIES) return entries;
+    let resolvedMap: Record<string, number> = {};
+    try {
+      resolvedMap = JSON.parse(storageService.getItem(RESOLVED_KEY) || '{}') as Record<string, number>;
+    } catch { resolvedMap = {}; }
+    const drop = new Set<number>();
+    let excess = entries.length - MAX_ENTRIES;
+    const dropWhere = (pred: (e: UserStateTrailEntry) => boolean) => {
+      for (let i = 0; i < entries.length && excess > 0; i++) {
+        if (!drop.has(i) && pred(entries[i])) { drop.add(i); excess--; }
+      }
+    };
+    dropWhere((e) => typeof resolvedMap[e.signal] === 'number' && e.at <= resolvedMap[e.signal]);
+    if (excess > 0) {
+      const positiveIdx = entries.map((e, i) => (e.signal === 'positive' && !drop.has(i) ? i : -1)).filter((i) => i >= 0);
+      const keepFrom = Math.max(0, positiveIdx.length - 10);
+      for (let k = 0; k < keepFrom && excess > 0; k++) { drop.add(positiveIdx[k]); excess--; }
+    }
+    dropWhere(() => true);
+    return entries.filter((_, i) => !drop.has(i));
   }
 
   /** P547: 疲労の言い回しかどうかだけを見る（記録はしない）。判定の語彙はここに集約する。 */

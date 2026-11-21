@@ -10681,6 +10681,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1118 分割保存でも取り込みが往復する', applied1118.files.length === 3 && round1118?.files.find((f) => f.path === 'src/a.ts')?.content.includes('a = 10') === true && !!round1118?.files.find((f) => f.path === 'src/b.ts'), JSON.stringify(round1118?.files?.map((f) => f.path)));
   }
 
+// ---- P1119: 保持の重要度つき切り捨て／自律サイクルのメモリ圧ゲート ----
+  {
+    const { userStateTrailService } = await import('../src/miki/conversation/services/userStateTrailService');
+    const { storageService: storage1119 } = await import('../src/services/storageService');
+    const now1119 = Date.now();
+    const H1119 = 3600_000;
+    const seed1119: any[] = [];
+    for (let i = 0; i < 10; i++) seed1119.push({ signal: 'fatigue', at: now1119 - 72 * H1119 + i * 1000 });
+    for (let i = 0; i < 20; i++) seed1119.push({ signal: 'positive', at: now1119 - 50 * H1119 + i * 1000 });
+    for (let i = 0; i < 14; i++) seed1119.push({ signal: 'anxiety', at: now1119 - 10 * H1119 + i * 1000 });
+    storage1119.setItem('miki_user_state_trail_v1', JSON.stringify(seed1119));
+    storage1119.setItem('miki_user_state_resolved_v1', JSON.stringify({ fatigue: now1119 - 60 * H1119 }));
+    userStateTrailService.recordFromText('今日は疲れた');
+    const after1119 = JSON.parse(storage1119.getItem('miki_user_state_trail_v1') || '[]') as any[];
+    check('P1119 切り捨ては解消済みの古い記録から落とす', after1119.length === 40 && after1119.filter((e: any) => e.signal === 'fatigue' && e.at <= now1119 - 60 * H1119).length === 5, JSON.stringify(after1119.length));
+    check('P1119 継続判定に効く記録（不安）は残る', after1119.filter((e: any) => e.signal === 'anxiety').length === 14, '');
+    const { surfaceVariationGrowthService } = await import('../src/miki/conversation/services/surfaceVariationGrowthService');
+    (globalThis.performance as any).memory = { usedJSHeapSize: 950 * 1024 * 1024, totalJSHeapSize: 960 * 1024 * 1024, jsHeapSizeLimit: 1000 * 1024 * 1024 };
+    const report1119 = await surfaceVariationGrowthService.runAutonomousVariationGrowthCycle(5);
+    (globalThis.performance as any).memory = undefined;
+    check('P1119 メモリ圧 NEAR_LIMIT では自律成長サイクルを見送る', report1119.promotedCount === 0 && report1119.totalGenerated === 0 && report1119.summary.includes('見送り'), report1119.summary);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

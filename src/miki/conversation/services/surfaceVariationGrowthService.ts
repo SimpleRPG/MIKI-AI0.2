@@ -442,6 +442,33 @@ export class SurfaceVariationGrowthService {
    */
   public async runAutonomousVariationGrowthCycle(maxPromotions: number = 5): Promise<VariationGrowthReport> {
     const cycleId = `growth-${Date.now()}`;
+    // P1119: メモリ圧が高いときは自律サイクルを軽くする／見送る。
+    // 実機では LOW_MEMORY でプロセスごと落とされており、重い裏作業が
+    // その引き金になり得る。圧は systemLogger の実測（ヒープ使用率）
+    // で見る。測れない環境では従来どおり進める。
+    let effectiveMaxPromotions = maxPromotions;
+    try {
+      const pressure = systemLogger.getRuntimeMemoryDiagnostics().current.pressure;
+      if (pressure === 'NEAR_LIMIT') {
+        const summary = 'メモリ圧が高いため、この回の自律成長サイクルは見送りました';
+        systemLogger.info('SELF_IMPROVEMENT', `[${cycleId}] ⏸️ ${summary}`);
+        return {
+          cycleId,
+          weaknessDetected: [],
+          totalGenerated: 0,
+          passedCount: 0,
+          rejectedCount: 0,
+          promotedCount: 0,
+          rejectionReasons: [],
+          promotedItems: [],
+          summary,
+        };
+      }
+      if (pressure === 'ELEVATED') {
+        effectiveMaxPromotions = Math.min(maxPromotions, 1);
+        systemLogger.info('SELF_IMPROVEMENT', `[${cycleId}] メモリ圧がやや高いため、昇格上限を ${effectiveMaxPromotions} に絞って実行します`);
+      }
+    } catch { /* 圧の計測は補助経路：失敗したら従来どおり */ }
     systemLogger.info('SELF_IMPROVEMENT', `[${cycleId}] 🎨 横(言い回し)の自律成長サイクルを開始します...`);
 
     const weaknesses = this.detectWeaknessCategories(5);
@@ -458,7 +485,7 @@ export class SurfaceVariationGrowthService {
     const categoriesSummary = surfaceVariationService.getAllCategoriesSummary();
 
     for (const weakness of weaknesses) {
-      if (promotedCount >= maxPromotions) break;
+      if (promotedCount >= effectiveMaxPromotions) break;
 
       const catInfo = categoriesSummary.find((c) => c.categoryKey === weakness.categoryKey);
       if (!catInfo || catInfo.samplePool.length === 0) continue;
@@ -537,7 +564,7 @@ export class SurfaceVariationGrowthService {
           passedCount++;
 
           // 昇格上限チェック
-          if (promotedCount < maxPromotions) {
+          if (promotedCount < effectiveMaxPromotions) {
             // CANDIDATE -> VERIFIED へ昇格し、正式プールへ反映
             // P425 C3: 横断重複で登録が落ちた場合は昇格として数えない。
             const registered = surfaceVariationService.registerDynamicVariant(weakness.categoryKey, {
