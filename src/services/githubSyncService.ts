@@ -142,6 +142,41 @@ class GitHubSyncService {
     return undefined;
   }
 
+  /** P1123: マニフェスト（パス＋ハッシュ）だけを読む。内容は読まない。 */
+  manifest(repository: string, branch: string): SplitManifest | undefined {
+    const split = this.readManifest(repository, branch);
+    if (split) return split;
+    const legacy = this.readLegacyState(repository, branch);
+    if (!legacy) return undefined;
+    try {
+      this.writeSplit(legacy);
+      storageService.removeItem(makeKey(repository, branch));
+    } catch { /* 移行は補助経路 */ }
+    return {
+      repository: normalizeRepository(repository),
+      branch: branch.trim(),
+      commitSha: legacy.commitSha,
+      treeSha: legacy.treeSha,
+      complete: legacy.complete,
+      source: legacy.source,
+      syncedAt: legacy.syncedAt,
+      files: legacy.files.map((file) => ({ path: file.path, sha256: file.sha256, blobSha: file.blobSha })),
+    };
+  }
+
+  /** P1123: 1ファイルの内容だけを読む（全体の組み立てをしない）。 */
+  readFileContent(repository: string, branch: string, path: string): string | undefined {
+    try {
+      const raw = storageService.getItem(makeFileKey(repository, branch, path));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.content === 'string') return parsed.content;
+      }
+    } catch { /* 下の全体読みへ落とす */ }
+    const state = this.get(repository, branch);
+    return state?.files.find((file) => file.path === path)?.content;
+  }
+
   private readManifest(repository: string, branch: string): SplitManifest | undefined {
     try {
       const raw = storageService.getItem(makeManifestKey(repository, branch));

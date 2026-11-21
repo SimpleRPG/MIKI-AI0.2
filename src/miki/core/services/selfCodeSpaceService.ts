@@ -784,6 +784,55 @@ class SelfCodeSpaceService {
     }));
   }
 
+  // P1123: 内容を含まない一覧（パス＋ハッシュだけ）。理解サービスの
+  // 既定の入力で、全体の内容を組み立てない。dirty な作業状態がある間は
+  // そちらが正本。
+  listSourceFileManifest(): Array<{ path: string; contentHash: string }> {
+    try {
+      const raw = storageService.getItem(KEY);
+      if (raw) {
+        const value = JSON.parse(raw);
+        if (value?.files && value?.dirty === true) {
+          return (value.files as SelfCodeFile[]).map(file => ({
+            path: file.path,
+            contentHash: file.sha256,
+          }));
+        }
+      }
+    } catch { /* clean 側へ */ }
+    const settings = this.getGitHubSettings();
+    const manifest = githubSyncService.manifest(
+      settings.repository,
+      settings.branch
+    );
+    if (!manifest?.complete || !manifest.files.length) return [];
+    return manifest.files.map(file => ({
+      path: file.path,
+      contentHash: file.sha256,
+    }));
+  }
+
+  // P1123: 1ファイルの内容だけを読む（全体の組み立てをしない）。
+  readSourceFileContent(path: string): string | undefined {
+    try {
+      const raw = storageService.getItem(KEY);
+      if (raw) {
+        const value = JSON.parse(raw);
+        if (value?.files && value?.dirty === true) {
+          return (value.files as SelfCodeFile[]).find(
+            file => file.path === path
+          )?.content;
+        }
+      }
+    } catch { /* clean 側へ */ }
+    const settings = this.getGitHubSettings();
+    return githubSyncService.readFileContent(
+      settings.repository,
+      settings.branch,
+      path
+    );
+  }
+
   applyCandidate(files: Array<{path:string; baselineSha256:string; candidateContent:string}>): SelfCodeSnapshot {
     const snapshot=this.get();
     if(!snapshot) throw new Error('SELF_CODE_SPACE_NOT_SYNCED');
@@ -844,7 +893,7 @@ class SelfCodeSpaceService {
         const { selfCodeUnderstandingService } = await import(
           './selfCodeUnderstandingService'
         );
-        selfCodeUnderstandingService.ensure([], this.listSourceFiles());
+        selfCodeUnderstandingService.ensure([]);
         const manifestCommit = this.getLightManifest()?.commitSha;
         if (manifestCommit) selfCodeUnderstandingService.stampSourceCommit(manifestCommit);
       } catch {

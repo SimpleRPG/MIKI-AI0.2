@@ -10740,6 +10740,43 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1122 ライフサイクルは bootstrap を静的に引かずに読み込める', typeof appRuntimeLifecycleService.initialize === 'function' && typeof appRuntimeLifecycleService.dispose === 'function', '');
   }
 
+// ---- P1123: 理解サービスの既定入力をマニフェスト化（内容はファイル単位読み） ----
+  {
+    const { githubSyncService } = await import('../src/services/githubSyncService');
+    const { selfCodeSpaceService } = await import('../src/miki/core/services/selfCodeSpaceService');
+    const { selfCodeUnderstandingService } = await import('../src/miki/core/services/selfCodeUnderstandingService');
+    const { canonicalSha256 } = await import('../src/miki/core/services/canonicalSha256Service');
+    const prevSettings1123 = selfCodeSpaceService.getGitHubSettings();
+    try {
+      selfCodeSpaceService.saveGitHubSettings({ repository: 'p1123/probe', branch: 'main' });
+      const a1123 = "import { betaFn } from './b';\nexport function alphaFn(): number { return betaFn(); }\n";
+      const b1123 = 'export function betaFn(): number { return 42; }\n';
+      githubSyncService.applyBundledSeed('p1123/probe', 'main', {
+        files: [
+          { path: 'src/a.ts', content: a1123, sha256: canonicalSha256(a1123) },
+          { path: 'src/b.ts', content: b1123, sha256: canonicalSha256(b1123) },
+        ],
+        commitSha: 'p1123c1', seedRevision: 'p1123-1',
+      });
+      const manifest1123 = selfCodeSpaceService.listSourceFileManifest();
+      check('P1123 マニフェストは内容を含まずパス＋ハッシュだけ', manifest1123.length === 2 && manifest1123.every((m: any) => !('content' in m) && typeof m.contentHash === 'string'), '');
+      const r1123 = selfCodeUnderstandingService.ensure(['src/a.ts']);
+      check('P1123 マニフェストだけから理解が組み上がる', r1123.ready && r1123.symbolIds.some((s: string) => s.includes('alphaFn')) && r1123.symbolIds.some((s: string) => s.includes('betaFn')), '');
+      const b1123v2 = 'export function betaFn(): number { return 42; }\nexport function gammaFn(): number { return 7; }\n';
+      githubSyncService.applyBundledSeed('p1123/probe', 'main', {
+        files: [
+          { path: 'src/a.ts', content: a1123, sha256: canonicalSha256(a1123) },
+          { path: 'src/b.ts', content: b1123v2, sha256: canonicalSha256(b1123v2) },
+        ],
+        commitSha: 'p1123c2', seedRevision: 'p1123-2',
+      });
+      const r1123b = selfCodeUnderstandingService.ensure(['src/a.ts']);
+      check('P1123 変わったファイルだけ読み直して新しいシンボルが見える', r1123b.ready && r1123b.symbolIds.some((s: string) => s.includes('gammaFn')), '');
+    } finally {
+      selfCodeSpaceService.saveGitHubSettings(prevSettings1123);
+    }
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

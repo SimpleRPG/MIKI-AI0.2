@@ -501,8 +501,11 @@ class SelfCodeUnderstandingService {
       .map(d=>({code:d.code,path,message:ts.flattenDiagnosticMessageText(d.messageText,'\n')}));
   }
 
-  ensure(targetPaths:string[],sourceFiles?:Array<{path:string;content:string;contentHash:string}>):CodeUnderstandingResult {
-    const files=(sourceFiles||selfCodeSpaceService.listSourceFiles()).filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
+  ensure(targetPaths:string[],sourceFiles?:Array<{path:string;content?:string;contentHash:string}>):CodeUnderstandingResult {
+    // P1123: 既定の入力はマニフェスト（パス＋ハッシュ）のみ。内容は
+    // parse が必要なファイルだけ readSourceFileContent で読む。
+    const providedFiles:Array<{path:string;content?:string;contentHash:string}>=sourceFiles||selfCodeSpaceService.listSourceFileManifest();
+    const files=providedFiles.filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
     const empty:CodeUnderstandingResult={ready:false,reused:false,repoSha256:'',targetPaths,relatedPaths:[],reasons:[],symbolIds:[],executionRelations:[],contractValues:[],executionPaths:[],impactScopes:[],unresolvedEdges:[]};
     if(!files.length)return {...empty,reasons:['SOURCE_SNAPSHOT_EMPTY']};
 
@@ -550,7 +553,14 @@ class SelfCodeUnderstandingService {
           if(file&&file.contentHash===entry.contentHash)entries.set(entry.path,{...entry,importedBy:[]});
         }
       }
-      for(const file of files)if(!entries.has(file.path))entries.set(file.path,this.parse(file));
+      for(const file of files)if(!entries.has(file.path)){
+        // P1123: 内容が付いていない項目は、parse の直前にその1件だけ読む。
+        // 読めないファイルは項目を作らず「未理解」として扱う（空の parse で
+        // スナップショットを汚さない）。
+        const content=typeof file.content==='string'?file.content:selfCodeSpaceService.readSourceFileContent(file.path);
+        if(typeof content!=='string')continue;
+        entries.set(file.path,this.parse({path:file.path,content,contentHash:file.contentHash}));
+      }
       for(const entry of entries.values())for(const raw of entry.imports){
         const resolved=this.resolve(entries,entry.path,raw);
         if(resolved){
@@ -673,10 +683,20 @@ class SelfCodeUnderstandingService {
     // edges on ordinary files; edges originating in the target files
     // block the context closure and the requirement contract, so the
     // candidate-generation gate was unreachable for any real target.
-    const contentByPath=new Map(files.map(file=>[file.path,file.content]));
+    // P1123: 内容は必要な項目の分だけ遅れて読む（マニフェスト経由では
+    // 全ファイルの内容が手元に無いため）。
+    const contentCache=new Map<string,string>();
+    const contentOf=(path:string):string=>{
+      const cached=contentCache.get(path);
+      if(typeof cached==='string')return cached;
+      const file=files.find(item=>item.path===path);
+      const content=typeof file?.content==='string'?file.content:(selfCodeSpaceService.readSourceFileContent(path)||'');
+      contentCache.set(path,content);
+      return content;
+    };
     const calleeNamesFor=(entry:CodeUnderstandingEntry):Set<string>=>{
       const names=new Set(knownCalleeNames);
-      const content=contentByPath.get(entry.path)||'';
+      const content=contentOf(entry.path);
       for(const match of content.matchAll(IMPORT_BINDING_PATTERN)){
         if(match[1])names.add(match[1]);
         if(match[3])names.add(match[3]);
