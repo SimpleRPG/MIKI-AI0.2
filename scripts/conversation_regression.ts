@@ -10890,6 +10890,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1128 構造照合は維持', Boolean(vs1128?.verified), `structured=${vs1128?.verified}`);
   }
 
+// ---- P1129: 房線のコントラストを落として遷移を柔らかい側へ寄せる ----
+  {
+    const svc1129 = poseSvc() as any;
+    const img1129 = paleLongHair48();
+    const reading1129 = svc1129.analyzePose(img1129, 48, 56);
+    svc1129.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+    const render1129 = reading1129 ? svc1129.renderBodyStructured(reading1129, 128, null, null, { backHair: true }) : null;
+    const prof1129 = render1129 ? visualLikenessService.perceptualProfile(render1129, 128, 128) : null;
+    check('P1129 房線を柔らかくしても仕上げの柔らかさは落ちない', Boolean(prof1129) && (prof1129 as any).softRatio > 0.26, `softRatio=${(prof1129 as any)?.softRatio}`);
+    const vs1129 = reading1129 ? svc1129.verifyBodyStructured(reading1129) : null;
+    check('P1129 構造照合は維持', Boolean(vs1129?.verified), `structured=${vs1129?.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

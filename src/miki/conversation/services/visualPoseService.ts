@@ -2552,7 +2552,11 @@ class VisualPoseService {
               }
               if (bestD <= Math.max(0.8, bestW * 0.6)) {
                 const sh = deriveShadow([out[i], out[i + 1], out[i + 2]]);
-                const f = bestA * 0.9;
+                // P1129: 線のコントラストを半分に落とす。影色への
+                // 全量混合は遷移が硬すぎて（d≈56）、見本の髪の
+                // 柔らかい階調にならない。混ぜ率を下げて遷移を
+                // 柔らかい側（d 2〜20）へ寄せる。
+                const f = bestA * 0.45;
                 out[i] = Math.round(out[i] + (sh[0] - out[i]) * f);
                 out[i + 1] = Math.round(out[i + 1] + (sh[1] - out[i + 1]) * f);
                 out[i + 2] = Math.round(out[i + 2] + (sh[2] - out[i + 2]) * f);
