@@ -141,6 +141,7 @@ class StorageService {
       backend: this.backend,
       keyCount: this.cache.size,
       largestKeys: this.describeLargestKeys(8),
+      largestKeysSummary: this.describeLargestKeysSummary(8),
     });
   }
 
@@ -647,6 +648,17 @@ class StorageService {
       .map(([key, value]) => ({ key, chars: value.length }))
       .sort((a, b) => b.chars - a.chars)
       .slice(0, Math.max(1, limit));
+  }
+
+  /**
+   * P1111: largestKeys を実機ログに残せる形（スカラ文字列）にする。
+   * P885 の配列形式は、ランタイム診断の詳細フィルタ（許可キー＋
+   * スカラ値のみ）で落とされ、LOG_4 の INVENTORY に残らなかった。
+   */
+  public describeLargestKeysSummary(limit = 8): string {
+    return this.describeLargestKeys(limit)
+      .map((e) => `${e.key}=${e.chars}`)
+      .join(';');
   }
 
   // --- 7-Tier Hierarchical Memory Dedicated Methods ---

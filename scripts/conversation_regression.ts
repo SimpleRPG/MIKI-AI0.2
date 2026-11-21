@@ -10548,6 +10548,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1110 比較は符号つきで返る', d1110.softRatio < -0.5 && d1110.hardEdges > 0, JSON.stringify(d1110));
   }
 
+// ---- P1111: 巨大キーを実機ログで特定できるようにする ----
+  {
+    storageService.setItem('p1111_big', 'x'.repeat(200000));
+    storageService.setItem('p1111_mid', 'y'.repeat(150000));
+    const sum1111 = (storageService as any).describeLargestKeysSummary(64) as string;
+    const pairs1111 = sum1111.split(';').map((p) => { const i = p.lastIndexOf('='); return { key: p.slice(0, i), chars: Number(p.slice(i + 1)) }; });
+    const descOk1111 = pairs1111.every((p, i) => i === 0 || pairs1111[i - 1].chars >= p.chars);
+    check('P1111 大きいキーが名前とサイズつきの文字列で返る', typeof sum1111 === 'string' && sum1111.includes('p1111_big=200000') && sum1111.includes('p1111_mid=150000') && descOk1111, sum1111.slice(0, 80));
+    const top1111 = (storageService as any).describeLargestKeys(2) as Array<{ key: string; chars: number }>;
+    check('P1111 大きい順に並ぶ', top1111.length === 2 && top1111[0].chars >= top1111[1].chars && top1111[0].chars >= 200000, JSON.stringify(top1111));
+    storageService.removeItem('p1111_big');
+    storageService.removeItem('p1111_mid');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

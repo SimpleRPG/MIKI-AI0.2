@@ -48,7 +48,7 @@ const RUNTIME_BREADCRUMB_DETAIL_KEYS = new Set([
   'stage', 'domain', 'step', 'status', 'lastCompleted', 'nextStage', 'nextDomain', 'nextStep',
   'completedCount', 'totalCount', 'order', 'accepted', 'passed', 'correlationId', 'phase',
   'totalJSHeapMB', 'jsHeapLimitMB', 'jsHeapUsageRatio', 'deviceMemoryGB', 'hardwareConcurrency', 'pressure',
-  'keyCount', 'totalValueChars', 'maxValueChars', 'keyClasses', 'backend', 'zipBytes', 'fileCount',
+  'keyCount', 'totalValueChars', 'maxValueChars', 'keyClasses', 'backend', 'zipBytes', 'fileCount', 'largestKeysSummary',
   'totalContentChars', 'maxFileChars', 'historyCount', 'serializedChars', 'serializationElapsedMs',
   'command', 'source', 'target', 'javaUsedKB', 'javaTotalKB', 'javaMaxKB',
   'nativeAllocKB', 'nativeSizeKB', 'pssKB', 'availKB', 'thresholdKB', 'lowMem', 'sampleIndex', 'status',
