@@ -10823,6 +10823,24 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     }
   }
 
+// ---- P1126: 彼女の合成部品 strandFalloff（房の縁の影をなだらかに） ----
+  {
+    const { strandFalloff } = await import('../src/miki/core/parts/strandFalloffPart');
+    const f1126 = (d: number) => strandFalloff(d);
+    check('P1126 合成部品の曲線が余弦の落ち込みに合う', Math.abs(f1126(0) - 1) < 0.001 && Math.abs(f1126(0.5) - 0.5) < 0.02 && Math.abs(f1126(1)) < 0.001 && f1126(0.25) > f1126(0.5) && f1126(0.5) > f1126(0.75), JSON.stringify({ a: f1126(0), b: f1126(0.25), c: f1126(0.5), d: f1126(0.75), e: f1126(1) }));
+    const svc1126 = poseSvc() as any;
+    const img1126 = paleLongHair48();
+    const reading1126 = svc1126.analyzePose(img1126, 48, 56);
+    svc1126.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+    const render1126 = reading1126 ? svc1126.renderBodyStructured(reading1126, 128, null, null, { backHair: true }) : null;
+    const prof1126 = render1126 ? visualLikenessService.perceptualProfile(render1126, 128, 128) : null;
+    check('P1126 房の縁を柔らかくしても仕上げの柔らかさは落ちない', Boolean(prof1126) && (prof1126 as any).softRatio > 0.26, `softRatio=${(prof1126 as any)?.softRatio}`);
+    const vs1126 = reading1126 ? svc1126.verifyBodyStructured(reading1126) : null;
+    const vc1126 = reading1126 ? svc1126.verifyBodyContour(reading1126) : null;
+    check('P1126 構造と輪郭の照合は維持', Boolean(vs1126?.verified) && Boolean(vc1126?.verified), `structured=${vs1126?.verified} contour=${vc1126?.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

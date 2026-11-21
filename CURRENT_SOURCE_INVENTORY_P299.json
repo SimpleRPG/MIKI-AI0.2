@@ -36,11 +36,11 @@
     "semanticAuthorityProof": false
   },
   "counts": {
-    "trackedPathCountExcludingControlPaths": 1900,
-    "sourceFileCount": 1453,
-    "ecmascriptSourceFileCountScannedForRelativeImports": 1364,
-    "relativeImportCandidateCount": 4912,
-    "resolvedRelativeImportCandidateCount": 4894,
+    "trackedPathCountExcludingControlPaths": 1901,
+    "sourceFileCount": 1454,
+    "ecmascriptSourceFileCountScannedForRelativeImports": 1365,
+    "relativeImportCandidateCount": 4917,
+    "resolvedRelativeImportCandidateCount": 4899,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 910421,
-      "lines": 10839,
-      "sha256": "4ba4b9c505797811854df2ed4aa3a8b9f46fea3f40b94e89849f6de065bb46fb",
+      "bytes": 912103,
+      "lines": 10857,
+      "sha256": "155db7dd2d99b6dfc63f0d943a2c24ad6ff587c0218d068f7b345c18d11e7cc3",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5388,10 +5388,22 @@
           "specifier": "../src/miki/core/services/candidateCodeGenerationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/candidateCodeGenerationService.ts"
+        },
+        {
+          "line": 10828,
+          "specifier": "../src/miki/core/parts/strandFalloffPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/strandFalloffPart.ts"
+        },
+        {
+          "line": 10835,
+          "specifier": "../src/miki/conversation/services/visualLikenessService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
         }
       ],
-      "relativeImportCandidateCount": 612,
-      "resolvedRelativeImportCount": 610,
+      "relativeImportCandidateCount": 614,
+      "resolvedRelativeImportCount": 612,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -16484,9 +16496,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 408779,
-      "lines": 7327,
-      "sha256": "90b90438e5a4f982fa495fe1f7499cea651b17cc5865f6f736ef3f873b211f26",
+      "bytes": 409200,
+      "lines": 7333,
+      "sha256": "5737830f9b545863a9abc47bb6f945efe5829441e6100ff4c185d4d8ff3a638d",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -16520,19 +16532,25 @@
         },
         {
           "line": 9,
+          "specifier": "../../core/parts/strandFalloffPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/strandFalloffPart.ts"
+        },
+        {
+          "line": 10,
           "specifier": "./visualLikenessService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
         },
         {
-          "line": 31,
+          "line": 32,
           "specifier": "../../selfAwareness/services/motionPatternService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfAwareness/services/motionPatternService.ts"
         }
       ],
-      "relativeImportCandidateCount": 7,
-      "resolvedRelativeImportCount": 7,
+      "relativeImportCandidateCount": 8,
+      "resolvedRelativeImportCount": 8,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -17670,6 +17688,29 @@
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,
+      "unresolvedRelativeImportCount": 0
+    },
+    {
+      "path": "src/miki/core/parts/strandFalloffPart.ts",
+      "bytes": 683,
+      "lines": 12,
+      "sha256": "475212c6bfffb32ed9ec044a2c6df86cf5477882314f0d5380160f673c69fd90",
+      "relativeImportCandidates": [
+        {
+          "line": 9,
+          "specifier": "./smoothstep01Part",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/smoothstep01Part.ts"
+        },
+        {
+          "line": 10,
+          "specifier": "./lerpPart",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/parts/lerpPart.ts"
+        }
+      ],
+      "relativeImportCandidateCount": 2,
+      "resolvedRelativeImportCount": 2,
       "unresolvedRelativeImportCount": 0
     },
     {

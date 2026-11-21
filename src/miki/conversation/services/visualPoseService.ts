@@ -6,6 +6,7 @@ import {
 import { visualFigureService } from './visualFigureService';
 import { visualZoomService } from './visualZoomService';
 import { softenHairStrands } from './hairStrandSofteningService';
+import { strandFalloff } from '../../core/parts/strandFalloffPart';
 import { visualLikenessService, type PerceptualProfile, type PerceptualDiff } from './visualLikenessService';
 
 /** P994: 素体に描く顔の指定 */
@@ -2571,11 +2572,16 @@ class VisualPoseService {
             const localX = sx - x - k * clumpW;
             const wob = Math.round(Math.sin(y / Math.max(6, size * 0.045) + k * 2.4) * clumpW * 0.07);
             const bx = localX - wob;
-            if (bx <= 0) {
+            // P1126: 房の縁の影を段差でなく、境界を中心に
+            // strandFalloff でなだらかに落とす（内側で満ち、外で0）。
+            const softW = Math.max(1.5, clumpW * 0.25);
+            const edgeF = strandFalloff(Math.min(1, Math.max(0, (bx + softW) / (2 * softW))));
+            if (edgeF > 0.01) {
               const sh = deriveShadow([out[i], out[i + 1], out[i + 2]]);
-              out[i] = Math.round(out[i] + (sh[0] - out[i]) * fade);
-              out[i + 1] = Math.round(out[i + 1] + (sh[1] - out[i + 1]) * fade);
-              out[i + 2] = Math.round(out[i + 2] + (sh[2] - out[i + 2]) * fade);
+              const f = fade * edgeF;
+              out[i] = Math.round(out[i] + (sh[0] - out[i]) * f);
+              out[i + 1] = Math.round(out[i + 1] + (sh[1] - out[i + 1]) * f);
+              out[i + 2] = Math.round(out[i + 2] + (sh[2] - out[i + 2]) * f);
             } else if (k % 2 === 1) {
               out[i] = Math.round(out[i] * 0.97); out[i + 1] = Math.round(out[i + 1] * 0.97); out[i + 2] = Math.round(out[i + 2] * 0.97);
             }
