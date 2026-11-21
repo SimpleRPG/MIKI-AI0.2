@@ -1,9 +1,10 @@
 import { systemLogger } from '../services/systemLogger';
 import { CoreRoutingReadinessGate } from './coreRoutingReadinessGate';
 import { crossDomainCirculationService } from '../miki/core/services/crossDomainCirculationService';
-import { domainIntegrationBootstrapService } from '../miki/core/services/domainIntegrationBootstrapService';
+// P1122: domainIntegrationBootstrapService と章69-90初期化（../miki）は
+// 起動時の静的グラフから外し、初期化ステージの中で動的 import する。
+// 静的だとコード理解スタック（TypeScript コンパイラ含む）が起動に乗る。
 import { capabilityLearningService } from '../miki/capability/services/capabilityLearningService';
-import { initializeChapter69to90 } from '../miki';
 import { componentArtifactStoreService } from '../miki/capability/services/componentArtifactStoreService';
 import { componentRegistryService } from '../miki/capability/services/componentRegistryService';
 import { autonomousHardeningService } from '../miki/autonomy/services/autonomousHardeningService';
@@ -35,6 +36,20 @@ class AppRuntimeLifecycleService {
   private initialized = false;
   private generation = 0;
   private readonly coreRoutingReadinessGate = new CoreRoutingReadinessGate();
+  // P1122: 動的 import した bootstrap 本体（dispose 用に保持する）
+  private bootstrapService: { initialize(): Promise<void>; dispose(): void } | undefined;
+  private bootstrapServicePromise: Promise<{ initialize(): Promise<void>; dispose(): void }> | undefined;
+
+  private loadBootstrapService(): Promise<{ initialize(): Promise<void>; dispose(): void }> {
+    if (!this.bootstrapServicePromise) {
+      this.bootstrapServicePromise = import('../miki/core/services/domainIntegrationBootstrapService')
+        .then((m) => {
+          this.bootstrapService = m.domainIntegrationBootstrapService;
+          return m.domainIntegrationBootstrapService;
+        });
+    }
+    return this.bootstrapServicePromise;
+  }
 
   waitForCoreRoutingReady(signal?: AbortSignal): Promise<void> {
     return this.coreRoutingReadinessGate.wait(signal);
@@ -63,7 +78,9 @@ class AppRuntimeLifecycleService {
           for (let attempt = 1; attempt <= 2; attempt += 1) {
             if (generation !== this.generation) return;
             try {
-              await domainIntegrationBootstrapService.initialize();
+              const bootstrap = await this.loadBootstrapService();
+              if (generation !== this.generation) return;
+              await bootstrap.initialize();
               if (generation !== this.generation) return;
               this.coreRoutingReadinessGate.markReady();
               return;
@@ -84,7 +101,7 @@ class AppRuntimeLifecycleService {
       },
       { name: 'capabilityLearningService.initialize', run: () => capabilityLearningService.initialize() },
       { name: 'dictionaryBootstrapService.initialize', run: () => dictionaryBootstrapService.initialize() },
-      { name: 'initializeChapter69to90', run: () => initializeChapter69to90() },
+      { name: 'initializeChapter69to90', run: async () => { const m = await import('../miki'); await m.initializeChapter69to90(); } },
       {
         name: 'componentArtifactStoreService.reconcile',
         run: () => { componentArtifactStoreService.reconcile(componentRegistryService.getAllComponents()); },
@@ -179,7 +196,7 @@ class AppRuntimeLifecycleService {
     this.coreRoutingReadinessGate.reset();
 
     taskConversationFeedbackService.dispose();
-    domainIntegrationBootstrapService.dispose();
+    this.bootstrapService?.dispose();
     crossDomainCirculationService.dispose();
     taskResultFeedbackService.dispose();
     executionLearningCoordinatorService.dispose();

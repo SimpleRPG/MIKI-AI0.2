@@ -41,7 +41,7 @@ import { remediationExecutionCoordinatorService } from './remediationExecutionCo
 import { remediationFailureRecoveryService } from '../../safety/services/remediationFailureRecoveryService';
 import { virtualExperienceGeneratorService } from '../../experience/services/virtualExperienceGeneratorService';
 import { faultInjectionLabService } from '../../verification/services/faultInjectionLabService';
-import { specContractCompilerService } from '../../selfDevelopment/services/specContractCompilerService';
+// P1122: specContractCompilerService は実行時に動的 import する。
 import { knowledgeHalfLifeService } from '../../memory/services/knowledgeHalfLifeService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
@@ -1228,6 +1228,8 @@ export class BackgroundWorkerService {
       // Step 6.12.10: 第159/161章 仕様契約・知識半減期監査
       if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
       try {
+        // P1122: 仕様契約コンパイラは実行時のみ動的 import（起動グラフから外す）。
+        const { specContractCompilerService } = await import('../../selfDevelopment/services/specContractCompilerService');
         const specAudit = specContractCompilerService.audit();
         if (specAudit.invalidated) {
           specContractCompilerService.compile();

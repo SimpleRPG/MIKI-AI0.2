@@ -2,7 +2,15 @@ import { graphAnswerMeaningPipelineP216Service, type P216FinalAnswer } from '../
 import { conversationGraphRuntimeP212Service } from '../../conversation/services/conversationGraphRuntimeP212Service';
 import { personaProfileService } from '../../conversation/services/personaProfileService';
 import { roleplaySessionService } from '../../conversation/services/roleplaySessionService';
-import { coreOrchestratorService, type CoreOrchestrationResult } from './coreOrchestratorService';
+import type { CoreOrchestrationResult } from './coreOrchestratorService';
+// P1122: オーケストレータ本体は動的 import で読む（起動時の静的グラフ
+// からコード理解スタックを外すため）。タスクは必ず submit を経由して
+// 作られるので、同期メソッド（finalize / pause / cancel）が呼ばれる
+// 時点ではモジュールは読み込み済みという不変条件が成り立つ。
+type CoreOrchestratorModule = typeof import('./coreOrchestratorService');
+let coreOrchestratorModule: CoreOrchestratorModule | undefined;
+const coreOrchestratorReady: Promise<CoreOrchestratorModule> = import('./coreOrchestratorService')
+  .then((m) => { coreOrchestratorModule = m; return m; });
 import type { MikiDomain } from './crossDomainCirculationService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
 import { capabilityLedgerService } from '../../capability/services/capabilityLedgerService';
@@ -63,7 +71,7 @@ class CoreTaskIngressService {
   const prediction=outcomePredictionService.predict({planKey:intentPlan.deterministicKey,goal:request.goal});
   if(prediction)payload.predictionId=prediction.predictionId;
   if(request.kind==='SELF_IMPROVEMENT')payload.capabilityLedgerContext=capabilityLedgerService.buildCoreContext(request.goal);
-  const result=await coreOrchestratorService.run(request.goal,request.source as MikiDomain,payload,maxCycles,signal);
+  const result=await (await coreOrchestratorReady).coreOrchestratorService.run(request.goal,request.source as MikiDomain,payload,maxCycles,signal);
   if(result.task.status==='CANCELLED')return result;
   const task=result.task;
   taskBlackboardService.post(task.taskId,'OBSERVATION','core','cognitiveContinuity:requestPlan',{planKey:intentPlan.deterministicKey,isMultiIntent:intentPlan.isMultiIntent,intents:intentPlan.units.map(unit=>({id:unit.id,text:unit.text,goal:unit.goal,action:unit.action,target:unit.target,dependencies:unit.dependencies})),hypotheses:intentPlan.hypotheses,unresolved:intentPlan.unresolved},[]);
@@ -236,7 +244,7 @@ class CoreTaskIngressService {
    const marker=displayPersonaName?`【${personaProfileService.avatarText()} ${displayPersonaName}】`:'';
    if(marker&&finalResponse.trim()&&!finalResponse.startsWith(marker))finalResponse=`${marker}${finalResponse}`;
   }
-  const result=coreOrchestratorService.finalizeConversationResponse(taskId,finalResponse,{passed:answerValidationPassed,failedReasons:[...new Set(failedReasons)]});
+  const result=coreOrchestratorModule?.coreOrchestratorService.finalizeConversationResponse(taskId,finalResponse,{passed:answerValidationPassed,failedReasons:[...new Set(failedReasons)]});
   if(!result)failedReasons.push('CORE_FINALIZATION_RESULT_MISSING');
   const passed=Boolean(result)&&answerValidationPassed;
   conversationGraphRuntimeP212Service.ingestOutput(taskId,finalResponse,{passed,counterexample:failedReasons.length?[...new Set(failedReasons)].join(','):undefined,repair:finalized?.repaired?'P216_ANSWER_MEANING_REPAIR':undefined});
@@ -251,9 +259,9 @@ class CoreTaskIngressService {
   // CORE is the single authority for snapshot hashing, checkpoint-chain validation and
   // recovery. A duplicate wrapper-level check used to reject a recoverable valid snapshot
   // before CORE could re-root its missing/corrupt receipt.
-  return coreOrchestratorService.resume(taskId,maxCycles,allowRoutingRecovery);
+  return (await coreOrchestratorReady).coreOrchestratorService.resume(taskId,maxCycles,allowRoutingRecovery);
  }
- pause(taskId:string,reason?:string){return coreOrchestratorService.pause(taskId,reason);}
- cancel(taskId:string){return coreOrchestratorService.cancel(taskId);}
+ pause(taskId:string,reason?:string){return coreOrchestratorModule?.coreOrchestratorService.pause(taskId,reason);}
+ cancel(taskId:string){return coreOrchestratorModule?.coreOrchestratorService.cancel(taskId);}
 }
 export const coreTaskIngressService=new CoreTaskIngressService();

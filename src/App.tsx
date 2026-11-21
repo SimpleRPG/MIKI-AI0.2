@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { coreResultService } from './miki/core/services/coreResultService';
-import { typedImprovementUiGatewayService } from './miki/core/ui/typedImprovementUiGatewayService';
+// P1122: typedImprovementUiGatewayService は App では未使用のため import を除去
+// （静的グラフにコード理解スタックを引く一因だった）。
 import { typedCoreUiGatewayService } from './miki/core/ui/typedCoreUiGatewayService';
 import { improvementCanaryRollbackService } from './miki/improvement/services/improvementCanaryRollbackService';
 import React, { useState, useEffect, useRef } from 'react';
@@ -17,7 +18,8 @@ const loadMemoryModal = () => import('./components/MemoryModal');
 const loadActivityMonitor = () => import('./components/RealtimeActivityMonitorModal');
 const loadCapabilityLedger = () => import('./components/CapabilityLedgerScreen');
 const CodeEditor = React.lazy(() => loadCodeEditor().then(module => ({ default: module.CodeEditor })));
-import { GitHubHub } from './components/GitHubHub';
+// P1122: GitHub タブは開いた時だけ読み込む（起動時の静的グラフから外す）。
+const GitHubHub = React.lazy(() => import('./components/GitHubHub').then((m) => ({ default: m.GitHubHub })));
 const AutonomousImprovementHome = React.lazy(() => loadImprovementHome().then(module => ({ default: module.AutonomousImprovementHome })));
 import { ExternalConnectionsScreen } from './components/ExternalConnectionsScreen';
 import { WorkspaceScreen } from './components/WorkspaceScreen';
@@ -109,7 +111,8 @@ import { codeVerificationService } from './miki/verification/services/codeVerifi
 import { falsificationService, classifyClaimEpistemology } from './miki/verification/services/falsificationService';
 import { counterfactualReasoningService } from './miki/unknown/services/counterfactualReasoningService';
 import { crossDomainCirculationService } from './miki/core/services/crossDomainCirculationService';
-import { domainIntegrationBootstrapService } from './miki/core/services/domainIntegrationBootstrapService';
+// P1122: domainIntegrationBootstrapService は App では未使用（実利用は
+// appRuntimeLifecycleService 側で動的 import 化済み）のため import を除去。
 import { unifiedUnknownResolutionCoordinatorService } from './miki/unknown/services/unifiedUnknownResolutionCoordinatorService';
 import { experienceRouterService } from './miki/experience/services/experienceRouterService';
 import { workflowSynthesisService } from './miki/execution/services/workflowSynthesisService';
@@ -1900,12 +1903,14 @@ export default function App() {
             )}
 
             {activeTab === 'github' && (
-              <GitHubHub
-                onLoadRepoIntoWorkspace={handleLoadRepoIntoWorkspace}
-                onAskAIAboutRepo={handleAskAIAboutRepo}
-                workspaceFiles={workspaceFiles}
-                persona={persona}
-              />
+              <React.Suspense fallback={<div style={{ padding: 16 }}>読み込み中…</div>}>
+                <GitHubHub
+                  onLoadRepoIntoWorkspace={handleLoadRepoIntoWorkspace}
+                  onAskAIAboutRepo={handleAskAIAboutRepo}
+                  workspaceFiles={workspaceFiles}
+                  persona={persona}
+                />
+              </React.Suspense>
             )}
 
             {activeTab === 'improvement' && (
@@ -2014,12 +2019,14 @@ export default function App() {
             )}
 
             {mobileTab === 'github' && (
-              <GitHubHub
-                onLoadRepoIntoWorkspace={handleLoadRepoIntoWorkspace}
-                onAskAIAboutRepo={handleAskAIAboutRepo}
-                workspaceFiles={workspaceFiles}
-                persona={persona}
-              />
+              <React.Suspense fallback={<div style={{ padding: 16 }}>読み込み中…</div>}>
+                <GitHubHub
+                  onLoadRepoIntoWorkspace={handleLoadRepoIntoWorkspace}
+                  onAskAIAboutRepo={handleAskAIAboutRepo}
+                  workspaceFiles={workspaceFiles}
+                  persona={persona}
+                />
+              </React.Suspense>
             )}
 
             {mobileTab === 'improvement' && (

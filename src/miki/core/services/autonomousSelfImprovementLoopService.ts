@@ -5,7 +5,7 @@ import { taskBlackboardService } from './taskBlackboardService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
 import { requiredAssetAcquisitionService } from './requiredAssetAcquisitionService';
-import { selfImprovementPreflightService } from './selfImprovementPreflightService';
+// P1122: selfImprovementPreflightService は実行時に動的 import する。
 import { improvementDebtService } from './improvementDebtService';
 import { coreCycleSettingsService } from './coreCycleSettingsService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
@@ -736,6 +736,8 @@ class AutonomousSelfImprovementLoopService {
         }
 
         if (request.runId) {
+          // P1122: preflight は実行時のみ動的 import（起動グラフから外す）。
+          const { selfImprovementPreflightService } = await import('./selfImprovementPreflightService');
           const preflight = await selfImprovementPreflightService.evaluate(request.runId);
           if (!this.isGenerationCurrent(generation)) return;
           if (!preflight.passed) {

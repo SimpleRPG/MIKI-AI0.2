@@ -10727,6 +10727,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1121 ファイル読みも使えない環境では undefined', (await nativeWorkspaceBridgeService.readFile('src/index.ts')) === undefined, '');
   }
 
+// ---- P1122: 起動の静的グラフから TypeScript を外す（動的 import 境界） ----
+  {
+    const { coreTaskIngressService } = await import('../src/miki/core/services/coreTaskIngressService');
+    check('P1122 入口サービスはオーケストレータを静的に引かずに読み込める', typeof coreTaskIngressService.submit === 'function' && typeof coreTaskIngressService.finalizeConversationResponse === 'function', '');
+    let ingressRejected = false;
+    try { await coreTaskIngressService.submit({ kind: 'USER_REQUEST', goal: '  ', source: 'core' } as any); } catch { ingressRejected = true; }
+    check('P1122 空の目標は従来どおり入口で弾かれる', ingressRejected, '');
+    const { researchService } = await import('../src/miki/research/services/researchService');
+    check('P1122 調査の材料収集は空クエリで従来どおり空を返す（動的 import 化の後も）', Array.isArray(await researchService.collectImplementationMaterials('   ')) && (await researchService.collectImplementationMaterials('   ')).length === 0, '');
+    const { appRuntimeLifecycleService } = await import('../src/app/appRuntimeLifecycleService');
+    check('P1122 ライフサイクルは bootstrap を静的に引かずに読み込める', typeof appRuntimeLifecycleService.initialize === 'function' && typeof appRuntimeLifecycleService.dispose === 'function', '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

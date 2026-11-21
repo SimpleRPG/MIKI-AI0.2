@@ -31,11 +31,10 @@ import {
   WebMaterialPatternExtractor,
   type WebImplementationMaterial,
 } from './webMaterialPatternExtractor';
-import {
-  githubCodeMaterialService,
-  type CodeMaterialCollectionContext,
-} from '../../core/services/githubCodeMaterialService';
-import { stackExchangeMaterialService } from '../../core/services/stackExchangeMaterialService';
+import type { CodeMaterialCollectionContext } from '../../core/services/githubCodeMaterialService';
+// P1122: コード材料の2チャンネル（GitHub / Stack Exchange）は調査時のみ
+// 動的 import する。静的 import だとコード理解スタック（TypeScript
+// コンパイラ含む）が起動時のグラフに入ってしまうため。
 
 // P439: 不足スロット向け研究で試した戦略の記録。ギャップごとに3戦略まで。
 const GAP_FOCUS_STRATEGY_LEDGER_KEY='miki_gap_focus_strategy_attempts_v1';
@@ -394,8 +393,8 @@ export class ResearchService {
     // start together and the (usually slower) channel is awaited only
     // at the end. With no PAT configured it resolves immediately as
     // SKIPPED and the web result is exactly what it was before.
-    const githubPromise = githubCodeMaterialService
-      .collectMaterials(text, options?.codeMaterialContext)
+    const githubPromise = import('../../core/services/githubCodeMaterialService')
+      .then((m) => m.githubCodeMaterialService.collectMaterials(text, options?.codeMaterialContext))
       .catch(() => null);
 
     // P423: the Stack Exchange channel runs in parallel too, as the
@@ -404,8 +403,8 @@ export class ResearchService {
     // code examples) under its own daily-quota ledger. It never
     // holds the web path up either, and when disabled it resolves
     // immediately as SKIPPED.
-    const stackExchangePromise = stackExchangeMaterialService
-      .collectMaterials(text, options?.codeMaterialContext)
+    const stackExchangePromise = import('../../core/services/stackExchangeMaterialService')
+      .then((m) => m.stackExchangeMaterialService.collectMaterials(text, options?.codeMaterialContext))
       .catch(() => null);
 
     const materials: WebImplementationMaterial[] = [];

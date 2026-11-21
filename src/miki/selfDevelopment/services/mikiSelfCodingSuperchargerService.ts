@@ -3,7 +3,7 @@ import { AutonomousVerificationData } from '../../../types';
 import { callSelfCodeApi, isApiFailure } from './selfCodeApiClient';
 import { skillIrCompilerService } from './skillIrCompilerService';
 import { storageService } from '../../../services/storageService';
-import { unifiedInstructionDevelopmentService } from './unifiedInstructionDevelopmentService';
+// P1122: unifiedInstructionDevelopmentService は実行時に動的 import する。
 import { isolatedCandidateWorkspaceService } from '../../core/services/isolatedCandidateWorkspaceService';
 
 export interface CouncilCheckItem {
@@ -361,8 +361,11 @@ class MikiSelfCodingSuperchargerService {
       return {success:false,prompt,targetFile:targetFileHint||'',isNewFile:false,snapshotId:null,applied:false,syntaxCheckPassed:false,reasoning:reason,code:'',linesCount:0,generationMethod:'unified_pipeline_candidate',failureStage:'PACKAGE_SCRIPTS',isRequirementImplemented:false,error:reason};
     }
     const packageScripts = packageScriptsResponse.scripts;
-    let unifiedDevelopment: Awaited<ReturnType<typeof unifiedInstructionDevelopmentService.prepare>>;
+    // P1122: 統合開発パイプラインは実行時のみ動的 import（起動グラフから外す）。
+    type UnifiedDevelopmentResult = Awaited<ReturnType<(typeof import('./unifiedInstructionDevelopmentService'))['unifiedInstructionDevelopmentService']['prepare']>>;
+    let unifiedDevelopment: UnifiedDevelopmentResult;
     try {
+      const { unifiedInstructionDevelopmentService } = await import('./unifiedInstructionDevelopmentService');
       unifiedDevelopment = await unifiedInstructionDevelopmentService.prepare(
         prompt,
         targetFileHint ? [targetFileHint] : [],
