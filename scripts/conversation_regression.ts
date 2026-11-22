@@ -11267,6 +11267,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1148 弱い仕様は課題にしない', weak1148.discrimination === 'WEAK' && weak1148.solved === false && weak1148.reason === 'SPEC_TOO_WEAK' && codeDrillService.getRecord('spec-linearDrill1148') === undefined, `disc=${weak1148.discrimination} reason=${weak1148.reason || ''}`);
   }
 
+// ---- P1149: 境界の段差を幅のある移行に（仕上げの柔らかさ第2段） ----
+  {
+    const svc1149 = poseSvc() as any;
+    const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+    const img1149 = paleLongHair48();
+    const reading1149 = svc1149.analyzePose(img1149, 48, 56);
+    svc1149.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const render1149 = reading1149 ? svc1149.renderBodyStructured(reading1149, 128, null, null, { backHair: true }) : null;
+    const prof1149 = render1149 ? visualLikenessService.perceptualProfile(render1149, 128, 128) : null;
+    check('P1149 境界を幅のある移行にして柔らかさが一段上がる', Boolean(prof1149) && (prof1149 as any).softRatio > 0.36, `softRatio=${(prof1149 as any)?.softRatio}`);
+    const vs1149 = reading1149 ? svc1149.verifyBodyStructured(reading1149) : null;
+    const vc1149 = reading1149 ? svc1149.verifyBodyContour(reading1149) : null;
+    check('P1149 構造と輪郭の照合は維持（服色の同一性信号も維持）', Boolean(vs1149?.verified) && Boolean(vc1149?.verified), `structured=${vs1149?.verified} contour=${vc1149?.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

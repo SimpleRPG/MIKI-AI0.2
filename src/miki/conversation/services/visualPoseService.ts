@@ -2807,7 +2807,73 @@ class VisualPoseService {
         if (y + 1 < size && body[(y + 1) * size + x]) blendAt(x, y, x, y + 1);
       }
     }
-    return out;
+    // P1149: 境界の段差を幅のある移行にする。上の1画素混ぜだけ
+    // では、大きな段差（60以上）は混ぜた後も「硬い段差」のまま
+    // 残る。平らな下絵（flat）で色が変わる画素を境界として、
+    // その周囲1画素の帯だけを3x3平均でならすと、段差が2〜3
+    // 画素のなだらかな移行に分かれる。面の内側は触らない。
+    // ただし服の面の色は厳密な色数で見る同一性信号（P1081）
+    // そのものなので、服色の画素はならし対象から外す（帯の
+    // 形成は肌・髪側と服以外の境界で担う）。
+    const topRgb1149 = reading.clothing?.topRgb ?? (reading.clothing?.topColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing!.topColor)?.rgb : undefined);
+    const botRgb1149 = reading.clothing?.bottomRgb ?? (reading.clothing?.bottomColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing!.bottomColor)?.rgb : undefined);
+    const protectedKeys1149 = new Set<string>();
+    for (const c of [topRgb1149, botRgb1149]) if (c) protectedKeys1149.add(`${c[0]},${c[1]},${c[2]}`);
+    const isProtected1149 = (idx: number): boolean =>
+      protectedKeys1149.has(`${flat[idx * 4]},${flat[idx * 4 + 1]},${flat[idx * 4 + 2]}`);
+    const boundary = new Uint8Array(size * size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (!body[y * size + x]) continue;
+        const i = (y * size + x) * 4;
+        const differs = (nx: number, ny: number): boolean => {
+          if (nx < 0 || ny < 0 || nx >= size || ny >= size || !body[ny * size + nx]) return false;
+          const j = (ny * size + nx) * 4;
+          return flat[i] !== flat[j] || flat[i + 1] !== flat[j + 1] || flat[i + 2] !== flat[j + 2];
+        };
+        if (differs(x + 1, y) || differs(x - 1, y) || differs(x, y + 1) || differs(x, y - 1)) {
+          boundary[y * size + x] = 1;
+        }
+      }
+    }
+    const inBand = (x: number, y: number): boolean => {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < size && ny < size && boundary[ny * size + nx]) return true;
+        }
+      }
+      return false;
+    };
+    // 2回なでる。1回では移行幅が足りず、大きな段差が硬いまま
+    // 残るため。帯の外には広げない（平均の入力が帯の画素だけ
+    // 変わり、内側の平色は保たれる）。
+    let current = out;
+    for (let pass = 0; pass < 2; pass++) {
+      const smoothed = new Uint8Array(current);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          if (!body[y * size + x] || !inBand(x, y) || isProtected1149(y * size + x)) continue;
+          let r = 0, g = 0, b = 0, n = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const nx = x + dx, ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= size || ny >= size || !body[ny * size + nx]) continue;
+              const j = (ny * size + nx) * 4;
+              r += current[j]; g += current[j + 1]; b += current[j + 2]; n++;
+            }
+          }
+          if (n === 0) continue;
+          const i = (y * size + x) * 4;
+          smoothed[i] = Math.round(r / n);
+          smoothed[i + 1] = Math.round(g / n);
+          smoothed[i + 2] = Math.round(b / n);
+          smoothed[i + 3] = current[i + 3];
+        }
+      }
+      current = smoothed;
+    }
+    return current;
   }
 
   /** P1124: 仕上げの面内階調（髪のツヤ帯＋体の輪郭際の陰） */
