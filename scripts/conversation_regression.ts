@@ -11074,6 +11074,14 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1138 主題のある文は対象にしない', isControlTokenDominatedText('UNEXECUTED_CHECKの意味を調べる') === false && isControlTokenDominatedText('TypeScriptの型推論の仕組み') === false, '');
   }
 
+// ---- P1139: 機械トークン形式の要求文をClaim化対象外にする ----
+  {
+    const { isControlTokenRequirement1139 } = await import('../src/miki/core/services/requiredAssetAcquisitionService');
+    check('P1139 RECOVERY_ACTION_REQUIRED形式は主張化しない', isControlTokenRequirement1139('RECOVERY_ACTION_REQUIRED:RESEARCH:PERSISTENT_BACKEND_REQUIRED') === true, '');
+    check('P1139 理由コードだけの要求は主張化しない', isControlTokenRequirement1139('UNEXECUTED_CHECK / EVIDENCE_MISSING') === true, '');
+    check('P1139 自然文の要求は対象外にしない', isControlTokenRequirement1139('検証済み部品の合成パターンについての資料') === false && isControlTokenRequirement1139('UNEXECUTED_CHECKの意味を調べる') === false, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

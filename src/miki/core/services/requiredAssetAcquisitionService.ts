@@ -77,6 +77,28 @@ export interface RequiredAssetAcquisitionResult {
 
 const STORAGE_KEY = 'miki_required_asset_acquisition_v1';
 
+/*
+ * P1139: 機械トークン形式の要求文の判定。要求文が
+ * RECOVERY_ACTION_REQUIRED:… のような機械向け指示文や、理由
+ * コード（SCREAMING_SNAKE）だけでできている場合、それは事実の
+ * 主張ではないので Claim 化の対象外にする。P1137 で主張適格性
+ * チェックを通したが、機械トークンは文の形をしていないため
+ * 適格性チェックを素通りしていた（P1138 の
+ * isControlTokenDominatedText と同じ物差し。あちらは import の
+ * 循環を避けるため、ここでは同じ判定を局所に持つ）。
+ */
+export function isControlTokenRequirement1139(value: string): boolean {
+  const text = String(value || '').trim();
+  if (/^RECOVERY_ACTION_REQUIRED:/.test(text)) return true;
+  if (!/[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/.test(text)) return false;
+  const stripped = text
+    .replace(/[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+/g, ' ')
+    .replace(/[A-Za-z][A-Za-z0-9]*:/g, ' ')
+    .replace(/[／/|:：、,()（）「」]/g, ' ');
+  const content = stripped.replace(/[\sのをにへがはとや、。]/g, '').trim();
+  return content.length < 4;
+}
+
 class RequiredAssetAcquisitionService {
   private requests = new Map<string, RequiredAssetRequest>();
   private sequence = 0;
@@ -503,7 +525,7 @@ class RequiredAssetAcquisitionService {
         this.extractStringIds(researched, /^claim(?:[_-]?ids?)?$/i)[0] ??
         knowledgeGapService.getById(gap.id)?.researchClaimIds?.[0] ??
         knowledgeGapService.getById(gap.id)?.identity?.claimIds?.[0] ??
-        (webEvidenceIds.length > 0 && request.requirement.trim().length >= 15 && assessClaimWorthiness(request.requirement.trim()).ok
+        (webEvidenceIds.length > 0 && request.requirement.trim().length >= 15 && assessClaimWorthiness(request.requirement.trim()).ok && !isControlTokenRequirement1139(request.requirement)
           ? evidenceService.registerUnverifiedClaim(webEvidenceIds[0], request.requirement.trim())
           : undefined);
       let gapClaimAttachedCount = 0;
