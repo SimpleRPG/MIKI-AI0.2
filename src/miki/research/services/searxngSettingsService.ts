@@ -44,11 +44,23 @@ export function getSearxngSearchSettings(): SearxngSearchSettings {
   return { baseUrl, path, timeoutMs };
 }
 
+/*
+ * P1142: 検索文の言語を SearXNG に伝える。日本語（かな・漢字）を
+ * 含む検索文では language=ja を付け、結果の並びが日本語寄りに
+ * なるようにする。これまでは q と format しか送っておらず、
+ * 日本語の問いでも言語指定なしで検索していた。
+ */
+export function detectSearxngLanguage1142(query: string): string | undefined {
+  return /[぀-ゟ゠-ヿ一-鿿]/.test(String(query || '')) ? 'ja' : undefined;
+}
+
 export function buildSearxngSearchUrl(settings: SearxngSearchSettings, query: string): string {
   const base = normalizeBaseUrl(settings.baseUrl);
   const path = normalizePath(settings.path);
   const url = new URL(`${base}${path}`);
   url.searchParams.set('q', query);
   url.searchParams.set('format', 'json');
+  const language = detectSearxngLanguage1142(query);
+  if (language) url.searchParams.set('language', language);
   return url.toString();
 }

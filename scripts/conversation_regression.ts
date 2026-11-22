@@ -11134,6 +11134,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1141 実装系の計画では反証が環境より前', implIntents.includes('CURRENT_ENVIRONMENT') && implIntents.indexOf('COUNTEREVIDENCE') < implIntents.indexOf('CURRENT_ENVIRONMENT'), `intents=${implIntents.join(',')}`);
   }
 
+// ---- P1142: 検索文の質（言語指定・決まり文句の言語合わせ・主題文での基準検索） ----
+  {
+    const { buildSearxngSearchUrl, detectSearxngLanguage1142 } = await import('../src/miki/research/services/searxngSettingsService');
+    const { derivedQuerySuffixes1142, baselineQueryText1142, researchQueryPlanningService } = await import('../src/miki/research/services/researchQueryPlanningService');
+    const settings1142 = { baseUrl: 'http://127.0.0.1:8888', path: '/search', timeoutMs: 8000 };
+    check('P1142 日本語の検索文では言語指定が付く', detectSearxngLanguage1142('光合成の仕組み') === 'ja' && buildSearxngSearchUrl(settings1142, '光合成の仕組み').includes('language=ja'), '');
+    check('P1142 英語の検索文では言語指定を付けない', detectSearxngLanguage1142('photosynthesis mechanism') === undefined && !buildSearxngSearchUrl(settings1142, 'photosynthesis mechanism').includes('language='), '');
+    check('P1142 決まり文句は問いの言語に合う', derivedQuerySuffixes1142(true).official.includes('公式') && derivedQuerySuffixes1142(false).official.includes('official'), '');
+    check('P1142 文の形の問いは主題文で検索する', baselineQueryText1142('TypeScriptの型推論はどうやって実装するの？', 'TypeScriptの型推論の実装') === 'TypeScriptの型推論の実装', '');
+    check('P1142 名詞句の問いはそのまま検索する', baselineQueryText1142('光合成の仕組み', '光合成') === '光合成の仕組み' && baselineQueryText1142('光合成の仕組み', '光合成の仕組み') === '光合成の仕組み', '');
+    const { japaneseDictionaryService: dictSvc1142 } = await import('../src/miki/research/services/japaneseDictionaryService');
+    const seedPlan1142 = (question: string) => {
+      for (let i = 0; i < 5; i++) {
+        const p = researchQueryPlanningService.buildPlan(question, []);
+        if (p.queries.length > 0) return p;
+        const unknowns = p.subject?.unknownTerms || [];
+        if (unknowns.length === 0) return p;
+        for (const t of unknowns) dictSvc1142.addPersonal(t, { reading: t, pos: '名詞', gloss: 'テスト用の語' } as any);
+      }
+      return researchQueryPlanningService.buildPlan(question, []);
+    };
+    const plan1142 = seedPlan1142('光合成の仕組み');
+    const official1142 = plan1142.queries.find(q => q.intentType === 'OFFICIAL_SPECIFICATION');
+    const counter1142 = plan1142.queries.find(q => q.intentType === 'COUNTEREVIDENCE');
+    check('P1142 日本語の計画では決まり文句が日本語になる', Boolean(official1142 && official1142.queryText.includes('公式') && !official1142.queryText.includes('official specification')) && Boolean(counter1142 && counter1142.queryText.includes('制限')), `official=${official1142?.queryText} counter=${counter1142?.queryText}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

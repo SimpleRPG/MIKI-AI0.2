@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4948,
-    "resolvedRelativeImportCandidateCount": 4930,
+    "relativeImportCandidateCount": 4951,
+    "resolvedRelativeImportCandidateCount": 4933,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 936281,
-      "lines": 11150,
-      "sha256": "40a277a6c26554f51418e50dddd9b40ecac62fccaf29b48de59d6d3abcf2b52a",
+      "bytes": 939188,
+      "lines": 11177,
+      "sha256": "c36335b9603d97b0f041eb2b36f16215976a4a591fc5519e6f3a8a803c34b50f",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5562,10 +5562,28 @@
           "specifier": "../src/miki/research/services/japaneseDictionaryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
+        },
+        {
+          "line": 11139,
+          "specifier": "../src/miki/research/services/searxngSettingsService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/searxngSettingsService.ts"
+        },
+        {
+          "line": 11140,
+          "specifier": "../src/miki/research/services/researchQueryPlanningService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/researchQueryPlanningService.ts"
+        },
+        {
+          "line": 11147,
+          "specifier": "../src/miki/research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 641,
-      "resolvedRelativeImportCount": 639,
+      "relativeImportCandidateCount": 644,
+      "resolvedRelativeImportCount": 642,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -31578,9 +31596,9 @@
     },
     {
       "path": "src/miki/research/services/researchQueryPlanningService.ts",
-      "bytes": 31204,
-      "lines": 274,
-      "sha256": "46ad03edcca5269a1e7c15120dc82e4a3f38684578ed6649bd12895cc7e2b628",
+      "bytes": 33669,
+      "lines": 318,
+      "sha256": "d498765942e847d7137720dd0f386828f888768eeca28160ed0a4dd1b7df888a",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31967,9 +31985,9 @@
     },
     {
       "path": "src/miki/research/services/searxngSettingsService.ts",
-      "bytes": 1877,
-      "lines": 54,
-      "sha256": "562d632d8b40d8da315e905ab8d94f2c413095e7e6873e77cf94a1162279b099",
+      "bytes": 2489,
+      "lines": 66,
+      "sha256": "2746c2a17847fdc6c3b813836c7d0f1f5530fecdd419cf05ce29b9cea3df5a60",
       "relativeImportCandidates": [
         {
           "line": 1,

@@ -59,6 +59,46 @@ export function intentNeedsEnvironmentCheck1141(text: string, implementationLike
   return /(?:Android|Termux|端末|環境|互換|compatib|動作環境|インストール|install|Galaxy|arm64|対応機種|対応OS)/i.test(String(text || ''));
 }
 
+/*
+ * P1142: 派生クエリの決まり文句を、問いの言語に合わせる。これまで
+ * 日本語の問いにも英語の型文（official specification
+ * documentation 等）が機械的に付いていて、内容と無関係な語が
+ * 焦点をぼかしていた。日本語の問いには日本語の型文を使う。
+ */
+export function intentIsJapanese1142(text: string): boolean {
+  return /[぀-ゟ゠-ヿ]/.test(String(text || ''));
+}
+
+export function derivedQuerySuffixes1142(japanese: boolean): { official: string; counter: string; primary: string; implExample: string; independent: string } {
+  return japanese
+    ? {
+        official: '公式 ドキュメント 仕様',
+        counter: '制限 既知の問題 注意点',
+        primary: '一次資料',
+        implExample: '実装例 サンプルコード アルゴリズム',
+        independent: '独立した出典 公式ドキュメント 反証',
+      }
+    : {
+        official: 'official specification documentation',
+        counter: 'limitation unsupported known issue',
+        primary: 'primary source',
+        implExample: 'implementation example source code algorithm',
+        independent: 'independent source evidence official documentation counterevidence',
+      };
+}
+
+/*
+ * P1142: 文の形の問い（「〜はどうやって〜するの？」等）は、文を
+ * そのまま検索文にせず、主題理解の段が立てた主題文を基準検索に
+ * 使う。名詞句の問いや、主題文の方が長い場合は元の問いを使う。
+ */
+export function baselineQueryText1142(intent: string, subjectText: string): string {
+  const subject = String(subjectText || '').trim();
+  if (!subject || subject === intent || subject.length >= intent.length) return intent;
+  const questionForm = /[？?]$|ですか|ますか|でしょうか|どうやって|なぜ|なに|何|どうすれば/.test(intent);
+  return questionForm ? subject : intent;
+}
+
 const POLICY_KEY='miki_research_query_planning_policy_v1';
 const PLAN_KEY='miki_research_query_plans_v1';
 const REVISION_KEY='miki_research_query_revision_pairs_v1';
@@ -183,7 +223,10 @@ if(understanding.status!=='UNDERSTOOD'){
   storageService.setItem(PLAN_KEY,JSON.stringify([blockedPlan,...this.listPlans().filter(x=>x.queryPlanId!==blockedPlan.queryPlanId)].slice(0,100)));
   return blockedPlan;
 }
-const specs:Array<[QueryIntentType,string,string]>=[];specs.push(['BASELINE',effectiveIntent,'全体条件を保持した基準検索']);
+const specs:Array<[QueryIntentType,string,string]>=[];
+const queryBase1142=baselineQueryText1142(effectiveIntent,understanding.subjectText);
+const sfx1142=derivedQuerySuffixes1142(intentIsJapanese1142(effectiveIntent));
+specs.push(['BASELINE',queryBase1142,'全体条件を保持した基準検索']);
 /*
  * P439: 不足スロット向けの材料探索クエリを1本足す（gapFocus がある場合）。
  * 戦略ごとに探索先を変える（GitHub コード検索／Stack Exchange／Web 文書）。
@@ -207,16 +250,17 @@ if(gapFocus&&Array.isArray(gapFocus.slotNames)&&gapFocus.slotNames.length>0){
 if(gapStructure&&gapStructure.gapType){
   const targetTerm=gapStructure.target?normalize(gapStructure.target).split(/\s+/)[0]:'';
   const base=targetTerm&&!effectiveIntent.includes(targetTerm)?`${targetTerm} ${effectiveIntent}`:effectiveIntent;
+  const jpBt=intentIsJapanese1142(base);
   const byType:Record<string,[QueryIntentType,string,string]> = {
-    UNKNOWN_VERSION:['VERSION_SPECIFIC',`${base} version release notes changelog`,'版の特定'],
-    UNKNOWN_TERM:['PRIMARY_SOURCE',`${base} definition glossary official`,'用語の定義（一次資料）'],
-    CONTRADICTION:['LIMITATION',`${base} conditions exceptions specification`,'矛盾する条件の切り分け'],
-    UNKNOWN_COUNTEREXAMPLE:['LIMITATION',`${base} conditions exceptions specification`,'反例が成り立つ条件の切り分け'],
-    UNKNOWN_CAUSE:['ERROR_DIAGNOSIS',`${base} cause diagnosis troubleshooting`,'原因の診断'],
-    UNKNOWN_EFFECT:['ERROR_DIAGNOSIS',`${base} effects impact documentation`,'効果・影響の確認'],
-    UNKNOWN_COMPATIBILITY:['COMPATIBILITY',`${base} compatibility supported versions requirements`,'互換性・対応条件'],
-    UNKNOWN_EXCEPTION:['LIMITATION',`${base} limitations exceptions edge cases`,'例外・境界条件'],
-    UNKNOWN_SOURCE:['PRIMARY_SOURCE',`${base} primary source original publication`,'出典の特定'],
+    UNKNOWN_VERSION:['VERSION_SPECIFIC',`${base} ${jpBt ? 'バージョン リリースノート 変更履歴' : 'version release notes changelog'}`,'版の特定'],
+    UNKNOWN_TERM:['PRIMARY_SOURCE',`${base} ${jpBt ? '定義 用語集 公式' : 'definition glossary official'}`,'用語の定義（一次資料）'],
+    CONTRADICTION:['LIMITATION',`${base} ${jpBt ? '条件 例外 仕様' : 'conditions exceptions specification'}`,'矛盾する条件の切り分け'],
+    UNKNOWN_COUNTEREXAMPLE:['LIMITATION',`${base} ${jpBt ? '条件 例外 仕様' : 'conditions exceptions specification'}`,'反例が成り立つ条件の切り分け'],
+    UNKNOWN_CAUSE:['ERROR_DIAGNOSIS',`${base} ${jpBt ? '原因 診断 対処法' : 'cause diagnosis troubleshooting'}`,'原因の診断'],
+    UNKNOWN_EFFECT:['ERROR_DIAGNOSIS',`${base} ${jpBt ? '効果 影響 ドキュメント' : 'effects impact documentation'}`,'効果・影響の確認'],
+    UNKNOWN_COMPATIBILITY:['COMPATIBILITY',`${base} ${jpBt ? '互換性 対応バージョン 要件' : 'compatibility supported versions requirements'}`,'互換性・対応条件'],
+    UNKNOWN_EXCEPTION:['LIMITATION',`${base} ${jpBt ? '制限 例外 境界条件' : 'limitations exceptions edge cases'}`,'例外・境界条件'],
+    UNKNOWN_SOURCE:['PRIMARY_SOURCE',`${base} ${jpBt ? '一次資料 原典' : 'primary source original publication'}`,'出典の特定'],
   };
   const spec=byType[gapStructure.gapType];
   if(spec)specs.push(spec);
@@ -230,7 +274,7 @@ if(gapStructure&&gapStructure.gapType){
  * ない。除外条件を変えた再試行も同一の計画として改訂履歴に残る。
  */
 if(independentFocus&&Array.isArray(independentFocus.claimIds)&&independentFocus.claimIds.length>0){
-  const independentQuery=`${effectiveIntent} independent source evidence official documentation counterevidence`;
+  const independentQuery=`${queryBase1142} ${sfx1142.independent}`;
   specs.push(['PRIMARY_SOURCE',independentQuery,'独立出典の追加証拠']);
 }
 
@@ -239,12 +283,12 @@ const fieldImplementation=lexicalRelationService.fieldsOfText(effectiveIntent).i
 if(implementationRequired||fieldImplementation){
   specs.push([
     'IMPLEMENTATION_EXAMPLE',
-    `${effectiveIntent} implementation example source code algorithm`,
+    `${queryBase1142} ${sfx1142.implExample}`,
     '実装方式・明示的コード例・アルゴリズム'
   ]);
 }
 
-if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${effectiveIntent} official specification documentation`,'一次・公式情報']);if(policy.requireCounterEvidenceSearch)specs.push(['COUNTEREVIDENCE',`${effectiveIntent} limitation unsupported known issue`,'反証・制限']);if(policy.requireCurrentEnvironmentCheck&&intentNeedsEnvironmentCheck1141(effectiveIntent,implementationRequired||fieldImplementation))specs.push(['CURRENT_ENVIRONMENT',`${effectiveIntent} Android arm64 Termux compatibility`,'Galaxy S25環境適合']);const webPolicy=webResearchPolicyService.get();if(webPolicy.requirePrimarySource&&!specs.some(x=>x[0]==='PRIMARY_SOURCE'||x[0]==='OFFICIAL_SPECIFICATION'))specs.push(['PRIMARY_SOURCE',`${effectiveIntent} primary source`,'一次情報']);const expansionSpecs:Array<[QueryIntentType,string,string]>=[];
+if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${queryBase1142} ${sfx1142.official}`,'一次・公式情報']);if(policy.requireCounterEvidenceSearch)specs.push(['COUNTEREVIDENCE',`${queryBase1142} ${sfx1142.counter}`,'反証・制限']);if(policy.requireCurrentEnvironmentCheck&&intentNeedsEnvironmentCheck1141(effectiveIntent,implementationRequired||fieldImplementation))specs.push(['CURRENT_ENVIRONMENT',`${queryBase1142} Android arm64 Termux compatibility`,'Galaxy S25環境適合']);const webPolicy=webResearchPolicyService.get();if(webPolicy.requirePrimarySource&&!specs.some(x=>x[0]==='PRIMARY_SOURCE'||x[0]==='OFFICIAL_SPECIFICATION'))specs.push(['PRIMARY_SOURCE',`${queryBase1142} ${sfx1142.primary}`,'一次情報']);const expansionSpecs:Array<[QueryIntentType,string,string]>=[];
 const synVariant=lexicalRelationService.synonymVariantOf(effectiveIntent);if(synVariant&&synVariant!==effectiveIntent)expansionSpecs.push(['SYNONYM_EXPANSION',synVariant,'同義語での言い換え検索']);
 const traVariant=lexicalRelationService.translationVariantOf(effectiveIntent);if(traVariant&&traVariant!==effectiveIntent)expansionSpecs.push(['TRANSLATION_EXPANSION',traVariant,'英語での言い換え検索']);
 const abbVariant=lexicalRelationService.abbreviationVariantOf(effectiveIntent);if(abbVariant&&abbVariant!==effectiveIntent)expansionSpecs.push(['ABBREVIATION_EXPANSION',abbVariant,'略語の展開・圧縮での検索']);
