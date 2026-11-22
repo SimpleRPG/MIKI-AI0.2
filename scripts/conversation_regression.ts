@@ -11335,6 +11335,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1153 切り出せない説明はドリルに入らない', !unavailable1153.solved && unavailable1153.reason === 'SPEC_POINTS_UNAVAILABLE', `reason=${unavailable1153.reason || ''}`);
   }
 
+// ---- P1154: 自動ドリルに「言葉→仕様→解題」の仕様セッション ----
+  {
+    const { drillTaskGenerationService } = await import('../src/miki/selfDevelopment/services/drillTaskGenerationService');
+    const { compositionDrillService } = await import('../src/miki/selfDevelopment/services/compositionDrillService');
+    const gen1154a = drillTaskGenerationService.generateSpecTasks(0, 3);
+    const gen1154b = drillTaskGenerationService.generateSpecTasks(0, 3);
+    check('P1154 仕様ブリーフの生成は seed 決定的', JSON.stringify(gen1154a) === JSON.stringify(gen1154b) && gen1154a.length === 3 && gen1154a[0].description.includes('減って'), JSON.stringify(gen1154a).slice(0, 120));
+    const session1154 = await compositionDrillService.runSpecSession(0, 1);
+    check('P1154 仕様セッションで言葉の依頼が解題まで通る', session1154.generated === 1 && session1154.solved === 1 && session1154.results[0]?.pointsSource === 'template:falloff', JSON.stringify(session1154).slice(0, 160));
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -177,6 +177,30 @@ class CompositionDrillService {
     }
     return { generated: tasks.length, solved, registered, results };
   }
+
+  /**
+   * P1154: 仕様セッション。言葉の依頼から彼女が仕様を切り出し、
+   * 弁別力ゲートを通して解題する練習の1周分。自動セッション
+   * （式から作る課題）とは別に、「言葉→仕様→解題」の回路を
+   * 常駐ドリルや自律実行から回せるようにする。
+   */
+  public async runSpecSession(seed: number, count: number, registerAsPart = false): Promise<{
+    generated: number; solved: number;
+    results: Array<{ taskId: string; solved: boolean; reason?: string; pointsSource?: string }>;
+  }> {
+    const tasks = drillTaskGenerationService.generateSpecTasks(seed, count);
+    const results: Array<{ taskId: string; solved: boolean; reason?: string; pointsSource?: string }> = [];
+    let solved = 0;
+    for (const t of tasks) {
+      const r = await this.solveSpecDescription(
+        { name: t.name, description: t.description },
+        registerAsPart,
+      );
+      if (r.solved) solved++;
+      results.push({ taskId: t.taskId, solved: r.solved, reason: r.reason, pointsSource: r.pointsSource });
+    }
+    return { generated: tasks.length, solved, results };
+  }
 }
 
 export const compositionDrillService = new CompositionDrillService();

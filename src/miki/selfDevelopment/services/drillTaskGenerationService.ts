@@ -59,9 +59,45 @@ export interface GeneratedTask {
   generatingExpression: string;
 }
 
+/*
+ * P1154: 言葉の依頼（仕様ブリーフ）のプール。自動セッションが
+ * 「言葉→仕様点の切り出し（P1153）→弁別力ゲート→解題」の
+ * 練習も回せるようにするための課題源。言い回しは複数持たせ、
+ * 形の言葉の表記ゆれに強くする。点そのものは持たない（点は
+ * 彼女が説明から切り出すのが練習の本体）。
+ */
+const SPEC_BRIEFS_1154: string[] = [
+  'だんだん減って0に近づく形',
+  '徐々に減衰していく形',
+  '真ん中が最大の山なりの形',
+  '中央が最大で盛り上がる形',
+  'だんだん増えて上限に近づく形',
+  '飽和するように増える形',
+  '0で1、0.5で0.5、1で0になる落ち込み',
+  '(0, 1) (0.5, 0.5) (1, 0) の形',
+];
+
+export interface GeneratedSpecTask {
+  taskId: string; name: string; description: string;
+}
+
 export const drillTaskGenerationService = {
   generateTasks(seed: number, count: number): GeneratedTask[] {
     return generateTasksImpl(seed, count);
+  },
+  /** P1154: seed 決定的にブリーフを選ぶ（開始位置だけ seed でずらして一巡する）。 */
+  generateSpecTasks(seed: number, count: number): GeneratedSpecTask[] {
+    const out: GeneratedSpecTask[] = [];
+    const start = Math.abs(Math.floor(seed)) % SPEC_BRIEFS_1154.length;
+    for (let i = 0; i < count; i++) {
+      const description = SPEC_BRIEFS_1154[(start + i) % SPEC_BRIEFS_1154.length];
+      out.push({
+        taskId: `specgen-${seed}-${i}`,
+        name: `specShape${Math.abs(Math.floor(seed))}x${i}`,
+        description,
+      });
+    }
+    return out;
   },
 };
 

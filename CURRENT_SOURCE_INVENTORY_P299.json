@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4973,
-    "resolvedRelativeImportCandidateCount": 4955,
+    "relativeImportCandidateCount": 4975,
+    "resolvedRelativeImportCandidateCount": 4957,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 957382,
-      "lines": 11351,
-      "sha256": "041508781510f30939f87f34806edbc4b3b8c813a2e21be85ea5bfb91b40f2fa",
+      "bytes": 958427,
+      "lines": 11362,
+      "sha256": "67ff11a9691a6fefebb8cd06ea44cfbd541318a8f8a4b34f5c53f89c0bc04569",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5694,10 +5694,22 @@
           "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
+        },
+        {
+          "line": 11340,
+          "specifier": "../src/miki/selfDevelopment/services/drillTaskGenerationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/drillTaskGenerationService.ts"
+        },
+        {
+          "line": 11341,
+          "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
         }
       ],
-      "relativeImportCandidateCount": 663,
-      "resolvedRelativeImportCount": 661,
+      "relativeImportCandidateCount": 665,
+      "resolvedRelativeImportCount": 663,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -37075,9 +37087,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/compositionDrillService.ts",
-      "bytes": 8612,
-      "lines": 182,
-      "sha256": "3c4eac36f69f1ea9ddc12649ca14bd1652cc56ff31abb5a17f5aad6e52f15da4",
+      "bytes": 9775,
+      "lines": 206,
+      "sha256": "57ecbd6ca3cc4da1cd0da2f6f09bdf066bd811395845269422a7943b643a347b",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -37885,9 +37897,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/drillTaskGenerationService.ts",
-      "bytes": 7864,
-      "lines": 151,
-      "sha256": "dd943126c823dab85c965239bb4699b89ac847f5a02a1f0e768b2e495c5a3270",
+      "bytes": 9360,
+      "lines": 187,
+      "sha256": "e3ff133984342992c2176f7549c470f554773adc85a9acb1914c0618000a9300",
       "relativeImportCandidates": [
         {
           "line": 9,
