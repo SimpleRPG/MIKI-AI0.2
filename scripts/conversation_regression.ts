@@ -11282,6 +11282,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1149 構造と輪郭の照合は維持（服色の同一性信号も維持）', Boolean(vs1149?.verified) && Boolean(vc1149?.verified), `structured=${vs1149?.verified} contour=${vc1149?.verified}`);
   }
 
+// ---- P1150: 線を描いた後にも境界をならす（線の段差を分ける） ----
+  {
+    const svc1150 = poseSvc() as any;
+    const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+    const img1150 = paleLongHair48();
+    const reading1150 = svc1150.analyzePose(img1150, 48, 56);
+    svc1150.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+    const render1150 = reading1150 ? svc1150.renderBodyStructured(reading1150, 128, null, null, { backHair: true }) : null;
+    const prof1150 = render1150 ? visualLikenessService.perceptualProfile(render1150, 128, 128) : null;
+    check('P1150 線の段差もならして柔らかさがもう一段上がる', Boolean(prof1150) && (prof1150 as any).softRatio > 0.41, `softRatio=${(prof1150 as any)?.softRatio}`);
+    const vs1150 = reading1150 ? svc1150.verifyBodyStructured(reading1150) : null;
+    const vc1150 = reading1150 ? svc1150.verifyBodyContour(reading1150) : null;
+    check('P1150 構造と輪郭の照合は維持', Boolean(vs1150?.verified) && Boolean(vc1150?.verified), `structured=${vs1150?.verified} contour=${vc1150?.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

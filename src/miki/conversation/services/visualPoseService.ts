@@ -2780,7 +2780,72 @@ class VisualPoseService {
     const outlined = this.applyOutlineLines(graded, size);
     // P1068: 中の線（平坦な双子には残らないので仕上げで描く）
     this.stampInnerLines(outlined, size, reading);
-    return outlined;
+    // P1150: 線は仕上げの後段で描かれるため、線の画素と素地の
+    // 段差は P1149 の帯ならしの対象外だった（下半身の硬さの
+    // 主犯）。線を描いた後にもう一度だけ、平らな下絵の境界の
+    // 帯をならして線の段差を分ける。服の厳密色（P1081）は
+    // 現在色が服色ちょうどの画素を外して守る（線で暗くなった
+    // 画素は元々数に入らないので、ならしてよい）。
+    return this.applyPostLineRamp1150(outlined, flat, size, reading);
+  }
+
+  /** P1150: 線描き後の境界ならし（P1149 の帯を線の上にも効かせる） */
+  private applyPostLineRamp1150(img: Uint8Array, flat: Uint8Array, size: number, reading: PoseReading): Uint8Array {
+    const pal = this.segmentTwinPalette(flat, size, reading);
+    if (!pal) return img;
+    const body = pal.body;
+    const topRgb = reading.clothing?.topRgb ?? (reading.clothing?.topColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing!.topColor)?.rgb : undefined);
+    const botRgb = reading.clothing?.bottomRgb ?? (reading.clothing?.bottomColor ? EXTRA_COLORS.find((c) => c.name === reading.clothing!.bottomColor)?.rgb : undefined);
+    const protectedKeys = new Set<string>();
+    for (const c of [topRgb, botRgb]) if (c) protectedKeys.add(`${c[0]},${c[1]},${c[2]}`);
+    const isProtected = (idx: number): boolean =>
+      protectedKeys.has(`${img[idx * 4]},${img[idx * 4 + 1]},${img[idx * 4 + 2]}`);
+    const boundary = new Uint8Array(size * size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (!body[y * size + x]) continue;
+        const i = (y * size + x) * 4;
+        const differs = (nx: number, ny: number): boolean => {
+          if (nx < 0 || ny < 0 || nx >= size || ny >= size || !body[ny * size + nx]) return false;
+          const j = (ny * size + nx) * 4;
+          return flat[i] !== flat[j] || flat[i + 1] !== flat[j + 1] || flat[i + 2] !== flat[j + 2];
+        };
+        if (differs(x + 1, y) || differs(x - 1, y) || differs(x, y + 1) || differs(x, y - 1)) {
+          boundary[y * size + x] = 1;
+        }
+      }
+    }
+    const inBand = (x: number, y: number): boolean => {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < size && ny < size && boundary[ny * size + nx]) return true;
+        }
+      }
+      return false;
+    };
+    const out = new Uint8Array(img);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (!body[y * size + x] || !inBand(x, y) || isProtected(y * size + x)) continue;
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= size || ny >= size || !body[ny * size + nx]) continue;
+            const j = (ny * size + nx) * 4;
+            r += img[j]; g += img[j + 1]; b += img[j + 2]; n++;
+          }
+        }
+        if (n === 0) continue;
+        const i = (y * size + x) * 4;
+        out[i] = Math.round(r / n);
+        out[i + 1] = Math.round(g / n);
+        out[i + 2] = Math.round(b / n);
+        out[i + 3] = img[i + 3];
+      }
+    }
+    return out;
   }
 
   /** P1114: 体マスク内側の硬い境界を帯で柔らかくする */
