@@ -131,6 +131,27 @@ class CompositionDrillService {
     return { ...result, discrimination: 'STRONG' };
   }
 
+  /**
+   * P1153: 説明文だけから仕様を切り出してドリルへ渡す。
+   * 点の切り出し（P1153 specDraftService 側）ができなければ
+   * SPEC_POINTS_UNAVAILABLE。切り出せた後は P1148 と同じ
+   * 経路（弁別力ゲート→課題化→解題→台帳）。
+   */
+  public async solveSpecDescription(
+    request: { name: string; description: string; tolerance?: number },
+    registerAsPart = false,
+  ): Promise<CompositionDrillResult & { discrimination?: 'STRONG' | 'WEAK'; pointsSource?: string }> {
+    const drafted = specDraftService.draftPointsFromDescription(request.description);
+    if (!drafted) {
+      return { solved: false, usedParts: [], maxError: 0, attempts: 0, reason: 'SPEC_POINTS_UNAVAILABLE' };
+    }
+    const result = await this.solveSpecDraft(
+      { name: request.name, description: request.description, points: drafted.points, tolerance: request.tolerance },
+      registerAsPart,
+    );
+    return { ...result, pointsSource: drafted.source };
+  }
+
   /*
    * P1106: 自動セッション。課題を自動生成（P1106 生成サービス）して
    * 全部解題に回し、解けたものは部品登録する。彼女が自分で課題を作って

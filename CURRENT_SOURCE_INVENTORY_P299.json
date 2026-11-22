@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4971,
-    "resolvedRelativeImportCandidateCount": 4953,
+    "relativeImportCandidateCount": 4973,
+    "resolvedRelativeImportCandidateCount": 4955,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 955347,
-      "lines": 11336,
-      "sha256": "2fdb9898c2658723568071708e3ed5678b6a44dcef96c6745d7a31388d3d4a67",
+      "bytes": 957382,
+      "lines": 11351,
+      "sha256": "041508781510f30939f87f34806edbc4b3b8c813a2e21be85ea5bfb91b40f2fa",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5682,10 +5682,22 @@
           "specifier": "../src/miki/memory/services/lexicalRelationService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
+        },
+        {
+          "line": 11325,
+          "specifier": "../src/miki/selfDevelopment/services/specDraftService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/specDraftService.ts"
+        },
+        {
+          "line": 11326,
+          "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
         }
       ],
-      "relativeImportCandidateCount": 661,
-      "resolvedRelativeImportCount": 659,
+      "relativeImportCandidateCount": 663,
+      "resolvedRelativeImportCount": 661,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -37063,9 +37075,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/compositionDrillService.ts",
-      "bytes": 7592,
-      "lines": 161,
-      "sha256": "23407fc93851b2e3a0b199cd8ad8a50f4640f600b29e5ac651d4bc86272f94cb",
+      "bytes": 8612,
+      "lines": 182,
+      "sha256": "3c4eac36f69f1ea9ddc12649ca14bd1652cc56ff31abb5a17f5aad6e52f15da4",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -40864,9 +40876,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/specDraftService.ts",
-      "bytes": 4208,
-      "lines": 109,
-      "sha256": "b7ee49c731e20c4ce597cf6db48b7376988c62f35b78fa28ef6aca2dd380c28e",
+      "bytes": 7797,
+      "lines": 189,
+      "sha256": "f3d3e2b4bbe769e6f4965c1ee1cbda832e3bab8ed319d780b1af5b817c5f1770",
       "relativeImportCandidates": [
         {
           "line": 1,

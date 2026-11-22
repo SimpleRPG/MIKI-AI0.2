@@ -11320,6 +11320,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1152 -sis の複数形は -ses（analysis→analyses）', (lex1152 as any).englishPluralOf1152('analysis') === 'analyses' && (lex1152 as any).englishSingularOf1152('class') === null, String((lex1152 as any).englishPluralOf1152('analysis')));
   }
 
+// ---- P1153: 仕様点を言葉の説明から彼女自身が切り出す ----
+  {
+    const { specDraftService } = await import('../src/miki/selfDevelopment/services/specDraftService');
+    const { compositionDrillService } = await import('../src/miki/selfDevelopment/services/compositionDrillService');
+    const exp1153 = (specDraftService as any).draftPointsFromDescription('0で1、0.5で0.5、1で0になる落ち込み');
+    check('P1153 明示された点を説明から拾える', exp1153?.source === 'explicit' && exp1153.points.length === 3 && exp1153.points[1].y === 0.5, JSON.stringify(exp1153 ?? null).slice(0, 120));
+    const tpl1153 = (specDraftService as any).draftPointsFromDescription('だんだん減って0に近づく形');
+    check('P1153 形の言葉から型で点を生成できる', tpl1153?.source === 'template:falloff' && tpl1153.points.length === 5 && Math.abs(tpl1153.points[1].y - 0.8536) < 0.001, JSON.stringify(tpl1153 ?? null).slice(0, 120));
+    check('P1153 どの型にも当たらない説明は切り出せない（正直な失敗）', (specDraftService as any).draftPointsFromDescription('なにかいい感じのやつ') === undefined, '');
+    const solved1153 = await compositionDrillService.solveSpecDescription({ name: 'descDrillFalloff1153', description: 'だんだん減って0に近づく形' });
+    check('P1153 説明だけから切り出した仕様がドリルで解ける', solved1153.pointsSource === 'template:falloff' && solved1153.discrimination === 'STRONG' && solved1153.solved, `src=${solved1153.pointsSource} disc=${solved1153.discrimination} solved=${solved1153.solved} reason=${solved1153.reason || ''}`);
+    const unavailable1153 = await compositionDrillService.solveSpecDescription({ name: 'descDrillNone1153', description: 'なにかいい感じのやつ' });
+    check('P1153 切り出せない説明はドリルに入らない', !unavailable1153.solved && unavailable1153.reason === 'SPEC_POINTS_UNAVAILABLE', `reason=${unavailable1153.reason || ''}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

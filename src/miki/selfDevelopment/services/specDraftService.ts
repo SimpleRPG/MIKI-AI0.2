@@ -46,6 +46,31 @@ export interface SpecDraftRecord {
   at: number;
 }
 
+/** P1153: 説明文から切り出した仕様点と、その出どころ。 */
+export interface SpecPointsDraft {
+  points: Array<{ x: number; y: number }>;
+  source: string;
+}
+
+const TEMPLATE_XS = [0, 0.25, 0.5, 0.75, 1];
+const SPEC_TEMPLATES_1153: Array<{ id: string; keywords: string[]; fn: (x: number) => number }> = [
+  {
+    id: 'falloff',
+    keywords: ['減衰', 'だんだん減', '徐々に減', '次第に減', '0に近づ', 'ゼロに近づ', '弱まる', 'フェード', 'falloff', 'decay'],
+    fn: (x) => 0.5 + 0.5 * Math.cos(Math.PI * x),
+  },
+  {
+    id: 'bump',
+    keywords: ['山なり', '真ん中が最大', '中央が最大', '真ん中が一番', '盛り上が', 'bump'],
+    fn: (x) => Math.sin(Math.PI * x),
+  },
+  {
+    id: 'saturate',
+    keywords: ['飽和', '上限に近づ', '増えて止まる', 'だんだん増えて', 'saturat'],
+    fn: (x) => 1 - Math.exp(-3 * x),
+  },
+];
+
 function trivialFitMaxError(points: Array<{ x: number; y: number }>): number {
   const n = points.length;
   const meanY = points.reduce((sum, p) => sum + p.y, 0) / n;
@@ -67,6 +92,61 @@ class SpecDraftService {
 
   list(): SpecDraftRecord[] {
     return this.readLedger();
+  }
+
+  /**
+   * P1153: 仕様「点」を言葉の説明から彼女自身が切り出す。
+   * P1134 では点は教師が渡していた。ここでは2つの出どころを
+   * 彼女の側に持つ:
+   *   1. 説明の中に点が明示されている場合（「0で1、0.5で0.5」
+   *      や「(0, 1)」の形）は、それをそのまま拾う。
+   *   2. 形の言葉（減衰・山なり・飽和など）があれば、形の型
+   *      から点を生成する。
+   * どちらにも当たらなければ undefined（まだ切り出せない、
+   * という正直な失敗。教師の点にフォールバックするのは
+   * 呼び出し側の判断）。切り出した点は従来どおり弁別力
+   * チェックに通すので、甘い点は WEAK として弾かれる。
+   */
+  draftPointsFromDescription(descriptionRaw: string): SpecPointsDraft | undefined {
+    const description = String(descriptionRaw || '');
+    if (!description) return undefined;
+    const byX = new Map<number, number>();
+    const addPoint = (x: number, y: number) => {
+      if (Number.isFinite(x) && Number.isFinite(y) && !byX.has(x)) byX.set(x, y);
+    };
+    for (const m of description.matchAll(/[\(（]\s*(-?\d+(?:\.\d+)?)\s*[,、]\s*(-?\d+(?:\.\d+)?)\s*[\)）]/g)) {
+      addPoint(Number(m[1]), Number(m[2]));
+    }
+    for (const m of description.matchAll(/(-?\d+(?:\.\d+)?)\s*(?:のとき|で|→|->)\s*(-?\d+(?:\.\d+)?)/g)) {
+      addPoint(Number(m[1]), Number(m[2]));
+    }
+    if (byX.size >= 2) {
+      const points = [...byX.entries()].map(([x, y]) => ({ x, y })).sort((a, b) => a.x - b.x);
+      return { points, source: 'explicit' };
+    }
+    const lower = description.toLowerCase();
+    for (const template of SPEC_TEMPLATES_1153) {
+      if (!template.keywords.some((k) => lower.includes(k.toLowerCase()))) continue;
+      const points = TEMPLATE_XS.map((x) => ({ x, y: Math.round(template.fn(x) * 10000) / 10000 }));
+      return { points, source: `template:${template.id}` };
+    }
+    return undefined;
+  }
+
+  /** P1153: 説明から点を切り出して、そのまま仕様化と解題まで通す。 */
+  draftFromDescription(
+    request: { name: string; description: string; tolerance?: number },
+  ): { record: SpecDraftRecord; source: string } | undefined {
+    const drafted = this.draftPointsFromDescription(request.description);
+    if (!drafted) return undefined;
+    const record = this.draftAndSolve({
+      name: request.name,
+      description: request.description,
+      points: drafted.points,
+      tolerance: request.tolerance,
+    });
+    if (!record) return undefined;
+    return { record, source: drafted.source };
   }
 
   draftAndSolve(request: SpecDraftRequest): SpecDraftRecord | undefined {
