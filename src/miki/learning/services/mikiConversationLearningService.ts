@@ -47,6 +47,34 @@ export interface ClaimCandidatePromotionEvaluation {
  * 応答パターンおよびClaim候補の品質と確信度を統計的に評価し、
  * 4大客観基準（反復確認・ゼロ訂正・高確信度）を満たした場合にのみVERIFIEDへ自動昇格させる。
  */
+/*
+ * P1140: ユーザーの発話が、その主張への言及を含むか。
+ * 会話候補の自動昇格では、強い肯定（ありがとう／その通り等）が
+ * あっても、それが当該の主張に向けられたものとは限らない
+ * （別の件へのお礼でも肯定として数えてしまう）。肯定を
+ * 「検証済み」と数えるのは、発話が主張の内容語（助詞・句読点で
+ * 区切った3文字以上の塊）や主張の核の部分文字列を含むときだけ
+ * にする。
+ */
+export function affirmationReferencesClaim1140(prompt: string, statement: string): boolean {
+  const text = String(prompt || '');
+  const stmt = String(statement || '');
+  if (!text || !stmt) return false;
+  const chunks = stmt
+    .replace(/[「」『』（）()【】]/g, ' ')
+    .split(/[\sのをにへがはとや、。・:：/／|]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 3);
+  if (chunks.some((c) => text.includes(c))) return true;
+  const squash = (v: string) => v.replace(/[\sのをにへがはとや、。・]/g, '');
+  const squashedStmt = squash(stmt);
+  const squashedText = squash(text);
+  for (let i = 0; i + 8 <= squashedStmt.length; i += 4) {
+    if (squashedText.includes(squashedStmt.slice(i, i + 8))) return true;
+  }
+  return false;
+}
+
 export class MikiConversationLearningService {
   private static instance: MikiConversationLearningService;
 
@@ -166,11 +194,18 @@ export class MikiConversationLearningService {
     const promotedClaims: ClaimRecord[] = [];
     if (state.lastCandidateClaimId) {
       const candidateKey = `claim_candidate:${state.lastCandidateClaimId}`;
+      // P1140: 肯定がこの候補への言及を含むときだけ検証済みと数える
+      const candidateClaimRecord = claimDatabaseService.getClaim(state.lastCandidateClaimId);
+      const candidateVerified = Boolean(
+        verified &&
+        candidateClaimRecord &&
+        affirmationReferencesClaim1140(text, candidateClaimRecord.statement)
+      );
       mikiUnifiedLearningContinuumService.observe({
         domain: 'conversation',
         key: candidateKey,
         outcome,
-        verified,
+        verified: candidateVerified,
         concepts: ['candidate_claim', prevTopic],
       });
 

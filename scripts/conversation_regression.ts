@@ -11082,6 +11082,29 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1139 自然文の要求は対象外にしない', isControlTokenRequirement1139('検証済み部品の合成パターンについての資料') === false && isControlTokenRequirement1139('UNEXECUTED_CHECKの意味を調べる') === false, '');
   }
 
+// ---- P1140: 肯定がその主張への言及のときだけ「検証済み」と数える ----
+  {
+    const { mikiConversationLearningService, affirmationReferencesClaim1140 } = await import('../src/miki/learning/services/mikiConversationLearningService');
+    const { claimDatabaseService } = await import('../src/miki/memory/services/claimDatabaseService');
+    const stmt1140 = 'TypeScriptの型推論は構造的サブタイピングである';
+    check('P1140 言及を含む肯定は向けられた肯定', affirmationReferencesClaim1140('型推論の話、その通りだね', stmt1140) === true, '');
+    check('P1140 別の件へのお礼は向けられた肯定にしない', affirmationReferencesClaim1140('ありがとう、助かった', stmt1140) === false, '');
+    const claim1140 = claimDatabaseService.registerClaim({
+      statement: stmt1140, world: 'REAL', kind: 'FACT_CLAIM', status: 'CANDIDATE',
+      source: 'web_search', self_provenance: 'INDEPENDENTLY_SUPPORTED', maturity: 'DEFINED',
+      scope: { environment: 'test' }, origin_source_id: 'p1140_test',
+      independence_cluster_id: 'cluster_p1140_test',
+    });
+    const state1140: any = { lastCandidateClaimId: claim1140.claim_id, invalidatedAssumptions: [], lastTopic: 'typescript' };
+    mikiConversationLearningService.evaluatePreviousTurn('ありがとう、助かった', state1140);
+    mikiConversationLearningService.evaluatePreviousTurn('ありがとう、助かった', state1140);
+    const afterUntargeted = mikiConversationLearningService.evaluateCandidatePromotion(claim1140.claim_id);
+    check('P1140 無関係なお礼では検証済みが付かない', afterUntargeted.verified === 0, `verified=${afterUntargeted.verified}`);
+    mikiConversationLearningService.evaluatePreviousTurn('型推論の話、その通りだね', state1140);
+    const afterTargeted = mikiConversationLearningService.evaluateCandidatePromotion(claim1140.claim_id);
+    check('P1140 言及つきの肯定で検証済みが付く', afterTargeted.verified >= 1, `verified=${afterTargeted.verified}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
