@@ -11049,6 +11049,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     }
   }
 
+// ---- P1137: 要求文のClaim化にも主張適格性チェックを通す ----
+  {
+    const { assessClaimWorthiness } = await import('../src/miki/research/services/researchService');
+    const question1137 = assessClaimWorthiness('この部品はどうやって実装するのが正しいのですか？');
+    check('P1137 疑問文の要求は主張化しない', question1137.ok === false && question1137.reason === 'QUESTION_FORM', `reason=${question1137.reason}`);
+    const rhetoric1137 = assessClaimWorthiness('保守性のためには厳密な検証を常に行うべきだ。');
+    check('P1137 修辞の要求は主張化しない', rhetoric1137.ok === false, `reason=${rhetoric1137.reason}`);
+    const fact1137 = assessClaimWorthiness('このモジュールは入力文字列を検証してから保存する。');
+    check('P1137 事実の文は従来どおり主張化できる', fact1137.ok === true, `reason=${fact1137.reason}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

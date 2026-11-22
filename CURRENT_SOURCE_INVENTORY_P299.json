@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4939,
-    "resolvedRelativeImportCandidateCount": 4921,
+    "relativeImportCandidateCount": 4940,
+    "resolvedRelativeImportCandidateCount": 4922,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 927420,
-      "lines": 11065,
-      "sha256": "04f945801ab46b5d0a25c1c4973c9e13b6ecb7c8521a665f78f64ec8fd2599ad",
+      "bytes": 928378,
+      "lines": 11076,
+      "sha256": "d27227ff205dbe7fe02e3d9fda3e306d9c388b0060d0e378dc80ddfe0d2d86a7",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5508,10 +5508,16 @@
           "specifier": "../src/miki/verification/services/verifierService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verifierService.ts"
+        },
+        {
+          "line": 11054,
+          "specifier": "../src/miki/research/services/researchService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/researchService.ts"
         }
       ],
-      "relativeImportCandidateCount": 632,
-      "resolvedRelativeImportCount": 630,
+      "relativeImportCandidateCount": 633,
+      "resolvedRelativeImportCount": 631,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -23348,9 +23354,9 @@
     },
     {
       "path": "src/miki/core/services/requiredAssetAcquisitionService.ts",
-      "bytes": 46932,
+      "bytes": 47011,
       "lines": 1101,
-      "sha256": "b3192e3a6e8352b33de8cf3c9afa584c268bcf9fd00af3b9e96a84ea56c4ab81",
+      "sha256": "27d0c66bd3c6467a99c796f21f8382f5df094826e5acde42c203277ba85f912b",
       "relativeImportCandidates": [
         {
           "line": 1,

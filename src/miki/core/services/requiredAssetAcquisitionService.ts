@@ -1,7 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
-import { researchService } from '../../research/services/researchService';
+import { researchService, assessClaimWorthiness } from '../../research/services/researchService';
 import { capabilityGapService } from '../../capability/services/capabilityGapService';
 import { taskBlackboardService } from './taskBlackboardService';
 import { reusableComponentFactoryService } from './reusableComponentFactoryService';
@@ -503,7 +503,7 @@ class RequiredAssetAcquisitionService {
         this.extractStringIds(researched, /^claim(?:[_-]?ids?)?$/i)[0] ??
         knowledgeGapService.getById(gap.id)?.researchClaimIds?.[0] ??
         knowledgeGapService.getById(gap.id)?.identity?.claimIds?.[0] ??
-        (webEvidenceIds.length > 0 && request.requirement.trim().length >= 15
+        (webEvidenceIds.length > 0 && request.requirement.trim().length >= 15 && assessClaimWorthiness(request.requirement.trim()).ok
           ? evidenceService.registerUnverifiedClaim(webEvidenceIds[0], request.requirement.trim())
           : undefined);
       let gapClaimAttachedCount = 0;
