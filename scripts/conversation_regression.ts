@@ -11161,6 +11161,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1142 日本語の計画では決まり文句が日本語になる', Boolean(official1142 && official1142.queryText.includes('公式') && !official1142.queryText.includes('official specification')) && Boolean(counter1142 && counter1142.queryText.includes('制限')), `official=${official1142?.queryText} counter=${counter1142?.queryText}`);
   }
 
+// ---- P1143: 読むページの関連度選択＋言語指定は技術系では付けない ----
+  {
+    const { orderResultsForReading, scoreResultRelevance1143, queryRelevanceTerms1143 } = await import('../src/miki/research/services/researchService');
+    const { detectSearxngLanguage1142 } = await import('../src/miki/research/services/searxngSettingsService');
+    check('P1143 関連度: タイトル一致は2点・抜粋一致は1点', scoreResultRelevance1143({ title: '光合成の仕組み', snippet: '' }, ['光合成']) === 2 && scoreResultRelevance1143({ title: '植物', snippet: '光合成について' }, ['光合成']) === 1 && scoreResultRelevance1143({ title: '無関係', snippet: '無関係' }, ['光合成']) === 0, '');
+    check('P1143 関連の語から決まり文句を外す', !queryRelevanceTerms1143({ queryText: '光合成の仕組み 公式 ドキュメント 仕様' }).includes('公式') && queryRelevanceTerms1143({ queryText: '光合成の仕組み 公式 ドキュメント 仕様' }).includes('光合成の仕組み'), '');
+    const ordered1143 = orderResultsForReading([
+      { url: 'https://example.com/low', title: '天気の話', snippet: '今日の天気' },
+      { url: 'https://example.com/high', title: '光合成の仕組み', snippet: '葉緑体' },
+      { url: 'https://www.city.example.go.jp/none', title: 'お知らせ', snippet: '窓口案内' },
+    ], { queryText: '光合成の仕組み' });
+    check('P1143 出典の格が先・同じ格では関連度順', ordered1143[0].url.includes('go.jp') && ordered1143[1].url.includes('high') && ordered1143[2].url.includes('low'), ordered1143.map(r => r.url).join(','));
+    check('P1143 技術系の検索文では言語指定を付けない', detectSearxngLanguage1142('TypeScriptの型推論の実装方法') === undefined && detectSearxngLanguage1142('光合成の仕組み') === 'ja', '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

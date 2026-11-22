@@ -50,8 +50,19 @@ export function getSearxngSearchSettings(): SearxngSearchSettings {
  * なるようにする。これまでは q と format しか送っておらず、
  * 日本語の問いでも言語指定なしで検索していた。
  */
+/*
+ * P1143: 技術・実装系の検索文では言語指定を付けない。一次資料や
+ * 公式ドキュメントが英語のことが多く、日本語寄せの並び替えが
+ * かえって良い出典を沈めるため。技術語（言語名・API等の英字
+ * トークンやキャメルケース）を含む検索文が対象。
+ */
+const TECH_SIGNAL_1143 = /(?:[A-Za-z]+[A-Z][A-Za-z]*|\b(?:TypeScript|JavaScript|Python|API|SDK|HTTP|JSON|SQL|CSS|HTML|Rust|Docker|Linux|Android|npm|git)\b)/;
+
 export function detectSearxngLanguage1142(query: string): string | undefined {
-  return /[぀-ゟ゠-ヿ一-鿿]/.test(String(query || '')) ? 'ja' : undefined;
+  const text = String(query || '');
+  if (!/[぀-ゟ゠-ヿ一-鿿]/.test(text)) return undefined;
+  if (TECH_SIGNAL_1143.test(text)) return undefined;
+  return 'ja';
 }
 
 export function buildSearxngSearchUrl(settings: SearxngSearchSettings, query: string): string {

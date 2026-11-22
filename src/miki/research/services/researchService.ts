@@ -167,12 +167,47 @@ export function assessResearchEvidenceSatisfied1141(input: {
   return input.executedIntentTypes.includes('COUNTEREVIDENCE');
 }
 
-export function orderResultsForReading<T extends { url?: string }>(results: T[], query: { intentType?: string; sourceTierTarget?: string; siteOrDomainConstraints?: string[] }): T[] {
+/*
+ * P1143: 読むページの関連度。検索結果のタイトル・抜粋に、問いの
+ * 要の語がどれだけ含まれるかで点を付ける。決まり文句（公式・
+ * official specification 等）は全クエリ共通で関連の証拠に
+ * ならないため、語の抽出から外す。
+ */
+const RELEVANCE_STOP_WORDS_1143 = new Set(['公式', 'ドキュメント', '仕様', '制限', '既知の問題', '注意点', '一次資料', '実装例', 'サンプルコード', 'アルゴリズム', '独立した出典', '反証', 'official', 'specification', 'documentation', 'limitation', 'unsupported', 'known', 'issue', 'primary', 'source', 'android', 'arm64', 'termux', 'compatibility', 'independent', 'evidence', 'counterevidence']);
+
+export function queryRelevanceTerms1143(query: { queryText?: string; termsIncluded?: string[] }): string[] {
+  const raw = (query.termsIncluded && query.termsIncluded.length > 0)
+    ? query.termsIncluded
+    : String(query.queryText || '').split(/[\s、。・:：/／|]+/);
+  const terms = raw
+    .map((v) => String(v || '').trim())
+    .filter((v) => v.length >= 2 && !RELEVANCE_STOP_WORDS_1143.has(v.toLowerCase()));
+  return [...new Set(terms)].slice(0, 8);
+}
+
+export function scoreResultRelevance1143(result: { title?: string; snippet?: string }, terms: string[]): number {
+  const title = String(result.title || '').toLowerCase();
+  const snippet = String(result.snippet || '').toLowerCase();
+  let score = 0;
+  for (const term of terms) {
+    const t = term.toLowerCase();
+    if (!t) continue;
+    if (title.includes(t)) score += 2;
+    if (snippet.includes(t)) score += 1;
+  }
+  return score;
+}
+
+export function orderResultsForReading<T extends { url?: string; title?: string; snippet?: string }>(results: T[], query: { intentType?: string; sourceTierTarget?: string; siteOrDomainConstraints?: string[]; queryText?: string; termsIncluded?: string[] }): T[] {
   const rank = (item: T): number => {
     const role = assessResearchSourceRole(query, { url: item.url || "" });
     return role === "OFFICIAL" || role === "PRIMARY" ? 0 : 1;
   };
-  return [...results].sort((a, b) => rank(a) - rank(b));
+  // P1143: 出典の格が同じ中では、問いの語との関連が高い順に読む。
+  // 読みは1パス2〜3件までで高くつくため、外れページから読む
+  // 無駄を減らす。関連の語が無い経路では従来どおりの並び。
+  const terms = queryRelevanceTerms1143(query);
+  return [...results].sort((a, b) => (rank(a) - rank(b)) || (scoreResultRelevance1143(b, terms) - scoreResultRelevance1143(a, terms)));
 }
 
 export class ResearchService {

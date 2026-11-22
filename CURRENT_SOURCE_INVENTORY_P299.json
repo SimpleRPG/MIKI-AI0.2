@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4951,
-    "resolvedRelativeImportCandidateCount": 4933,
+    "relativeImportCandidateCount": 4953,
+    "resolvedRelativeImportCandidateCount": 4935,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 939188,
-      "lines": 11177,
-      "sha256": "c36335b9603d97b0f041eb2b36f16215976a4a591fc5519e6f3a8a803c34b50f",
+      "bytes": 941094,
+      "lines": 11192,
+      "sha256": "9f9d8dce01e122c738b401c1cf4df96c623cf8555208d953dd314ded45aee1db",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5580,10 +5580,22 @@
           "specifier": "../src/miki/research/services/japaneseDictionaryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
+        },
+        {
+          "line": 11166,
+          "specifier": "../src/miki/research/services/researchService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/researchService.ts"
+        },
+        {
+          "line": 11167,
+          "specifier": "../src/miki/research/services/searxngSettingsService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/searxngSettingsService.ts"
         }
       ],
-      "relativeImportCandidateCount": 644,
-      "resolvedRelativeImportCount": 642,
+      "relativeImportCandidateCount": 646,
+      "resolvedRelativeImportCount": 644,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -31659,9 +31671,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 86458,
-      "lines": 1576,
-      "sha256": "e7cf1c234714d8431a3e8b5c29e76b63cece28e82da1c2449655b6ec0a9b930c",
+      "bytes": 88601,
+      "lines": 1611,
+      "sha256": "f0ad08e280df10fe12c44abe2bffa60cdf7984509e1217f178c98a208ec26253",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31850,13 +31862,13 @@
           "resolvedPath": "src/miki/core/services/githubCodeMaterialService.ts"
         },
         {
-          "line": 408,
+          "line": 443,
           "specifier": "../../core/services/githubCodeMaterialService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/githubCodeMaterialService.ts"
         },
         {
-          "line": 418,
+          "line": 453,
           "specifier": "../../core/services/stackExchangeMaterialService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/stackExchangeMaterialService.ts"
@@ -31985,9 +31997,9 @@
     },
     {
       "path": "src/miki/research/services/searxngSettingsService.ts",
-      "bytes": 2489,
-      "lines": 66,
-      "sha256": "2746c2a17847fdc6c3b813836c7d0f1f5530fecdd419cf05ce29b9cea3df5a60",
+      "bytes": 3085,
+      "lines": 77,
+      "sha256": "ea20cb7b28374751d276e313874ecd9c8896a4b9eb2e257d266320eb484db48b",
       "relativeImportCandidates": [
         {
           "line": 1,
