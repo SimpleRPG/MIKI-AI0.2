@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4977,
-    "resolvedRelativeImportCandidateCount": 4959,
+    "relativeImportCandidateCount": 4978,
+    "resolvedRelativeImportCandidateCount": 4960,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 959650,
-      "lines": 11381,
-      "sha256": "a1309c5caed0243d4323b30f6b4eda49a8fb6e0b5d969c7ebb0a0c652c2acd72",
+      "bytes": 960815,
+      "lines": 11396,
+      "sha256": "4ba131caf42c2be9d60f6c782d415476da014ba9c12020c0e3c54d52a8798b6b",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5712,10 +5712,16 @@
           "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
+        },
+        {
+          "line": 11371,
+          "specifier": "../src/miki/conversation/services/visualLikenessService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
         }
       ],
-      "relativeImportCandidateCount": 666,
-      "resolvedRelativeImportCount": 664,
+      "relativeImportCandidateCount": 667,
+      "resolvedRelativeImportCount": 665,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -16814,9 +16820,9 @@
     },
     {
       "path": "src/miki/conversation/services/visualPoseService.ts",
-      "bytes": 418283,
-      "lines": 7491,
-      "sha256": "1ac403c5361cbd34388790f3b6804452273b3978795dce475239670b7c231eb1",
+      "bytes": 421009,
+      "lines": 7547,
+      "sha256": "b5f8f5593f06a6b9963a55a157e4638c9da39d5abdce8fddaef03e4b8b10ea71",
       "relativeImportCandidates": [
         {
           "line": 1,

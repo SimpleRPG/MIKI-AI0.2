@@ -11365,6 +11365,21 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     p1155Sess2.results[1].taskId === p1155Sess.results[1].taskId);
 }
 
+// ---- P1156: 髪側にも境界ならし（後ろ髪の帯の硬さを取る） ----
+{
+  const svc1156 = poseSvc() as any;
+  const { visualLikenessService } = await import('../src/miki/conversation/services/visualLikenessService');
+  const img1156 = paleLongHair48();
+  const reading1156 = svc1156.analyzePose(img1156, 48, 56);
+  svc1156.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+  const render1156 = reading1156 ? svc1156.renderBodyStructured(reading1156, 128, null, null, { backHair: true }) : null;
+  const prof1156 = render1156 ? visualLikenessService.perceptualProfile(render1156, 128, 128) : null;
+  check('P1156 髪の境界もならして柔らかさが上がる', Boolean(prof1156) && (prof1156 as any).softRatio > 0.50, `softRatio=${(prof1156 as any)?.softRatio}`);
+  const vs1156 = reading1156 ? svc1156.verifyBodyStructured(reading1156) : null;
+  const vc1156 = reading1156 ? svc1156.verifyBodyContour(reading1156) : null;
+  check('P1156 構造と輪郭の照合は維持', Boolean(vs1156?.verified) && Boolean(vc1156?.verified), `structured=${vs1156?.verified} contour=${vc1156?.verified}`);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

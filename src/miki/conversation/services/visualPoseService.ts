@@ -2938,6 +2938,62 @@ class VisualPoseService {
       }
       current = smoothed;
     }
+    // P1156: 髪側の境界ならし。P1149 の帯は体マスクだけが対象で、
+    // 後ろ髪の帯（帯5）は髪同士の段差が硬さの主犯なのに届いて
+    // いなかった（実測：帯5の硬い隣接859件中、髪↔髪が754件、
+    // その53%が平らな下絵の髪境界の帯の中）。髪マスクで同じ
+    // 帯ならしを掛ける。平均は髪の画素同士だけで取り、服色の
+    // 画素は従来どおり外す。下絵の境界から離れた房の線の段差
+    // には触れない（線の対比は P1129 の成果なので守る）。
+    const hair1156 = pal.hair;
+    const hairBoundary1156 = new Uint8Array(size * size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (!hair1156[y * size + x]) continue;
+        const i = (y * size + x) * 4;
+        const differsHair = (nx: number, ny: number): boolean => {
+          if (nx < 0 || ny < 0 || nx >= size || ny >= size || !hair1156[ny * size + nx]) return false;
+          const j = (ny * size + nx) * 4;
+          return flat[i] !== flat[j] || flat[i + 1] !== flat[j + 1] || flat[i + 2] !== flat[j + 2];
+        };
+        if (differsHair(x + 1, y) || differsHair(x - 1, y) || differsHair(x, y + 1) || differsHair(x, y - 1)) {
+          hairBoundary1156[y * size + x] = 1;
+        }
+      }
+    }
+    const inHairBand1156 = (x: number, y: number): boolean => {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < size && ny < size && hairBoundary1156[ny * size + nx]) return true;
+        }
+      }
+      return false;
+    };
+    for (let pass = 0; pass < 2; pass++) {
+      const smoothed = new Uint8Array(current);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          if (!hair1156[y * size + x] || !inHairBand1156(x, y) || isProtected1149(y * size + x)) continue;
+          let r = 0, g = 0, b = 0, n = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const nx = x + dx, ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= size || ny >= size || !hair1156[ny * size + nx]) continue;
+              const j = (ny * size + nx) * 4;
+              r += current[j]; g += current[j + 1]; b += current[j + 2]; n++;
+            }
+          }
+          if (n === 0) continue;
+          const i = (y * size + x) * 4;
+          smoothed[i] = Math.round(r / n);
+          smoothed[i + 1] = Math.round(g / n);
+          smoothed[i + 2] = Math.round(b / n);
+          smoothed[i + 3] = current[i + 3];
+        }
+      }
+      current = smoothed;
+    }
     return current;
   }
 
