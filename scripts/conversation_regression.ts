@@ -11434,6 +11434,39 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   svc1158.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
 }
 
+// ---- P1159: 膝関節（withPoseのkneeDeg、脚の2区間描画） ----
+{
+  const svc1159 = poseSvc() as any;
+  const img1159 = paleLongHair48();
+  const r1159 = svc1159.analyzePose(img1159, 48, 56);
+  svc1159.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+  const ang0_1159 = r1159 ? svc1159.poseAnglesOf(r1159) : null;
+  const sk0_1159 = r1159 ? svc1159.skeletonOf(r1159) : null;
+  const posed1159 = r1159 ? svc1159.withPose(r1159, { legL: { hipDeg: -35, kneeDeg: 30 }, legR: { hipDeg: 35, kneeDeg: -30 } }) : null;
+  const ang1_1159 = posed1159 ? svc1159.poseAnglesOf(posed1159) : null;
+  const dist1159 = (a: any, b: any): number => Math.hypot(b.x - a.x, b.y - a.y);
+  const L0_1159 = r1159?.hipL && r1159?.footL ? dist1159(r1159.hipL, r1159.footL) : 0;
+  check('P1159 膝の角度指定が太もも・ふくらはぎの角度になり長さ比が幅モデルと一致', !!posed1159 && !!ang1_1159 && typeof ang0_1159?.legL === 'number' && Math.abs((ang1_1159.legL as number) - (ang0_1159.legL as number) + 35) < 1.0 && Math.abs((ang1_1159.calfL as number) - (ang0_1159.legL as number) + 5) < 1.0 && Math.abs(dist1159(posed1159.hipL, posed1159.kneeL) / L0_1159 - 0.48) < 0.01 && Math.abs(dist1159(posed1159.kneeL, posed1159.footL) / L0_1159 - 0.52) < 0.01 && !!sk0_1159 && sk0_1159.kneeL === null, JSON.stringify({ t: ang1_1159?.legL, c: ang1_1159?.calfL }));
+  const straight1159 = r1159 ? svc1159.withPose(r1159, { legL: { hipDeg: 20 } }) : null;
+  const angS_1159 = straight1159 ? svc1159.poseAnglesOf(straight1159) : null;
+  check('P1159 膝折れなしの脚回転では膝が直線上に残る', !!angS_1159 && typeof angS_1159.legL === 'number' && typeof angS_1159.calfL === 'number' && Math.abs((angS_1159.calfL as number) - (angS_1159.legL as number)) < 0.5, JSON.stringify(angS_1159));
+  const flat0_1159 = r1159 ? svc1159.renderBodyStructured(r1159, 128, null, null, { backHair: true }) : null;
+  const flatB_1159 = posed1159 ? svc1159.renderBodyStructured(posed1159, 128, null, null, { backHair: true }) : null;
+  let diff1159 = -1, diffKnee1159 = -1;
+  if (flat0_1159 && flatB_1159 && posed1159?.kneeL) {
+    diff1159 = 0; diffKnee1159 = 0;
+    const kx = posed1159.kneeL.x * 127, ky = posed1159.kneeL.y * 127;
+    for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+      const i = (y * 128 + x) * 4;
+      if (flat0_1159[i] === flatB_1159[i] && flat0_1159[i + 1] === flatB_1159[i + 1] && flat0_1159[i + 2] === flatB_1159[i + 2]) continue;
+      diff1159++;
+      if (Math.hypot(x - kx, y - ky) <= 8) diffKnee1159++;
+    }
+  }
+  check('P1159 曲げた膝が指定位置に描かれる', diff1159 > 200 && diff1159 < 12000 && diffKnee1159 >= 20, JSON.stringify({ diff1159, diffKnee1159 }));
+  svc1159.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

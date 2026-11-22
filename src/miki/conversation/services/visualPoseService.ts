@@ -162,6 +162,10 @@ export interface PoseReading {
   hipR?: PosePoint | null;
   footL: PosePoint | null;
   footR: PosePoint | null;
+  /** P1159: 膝関節。実測ではまだ読めないので通常は null。
+   * ポーズ合成（withPose）が置いた時だけ入る。 */
+  kneeL?: PosePoint | null;
+  kneeR?: PosePoint | null;
   armL: ArmState;
   armR: ArmState;
   legs: LegState;
@@ -813,6 +817,8 @@ export interface PoseSkeleton1158 {
   handR: PosePoint | null;
   hipL: PosePoint | null;
   hipR: PosePoint | null;
+  kneeL: PosePoint | null;
+  kneeR: PosePoint | null;
   footL: PosePoint | null;
   footR: PosePoint | null;
 }
@@ -825,14 +831,17 @@ export interface PoseAngles1158 {
   forearmR: number | null;
   legL: number | null;
   legR: number | null;
+  /** P1159: 膝→足（ふくらはぎ）の向き。膝がある時だけ */
+  calfL?: number | null;
+  calfR?: number | null;
 }
 
 /** P1158: ポーズ指定（関節角度の増分、度） */
 export interface PoseSpec1158 {
   armL?: { shoulderDeg?: number; elbowDeg?: number };
   armR?: { shoulderDeg?: number; elbowDeg?: number };
-  legL?: { hipDeg?: number };
-  legR?: { hipDeg?: number };
+  legL?: { hipDeg?: number; kneeDeg?: number };
+  legR?: { hipDeg?: number; kneeDeg?: number };
 }
 
 /** P1001: 目標の素体（見本を測って保存したパラメータ） */
@@ -1357,16 +1366,43 @@ class VisualPoseService {
       }
     }
     // 脚：腰から足先へ、太もも→ふくらはぎ→足首と細くする
+    // P1159: 脚の中心の通り道。膝が腰→足の直線から有意に外れて
+    // いる読みでは、腰→膝→足の2区間で中心を通す（腕と同じ
+    // 偏差ゲート）。幅は従来どおり全体の t で引く（幅モデルが
+    // 太もも→膝を 0.48 と置き、合成側の膝位置もそれに揃えた）。
+    // 前髪パネルの脚際も同じ道を使う。
+    const legPath1159 = (sideSign: number, top: number, bottom: number): { hipX: number; footX: number; kneeX: number | null; kneeRowT: number } => {
+      const footP = sideSign < 0 ? reading.footL : reading.footR;
+      const hipX = cxN * (S - 1) + sideSign * legSpread;
+      const footX = footP ? (footP.x + footXOff(sideSign)) * (S - 1) : hipX;
+      const hipR = (sideSign < 0 ? reading.hipL : reading.hipR) ?? null;
+      const kneeR = (sideSign < 0 ? reading.kneeL : reading.kneeR) ?? null;
+      let kneeX: number | null = null;
+      let kneeRowT = 0.48;
+      if (kneeR && hipR && footP) {
+        const dx = footP.x - hipR.x, dy = footP.y - hipR.y;
+        const len2 = dx * dx + dy * dy;
+        const tt = len2 > 0 ? Math.max(0, Math.min(1, ((kneeR.x - hipR.x) * dx + (kneeR.y - hipR.y) * dy) / len2)) : 0;
+        const dev = Math.hypot(kneeR.x - (hipR.x + dx * tt), kneeR.y - (hipR.y + dy * tt));
+        if (dev > 0.02) {
+          kneeX = kneeR.x * (S - 1);
+          kneeRowT = Math.max(0.05, Math.min(0.95, (kneeR.y * (S - 1) - top) / Math.max(1, bottom - top)));
+        }
+      }
+      return { hipX, footX, kneeX, kneeRowT };
+    };
+    const legCenter1159 = (p: { hipX: number; footX: number; kneeX: number | null; kneeRowT: number }, t: number): number => {
+      if (p.kneeX === null) return lerp(p.hipX, p.footX, t);
+      return t <= p.kneeRowT ? lerp(p.hipX, p.kneeX, t / p.kneeRowT) : lerp(p.kneeX, p.footX, (t - p.kneeRowT) / (1 - p.kneeRowT));
+    };
     const legTop = y1, legBottom = Math.round(footY * (S - 1));
     const legSpanRows = new Map<number, { l?: [number, number]; r?: [number, number] }>();
     for (const sideSign of [-1, 1]) {
-      const foot = sideSign < 0 ? reading.footL : reading.footR;
-      const hipX = cxN * (S - 1) + sideSign * legSpread;
-      const footX = foot ? (foot.x + footXOff(sideSign)) * (S - 1) : hipX;
+      const path1159 = legPath1159(sideSign, legTop, legBottom);
       for (let y = legTop; y <= legBottom; y++) {
         const t = legBottom > legTop ? (y - legTop) / (legBottom - legTop) : 0;
         const w = legWAt(t);
-        const cxp = lerp(hipX, footX, t);
+        const cxp = legCenter1159(path1159, t);
         // P1025: 下の服は脚の付け根だけ（分かれ形）。裾に線。
         let legCol: [number, number, number] = BODY;
         if (twoPiece) {
@@ -1673,12 +1709,10 @@ class VisualPoseService {
             } else if (y <= y1) {
               edgeAbs = cxPx + sgn * (torsoW((y - y0) / Math.max(1, y1 - y0)) / 2);
             } else {
-              const foot = sgn < 0 ? reading.footL : reading.footR;
-              const hipX = cxPx + sgn * legSpread;
-              const footX = foot ? (foot.x + footXOff(sgn)) * (S - 1) : hipX;
               const legBottom = Math.round(footY * (S - 1));
               const lt = Math.min(1, (y - y1) / Math.max(1, legBottom - y1));
-              const cxp = lerp(hipX, footX, lt);
+              // P1159: パネルの脚際も脚の2区間の道に沿わせる
+              const cxp = legCenter1159(legPath1159(sgn, y1, legBottom), lt);
               const w = legWAt(lt);
               edgeAbs = cxp + sgn * (w / 2);
             }
@@ -4120,6 +4154,8 @@ class VisualPoseService {
       handR: reading.handR ?? null,
       hipL: reading.hipL ?? null,
       hipR: reading.hipR ?? null,
+      kneeL: reading.kneeL ?? null,
+      kneeR: reading.kneeR ?? null,
       footL: reading.footL ?? null,
       footR: reading.footR ?? null,
     };
@@ -4142,8 +4178,10 @@ class VisualPoseService {
       upperArmR: ang(reading.shoulderR, reading.elbowR ?? reading.handR),
       forearmL: reading.elbowL ? ang(reading.elbowL, reading.handL) : null,
       forearmR: reading.elbowR ? ang(reading.elbowR, reading.handR) : null,
-      legL: ang(reading.hipL, reading.footL),
-      legR: ang(reading.hipR, reading.footR),
+      legL: ang(reading.hipL, reading.kneeL ?? reading.footL),
+      legR: ang(reading.hipR, reading.kneeR ?? reading.footR),
+      calfL: reading.kneeL ? ang(reading.kneeL, reading.footL) : null,
+      calfR: reading.kneeR ? ang(reading.kneeR, reading.footR) : null,
     };
   }
 
@@ -4154,8 +4192,9 @@ class VisualPoseService {
    * 全体の回転、elbowDeg は上腕に対する前腕の追加の折れ。
    * 肘が無い読みで elbowDeg を指定した場合は、腕の中点を
    * 肘として折る（これは測定ではなくポーズの指定）。
-   * 脚はこの段では1区間（膝の折れは次段）。説明文などの
-   * 記述フィールドは元の読みのまま（ポーズは描く時の変換）。
+   * P1159: 脚も膝で2区間になった。膝が無い読みでは幅モデル
+   * の 0.48 地点に膝を合成する。説明文などの記述フィールドは
+   * 元の読みのまま（ポーズは描く時の変換）。
    */
   public withPose(reading: PoseReading, spec: PoseSpec1158): PoseReading {
     const out: PoseReading = { ...reading };
@@ -4185,13 +4224,26 @@ class VisualPoseService {
       const ha2 = place(el2, foreAng, l2);
       if (side === 'L') { out.elbowL = el2; out.handL = ha2; } else { out.elbowR = el2; out.handR = ha2; }
     };
-    const doLeg = (side: 'L' | 'R', s?: { hipDeg?: number }): void => {
-      if (!s || !s.hipDeg) return;
+    const doLeg = (side: 'L' | 'R', s?: { hipDeg?: number; kneeDeg?: number }): void => {
+      if (!s) return;
+      const hd = s.hipDeg ?? 0;
+      const kd = s.kneeDeg ?? 0;
+      if (hd === 0 && kd === 0) return;
       const hip = (side === 'L' ? reading.hipL : reading.hipR) ?? null;
       const foot = side === 'L' ? reading.footL : reading.footR;
       if (!hip || !foot) return;
-      const f2 = place(hip, angOf(hip, foot) + s.hipDeg, dist(hip, foot));
-      if (side === 'L') out.footL = f2; else out.footR = f2;
+      const total = dist(hip, foot);
+      if (total < 1e-9) return;
+      // P1159: 膝。読みにあればその位置、無ければ描画の幅
+      // モデルが太もも→膝と置く 0.48 の地点に合成する
+      // （ポーズの指定であって測定ではない）。
+      const kneeIn = (side === 'L' ? reading.kneeL : reading.kneeR) ?? null;
+      const knee0: PosePoint = kneeIn ?? { x: hip.x + (foot.x - hip.x) * 0.48, y: hip.y + (foot.y - hip.y) * 0.48 };
+      const l1 = dist(hip, knee0);
+      const l2 = dist(knee0, foot);
+      const knee2 = place(hip, angOf(hip, knee0) + hd, l1);
+      const foot2 = place(knee2, angOf(knee0, foot) + hd + kd, l2);
+      if (side === 'L') { out.kneeL = knee2; out.footL = foot2; } else { out.kneeR = knee2; out.footR = foot2; }
     };
     doArm('L', spec.armL);
     doArm('R', spec.armR);
