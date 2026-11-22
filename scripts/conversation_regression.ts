@@ -11380,6 +11380,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   check('P1156 構造と輪郭の照合は維持', Boolean(vs1156?.verified) && Boolean(vc1156?.verified), `structured=${vs1156?.verified} contour=${vc1156?.verified}`);
 }
 
+// ---- P1157: 仕上げパラメータのドリル（知覚プロファイルで合否） ----
+{
+  const svc1157 = poseSvc() as any;
+  const img1157 = paleLongHair48();
+  const r1157 = svc1157.analyzePose(img1157, 48, 56);
+  const fc0 = svc1157.getFinishCorrections();
+  check('P1157 仕上げ補正の既定は現行の仕上げと一致', fc0.blendAlpha === 0.35 && fc0.glossAdd === 15 && Math.abs(fc0.shadeK - 0.10) < 1e-9, JSON.stringify(fc0));
+  svc1157.setFinishCorrections({ blendAlpha: 99, glossAdd: -5, shadeK: 99 });
+  const fc1 = svc1157.getFinishCorrections();
+  check('P1157 仕上げ補正は範囲内に丸められる', fc1.blendAlpha === 0.6 && fc1.glossAdd === 0 && fc1.shadeK === 0.25, JSON.stringify(fc1));
+  svc1157.setFinishCorrections({ blendAlpha: 0.35, glossAdd: 15, shadeK: 0.10 });
+  svc1157.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+  const okSet1157 = r1157 ? svc1157.setTarget(r1157, { rgba: img1157, width: 48, height: 56 }) : false;
+  const dr1157 = r1157 && okSet1157 ? svc1157.drillFinishParameters(r1157, 2) : null;
+  check('P1157 仕上げドリルが回って知覚スコアが悪化しない', !!dr1157 && dr1157.finalScore <= dr1157.initialScore + 1e-9 && dr1157.corrections.blendAlpha >= 0 && dr1157.corrections.blendAlpha <= 0.6 && dr1157.corrections.glossAdd >= 0 && dr1157.corrections.glossAdd <= 30, JSON.stringify(dr1157 && { i: dr1157.initialScore, f: dr1157.finalScore }));
+  if (r1157) svc1157.setTarget(r1157);
+  svc1157.setFinishCorrections({ blendAlpha: 0.35, glossAdd: 15, shadeK: 0.10 });
+  svc1157.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

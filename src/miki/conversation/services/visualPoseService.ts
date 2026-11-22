@@ -800,6 +800,7 @@ const CORRECTION_KEY = 'miki_visual_corrections_v1';
 const CONTOUR_CORRECTION_KEY = 'miki_visual_contour_corrections_v1';
 const JOINT_CORRECTION_KEY = 'miki_visual_joint_corrections_v1';
 const OVERLAP_CORRECTION_KEY = 'miki_visual_overlap_corrections_v1';
+const FINISH_CORRECTION_KEY = 'miki_visual_finish_corrections_v1';
 
 /** P1001: 目標の素体（見本を測って保存したパラメータ） */
 export interface BodyTarget {
@@ -2854,12 +2855,13 @@ class VisualPoseService {
     if (!pal) return base;
     const out = new Uint8Array(base);
     const body = pal.body;
+    const finishCorr1157 = this.getFinishCorrections();
     const blendAt = (x: number, y: number, nx: number, ny: number): void => {
       const i = (y * size + x) * 4;
       const j = (ny * size + nx) * 4;
       const d = (Math.abs(base[i] - base[j]) + Math.abs(base[i + 1] - base[j + 1]) + Math.abs(base[i + 2] - base[j + 2])) / 3;
       if (d <= 20) return;
-      const a = 0.35;
+      const a = finishCorr1157.blendAlpha;
       for (let c = 0; c < 3; c++) {
         out[i + c] = Math.round(base[i + c] * (1 - a) + base[j + c] * a);
         out[j + c] = Math.round(base[j + c] * (1 - a) + base[i + c] * a);
@@ -3002,6 +3004,7 @@ class VisualPoseService {
     const pal = this.segmentTwinPalette(flat, size, reading);
     if (!pal) return base;
     const out = new Uint8Array(base);
+    const finishCorr1157 = this.getFinishCorrections();
     // 髪のツヤ: 髪の縦範囲の上寄りに、横に広がる柔らかい帯を足す。
     let hairTop = size, hairBottom = -1;
     for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
@@ -3015,7 +3018,7 @@ class VisualPoseService {
         const t = (y - hairTop) / span;
         const band = Math.exp(-((t - 0.30) * (t - 0.30)) / (2 * 0.11 * 0.11));
         if (band < 0.02) continue;
-        const add = band * 15;
+        const add = band * finishCorr1157.glossAdd;
         for (let x = 0; x < size; x++) {
           if (!pal.hair[y * size + x]) continue;
           const i = (y * size + x) * 4;
@@ -3040,7 +3043,7 @@ class VisualPoseService {
           if (!(flat[i] === skin[0] && flat[i + 1] === skin[1] && flat[i + 2] === skin[2])) continue;
           const dist = Math.min(k, runLen - 1 - k);
           if (dist < 4) {
-            const shade = (1 - dist / 4) * 0.10;
+            const shade = (1 - dist / 4) * finishCorr1157.shadeK;
             for (let c = 0; c < 3; c++) out[i + c] = Math.round(out[i + c] * (1 - shade));
           }
           // P1128: 面の丸み。帯域測定（P1128 準備）では脚まわりが
@@ -3529,6 +3532,25 @@ class VisualPoseService {
     try { storageService.setItem(CORRECTION_KEY, JSON.stringify(c)); } catch { /* 保存できなくても本流は止めない */ }
   }
 
+  /** P1157: 仕上げの癖（境界の混ぜ具合・髪のツヤ・体の陰の強さ）を読む。既定は P1114〜P1124 で固めた現行の仕上げそのもの */
+  public getFinishCorrections(): { blendAlpha: number; glossAdd: number; shadeK: number } {
+    const base = { blendAlpha: 0.35, glossAdd: 15, shadeK: 0.10 };
+    try {
+      const raw = storageService.getJson(FINISH_CORRECTION_KEY, null) as Partial<typeof base> | null;
+      if (raw) {
+        if (typeof raw.blendAlpha === 'number' && Number.isFinite(raw.blendAlpha)) base.blendAlpha = Math.max(0, Math.min(0.6, raw.blendAlpha));
+        if (typeof raw.glossAdd === 'number' && Number.isFinite(raw.glossAdd)) base.glossAdd = Math.max(0, Math.min(30, raw.glossAdd));
+        if (typeof raw.shadeK === 'number' && Number.isFinite(raw.shadeK)) base.shadeK = Math.max(0, Math.min(0.25, raw.shadeK));
+      }
+    } catch { /* fall through */ }
+    return base;
+  }
+
+  /** P1157: 仕上げの癖を保存する */
+  public setFinishCorrections(c: { blendAlpha: number; glossAdd: number; shadeK: number }): void {
+    try { storageService.setItem(FINISH_CORRECTION_KEY, JSON.stringify(c)); } catch { /* 保存できなくても本流は止めない */ }
+  }
+
   /** P1085: 輪郭の描く側の癖（24段ごとの左右オフセット）を読む */
   public getContourCorrections(): { l: number[]; r: number[] } | null {
     try {
@@ -3948,6 +3970,80 @@ class VisualPoseService {
     if (improved) state.drillsOk++;
     try { storageService.setItem(KEY, JSON.stringify(state)); } catch { /* 保存できなくても本流は止めない */ }
     return { initialDiff: first.diff, finalDiff: best.diff, improved, rounds, corrections: bestCorr, contourDiffInitial: first.contourDiff, contourDiffFinal: best.contourDiff, contourCorrections: contourCorrOut, jointDiffInitial: jointDiffOf(first.joints), jointDiffFinal: jointDiffOf(best.joints), jointCorrections: jointCorrOut, innerDiffInitial: innerDiffOf(first.inner), innerDiffFinal: innerDiffOf(best.inner), overlapCorrections: overlapCorrOut, perceptualInitial: first.perc, perceptualFinal: best.perc };
+  }
+
+  /**
+   * P1157: 仕上げパラメータのドリル（局所探索）。寸法の補正
+   * （drillCorrections）は寸法の差で合否を見るため、見え方の差
+   * （知覚プロファイル）は P1113 以来「報告のみ」で合否に使われて
+   * こなかった。こちらは仕上げの3パラメータ（境界の混ぜ具合・
+   * 髪のツヤ・体の陰）を1つずつ摂動させ、描き直しの知覚
+   * プロファイルが目標に近づいた時だけ採用する（primitive の
+   * 山登りと diffvg の「描画結果を損失にする」の離散版）。
+   * 構造の照合が崩れる候補は採用しない。摂動で動かすのは
+   * 仕上げだけで、寸法・輪郭の補正には触らない。
+   */
+  public drillFinishParameters(start: PoseReading, maxRounds = 3): { initialScore: number; finalScore: number; improved: boolean; rounds: number; corrections: { blendAlpha: number; glossAdd: number; shadeK: number } } | null {
+    const target = this.getTarget();
+    if (!target || !start.head || !target.perceptual) return null;
+    if (start.profileKind === 'depth') return null;
+    type FC = { blendAlpha: number; glossAdd: number; shadeK: number };
+    const clamp = (c: FC): FC => ({
+      blendAlpha: Math.max(0, Math.min(0.6, c.blendAlpha)),
+      glossAdd: Math.max(0, Math.min(30, c.glossAdd)),
+      shadeK: Math.max(0, Math.min(0.25, c.shadeK)),
+    });
+    const scoreOf = (cand: FC): number | null => {
+      this.setFinishCorrections(cand);
+      const img = this.renderBodyStructured(start, 128, null, null, { backHair: true });
+      if (!img) return null;
+      try {
+        const wholeP = visualLikenessService.perceptualProfile(img, 128, 128);
+        const wholeD = visualLikenessService.comparePerceptual(target.perceptual!.whole, wholeP);
+        let score = Math.abs(wholeD.softRatio) + Math.abs(wholeD.darkFlatShare);
+        if (target.perceptual!.head) {
+          const re = this.analyzePose(img, 128, 128);
+          const hRegion = re ? visualLikenessService.headRegion(re, 128) : null;
+          if (hRegion) {
+            const headP = visualLikenessService.perceptualProfile(img, 128, 128, hRegion);
+            const headD = visualLikenessService.comparePerceptual(target.perceptual!.head, headP);
+            score += Math.abs(headD.softRatio) + Math.abs(headD.darkFlatShare);
+          }
+        }
+        return score;
+      } catch { return null; }
+    };
+    let best: FC = this.getFinishCorrections();
+    const first = scoreOf(best);
+    if (first === null) { this.setFinishCorrections(best); return null; }
+    let bestScore = first;
+    let rounds = 0;
+    const keys = ['blendAlpha', 'glossAdd', 'shadeK'] as const;
+    for (let round = 0; round < maxRounds; round++) {
+      rounds++;
+      let improvedRound = false;
+      for (const key of keys) {
+        for (const f of [1.3, 0.7]) {
+          const cand = clamp({ ...best, [key]: best[key] * f });
+          if (cand[key] === best[key]) continue;
+          const s = scoreOf(cand);
+          if (s === null) continue;
+          if (s < bestScore - 0.002) {
+            // 構造の守り：寸法・輪郭の照合が崩れる候補は採用しない
+            this.setFinishCorrections(cand);
+            const ver = this.verifyBodyStructured(start);
+            if (!ver?.verified) continue;
+            best = cand;
+            bestScore = s;
+            improvedRound = true;
+          }
+        }
+      }
+      this.setFinishCorrections(best);
+      if (!improvedRound) break;
+    }
+    this.setFinishCorrections(best);
+    return { initialScore: first, finalScore: bestScore, improved: bestScore < first - 0.002, rounds, corrections: best };
   }
 
   /**
