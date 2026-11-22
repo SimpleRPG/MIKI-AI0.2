@@ -802,6 +802,39 @@ const JOINT_CORRECTION_KEY = 'miki_visual_joint_corrections_v1';
 const OVERLAP_CORRECTION_KEY = 'miki_visual_overlap_corrections_v1';
 const FINISH_CORRECTION_KEY = 'miki_visual_finish_corrections_v1';
 
+/** P1158: 関節の骨格（読みから取り出した関節点。膝は未測定） */
+export interface PoseSkeleton1158 {
+  head: PosePoint | null;
+  shoulderL: PosePoint | null;
+  shoulderR: PosePoint | null;
+  elbowL: PosePoint | null;
+  elbowR: PosePoint | null;
+  handL: PosePoint | null;
+  handR: PosePoint | null;
+  hipL: PosePoint | null;
+  hipR: PosePoint | null;
+  footL: PosePoint | null;
+  footR: PosePoint | null;
+}
+
+/** P1158: 区間の向き（真下からのずれ、度。+は画像の右方向） */
+export interface PoseAngles1158 {
+  upperArmL: number | null;
+  upperArmR: number | null;
+  forearmL: number | null;
+  forearmR: number | null;
+  legL: number | null;
+  legR: number | null;
+}
+
+/** P1158: ポーズ指定（関節角度の増分、度） */
+export interface PoseSpec1158 {
+  armL?: { shoulderDeg?: number; elbowDeg?: number };
+  armR?: { shoulderDeg?: number; elbowDeg?: number };
+  legL?: { hipDeg?: number };
+  legR?: { hipDeg?: number };
+}
+
 /** P1001: 目標の素体（見本を測って保存したパラメータ） */
 export interface BodyTarget {
   profile: PoseReading['bodyProfile'];
@@ -1420,6 +1453,11 @@ class VisualPoseService {
       if (l === null || r === null) return null;
       return { l: (head.x + l * figHpArm) * (S - 1), r: (head.x + r * figHpArm) * (S - 1) };
     };
+    // P1158: 曲げた腕の区間を描く間だけ true になる。輪郭
+    // クランプ（P1078）は「立った姿の輪郭の外へ腕を出さない」
+    // ためのもので、意図して曲げた腕はポーズが居場所を決める
+    // ので、その区間と手はクランプを外して描く。
+    let segClampFree1158 = false;
     const stampArm = (cx: number, cy: number, r: number, c: [number, number, number]) => {
       if (!ctrArm) { stamp(cx, cy, r, c); return; }
       // 丸いスタンプは1つの筆の塊として扱い、中心の行の
@@ -1428,7 +1466,7 @@ class VisualPoseService {
       // 肩付近の肌の量が実物より減る（鎖骨の読みが落ちた）。
       // 縦幅いっぱいの最大幅で許すと、輪郭が急に広がる
       // 帯（面の広がり始め）で緩みすぎる。
-      const e = armEdgeAt(cy);
+      const e = segClampFree1158 ? null : armEdgeAt(cy);
       if (!e) { stamp(cx, cy, r, c); return; }
       // P1107: 縁の帯では下の色からブレンドして書く（二値の
       // スタンプは階段状の境界になって硬く見える）。スタンプが
@@ -1451,8 +1489,9 @@ class VisualPoseService {
         }
       }
     };
-    const seg = (a: { x: number; y: number } | null, b: { x: number; y: number } | null, gap = false) => {
+    const seg = (a: { x: number; y: number } | null, b: { x: number; y: number } | null, gap = false, clampFree = false) => {
       if (!a || !b) return;
+      segClampFree1158 = clampFree;
       const ax = a.x * (S - 1), ay = a.y * (S - 1), bx = b.x * (S - 1), by = b.y * (S - 1);
       const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay)));
       // P1030: 隙間がある腕は、肩の付け根から少しずつ外へ
@@ -1482,7 +1521,7 @@ class VisualPoseService {
       // stampArm 側のブレンドで担う。
       const stampArmRim = (cx: number, cy: number, r: number) => {
         for (let y = Math.max(0, Math.floor(cy - r)); y <= Math.min(S - 1, Math.ceil(cy + r)); y++) {
-          const e = ctrArm ? armEdgeAt(y) : null;
+          const e = ctrArm && !segClampFree1158 ? armEdgeAt(y) : null;
           for (let x = Math.max(0, Math.floor(cx - r)); x <= Math.min(S - 1, Math.ceil(cx + r)); x++) {
             const dist = Math.hypot(x - cx, y - cy);
             if (dist > r) continue;
@@ -1507,15 +1546,34 @@ class VisualPoseService {
         const sh = gapShift * Math.min(1, t / 0.22);
         stampArm(ax + (bx - ax) * t + dir * sh, ay + (by - ay) * t, Math.max(1.1, armR0 * (1.18 - 0.48 * t)), armCol);
       }
+      segClampFree1158 = false;
     };
-    seg(reading.shoulderL, handLUse, reading.armGap?.l === true);
-    seg(reading.shoulderR, handRUse, reading.armGap?.r === true);
+    // P1158: 肘が肩→手の直線から有意に外れている読み（曲がった
+    // 腕）は肩→肘→手の2区間で描く。真っ直ぐな腕は従来の1区間の
+    // まま（既存の描画を変えないための偏差ゲート）。
+    let bentArmL1158 = false;
+    let bentArmR1158 = false;
+    const drawArm1158 = (shoulder: PosePoint | null, elbow: PosePoint | null, hand: PosePoint | null, gap: boolean): boolean => {
+      if (!shoulder || !hand || !elbow) { seg(shoulder, hand, gap); return false; }
+      const dx = hand.x - shoulder.x, dy = hand.y - shoulder.y;
+      const len2 = dx * dx + dy * dy;
+      const t = len2 > 0 ? Math.max(0, Math.min(1, ((elbow.x - shoulder.x) * dx + (elbow.y - shoulder.y) * dy) / len2)) : 0;
+      const dev = Math.hypot(elbow.x - (shoulder.x + dx * t), elbow.y - (shoulder.y + dy * t));
+      if (dev > 0.02) { seg(shoulder, elbow, gap, true); seg(elbow, hand, gap, true); return true; }
+      seg(shoulder, hand, gap);
+      return false;
+    };
+    bentArmL1158 = drawArm1158(reading.shoulderL, reading.elbowL && jCorr ? { x: reading.elbowL.x + jCorr.handLx, y: reading.elbowL.y } : reading.elbowL ?? null, handLUse, reading.armGap?.l === true);
+    bentArmR1158 = drawArm1158(reading.shoulderR, reading.elbowR && jCorr ? { x: reading.elbowR.x + jCorr.handRx, y: reading.elbowR.y } : reading.elbowR ?? null, handRUse, reading.armGap?.r === true);
     // P1001: 手。腕の先に肌色の楕円＋指の分かれ目を描く。
     // P1016: 指の分かれ目は固定の赤茶でなく本人の肌色の影で
     // 描く（赤い爪のように見えないように）。
     const FINGER: [number, number, number] = deriveShadow(SKIN);
     for (const hand of [handLUse, handRUse]) {
       if (!hand) continue;
+      // P1158: 曲げた腕の手は輪郭クランプを外して描く（腕と同じ理由）。
+      const handBent1158 = hand === handLUse ? bentArmL1158 : bentArmR1158;
+      const edgeFor1158 = (yy: number): { l: number; r: number } | null => (handBent1158 ? null : armEdgeAt(yy));
       const gapH = hand === handLUse ? reading.armGap?.l === true : reading.armGap?.r === true;
       const hDir = hand.x >= cxN ? 1 : -1;
       const hx = hand.x * (S - 1) + (gapH ? hDir * (armR0 * 0.85 + 1.5) : 0), hy = hand.y * (S - 1);
@@ -1530,7 +1588,7 @@ class VisualPoseService {
       const rimH: [number, number, number] = [Math.round(SKIN[0] * 0.72), Math.round(SKIN[1] * 0.72), Math.round(SKIN[2] * 0.72)];
       const rimWH = Math.max(1.2, S * 0.006);
       for (let y = Math.round(hy - ry - rimWH); y <= Math.round(hy + ry + rimWH); y++) {
-        const he = armEdgeAt(y);
+        const he = edgeFor1158(y);
         for (let x = Math.round(hx - rx - rimWH); x <= Math.round(hx + rx + rimWH); x++) {
           if (he && (x < he.l - 0.5 || x > he.r + 0.5)) continue;
           if (((x - hx) / (rx + rimWH)) ** 2 + ((y - hy) / (ry + rimWH)) ** 2 > 1) continue;
@@ -1542,7 +1600,7 @@ class VisualPoseService {
         }
       }
       for (let y = Math.round(hy - ry); y <= Math.round(hy + ry); y++) {
-        const he = armEdgeAt(y);
+        const he = edgeFor1158(y);
         for (let x = Math.round(hx - rx); x <= Math.round(hx + rx); x++) {
           if (he && (x < he.l - 0.5 || x > he.r + 0.5)) continue;
           if (((x - hx) / rx) ** 2 + ((y - hy) / ry) ** 2 <= 1) set(x, y, SKIN);
@@ -1553,7 +1611,7 @@ class VisualPoseService {
       const inward = hx < cxN * (S - 1) ? 1 : -1;
       const tx = hx + inward * rx * 0.8, ty = hy - ry * 0.15, tr = Math.max(1, rx * 0.38);
       for (let y = Math.round(ty - tr); y <= Math.round(ty + tr); y++) {
-        const he = armEdgeAt(y);
+        const he = edgeFor1158(y);
         for (let x = Math.round(tx - tr); x <= Math.round(tx + tr); x++) {
           if (he && (x < he.l - 0.5 || x > he.r + 0.5)) continue;
           if (((x - tx) / tr) ** 2 + ((y - ty) / tr) ** 2 <= 1) set(x, y, SKIN);
@@ -4044,6 +4102,102 @@ class VisualPoseService {
     }
     this.setFinishCorrections(best);
     return { initialScore: first, finalScore: bestScore, improved: bestScore < first - 0.002, rounds, corrections: best };
+  }
+
+  /**
+   * P1158: 読みから関節の骨格を取り出す。膝は読みでは測って
+   * いないので含めない（推定で埋めない。ポーズ合成側では
+   * 脚を1区間として扱う）。
+   */
+  public skeletonOf(reading: PoseReading): PoseSkeleton1158 {
+    return {
+      head: reading.head ? { x: reading.head.x, y: reading.head.y } : null,
+      shoulderL: reading.shoulderL ?? null,
+      shoulderR: reading.shoulderR ?? null,
+      elbowL: reading.elbowL ?? null,
+      elbowR: reading.elbowR ?? null,
+      handL: reading.handL ?? null,
+      handR: reading.handR ?? null,
+      hipL: reading.hipL ?? null,
+      hipR: reading.hipR ?? null,
+      footL: reading.footL ?? null,
+      footR: reading.footR ?? null,
+    };
+  }
+
+  /**
+   * P1158: 各区間の向きを「真下から何度ずれたか」で表す
+   * （0=真下、+90=画像の右方向、-90=左方向）。描画が使う
+   * 正規化座標のまま測る（描く側と物差しを揃える）。
+   */
+  public poseAnglesOf(reading: PoseReading): PoseAngles1158 {
+    const ang = (a: PosePoint | null | undefined, b: PosePoint | null | undefined): number | null => {
+      if (!a || !b) return null;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      if (Math.hypot(dx, dy) < 1e-9) return null;
+      return (Math.atan2(dx, dy) * 180) / Math.PI;
+    };
+    return {
+      upperArmL: ang(reading.shoulderL, reading.elbowL ?? reading.handL),
+      upperArmR: ang(reading.shoulderR, reading.elbowR ?? reading.handR),
+      forearmL: reading.elbowL ? ang(reading.elbowL, reading.handL) : null,
+      forearmR: reading.elbowR ? ang(reading.elbowR, reading.handR) : null,
+      legL: ang(reading.hipL, reading.footL),
+      legR: ang(reading.hipR, reading.footR),
+    };
+  }
+
+  /**
+   * P1158: ポーズ指定（関節角度の増分）を読んだ形へ適用し、
+   * 描画用の新しい読みを返す。角度は poseAnglesOf と同じ
+   * 「真下からのずれ」の度数で、shoulderDeg/hipDeg は区間
+   * 全体の回転、elbowDeg は上腕に対する前腕の追加の折れ。
+   * 肘が無い読みで elbowDeg を指定した場合は、腕の中点を
+   * 肘として折る（これは測定ではなくポーズの指定）。
+   * 脚はこの段では1区間（膝の折れは次段）。説明文などの
+   * 記述フィールドは元の読みのまま（ポーズは描く時の変換）。
+   */
+  public withPose(reading: PoseReading, spec: PoseSpec1158): PoseReading {
+    const out: PoseReading = { ...reading };
+    const dist = (a: PosePoint, b: PosePoint): number => Math.hypot(b.x - a.x, b.y - a.y);
+    const place = (from: PosePoint, baseAngDeg: number, len: number): PosePoint => {
+      const rad = (baseAngDeg * Math.PI) / 180;
+      return { x: from.x + Math.sin(rad) * len, y: from.y + Math.cos(rad) * len };
+    };
+    const angOf = (a: PosePoint, b: PosePoint): number => (Math.atan2(b.x - a.x, b.y - a.y) * 180) / Math.PI;
+    const doArm = (side: 'L' | 'R', s?: { shoulderDeg?: number; elbowDeg?: number }): void => {
+      if (!s) return;
+      const sd = s.shoulderDeg ?? 0;
+      const ed = s.elbowDeg ?? 0;
+      if (sd === 0 && ed === 0) return;
+      const sh = side === 'L' ? reading.shoulderL : reading.shoulderR;
+      const el = (side === 'L' ? reading.elbowL : reading.elbowR) ?? null;
+      const ha = side === 'L' ? reading.handL : reading.handR;
+      if (!sh || !ha) return;
+      const total = dist(sh, ha);
+      if (total < 1e-9) return;
+      const l1 = el ? dist(sh, el) : total / 2;
+      const l2 = el ? dist(el, ha) : total / 2;
+      const mid: PosePoint = el ?? { x: sh.x + (ha.x - sh.x) * (l1 / total), y: sh.y + (ha.y - sh.y) * (l1 / total) };
+      const upperAng = angOf(sh, mid) + sd;
+      const el2 = place(sh, upperAng, l1);
+      const foreAng = angOf(mid, ha) + sd + ed;
+      const ha2 = place(el2, foreAng, l2);
+      if (side === 'L') { out.elbowL = el2; out.handL = ha2; } else { out.elbowR = el2; out.handR = ha2; }
+    };
+    const doLeg = (side: 'L' | 'R', s?: { hipDeg?: number }): void => {
+      if (!s || !s.hipDeg) return;
+      const hip = (side === 'L' ? reading.hipL : reading.hipR) ?? null;
+      const foot = side === 'L' ? reading.footL : reading.footR;
+      if (!hip || !foot) return;
+      const f2 = place(hip, angOf(hip, foot) + s.hipDeg, dist(hip, foot));
+      if (side === 'L') out.footL = f2; else out.footR = f2;
+    };
+    doArm('L', spec.armL);
+    doArm('R', spec.armR);
+    doLeg('L', spec.legL);
+    doLeg('R', spec.legR);
+    return out;
   }
 
   /**

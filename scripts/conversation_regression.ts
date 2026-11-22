@@ -11400,6 +11400,40 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   svc1157.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
 }
 
+// ---- P1158: 関節ポーズ層（骨格・角度・withPose・肘の2区間描画） ----
+{
+  const svc1158 = poseSvc() as any;
+  const img1158 = paleLongHair48();
+  const r1158 = svc1158.analyzePose(img1158, 48, 56);
+  svc1158.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+  const sk1158 = r1158 ? svc1158.skeletonOf(r1158) : null;
+  const ang1158 = r1158 ? svc1158.poseAnglesOf(r1158) : null;
+  check('P1158 骨格が取れて真っ直ぐな腕に肘を捏造しない', !!sk1158 && !!sk1158.shoulderL && !!sk1158.shoulderR && !!sk1158.handL && !!sk1158.handR && !!sk1158.footL && !!sk1158.footR && !!ang1158 && typeof ang1158.upperArmL === 'number' && typeof ang1158.upperArmR === 'number' && ang1158.forearmL === null && ang1158.forearmR === null, JSON.stringify(ang1158));
+  const bent1158 = r1158 ? svc1158.withPose(r1158, { armL: { elbowDeg: -55 }, legL: { hipDeg: 20 } }) : null;
+  const angB1158 = bent1158 ? svc1158.poseAnglesOf(bent1158) : null;
+  const rt1158 = r1158 ? svc1158.withPose(r1158, {}) : null;
+  const hipFoot1158 = (r: any): number | null => (r?.hipL && r?.footL ? Math.hypot(r.footL.x - r.hipL.x, r.footL.y - r.hipL.y) : null);
+  const d0 = hipFoot1158(r1158), d1 = hipFoot1158(bent1158);
+  check('P1158 withPoseの角度指定がそのまま角度になり脚の長さが保たれる', !!bent1158 && !!angB1158 && typeof angB1158.forearmL === 'number' && Math.abs((angB1158.forearmL as number) - ((ang1158?.upperArmL ?? 0) - 55)) < 1.0 && typeof angB1158.legL === 'number' && typeof ang1158?.legL === 'number' && Math.abs((angB1158.legL as number) - (ang1158.legL as number) - 20) < 1.0 && d0 !== null && d1 !== null && Math.abs(d1 - d0) < 1e-6 && !!rt1158 && rt1158.handL?.x === r1158?.handL?.x && rt1158.handL?.y === r1158?.handL?.y, JSON.stringify({ f: angB1158?.forearmL, l: angB1158?.legL, d0, d1 }));
+  const flat0_1158 = r1158 ? svc1158.renderBodyStructured(r1158, 128, null, null, { backHair: true }) : null;
+  const bentArmOnly1158 = r1158 ? svc1158.withPose(r1158, { armL: { elbowDeg: -55 } }) : null;
+  const flatB1158 = bentArmOnly1158 ? svc1158.renderBodyStructured(bentArmOnly1158, 128, null, null, { backHair: true }) : null;
+  let diff1158 = -1, diffHand1158 = -1, diffFeet1158 = -1;
+  if (flat0_1158 && flatB1158 && bentArmOnly1158) {
+    diff1158 = 0; diffHand1158 = 0; diffFeet1158 = 0;
+    const hx = bentArmOnly1158.handL.x * 127, hy = bentArmOnly1158.handL.y * 127;
+    for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+      const i = (y * 128 + x) * 4;
+      if (flat0_1158[i] === flatB1158[i] && flat0_1158[i + 1] === flatB1158[i + 1] && flat0_1158[i + 2] === flatB1158[i + 2]) continue;
+      diff1158++;
+      if (Math.hypot(x - hx, y - hy) <= 8) diffHand1158++;
+      if (Math.hypot(x - 64, y - 122) <= 10) diffFeet1158++;
+    }
+  }
+  check('P1158 曲げた腕が指定位置に描かれ差分が腕に局所化する', diff1158 > 200 && diff1158 < 9000 && diffHand1158 >= 20 && diffFeet1158 <= 4, JSON.stringify({ diff1158, diffHand1158, diffFeet1158 }));
+  svc1158.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
