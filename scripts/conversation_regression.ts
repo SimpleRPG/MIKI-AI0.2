@@ -11034,7 +11034,7 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     const { evidenceService } = await import('../src/miki/memory/services/evidenceService');
     const { verifierService } = await import('../src/miki/verification/services/verifierService');
     const stmt1136 = '検証対象の文サンプル1136は十分な長さを持つ事実の文です。';
-    const evA1136 = evidenceService.recordWebEvidence({ title: 'src A', snippet: '出典Aの抜粋テキストです。', source: 'docs-a', url: 'https://a-docs.example.net/p1136', sourceId: 'src-a-1136', independenceClusterId: 'cluster-a-1136' });
+    const evA1136 = evidenceService.recordWebEvidence({ title: 'src A', snippet: '検証対象についての出典Aの抜粋テキストです。', source: 'docs-a', url: 'https://a-docs.example.net/p1136', sourceId: 'src-a-1136', independenceClusterId: 'cluster-a-1136' });
     const claim1136 = evidenceService.registerUnverifiedClaim(evA1136.evidence_id, stmt1136);
     check('P1136 テスト用Claimが作れる', Boolean(claim1136), `claim=${claim1136}`);
     if (claim1136) {
@@ -11042,7 +11042,7 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
       evidenceService.attachEvidenceToClaim(loc1136.evidence_id, claim1136);
       const vLocal1136 = verifierService.verifyClaim({ claimId: claim1136 });
       check('P1136 LOCAL証拠は独立クラスタに数えない', vLocal1136.independentEvidenceCount === 1 && vLocal1136.outcome !== 'SUPPORTED', `ind=${vLocal1136.independentEvidenceCount} outcome=${vLocal1136.outcome}`);
-      const evB1136 = evidenceService.recordWebEvidence({ title: 'src B', snippet: '出典Bの抜粋テキストです。', source: 'docs-b', url: 'https://b-docs.example.net/p1136', sourceId: 'src-b-1136', independenceClusterId: 'cluster-b-1136' });
+      const evB1136 = evidenceService.recordWebEvidence({ title: 'src B', snippet: '検証対象についての出典Bの抜粋テキストです。', source: 'docs-b', url: 'https://b-docs.example.net/p1136', sourceId: 'src-b-1136', independenceClusterId: 'cluster-b-1136' });
       evidenceService.attachEvidenceToClaim(evB1136.evidence_id, claim1136);
       const vWeb1136 = verifierService.verifyClaim({ claimId: claim1136 });
       check('P1136 Web証拠2クラスタで従来どおり昇格する', vWeb1136.outcome === 'SUPPORTED' && vWeb1136.independentEvidenceCount === 2, `ind=${vWeb1136.independentEvidenceCount} outcome=${vWeb1136.outcome}`);
@@ -11174,6 +11174,28 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     ], { queryText: '光合成の仕組み' });
     check('P1143 出典の格が先・同じ格では関連度順', ordered1143[0].url.includes('go.jp') && ordered1143[1].url.includes('high') && ordered1143[2].url.includes('low'), ordered1143.map(r => r.url).join(','));
     check('P1143 技術系の検索文では言語指定を付けない', detectSearxngLanguage1142('TypeScriptの型推論の実装方法') === undefined && detectSearxngLanguage1142('光合成の仕組み') === 'ja', '');
+  }
+
+// ---- P1144: 検証の関連性（主張の要の語を含む証拠だけを昇格に数える） ----
+  {
+    const { evidenceService } = await import('../src/miki/memory/services/evidenceService');
+    const { verifierService, claimAnchorTerms1144, evidenceRelevantToClaim1144 } = await import('../src/miki/verification/services/verifierService');
+    check('P1144 主張から要の語が抜ける', claimAnchorTerms1144('光合成は葉緑体で二酸化炭素と水から糖を作る反応である').includes('光合成'), claimAnchorTerms1144('光合成は葉緑体で二酸化炭素と水から糖を作る反応である').join(','));
+    check('P1144 関連性判定: 要の語を含む証拠だけ関連あり', evidenceRelevantToClaim1144({ title: '植物の光合成', snippet: '葉緑体で起きる' }, ['光合成']) === true && evidenceRelevantToClaim1144({ title: '天気予報', snippet: '各地の気温' }, ['光合成']) === false && evidenceRelevantToClaim1144({ title: 'x', snippet: 'y' }, []) === true, '');
+    const stmt1144 = '光合成は葉緑体で二酸化炭素と水から糖を作る反応である';
+    const evA1144 = evidenceService.recordWebEvidence({ title: '光合成の基礎', snippet: '光合成は葉緑体で行われ、二酸化炭素と水から糖を作る。', source: 'docs-a', url: 'https://a-docs.example.net/p1144', sourceId: 'src-a-1144', independenceClusterId: 'cluster-a-1144' });
+    const claim1144 = evidenceService.registerUnverifiedClaim(evA1144.evidence_id, stmt1144);
+    check('P1144 テスト用Claimが作れる', Boolean(claim1144), `claim=${claim1144}`);
+    if (claim1144) {
+      const evIrrelevant1144 = evidenceService.recordWebEvidence({ title: '天気予報', snippet: '今日は各地で気温が上がり、晴れ間が広がりました。', source: 'docs-w', url: 'https://w-docs.example.net/p1144', sourceId: 'src-w-1144', independenceClusterId: 'cluster-w-1144' });
+      evidenceService.attachEvidenceToClaim(evIrrelevant1144.evidence_id, claim1144);
+      const vMixed1144 = verifierService.verifyClaim({ claimId: claim1144 });
+      check('P1144 無関係な証拠はクラスタに数えない', vMixed1144.outcome !== 'SUPPORTED' && vMixed1144.independentEvidenceCount === 1, `ind=${vMixed1144.independentEvidenceCount} outcome=${vMixed1144.outcome}`);
+      const evC1144 = evidenceService.recordWebEvidence({ title: '葉緑体の働き', snippet: '葉緑体では光合成により糖が作られる。', source: 'docs-c', url: 'https://c-docs.example.net/p1144', sourceId: 'src-c-1144', independenceClusterId: 'cluster-c-1144' });
+      evidenceService.attachEvidenceToClaim(evC1144.evidence_id, claim1144);
+      const vOk1144 = verifierService.verifyClaim({ claimId: claim1144 });
+      check('P1144 関連する証拠2クラスタで昇格する', vOk1144.outcome === 'SUPPORTED' && vOk1144.independentEvidenceCount === 2, `ind=${vOk1144.independentEvidenceCount} outcome=${vOk1144.outcome}`);
+    }
   }
 
 // ---- 結果 ----

@@ -34,6 +34,35 @@ export interface VerificationResult {
   trustedVerifierAttested: boolean;
 }
 
+/*
+ * P1144: 主張の要の語（アンカー語）の抽出と、証拠の関連性判定。
+ * これまでの昇格判定は、主張に紐づいた証拠のクラスタ数だけを
+ * 数えていて、その証拠が本当にその主張を裏付ける内容かを見て
+ * いなかった（調査で集めた証拠が全部くっつくと、無関係な出典
+ * でも数がそろってしまう）。WEB / DOCUMENT 証拠については、
+ * 主張の要の語が証拠の本文（タイトル・抜粋・要約）に含まれる
+ * ものだけを、昇格の数えに入れる。
+ */
+export function claimAnchorTerms1144(statement: string): string[] {
+  const text = String(statement || '');
+  const chunks = text
+    .replace(/[「」『』（）()【】]/g, ' ')
+    .split(/[\sのをにへがはとや、。・:：/／|]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 3);
+  const ascii = text.match(/[A-Za-z][A-Za-z0-9_.-]{2,}/g) || [];
+  return [...new Set([...chunks, ...ascii])].slice(0, 8);
+}
+
+export function evidenceRelevantToClaim1144(
+  evidence: { title?: string; snippet?: string; metadata?: { result_summary?: string } },
+  anchorTerms: string[],
+): boolean {
+  if (anchorTerms.length === 0) return true;
+  const haystack = `${evidence.title || ''} ${evidence.snippet || ''} ${evidence.metadata?.result_summary || ''}`.toLowerCase();
+  return anchorTerms.some((term) => haystack.includes(term.toLowerCase()));
+}
+
 /**
  * Evidence -> verification boundary.
  *
@@ -88,16 +117,26 @@ export class VerifierService {
     // P481: ペア解消の判断証拠（pair_dissolution）は真偽の証拠ではない
     // ため、反証と同じく裏付けの数えから外す。
     const admissible = evidence.filter((e) => e.status === 'ADMISSIBLE' && e.metadata?.research_source_role !== 'COUNTEREVIDENCE' && e.metadata?.pair_dissolution !== true);
+    // P1144: WEB / DOCUMENT 証拠は、主張の要の語を含むものだけを
+    // 昇格の数えに入れる（関連性ゲート）。実行証拠・教師証言・
+    // ユーザー証拠など他の種別は従来どおり数える。要の語が
+    // 抽出できない主張ではゲートは素通り（判定材料が無い）。
+    const anchorTerms = claimAnchorTerms1144(claim.statement);
+    const relevantAdmissible = admissible.filter((e) =>
+      e.kind !== 'WEB' && e.kind !== 'DOCUMENT'
+        ? true
+        : evidenceRelevantToClaim1144(e, anchorTerms),
+    );
     // P1136: LOCAL_CLAIM 証拠は「自分の知識ベースに既にあった」という
     // 照合結果であり、外部からの独立した裏付けではない。独立クラスタ
     // 数には数えない（昇格の根拠から外す）。証拠件数や鮮度判定には
     // 従来どおり含める。
-    const independentClusters = new Set(admissible.filter((e) => e.kind !== 'LOCAL_CLAIM').map((e) => e.independence_cluster_id));
+    const independentClusters = new Set(relevantAdmissible.filter((e) => e.kind !== 'LOCAL_CLAIM').map((e) => e.independence_cluster_id));
     // P463: 一次資料の判定接続。収集ポリシーでは一次資料が必須でも、
     // 判定段の昇格条件には入っていなかった。証拠全件に役割が明示されて
     // いる場合（研究経由）に限り、一次・公式情報なしでは確定しない。
     // 役割が未記録の証拠が混ざる経路は従来どおり（クラスタ数で判定）。
-    const hasPrimaryOrOfficialSource = admissible.some((e) => {
+    const hasPrimaryOrOfficialSource = relevantAdmissible.some((e) => {
       const role = e.metadata?.research_source_role;
       return role === 'PRIMARY' || role === 'OFFICIAL';
     });
@@ -155,6 +194,10 @@ export class VerifierService {
       claimDatabaseService.setVerificationStatus(claim.claim_id, 'SUPPORTED', 'Verifier: independent evidence');
     } else {
       reasons.push(`独立証拠クラスターが${independentClusters.size}件しかありません。SUPPORTEDには2件以上必要です。`);
+    }
+
+    if (relevantAdmissible.length < admissible.length) {
+      reasons.push(`主張の要の語を含まない証拠${admissible.length - relevantAdmissible.length}件を、昇格の数えから外しました。`);
     }
 
     const promoted = outcome === 'SUPPORTED' || outcome === 'DEVICE_VERIFIED';
