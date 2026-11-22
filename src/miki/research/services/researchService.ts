@@ -584,13 +584,16 @@ export class ResearchService {
     // P473: この研究の錨語。質問・gap の対象・不足内容・焦点スロット
     // から抽出する。派生クエリの語や、取得したページの語彙は含めない
     // （含めると「読んだページの言葉」が錨になって漂流が止まらない）。
-    const anchorTerms = this.extractAnchorTerms(
+    // P1145: 錨語に翻訳対応語も足す。英語のページから抜いた文が、
+    // 日本語の錨だけでは関門を通れず捨てられていたため。錨の核は
+    // あくまで元の語で、対応語は照合の幅としてだけ足す。
+    const anchorTerms = lexicalRelationService.expandTermsBilingual(this.extractAnchorTerms(
       baseQuery,
       gap.identity?.target || '',
       gap.identity?.missingContent || '',
       (options?.gapFocus?.slotNames || []).join(' '),
       (options?.gapFocus?.targetPaths || []).join(' '),
-    );
+    ), 16);
     /*
      * P0: 固定3回を最終仕様にしない。
      * 1回の呼び出しには安全な実行上限を置くが、adaptive=trueなら

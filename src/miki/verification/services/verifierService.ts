@@ -4,6 +4,7 @@ import { evidenceService, EvidenceRecord } from '../../../services/evidenceServi
 import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { claimVerificationEventService } from './claimVerificationEventService';
+import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
 
 // P440 D5: 勉強の測定値の置き場所（reusableComponentFactoryService・
 // domainIntegrationBootstrapService・researchService と同じキー・同じ形）。
@@ -121,7 +122,10 @@ export class VerifierService {
     // 昇格の数えに入れる（関連性ゲート）。実行証拠・教師証言・
     // ユーザー証拠など他の種別は従来どおり数える。要の語が
     // 抽出できない主張ではゲートは素通り（判定材料が無い）。
-    const anchorTerms = claimAnchorTerms1144(claim.statement);
+    // P1145: 要の語は翻訳対応語でも展開する。日本語の主張に
+    // 英語の証拠が付いた場合でも、対応する英語の語で関連を
+    // 判定できるようにするため。
+    const anchorTerms = lexicalRelationService.expandTermsBilingual(claimAnchorTerms1144(claim.statement), 16);
     const relevantAdmissible = admissible.filter((e) =>
       e.kind !== 'WEB' && e.kind !== 'DOCUMENT'
         ? true

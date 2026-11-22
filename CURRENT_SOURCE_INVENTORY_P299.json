@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4955,
-    "resolvedRelativeImportCandidateCount": 4937,
+    "relativeImportCandidateCount": 4961,
+    "resolvedRelativeImportCandidateCount": 4943,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 944148,
-      "lines": 11214,
-      "sha256": "6e72ad139c7f3db9298250bdc05736ba5ae452c3afc65b67a048362d6d010ca7",
+      "bytes": 947269,
+      "lines": 11238,
+      "sha256": "acad564451216bc297d46df5eb1797685a602af5e7730c411aa4f0277197e6f8",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5604,10 +5604,34 @@
           "specifier": "../src/miki/verification/services/verifierService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/verifierService.ts"
+        },
+        {
+          "line": 11203,
+          "specifier": "../src/miki/memory/services/lexicalRelationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
+        },
+        {
+          "line": 11208,
+          "specifier": "../src/miki/research/services/sourcePageGraphService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/sourcePageGraphService.ts"
+        },
+        {
+          "line": 11211,
+          "specifier": "../src/miki/memory/services/evidenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/evidenceService.ts"
+        },
+        {
+          "line": 11212,
+          "specifier": "../src/miki/verification/services/verifierService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/verification/services/verifierService.ts"
         }
       ],
-      "relativeImportCandidateCount": 648,
-      "resolvedRelativeImportCount": 646,
+      "relativeImportCandidateCount": 652,
+      "resolvedRelativeImportCount": 650,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -29711,9 +29735,9 @@
     },
     {
       "path": "src/miki/memory/services/lexicalRelationService.ts",
-      "bytes": 34592,
-      "lines": 798,
-      "sha256": "091faa5919f7b2ed2688af3002be0bfc1016109f4b2fb4cdea669c968fc0b471",
+      "bytes": 36516,
+      "lines": 848,
+      "sha256": "2e5e22453098000b8a653cab56e5261ccd67908675518f4b4e5125d03a2ee956",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31683,9 +31707,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 88601,
-      "lines": 1611,
-      "sha256": "f0ad08e280df10fe12c44abe2bffa60cdf7984509e1217f178c98a208ec26253",
+      "bytes": 88921,
+      "lines": 1614,
+      "sha256": "d88ce369a27c611475f99c1f156535dc205288b6e2c7eee56baea506d6b04237",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -32026,9 +32050,9 @@
     },
     {
       "path": "src/miki/research/services/sourcePageGraphService.ts",
-      "bytes": 10302,
-      "lines": 277,
-      "sha256": "1448a84e24499e5edeb7bf8804dbee30312e82353ec012e1ddd15e230c91ddde",
+      "bytes": 10836,
+      "lines": 283,
+      "sha256": "1bcf998823b0a885d47641e806cca3350e1905fa4b8bd26f44927fa6db6d4ebc",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -32059,10 +32083,16 @@
           "specifier": "../../conversation/services/japaneseAnalysisCompositionService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/japaneseAnalysisCompositionService.ts"
+        },
+        {
+          "line": 6,
+          "specifier": "../../memory/services/lexicalRelationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 5,
-      "resolvedRelativeImportCount": 5,
+      "relativeImportCandidateCount": 6,
+      "resolvedRelativeImportCount": 6,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -43640,9 +43670,9 @@
     },
     {
       "path": "src/miki/verification/services/verifierService.ts",
-      "bytes": 15310,
-      "lines": 333,
-      "sha256": "cf69a7dd7ed7cbcfd990018eff6d6cb4bb4a16b40b040e46ea45d759eb86dac8",
+      "bytes": 15663,
+      "lines": 337,
+      "sha256": "035093f532c8cee47f7059acf4d2c1d91625606ffc1dbaf00b0d326e9861a4f1",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -43679,10 +43709,16 @@
           "specifier": "./claimVerificationEventService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/verification/services/claimVerificationEventService.ts"
+        },
+        {
+          "line": 7,
+          "specifier": "../../memory/services/lexicalRelationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 7,
+      "resolvedRelativeImportCount": 7,
       "unresolvedRelativeImportCount": 0
     },
     {

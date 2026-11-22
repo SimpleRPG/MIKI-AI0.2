@@ -3,6 +3,7 @@ import { systemLogger} from '../../../services/systemLogger';
 import { canonicalSha256Object} from '../../core/services/canonicalSha256Service';
 import { contentTermsFromTokens} from './japaneseAnalysisService';
 import { japaneseAnalysisCompositionService} from '../../conversation/services/japaneseAnalysisCompositionService';
+import { lexicalRelationService} from '../../memory/services/lexicalRelationService';
 
 export type SourcePageStatementKind = 'SENTENCE' | 'LIST_ITEM' | 'TABLE_ROW';
 
@@ -114,7 +115,7 @@ const isList = /^[・･\-*＊●○]/.test(line);
 const isTable =!isList && (line.includes('｜') || line.includes('\t') || (line.match(/\|/g) || []).length >= 2);
 const units = isList || isTable
 ? [line.replace(/^[・･\-*＊●○]\s*/, '')]
-: line.split(/(?<=[。！？])/);
+: line.split(/(?<=[。！？])|(?<=[.?!])\s+/);
 for (const unitRaw of units) {
 const statementText = unitRaw.trim();
 const key = normalizeKey(statementText);
@@ -217,11 +218,16 @@ this.save();
 }
 
 public relevantStatements(graph: SourcePageGraph, questionTerms: string[]): SourcePageRelevantStatement[] {
-const terms = [...new Set((questionTerms || []).filter(Boolean))];
+// P1145: 質問の語を翻訳対応語で展開してから照合する。英語の
+// ページでも、日本語の問いの語と対応する英語の語で文が拾える。
+// 英字の語は大文字小文字を区別しない。
+const terms = [...new Set(lexicalRelationService.expandTermsBilingual((questionTerms || []).filter(Boolean)))];
+const termHit = (text: string, term: string): boolean =>
+/^[A-Za-z]/.test(term)? text.toLowerCase().includes(term.toLowerCase()): text.includes(term);
 const sectionById = new Map(graph.sections.map((section) => [section.id, section]));
 const scored = graph.statements.map((statement) => {
 const section = sectionById.get(statement.sectionId);
-const statementHits = terms.filter((term) => statement.text.includes(term)).length;
+const statementHits = terms.filter((term) => termHit(statement.text, term)).length;
 const sectionHits = section? terms.filter((term) => section.contentTerms.includes(term)).length: 0;
 return {
 text: statement.text,

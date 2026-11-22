@@ -11198,6 +11198,30 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     }
   }
 
+// ---- P1145: 読む段の日英の橋（翻訳対応語で照合する） ----
+  {
+    const { lexicalRelationService } = await import('../src/miki/memory/services/lexicalRelationService');
+    lexicalRelationService.addRelation('光合成', 'photosynthesis', 'TRANSLATION', 'manual');
+    check('P1145 翻訳対応語が双方向に引ける', lexicalRelationService.translationCounterpartsOf('光合成').includes('photosynthesis') && lexicalRelationService.translationCounterpartsOf('photosynthesis').includes('光合成'), lexicalRelationService.translationCounterpartsOf('光合成').join(','));
+    const expanded1145 = lexicalRelationService.expandTermsBilingual(['光合成']);
+    check('P1145 展開で両言語の語がそろう', expanded1145.includes('光合成') && expanded1145.includes('photosynthesis'), expanded1145.join(','));
+    const { sourcePageGraphService } = await import('../src/miki/research/services/sourcePageGraphService');
+    const built1145 = sourcePageGraphService.buildFromPage({ url: 'https://example.net/p1145', title: 'Photosynthesis basics', text: 'Photosynthesis is the process by which plants convert sunlight into energy. The weather today is sunny and warm across the region.', questionTerms: ['光合成'] });
+    check('P1145 英語ページから対応する文が拾える', built1145.relevantStatements.length > 0 && built1145.relevantStatements[0].text.toLowerCase().includes('photosynthesis') && !built1145.relevantStatements[0].text.toLowerCase().includes('weather'), `n=${built1145.relevantStatements.length} top=${built1145.relevantStatements[0]?.text || ''}`);
+    const { evidenceService } = await import('../src/miki/memory/services/evidenceService');
+    const { verifierService } = await import('../src/miki/verification/services/verifierService');
+    const stmt1145 = '光合成は植物が光のエネルギーを使って栄養を作る働きである';
+    const evA1145 = evidenceService.recordWebEvidence({ title: 'Photosynthesis', snippet: 'Photosynthesis takes place in chloroplasts, converting carbon dioxide and water into sugars.', source: 'docs-en-a', url: 'https://en-a.example.net/p1145', sourceId: 'src-en-a-1145', independenceClusterId: 'cluster-en-a-1145' });
+    const claim1145 = evidenceService.registerUnverifiedClaim(evA1145.evidence_id, stmt1145);
+    check('P1145 テスト用Claimが作れる', Boolean(claim1145), `claim=${claim1145}`);
+    if (claim1145) {
+      const evB1145 = evidenceService.recordWebEvidence({ title: 'Chloroplast', snippet: 'In photosynthesis, chloroplasts capture light energy for the plant cell.', source: 'docs-en-b', url: 'https://en-b.example.net/p1145', sourceId: 'src-en-b-1145', independenceClusterId: 'cluster-en-b-1145' });
+      evidenceService.attachEvidenceToClaim(evB1145.evidence_id, claim1145);
+      const v1145 = verifierService.verifyClaim({ claimId: claim1145 });
+      check('P1145 日本語の主張に英語の証拠2つで昇格する', v1145.outcome === 'SUPPORTED' && v1145.independentEvidenceCount === 2, `ind=${v1145.independentEvidenceCount} outcome=${v1145.outcome}`);
+    }
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

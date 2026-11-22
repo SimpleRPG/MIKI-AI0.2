@@ -457,6 +457,56 @@ class LexicalRelationService {
     return undefined;
   }
 
+  /**
+   * P1145: 1語の翻訳対応語（双方向）を返す。TRANSLATION 関係の
+   * 相手側と、意味に付いた英語ラベル（enLabel、逆引き含む）を
+   * 見る。読んだページが英語でも、知っている日本語の語に
+   * 錨を下ろせるようにするための橋。
+   */
+  public translationCounterpartsOf(termRaw: string): string[] {
+    this.load();
+    const term = String(termRaw || '').trim();
+    if (!term) return [];
+    const out: string[] = [];
+    const push = (v?: string) => {
+      const t = String(v || '').trim();
+      if (t && t !== term && !out.includes(t)) out.push(t);
+    };
+    const latin = /^[A-Za-z]/.test(term);
+    for (const rel of this.relations) {
+      if (rel.type !== 'TRANSLATION') continue;
+      if (rel.a === term) push(rel.b);
+      else if (rel.b === term) push(rel.a);
+      else if (latin && rel.a.toLowerCase() === term.toLowerCase()) push(rel.b);
+      else if (latin && rel.b.toLowerCase() === term.toLowerCase()) push(rel.a);
+    }
+    for (const sense of this.sensesOf(term)) push(sense.enLabel);
+    if (latin) {
+      for (const sense of this.senses) {
+        if (sense.enLabel && sense.enLabel.toLowerCase() === term.toLowerCase()) push(sense.term);
+      }
+    }
+    return out.slice(0, 4);
+  }
+
+  /**
+   * P1145: 語の集合に翻訳対応語を足して返す（元の語が先）。
+   * ページの文・証拠との照合に使う共有の展開。
+   */
+  public expandTermsBilingual(terms: string[], cap = 24): string[] {
+    const out: string[] = [];
+    const push = (v: string) => {
+      const t = String(v || '').trim();
+      if (t && !out.includes(t)) out.push(t);
+    };
+    for (const term of terms || []) push(term);
+    for (const term of terms || []) {
+      for (const cp of this.translationCounterpartsOf(term)) push(cp);
+      if (out.length >= cap) break;
+    }
+    return out.slice(0, cap);
+  }
+
   /** テキスト中の略語（または正式名称）をもう一方に置き換えた文。 */
   public abbreviationVariantOf(textRaw: string): string | undefined {
     this.load();
