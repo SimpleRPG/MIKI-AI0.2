@@ -450,6 +450,36 @@ export class AutonomousEvolutionService {
   }> {
     const targetCat = syntheticDataService.detectWeaknessCategory().targetCategory;
 
+    // P1155: コード隣接カテゴリ（math / json_transform / string_manipulation）は
+    // 合成ドリル（式＋仕様の混合練習セッション）が実行器として接続済み。
+    // 採点は機械実行（ケース照合）なので、自己申告ではない独立評価になる。
+    // 解けた課題は部品登録され、練習がそのまま彼女の部品カタログを増やす。
+    const CODE_ADJACENT_CATEGORIES: ReadonlyArray<string> = ['math', 'json_transform', 'string_manipulation'];
+    if (CODE_ADJACENT_CATEGORIES.includes(targetCat) && !signal?.aborted) {
+      try {
+        const { compositionDrillService } = await import('../../selfDevelopment/services/compositionDrillService');
+        const session = await compositionDrillService.runPracticeSession(this.reports.length, 4, true);
+        if (session.generated > 0) {
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `コード練習セッション実行: ${session.solved}/${session.generated} 解決（式 ${session.expressionSolved}・仕様 ${session.specSolved}）, 部品登録 ${session.registered} 件`
+          );
+          return {
+            category: targetCat,
+            totalDrills: session.generated,
+            score: session.solved / session.generated,
+            results: session.results.map((r) => ({
+              topic: `${r.kind}:${r.taskId}`,
+              passed: r.solved,
+              score: r.solved ? 1 : 0,
+            })),
+          };
+        }
+      } catch (err: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', 'コード練習セッションをスキップ:', err?.message || err);
+      }
+    }
+
     if (!signal?.aborted) {
       systemLogger.info(
         'SELF_IMPROVEMENT',

@@ -201,6 +201,50 @@ class CompositionDrillService {
     }
     return { generated: tasks.length, solved, results };
   }
+
+  /**
+   * P1155: 練習セッション（混合ローテーション）。式の課題と仕様の課題を
+   * 交互に回す1周分。自動セッション（式のみ）・仕様セッション（言葉のみ）を
+   * 1つの入口に束ね、アイドル進化サイクルの熟達ドリルから呼べるようにする。
+   * 解けた課題は部品登録する（練習で彼女の部品カタログが増える）。
+   */
+  public async runPracticeSession(seed: number, count: number, registerAsPart = true): Promise<{
+    generated: number; solved: number; registered: number;
+    expressionSolved: number; specSolved: number;
+    results: Array<{ taskId: string; kind: 'expression' | 'spec'; solved: boolean; reason?: string; pointsSource?: string }>;
+  }> {
+    const exprCount = Math.ceil(count / 2);
+    const specCount = count - exprCount;
+    const exprTasks = drillTaskGenerationService.generateTasks(seed, exprCount);
+    const specTasks = drillTaskGenerationService.generateSpecTasks(seed, specCount);
+    const results: Array<{ taskId: string; kind: 'expression' | 'spec'; solved: boolean; reason?: string; pointsSource?: string }> = [];
+    let solved = 0;
+    let registered = 0;
+    let expressionSolved = 0;
+    let specSolved = 0;
+    for (let i = 0; i < count; i++) {
+      if (i % 2 === 0) {
+        const t = exprTasks[i / 2];
+        const r = await this.solveAndRegister({
+          task: { taskId: t.taskId, title: t.title, entryPoint: t.entryPoint, cases: t.cases },
+          registerAsPart,
+        });
+        if (r.solved) { solved++; expressionSolved++; }
+        if (r.componentId) registered++;
+        results.push({ taskId: t.taskId, kind: 'expression', solved: r.solved, reason: r.reason });
+      } else {
+        const t = specTasks[(i - 1) / 2];
+        const r = await this.solveSpecDescription(
+          { name: t.name, description: t.description },
+          registerAsPart,
+        );
+        if (r.solved) { solved++; specSolved++; }
+        if (r.componentId) registered++;
+        results.push({ taskId: t.taskId, kind: 'spec', solved: r.solved, reason: r.reason, pointsSource: r.pointsSource });
+      }
+    }
+    return { generated: count, solved, registered, expressionSolved, specSolved, results };
+  }
 }
 
 export const compositionDrillService = new CompositionDrillService();

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4975,
-    "resolvedRelativeImportCandidateCount": 4957,
+    "relativeImportCandidateCount": 4977,
+    "resolvedRelativeImportCandidateCount": 4959,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 958427,
-      "lines": 11362,
-      "sha256": "67ff11a9691a6fefebb8cd06ea44cfbd541318a8f8a4b34f5c53f89c0bc04569",
+      "bytes": 959650,
+      "lines": 11381,
+      "sha256": "a1309c5caed0243d4323b30f6b4eda49a8fb6e0b5d969c7ebb0a0c652c2acd72",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5706,10 +5706,16 @@
           "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
+        },
+        {
+          "line": 11351,
+          "specifier": "../src/miki/selfDevelopment/services/compositionDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
         }
       ],
-      "relativeImportCandidateCount": 665,
-      "resolvedRelativeImportCount": 663,
+      "relativeImportCandidateCount": 666,
+      "resolvedRelativeImportCount": 664,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -12841,9 +12847,9 @@
     },
     {
       "path": "src/miki/autonomy/services/autonomousEvolutionService.ts",
-      "bytes": 21059,
-      "lines": 494,
-      "sha256": "bdd79476eb9a96c0e0e0f6827b3c7f02d8963d5cb5d2d1d50d5becfe3c7e6cf0",
+      "bytes": 22735,
+      "lines": 524,
+      "sha256": "fe058f0e14dfb1c56566a4b88716d006ddc17c900852cb8d005fc066f5429188",
       "relativeImportCandidates": [
         {
           "line": 6,
@@ -12904,10 +12910,16 @@
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
+        },
+        {
+          "line": 460,
+          "specifier": "../../selfDevelopment/services/compositionDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/compositionDrillService.ts"
         }
       ],
-      "relativeImportCandidateCount": 10,
-      "resolvedRelativeImportCount": 10,
+      "relativeImportCandidateCount": 11,
+      "resolvedRelativeImportCount": 11,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -37087,9 +37099,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/compositionDrillService.ts",
-      "bytes": 9775,
-      "lines": 206,
-      "sha256": "57ecbd6ca3cc4da1cd0da2f6f09bdf066bd811395845269422a7943b643a347b",
+      "bytes": 12043,
+      "lines": 250,
+      "sha256": "79a99d988dbd9f318baa62c7e7af2c3e36eaf92e38cf574e9e82f0960d0e7cf3",
       "relativeImportCandidates": [
         {
           "line": 1,

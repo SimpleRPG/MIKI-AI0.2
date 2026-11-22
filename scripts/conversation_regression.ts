@@ -11346,6 +11346,25 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1154 仕様セッションで言葉の依頼が解題まで通る', session1154.generated === 1 && session1154.solved === 1 && session1154.results[0]?.pointsSource === 'template:falloff', JSON.stringify(session1154).slice(0, 160));
   }
 
+// ---- P1155: 練習セッション（混合ローテーション）をアイドル進化の熟達ドリルへ ----
+{
+  const { compositionDrillService: cds1155 } = await import('../src/miki/selfDevelopment/services/compositionDrillService');
+  const p1155Sess = await cds1155.runPracticeSession(3, 4, true);
+  check('P1155 mixed session generates alternating expression/spec tasks',
+    p1155Sess.generated === 4 && p1155Sess.results.length === 4 &&
+    p1155Sess.results[0].kind === 'expression' && p1155Sess.results[1].kind === 'spec' &&
+    p1155Sess.results[2].kind === 'expression' && p1155Sess.results[3].kind === 'spec');
+  check('P1155 tallies are consistent and at least one task solves',
+    p1155Sess.solved === p1155Sess.expressionSolved + p1155Sess.specSolved &&
+    p1155Sess.solved >= 1 && p1155Sess.registered <= p1155Sess.solved &&
+    (p1155Sess.solved === 0 || p1155Sess.registered >= 1));
+  const p1155Sess2 = await cds1155.runPracticeSession(3, 2, false);
+  check('P1155 session task sequence is deterministic for a seed',
+    p1155Sess2.results.length === 2 &&
+    p1155Sess2.results[0].taskId === p1155Sess.results[0].taskId &&
+    p1155Sess2.results[1].taskId === p1155Sess.results[1].taskId);
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
