@@ -1398,6 +1398,14 @@ export class ResearchService {
     if (!anchor) return undefined;
     const statement = gap.query.trim();
     if (statement.length < 15) return undefined;
+    // P1136: gap の文は「調べるべきこと」の指示文であり、事実の主張
+    // とは限らない。通常の Claim 化と同じ主張適格性チェックを通し、
+    // 疑問文・修辞などは Claim 化しない（証拠の追跡は gap 側に残る）。
+    const worthiness1136 = assessClaimWorthiness(statement);
+    if (!worthiness1136.ok) {
+      systemLogger.info('SELF_IMPROVEMENT', `[P1136] gap文の主張化を見送り (${worthiness1136.reason}): ${statement.slice(0, 60)}`);
+      return undefined;
+    }
     return evidenceService.registerUnverifiedClaim(anchor.evidence_id, statement);
   }
 

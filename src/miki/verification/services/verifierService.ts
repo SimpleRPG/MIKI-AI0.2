@@ -88,7 +88,11 @@ export class VerifierService {
     // P481: ペア解消の判断証拠（pair_dissolution）は真偽の証拠ではない
     // ため、反証と同じく裏付けの数えから外す。
     const admissible = evidence.filter((e) => e.status === 'ADMISSIBLE' && e.metadata?.research_source_role !== 'COUNTEREVIDENCE' && e.metadata?.pair_dissolution !== true);
-    const independentClusters = new Set(admissible.map((e) => e.independence_cluster_id));
+    // P1136: LOCAL_CLAIM 証拠は「自分の知識ベースに既にあった」という
+    // 照合結果であり、外部からの独立した裏付けではない。独立クラスタ
+    // 数には数えない（昇格の根拠から外す）。証拠件数や鮮度判定には
+    // 従来どおり含める。
+    const independentClusters = new Set(admissible.filter((e) => e.kind !== 'LOCAL_CLAIM').map((e) => e.independence_cluster_id));
     // P463: 一次資料の判定接続。収集ポリシーでは一次資料が必須でも、
     // 判定段の昇格条件には入っていなかった。証拠全件に役割が明示されて
     // いる場合（研究経由）に限り、一次・公式情報なしでは確定しない。

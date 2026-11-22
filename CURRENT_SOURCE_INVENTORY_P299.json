@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4937,
-    "resolvedRelativeImportCandidateCount": 4919,
+    "relativeImportCandidateCount": 4939,
+    "resolvedRelativeImportCandidateCount": 4921,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 925394,
-      "lines": 11045,
-      "sha256": "ef0e57ee2d621a866190e271c7d9391d8cd8a893f83c49478741711dfbf34e85",
+      "bytes": 927420,
+      "lines": 11065,
+      "sha256": "04f945801ab46b5d0a25c1c4973c9e13b6ecb7c8521a665f78f64ec8fd2599ad",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5496,10 +5496,22 @@
           "specifier": "../src/miki/research/services/autonomousSearchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/autonomousSearchService.ts"
+        },
+        {
+          "line": 11034,
+          "specifier": "../src/miki/memory/services/evidenceService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/evidenceService.ts"
+        },
+        {
+          "line": 11035,
+          "specifier": "../src/miki/verification/services/verifierService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/verification/services/verifierService.ts"
         }
       ],
-      "relativeImportCandidateCount": 630,
-      "resolvedRelativeImportCount": 628,
+      "relativeImportCandidateCount": 632,
+      "resolvedRelativeImportCount": 630,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -31575,9 +31587,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 84162,
-      "lines": 1538,
-      "sha256": "b404d9d0cba5d994b9c36c604af68b4917b9c1b0722cbc6f33837291b25882b0",
+      "bytes": 84712,
+      "lines": 1546,
+      "sha256": "97bb8063cdce569d65d3cf75a4e2baf78d2140a0c63fa304c9b928c5f1a9ee17",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -43532,9 +43544,9 @@
     },
     {
       "path": "src/miki/verification/services/verifierService.ts",
-      "bytes": 12656,
-      "lines": 286,
-      "sha256": "c675827d61a1b54a903bfd168418546731aa09e905bef78a3d2e73436ae5e600",
+      "bytes": 13023,
+      "lines": 290,
+      "sha256": "2b5c0189ff79747615da7bc4845166d86880f8b1a80eceead09f1415a5caae57",
       "relativeImportCandidates": [
         {
           "line": 1,

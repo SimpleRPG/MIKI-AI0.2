@@ -11029,6 +11029,26 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1135 照会と別の要約は従来どおり取り込む', ok1135.extractedKnowledge.some((k) => k.includes('合成パターンの要約')), `know=${ok1135.extractedKnowledge.length}`);
   }
 
+// ---- P1136: 検証段の自己参照を断つ ----
+  {
+    const { evidenceService } = await import('../src/miki/memory/services/evidenceService');
+    const { verifierService } = await import('../src/miki/verification/services/verifierService');
+    const stmt1136 = '検証対象の文サンプル1136は十分な長さを持つ事実の文です。';
+    const evA1136 = evidenceService.recordWebEvidence({ title: 'src A', snippet: '出典Aの抜粋テキストです。', source: 'docs-a', url: 'https://a-docs.example.net/p1136', sourceId: 'src-a-1136', independenceClusterId: 'cluster-a-1136' });
+    const claim1136 = evidenceService.registerUnverifiedClaim(evA1136.evidence_id, stmt1136);
+    check('P1136 テスト用Claimが作れる', Boolean(claim1136), `claim=${claim1136}`);
+    if (claim1136) {
+      const loc1136 = evidenceService.recordLocalClaimEvidence({ title: 'LOCAL Claim [UNVERIFIED]', statement: stmt1136, sourceId: 'self-1136', independenceClusterId: 'cluster-local-1136' });
+      evidenceService.attachEvidenceToClaim(loc1136.evidence_id, claim1136);
+      const vLocal1136 = verifierService.verifyClaim({ claimId: claim1136 });
+      check('P1136 LOCAL証拠は独立クラスタに数えない', vLocal1136.independentEvidenceCount === 1 && vLocal1136.outcome !== 'SUPPORTED', `ind=${vLocal1136.independentEvidenceCount} outcome=${vLocal1136.outcome}`);
+      const evB1136 = evidenceService.recordWebEvidence({ title: 'src B', snippet: '出典Bの抜粋テキストです。', source: 'docs-b', url: 'https://b-docs.example.net/p1136', sourceId: 'src-b-1136', independenceClusterId: 'cluster-b-1136' });
+      evidenceService.attachEvidenceToClaim(evB1136.evidence_id, claim1136);
+      const vWeb1136 = verifierService.verifyClaim({ claimId: claim1136 });
+      check('P1136 Web証拠2クラスタで従来どおり昇格する', vWeb1136.outcome === 'SUPPORTED' && vWeb1136.independentEvidenceCount === 2, `ind=${vWeb1136.independentEvidenceCount} outcome=${vWeb1136.outcome}`);
+    }
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
