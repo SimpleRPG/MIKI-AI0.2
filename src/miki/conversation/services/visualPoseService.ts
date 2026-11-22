@@ -1136,7 +1136,12 @@ class VisualPoseService {
     const shoulderY = reading.shoulderL && reading.shoulderR ? (reading.shoulderL.y + reading.shoulderR.y) / 2 : head.y + headRh * 1.6;
     const cxN = reading.shoulderL && reading.shoulderR ? (reading.shoulderL.x + reading.shoulderR.x) / 2 : head.x;
     const footY = reading.footL && reading.footR ? (reading.footL.y + reading.footR.y) / 2 : 0.95;
-    const hipY = shoulderY + (footY - shoulderY) * 0.43;
+    // P1160: 膝のある読み（ポーズ合成済み）では、腰の行は比で
+    // なく腰の点そのものから取る（胴の丈がポーズの幾何と一致
+    // する）。膝の無い通常の読みは従来の比のまま（描画不変）。
+    const hipY = reading.kneeL && reading.kneeR && reading.hipL && reading.hipR
+      ? (reading.hipL.y + reading.hipR.y) / 2
+      : shoulderY + (footY - shoulderY) * 0.43;
     const figHn = Math.max(0.1, footY - (head.y - headRh));
     const W = (ratio: number | null, fallback: number) => (ratio !== null ? ratio * figHn * (S - 1) : fallback);
     const shoulderW = W(prof.shoulder, (S - 1) * 0.3);
@@ -4249,6 +4254,50 @@ class VisualPoseService {
     doArm('R', spec.armR);
     doLeg('L', spec.legL);
     doLeg('R', spec.legR);
+    return out;
+  }
+
+  /**
+   * P1160: 座りポーズ。足は元の位置に置いたまま、ふくらはぎは
+   * 垂直、太ももは垂直から thighDeg だけ外へ倒して、腰の位置を
+   * 幾何で解く。上半身（頭・肩・肘・手）は腰の落ちた分だけ
+   * 平行移動する。椅子や床などの環境物は描かない。
+   * 前提（両腰・両足・頭）が無い読みや、腰が落ちない読みでは
+   * そのまま返す（できないポーズを捏造しない）。
+   */
+  public poseSitting(reading: PoseReading, thighDeg = 50): PoseReading {
+    if (!reading.hipL || !reading.hipR || !reading.footL || !reading.footR || !reading.head) return reading;
+    const solve = (hip: PosePoint, foot: PosePoint, sgn: number): { hip: PosePoint; knee: PosePoint } | null => {
+      const total = Math.hypot(foot.x - hip.x, foot.y - hip.y);
+      if (total < 1e-9) return null;
+      // 区間の長さの比は withPose／描画の幅モデルと同じ 0.48。
+      const l1 = total * 0.48;
+      const l2 = total * 0.52;
+      const knee: PosePoint = { x: foot.x, y: foot.y - l2 };
+      const rad = (thighDeg * Math.PI) / 180;
+      const hip2: PosePoint = { x: knee.x + sgn * Math.sin(rad) * l1, y: knee.y - Math.cos(rad) * l1 };
+      if (!(hip2.y > hip.y)) return null; // 落ちていない＝座りにならない
+      return { hip: hip2, knee };
+    };
+    const sl = solve(reading.hipL, reading.footL, -1);
+    const sr = solve(reading.hipR, reading.footR, 1);
+    if (!sl || !sr) return reading;
+    const dy = ((sl.hip.y - reading.hipL.y) + (sr.hip.y - reading.hipR.y)) / 2;
+    if (!(dy > 0.01)) return reading;
+    const out: PoseReading = { ...reading };
+    const drop = (p: PosePoint | null | undefined): PosePoint | null => (p ? { x: p.x, y: p.y + dy } : null);
+    out.head = { ...reading.head, y: reading.head.y + dy };
+    out.shoulderL = drop(reading.shoulderL);
+    out.shoulderR = drop(reading.shoulderR);
+    out.elbowL = drop(reading.elbowL);
+    out.elbowR = drop(reading.elbowR);
+    out.handL = drop(reading.handL);
+    out.handR = drop(reading.handR);
+    out.hipL = sl.hip;
+    out.kneeL = sl.knee;
+    out.hipR = sr.hip;
+    out.kneeR = sr.knee;
+    // 足（footL/footR）は元の読みのまま＝置いたまま。
     return out;
   }
 

@@ -11467,6 +11467,36 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   svc1159.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
 }
 
+// ---- P1160: 座りポーズ（poseSitting、hipYの点駆動化） ----
+{
+  const svc1160 = poseSvc() as any;
+  const img1160 = paleLongHair48();
+  const r1160 = svc1160.analyzePose(img1160, 48, 56);
+  svc1160.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+  const dist1160 = (a: any, b: any): number => Math.hypot(b.x - a.x, b.y - a.y);
+  const sit1160 = r1160 ? svc1160.poseSitting(r1160, 50) : null;
+  const L0_1160 = r1160?.hipL && r1160?.footL ? dist1160(r1160.hipL, r1160.footL) : 0;
+  const dropL_1160 = sit1160 && r1160 ? sit1160.hipL.y - r1160.hipL.y : 0;
+  const dropR_1160 = sit1160 && r1160 ? sit1160.hipR.y - r1160.hipR.y : 0;
+  check('P1160 座りは足を置いたまま幾何で解ける（区間比・ふくらはぎ垂直・腰の落差）', !!sit1160 && !!r1160 && sit1160 !== r1160 && sit1160.footL.x === r1160.footL.x && sit1160.footL.y === r1160.footL.y && sit1160.footR.x === r1160.footR.x && Math.abs(dist1160(sit1160.hipL, sit1160.kneeL) / L0_1160 - 0.48) < 0.01 && Math.abs(dist1160(sit1160.kneeL, sit1160.footL) / L0_1160 - 0.52) < 0.01 && Math.abs(sit1160.kneeL.x - sit1160.footL.x) < 0.001 && Math.abs(sit1160.kneeR.x - sit1160.footR.x) < 0.001 && dropL_1160 > 0.02 && Math.abs((sit1160.head.y - r1160.head.y) - (dropL_1160 + dropR_1160) / 2) < 0.005, JSON.stringify({ dropL: dropL_1160, dropR: dropR_1160 }));
+  const noHip1160 = r1160 ? { ...r1160, hipL: null } : null;
+  check('P1160 前提の無い読みでは座りを捏造しない', !!noHip1160 && svc1160.poseSitting(noHip1160, 50) === noHip1160, '');
+  const flat0_1160 = r1160 ? svc1160.renderBodyStructured(r1160, 128, null, null, { backHair: true }) : null;
+  const flatS_1160 = sit1160 ? svc1160.renderBodyStructured(sit1160, 128, null, null, { backHair: true }) : null;
+  const flatNK_1160 = sit1160 ? svc1160.renderBodyStructured({ ...sit1160, kneeL: null, kneeR: null }, 128, null, null, { backHair: true }) : null;
+  let diff1160 = -1, diffLow1160 = -1, gateDiff1160 = -1;
+  if (flat0_1160 && flatS_1160 && flatNK_1160) {
+    diff1160 = 0; diffLow1160 = 0; gateDiff1160 = 0;
+    for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+      const i = (y * 128 + x) * 4;
+      if (flat0_1160[i] !== flatS_1160[i] || flat0_1160[i + 1] !== flatS_1160[i + 1] || flat0_1160[i + 2] !== flatS_1160[i + 2]) { diff1160++; if (y >= 77) diffLow1160++; }
+      if (flatS_1160[i] !== flatNK_1160[i] || flatS_1160[i + 1] !== flatNK_1160[i + 1] || flatS_1160[i + 2] !== flatNK_1160[i + 2]) gateDiff1160++;
+    }
+  }
+  check('P1160 座り描画は下半身中心に変わりhipYの点駆動が効く', diff1160 > 500 && diff1160 < 20000 && diffLow1160 > 300 && diffLow1160 > diff1160 * 0.12 && gateDiff1160 > 100, JSON.stringify({ diff1160, diffLow1160, gateDiff1160 }));
+  svc1160.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
+}
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
