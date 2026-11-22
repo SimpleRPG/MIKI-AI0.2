@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4940,
-    "resolvedRelativeImportCandidateCount": 4922,
+    "relativeImportCandidateCount": 4942,
+    "resolvedRelativeImportCandidateCount": 4924,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 928378,
-      "lines": 11076,
-      "sha256": "d27227ff205dbe7fe02e3d9fda3e306d9c388b0060d0e378dc80ddfe0d2d86a7",
+      "bytes": 930001,
+      "lines": 11090,
+      "sha256": "1d74289e5fa35e661a0176d01bf308519216d7262030f7b57cb4790dd4af5263",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5514,10 +5514,22 @@
           "specifier": "../src/miki/research/services/researchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchService.ts"
+        },
+        {
+          "line": 11065,
+          "specifier": "../src/miki/core/services/coreOrchestratorService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/coreOrchestratorService.ts"
+        },
+        {
+          "line": 11072,
+          "specifier": "../src/miki/core/services/autonomousIssueDiscoveryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/core/services/autonomousIssueDiscoveryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 633,
-      "resolvedRelativeImportCount": 631,
+      "relativeImportCandidateCount": 635,
+      "resolvedRelativeImportCount": 633,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -18117,9 +18129,9 @@
     },
     {
       "path": "src/miki/core/services/autonomousIssueDiscoveryService.ts",
-      "bytes": 45167,
-      "lines": 742,
-      "sha256": "8dd2cec490466ef111d3764d8036bf26198a344e88773b6b2fa2b2ead9852941",
+      "bytes": 46830,
+      "lines": 768,
+      "sha256": "a3a897c69d70b7b81218aec5f866fe097a68949260330e159633c6dae08bd5eb",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -19835,9 +19847,9 @@
     },
     {
       "path": "src/miki/core/services/coreOrchestratorService.ts",
-      "bytes": 118521,
-      "lines": 2094,
-      "sha256": "f6e57e187c01a517beaddc49e58bffe709859f17c881ab9ab52759a4ac51544d",
+      "bytes": 120442,
+      "lines": 2132,
+      "sha256": "772e1342da1054ca5328b93994a664157882a8b35cf98fcc88983076b1a768e0",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -20098,7 +20110,7 @@
           "resolvedPath": "src/miki/autonomy/services/operationalGovernanceService.ts"
         },
         {
-          "line": 191,
+          "line": 211,
           "specifier": "../../improvement/services/selfImprovementControllerService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/improvement/services/selfImprovementControllerService.ts"

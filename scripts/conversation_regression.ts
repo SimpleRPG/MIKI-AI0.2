@@ -11060,6 +11060,20 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1137 事実の文は従来どおり主張化できる', fact1137.ok === true, `reason=${fact1137.reason}`);
   }
 
+// ---- P1138: グレー2件（未承認の自動学習記憶だけの想起／制御トークンのタスク化） ----
+  {
+    const { assessRecallSufficiency1138 } = await import('../src/miki/core/services/coreOrchestratorService');
+    const autoOnly1138 = assessRecallSufficiency1138([{ approved: false, source: 'auto' }, { approved: false, source: 'auto' }], false);
+    check('P1138 未承認の自動学習記憶だけでは文脈十分としない', autoOnly1138.sufficient === false && autoOnly1138.unverifiedAutoHits === 2, `suf=${autoOnly1138.sufficient}`);
+    const mixed1138 = assessRecallSufficiency1138([{ approved: false, source: 'auto' }, { approved: true, source: 'user' }], false);
+    check('P1138 承認済みが混ざれば従来どおり十分', mixed1138.sufficient === true, `suf=${mixed1138.sufficient}`);
+    const ctx1138 = assessRecallSufficiency1138([{ approved: false, source: 'auto' }], true);
+    check('P1138 現在のタスク文脈があれば十分', ctx1138.sufficient === true, `suf=${ctx1138.sufficient}`);
+    const { isControlTokenDominatedText } = await import('../src/miki/core/services/autonomousIssueDiscoveryService');
+    check('P1138 制御トークンだけの文は知識の質問とみなさない', isControlTokenDominatedText('UNEXECUTED_CHECK 必要Evidence: RECOVERY_ACTION_REQUIRED:RESEARCH:PERSISTENT_BACKEND_REQUIRED') === true, '');
+    check('P1138 主題のある文は対象にしない', isControlTokenDominatedText('UNEXECUTED_CHECKの意味を調べる') === false && isControlTokenDominatedText('TypeScriptの型推論の仕組み') === false, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

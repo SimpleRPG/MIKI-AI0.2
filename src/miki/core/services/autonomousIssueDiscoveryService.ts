@@ -64,6 +64,28 @@ const ISSUE_KINDS:DiscoveredIssueKind[]=['EXECUTION_FAILURE','KNOWLEDGE_GAP','CA
 const KEY='miki_autonomous_issue_discovery_v1';
 const CONFIG_KEY='miki_autonomous_issue_discovery_config_v1';
 const DEFAULT_CONFIG:DiscoveryConfig={enabled:true,intervalMinutes:180,maxIssuesPerScan:5,minimumPriority:40};
+
+/*
+ * P1138: 制御トークン支配のテキスト判定。内部の理由コード
+ * （UNEXECUTED_CHECK や RECOVERY_ACTION_REQUIRED:… のような
+ * SCREAMING_SNAKE トークン）を含み、トークンを除くと自然言語の
+ * 主題（助詞を除く内容文字）がほぼ残らない文は「知識の質問」
+ * ではない。こういう gap を自律タスク化すると、制御層の言葉が
+ * そのままタスク目標と未知の質問になり、空転の出発点になる
+ * （2026-11-22 実機の OSCILLATION タスク）。主題が残る文は
+ * 対象にしない。
+ */
+export function isControlTokenDominatedText(value:string):boolean{
+ const text=String(value||'');
+ if(!/[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/.test(text))return false;
+ const stripped=text
+  .replace(/(停滞タスク|改善負債|能力不足|知識不足|実行失敗|18分類未循環|Claim矛盾|CONTRADICTED|UNRESOLVED|必要Evidenceの取得|必要Evidence)[:：]/g,' ')
+  .replace(/[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+/g,' ')
+  .replace(/[A-Za-z][A-Za-z0-9]*:/g,' ')
+  .replace(/[／/|:：、,()（）「」]/g,' ');
+ const content=stripped.replace(/[\sのをにへがはとや、。]/g,'').trim();
+ return content.length<4;
+}
 class AutonomousIssueDiscoveryService{
  private issues=new Map<string,DiscoveredIssue>();private config:DiscoveryConfig={...DEFAULT_CONFIG};private timer:ReturnType<typeof setInterval>|null=null;private retryTimer:ReturnType<typeof setTimeout>|null=null;private scanning=false;private activeScanGeneration:number|null=null;private lifecycleGeneration=0;
   private disposed=false;
@@ -111,7 +133,11 @@ class AutonomousIssueDiscoveryService{
    // pursue. Queueing them spawned self-referencing recovery tasks.
    // P409 案3: strip diagnostic prefixes the query may already carry (e.g.
    // a previous generation's issue title) so titles never stack prefixes.
-   for(const gap of knowledgeGapService.listOpen(50).filter(gap=>!/required_asset\./i.test(gap.query)))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${this.normalizeDiagnosticPrefixes(gap.query)}`,gap.reason||gap.query,70);
+   // P1138: 制御トークンだけの gap（内部理由コードがそのまま質問に
+   // なったもの）も知識の課題ではないので起票しない。P366 の
+   // required_asset 除外と同じ理由（制御層の言葉のタスク化は
+   // 自己参照の空転を生む）。
+   for(const gap of knowledgeGapService.listOpen(50).filter(gap=>!/required_asset\./i.test(gap.query)&&!isControlTokenDominatedText(gap.query)))this.upsert('KNOWLEDGE_GAP',gap.id,`知識不足: ${this.normalizeDiagnosticPrefixes(gap.query)}`,gap.reason||gap.query,70);
    for(const gap of capabilityGapService.getAllGaps().filter(item=>item.status==='OPEN'&&!/^required_asset\./i.test(item.capabilityId)).slice(0,50))this.upsert('CAPABILITY_GAP',gap.gap_id,`能力不足: ${gap.capabilityId}`,gap.description||gap.current_workaround||gap.capabilityId,80);
    for(const task of taskBlackboardService.list(100).filter(item=>this.isStallCandidate(item.status,item.pausedReason))){
     const goal=this.normalizeDiagnosticPrefixes(task.goal);
@@ -131,7 +157,7 @@ class AutonomousIssueDiscoveryService{
     // hold for issues persisted by older builds, which the upsert-time
     // filter never sees.
     const activeGapIds=this.activeKnowledgeGapIds();
-    const candidates=this.list(200).filter(item=>this.isActionableIssue(item)&&!item.resolvedAt&&!item.queuedAt&&!item.exhausted&&(!item.nextRetryAt||item.nextRetryAt<=Date.now())&&item.priority>=this.config.minimumPriority&&!this.isRequiredAssetBookkeepingIssue(item)&&!(item.kind==='KNOWLEDGE_GAP'&&activeGapIds.has(item.sourceId))).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
+    const candidates=this.list(200).filter(item=>this.isActionableIssue(item)&&!item.resolvedAt&&!item.queuedAt&&!item.exhausted&&(!item.nextRetryAt||item.nextRetryAt<=Date.now())&&item.priority>=this.config.minimumPriority&&!this.isRequiredAssetBookkeepingIssue(item)&&!(item.kind==='KNOWLEDGE_GAP'&&isControlTokenDominatedText(item.title))&&!(item.kind==='KNOWLEDGE_GAP'&&activeGapIds.has(item.sourceId))).sort((a,b)=>b.priority-a.priority||a.kind.localeCompare(b.kind)||a.sourceId.localeCompare(b.sourceId)||a.id.localeCompare(b.id)).slice(0,this.config.maxIssuesPerScan);
     for(const issue of candidates){
      if(autonomousSelfImprovementLoopService.getPersistenceState().status==='WRITE_BLOCKED')break;
      const issueEnvironment=issue.kind==='EXECUTION_FAILURE'

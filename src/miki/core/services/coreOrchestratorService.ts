@@ -44,6 +44,26 @@ import { cognitiveStateCheckpointService } from '../../autonomy/services/operati
 
 export interface CoreOrchestrationResult { task:BlackboardTask; cycles:number; dispatched:number; coreResult?:CoreResult; }
 
+/*
+ * P1138: 想起の十分性判定。ヒットが「未承認の自動学習記憶」
+ * （source='auto' かつ approved でないもの）だけしかなく、現在の
+ * タスク文脈も無い場合、それは裏付けのない自己学習の寄せ集めで
+ * しかないため、文脈十分とはみなさない。ユーザーが教えた記憶や
+ * 承認済みの記憶が1件でも混ざれば従来どおり十分とする。
+ */
+export function assessRecallSufficiency1138(
+  hits: Array<{ approved?: unknown; source?: unknown }>,
+  currentContextAvailable: boolean,
+): { sufficient: boolean; unverifiedAutoHits: number } {
+  const unverifiedAutoHits = hits.filter(
+    (hit) => hit.approved !== true && String(hit.source || '') === 'auto',
+  ).length;
+  const sufficient =
+    currentContextAvailable ||
+    (hits.length > 0 && unverifiedAutoHits < hits.length);
+  return { sufficient, unverifiedAutoHits };
+}
+
 export interface CoreImprovementGateEvidence { semantic:boolean; scope:boolean; contract:boolean; dependency:boolean; staticVerification:boolean; typecheck:boolean; regression:boolean; resource:boolean; packageIntegrity:boolean; externalEvaluation?:boolean; }
 export interface CoreImprovementDecisionInput { instruction:string; baselineSha256:string; candidateSha256?:string; targetPaths:string[]; evidence:CoreImprovementGateEvidence; repairAttempt:number; maxRepairAttempts:number; currentFailureSignature?:string; previousFailureSignatures:string[]; reviewPackageId?:string; externalVerdict?:'ADOPT'|'HOLD'|'REJECT'; }
 export interface CoreImprovementDecision { nextAction:'ANALYZE'|'BUILD'|'REPAIR'|'RUN_REGRESSION'|'BUILD_REVIEW_PACKAGE'|'WAIT_EXTERNAL_EVALUATION'|'PREPARE_ADOPTION'|'STOP'; reasons:string[]; canMutateCanonical:false; requiresExternalEvaluation:true; }
@@ -875,6 +895,12 @@ class CoreOrchestratorService {
     const recalledIds=new Set<string>(
       initialRecall.scoredMemories.map(hit=>String(hit.memory.id))
     );
+    // P1138: 十分性判定のためにヒットの出所も集める。
+    const allHits1138: Array<{ approved?: unknown; source?: unknown }> =
+      initialRecall.scoredMemories.map(hit=>({
+        approved:(hit.memory as {approved?:unknown})?.approved,
+        source:(hit.memory as {source?:unknown})?.source,
+      }));
 
     let additionalRecallPerformed=false;
 
@@ -913,6 +939,10 @@ class CoreOrchestratorService {
 
         for(const hit of relatedRecall.scoredMemories){
           recalledIds.add(String(hit.memory.id));
+          allHits1138.push({
+            approved:(hit.memory as {approved?:unknown})?.approved,
+            source:(hit.memory as {source?:unknown})?.source,
+          });
         }
 
         additionalRecallPerformed=true;
@@ -938,8 +968,11 @@ class CoreOrchestratorService {
 
     const currentContextAvailable=currentContextEntries.length>0;
 
+    // P1138: 未承認の自動学習記憶だけの想起では十分とみなさない。
+    const sufficiency1138=assessRecallSufficiency1138(allHits1138,currentContextAvailable);
+
     const status=
-      recalledIds.size>0 || currentContextAvailable
+      sufficiency1138.sufficient
         ? 'SUFFICIENT'
         : 'CONTEXT_INSUFFICIENT';
 
@@ -959,13 +992,18 @@ class CoreOrchestratorService {
         currentContextEntries:currentContextEntries.length,
         currentContextEvidenceIds:[...new Set(currentContextEvidenceIds)].slice(0,24),
         memoryIds:[...recalledIds].slice(0,24),
+        unverifiedAutoRecallHits:sufficiency1138.unverifiedAutoHits,
         reason:status==='SUFFICIENT'
           ? (
               recalledIds.size>0
                 ? 'CORE context is sufficient through persistent memory recall'
                 : 'CORE context is sufficient through current task Evidence/Research/Verification state'
             )
-          : 'CORE context is insufficient after current-task context inspection and persistent-memory recall'
+          : (
+              allHits1138.length>0 && sufficiency1138.unverifiedAutoHits===allHits1138.length
+                ? 'CORE context recall consisted only of unapproved auto-learned memories; treated as insufficient (P1138)'
+                : 'CORE context is insufficient after current-task context inspection and persistent-memory recall'
+            )
       }
     );
   }catch(error){
