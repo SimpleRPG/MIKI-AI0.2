@@ -1901,7 +1901,15 @@ export class AutonomousSearchService {
 
     // 重要スニペット・要点の抽出
     if (summary && summary.trim().length > 10) {
-      extractedKnowledge.push(summary.trim());
+      // P1135: 要約が照会文そのもの（またはその部分）なら知識として
+      // 取り込まない。不足文が照会文になり、その要約として不足文が
+      // 返ると、「調べた知識」が自分の文の言い換えになってしまう。
+      const squash1135 = (s: string) => s.replace(/\s+/g, '').slice(0, 120);
+      const summarySquash = squash1135(summary);
+      const querySquash = squash1135(query);
+      if (!summarySquash.includes(querySquash) && !querySquash.includes(summarySquash)) {
+        extractedKnowledge.push(summary.trim());
+      }
     }
     for (const r of sourceBackedResults.slice(0, 3)) {
       if (r.snippet && r.snippet.length > 15) {

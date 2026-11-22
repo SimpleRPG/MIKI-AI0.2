@@ -11013,6 +11013,22 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1134 仕様の台帳に両方残る', specDraftService.list().some((r) => r.name === 'falloffProbe1134') && specDraftService.list().some((r) => r.name === 'linearProbe1134'), `ledger=${specDraftService.list().length}`);
   }
 
+// ---- P1135: 自己参照の学習ループを断つ ----
+  {
+    const { autonomousSearchService } = await import('../src/miki/research/services/autonomousSearchService');
+    const query1135 = '自律コード改善で必要な実装能力が不足している。不足文字列そのものを検索意図として扱わず調査する。';
+    const results1135 = [{
+      title: 'Example implementation patterns',
+      snippet: '検証済み部品の合成パターンと受け入れテストの書き方についての実例。',
+      url: 'https://example.com/patterns',
+      source: 'example',
+    }];
+    const dup1135 = autonomousSearchService.learnFromSearch(query1135, results1135 as any, query1135, { triggerType: 'working_agenda' });
+    check('P1135 照会文そのものの要約は知識として取り込まない', !dup1135.extractedKnowledge.some((k) => k.includes('不足文字列そのもの')), `know=${dup1135.extractedKnowledge.length}`);
+    const ok1135 = autonomousSearchService.learnFromSearch('部品合成パターン', results1135 as any, '合成パターンの要約は照会とは別の文です。十分な長さがあります。', { triggerType: 'working_agenda' });
+    check('P1135 照会と別の要約は従来どおり取り込む', ok1135.extractedKnowledge.some((k) => k.includes('合成パターンの要約')), `know=${ok1135.extractedKnowledge.length}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

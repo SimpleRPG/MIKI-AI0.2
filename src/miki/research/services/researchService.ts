@@ -620,9 +620,22 @@ export class ResearchService {
 
         const seenLocalClaims = new Set<string>();
 
+        // P1135: gap 自身の Claim は、その gap の証拠にならない。
+        // 不足文そのものが照会文になり、過去に作られた「不足文の
+        // Claim」と完全一致で照合されると、不足が既存知識に化けて
+        // 検証まで通ってしまう（自己参照ループ）。Web 検索側の
+        // sourceExclusion と同じ扱いを LOCAL 側にも入れる。
+        const ownClaimIds1135 = new Set([
+          ...(gap.researchClaimIds || []),
+          ...(gap.identity?.claimIds || []),
+        ]);
+        const normalizedQuery1135 = this.normalizeClaimStatement(baseQuery);
+
         for (const claim of localClaims) {
           if (seenLocalClaims.has(claim.claim_id)) continue;
           seenLocalClaims.add(claim.claim_id);
+          if (ownClaimIds1135.has(claim.claim_id)) continue;
+          if (this.normalizeClaimStatement(claim.statement) === normalizedQuery1135) continue;
 
           const localEvidence = evidenceService.recordLocalClaimEvidence({
             title: `LOCAL Claim [${claim.status}]`,
