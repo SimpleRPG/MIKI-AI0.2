@@ -85,6 +85,50 @@ export interface FaceReading {
   /** P989: 口の大きさ（既にある口幅の比から読む） */
   mouthSize: 'large' | 'small' | null;
   mouthSizeDescription: string | null;
+  /** P1163: 顔の連続量（目の中心・間隔・口の中心を顔の箱で
+   * 正規化したもの）。カテゴリに潰す前の物差し。 */
+  geometry: FaceGeometry1163;
+}
+
+/** P1163: 顔の連続量。座標は顔の箱（肌の塊の外接）で
+ * 正規化した 0..1。測れない項目は null（捏造しない）。 */
+export interface FaceGeometry1163 {
+  eyeL: { x: number; y: number } | null;
+  eyeR: { x: number; y: number } | null;
+  /** 両目の中心の距離 ÷ 顔幅 */
+  eyeSpan: number | null;
+  /** 目の中心の行（顔の箱の縦 0..1） */
+  eyeRow: number | null;
+  /** 目の幅の平均 ÷ 顔幅 */
+  eyeWidth: number | null;
+  mouth: { x: number; y: number } | null;
+  /** 口の中心の行（顔の箱の縦 0..1） */
+  mouthRow: number | null;
+}
+
+/** P1163: 2つの顔の連続量の差。両方で測れた項目だけを
+ * 数え、平均差と項目ごとの差を返す。 */
+export function compareFaceGeometry1163(a: FaceGeometry1163 | null, b: FaceGeometry1163 | null): { mean: number | null; compared: number; diffs: { [k: string]: number } } {
+  if (!a || !b) return { mean: null, compared: 0, diffs: {} };
+  const items: [string, number | null, number | null][] = [
+    ['eyeSpan', a.eyeSpan, b.eyeSpan],
+    ['eyeRow', a.eyeRow, b.eyeRow],
+    ['eyeWidth', a.eyeWidth, b.eyeWidth],
+    ['mouthRow', a.mouthRow, b.mouthRow],
+    ['mouthX', a.mouth ? a.mouth.x : null, b.mouth ? b.mouth.x : null],
+    ['eyeLX', a.eyeL ? a.eyeL.x : null, b.eyeL ? b.eyeL.x : null],
+    ['eyeRX', a.eyeR ? a.eyeR.x : null, b.eyeR ? b.eyeR.x : null],
+  ];
+  const diffs: { [k: string]: number } = {};
+  let sum = 0;
+  let n = 0;
+  for (const [k, x, y] of items) {
+    if (x === null || y === null) continue;
+    diffs[k] = Math.abs(x - y);
+    sum += diffs[k];
+    n++;
+  }
+  return { mean: n ? sum / n : null, compared: n, diffs };
 }
 
 class VisualZoomService {
@@ -428,7 +472,7 @@ class VisualZoomService {
     return { ...raw, verified, description, eyeColor, faceShapeDescription, hairlineDescription, partingDescription, eyeShapeDescription, browAngleDescription, eyeSizeDescription, mouthSize, mouthSizeDescription };
   }
 
-  private measureFace(pixels: Uint8Array): { eyes: 0 | 1 | 2; mouthShape: FaceReading['mouthShape']; mouthWidthRatio: number; eyePts: { x: number; y: number }[]; eyeColorPts: { x: number; y: number }[]; mouthPts: { x: number; y: number }[]; brows: boolean | null; nose: boolean | null; ears: boolean | null; faceShape: 'round' | 'long' | 'pointed' | null; cheekFlush: boolean | null; hairline: 'm-shaped' | 'straight' | 'round' | null; parting: 'center' | 'left' | 'right' | null; eyeShape: 'tareme' | 'tsurime' | null; browAngle: number | null; eyeSize: 'large' | 'small' | null; faceBox: { x0: number; y0: number; x1: number; y1: number } } | null {
+  private measureFace(pixels: Uint8Array): { eyes: 0 | 1 | 2; mouthShape: FaceReading['mouthShape']; mouthWidthRatio: number; eyePts: { x: number; y: number }[]; eyeColorPts: { x: number; y: number }[]; mouthPts: { x: number; y: number }[]; brows: boolean | null; nose: boolean | null; ears: boolean | null; faceShape: 'round' | 'long' | 'pointed' | null; cheekFlush: boolean | null; hairline: 'm-shaped' | 'straight' | 'round' | null; parting: 'center' | 'left' | 'right' | null; eyeShape: 'tareme' | 'tsurime' | null; browAngle: number | null; eyeSize: 'large' | 'small' | null; geometry: FaceGeometry1163; faceBox: { x0: number; y0: number; x1: number; y1: number } } | null {
     const S = OUT;
     const isSkinStrict = (i: number) => {
       const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
@@ -904,7 +948,32 @@ class VisualZoomService {
         else if (avg <= -0.18) eyeShape = 'tsurime';
       }
     }
-    return { eyes, mouthShape, mouthWidthRatio, eyePts, eyeColorPts: coloredEyePts, mouthPts, brows, browAngle, nose, ears, faceShape, cheekFlush, hairline, parting, eyeShape, eyeSize, faceBox: { x0: sx0, y0: sy0, x1: sx1, y1: sy1 } };
+    // P1163: 顔の連続量。カテゴリに潰す前の点の重心を、顔の
+    // 箱で正規化して残す（照合用の物差し）。取れない項目は
+    // null のまま（捏造しない）。
+    const centroidOf = (pts: { x: number; y: number }[]): { x: number; y: number } | null => {
+      if (!pts.length) return null;
+      let mx = 0, my = 0;
+      for (const p of pts) { mx += p.x; my += p.y; }
+      return { x: mx / pts.length, y: my / pts.length };
+    };
+    const eyeLC = leftEyes.length >= 2 ? centroidOf(leftEyes) : null;
+    const eyeRC = rightEyes.length >= 2 ? centroidOf(rightEyes) : null;
+    const mouthC = mouthPts.length >= 3 ? centroidOf(mouthPts) : null;
+    const widthOf = (pts: { x: number; y: number }[]): number | null => pts.length >= 2 ? (Math.max(...pts.map((p) => p.x)) - Math.min(...pts.map((p) => p.x)) + 1) / fw : null;
+    const eyeWL = widthOf(leftEyes);
+    const eyeWR = widthOf(rightEyes);
+    const eyeSides = (eyeLC ? 1 : 0) + (eyeRC ? 1 : 0);
+    const geometry: FaceGeometry1163 = {
+      eyeL: eyeLC ? { x: (eyeLC.x - sx0) / fw, y: (eyeLC.y - sy0) / fh } : null,
+      eyeR: eyeRC ? { x: (eyeRC.x - sx0) / fw, y: (eyeRC.y - sy0) / fh } : null,
+      eyeSpan: eyeLC && eyeRC ? (eyeRC.x - eyeLC.x) / fw : null,
+      eyeRow: eyeSides ? (((eyeLC ? eyeLC.y : 0) + (eyeRC ? eyeRC.y : 0)) / eyeSides - sy0) / fh : null,
+      eyeWidth: eyeWL !== null || eyeWR !== null ? ((eyeWL ?? 0) + (eyeWR ?? 0)) / ((eyeWL !== null ? 1 : 0) + (eyeWR !== null ? 1 : 0)) : null,
+      mouth: mouthC ? { x: (mouthC.x - sx0) / fw, y: (mouthC.y - sy0) / fh } : null,
+      mouthRow: mouthC ? (mouthC.y - sy0) / fh : null,
+    };
+    return { eyes, mouthShape, mouthWidthRatio, eyePts, eyeColorPts: coloredEyePts, mouthPts, brows, browAngle, nose, ears, faceShape, cheekFlush, hairline, parting, eyeShape, eyeSize, geometry, faceBox: { x0: sx0, y0: sy0, x1: sx1, y1: sy1 } };
   }
 
   /** 読み通りの模式図（肌色の四角＋目の点＋口の弧）を描く */

@@ -11599,6 +11599,44 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1162 髪の平均輝度が下がる（影として効く）', hairN > 0 && lumS < lumG);
   }
 
+  // ---- P1163: 顔の連続量の物差し（geometry） ----
+  {
+    const { visualZoomService, compareFaceGeometry1163 } = await import('../src/miki/conversation/services/visualZoomService');
+    const Z = visualZoomService as any;
+    const S48 = 48;
+    const mkFace = (withEyes: boolean): Uint8Array => {
+      const img = new Uint8Array(S48 * S48 * 4);
+      const set = (x: number, y: number, c: [number, number, number]) => {
+        if (x < 0 || y < 0 || x >= S48 || y >= S48) return;
+        const i = (y * S48 + x) * 4;
+        img[i] = c[0]; img[i + 1] = c[1]; img[i + 2] = c[2]; img[i + 3] = 255;
+      };
+      const SKIN: [number, number, number] = [242, 200, 180];
+      const HAIRC: [number, number, number] = [120, 90, 110];
+      const DARK: [number, number, number] = [40, 30, 40];
+      for (let y = 0; y < S48; y++) for (let x = 0; x < S48; x++) set(x, y, y <= 6 ? HAIRC : SKIN);
+      if (withEyes) {
+        for (const cxE of [17, 31]) for (let dy = -2; dy <= 2; dy++) for (let dx = -3; dx <= 3; dx++) {
+          if ((dx * dx) / 9 + (dy * dy) / 4 <= 1) set(cxE + dx, 22 + dy, DARK);
+        }
+      }
+      for (let x = 21; x <= 27; x++) set(x, 36, DARK);
+      return img;
+    };
+    const faceA: any = Z.analyzeFace(mkFace(true));
+    const gA = faceA?.geometry;
+    console.log(`  [P1163] geometry: ${JSON.stringify(gA)}`);
+    check('P1163 顔の連続量が取れる（両目と口）', !!faceA && faceA.eyes === 2 && !!gA && gA.eyeSpan !== null && gA.mouth !== null);
+    check('P1163 目の中心と間隔が既知位置に合う', !!gA && gA.eyeL !== null && gA.eyeR !== null && Math.abs(gA.eyeL.x - 0.354) < 0.15 && Math.abs(gA.eyeR.x - 0.646) < 0.15 && Math.abs((gA.eyeSpan ?? 0) - 0.29) < 0.15);
+    check('P1163 口の行が既知位置に合う', !!gA && gA.mouthRow !== null && Math.abs(gA.mouthRow - 0.707) < 0.18);
+    const faceB: any = Z.analyzeFace(mkFace(false));
+    const gB = faceB?.geometry;
+    check('P1163 目が無い顔では目の量が null（捏造しない）', !!faceB && faceB.eyes === 0 && !!gB && gB.eyeSpan === null && gB.eyeL === null && gB.mouth !== null);
+    const cmpSame = compareFaceGeometry1163(gA, gA);
+    const cmpDiff = compareFaceGeometry1163(gA, gB);
+    check('P1163 照合：同一は差0、目なしとは比較項目が減る', cmpSame.mean === 0 && cmpSame.compared >= 5 && cmpDiff.compared < cmpSame.compared && cmpDiff.mean !== null);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
