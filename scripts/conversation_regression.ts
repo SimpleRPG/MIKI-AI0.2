@@ -11310,6 +11310,16 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1151 単数形の読み下しは従来通り', String(g1151c.text).includes('葉緑体') && g1151c.replaced >= 1, JSON.stringify(g1151c).slice(0, 120));
   }
 
+// ---- P1152: 照合の展開でも複数形・単数形を相互に引ける ----
+  {
+    const { lexicalRelationService: lex1152 } = await import('../src/miki/memory/services/lexicalRelationService');
+    const e1152a = (lex1152 as any).expandTermsBilingual(['cell']);
+    check('P1152 単数形の照合語に複数形が足される', e1152a.includes('cell') && e1152a.includes('cells'), e1152a.join(','));
+    const e1152b = (lex1152 as any).expandTermsBilingual(['cities']);
+    check('P1152 複数形の照合語に単数形が足され、二重の複数化はしない', e1152b.includes('city') && !e1152b.includes('citieses'), e1152b.join(','));
+    check('P1152 -sis の複数形は -ses（analysis→analyses）', (lex1152 as any).englishPluralOf1152('analysis') === 'analyses' && (lex1152 as any).englishSingularOf1152('class') === null, String((lex1152 as any).englishPluralOf1152('analysis')));
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

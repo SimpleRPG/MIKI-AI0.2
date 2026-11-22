@@ -507,8 +507,41 @@ class LexicalRelationService {
   }
 
   /**
+   * P1152: 規則的な複数形を作る（-s / -es / -ies）。作れない
+   * 形は null。P1151 の読み下しと照合の展開で共有する。
+   */
+  public englishPluralOf1152(wordRaw: string): string | null {
+    const en = String(wordRaw || '').trim();
+    if (!en || /[\s-]/.test(en) || !/^[A-Za-z]+$/.test(en)) return null;
+    const w = en.toLowerCase();
+    // 既に複数形らしい語は二重に複数化しない（cities→×citieses）。
+    const singular = this.englishSingularOf1152(en);
+    if (singular && singular.toLowerCase() !== w) return null;
+    if (w.endsWith('sis')) return `${en.slice(0, -3)}ses`;
+    if (/(?:s|x|z|ch|sh)$/.test(w)) return `${en}es`;
+    if (/[^aeiou]y$/.test(w)) return `${en.slice(0, -1)}ies`;
+    return `${en}s`;
+  }
+
+  /**
+   * P1152: 規則的な複数形から単数形を戻す。誤爆しやすい形
+   * （-ss / -us / -is で終わる語）は戻さない。
+   */
+  public englishSingularOf1152(wordRaw: string): string | null {
+    const en = String(wordRaw || '').trim();
+    if (!en || /[\s-]/.test(en) || !/^[A-Za-z]+$/.test(en)) return null;
+    const w = en.toLowerCase();
+    if (w.length > 4 && w.endsWith('ies')) return `${en.slice(0, -3)}y`;
+    if (w.endsWith('es') && /(?:s|x|z|ch|sh)$/.test(w.slice(0, -2))) return en.slice(0, -2);
+    if (w.endsWith('s') && !/(?:ss|us|is)$/.test(w) && w.length >= 4) return en.slice(0, -1);
+    return null;
+  }
+
+  /**
    * P1145: 語の集合に翻訳対応語を足して返す（元の語が先）。
    * ページの文・証拠との照合に使う共有の展開。
+   * P1152: 英単語は複数形・単数形の語形違いも足す。ページ側の
+   * 文が複数形で書かれていても、単数形の語で照合が届くように。
    */
   public expandTermsBilingual(terms: string[], cap = 24): string[] {
     const out: string[] = [];
@@ -519,6 +552,14 @@ class LexicalRelationService {
     for (const term of terms || []) push(term);
     for (const term of terms || []) {
       for (const cp of this.translationCounterpartsOf(term)) push(cp);
+      if (out.length >= cap) break;
+    }
+    const base = [...out];
+    for (const term of base) {
+      const plural = this.englishPluralOf1152(term);
+      if (plural) push(plural);
+      const singular = this.englishSingularOf1152(term);
+      if (singular) push(singular);
       if (out.length >= cap) break;
     }
     return out.slice(0, cap);
@@ -560,15 +601,10 @@ class LexicalRelationService {
     let replaced = 0;
     for (const [en, ja] of pairs) {
       // P1151: 単独語には規則的な複数形も候補に足す（長い方を先に）。
+      // P1152: 複数形の生成は共有ヘルパーへ寄せた。
       const variants = [en];
-      if (!/[\s-]/.test(en)) {
-        const w = en.toLowerCase();
-        let plural: string | null = null;
-        if (/(?:s|x|z|ch|sh)$/.test(w)) plural = `${en}es`;
-        else if (/[^aeiou]y$/.test(w)) plural = `${en.slice(0, -1)}ies`;
-        else plural = `${en}s`;
-        if (plural && plural.toLowerCase() !== w) variants.unshift(plural);
-      }
+      const plural = this.englishPluralOf1152(en);
+      if (plural) variants.unshift(plural);
       const re = new RegExp(`\\b(?:${variants.map((v) => escapeRegExp(v)).join('|')})\\b`, 'gi');
       text = text.replace(re, () => {
         replaced++;
