@@ -11497,6 +11497,51 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
   svc1160.setDrawingCorrections({ shoulder: 1, chest: 1, waist: 1, hip: 1, thigh: 1, calf: 1, ankle: 1 });
 }
 
+  // ---- P1161: 座りの可読性（椅子＋後ろ髪の座面追従） ----
+  {
+    const { visualPoseService } = await import('../src/miki/conversation/services/visualPoseService');
+    const S = visualPoseService as any;
+    const W = 128, H = 256;
+    const img = new Uint8Array(W * H * 4);
+    const put = (x: number, y: number, c: [number, number, number]) => {
+      const px = Math.round(x * (W - 1)), py = Math.round(y * (H - 1)), i = (py * W + px) * 4;
+      img[i] = c[0]; img[i + 1] = c[1]; img[i + 2] = c[2]; img[i + 3] = 255;
+    };
+    const box = (cx: number, cy: number, hw: number, hh: number, c: [number, number, number]) => {
+      for (let y = cy - hh; y <= cy + hh; y++) for (let x = cx - hw; x <= cx + hw; x++) put(x / (W - 1), y / (H - 1), c);
+    };
+    for (let i = 0; i < W * H * 4; i += 4) { img[i] = 168; img[i + 1] = 168; img[i + 2] = 172; img[i + 3] = 255; }
+    const SKIN: [number, number, number] = [242, 200, 180];
+    const HAIRC: [number, number, number] = [208, 182, 196];
+    const TOPC: [number, number, number] = [245, 222, 228];
+    const BOTC: [number, number, number] = [231, 203, 210];
+    box(64, 30, 13, 16, HAIRC); box(64, 128, 30, 100, HAIRC);
+    box(64, 84, 13, 30, TOPC); box(64, 140, 15, 26, BOTC);
+    box(64, 30, 9, 12, SKIN); box(58, 74, 4, 26, SKIN); box(70, 74, 4, 26, SKIN);
+    box(58, 170, 5, 62, SKIN); box(70, 170, 5, 62, SKIN);
+    box(56, 236, 6, 4, SKIN); box(72, 236, 6, 4, SKIN);
+    box(50, 118, 4, 14, SKIN); box(78, 118, 4, 14, SKIN);
+    const rd1161: any = S.analyzePose(img, W, H);
+    const sit1161: any = S.poseSitting(rd1161, 50);
+    check('P1161 poseSitting が座りの印を付ける', sit1161 !== rd1161 && sit1161.sittingPose === true);
+    const SZ = 128;
+    const chairExact = (im: Uint8Array): number => {
+      let n = 0;
+      for (let i = 0; i < SZ * SZ * 4; i += 4) if (im[i] === 124 && im[i + 1] === 96 && im[i + 2] === 72) n++;
+      return n;
+    };
+    const sitImg1161 = S.renderBody(sit1161, SZ, null, null, { backHair: true });
+    const standImg1161 = S.renderBody(rd1161, SZ, null, null, { backHair: true });
+    const bent1161: any = S.withPose(rd1161, { legL: { hipDeg: -35, kneeDeg: 30 }, legR: { hipDeg: 35, kneeDeg: -30 } });
+    const bentImg1161 = S.renderBody(bent1161, SZ, null, null, { backHair: true });
+    const chairSit = sitImg1161 ? chairExact(sitImg1161) : -1;
+    const chairStand = standImg1161 ? chairExact(standImg1161) : -1;
+    const chairBent = bentImg1161 ? chairExact(bentImg1161) : -1;
+    console.log(`  [P1161] chair px: sitting=${chairSit}, standing=${chairStand}, bentOnly=${chairBent}`);
+    check('P1161 座り描画に椅子が出る（椅子色が十分ある）', chairSit > 100);
+    check('P1161 立位と膝折れだけのポーズには椅子を出さない', chairStand === 0 && chairBent === 0);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

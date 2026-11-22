@@ -166,6 +166,9 @@ export interface PoseReading {
    * ポーズ合成（withPose）が置いた時だけ入る。 */
   kneeL?: PosePoint | null;
   kneeR?: PosePoint | null;
+  /** P1161: 座りポーズの印（poseSitting が付ける）。描画側は
+   * 幾何からの推測でなく、この印で椅子と髪の座面追従を出す。 */
+  sittingPose?: boolean;
   armL: ArmState;
   armR: ArmState;
   legs: LegState;
@@ -1179,6 +1182,45 @@ class VisualPoseService {
     // 後ろに垂れて下で広がる面として最初に描く（体はその上に
     // 描かれる）。広がりは読みの輪郭幅から取る：サンプルの
     // 輪郭は腰から下の広がりを髪が決めていた（IoU 0.47の主因）。
+    // P1161: 座りの可読性。膝のある読みで腰が立位の比より
+    // はっきり落ちていれば「座り」とみなし、体の後ろに椅子を
+    // 描く（背もたれ・座面・脚）。髪と体はこの後に描かれるので
+    // 椅子は自然に後ろへ回る。無ポーズ・膝折れだけの読みでは
+    // 描かない（従来の描画を変えない）。
+    const sitting1161 = reading.sittingPose === true && !!(reading.kneeL && reading.kneeR && reading.hipL && reading.hipR);
+    if (sitting1161) {
+      const CHAIR: [number, number, number] = [124, 96, 72];
+      const CHAIR_SH: [number, number, number] = deriveShadow(CHAIR);
+      const cxPx = cxN * (S - 1);
+      const seatTop = Math.round(hipY * (S - 1)) + 1;
+      const seatThick = Math.max(2, Math.round(figHn * S * 0.018));
+      // 座面と背もたれは後ろ髪の広がりより少し外へ出す。髪の
+      // 内側に収めると全部髪に隠れて椅子が読めない（初版の実測）。
+      const hairHalfEst = reading.silhouetteWidth
+        ? reading.silhouetteWidth * figHn * (S - 1) * 0.5 * 0.94
+        : Math.max(hipW, shoulderW) * 0.72;
+      const seatHalf = Math.max(hipW * 0.95, hairHalfEst * 1.05);
+      const footRow = Math.round(footY * (S - 1));
+      const rect = (x0: number, x1: number, y0: number, y1: number, c: [number, number, number]) => {
+        for (let y = Math.max(0, y0); y <= Math.min(S - 1, y1); y++) for (let x = Math.max(0, Math.round(x0)); x <= Math.min(S - 1, Math.round(x1)); x++) set(x, y, c);
+      };
+      // 背もたれ：柱2本＋横桟2枚（肩より少し上まで）
+      const backHalf = Math.max(shoulderW * 0.62, hairHalfEst * 0.92);
+      const backTop = Math.round((shoulderY - figHn * 0.14) * (S - 1));
+      const postW = Math.max(2, Math.round(S * 0.022));
+      rect(cxPx - backHalf, cxPx - backHalf + postW, backTop, seatTop, CHAIR_SH);
+      rect(cxPx + backHalf - postW, cxPx + backHalf, backTop, seatTop, CHAIR_SH);
+      const slatH = Math.max(2, Math.round(figHn * S * 0.05));
+      rect(cxPx - backHalf, cxPx + backHalf, backTop, backTop + slatH, CHAIR);
+      const slat2Y = backTop + Math.round((seatTop - backTop) * 0.45);
+      rect(cxPx - backHalf, cxPx + backHalf, slat2Y, slat2Y + slatH, CHAIR_SH);
+      // 座面
+      rect(cxPx - seatHalf, cxPx + seatHalf, seatTop, seatTop + seatThick, CHAIR);
+      // 脚（座面の両端から床まで）
+      const legW2 = Math.max(2, Math.round(S * 0.02));
+      rect(cxPx - seatHalf + 1, cxPx - seatHalf + 1 + legW2, seatTop + seatThick, footRow, CHAIR);
+      rect(cxPx + seatHalf - 1 - legW2, cxPx + seatHalf - 1, seatTop + seatThick, footRow, CHAIR);
+    }
     if (reading.hair && reading.hair.length === 'long' && shape?.backHair === true) {
       const bkTopY = (head.y - headRh) * (S - 1);
       const bkBottomY = bkTopY + reading.hair.lengthRatio * figHn * (S - 1);
@@ -1235,7 +1277,10 @@ class VisualPoseService {
         }
       }
       const useCtr = ctrBottomY > bkTopY;
-      const sheetBottomY = useCtr ? Math.max(ctrBottomY, bkTopY + figHpPx * 0.3) : bkBottomY;
+      const sheetBottomRaw = useCtr ? Math.max(ctrBottomY, bkTopY + figHpPx * 0.3) : bkBottomY;
+      // P1161: 座りでは後ろ髪は床まで垂れず、座面に乗って
+      // 止まる（腰の少し下で打ち切る）。
+      const sheetBottomY = sitting1161 ? Math.min(sheetBottomRaw, (hipY + 0.055) * (S - 1)) : sheetBottomRaw;
       // 後ろの髪は少し落とした色の面として描く（実物でも後ろ髪は
       // 暗く落ちる。前の髪と同色だと、体との境界に壁が立たず、
       // 自分の描画を測り直す時に髪と体が分離できない。落とし
@@ -4297,6 +4342,7 @@ class VisualPoseService {
     out.kneeL = sl.knee;
     out.hipR = sr.hip;
     out.kneeR = sr.knee;
+    out.sittingPose = true;
     // 足（footL/footR）は元の読みのまま＝置いたまま。
     return out;
   }
