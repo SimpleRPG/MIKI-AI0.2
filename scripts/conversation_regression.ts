@@ -11105,6 +11105,35 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1140 言及つきの肯定で検証済みが付く', afterTargeted.verified >= 1, `verified=${afterTargeted.verified}`);
   }
 
+// ---- P1141: 検索の最小化（証拠充足で早期終了・反証を前へ・環境クエリは必要な時だけ） ----
+  {
+    const { assessResearchEvidenceSatisfied1141 } = await import('../src/miki/research/services/researchService');
+    const { researchQueryPlanningService, intentNeedsEnvironmentCheck1141 } = await import('../src/miki/research/services/researchQueryPlanningService');
+    check('P1141 充足判定: クラスタ2＋反証試行済みで充足', assessResearchEvidenceSatisfied1141({ stopWhenEvidenceSatisfied: true, independentClusterCount: 2, planIntentTypes: ['BASELINE', 'COUNTEREVIDENCE'], executedIntentTypes: ['BASELINE', 'COUNTEREVIDENCE'] }) === true, '');
+    check('P1141 充足判定: 反証が未試行なら不足', assessResearchEvidenceSatisfied1141({ stopWhenEvidenceSatisfied: true, independentClusterCount: 3, planIntentTypes: ['BASELINE', 'COUNTEREVIDENCE'], executedIntentTypes: ['BASELINE'] }) === false, '');
+    check('P1141 充足判定: クラスタ1では不足・方針offでは不足', assessResearchEvidenceSatisfied1141({ stopWhenEvidenceSatisfied: true, independentClusterCount: 1, planIntentTypes: [], executedIntentTypes: [] }) === false && assessResearchEvidenceSatisfied1141({ stopWhenEvidenceSatisfied: false, independentClusterCount: 5, planIntentTypes: [], executedIntentTypes: [] }) === false, '');
+    check('P1141 充足判定: 計画に反証が無ければクラスタ2で充足', assessResearchEvidenceSatisfied1141({ stopWhenEvidenceSatisfied: true, independentClusterCount: 2, planIntentTypes: ['BASELINE'], executedIntentTypes: ['BASELINE'] }) === true, '');
+    check('P1141 環境クエリ判定: 一般の問いには不要', intentNeedsEnvironmentCheck1141('光合成の仕組み', false) === false, '');
+    check('P1141 環境クエリ判定: 環境言及・実装系では必要', intentNeedsEnvironmentCheck1141('Androidへのインストール方法', false) === true && intentNeedsEnvironmentCheck1141('型推論の仕組み', true) === true, '');
+    const { japaneseDictionaryService: dictSvc1141 } = await import('../src/miki/research/services/japaneseDictionaryService');
+    const seedPlan1141 = (question: string) => {
+      for (let i = 0; i < 5; i++) {
+        const p = researchQueryPlanningService.buildPlan(question, []);
+        if (p.queries.length > 0) return p;
+        const unknowns = p.subject?.unknownTerms || [];
+        if (unknowns.length === 0) return p;
+        for (const t of unknowns) dictSvc1141.addPersonal(t, { reading: t, pos: '名詞', gloss: 'テスト用の語' } as any);
+      }
+      return researchQueryPlanningService.buildPlan(question, []);
+    };
+    const generalPlan = seedPlan1141('光合成の仕組み');
+    const generalIntents = generalPlan.queries.map(q => q.intentType);
+    check('P1141 一般の問いの計画に環境クエリが無い', generalIntents.length > 0 && !generalIntents.includes('CURRENT_ENVIRONMENT'), `intents=${generalIntents.join(',')}`);
+    const implPlan = seedPlan1141('TypeScriptの型推論の実装方法');
+    const implIntents = implPlan.queries.map(q => q.intentType);
+    check('P1141 実装系の計画では反証が環境より前', implIntents.includes('CURRENT_ENVIRONMENT') && implIntents.indexOf('COUNTEREVIDENCE') < implIntents.indexOf('CURRENT_ENVIRONMENT'), `intents=${implIntents.join(',')}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

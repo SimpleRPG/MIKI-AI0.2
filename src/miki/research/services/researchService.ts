@@ -155,6 +155,18 @@ export function assessResearchSourceRole(query: { intentType?: string; sourceTie
  * pages first instead of whatever the search order happened to
  * return; the remaining results still contribute snippet evidence.
  */
+export function assessResearchEvidenceSatisfied1141(input: {
+  stopWhenEvidenceSatisfied: boolean;
+  independentClusterCount: number;
+  planIntentTypes: string[];
+  executedIntentTypes: string[];
+}): boolean {
+  if (!input.stopWhenEvidenceSatisfied) return false;
+  if (input.independentClusterCount < 2) return false;
+  if (!input.planIntentTypes.includes('COUNTEREVIDENCE')) return true;
+  return input.executedIntentTypes.includes('COUNTEREVIDENCE');
+}
+
 export function orderResultsForReading<T extends { url?: string }>(results: T[], query: { intentType?: string; sourceTierTarget?: string; siteOrDomainConstraints?: string[] }): T[] {
   const rank = (item: T): number => {
     const role = assessResearchSourceRole(query, { url: item.url || "" });
@@ -1215,6 +1227,24 @@ export class ResearchService {
         previousEvidenceFingerprint = evidenceFingerprint;
         previousEvidenceIds = currentEvidenceIds;
         previousIndependentClusters = currentIndependentClusters;
+
+        // P1141: 証拠が足りたら残りの計画パスを回さない（方針
+        // stopWhenEvidenceSatisfied の実働化。これまでは方針に
+        // あるだけで実行側は読んでいなかった）。支持側の独立
+        // クラスタが2以上そろい、反証パスを試行済み（または
+        // 計画に無い）なら、この調査は答えに届いたものとして
+        // 打ち切る。環境・拡張などの残りパスは必要な時だけ回る。
+        if (queryPlan.status === 'READY' && assessResearchEvidenceSatisfied1141({
+          stopWhenEvidenceSatisfied: queryPlan.policy.stopWhenEvidenceSatisfied,
+          independentClusterCount: webResearchProgress.acceptedIndependentSourceCount,
+          planIntentTypes: queryPlan.queries.map(q => q.intentType),
+          executedIntentTypes: queryPlan.queries.slice(0, pass + 1).map(q => q.intentType),
+        })) {
+          continuationAvailable = false;
+          continuationReason = 'EVIDENCE_SATISFIED';
+          systemLogger.info('SELF_IMPROVEMENT', `🔎 [検索最小化] 証拠が充足したため残りの計画パスを省略しました (pass=${pass + 1}, clusters=${webResearchProgress.acceptedIndependentSourceCount})`);
+          break;
+        }
 
         const webPolicySatisfied = webResearchPolicy.stopWhenTargetReached && webResearchPolicyService.isSatisfied(webResearchProgress, webResearchPolicy);
         if (webPolicySatisfied && !resolved) {

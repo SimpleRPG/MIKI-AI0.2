@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4945,
-    "resolvedRelativeImportCandidateCount": 4927,
+    "relativeImportCandidateCount": 4948,
+    "resolvedRelativeImportCandidateCount": 4930,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 932895,
-      "lines": 11121,
-      "sha256": "cd1a2540ca8ad52a0bf8701e32dbbdea15daf0bd73365576f616123c665950e2",
+      "bytes": 936281,
+      "lines": 11150,
+      "sha256": "40a277a6c26554f51418e50dddd9b40ecac62fccaf29b48de59d6d3abcf2b52a",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5544,10 +5544,28 @@
           "specifier": "../src/miki/memory/services/claimDatabaseService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/memory/services/claimDatabaseService.ts"
+        },
+        {
+          "line": 11110,
+          "specifier": "../src/miki/research/services/researchService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/researchService.ts"
+        },
+        {
+          "line": 11111,
+          "specifier": "../src/miki/research/services/researchQueryPlanningService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/researchQueryPlanningService.ts"
+        },
+        {
+          "line": 11118,
+          "specifier": "../src/miki/research/services/japaneseDictionaryService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
         }
       ],
-      "relativeImportCandidateCount": 638,
-      "resolvedRelativeImportCount": 636,
+      "relativeImportCandidateCount": 641,
+      "resolvedRelativeImportCount": 639,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -31560,9 +31578,9 @@
     },
     {
       "path": "src/miki/research/services/researchQueryPlanningService.ts",
-      "bytes": 30385,
-      "lines": 262,
-      "sha256": "84c2fb01faa68e95936e1ac6d22f6a97c1696bf0da4634c520c4890b873275ba",
+      "bytes": 31204,
+      "lines": 274,
+      "sha256": "46ad03edcca5269a1e7c15120dc82e4a3f38684578ed6649bd12895cc7e2b628",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31623,9 +31641,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 84712,
-      "lines": 1546,
-      "sha256": "97bb8063cdce569d65d3cf75a4e2baf78d2140a0c63fa304c9b928c5f1a9ee17",
+      "bytes": 86458,
+      "lines": 1576,
+      "sha256": "e7cf1c234714d8431a3e8b5c29e76b63cece28e82da1c2449655b6ec0a9b930c",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31814,13 +31832,13 @@
           "resolvedPath": "src/miki/core/services/githubCodeMaterialService.ts"
         },
         {
-          "line": 396,
+          "line": 408,
           "specifier": "../../core/services/githubCodeMaterialService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/githubCodeMaterialService.ts"
         },
         {
-          "line": 406,
+          "line": 418,
           "specifier": "../../core/services/stackExchangeMaterialService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/stackExchangeMaterialService.ts"

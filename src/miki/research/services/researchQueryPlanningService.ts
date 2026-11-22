@@ -47,6 +47,18 @@ export interface ResearchQueryIntent {queryId:string;queryPlanId:string;parentQu
 export interface QueryPlanningPolicy {enabled:boolean;maxQueriesPerPlan:number;maxRevisionPerQuery:number;maxParallelQueries:number;maxTotalSearchRequests:number;maxQueryExecutionTimeMs:number;maxCandidateUrlsPerQuery:number;stopWhenEvidenceSatisfied:boolean;preferOfficialSources:boolean;requireCurrentEnvironmentCheck:boolean;requireCounterEvidenceSearch:boolean;linkAutoIndependentSourcePolicy:boolean;updatedAt:number;}
 export interface ResearchQueryPlan {queryPlanId:string;researchQuestionId:string;canonicalResearchIntent:string;environment:EnvironmentFingerprint;policy:QueryPlanningPolicy;queries:ResearchQueryIntent[];usedQueryPatternIds:string[];excludedQueryPatternIds:string[];queryPatternSelectionId:string;queryPatternSelectionSha256:string;status:'DRAFT'|'READY'|'BLOCKED'|'RUNNING'|'COMPLETED'|'STOPPED';planSha256:string;createdAt:number;updatedAt:number;/** P493: 主題理解の段の結果（主題文・未知語・分野・意味の伴走語）。 */subject?:{status:string;subjectText:string;unknownTerms:string[];field?:string;senseAnchorTerms:string[]};}
 export interface QueryRevisionPair {revisionPairId:string;queryId:string;originalQuery:string;revisedQuery:string;revisionReason:string;termsAdded:string[];termsRemoved:string[];beforeOutcome:Record<string,unknown>;afterOutcome?:Record<string,unknown>;resultingEvidenceIds:string[];acceptedByCore:boolean;pairSha256:string;createdAt:number;}
+/*
+ * P1141: 環境適合クエリ（「X Android arm64 Termux compatibility」）が
+ * 要る問いかどうか。実装・導入・環境そのものに関わる問いにだけ
+ * 意味があるクエリで、一般の知識の問いでは毎回1パス無駄になって
+ * いた。計画側では、実装系の意図がある場合か、問い自体が環境に
+ * 言及している場合だけ載せる。
+ */
+export function intentNeedsEnvironmentCheck1141(text: string, implementationLike: boolean): boolean {
+  if (implementationLike) return true;
+  return /(?:Android|Termux|端末|環境|互換|compatib|動作環境|インストール|install|Galaxy|arm64|対応機種|対応OS)/i.test(String(text || ''));
+}
+
 const POLICY_KEY='miki_research_query_planning_policy_v1';
 const PLAN_KEY='miki_research_query_plans_v1';
 const REVISION_KEY='miki_research_query_revision_pairs_v1';
@@ -232,7 +244,7 @@ if(implementationRequired||fieldImplementation){
   ]);
 }
 
-if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${effectiveIntent} official specification documentation`,'一次・公式情報']);if(policy.requireCurrentEnvironmentCheck)specs.push(['CURRENT_ENVIRONMENT',`${effectiveIntent} Android arm64 Termux compatibility`,'Galaxy S25環境適合']);if(policy.requireCounterEvidenceSearch)specs.push(['COUNTEREVIDENCE',`${effectiveIntent} limitation unsupported known issue`,'反証・制限']);const webPolicy=webResearchPolicyService.get();if(webPolicy.requirePrimarySource&&!specs.some(x=>x[0]==='PRIMARY_SOURCE'||x[0]==='OFFICIAL_SPECIFICATION'))specs.push(['PRIMARY_SOURCE',`${effectiveIntent} primary source`,'一次情報']);const expansionSpecs:Array<[QueryIntentType,string,string]>=[];
+if(policy.preferOfficialSources)specs.push(['OFFICIAL_SPECIFICATION',`${effectiveIntent} official specification documentation`,'一次・公式情報']);if(policy.requireCounterEvidenceSearch)specs.push(['COUNTEREVIDENCE',`${effectiveIntent} limitation unsupported known issue`,'反証・制限']);if(policy.requireCurrentEnvironmentCheck&&intentNeedsEnvironmentCheck1141(effectiveIntent,implementationRequired||fieldImplementation))specs.push(['CURRENT_ENVIRONMENT',`${effectiveIntent} Android arm64 Termux compatibility`,'Galaxy S25環境適合']);const webPolicy=webResearchPolicyService.get();if(webPolicy.requirePrimarySource&&!specs.some(x=>x[0]==='PRIMARY_SOURCE'||x[0]==='OFFICIAL_SPECIFICATION'))specs.push(['PRIMARY_SOURCE',`${effectiveIntent} primary source`,'一次情報']);const expansionSpecs:Array<[QueryIntentType,string,string]>=[];
 const synVariant=lexicalRelationService.synonymVariantOf(effectiveIntent);if(synVariant&&synVariant!==effectiveIntent)expansionSpecs.push(['SYNONYM_EXPANSION',synVariant,'同義語での言い換え検索']);
 const traVariant=lexicalRelationService.translationVariantOf(effectiveIntent);if(traVariant&&traVariant!==effectiveIntent)expansionSpecs.push(['TRANSLATION_EXPANSION',traVariant,'英語での言い換え検索']);
 const abbVariant=lexicalRelationService.abbreviationVariantOf(effectiveIntent);if(abbVariant&&abbVariant!==effectiveIntent)expansionSpecs.push(['ABBREVIATION_EXPANSION',abbVariant,'略語の展開・圧縮での検索']);
