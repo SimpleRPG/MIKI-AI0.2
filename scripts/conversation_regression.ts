@@ -11297,6 +11297,19 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1150 構造と輪郭の照合は維持', Boolean(vs1150?.verified) && Boolean(vc1150?.verified), `structured=${vs1150?.verified} contour=${vc1150?.verified}`);
   }
 
+// ---- P1151: 読み下しで規則的な複数形も引ける ----
+  {
+    const { lexicalRelationService: lex1151 } = await import('../src/miki/memory/services/lexicalRelationService');
+    (lex1151 as any).addRelation('chloroplast', '葉緑体', 'TRANSLATION', 'manual');
+    (lex1151 as any).addRelation('city', '都市', 'TRANSLATION', 'manual');
+    const g1151a = (lex1151 as any).japaneseGlossOf('Chloroplasts convert sunlight.');
+    check('P1151 複数形（-s）も単数形の知識で読み下せる', String(g1151a.text).includes('葉緑体') && g1151a.replaced >= 1 && !(g1151a.unknownTerms as string[]).includes('chloroplasts'), JSON.stringify(g1151a).slice(0, 120));
+    const g1151b = (lex1151 as any).japaneseGlossOf('Many cities grow.');
+    check('P1151 複数形（-ies）も読み下せる', String(g1151b.text).includes('都市') && g1151b.replaced >= 1, JSON.stringify(g1151b).slice(0, 120));
+    const g1151c = (lex1151 as any).japaneseGlossOf('The chloroplast is green.');
+    check('P1151 単数形の読み下しは従来通り', String(g1151c.text).includes('葉緑体') && g1151c.replaced >= 1, JSON.stringify(g1151c).slice(0, 120));
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4969,
-    "resolvedRelativeImportCandidateCount": 4951,
+    "relativeImportCandidateCount": 4970,
+    "resolvedRelativeImportCandidateCount": 4952,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 953261,
-      "lines": 11313,
-      "sha256": "d6f53e67d7814cffb84269b360b25cfee50afd24d91e3f8ff0439dc13ef7d73c",
+      "bytes": 954432,
+      "lines": 11326,
+      "sha256": "b0ae8108fa25d6652cd4726f0851ad51dc0bd194eaa497ef1fa498bf9d7533f4",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5670,10 +5670,16 @@
           "specifier": "../src/miki/conversation/services/visualLikenessService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/conversation/services/visualLikenessService.ts"
+        },
+        {
+          "line": 11302,
+          "specifier": "../src/miki/memory/services/lexicalRelationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 659,
-      "resolvedRelativeImportCount": 657,
+      "relativeImportCandidateCount": 660,
+      "resolvedRelativeImportCount": 658,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -29777,9 +29783,9 @@
     },
     {
       "path": "src/miki/memory/services/lexicalRelationService.ts",
-      "bytes": 41658,
-      "lines": 963,
-      "sha256": "961181a990ee18a29896242718e1f885654e81a32595c8cd503adc5b117422d9",
+      "bytes": 42346,
+      "lines": 975,
+      "sha256": "d5abd21ca2b31e07d0dc2e35e20a946b7efcbc4075936da3e4c870870bfcc155",
       "relativeImportCandidates": [
         {
           "line": 1,

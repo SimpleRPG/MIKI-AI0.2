@@ -528,8 +528,10 @@ class LexicalRelationService {
    * P1146: 英語の文の「読み下し」を返す。翻訳ではなく、彼女が
    * 知っている語だけを日本語に置き換える部分的な読み下し。
    * 知らない英単語はそのまま残り、unknownTerms として見える
-   * （後の意味学習の対象になる形）。複数形などの語形変化は
-   * この段では扱わない。
+   * （後の意味学習の対象になる形）。
+   * P1151: 規則的な複数形（-s / -es / -ies）も単数形の知識で
+   * 引けるようにする。英語の文では複数形が既定に近いので、
+   * 単数しか引けないと読み下しの穴が大きくなる。
    */
   public japaneseGlossOf(textRaw: string): { text: string; replaced: number; unknownTerms: string[] } {
     this.load();
@@ -557,7 +559,17 @@ class LexicalRelationService {
     pairs.sort((x, y) => y[0].length - x[0].length);
     let replaced = 0;
     for (const [en, ja] of pairs) {
-      const re = new RegExp(`\\b${escapeRegExp(en)}\\b`, 'gi');
+      // P1151: 単独語には規則的な複数形も候補に足す（長い方を先に）。
+      const variants = [en];
+      if (!/[\s-]/.test(en)) {
+        const w = en.toLowerCase();
+        let plural: string | null = null;
+        if (/(?:s|x|z|ch|sh)$/.test(w)) plural = `${en}es`;
+        else if (/[^aeiou]y$/.test(w)) plural = `${en.slice(0, -1)}ies`;
+        else plural = `${en}s`;
+        if (plural && plural.toLowerCase() !== w) variants.unshift(plural);
+      }
+      const re = new RegExp(`\\b(?:${variants.map((v) => escapeRegExp(v)).join('|')})\\b`, 'gi');
       text = text.replace(re, () => {
         replaced++;
         return ja;
