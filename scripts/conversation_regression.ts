@@ -11542,6 +11542,63 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1161 立位と膝折れだけのポーズには椅子を出さない', chairStand === 0 && chairBent === 0);
   }
 
+  // ---- P1162: 色の段（髪と肌への影の段、服色は守る） ----
+  {
+    const { visualPoseService } = await import('../src/miki/conversation/services/visualPoseService');
+    const S = visualPoseService as any;
+    const W = 128, H = 256;
+    const img = new Uint8Array(W * H * 4);
+    const put = (x: number, y: number, c: [number, number, number]) => {
+      const px = Math.round(x * (W - 1)), py = Math.round(y * (H - 1)), i = (py * W + px) * 4;
+      img[i] = c[0]; img[i + 1] = c[1]; img[i + 2] = c[2]; img[i + 3] = 255;
+    };
+    const box = (cx: number, cy: number, hw: number, hh: number, c: [number, number, number]) => {
+      for (let y = cy - hh; y <= cy + hh; y++) for (let x = cx - hw; x <= cx + hw; x++) put(x / (W - 1), y / (H - 1), c);
+    };
+    for (let i = 0; i < W * H * 4; i += 4) { img[i] = 168; img[i + 1] = 168; img[i + 2] = 172; img[i + 3] = 255; }
+    const SKIN: [number, number, number] = [242, 200, 180];
+    const HAIRC: [number, number, number] = [208, 182, 196];
+    const TOPC: [number, number, number] = [245, 222, 228];
+    const BOTC: [number, number, number] = [231, 203, 210];
+    box(64, 30, 13, 16, HAIRC); box(64, 128, 30, 100, HAIRC);
+    box(64, 84, 13, 30, TOPC); box(64, 140, 15, 26, BOTC);
+    box(64, 30, 9, 12, SKIN); box(58, 74, 4, 26, SKIN); box(70, 74, 4, 26, SKIN);
+    box(58, 170, 5, 62, SKIN); box(70, 170, 5, 62, SKIN);
+    box(56, 236, 6, 4, SKIN); box(72, 236, 6, 4, SKIN);
+    box(50, 118, 4, 14, SKIN); box(78, 118, 4, 14, SKIN);
+    const rd1162: any = S.analyzePose(img, W, H);
+    const SZ = 128;
+    const flat1162 = S.renderBodyStructuredTwin(rd1162, SZ, null, null, { backHair: true });
+    const base1162 = flat1162 ? S.renderBodyHairDetail(rd1162, SZ, null, null, { backHair: true }, flat1162) : null;
+    const fin1162 = base1162 && flat1162 ? S.applyBodyFinishBlend(base1162, flat1162, SZ, rd1162) : null;
+    const graded1162 = fin1162 && flat1162 ? S.applyBodyFinishGradients(fin1162, flat1162, SZ, rd1162) : null;
+    const stepped1162 = graded1162 && flat1162 ? S.applyBodyShadowStep1162(graded1162, flat1162, SZ, rd1162) : null;
+    let diff1162 = 0, clothTouched1162 = 0;
+    if (graded1162 && stepped1162 && flat1162) {
+      for (let i = 0; i < SZ * SZ * 4; i += 4) {
+        if (graded1162[i] !== stepped1162[i] || graded1162[i + 1] !== stepped1162[i + 1] || graded1162[i + 2] !== stepped1162[i + 2]) {
+          diff1162++;
+          const fr = flat1162[i], fg = flat1162[i + 1], fb = flat1162[i + 2];
+          if ((fr === TOPC[0] && fg === TOPC[1] && fb === TOPC[2]) || (fr === BOTC[0] && fg === BOTC[1] && fb === BOTC[2])) clothTouched1162++;
+        }
+      }
+    }
+    const pal1162 = flat1162 ? S.segmentTwinPalette(flat1162, SZ, rd1162) : null;
+    let lumG = 0, lumS = 0, hairN = 0;
+    if (pal1162 && graded1162 && stepped1162) {
+      for (let p = 0; p < SZ * SZ; p++) {
+        if (!pal1162.hair[p]) continue;
+        hairN++;
+        lumG += graded1162[p * 4] + graded1162[p * 4 + 1] + graded1162[p * 4 + 2];
+        lumS += stepped1162[p * 4] + stepped1162[p * 4 + 1] + stepped1162[p * 4 + 2];
+      }
+    }
+    console.log(`  [P1162] step diff=${diff1162}, clothTouched=${clothTouched1162}, hairLum ${hairN ? Math.round(lumG / hairN) : -1} -> ${hairN ? Math.round(lumS / hairN) : -1}`);
+    check('P1162 影の段が髪と肌に入る（差分が十分ある）', diff1162 > 150);
+    check('P1162 影の段は服の厳密色に触れない', clothTouched1162 === 0);
+    check('P1162 髪の平均輝度が下がる（影として効く）', hairN > 0 && lumS < lumG);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

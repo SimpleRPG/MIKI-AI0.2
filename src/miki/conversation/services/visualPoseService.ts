@@ -2920,7 +2920,13 @@ class VisualPoseService {
     // 面内は一様でなく、帯域ごとの softRatio でも見本 0.52〜0.62 に
     // 対し描画 0.09〜0.22 と開きが残っていた部分への対策。
     const graded = this.applyBodyFinishGradients(finished, flat, size, reading);
-    const outlined = this.applyOutlineLines(graded, size);
+    // P1162: 色の段。面は平坦＋縁の陰だけでは形が色で分かれず、
+    // 淡色が一帯に溶けて見える（見本は面の中に影の段がある）。
+    // 髪と肌にだけ、面の下部と右側へ一段落とした影を入れる。
+    // 影色は単に暗くせず青紫へ寄せる（暗くするだけだと灰色に
+    // 濁る）。服の厳密色（P1081）は対象外にして守る。
+    const stepped = this.applyBodyShadowStep1162(graded, flat, size, reading);
+    const outlined = this.applyOutlineLines(stepped, size);
     // P1068: 中の線（平坦な双子には残らないので仕上げで描く）
     this.stampInnerLines(outlined, size, reading);
     // P1150: 線は仕上げの後段で描かれるため、線の画素と素地の
@@ -3199,6 +3205,72 @@ class VisualPoseService {
         }
         x = runEnd + 1;
       }
+    }
+    return out;
+  }
+
+  /**
+   * P1162: 影の段。髪マスクと肌色画素に、面の下部（縦の
+   * 下32%）と右側（横の右18%）へ一段落とした影を入れる。
+   * 影色は明度を落とすだけでなく青紫側へ寄せる（R×0.78 /
+   * G×0.70 / B×0.84）。服色は同一性信号（P1081）なので
+   * 触らない。段の境界はあえて硬く残す（見本の影も段に
+   * なっている）。
+   */
+  private applyBodyShadowStep1162(base: Uint8Array, flat: Uint8Array, size: number, reading: PoseReading): Uint8Array {
+    const pal = this.segmentTwinPalette(flat, size, reading);
+    if (!pal) return base;
+    const out = new Uint8Array(base);
+    const skin = reading.skinColor ?? [232, 190, 160];
+    const shadowMask = new Uint8Array(size * size);
+    const mark = (mask: Uint8Array, skinOnly: boolean) => {
+      // 縦：列ごとにマスクの下部
+      for (let x = 0; x < size; x++) {
+        let top = -1, bottom = -1;
+        for (let y = 0; y < size; y++) {
+          const on = skinOnly
+            ? (mask[y * size + x] === 1 && flat[(y * size + x) * 4] === skin[0] && flat[(y * size + x) * 4 + 1] === skin[1] && flat[(y * size + x) * 4 + 2] === skin[2])
+            : mask[y * size + x] === 1;
+          if (on) { if (top < 0) top = y; bottom = y; }
+        }
+        if (bottom > top) {
+          const from = top + Math.floor((bottom - top) * 0.68);
+          for (let y = from; y <= bottom; y++) {
+            const on = skinOnly
+              ? (mask[y * size + x] === 1 && flat[(y * size + x) * 4] === skin[0] && flat[(y * size + x) * 4 + 1] === skin[1] && flat[(y * size + x) * 4 + 2] === skin[2])
+              : mask[y * size + x] === 1;
+            if (on) shadowMask[y * size + x] = 1;
+          }
+        }
+      }
+      // 横：行ごとにマスクの右側
+      for (let y = 0; y < size; y++) {
+        let left = -1, right = -1;
+        for (let x = 0; x < size; x++) {
+          const on = skinOnly
+            ? (mask[y * size + x] === 1 && flat[(y * size + x) * 4] === skin[0] && flat[(y * size + x) * 4 + 1] === skin[1] && flat[(y * size + x) * 4 + 2] === skin[2])
+            : mask[y * size + x] === 1;
+          if (on) { if (left < 0) left = x; right = x; }
+        }
+        if (right > left) {
+          const from = left + Math.floor((right - left) * 0.82);
+          for (let x = from; x <= right; x++) {
+            const on = skinOnly
+              ? (mask[y * size + x] === 1 && flat[(y * size + x) * 4] === skin[0] && flat[(y * size + x) * 4 + 1] === skin[1] && flat[(y * size + x) * 4 + 2] === skin[2])
+              : mask[y * size + x] === 1;
+            if (on) shadowMask[y * size + x] = 1;
+          }
+        }
+      }
+    };
+    mark(pal.hair, false);
+    mark(pal.body, true);
+    for (let p = 0; p < size * size; p++) {
+      if (!shadowMask[p]) continue;
+      const i = p * 4;
+      out[i] = Math.round(out[i] * 0.78);
+      out[i + 1] = Math.round(out[i + 1] * 0.70);
+      out[i + 2] = Math.round(out[i + 2] * 0.84);
     }
     return out;
   }
