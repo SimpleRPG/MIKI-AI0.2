@@ -46,6 +46,17 @@ const GAP_FOCUS_STRATEGY_LEDGER_KEY='miki_gap_focus_strategy_attempts_v1';
 // （実例: 製品ページの宣伝文が FACT_CLAIM になった）。ここで落とす
 // のは Claim 化だけで、Evidence 自体は従来どおり記録される。
 const P473_PROMO_TERMS = ['応援し', '激減', '瞬時', 'ゼロで', '徹底的', '叩き出', 'かみ砕', 'あるある', '詰まったら', 'ここへ', '爆速', '禁断', '裏技', 'じゃじゃ馬', 'お任せ'];
+
+// P1146: 文が英語中心かどうか（英字が日本語文字の2倍超、かつ
+// 英字10文字以上）。読み下しの対象判定に使う。
+export function isEnglishDominantText1146(text: string): boolean {
+  const t = String(text || '');
+  const latin = (t.match(/[A-Za-z]/g) || []).length;
+  if (latin < 10) return false;
+  const jp = (t.match(/[぀-ヿ一-鿿]/g) || []).length;
+  return latin > jp * 2;
+}
+
 export function assessClaimWorthiness(statement: string): { ok: boolean; reason?: string } {
   const text = String(statement || '').trim();
   if (!text) return { ok: false, reason: 'EMPTY' };
@@ -1515,6 +1526,16 @@ export class ResearchService {
     reuseExisting = true,
     gate?: { anchorTerms?: string[]; subjectField?: string },
   ): string | undefined {
+    // P1146: 英語中心の文は、知っている語だけ日本語に寄せた
+    // 読み下しを主張文にする（原文は証拠側に残る）。読み下しで
+    // 日本語の語が立つ場合だけ差し替える。何も知らない文を
+    // 無理に混ぜ物にはしない。
+    if (isEnglishDominantText1146(statement)) {
+      const gloss = lexicalRelationService.japaneseGlossOf(statement);
+      if (gloss.replaced > 0 && /[぀-ヿ一-鿿]/.test(gloss.text)) {
+        statement = gloss.text;
+      }
+    }
     const normalized = this.normalizeClaimStatement(statement);
     if (normalized.length < 15) return undefined;
 

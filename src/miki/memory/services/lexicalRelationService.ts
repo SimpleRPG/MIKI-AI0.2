@@ -135,6 +135,15 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// P1146: 読み下しで「知らない語」から外す英語の機能語。
+const GLOSS_STOP_LATIN_1146 = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'are', 'was', 'were',
+  'has', 'have', 'had', 'into', 'which', 'when', 'where', 'while', 'than',
+  'then', 'such', 'each', 'other', 'also', 'only', 'over', 'under', 'between',
+  'through', 'during', 'about', 'after', 'before', 'their', 'there', 'these',
+  'those', 'they', 'them', 'been', 'being', 'will', 'would', 'can', 'could',
+]);
+
 /**
  * P491: 意味の分岐（多義語）。同じ語に対する Wikidata の別項目が
  * 別の意味に対応する。description と上位語が、文脈から意味を
@@ -505,6 +514,56 @@ class LexicalRelationService {
       if (out.length >= cap) break;
     }
     return out.slice(0, cap);
+  }
+
+  /**
+   * P1146: 英語の文の「読み下し」を返す。翻訳ではなく、彼女が
+   * 知っている語だけを日本語に置き換える部分的な読み下し。
+   * 知らない英単語はそのまま残り、unknownTerms として見える
+   * （後の意味学習の対象になる形）。複数形などの語形変化は
+   * この段では扱わない。
+   */
+  public japaneseGlossOf(textRaw: string): { text: string; replaced: number; unknownTerms: string[] } {
+    this.load();
+    let text = String(textRaw || '');
+    if (!text) return { text, replaced: 0, unknownTerms: [] };
+    const pairs: Array<[string, string]> = [];
+    const seenPair = new Set<string>();
+    const addPair = (en: string, ja: string) => {
+      const e = String(en || '').trim();
+      const j = String(ja || '').trim();
+      if (!e || !j || !/^[A-Za-z]/.test(e) || e.toLowerCase() === j.toLowerCase()) return;
+      const key = e.toLowerCase();
+      if (seenPair.has(key)) return;
+      seenPair.add(key);
+      pairs.push([e, j]);
+    };
+    for (const rel of this.relations) {
+      if (rel.type !== 'TRANSLATION') continue;
+      if (/^[A-Za-z]/.test(rel.a) && !/^[A-Za-z]/.test(rel.b)) addPair(rel.a, rel.b);
+      else if (/^[A-Za-z]/.test(rel.b) && !/^[A-Za-z]/.test(rel.a)) addPair(rel.b, rel.a);
+    }
+    for (const sense of this.senses) {
+      if (sense.enLabel) addPair(sense.enLabel, sense.term);
+    }
+    pairs.sort((x, y) => y[0].length - x[0].length);
+    let replaced = 0;
+    for (const [en, ja] of pairs) {
+      const re = new RegExp(`\\b${escapeRegExp(en)}\\b`, 'gi');
+      text = text.replace(re, () => {
+        replaced++;
+        return ja;
+      });
+    }
+    const knownLatin = new Set(pairs.map(([e]) => e.toLowerCase()));
+    const unknownTerms = [
+      ...new Set(
+        (text.match(/[A-Za-z][A-Za-z-]{3,}/g) || [])
+          .map((w) => w.toLowerCase())
+          .filter((w) => !knownLatin.has(w) && !GLOSS_STOP_LATIN_1146.has(w)),
+      ),
+    ].slice(0, 12);
+    return { text, replaced, unknownTerms };
   }
 
   /** テキスト中の略語（または正式名称）をもう一方に置き換えた文。 */

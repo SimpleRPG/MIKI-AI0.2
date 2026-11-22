@@ -11222,6 +11222,17 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     }
   }
 
+// ---- P1146: 英語の文の読み下し（知っている語だけ日本語に寄せる） ----
+  {
+    const { lexicalRelationService } = await import('../src/miki/memory/services/lexicalRelationService');
+    const { isEnglishDominantText1146 } = await import('../src/miki/research/services/researchService');
+    lexicalRelationService.addRelation('葉緑体', 'chloroplast', 'TRANSLATION', 'manual');
+    const gloss1146 = lexicalRelationService.japaneseGlossOf('Photosynthesis occurs in the chloroplast of plant cells.');
+    check('P1146 知っている語だけ日本語に寄る', gloss1146.replaced >= 2 && gloss1146.text.includes('光合成') && gloss1146.text.includes('葉緑体'), gloss1146.text);
+    check('P1146 知らない語は残って見える', gloss1146.unknownTerms.length > 0 && !gloss1146.unknownTerms.includes('photosynthesis') && !gloss1146.unknownTerms.includes('chloroplast'), gloss1146.unknownTerms.join(','));
+    check('P1146 日本語の文は読み下しの対象外', isEnglishDominantText1146('光合成は植物の働きである') === false && lexicalRelationService.japaneseGlossOf('光合成は植物の働きである').replaced === 0 && isEnglishDominantText1146('Photosynthesis is a process used by plants.') === true, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
