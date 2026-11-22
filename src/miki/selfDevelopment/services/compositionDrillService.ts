@@ -1,5 +1,6 @@
 import { compositionSearchService, type CompositionCase } from './compositionSearchService';
 import { codeDrillService, type CodeDrillTask } from './codeDrillService';
+import { specDraftService, type SpecDraftRequest } from './specDraftService';
 import { drillTaskGenerationService } from './drillTaskGenerationService';
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
 import { selfCodeSpaceService } from '../../core/services/selfCodeSpaceService';
@@ -96,6 +97,38 @@ class CompositionDrillService {
       attempts: attempt.record.attempts,
       componentId,
     };
+  }
+
+  /*
+   * P1148: 仕様の切り出し（P1134）をドリルへ接続する。
+   * 仕様点→ケース化と弁別力チェックを通し、弱い仕様（定数や
+   * 直線当てで通ってしまうもの）は課題にしない。解題しても
+   * 腕が測れないため。強い仕様だけを課題化して、合成→解題→
+   * （任意で）部品登録の既存経路に乗せる。
+   */
+  public async solveSpecDraft(
+    request: SpecDraftRequest,
+    registerAsPart = false,
+  ): Promise<CompositionDrillResult & { discrimination?: 'STRONG' | 'WEAK' }> {
+    const draft = specDraftService.draftAndSolve(request);
+    if (!draft) return { solved: false, usedParts: [], maxError: 0, attempts: 0, reason: 'SPEC_INVALID' };
+    if (draft.discrimination === 'WEAK') {
+      return { solved: false, usedParts: [], maxError: draft.maxError, attempts: 0, reason: 'SPEC_TOO_WEAK', discrimination: 'WEAK' };
+    }
+    // P1148: 仕様の許容誤差をそのまま解題のケースに載せる。
+    // 探索は許容誤差の範囲で式を探すのに、解題の判定が
+    // 許容誤差0（完全一致）だと、仕様どおりの式でも必ず
+    // 落ちてしまう。仕様の公差と解題の公差は同じものである
+    // べきなので、ここでつなぐ。
+    const tolerance = request.tolerance && request.tolerance > 0 ? request.tolerance : 0.02;
+    const task: CodeDrillTask = {
+      taskId: `spec-${draft.name}`,
+      title: draft.description || draft.name,
+      entryPoint: draft.name,
+      cases: draft.cases.map((c) => ({ args: [...c.args], expected: c.expected, tolerance })),
+    };
+    const result = await this.solveAndRegister({ task, registerAsPart });
+    return { ...result, discrimination: 'STRONG' };
   }
 
   /*

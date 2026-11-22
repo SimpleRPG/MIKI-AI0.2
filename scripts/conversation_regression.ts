@@ -11240,6 +11240,33 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1147 短すぎる語・既知の語は引かない', (await lexicalRelationService.learnJapaneseLabelFromWikidata('ab')) === 0 && (await lexicalRelationService.learnJapaneseLabelFromWikidata('photosynthesis')) === 0, '');
   }
 
+// ---- P1148: 仕様の切り出しをドリルへ接続 ----
+  {
+    const { compositionDrillService } = await import('../src/miki/selfDevelopment/services/compositionDrillService');
+    const { codeDrillService } = await import('../src/miki/selfDevelopment/services/codeDrillService');
+    const strong1148 = await compositionDrillService.solveSpecDraft({
+      name: 'falloffDrill1148',
+      description: '0で1、1で0、真ん中がなだらかな落ち込み',
+      points: [
+        { x: 0, y: 1 },
+        { x: 0.25, y: 0.8536 },
+        { x: 0.5, y: 0.5 },
+        { x: 0.75, y: 0.1464 },
+        { x: 1, y: 0 },
+      ],
+    });
+    check('P1148 強い仕様は課題になって解ける', strong1148.discrimination === 'STRONG' && strong1148.solved && codeDrillService.getRecord('spec-falloffDrill1148')?.solved === true, `disc=${strong1148.discrimination} solved=${strong1148.solved} reason=${strong1148.reason || ''}`);
+    const weak1148 = await compositionDrillService.solveSpecDraft({
+      name: 'linearDrill1148',
+      description: 'まっすぐ増える',
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 1 },
+      ],
+    });
+    check('P1148 弱い仕様は課題にしない', weak1148.discrimination === 'WEAK' && weak1148.solved === false && weak1148.reason === 'SPEC_TOO_WEAK' && codeDrillService.getRecord('spec-linearDrill1148') === undefined, `disc=${weak1148.discrimination} reason=${weak1148.reason || ''}`);
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {
