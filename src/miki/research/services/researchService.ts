@@ -1534,6 +1534,12 @@ export class ResearchService {
       const gloss = lexicalRelationService.japaneseGlossOf(statement);
       if (gloss.replaced > 0 && /[぀-ヿ一-鿿]/.test(gloss.text)) {
         statement = gloss.text;
+        // P1147: 読み下しで残った知らない英単語は、意味学習の
+        // 入口にする（Wikidata で日本語ラベルを引いて日英対応
+        // として覚える）。主張化の流れは待たせない。
+        for (const unknown of gloss.unknownTerms.slice(0, 2)) {
+          void lexicalRelationService.learnJapaneseLabelFromWikidata(unknown);
+        }
       }
     }
     const normalized = this.normalizeClaimStatement(statement);

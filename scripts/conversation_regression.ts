@@ -11233,6 +11233,13 @@ check('P622 生息地は専用の欠けとして答える', habitatReply.replyTe
     check('P1146 日本語の文は読み下しの対象外', isEnglishDominantText1146('光合成は植物の働きである') === false && lexicalRelationService.japaneseGlossOf('光合成は植物の働きである').replaced === 0 && isEnglishDominantText1146('Photosynthesis is a process used by plants.') === true, '');
   }
 
+// ---- P1147: 知らない英単語を引いて日英対応として覚える ----
+  {
+    const { lexicalRelationService, japaneseLabelFromEntity1147 } = await import('../src/miki/memory/services/lexicalRelationService');
+    check('P1147 Wikidata項目から日本語ラベルが取れる', japaneseLabelFromEntity1147({ labels: { ja: { value: '栄養素' }, en: { value: 'nutrient' } } }) === '栄養素' && japaneseLabelFromEntity1147({ labels: { en: { value: 'nutrient' } } }) === undefined && japaneseLabelFromEntity1147(null) === undefined, '');
+    check('P1147 短すぎる語・既知の語は引かない', (await lexicalRelationService.learnJapaneseLabelFromWikidata('ab')) === 0 && (await lexicalRelationService.learnJapaneseLabelFromWikidata('photosynthesis')) === 0, '');
+  }
+
 // ---- 結果 ----
 let fail = 0;
 for (const [name, ok, detail] of results) {

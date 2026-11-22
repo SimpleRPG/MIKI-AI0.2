@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1902,
     "sourceFileCount": 1455,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1366,
-    "relativeImportCandidateCount": 4963,
-    "resolvedRelativeImportCandidateCount": 4945,
+    "relativeImportCandidateCount": 4964,
+    "resolvedRelativeImportCandidateCount": 4946,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -1715,9 +1715,9 @@
     },
     {
       "path": "scripts/conversation_regression.ts",
-      "bytes": 948545,
-      "lines": 11249,
-      "sha256": "b91017c53d975a856ea27b062285b8db1836cb7747f2f83d5de0f21323981e38",
+      "bytes": 949338,
+      "lines": 11256,
+      "sha256": "1672f65d7c24c8ef0e61780dd98d876285036817c05c82140a7549ac9673cfd6",
       "relativeImportCandidates": [
         {
           "line": 19,
@@ -5640,10 +5640,16 @@
           "specifier": "../src/miki/research/services/researchService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/researchService.ts"
+        },
+        {
+          "line": 11238,
+          "specifier": "../src/miki/memory/services/lexicalRelationService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/memory/services/lexicalRelationService.ts"
         }
       ],
-      "relativeImportCandidateCount": 654,
-      "resolvedRelativeImportCount": 652,
+      "relativeImportCandidateCount": 655,
+      "resolvedRelativeImportCount": 653,
       "unresolvedRelativeImportCount": 2
     },
     {
@@ -29747,9 +29753,9 @@
     },
     {
       "path": "src/miki/memory/services/lexicalRelationService.ts",
-      "bytes": 39090,
-      "lines": 907,
-      "sha256": "b5f95b965de82039e0e5668658af10c5b3a8f9fe7a29264c5c88e5be23ab1bd1",
+      "bytes": 41658,
+      "lines": 963,
+      "sha256": "961181a990ee18a29896242718e1f885654e81a32595c8cd503adc5b117422d9",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -31719,9 +31725,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 89890,
-      "lines": 1635,
-      "sha256": "3e44cbf943b955c20dfa7a2f68caeeb000224f15a7221c19539c1d987135af3c",
+      "bytes": 90287,
+      "lines": 1641,
+      "sha256": "212c20e2f6a06c34d15cb1a19426d271e9328bd87f72b43517ef2539834af250",
       "relativeImportCandidates": [
         {
           "line": 1,

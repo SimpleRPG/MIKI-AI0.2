@@ -144,6 +144,14 @@ const GLOSS_STOP_LATIN_1146 = new Set([
   'those', 'they', 'them', 'been', 'being', 'will', 'would', 'can', 'could',
 ]);
 
+// P1147: Wikidata の項目データから日本語ラベルを取り出す。
+export function japaneseLabelFromEntity1147(entity: any): string | undefined {
+  const value = entity?.labels?.ja?.value;
+  if (typeof value !== 'string') return undefined;
+  const label = value.trim();
+  return label.length >= 2 && label.length <= 30 ? label : undefined;
+}
+
 /**
  * P491: 意味の分岐（多義語）。同じ語に対する Wikidata の別項目が
  * 別の意味に対応する。description と上位語が、文脈から意味を
@@ -564,6 +572,54 @@ class LexicalRelationService {
       ),
     ].slice(0, 12);
     return { text, replaced, unknownTerms };
+  }
+
+  /**
+   * P1147: 知らない英単語を Wikidata で引いて、日本語ラベルとの
+   * 日英対応として覚える。learnFromWikidata（日本語→英語）の
+   * 逆向き。読み下しで残った語が次の学習の入口になる。
+   * 間引き台帳は learnFromWikidata と共有する。
+   */
+  public async learnJapaneseLabelFromWikidata(enTermRaw: string): Promise<number> {
+    const term = normalizeTerm(enTermRaw);
+    if (!term || term.length < 3 || !/^[a-z][a-z -]*$/.test(term)) return 0;
+    this.load();
+    if (this.translationCounterpartsOf(term).length > 0) return 0;
+    const attempts = this.loadAttempts();
+    const last = attempts[term] || 0;
+    if (Date.now() - last < WIKIDATA_RETRY_MS) return 0;
+    attempts[term] = Date.now();
+    try {
+      storageService.setItem(ATTEMPTS_KEY, JSON.stringify(attempts));
+    } catch { /* 間引き台帳が書けなくても学習自体は続ける */ }
+    try {
+      const api = new URL('https://www.wikidata.org/w/api.php');
+      const callApi = async (params: Record<string, string>): Promise<any | null> => {
+        const url = new URL(api.toString());
+        for (const [key, value] of Object.entries({ ...params, format: 'json' })) {
+          url.searchParams.set(key, value);
+        }
+        const res = await fetch(url.toString(), {
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+          headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+        });
+        if (!res.ok) return null;
+        return res.json();
+      };
+      const search = await callApi({
+        action: 'wbsearchentities', search: term, language: 'en', uselang: 'en', type: 'item', limit: '1',
+      });
+      const main = (Array.isArray(search?.search) ? search.search : []).find((h: any) => h?.id);
+      if (!main) return 0;
+      const labels = await callApi({
+        action: 'wbgetentities', ids: String(main.id), props: 'labels', languages: 'ja|en',
+      });
+      const jaLabel = japaneseLabelFromEntity1147(labels?.entities?.[String(main.id)]);
+      if (!jaLabel) return 0;
+      return this.addRelation(jaLabel, term, 'TRANSLATION', 'wikidata') ? 1 : 0;
+    } catch {
+      return 0;
+    }
   }
 
   /** テキスト中の略語（または正式名称）をもう一方に置き換えた文。 */
