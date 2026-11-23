@@ -11774,9 +11774,9 @@
     },
     {
       "path": "src/components/ChatPanel.tsx",
-      "bytes": 215256,
-      "lines": 3732,
-      "sha256": "d69fd299a0b472bfaafa80a00e8087d8312b07f76a4f4ab140bfd77b9ed3d9f6",
+      "bytes": 214693,
+      "lines": 3706,
+      "sha256": "a5bf48f551669f8908293c335be437465011a0b1fbef6f4b65852ca84b41a9b5",
       "relativeImportCandidates": [
         {
           "line": 82,
@@ -44345,9 +44345,9 @@
     },
     {
       "path": "src/services/chatDraftStore.ts",
-      "bytes": 1310,
-      "lines": 32,
-      "sha256": "52cd4dec3ca3fa8f8408400824d969d894507ebe5e0b2fbacc15b32f067adfde",
+      "bytes": 2480,
+      "lines": 53,
+      "sha256": "078b95ed5e6c1bf15dd6ed3dfc8ab15b827d1e0aedd4b4712416ef840df65cf7",
       "relativeImportCandidates": [],
       "relativeImportCandidateCount": 0,
       "resolvedRelativeImportCount": 0,

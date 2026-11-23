@@ -198,14 +198,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onRejectCodeProposal,
   onDeleteMessage,
 }) => {
-  // P2006: 下書きの正本は chatDraftStore（モジュールレベル）。
-  // タブ切り替え等でアンマウントされても、再マウント時に
-  // 初期値として復元される。変更は下の effect で写し、クリアは
-  // 送信成功時に handleSend が入力を空にすることでのみ起きる。
-  const [inputText, setInputText] = useState(() => chatDraftStore.getDraft());
-  useEffect(() => {
-    chatDraftStore.setDraft(inputText);
-  }, [inputText]);
+  // P2006→P2009: 下書きの正本は chatDraftStore（モジュールレベル）。
+  // 入力欄は非制御とし、初期値は textarea の defaultValue で
+  // ストアから取る（再マウントで復元される）。制御コンポーネント
+  // （value={state}）では再描画のたびに React が DOM 値へ state 値を
+  // 書き戻し、IME 変換中の文字列を破棄していたため（実機：入力中に
+  // 文字が出ない／打った文字が消える）、state は持たない。下書き
+  // 同期は onChange からストアへ直接書き、クリアは送信成功時に
+  // handleSend がストアと DOM を空にする場合のみ（chatDraftStore
+  // のコメント参照）。
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [appliedId, setAppliedId] = useState<string | null>(null);
@@ -288,11 +289,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleApplyInsight = (insight: ProactiveInsightItem) => {
     if (insight.actionType === 'INSERT_PROMPT' && insight.suggestedPrompt) {
-      setInputText(insight.suggestedPrompt);
-      if (textareaRef.current) {
-        textareaRef.current.value = insight.suggestedPrompt;
-        textareaRef.current.focus();
-      }
+      chatDraftStore.applyProgrammaticText(textareaRef.current, insight.suggestedPrompt);
+      textareaRef.current?.focus();
     } else if (insight.actionType === 'OPEN_VITALS' || insight.actionType === 'OPEN_EVOLUTION') {
       onOpenSelfImprovementModal?.();
     } else if (insight.actionType === 'OPEN_DEV_STUDIO') {
@@ -511,7 +509,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     }
 
     const domValue = textareaRef.current?.value ?? '';
-    const textToSend = (domValue || inputText || '').trim();
+    const textToSend = (domValue || chatDraftStore.getDraft() || '').trim();
 
     if ((!textToSend && attachedFiles.length === 0) || isLoading || isGenerating) return;
 
@@ -562,7 +560,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     });
 
     onSendMessage(augmentedText, attachedFiles.length > 0 ? attachedFiles : undefined);
-    setInputText('');
+    chatDraftStore.clearDraft();
     if (textareaRef.current) {
       textareaRef.current.value = '';
     }
@@ -809,6 +807,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // P2009: IME 変換中のキー操作には干渉しない（変換確定の Enter を
+    // 送信と誤認しない）。
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
@@ -3498,11 +3499,8 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
               try {
                 const result = await speechRecognitionService.start({ language: 'ja-JP', maxResults: 3 });
                 if (result?.recognized && result.text.trim()) {
-                  setInputText(result.text.trim());
-                  if (textareaRef.current) {
-                    textareaRef.current.value = result.text.trim();
-                    textareaRef.current.focus();
-                  }
+                  chatDraftStore.applyProgrammaticText(textareaRef.current, result.text.trim());
+                  textareaRef.current?.focus();
                   setVoiceStatus('音声を入力しました');
                 } else {
                   setVoiceStatus('音声を認識できませんでした');
@@ -3524,32 +3522,8 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
 
           <textarea
             ref={textareaRef}
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onInput={(e) => {
-              const val = (e.target as HTMLTextAreaElement).value;
-              setInputText(val);
-            }}
-            onCompositionStart={(e) => {
-              const val = (e.currentTarget as HTMLTextAreaElement).value;
-              setInputText(val);
-            }}
-            onCompositionUpdate={(e) => {
-              const val = (e.currentTarget as HTMLTextAreaElement).value;
-              setInputText(val);
-            }}
-            onCompositionEnd={(e) => {
-              const val = (e.currentTarget as HTMLTextAreaElement).value;
-              setInputText(val);
-            }}
-            onKeyUp={(e) => {
-              const val = (e.currentTarget as HTMLTextAreaElement).value;
-              if (val !== inputText) setInputText(val);
-            }}
-            onBlur={(e) => {
-              const val = (e.currentTarget as HTMLTextAreaElement).value;
-              if (val !== inputText) setInputText(val);
-            }}
+            defaultValue={chatDraftStore.getDraft()}
+            onChange={(e) => chatDraftStore.setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={`${persona.name}にメッセージを入力...`}
             rows={1}
@@ -3682,7 +3656,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
             setTestModalState(null);
           }}
           onRequestFix={(failInfo) => {
-            setInputText(`【単体テスト駆動修復】以下のテスト失敗を解決するようにコードを修正してください：\n${failInfo}`);
+            chatDraftStore.applyProgrammaticText(textareaRef.current, `【単体テスト駆動修復】以下のテスト失敗を解決するようにコードを修正してください：\n${failInfo}`);
             textareaRef.current?.focus();
             setTestModalState(null);
           }}
@@ -3698,7 +3672,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
           setIsDependencyGraphModalOpen(false);
         }}
         onRequestRefactor={(prompt) => {
-          setInputText(prompt);
+          chatDraftStore.applyProgrammaticText(textareaRef.current, prompt);
           textareaRef.current?.focus();
           setIsDependencyGraphModalOpen(false);
         }}
