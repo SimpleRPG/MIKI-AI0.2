@@ -32,6 +32,8 @@ import { unifiedWebResearchService } from '../../research/services/unifiedWebRes
 import { isSourceBackedSearchResult } from '../../research/services/autonomousSearchService';
 import { isSyntheticWebMaterial } from '../../memory/services/evidenceService';
 import { autonomousEvolutionService } from '../../autonomy/services/autonomousEvolutionService';
+import { idleWorkQueueService, selectIdleWork, isIdleSearchJob, isIdleEvolutionJob, type IdleWorkItem } from './idleWorkQueueService';
+import { personaProfileService } from '../../conversation/services/personaProfileService';
 import { memoryAuditService } from '../../memory/services/memoryAuditService';
 import { embeddingService } from '../../research/services/embeddingService';
 import { storagePlanningService } from './storagePlanningService';
@@ -1085,33 +1087,60 @@ export class BackgroundWorkerService {
           systemLogger.warn('SELF_IMPROVEMENT', '自発思考モード実行中に例外が発生しました', thoughtErr);
         }
 
-        // Step 6.9: 設計思想 Master v5.0 第13章2節 非会話時・深い睡眠時の自律Web検索能動学習
+        // Step 6.9 + Step 6.10 (P3001): アイドル仕事キューから選んだ仕事を実行する。
+        // 従来は Step 6.9 が宿題→ギャップの固定順で検索し、Step 6.10 が
+        // 進化サイクルの全サブシステムを直呼びしていた。選択は
+        // idleWorkQueueService に寄せ、ここは選ばれた仕事の実行だけを担う。
+        // Step 6.8（宿題の自発思考）は死にコードのため P3003 の対象。ここでは触らない。
+        if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+        let selectedWork: IdleWorkItem[] = [];
+        try {
+          const personaId = personaProfileService.get().profileId;
+          const queuedWork = idleWorkQueueService.buildIdleWorkQueue(personaId);
+          selectedWork = selectIdleWork(queuedWork);
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `🌐 [P3001 アイドル仕事キュー] ${queuedWork.length}件の候補から${selectedWork.length}件を選択 (検索${selectedWork.filter(isIdleSearchJob).length}件 / 進化${selectedWork.filter(isIdleEvolutionJob).length}件)`
+          );
+        } catch (queueErr: any) {
+          systemLogger.warn('SELF_IMPROVEMENT', 'アイドル仕事キューの構築中に例外が発生しました', queueErr);
+        }
+
+        // Step 6.9: キューから選ばれた検索仕事（欲求・宿題・能力ギャップ）
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
-          const searchConfig = unifiedWebResearchService.getConfig();
-          if (searchConfig.enabled && searchConfig.idleSearchEnabled) {
-            systemLogger.info(
-              'SELF_IMPROVEMENT',
-              '🌐 [第13章 能動Web検索学習] 非会話時の自発的Web検索学習を開始します...'
-            );
-            const searchLearningResult = await unifiedWebResearchService.performIdleAutonomousLearning(abortSignal);
-            if (searchLearningResult.learnedCount > 0) {
-              weaknessFound.push(
-                `[自律Web学習] ${searchLearningResult.learnedCount}件の課題について最新知見を調査・長期記憶と教材データセットへ反映 (${searchLearningResult.queriesInvestigated.join(', ')})`
+          const searchJobs = selectedWork.filter(isIdleSearchJob);
+          if (searchJobs.length > 0) {
+            const searchConfig = unifiedWebResearchService.getConfig();
+            if (searchConfig.enabled && searchConfig.idleSearchEnabled) {
+              systemLogger.info(
+                'SELF_IMPROVEMENT',
+                '🌐 [第13章 能動Web検索学習] キューから選んだ仕事の自発的Web検索学習を開始します...'
               );
+              const searchLearningResult = await unifiedWebResearchService.performIdleAutonomousLearning({ jobs: searchJobs, signal: abortSignal });
+              if (searchLearningResult.learnedCount > 0) {
+                weaknessFound.push(
+                  `[自律Web学習] ${searchLearningResult.learnedCount}件の課題について最新知見を調査・長期記憶と教材データセットへ反映 (${searchLearningResult.queriesInvestigated.join(', ')})`
+                );
+              }
             }
           }
         } catch (searchLearnErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '自律Web検索学習中に例外が発生しました', searchLearnErr);
         }
 
-        // Step 6.10: 設計思想 Master v5.4 第19章 放置型自律進化エンジン (反省・知恵蒸留・宿題解決・弱点ドリル)
+        // Step 6.10: キューから選ばれた進化サブシステム（反省・知恵蒸留・弱点ドリル）
         if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
         try {
-          systemLogger.info('SELF_IMPROVEMENT', '🌱 [第19章 放置型自律進化] 反省・定石蒸留・宿題解決パイプラインを実行中...');
-          const evolutionReport = await autonomousEvolutionService.runIdleEvolutionCycle(abortSignal);
-          if (evolutionReport.growthHighlights.length > 0) {
-            weaknessFound.push(...evolutionReport.growthHighlights);
+          const evolutionKinds = selectedWork
+            .filter(isIdleEvolutionJob)
+            .map((job) => job.kind as 'REFLECT' | 'DISTILL' | 'DRILL');
+          if (evolutionKinds.length > 0) {
+            systemLogger.info('SELF_IMPROVEMENT', '🌱 [第19章 放置型自律進化] キューから選んだサブシステムを実行中...');
+            const evolutionResult = await autonomousEvolutionService.runIdleEvolutionSubsystems(evolutionKinds, abortSignal);
+            if (evolutionResult.growthHighlights.length > 0) {
+              weaknessFound.push(...evolutionResult.growthHighlights);
+            }
           }
         } catch (evoErr: any) {
           systemLogger.warn('SELF_IMPROVEMENT', '放置型自律進化サイクル実行中に例外が発生しました', evoErr);

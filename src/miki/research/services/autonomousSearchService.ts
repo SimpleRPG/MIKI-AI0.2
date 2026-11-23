@@ -23,6 +23,8 @@ import { surfaceVariationGrowthService } from '../../conversation/services/surfa
 import { nativeWorkManagerService } from '../../execution/services/nativeWorkManagerService';
 import { procedureChunkingService } from '../../execution/services/procedureChunkingService';
 import { researchPredictionService } from './researchPredictionService';
+import type { IdleWorkItem } from '../../execution/services/idleWorkQueueService';
+import { idleResearchTriggerFor, isIdleSearchJob } from '../../execution/services/idleWorkQueueService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { evidenceService, isSyntheticWebMaterial } from '../../memory/services/evidenceService';
 
@@ -831,7 +833,7 @@ export class AutonomousSearchService {
 
   private hasRecentUnverifiedResearch(
     query: string,
-    triggerType: 'working_agenda' | 'capability_gap',
+    triggerType: 'working_agenda' | 'capability_gap' | 'research_gap',
   ): boolean {
     const now = Date.now();
     return this.getRecentRecords(100).some(record =>
@@ -840,6 +842,19 @@ export class AutonomousSearchService {
       record.verificationStatus !== 'VERIFIED' &&
       now - Number(record.timestamp || 0) < UNVERIFIED_RESEARCH_COOLDOWN_MS
     );
+  }
+
+  /**
+   * P3001: アイドル仕事キューが構築時に使う抑制の公開窓口。
+   * 既存の24時間同一未検証検索の抑制を流用する（本体は上の
+   * hasRecentUnverifiedResearch）。実行時にも performIdleAutonomousLearning
+   * 側で同じ抑制を再確認する。
+   */
+  public isSuppressedForIdleResearch(
+    query: string,
+    triggerType: 'working_agenda' | 'capability_gap' | 'research_gap',
+  ): boolean {
+    return this.hasRecentUnverifiedResearch(query, triggerType);
   }
 
   /**
@@ -1785,7 +1800,7 @@ export class AutonomousSearchService {
     results: WebSearchResultItem[],
     summary?: string,
     options?: {
-      triggerType: 'in_conversation' | 'idle_autonomous' | 'working_agenda' | 'capability_gap';
+      triggerType: 'in_conversation' | 'idle_autonomous' | 'working_agenda' | 'capability_gap' | 'research_gap';
       resolvedAgendaId?: string;
       provider?: string;
       sourceRef?: string;
@@ -2113,16 +2128,110 @@ export class AutonomousSearchService {
   }
 
   /**
+   * P3001: キューから渡された検索仕事だけを実行する。検索・記録・
+   * 抑制の本体（executeSearch / learnFromSearch /
+   * hasRecentUnverifiedResearch / researchPredictionService の
+   * predict・settle）は従来の経路と共通で、選び方だけが外へ出ている。
+   * 検索結果は従来どおり UNVERIFIED の候補として記録するのみで、
+   * ギャップは OPEN のまま維持する。
+   */
+  private async performQueuedIdleLearning(
+    jobs: IdleWorkItem[],
+    abortSignal?: AbortSignal,
+  ): Promise<{
+    learnedCount: number;
+    queriesInvestigated: string[];
+    details: string[];
+  }> {
+    const investigated: string[] = [];
+    const details: string[] = [];
+    let learnedCount = 0;
+    // P903: 手続きの塊化のための観測（実際に通った段だけを記録）。
+    const procedureSteps: string[] = ['キュー選択'];
+
+    for (const job of jobs) {
+      if (abortSignal?.aborted) break;
+      if (!isIdleSearchJob(job)) continue;
+      const query = (job.query || job.topic || '').trim();
+      if (!query) continue;
+      const triggerType = idleResearchTriggerFor(job.kind);
+      // 抑制はキュー構築時にも見ているが、実行時にも既存の抑制で再確認する。
+      if (this.hasRecentUnverifiedResearch(query, triggerType)) {
+        details.push(`「${job.topic}」は24時間以内の未検証検索があるため再検索を抑制します。未解決状態を維持します。`);
+        continue;
+      }
+      investigated.push(query);
+      details.push(`「${job.topic}」について自律Web検索開始: ${query}`);
+      procedureSteps.push(job.kind === 'HOMEWORK' ? '宿題検索' : job.kind === 'CAPABILITY_GAP' ? 'ギャップ検索' : '欲求検索');
+      // P906: 調べる前に「得られるか」を予測する（能力ギャップのみ）。
+      const predictKey = job.refId || query;
+      if (job.kind === 'CAPABILITY_GAP') {
+        try { researchPredictionService.predict(predictKey); } catch { /* 予測は補助経路 */ }
+      }
+
+      const { results, summary, provider } = await this.executeSearch(query, { maxResults: 3 });
+      if (results.length === 0) {
+        details.push(`「${job.topic}」は検索結果を取得できませんでした。未解決状態を維持します。`);
+        if (job.kind === 'CAPABILITY_GAP') {
+          try { researchPredictionService.settle(predictKey, false); } catch { /* 照合は補助経路 */ }
+        }
+        continue;
+      }
+
+      const record = this.learnFromSearch(query, results, summary, {
+        triggerType,
+        verificationStatus: 'UNVERIFIED',
+      });
+      procedureSteps.push('学習記録');
+      if (job.kind === 'CAPABILITY_GAP') {
+        try { researchPredictionService.settle(predictKey, record.extractedKnowledge.length > 0); } catch { /* 照合は補助経路 */ }
+      }
+      if (record.extractedKnowledge.length > 0) {
+        learnedCount++;
+        details.push(`「${job.topic}」の検索素材を候補として記録しました (${provider})。独立検証まで未解決状態を維持します。`);
+      } else {
+        details.push(`「${job.topic}」の検索結果は学習条件を満たさなかったため反映しませんでした。`);
+      }
+    }
+
+    if (investigated.length === 0 && details.length === 0) {
+      details.push('キューから選ばれた検索仕事はありませんでした。');
+    }
+
+    // P903: このサイクルで実際に通った手順を観測として残す。
+    try { procedureChunkingService.observeProcedure('アイドル学習', procedureSteps); } catch { /* 観測は補助経路 */ }
+
+    return {
+      learnedCount,
+      queriesInvestigated: investigated,
+      details,
+    };
+  }
+
+  /**
    * 会話していない時 (アイドル時 / バックグラウンド / 睡眠時) に自律的にWeb検索して学習するループ
    * 設計思想 Master v5.0 第13章2節: Idle & Background Autonomous Web Learning
+   *
+   * P3001: options.jobs が渡された場合はキューから選ばれた仕事だけを
+   * 実行し、渡されなければ従来の「宿題→ギャップ」の固定順で回す
+   * （typedResearchUiGatewayService などの既存の呼び出し元は後者）。
    */
-  public async performIdleAutonomousLearning(abortSignal?: AbortSignal): Promise<{
+  public async performIdleAutonomousLearning(options?: {
+    jobs?: IdleWorkItem[];
+    signal?: AbortSignal;
+  }): Promise<{
     learnedCount: number;
     queriesInvestigated: string[];
     details: string[];
   }> {
     if (!this.config.enabled || !this.config.idleSearchEnabled) {
       return { learnedCount: 0, queriesInvestigated: [], details: ['自律検索が無効です'] };
+    }
+    const abortSignal = options?.signal;
+
+    // P3001: キューから渡された仕事リストがある場合はそれを実行する。
+    if (options?.jobs) {
+      return this.performQueuedIdleLearning(options.jobs, abortSignal);
     }
 
     const investigated: string[] = [];

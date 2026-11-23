@@ -232,6 +232,60 @@ export class AutonomousEvolutionService {
   }
 
   /**
+   * P3001: キューから選ばれたサブシステムだけを実行する。
+   * runIdleEvolutionCycle（全サブシステム）とは別入口で、手動ボタンや
+   * 既存の呼び出しはそちらを使い続ける。宿題の深掘り（#3）は
+   * no-op のため対象外で、P3003 の判断を待つ。自律改善要求の投入
+   * （#5）はサイクル全体の仕事のため、ここでは行わない。
+   * 各サブシステムは従来どおり自己ゲートする（反省は誤差 0.35 以上
+   * の記録があるときだけ、蒸留は固定ルールの有無、ドリルは接続済み
+   * カテゴリのみ）。選ばれたのにやることが無い場合は空で返る。
+   */
+  public async runIdleEvolutionSubsystems(
+    kinds: Array<'REFLECT' | 'DISTILL' | 'DRILL'>,
+    signal?: AbortSignal,
+  ): Promise<{ growthHighlights: string[] }> {
+    if (this.isCycleRunning) {
+      throw new Error('自律進化サイクルが既に実行中です');
+    }
+
+    this.isCycleRunning = true;
+    this.loadState();
+    const highlights: string[] = [];
+
+    try {
+      if (kinds.includes('REFLECT')) {
+        if (signal?.aborted) throw new Error('ユーザー割り込みにより中断');
+        const newReflections = await this.executeCounterfactualReflections(signal);
+        if (newReflections.length > 0) {
+          highlights.push(`失敗インシデント${newReflections.length}件について反省仮説を記録（実測検証が済むまで学習データへ昇格しない）`);
+        }
+      }
+
+      if (kinds.includes('DISTILL')) {
+        if (signal?.aborted) throw new Error('ユーザー割り込みにより中断');
+        const newRules = await this.distillHeuristicRules(signal);
+        if (newRules.length > 0) {
+          highlights.push(`断片的な過去の会話・エピソード記憶から${newRules.length}件の【恒久知恵・定石ルール】を蒸留し意味記憶へ定着`);
+        }
+      }
+
+      if (kinds.includes('DRILL')) {
+        if (signal?.aborted) throw new Error('ユーザー割り込みにより中断');
+        const drillSummary = await this.runMasteryDrills(signal);
+        if (drillSummary.totalDrills > 0) {
+          highlights.push(`弱点分野（${drillSummary.category}）の自己生成ドリルを${drillSummary.totalDrills}問解答 (正答率: ${Math.round(drillSummary.score * 100)}%)`);
+        }
+      }
+
+      this.saveState();
+      return { growthHighlights: highlights };
+    } finally {
+      this.isCycleRunning = false;
+    }
+  }
+
+  /**
    * サブシステム 1: 反実仮想反省の実行 (優先度A - 1.1)
    */
   private async executeCounterfactualReflections(signal?: AbortSignal): Promise<CounterfactualReflectionItem[]> {
