@@ -425,8 +425,26 @@ class RequiredAssetAcquisitionService {
       // forceRoute only removes the LOCAL-only early return. Scope
       // is this acquisition dispatch only; the need judgment itself
       // is untouched.
+      const researchQuery = claimResearchQuery ?? this.composeEvidenceResearchQuery(request, objective);
+
+      // P2001: 橋（BeBe-bridge）へも並行に調査を投げる（設計: 調査は
+      // 端末 SearXNG と VM の両方へ並行、負荷分散・完走優先。結果は
+      // 出所付きの材料として橋の受信側で Evidence 化される）。橋は
+      // 補助線であり、失敗しても本線の調査には一切影響させない
+      // （動的 import で起動グラフからも外し、結果は待たない）。
+      try {
+        const { bridgeExchangeService } = await import('./bridgeExchangeService');
+        void bridgeExchangeService
+          .createResearchRequest({
+            question: researchQuery,
+            purpose: `証拠取得（run ${request.runId} / gap ${gap.id}）`,
+            sourceRef: gap.id,
+          })
+          .catch(() => undefined);
+      } catch { /* 橋は補助線: 失敗は無視 */ }
+
       const researched = await researchService.researchGap(gap, {
-        query: claimResearchQuery ?? this.composeEvidenceResearchQuery(request, objective),
+        query: researchQuery,
         forceRoute: 'WEB_SEARCH',
       });
 

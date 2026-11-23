@@ -1316,6 +1316,24 @@ export class BackgroundWorkerService {
         systemLogger.warn('SELF_IMPROVEMENT', '認知多様性・評価ガバナンス・最上位安全監査をスキップしました', governanceErr);
       }
 
+      // Step 6.12.13 (P2001): 橋（BeBe-bridge）交換 — VM からの返送の
+      // 取り込み、ログ返送（定期／依頼フラグ）、語彙・知識の差分送出。
+      // 橋は補助線であり、失敗してもサイクル本体には影響させない
+      // （動的 import で起動グラフから外す。取り込み先は全て既存の
+      // 受入・検証の入口で、橋が知識・部品を直接書き換えることはない）。
+      if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
+      try {
+        const { bridgeExchangeService } = await import('../../core/services/bridgeExchangeService');
+        const bridge = await bridgeExchangeService.runBackgroundExchange();
+        if (bridge.inbox.processed > 0 || bridge.logExported || bridge.syncExported) {
+          weaknessFound.push(
+            `[橋] 返送取り込み${bridge.inbox.processed}件 / ログ返送${bridge.logExported ? 'あり' : 'なし'} / 同期送出${bridge.syncExported ? 'あり' : 'なし'}`,
+          );
+        }
+      } catch (bridgeErr: any) {
+        systemLogger.warn('SELF_IMPROVEMENT', '橋の交換をスキップしました', bridgeErr);
+      }
+
       // Step 6.12.12: 設計思想 9章/16章/19.2節/20章 縦(骨格)・横(言い回し)の自律成長ループ
       if (abortSignal.aborted) throw new Error('ユーザー操作により中断');
       try {

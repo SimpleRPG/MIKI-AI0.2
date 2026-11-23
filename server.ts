@@ -867,6 +867,65 @@ app.get('/api/logs', (req, res) => {
   }
 });
 
+// P2001: 橋（BeBe-bridge）の交換フォルダ。アプリ（WebView）は git にも
+// Termux のホームにも直接触れず、この API 経由で ~/miki-bridge-exchange の
+// out/ への書き出しと in/ の読み取りだけを行う。運搬（git clone/pull/push）
+// は Termux 側 courier スクリプトの担当であり、サーバーはファイルの
+// 受け渡しだけをする（考えない）。交換フォルダの実パスは環境変数
+// MIKI_BRIDGE_EXCHANGE_DIR で差し替え可能。
+const BRIDGE_EXCHANGE_DIR = process.env.MIKI_BRIDGE_EXCHANGE_DIR || path.join(os.homedir(), 'miki-bridge-exchange');
+const bridgeExchangePath = (box: 'out' | 'in', name: string): string | null => {
+  const base = path.basename(String(name || ''));
+  if (!base || base !== String(name) || base.startsWith('.')) return null;
+  return path.join(BRIDGE_EXCHANGE_DIR, box, base);
+};
+
+app.post('/api/bridge/out', (req, res) => {
+  try {
+    const { name, text, base64 } = req.body || {};
+    const target = typeof name === 'string' ? bridgeExchangePath('out', name) : null;
+    if (!target) {
+      res.status(400).json({ error: 'invalid file name' });
+      return;
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    if (typeof base64 === 'string' && base64) {
+      fs.writeFileSync(target, Buffer.from(base64, 'base64'));
+    } else if (typeof text === 'string') {
+      fs.writeFileSync(target, text, 'utf-8');
+    } else {
+      res.status(400).json({ error: 'text or base64 is required' });
+      return;
+    }
+    res.json({ status: 'ok', name: path.basename(target) });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'bridge out write error' });
+  }
+});
+
+app.get('/api/bridge/in', (_req, res) => {
+  try {
+    const dir = path.join(BRIDGE_EXCHANGE_DIR, 'in');
+    const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => !f.startsWith('.')) : [];
+    res.json({ files });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'bridge in list error' });
+  }
+});
+
+app.get('/api/bridge/in/:name', (req, res) => {
+  try {
+    const target = bridgeExchangePath('in', req.params.name);
+    if (!target || !fs.existsSync(target)) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    res.type('text/plain').send(fs.readFileSync(target, 'utf-8'));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'bridge in read error' });
+  }
+});
+
 // Master Specification Document Download Endpoint
 app.get('/api/master-spec', (req, res) => {
   const specPath = path.join(process.cwd(), 'docs/MIKI_AI_18_DOMAIN_DESIGN_PHILOSOPHY.txt');
