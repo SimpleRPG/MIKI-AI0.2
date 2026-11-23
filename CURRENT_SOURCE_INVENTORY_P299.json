@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1905,
     "sourceFileCount": 1457,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1368,
-    "relativeImportCandidateCount": 5004,
-    "resolvedRelativeImportCandidateCount": 4986,
+    "relativeImportCandidateCount": 5006,
+    "resolvedRelativeImportCandidateCount": 4988,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -37284,9 +37284,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/compositionDrillService.ts",
-      "bytes": 12043,
-      "lines": 250,
-      "sha256": "79a99d988dbd9f318baa62c7e7af2c3e36eaf92e38cf574e9e82f0960d0e7cf3",
+      "bytes": 18902,
+      "lines": 368,
+      "sha256": "cdb6d23ad1ed75049d96a51e448b3f8522a7691c504166df8d0a198d24c42268",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -37314,26 +37314,38 @@
         },
         {
           "line": 5,
+          "specifier": "./pureCodeExecutionService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/pureCodeExecutionService.ts"
+        },
+        {
+          "line": 6,
           "specifier": "../../core/services/reusableComponentFactoryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/reusableComponentFactoryService.ts"
         },
         {
-          "line": 6,
+          "line": 7,
           "specifier": "../../core/services/selfCodeSpaceService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/selfCodeSpaceService.ts"
+        },
+        {
+          "line": 8,
+          "specifier": "../../capability/services/componentArtifactStoreService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/capability/services/componentArtifactStoreService.ts"
         }
       ],
-      "relativeImportCandidateCount": 6,
-      "resolvedRelativeImportCount": 6,
+      "relativeImportCandidateCount": 8,
+      "resolvedRelativeImportCount": 8,
       "unresolvedRelativeImportCount": 0
     },
     {
       "path": "src/miki/selfDevelopment/services/compositionSearchService.ts",
-      "bytes": 13500,
-      "lines": 257,
-      "sha256": "400b4c57e90ae0ec04184fbbe02d677900634b0cf2a9b29cdea9202389a77e97",
+      "bytes": 14539,
+      "lines": 278,
+      "sha256": "34a0e74268a798a75cbc8b5cbc2f9deb5d868b2b5326fe81248fa022616f0cae",
       "relativeImportCandidates": [
         {
           "line": 18,
@@ -38094,9 +38106,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/drillTaskGenerationService.ts",
-      "bytes": 9360,
-      "lines": 187,
-      "sha256": "e3ff133984342992c2176f7549c470f554773adc85a9acb1914c0618000a9300",
+      "bytes": 10942,
+      "lines": 219,
+      "sha256": "d134b83c58c8ce11e84dba93bbe3a521b105715d8145dc05f71d8fa9309583e1",
       "relativeImportCandidates": [
         {
           "line": 9,
@@ -39923,9 +39935,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/pureCodeExecutionService.ts",
-      "bytes": 5423,
-      "lines": 125,
-      "sha256": "d9bfb1aa4d481c35776054465cd459f42eb490afec0d302496ba455133526869",
+      "bytes": 6920,
+      "lines": 152,
+      "sha256": "4238027918113e4a228b58a6576234e0760eb083f2ab0f7f3f1a75865538ab8c",
       "relativeImportCandidates": [
         {
           "line": 2,

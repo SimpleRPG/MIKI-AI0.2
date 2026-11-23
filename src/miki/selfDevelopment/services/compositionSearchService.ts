@@ -32,12 +32,24 @@ import { manhattanDistance } from '../../core/parts/manhattanDistancePart';
 import { euclideanDistance } from '../../core/parts/euclideanDistancePart';
 
 export interface CompositionCase { args: number[]; expected: number }
+/*
+ * P2002: 追加の材料（彼女が登録した部品）。土台のカタログと同名なら
+ * 土台が優先される。modulePath は自己完結ソースの import 用で、
+ * 省略時は土台と同じ規約（../../core/parts/<名前>Part）を使う。
+ */
+export interface CompositionExtraPart {
+  name: string;
+  arity: number;
+  fn: (...a: number[]) => number;
+  modulePath?: string;
+}
 export interface CompositionSearchInput {
   entryPoint: string;
   cases: CompositionCase[];
   partNames?: string[];
   maxDepth?: 1 | 2;
   tolerance?: number;
+  extraParts?: CompositionExtraPart[];
 }
 export interface CompositionSearchResult {
   found: boolean;
@@ -77,17 +89,17 @@ type Node =
   | { t: 'op'; op: string; l: Node; r: Node }
   | { t: 'call'; name: string; args: Node[] };
 
-function evalNode(n: Node, consts: number[], vars: number[]): number {
+function evalNode(n: Node, consts: number[], vars: number[], catalog: Record<string, PartDef>): number {
   if (n.t === 'var') return vars[n.i];
   if (n.t === 'const') return consts[n.ci];
   if (n.t === 'op') {
-    const l = evalNode(n.l, consts, vars); const r = evalNode(n.r, consts, vars);
+    const l = evalNode(n.l, consts, vars, catalog); const r = evalNode(n.r, consts, vars, catalog);
     if (n.op === '+') return l + r;
     if (n.op === '-') return l - r;
     if (n.op === '*') return l * r;
     return l / (Math.abs(r) < 1e-9 ? 1e-9 : r);
   }
-  return CATALOG[n.name].fn(...n.args.map((a) => evalNode(a, consts, vars)));
+  return catalog[n.name].fn(...n.args.map((a) => evalNode(a, consts, vars, catalog)));
 }
 function nodeCode(n: Node, consts: number[]): string {
   if (n.t === 'var') return VAR_NAMES[n.i];
@@ -127,7 +139,16 @@ export const compositionSearchService = {
     const tol = input.tolerance ?? 1e-9;
     const k = Math.min(3, Math.max(1, input.cases.length ? input.cases[0].args.length : 1));
     const variables = VAR_NAMES.slice(0, k);
-    const names = (input.partNames && input.partNames.length ? input.partNames : Object.keys(CATALOG)).filter((n) => CATALOG[n]);
+    // P2002: この呼び出し専用のカタログ = 土台 + 追加部品（土台と同名なら土台が優先）。
+    const catalog: Record<string, PartDef> = { ...CATALOG };
+    if (input.extraParts) {
+      for (const p of input.extraParts) {
+        if (!p || !p.name || typeof p.fn !== 'function' || !(p.arity >= 1)) continue;
+        if (catalog[p.name]) continue;
+        catalog[p.name] = { fn: p.fn, arity: Math.floor(p.arity), modulePath: p.modulePath ?? `../../core/parts/${p.name}Part` };
+      }
+    }
+    const names = (input.partNames && input.partNames.length ? input.partNames : Object.keys(catalog)).filter((n) => catalog[n]);
     const maxDepth = input.maxDepth ?? 2;
     let evals = 0;
 
@@ -149,7 +170,7 @@ export const compositionSearchService = {
       for (let i = 0; i < k; i++) depth1.push({ node: { t: 'op', op, l: { t: 'var', i }, r: { t: 'const', ci: 0 } }, nConsts: 1 });
     }
     for (const name of names) {
-      const arity = CATALOG[name].arity;
+      const arity = catalog[name].arity;
       for (const assign of slotAssignments(arity, k, 3)) depth1.push(buildCall(name, assign));
     }
 
@@ -157,7 +178,7 @@ export const compositionSearchService = {
       let e = 0;
       for (const c of input.cases) {
         evals++;
-        const v = evalNode(node, cs, c.args);
+        const v = evalNode(node, cs, c.args, catalog);
         if (!Number.isFinite(v)) return 1e18;
         e = Math.max(e, Math.abs(v - c.expected));
       }
@@ -201,7 +222,7 @@ export const compositionSearchService = {
     if (bestErr > tol && maxDepth >= 2 && evals < EVAL_BUDGET) {
       // 深さ2：第1スロットに深さ1の構造を入れた部品呼び出し
       outer: for (const name of names) {
-        const arity = CATALOG[name].arity;
+        const arity = catalog[name].arity;
         const restAssigns = slotAssignments(arity - 1, k, 2);
         for (const inner of depth1) {
           for (const rest of restAssigns) {
@@ -236,7 +257,7 @@ export const compositionSearchService = {
     const expression = nodeCode(bestNode, bestConsts);
     const used = new Set<string>(); collectParts(bestNode, used);
     const usedParts = [...used];
-    const imports = usedParts.map((n) => `import { ${n} } from '${CATALOG[n].modulePath}';`).join('\n');
+    const imports = usedParts.map((n) => `import { ${n} } from '${catalog[n].modulePath}';`).join('\n');
     const params = variables.map((v) => `${v}: number`).join(', ');
     const source = `${imports ? imports + '\n\n' : ''}export function ${input.entryPoint}(${params}): number { return ${expression}; }\n`;
     return { found: bestErr <= tol, entryPoint: input.entryPoint, expression, usedParts, variables, maxError: bestErr, source };

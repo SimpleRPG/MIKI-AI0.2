@@ -1,9 +1,11 @@
 import { compositionSearchService, type CompositionCase } from './compositionSearchService';
 import { codeDrillService, type CodeDrillTask } from './codeDrillService';
 import { specDraftService, type SpecDraftRequest } from './specDraftService';
-import { drillTaskGenerationService } from './drillTaskGenerationService';
+import { drillTaskGenerationService, DRILL_BASE_PART_NAMES, type DrillExtraPart } from './drillTaskGenerationService';
+import { pureCodeExecutionService } from './pureCodeExecutionService';
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
 import { selfCodeSpaceService } from '../../core/services/selfCodeSpaceService';
+import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 
 /*
  * P1103: 合成ドリルの運転手。
@@ -24,6 +26,8 @@ export interface CompositionDrillInput {
   partNames?: string[];
   maxDepth?: 1 | 2;
   registerAsPart?: boolean;
+  /** P2002: 追加の材料（登録部品）。生成に使ったものと同じ一覧を解く側にも渡す。 */
+  extraParts?: DrillExtraPart[];
 }
 
 export interface CompositionDrillResult {
@@ -37,13 +41,113 @@ export interface CompositionDrillResult {
 }
 
 class CompositionDrillService {
+  private artifactSourceCache = new Map<string, string | null>();
+
   private partSource(name: string): string | null {
     try {
       const file = selfCodeSpaceService.readFile(`src/miki/core/parts/${name}Part.ts`);
-      return file?.content ?? null;
+      if (file?.content) return file.content;
     } catch {
-      return null;
+      // 空間が未初期化なら成果物側へ落ちる
     }
+    // P2002: 登録部品は成果物（部品TXT正本）が実体で、コード空間へ
+    // 反映されていないことがある。空間に無い部品は成果物から読む
+    // （生成・探索・自己完結化で、部品の出所を1本に揃える）。
+    return this.artifactPartSource(name);
+  }
+
+  /*
+   * P2002: 成果物から「部品ファイルとしての正本ソース」を引く。
+   * component.txt の ENTRY_POINT / TARGET_PATH が
+   * src/miki/core/parts/<名前>Part.ts と一致する記録だけを対象にし、
+   * implementation.txt の FILE_CONTENT 本体を返す。成果物は不変
+   * スナップショットなので、名前ごとの結果はキャッシュしてよい。
+   */
+  private artifactPartSource(name: string): string | null {
+    if (this.artifactSourceCache.has(name)) return this.artifactSourceCache.get(name) ?? null;
+    let found: string | null = null;
+    try {
+      for (const manifest of componentArtifactStoreService.getAllManifests()) {
+        const record = componentArtifactStoreService.getBySnapshotKey(manifest.snapshot_key);
+        if (!record) continue;
+        const parsed = CompositionDrillService.parseArtifactPart(record.component_txt, record.implementation_txt);
+        if (parsed && parsed.name === name) { found = parsed.content; break; }
+      }
+    } catch {
+      found = null;
+    }
+    this.artifactSourceCache.set(name, found);
+    return found;
+  }
+
+  /** 成果物の TXT から部品の入口・対象パス・本体を取り出す（対象外なら null）。 */
+  private static parseArtifactPart(
+    componentTxt: string,
+    implementationTxt: string,
+  ): { name: string; content: string } | null {
+    // 成果物 TXT の項目区切りはリテラル "\\n"（2文字）のことがあるため、
+    // 値の終端は空白とバックスラッシュの両方で止める。
+    const entry = /ENTRY_POINT:\s*([A-Za-z0-9_]+)/.exec(componentTxt)?.[1];
+    const target = /TARGET_PATH:\s*([^\s\\]+)/.exec(componentTxt)?.[1];
+    if (!entry || !target) return null;
+    if (target !== `src/miki/core/parts/${entry}Part.ts`) return null;
+    const begin = implementationTxt.indexOf('FILE_CONTENT_BEGIN');
+    const end = implementationTxt.indexOf('FILE_CONTENT_END');
+    if (begin < 0 || end < 0 || end <= begin) return null;
+    const content = implementationTxt
+      .slice(begin + 'FILE_CONTENT_BEGIN'.length, end)
+      .replace(/^(?:\s|\\n)+/, '')
+      .replace(/(?:\s|\\n)+$/, '');
+    return content ? { name: entry, content } : null;
+  }
+
+  /*
+   * P2002: 登録部品のスナップショット（名前＋arity、名前順）。
+   * セッション開始時点で確定させるための列挙で、成果物のうち
+   * 部品ファイル（src/miki/core/parts/<名前>Part.ts）を対象にし、
+   * 土台の語彙と同名のものと、評価器として取り出せないものは除く。
+   * arity は取り出した関数の長さ（実物）を正とする。
+   */
+  public snapshotRegisteredParts(): Array<{ name: string; arity: number }> {
+    const out: Array<{ name: string; arity: number }> = [];
+    const seen = new Set<string>();
+    try {
+      for (const manifest of componentArtifactStoreService.getAllManifests()) {
+        const record = componentArtifactStoreService.getBySnapshotKey(manifest.snapshot_key);
+        if (!record) continue;
+        const parsed = CompositionDrillService.parseArtifactPart(record.component_txt, record.implementation_txt);
+        if (!parsed || seen.has(parsed.name) || DRILL_BASE_PART_NAMES.has(parsed.name)) continue;
+        const fn = pureCodeExecutionService.compileFunction(parsed.content, parsed.name);
+        if (!fn || fn.length < 1) continue;
+        seen.add(parsed.name);
+        out.push({ name: parsed.name, arity: fn.length });
+      }
+    } catch {
+      // 列挙に失敗したら追加材料なし（土台だけのセッションとして続ける）
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+    return out;
+  }
+
+  /*
+   * P2002: スナップショット（名前＋arity）を評価できる材料へ解決する。
+   * 生成・探索・再構成の全てがこの解決を通すことで、同じ一覧が同じ
+   * 評価器に落ちる。解決できない部品は黙って落とすのではなく一覧から
+   * 外れる（＝そのセッションの材料に無いものとして扱う）。
+   * 戻り値の arity は実物の関数の長さで、セッションが返す
+   * スナップショットはこの解決後の値を使う。
+   */
+  public resolveExtraParts(list: Array<{ name: string; arity: number }>): DrillExtraPart[] {
+    const out: DrillExtraPart[] = [];
+    for (const item of list) {
+      if (!item || !item.name || out.some((p) => p.name === item.name)) continue;
+      const source = this.partSource(item.name);
+      if (!source) continue;
+      const fn = pureCodeExecutionService.compileFunction(source, item.name);
+      if (!fn || fn.length < 1) continue;
+      out.push({ name: item.name, arity: fn.length, fn: fn as (...args: number[]) => number });
+    }
+    return out;
   }
 
   public async solveAndRegister(input: CompositionDrillInput): Promise<CompositionDrillResult> {
@@ -53,6 +157,7 @@ class CompositionDrillService {
       cases,
       partNames: input.partNames,
       maxDepth: input.maxDepth,
+      extraParts: input.extraParts,
     });
     const source = compositionSearchService.buildSelfContainedSource(
       { found: search.found, entryPoint: search.entryPoint, expression: search.expression, usedParts: search.usedParts, variables: search.variables, maxError: search.maxError, source: search.source },
@@ -158,11 +263,16 @@ class CompositionDrillService {
    * 解く循環の1周分。結果は件数と内訳で返す（解けなかった課題も
    * 台帳に失敗として残る）。
    */
-  public async runAutoSession(seed: number, count: number, registerAsPart = true): Promise<{
+  public async runAutoSession(seed: number, count: number, registerAsPart = true, extraParts?: Array<{ name: string; arity: number }>): Promise<{
     generated: number; solved: number; registered: number;
+    extraParts: Array<{ name: string; arity: number }>;
     results: Array<{ taskId: string; solved: boolean; expression?: string; reason?: string }>;
   }> {
-    const tasks = drillTaskGenerationService.generateTasks(seed, count);
+    // P2002: 追加材料はセッション開始時点のスナップショットで固定し、
+    // 生成・探索・（結果経由の）再構成の全部で同じ一覧を使う。
+    const resolved = this.resolveExtraParts(extraParts ?? this.snapshotRegisteredParts());
+    const effective = resolved.map((p) => ({ name: p.name, arity: p.arity }));
+    const tasks = drillTaskGenerationService.generateTasks(seed, count, resolved);
     const results: Array<{ taskId: string; solved: boolean; expression?: string; reason?: string }> = [];
     let solved = 0;
     let registered = 0;
@@ -170,12 +280,13 @@ class CompositionDrillService {
       const r = await this.solveAndRegister({
         task: { taskId: t.taskId, title: t.title, entryPoint: t.entryPoint, cases: t.cases },
         registerAsPart,
+        extraParts: resolved,
       });
       if (r.solved) solved++;
       if (r.componentId) registered++;
       results.push({ taskId: t.taskId, solved: r.solved, expression: r.expression, reason: r.reason });
     }
-    return { generated: tasks.length, solved, registered, results };
+    return { generated: tasks.length, solved, registered, extraParts: effective, results };
   }
 
   /**
@@ -208,14 +319,20 @@ class CompositionDrillService {
    * 1つの入口に束ね、アイドル進化サイクルの熟達ドリルから呼べるようにする。
    * 解けた課題は部品登録する（練習で彼女の部品カタログが増える）。
    */
-  public async runPracticeSession(seed: number, count: number, registerAsPart = true): Promise<{
+  public async runPracticeSession(seed: number, count: number, registerAsPart = true, extraParts?: Array<{ name: string; arity: number }>): Promise<{
     generated: number; solved: number; registered: number;
     expressionSolved: number; specSolved: number;
+    extraParts: Array<{ name: string; arity: number }>;
     results: Array<{ taskId: string; kind: 'expression' | 'spec'; solved: boolean; reason?: string; pointsSource?: string }>;
   }> {
+    // P2002: 式の課題の追加材料はセッション開始時点のスナップショットで
+    // 固定する。結果に含めて返すので、失敗課題の再構成（同じ seed で
+    // 再生成する側）が同じ一覧をそのまま使える。仕様の課題は対象外。
+    const resolved = this.resolveExtraParts(extraParts ?? this.snapshotRegisteredParts());
+    const effective = resolved.map((p) => ({ name: p.name, arity: p.arity }));
     const exprCount = Math.ceil(count / 2);
     const specCount = count - exprCount;
-    const exprTasks = drillTaskGenerationService.generateTasks(seed, exprCount);
+    const exprTasks = drillTaskGenerationService.generateTasks(seed, exprCount, resolved);
     const specTasks = drillTaskGenerationService.generateSpecTasks(seed, specCount);
     const results: Array<{ taskId: string; kind: 'expression' | 'spec'; solved: boolean; reason?: string; pointsSource?: string }> = [];
     let solved = 0;
@@ -228,6 +345,7 @@ class CompositionDrillService {
         const r = await this.solveAndRegister({
           task: { taskId: t.taskId, title: t.title, entryPoint: t.entryPoint, cases: t.cases },
           registerAsPart,
+          extraParts: resolved,
         });
         if (r.solved) { solved++; expressionSolved++; }
         if (r.componentId) registered++;
@@ -243,7 +361,7 @@ class CompositionDrillService {
         results.push({ taskId: t.taskId, kind: 'spec', solved: r.solved, reason: r.reason, pointsSource: r.pointsSource });
       }
     }
-    return { generated: count, solved, registered, expressionSolved, specSolved, results };
+    return { generated: count, solved, registered, expressionSolved, specSolved, extraParts: effective, results };
   }
 }
 

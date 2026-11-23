@@ -34,17 +34,37 @@ const NAMES = Object.keys(FNS);
 const CONST_CHOICES = [0, 0.25, 0.3, 0.5, 0.8, 1, 2, 4, 10, 25, 50, -1];
 const VAR_NAMES = ['x', 'y'];
 
+/*
+ * P2002: 追加の材料（彼女が登録した部品）。スナップショットの同一性は
+ * 名前＋arity で、fn は登録部品の正本ソースから運転手
+ * （compositionDrillService）が解決して渡す評価器。生成は式を評価して
+ * ケースを作るため、名前だけでは課題にならない。
+ * 土台の語彙と同名のものは土台が優先され、追加分は NAMES の後ろに
+ * 並ぶため、extraParts 未指定（または空）のときの乱数消費と生成結果は
+ * 従来と完全に一致する。
+ */
+export interface DrillExtraPart {
+  name: string;
+  arity: number;
+  fn: (...args: number[]) => number;
+}
+
+/** 土台の語彙（登録部品スナップショットの除外判定に使う）。 */
+export const DRILL_BASE_PART_NAMES: ReadonlySet<string> = new Set(NAMES);
+
 type GNode =
   | { t: 'var'; i: number }
   | { t: 'const'; v: number }
   | { t: 'op'; op: string; l: GNode; r: GNode }
   | { t: 'call'; name: string; args: GNode[] };
 
-function evalG(n: GNode, vars: number[]): number {
+type GFnMap = Record<string, { fn: (...a: number[]) => number; arity: number }>;
+
+function evalG(n: GNode, vars: number[], fns: GFnMap): number {
   if (n.t === 'var') return vars[n.i];
   if (n.t === 'const') return n.v;
-  if (n.t === 'op') { const l = evalG(n.l, vars); const r = evalG(n.r, vars); if (n.op === '+') return l + r; if (n.op === '-') return l - r; if (n.op === '*') return l * r; return l / (Math.abs(r) < 1e-9 ? 1e-9 : r); }
-  return FNS[n.name].fn(...n.args.map((a) => evalG(a, vars)));
+  if (n.t === 'op') { const l = evalG(n.l, vars, fns); const r = evalG(n.r, vars, fns); if (n.op === '+') return l + r; if (n.op === '-') return l - r; if (n.op === '*') return l * r; return l / (Math.abs(r) < 1e-9 ? 1e-9 : r); }
+  return fns[n.name].fn(...n.args.map((a) => evalG(a, vars, fns)));
 }
 function codeG(n: GNode): string {
   if (n.t === 'var') return VAR_NAMES[n.i];
@@ -82,8 +102,8 @@ export interface GeneratedSpecTask {
 }
 
 export const drillTaskGenerationService = {
-  generateTasks(seed: number, count: number): GeneratedTask[] {
-    return generateTasksImpl(seed, count);
+  generateTasks(seed: number, count: number, extraParts?: DrillExtraPart[]): GeneratedTask[] {
+    return generateTasksImpl(seed, count, extraParts);
   },
   /** P1154: seed 決定的にブリーフを選ぶ（開始位置だけ seed でずらして一巡する）。 */
   generateSpecTasks(seed: number, count: number): GeneratedSpecTask[] {
@@ -101,13 +121,25 @@ export const drillTaskGenerationService = {
   },
 };
 
-function generateTasksImpl(seed: number, count: number): GeneratedTask[] {
+function generateTasksImpl(seed: number, count: number, extraParts?: DrillExtraPart[]): GeneratedTask[] {
+  // P2002: 材料 = 土台の語彙 + 追加部品（土台と同名なら土台が優先）。
+  // 追加が無いとき names は NAMES と中身・順序が一致し、乱数消費は従来どおり。
+  const fns: GFnMap = { ...FNS };
+  const names = [...NAMES];
+  if (extraParts) {
+    for (const p of extraParts) {
+      if (!p || !p.name || typeof p.fn !== 'function' || !(p.arity >= 1)) continue;
+      if (fns[p.name]) continue;
+      fns[p.name] = { fn: p.fn, arity: Math.floor(p.arity) };
+      names.push(p.name);
+    }
+  }
   const rand = mulberry32(seed);
   const pick = <T,>(arr: T[]): T => arr[Math.floor(rand() * arr.length)];
   const makeLeaf = (k: number): GNode => (rand() < 0.6 ? { t: 'var', i: Math.floor(rand() * k) } : { t: 'const', v: pick(CONST_CHOICES) });
   const makeCall = (k: number, first?: GNode): GNode => {
-    const name = pick(NAMES);
-    const arity = FNS[name].arity;
+    const name = pick(names);
+    const arity = fns[name].arity;
     const args: GNode[] = [];
     let hasVar = !!first;
     for (let s = 0; s < arity; s++) {
@@ -162,7 +194,7 @@ function generateTasksImpl(seed: number, count: number): GeneratedTask[] {
     }
     const code = codeG(expr);
     if (seen.has(code)) continue;
-    const cases = samplePoints(k).map((args) => ({ args, expected: evalG(expr, args) }));
+    const cases = samplePoints(k).map((args) => ({ args, expected: evalG(expr, args, fns) }));
     if (cases.some((c) => !Number.isFinite(c.expected))) continue;
     const vals = cases.map((c) => c.expected);
     if (Math.max(...vals) - Math.min(...vals) < 1e-6) continue; // 定数同然は課題にならない

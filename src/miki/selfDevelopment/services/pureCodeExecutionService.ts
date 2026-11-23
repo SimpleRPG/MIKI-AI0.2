@@ -120,6 +120,33 @@ class PureCodeExecutionService {
       implementationHash,
     };
   }
+
+  /*
+   * P2002: ソースから入口関数そのものを取り出す。ケース判定（execute）
+   * ではなく、登録部品を「評価できる材料」として生成・探索で使う側の口。
+   * 安全境界は execute と同じ（禁止グローバル・非決定要素の静的検査、
+   * トランスパイル診断、require を封じた使い捨てモジュール）。
+   * 取り出せなければ null（測れないものを測ったことにしない）。
+   */
+  public compileFunction(implementation: string, entryPoint: string): ((...args: unknown[]) => unknown) | null {
+    if (PROHIBITED.test(implementation) || NONDETERMINISTIC.test(implementation)) return null;
+    const transpiled = ts.transpileModule(implementation, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+      reportDiagnostics: true,
+    });
+    if ((transpiled.diagnostics || []).some((d) => d.category === ts.DiagnosticCategory.Error)) return null;
+    try {
+      const moduleObj: { exports: Record<string, unknown> } = { exports: {} };
+      const factory = new Function('module', 'exports', 'require', transpiled.outputText);
+      factory(moduleObj, moduleObj.exports, () => {
+        throw new Error('require is not available in pure execution');
+      });
+      const fn = moduleObj.exports[entryPoint];
+      return typeof fn === 'function' ? (fn as (...args: unknown[]) => unknown) : null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 export const pureCodeExecutionService = new PureCodeExecutionService();
