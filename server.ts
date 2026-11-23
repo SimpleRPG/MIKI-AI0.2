@@ -869,10 +869,11 @@ app.get('/api/logs', (req, res) => {
 
 // P2001: 橋（BeBe-bridge）の交換フォルダ。アプリ（WebView）は git にも
 // Termux のホームにも直接触れず、この API 経由で ~/miki-bridge-exchange の
-// out/ への書き出しと in/ の読み取りだけを行う。運搬（git clone/pull/push）
-// は Termux 側 courier スクリプトの担当であり、サーバーはファイルの
-// 受け渡しだけをする（考えない）。交換フォルダの実パスは環境変数
-// MIKI_BRIDGE_EXCHANGE_DIR で差し替え可能。
+// out/ への書き出しと in/ の読み取りだけを行う。交換フォルダの実パスは
+// 環境変数 MIKI_BRIDGE_EXCHANGE_DIR で差し替え可能。
+// P2003: 運搬（git pull/push）はサーバーへ組み込んだ（下記の courier 節）。
+// サーバーは受け渡しに加えて運搬も担うが、考えること（材料の検証・
+// 取り込み判断）は引き続きアプリ側の既存入口の担当で、ここではしない。
 const BRIDGE_EXCHANGE_DIR = process.env.MIKI_BRIDGE_EXCHANGE_DIR || path.join(os.homedir(), 'miki-bridge-exchange');
 const bridgeExchangePath = (box: 'out' | 'in', name: string): string | null => {
   const base = path.basename(String(name || ''));
@@ -925,6 +926,183 @@ app.get('/api/bridge/in/:name', (req, res) => {
     res.status(500).json({ error: err?.message || 'bridge in read error' });
   }
 });
+
+// P2003: 橋の運搬（courier）をサーバーへ組み込む。従来は Termux 側の
+// ~/termux_courier.sh（v1.1、手動実行のみ）が担っていた運搬を、サーバーが
+// 定期実行＋アプリ要請（POST /api/bridge/courier）で回す。処理は courier
+// v1.1 と等価：橋クローンで git pull --ff-only → 未着の返答・部品・
+// パッケージ・sync down を in/ へ写す → out/ を接頭辞で振り分けて橋
+// クローンへ移し、miki-device 名義で commit して push する。
+// 橋クローンは ~/miki-bridge（環境変数 MIKI_BRIDGE_REPO_DIR で差し替え
+// 可能）。認証はクローン側の core.sshCommand 設定に任せ、サーバーは鍵に
+// 触らない。橋クローンが存在しない環境（VM の開発環境等）では黙って
+// スキップし、失敗してもログに残すだけで他の経路を止めない。push 競合や
+// pull 失敗は次回に委ね、reset 等の破壊的操作はしない。
+const BRIDGE_REPO_DIR = process.env.MIKI_BRIDGE_REPO_DIR || path.join(os.homedir(), 'miki-bridge');
+const BRIDGE_COURIER_INTERVAL_MS = (() => {
+  const raw = Number.parseInt(process.env.MIKI_BRIDGE_COURIER_INTERVAL_MS || '', 10);
+  return Number.isInteger(raw) && raw >= 0 ? raw : 5 * 60 * 1000;
+})();
+
+interface BridgeCourierResult {
+  status: 'ok' | 'skipped' | 'busy' | 'failed';
+  copied: number;
+  moved: number;
+  pushed: boolean;
+  reason?: string;
+}
+
+let bridgeCourierRunning = false;
+
+const bridgeGit = (args: string[]): { success: boolean; stdout: string; stderr: string } => {
+  const res = spawnSync('git', args, {
+    cwd: BRIDGE_REPO_DIR,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+    timeout: 120000,
+  });
+  return { success: res.status === 0, stdout: res.stdout || '', stderr: res.stderr || '' };
+};
+
+const runBridgeCourierOnce = (): BridgeCourierResult => {
+  if (bridgeCourierRunning) {
+    return { status: 'busy', copied: 0, moved: 0, pushed: false, reason: 'courier already running' };
+  }
+  if (!fs.existsSync(path.join(BRIDGE_REPO_DIR, '.git'))) {
+    // 橋クローンが無い環境では運搬を持たないのが正常（黙ってスキップ）。
+    return { status: 'skipped', copied: 0, moved: 0, pushed: false, reason: 'bridge clone not found' };
+  }
+  bridgeCourierRunning = true;
+  try {
+    const inDir = path.join(BRIDGE_EXCHANGE_DIR, 'in');
+    const outDir = path.join(BRIDGE_EXCHANGE_DIR, 'out');
+    fs.mkdirSync(inDir, { recursive: true });
+    fs.mkdirSync(outDir, { recursive: true });
+
+    const pull = bridgeGit(['pull', '--ff-only', '-q']);
+    if (!pull.success) {
+      console.warn(`[橋] courier: git pull に失敗しました（次回に委ねます）: ${(pull.stderr || '').trim().slice(0, 300)}`);
+      return { status: 'failed', copied: 0, moved: 0, pushed: false, reason: 'git pull failed' };
+    }
+
+    // VM → 端末: 未着の返答・部品・パッケージ・sync down を in/ へ写す。
+    let copied = 0;
+    const copyIfNew = (src: string): void => {
+      const dest = path.join(inDir, path.basename(src));
+      if (!fs.existsSync(dest)) {
+        fs.copyFileSync(src, dest);
+        copied += 1;
+      }
+    };
+    const listJsonFiles = (dir: string): string[] => {
+      try {
+        return fs.existsSync(dir)
+          ? fs.readdirSync(dir).filter((f) => f.endsWith('.json') && !f.startsWith('.')).map((f) => path.join(dir, f))
+          : [];
+      } catch {
+        return [];
+      }
+    };
+    const resultsDir = path.join(BRIDGE_REPO_DIR, 'results');
+    try {
+      if (fs.existsSync(resultsDir)) {
+        for (const entry of fs.readdirSync(resultsDir, { withFileTypes: true })) {
+          if (entry.isDirectory()) {
+            for (const f of listJsonFiles(path.join(resultsDir, entry.name))) copyIfNew(f);
+          }
+        }
+      }
+    } catch {
+      // 読めない棚は飛ばす（運搬全体は止めない）
+    }
+    for (const f of listJsonFiles(resultsDir)) copyIfNew(f);
+    for (const f of listJsonFiles(path.join(BRIDGE_REPO_DIR, 'parts'))) copyIfNew(f);
+    for (const f of listJsonFiles(path.join(BRIDGE_REPO_DIR, 'packages'))) copyIfNew(f);
+    try {
+      const syncDir = path.join(BRIDGE_REPO_DIR, 'sync');
+      if (fs.existsSync(syncDir)) {
+        for (const f of fs.readdirSync(syncDir)) {
+          if (f.startsWith('down-') && f.endsWith('.json')) copyIfNew(path.join(syncDir, f));
+        }
+      }
+    } catch {
+      // 読めない棚は飛ばす（同上）
+    }
+
+    // 端末 → VM: out/ のファイルを接頭辞で振り分けて橋クローンへ移す。
+    // 未知の接頭辞は飛ばす（courier v1.1 と同じ）。橋側に同名があるものは
+    // 移さない（追記と移動のみ、のプロトコル規律）。
+    const routeOutboxFile = (name: string): string | null => {
+      if (!name.endsWith('.json') && !name.endsWith('.zip')) return null;
+      if (name.startsWith('research-') && name.endsWith('.json')) return path.join('requests', 'research', name);
+      if (name.startsWith('parts-') && name.endsWith('.json')) return path.join('requests', 'parts', name);
+      if (name.startsWith('fieldtest-') && name.endsWith('.json')) return path.join('requests', 'fieldtest', name);
+      if (name.startsWith('log-') && name.endsWith('.zip')) return path.join('logs', name);
+      if (name.startsWith('up-') && name.endsWith('.json')) return path.join('sync', name);
+      return null;
+    };
+    let moved = 0;
+    let outNames: string[] = [];
+    try {
+      outNames = fs.readdirSync(outDir);
+    } catch {
+      outNames = [];
+    }
+    for (const name of outNames) {
+      if (name.startsWith('.')) continue;
+      const rel = routeOutboxFile(name);
+      if (!rel) continue;
+      const dest = path.join(BRIDGE_REPO_DIR, rel);
+      if (fs.existsSync(dest)) continue;
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.renameSync(path.join(outDir, name), dest);
+      moved += 1;
+    }
+
+    if (moved > 0) {
+      bridgeGit(['add', '-A']);
+      const commit = bridgeGit(['-c', 'user.name=miki-device', '-c', 'user.email=device@localhost', 'commit', '-qm', 'device: bridge outbox']);
+      if (!commit.success) {
+        console.warn(`[橋] courier: git commit に失敗しました（次回に委ねます）: ${(commit.stderr || '').trim().slice(0, 300)}`);
+      }
+    }
+    // 前回 push に失敗して残った未 push コミットも含め、あれば push する。
+    let pushed = false;
+    const ahead = bridgeGit(['rev-list', '--count', 'origin/main..HEAD']);
+    if (ahead.success && Number.parseInt(ahead.stdout.trim(), 10) > 0) {
+      const push = bridgeGit(['push', '-q', 'origin', 'main']);
+      if (push.success) {
+        pushed = true;
+      } else {
+        console.warn(`[橋] courier: git push に失敗しました（次回に委ねます）: ${(push.stderr || '').trim().slice(0, 300)}`);
+      }
+    }
+    if (copied > 0 || moved > 0) {
+      console.log(`[橋] courier: 1往復が完了しました copied=${copied} moved=${moved} pushed=${pushed}`);
+    }
+    return { status: 'ok', copied, moved, pushed };
+  } catch (err: any) {
+    console.warn(`[橋] courier: 運搬中に例外が発生しました（次回に委ねます）: ${err?.message || err}`);
+    return { status: 'failed', copied: 0, moved: 0, pushed: false, reason: String(err?.message || err) };
+  } finally {
+    bridgeCourierRunning = false;
+  }
+};
+
+app.post('/api/bridge/courier', (_req, res) => {
+  const result = runBridgeCourierOnce();
+  res.json(result);
+});
+
+let bridgeCourierTimer: ReturnType<typeof setInterval> | null = null;
+const startBridgeCourierTimer = (): void => {
+  if (BRIDGE_COURIER_INTERVAL_MS <= 0 || bridgeCourierTimer) return;
+  bridgeCourierTimer = setInterval(() => {
+    runBridgeCourierOnce();
+  }, BRIDGE_COURIER_INTERVAL_MS);
+  bridgeCourierTimer.unref();
+};
 
 // Master Specification Document Download Endpoint
 app.get('/api/master-spec', (req, res) => {
@@ -4864,6 +5042,8 @@ async function startServer() {
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Miki AI Partner & Autonomous Studio server running on http://0.0.0.0:${PORT}`);
+    // P2003: 橋の運搬タイマー（橋クローンが無い環境では運搬側が黙ってスキップ）
+    startBridgeCourierTimer();
   });
 
   server.on('error', (err: any) => {

@@ -10350,9 +10350,9 @@
     },
     {
       "path": "server.ts",
-      "bytes": 216051,
-      "lines": 4965,
-      "sha256": "6f2ef575540ca13192d44886060ff6eda67f772cef5f26de373382d199b87b82",
+      "bytes": 224287,
+      "lines": 5145,
+      "sha256": "9fbd48b2580d74b7c569780b7b114fa54e49825cc01e19dc1ef399cf4c7a54f5",
       "relativeImportCandidates": [
         {
           "line": 15,
@@ -10607,7 +10607,7 @@
           "resolvedPath": "src/miki/improvement/services/selfImprovementMetricsService.ts"
         },
         {
-          "line": 3777,
+          "line": 3955,
           "specifier": "./chapter_${chapterNumber}",
           "resolution": "UNRESOLVED_CANDIDATE"
         }
@@ -18647,9 +18647,9 @@
     },
     {
       "path": "src/miki/core/services/bridgeExchangeService.ts",
-      "bytes": 43953,
-      "lines": 1041,
-      "sha256": "6a84326eb1ea59304a19ee3ec9e6cd5a0e2e0dcf5244d693d4a75b33c7e102f8",
+      "bytes": 45042,
+      "lines": 1059,
+      "sha256": "3dc8bdf808c9eddc56acd1f2f23fedaca2f068802bbe77b3f2f15aac428d927d",
       "relativeImportCandidates": [
         {
           "line": 2,

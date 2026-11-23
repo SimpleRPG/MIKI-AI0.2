@@ -23,8 +23,9 @@ import { sha256HexFromText } from './canonicalSha256Service';
  * 線引き（設計どおり）:
  *  - アプリは git を触らない。読み書きは端末内の交換フォルダ
  *    （~/miki-bridge-exchange の out/ と in/）だけで、その実アクセスは
- *    Termux サーバーの /api/bridge/* 経由。運搬（git）は Termux 側
- *    courier の担当であり、ここでは行わない。
+ *    Termux サーバーの /api/bridge/* 経由。運搬（git）そのものは
+ *    サーバー側の担当であり（P2003 でサーバーへ組み込み）、ここでは
+ *    行わない。ここから行うのはサーバーへの即時運搬の要請まで。
  *  - 戻りは全て「材料」。取り込みは既存の入口を通す: 部品・教師
  *    パッケージは componentSupplyIntakeService の受入台帳（結び付け
  *    検証・ベースライン照合・TVE 検証は全て既存のまま）、知識は
@@ -354,6 +355,17 @@ class BridgeExchangeService {
     }
   }
 
+  /**
+   * サーバーへ即時運搬を頼む（P2003、fire-and-forget）。
+   * サーバー側に組み込まれた運搬（POST /api/bridge/courier）を1回回して
+   * もらう。本線は待たず、失敗は無視する（定期運搬が次に拾う）。
+   */
+  private requestCourierNow(): void {
+    void this.fetchBridge('/api/bridge/courier', { method: 'POST' }, 30000).then((res) => {
+      if (res && res.ok) this.noteTransportRecovery();
+    });
+  }
+
   /** out/ へ1ファイルを書き出す。テキストか Base64（バイナリ用）のどちらか。 */
   private async writeOutbox(fileName: string, body: { text?: string; base64?: string }): Promise<BridgeWriteResult> {
     const res = await this.fetchBridge('/api/bridge/out', {
@@ -430,6 +442,9 @@ class BridgeExchangeService {
     const result = await this.writeOutbox(fileName, { text: JSON.stringify(envelope, null, 2) });
     if (result.ok) {
       this.recordPending(envelope, fileName, summary);
+      // research／parts の依頼は out/ へ書いた直後に即時運搬を頼む
+      // （定期運搬を待たずに VM 側へ届ける。Downloads 退避時は対象外）。
+      if (result.via !== 'DOWNLOADS_FALLBACK') this.requestCourierNow();
       return { ...result, envelopeId: envelope.id };
     }
     return result;
@@ -1024,6 +1039,9 @@ class BridgeExchangeService {
   // 背景サイクル用の一括交換（backgroundWorkerService から呼ばれる）
   // ------------------------------------------------------------------
   public async runBackgroundExchange(): Promise<BridgeBackgroundResult> {
+    // 取り込みの開始時に即時運搬を頼み、新着が in/ へ届く機会を増やす
+    // （fire-and-forget。今回の pollInbox に間に合わなくても次回に回る）。
+    this.requestCourierNow();
     const inbox = await this.pollInbox();
     let logExported = false;
     if (this.state.logRequested) {

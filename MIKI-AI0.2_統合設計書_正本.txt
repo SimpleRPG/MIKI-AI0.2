@@ -13601,3 +13601,21 @@ P2002（2026-11-23）ドリルの問題の自動拡張：登録部品を問題�
 検証：全体 tsc エラー0、check_imports 未解決0。プローブ（製品外、使い捨て）：成果物に部品を1件登録した状態で、スナップショットに名前＋arity で載ること、解決した評価器が期待どおり振る舞うこと、複数 seed の生成で登録部品を参照する課題が出ること（走査した240件中32件）、同じ seed＋同じスナップショットで再生成が一致すること、探索が登録部品を使った解を見つけること、その部品を参照する生成課題を solveAndRegister で解けること（PART_SOURCE_UNAVAILABLE にならない）、runPracticeSession の結果のスナップショットから再構成した式課題の ID 列がセッションと一致すること（ランナーの経路）、の全9項目 PASS。extraParts 未指定時の生成出力は変更前のベースラインと全件一致。在庫は再生成する（新規ファイルは無し）。
 
 実機確認は未実施。証明点：(a) VM の成長ループ（code_drill_runner）で、登録部品を参照する課題が生成され、不足リストの再構成が一致したまま運用できること、(b) 実機の自律サイクル（autonomousEvolutionService 経由の runPracticeSession）でスナップショットが付き、登録部品入りの課題が解題・登録の循環に乗ること。判断点として残す：成果物に部品が増え続けた場合の材料の上限（現状は全件。探索予算との兼ね合いで将来は直近・成功率等での選別が要る可能性がある）、仕様の課題への追加材料の適用可否。
+
+P2003（2026-11-23）橋の運搬のサーバー組み込み：定期運搬＋アプリ要請の即時運搬
+
+位置付け：P2001 で橋の受け渡し口（交換フォルダと /api/bridge/*）は入ったが、運搬（橋クローンの git pull／push）自体は Termux 側スクリプト ~/termux_courier.sh v1.1 の手動実行に限られ、アプリが依頼を出しても誰かがスクリプトを回すまで VM へ届かなかった。本束は運搬を Termux サーバーへ組み込み、定期運搬とアプリ要請の即時運搬で「出したら届く」状態にする（ユーザー承認済みの設計判断）。変更は製品2ファイル（server.ts／bridgeExchangeService）＋本書追記＋在庫。考えること（材料の検証・取り込み判断）は引き続きアプリ側の既存入口の担当で、サーバーは運搬と受け渡しだけをする線引きは不変更。
+
+（1）サーバー側の運搬（server.ts、runBridgeCourierOnce）：処理は courier v1.1 と等価。(a) 橋クローン（~/miki-bridge、環境変数 MIKI_BRIDGE_REPO_DIR で差し替え可能）で git pull --ff-only。認証はクローン側の core.sshCommand 設定に任せ、サーバーは鍵に触らない。(b) results/<kind>/*.json・results/*.json・parts/*.json・packages/*.json・sync/down-*.json のうち交換フォルダ in/ に未着のものをコピー（同名があれば写さない）。(c) out/ のファイルを接頭辞で振り分け（research-*.json／parts-*.json／fieldtest-*.json → requests/<kind>/、log-*.zip → logs/、up-*.json → sync/。未知の接頭辞は飛ばす。橋側に同名があるものは移さない）、移したものがあれば miki-device（device@localhost）名義で commit して push する。v1.1 からの意図的な差分は1点だけ：前回 push に失敗して残った未 push コミットがある場合は、その回に新規の移動が無くても push を再試行する（「失敗は次回に委ねる」が実際に次回へ届くようにするため）。
+
+（2）安全策：橋クローン（.git）が存在しない環境では運搬を黙ってスキップする（status: skipped。VM 等の開発環境でエラーにしない）。同時実行は1つまで（実行中フラグ、重なったら status: busy で即座に返す）。pull 失敗の回は in／out に触らず打ち切る。失敗・例外はサーバーログ（console.warn）に残すだけで、他の経路を止めない。push 競合時は次回に委ね、reset 等の破壊的操作はしない（pull は --ff-only のみ）。
+
+（3）定期運搬：サーバー起動（listen 開始）後にタイマーを張り、間隔は環境変数 MIKI_BRIDGE_COURIER_INTERVAL_MS（既定 5分、0 で無効）。タイマーは unref し、プロセスの寿命を引っ張らない。
+
+（4）即時運搬の口：POST /api/bridge/courier を追加。運搬1回を実行（実行中なら busy）し、結果（status／copied／moved／pushed／reason）を JSON で返す。
+
+（5）アプリ側（bridgeExchangeService）：サーバーへ即時運搬を頼む小さなヘルパー requestCourierNow を追加（POST /api/bridge/courier、fire-and-forget、本線は待たない・失敗は無視、既存の橋 dispatch と同じ作法）。呼ぶ場所は2箇所：(a) research／parts の依頼封筒を out/ へ書いた直後（writeEnvelope の成功時。Downloads 退避に回った場合は対象外）、(b) 背景の交換サイクル runBackgroundExchange の取り込み開始時（新着が in/ へ届く機会を増やす。今回の巡回に間に合わなくても次回に回る）。
+
+検証：全体 tsc エラー0、check_imports 未解決0（1,285ファイル／4,540 import）、node build-server.mjs 成功。製品外 harness105（新規）全12項目 PASS：一時ディレクトリに bare リモート＋橋クローン＋交換フォルダを用意し、ビルド済みサーバーを HTTP 経由で叩いて、サーバーが起動して /api/bridge/in に応答すること、運搬1回目が ok で results/research/ の結果が内容一致のまま in/ へ写ること、out/ の research-*.json が requests/research/ へ・up-*.json が sync/ へ・log-*.zip が logs/ へ移ること（moved=3）、未知の接頭辞のファイルが out/ に残ること、移したファイルがリモート（bare）の main に push されていること（ls-tree で確認）、2回目の運搬が copied=0／moved=0 の no-op であること、橋クローンの無い環境では status: skipped で黙ってスキップすること。在庫は再生成する（新規ファイルは無し）。
+
+実機確認は未実施。証明点：(a) S25 の Termux サーバーを P2003 へ更新した後、サーバーが起きている間に VM 側の新規結果がアプリの操作なしに in/ へ届くこと、(b) アプリが出した調査・部品の依頼が定期間隔を待たず BeBe-bridge の requests/ へ届くこと、(c) 手動スクリプト（courier v1.1）と併用しても ff-only と未 push 再送の範囲で競合が壊れないこと。未決の判断点：運搬間隔の既定5分が端末の電池・通信量と合うか（実機で様子を見る）、手動スクリプトの位置付け（サーバー組み込みを正本とし、スクリプトはサーバーが落ちている時の非常用として残す想定）、fieldtest 結果の置き場所の分離（P2001 から継続の courier 側課題で、本束でも未着手）。
