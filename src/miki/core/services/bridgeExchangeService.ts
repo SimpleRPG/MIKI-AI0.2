@@ -44,7 +44,11 @@ import { sha256HexFromText } from './canonicalSha256Service';
  *    runBackgroundExchange() を呼ぶ（返送取り込み・ログ返送・同期送出）。
  *  - 軽い取り込み: アプリ起動時・前景復帰時と段梯子タイマーが
  *    runLightIntake() を呼ぶ（返送取り込みのみ。P2004 で深い
- *    サイクル相乗りから分離）。
+ *    サイクル相乗りから分離）。P2008 で、取り込みのついでに
+ *    ログ返送の時間判定（前回返送から6時間）と依頼フラグの
+ *    確認もここで行う（返送自体は既存の exportLogBundle）。
+ *    VM からのログ返送依頼は kind 'log' の封筒として sync の
+ *    down-*.json で届き、取り込み時に1回だけ消費される。
  */
 
 export type BridgeEnvelopeKind = 'research' | 'parts' | 'fieldtest' | 'teacher' | 'sync' | 'log';
@@ -108,6 +112,18 @@ export interface BridgeSyncUpPayload {
 export interface BridgeSyncDownPayload {
   knowledge?: Array<{ statement: string; sourceTitle?: string; sourceUrl?: string; sourceName?: string }>;
   vocabulary?: Array<{ term: string; gloss?: string; reading?: string; sourceUrl?: string }>;
+}
+
+/**
+ * P2008: VM からのログ返送依頼（kind 'log'、sync の down-*.json で届く）。
+ * 端末は取り込み時に exportLogBundle を1回走らせて消費する（台帳の
+ * 重複排除で同じ依頼が二度効くことはない）。
+ */
+export interface BridgeLogRequestPayload {
+  /** 'EXPORT_LOGS' のみ対応。それ以外は取り込み側で UNSUPPORTED_ACTION。 */
+  action: 'EXPORT_LOGS';
+  /** 依頼理由（任意。診断用に短く）。 */
+  reason?: string;
 }
 
 export interface BridgeFieldTestPayload {
@@ -214,6 +230,18 @@ const MAX_FIELD_TEST_RECORDS = 50;
 
 /** ログ返送の定期間隔（設計メモ: 定期トリガー。電池配慮で日次級）。 */
 export const BRIDGE_LOG_EXPORT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/**
+ * P2008: 軽い取り込みのついでに行うログ返送の時間判定の閾値。
+ * 深いサイクルの24時間周期だけでは実機で一度も発火しなかった
+ * （背景サイクル自体が電池適応＋ユーザー操作中の停止で滅多に
+ * 回らない）ため、軽い発火口（起動・前景復帰・前景約10分）でも
+ * 前回返送からの経過を見て、超えていたら既存の exportLogBundle
+ * で1回だけ送る。最終返送時刻は深いサイクルと共通（state の
+ * lastLogExportAt）なので、二重返送にはならない。
+ * 6時間は調整可能な判断点（正本 P2008 記録）: 短くすれば診断の
+ * 鮮度は上がるが、橋の往復と電池の消費が増える。
+ */
+export const BRIDGE_LOG_EXPORT_LIGHT_INTERVAL_MS = 6 * 60 * 60 * 1000;
 /**
  * P2004: 軽い取り込み（pollInbox のみ）の段梯子周期。前景にいる間は
  * 約10分、背景では約30分。起動時・前景復帰時は即時（runLightIntake
@@ -593,9 +621,12 @@ class BridgeExchangeService {
    * ランタイムログを診断範囲に切って1束の ZIP にし、out/ へ置く。
    * - CHAT カテゴリは丸ごと除外する（会話本文を持ちうるため）。
    * - details は1件400字まで、束の本文は新しい側を優先して 4.5MB で切る。
-   * - 定期（SCHEDULED）と依頼フラグ（REQUESTED）の2トリガーを受ける。
+   * - 定期（SCHEDULED）、アプリ側の依頼フラグ（REQUESTED）、
+   *   橋経由の VM 依頼（BRIDGE_REQUESTED、P2008）の3トリガーを受ける。
+   *   成功したら最終返送時刻を共通の台帳へ刻み、依頼フラグも落とす
+   *   （どの経路で送れても「送る必要」は満たされるため）。
    */
-  public async exportLogBundle(trigger: 'SCHEDULED' | 'REQUESTED'): Promise<BridgeWriteResult> {
+  public async exportLogBundle(trigger: 'SCHEDULED' | 'REQUESTED' | 'BRIDGE_REQUESTED'): Promise<BridgeWriteResult> {
     const id = shortId();
     const createdAt = new Date().toISOString();
     const entries = systemLogger.getLogs().filter((entry) => entry.category !== 'CHAT');
@@ -642,7 +673,7 @@ class BridgeExchangeService {
     const result = await this.writeOutbox(fileName, { base64: toBase64(zipBytes) });
     if (result.ok) {
       this.state.lastLogExportAt = Date.now();
-      if (trigger === 'REQUESTED') {
+      if (trigger === 'REQUESTED' || trigger === 'BRIDGE_REQUESTED') {
         this.state.logRequested = false;
         this.state.logRequestReason = undefined;
       }
@@ -808,6 +839,8 @@ class BridgeExchangeService {
           return await this.intakeSyncDown(fileName, envelope as unknown as BridgeEnvelope<BridgeSyncDownPayload>);
         case 'fieldtest':
           return await this.intakeFieldTest(fileName, envelope as unknown as BridgeEnvelope<BridgeFieldTestPayload>);
+        case 'log':
+          return await this.intakeLogRequest(fileName, envelope as unknown as BridgeEnvelope<BridgeLogRequestPayload>);
         default:
           return { fileName, kind: envelope.kind, status: 'UNSUPPORTED_KIND', note: `未対応の kind: ${envelope.kind}` };
       }
@@ -981,6 +1014,44 @@ class BridgeExchangeService {
   }
 
   // ------------------------------------------------------------------
+  // ログ返送依頼（P2008）: VM から kind 'log' の封筒が sync の
+  // down-*.json で届いたら、その場でログ束を1回送って消費する
+  // ------------------------------------------------------------------
+  /**
+   * 消費は台帳の重複排除（ファイル名＋sha256）が担保する: 同じ依頼
+   * ファイルが in/ に残っていても二度目は処理されない。書き出しに
+   * 失敗した場合は、アプリ側の依頼フラグへ落として次の発火口
+   * （軽い取り込み／深いサイクル）で再試行させる。
+   */
+  private async intakeLogRequest(
+    fileName: string,
+    envelope: BridgeEnvelope<BridgeLogRequestPayload>,
+  ): Promise<BridgeInboxOutcome> {
+    const payload = envelope.payload ?? ({} as BridgeLogRequestPayload);
+    if (payload.action !== 'EXPORT_LOGS') {
+      return {
+        fileName,
+        kind: 'log',
+        status: 'UNSUPPORTED_ACTION',
+        note: `未対応の action: ${typeof payload.action === 'string' ? payload.action : '(なし)'}`,
+      };
+    }
+    const reason = typeof payload.reason === 'string' ? payload.reason.slice(0, 120) : undefined;
+    systemLogger.info('SYSTEM', `[橋] VM からログ返送の依頼を受けました${reason ? `: ${reason}` : ''}`);
+    const result = await this.exportLogBundle('BRIDGE_REQUESTED');
+    if (!result.ok) {
+      this.requestLogExport('橋経由の依頼（書き出し失敗のため再試行）');
+      return { fileName, kind: 'log', status: 'LOG_EXPORT_FAILED', note: result.message };
+    }
+    return {
+      fileName,
+      kind: 'log',
+      status: 'LOG_EXPORTED',
+      note: `依頼によりログ束を送出しました${reason ? `: ${reason}` : ''}`,
+    };
+  }
+
+  // ------------------------------------------------------------------
   // 実地試験（fieldtest）: 枠のみ。個別の試験は後続束が runner を登録する
   // ------------------------------------------------------------------
   public registerFieldTestRunner(testKind: string, runner: BridgeFieldTestRunner): void {
@@ -1062,8 +1133,11 @@ class BridgeExchangeService {
    * 段梯子: 起動時・前景復帰時は即時、前景にいる間は約10分間隔、
    * 背景では約30分間隔で pollInbox だけを回す。従来は取り込みが
    * 深いサイクル（電池適応15〜60分＋ユーザー操作中は停止）相乗りで、
-   * 通常使用では長時間止まっていた。ログ返送・同期送出は従来どおり
+   * 通常使用では長時間止まっていた。同期送出は従来どおり
    * runBackgroundExchange（深いサイクル）だけが行う。
+   * ログ返送は P2008 で軽い側にも発火口を持った: 取り込みのついでに
+   * 依頼フラグと「前回返送からの経過（閾値6時間）」を判定し、
+   * 既存の exportLogBundle を1回だけ走らせる（maybeExportLogOnLightCycle）。
    * 背景の30分は WebView の JS が生きている範囲での周期であり、
    * OS に止められた場合は前景復帰時の即時取り込みで回収する。
    * 失敗しても呼び出し元へは投げない（橋は補助線）。
@@ -1083,11 +1157,36 @@ class BridgeExchangeService {
     this.lastLightIntakeAt = now;
     try {
       this.requestCourierNow();
-      return await this.pollInbox();
+      const result = await this.pollInbox();
+      // P2008: 取り込みのついでにログ返送の判定（軽い判定のみ。
+      // 実際の返送は条件を満たした時だけ既存経路で1回）。
+      // 取り込みの中で VM 依頼により返送済みなら、最終返送時刻が
+      // 更新されているため、ここでは何も起きない。
+      await this.maybeExportLogOnLightCycle();
+      return result;
     } catch {
       return null;
     } finally {
       this.lightIntakeRunning = false;
+    }
+  }
+
+  /**
+   * P2008: 軽いサイクル側のログ返送判定。優先順位は
+   * (1) アプリ側の依頼フラグ (2) 前回返送から閾値（6時間）超過。
+   * どちらも既存の exportLogBundle を再利用し、成功すれば最終
+   * 返送時刻が共通台帳に刻まれるため、深いサイクル側と二重に
+   * 送ることはない。失敗しても次回の発火口で再判定される。
+   */
+  private async maybeExportLogOnLightCycle(): Promise<void> {
+    try {
+      if (this.state.logRequested) {
+        await this.exportLogBundle('REQUESTED');
+      } else if (Date.now() - this.state.lastLogExportAt >= BRIDGE_LOG_EXPORT_LIGHT_INTERVAL_MS) {
+        await this.exportLogBundle('SCHEDULED');
+      }
+    } catch {
+      /* 橋は補助線: 返送の失敗で取り込み側を巻き込まない */
     }
   }
 

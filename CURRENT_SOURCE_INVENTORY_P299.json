@@ -18683,9 +18683,9 @@
     },
     {
       "path": "src/miki/core/services/bridgeExchangeService.ts",
-      "bytes": 48563,
-      "lines": 1130,
-      "sha256": "0d774c735169b7bfff5328f49b1679ba2b443c3298eafb6732a804dc5e8d9b62",
+      "bytes": 54091,
+      "lines": 1229,
+      "sha256": "132110f66c595a1231c41fdb63e245fb34b7c273de60a5d7e2cffcbfc2fd71d1",
       "relativeImportCandidates": [
         {
           "line": 2,
