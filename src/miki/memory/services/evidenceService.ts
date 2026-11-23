@@ -5,6 +5,109 @@ import type { WebFetchMethod } from '../../../types';
 
 const EVIDENCE_STORAGE_KEY = 'miki_evidence_db_v1';
 
+// P2007: 主張文の入口整形。
+// 2026-11-23 の調査ラッシュでは、調査の実行診断（検索エンジンの
+// 状態・HTTP 429・レート制限のメモ）や複数主題の長文ダンプが、
+// そのまま Claim の statement として登録された（実例 CLM-000086
+// 系：エンジン状態の文字列と、無関係な作品紹介の長文が主張本文
+// になっていた）。Evidence は材料として全文を保持するが、主張は
+// 「定義・事実を述べる文」だけにする。整形は registerUnverified
+// Claim の入口でのみ行い、検証ゲートや証拠の独立性判定、出所の
+// 紐付けには触れない。診断のパターンに触れず上限にも掛からない
+// 通常の文は一字も変えずに返す（整形で消しすぎない）。
+const P2007_DIAGNOSTIC_PATTERNS: RegExp[] = [
+  // プロバイダの状態表記（SearXNG:EMPTY、GameWiki:SKIPPED（…）等）
+  /(?:SearXNG|Wikipedia|OpenAlex|Marginalia|GameWiki|Stack\s?Exchange|GitHub|DuckDuckGo|Bing)[:：]\s*(?:EMPTY|FAILED|SUCCEEDED|SKIPPED|SUCCESS|ERROR)/i,
+  // エンジン状態の割当（brave=停止中-リクエスト過多、
+  // duckduckgo=その他（CAPTCHA）等）
+  /[=＝]\s*(?:停止中|その他（|タイムアウト|解析エラー|HTTPエラー)/,
+  // エンジン停止の分類ラベル
+  /停止中-(?:リクエスト過多|アクセス拒否|CAPTCHA|キャプチャ)/,
+  // HTTP ステータスの実行メモ（HTTP 429 等。話題としての
+  // 「HTTPステータスコード429」は HTTP の直後に数字が来ない
+  // ため、ここには掛からない）
+  /HTTP\s*[1-5]\d\d/,
+  // 検索実行に紐づくレート制限・冷却のメモ（話題としての
+  // レート制限やゲームのクールダウンの事実文は、検索実行の語と
+  // 同じ文に同居しない限り落とさない）
+  /共有キー|冷却を開始|検索ペーサー|(?:レート制限|クールダウン)[^。]{0,24}(?:共有|キー|エンジン|検索)|(?:検索|エンジン)[^。]{0,24}(?:レート制限|クールダウン|冷却)/,
+  // 検索の成否を語る実行ナレーション
+  /検索に失敗しました|結果を取得できませんでした|候補を取得しました|空の理由|未発射|検索を省略しました|取得を省略しました/,
+  // CAPTCHA が停止・拒否の文脈で現れる場合（エンジン状態の内訳）
+  /(?:CAPTCHA|キャプチャ)[^。]{0,30}(?:停止|拒否|その他)|(?:停止|その他（)[^。]{0,30}(?:CAPTCHA|キャプチャ)/,
+];
+
+// 長文ダンプの切り詰め上限。定義・事実の先頭ブロックだけを
+// 1件の主張にし、残りは Evidence 側に残す（主張化しない）。
+const P2007_MAX_SENTENCES = 3;
+const P2007_MAX_CHARS = 600;
+
+function isDiagnosticSentence2007(sentence: string): boolean {
+  return P2007_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(sentence));
+}
+
+/**
+ * P2007: 主張として登録する前の statement 整形。
+ * - 複合ダンプの枠（【自律Web学習知識：…】見出し、要約：／
+ *   詳細知見：のラベル）を取り除く。
+ * - 診断を含む括弧書きを括弧単位で取り除き、診断文（検索の
+ *   実行状態を語る文）を文単位で落とす。
+ * - 残りが長文ダンプなら先頭の事実ブロックだけに切り詰める
+ *   （上限：3文・600字。最初の文は丸ごと残す）。
+ * - 切り出せる事実が無ければ空文字を返す（呼び出し側は主張化を
+ *   見送る。Evidence 自体は全文が保持される）。
+ */
+export function shapeClaimStatement(raw: string): string {
+  const original = String(raw || '').trim();
+  if (!original) return '';
+
+  const unframed = original
+    .replace(/【自律Web学習知識[:：][^】]*】/g, ' ')
+    .replace(/(?:要約|詳細知見)[:：]/g, '');
+
+  // 診断を含む括弧書き（エンジン状態の内訳など）は、文の区切り
+  // が無く後続の事実文とくっついている場合がある（要約の末尾の
+  // 状態括弧の直後に抜粋が続く形）。文分割の前に、診断を含む
+  // 括弧書きだけを内側から繰り返し取り除く。事実の括弧書き
+  // （読み仮名・原題など）は診断に触れないため残る。
+  let prepared = unframed;
+  for (let i = 0; i < 4; i += 1) {
+    const next = prepared
+      .replace(/（[^（）]*）/g, (m) => (isDiagnosticSentence2007(m) ? '' : m))
+      .replace(/\([^()]*\)/g, (m) => (isDiagnosticSentence2007(m) ? '' : m));
+    if (next === prepared) break;
+    prepared = next;
+  }
+  prepared = prepared.trim();
+
+  const sentences = (prepared.match(/[^。！？!?]+[。！？!?]?/g) || [])
+    .map((sentence) => sentence.replace(/\s+/g, ' ').trim())
+    .filter((sentence) => sentence.length > 0);
+  const kept = sentences.filter((sentence) => !isDiagnosticSentence2007(sentence));
+
+  const withinCaps =
+    kept.length <= P2007_MAX_SENTENCES && kept.join('').length <= P2007_MAX_CHARS;
+  if (kept.length === sentences.length && prepared === original && withinCaps) {
+    return original;
+  }
+  if (kept.length === 0) return '';
+
+  const parts: string[] = [];
+  let total = 0;
+  for (const sentence of kept) {
+    if (parts.length >= P2007_MAX_SENTENCES) break;
+    if (parts.length > 0 && total + sentence.length > P2007_MAX_CHARS) break;
+    // 抜粋の文頭に付いた出典マーカー（[題名]）は落として、
+    // 本文だけを主張にする。
+    const cleaned =
+      parts.length === 0 ? sentence.replace(/^\[[^\]]{1,80}\]\s*/, '') : sentence;
+    if (!cleaned) continue;
+    parts.push(cleaned);
+    total += cleaned.length;
+  }
+  return parts.join('').trim();
+}
+
 export type EvidenceKind = 'WEB' | 'LOCAL_CLAIM' | 'USER_OBSERVATION' | 'USER_CLAIM' | 'EXECUTION' | 'DOCUMENT' | 'CLOUD_AI';
 export type EvidenceStatus = 'DISCOVERED' | 'ADMISSIBLE' | 'REJECTED';
 
@@ -334,8 +437,18 @@ export class EvidenceService {
     const evidence = this.records.get(evidenceId);
     if (!evidence || evidence.status === 'REJECTED') return undefined;
 
-    const text = (statement || evidence.snippet).trim();
+    const rawText = (statement || evidence.snippet).trim();
+    // P2007: 入口整形。調査の診断文や複数主題の長文ダンプを
+    // 主張本文にしない。切り出せる事実が無ければ主張化を見送る
+    // （Evidence は全文のまま残る）。
+    const text = shapeClaimStatement(rawText);
     if (text.length < 15) return undefined;
+    if (text !== rawText) {
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `[P2007] 主張文を整形して登録（診断文・超過分は主張化しない）: ${text.slice(0, 60)}`
+      );
+    }
 
     // P459: registerClaim 側の重複排除により、同一文面が既にあれば
     // 既存 Claim が返る。その場合この証拠は「既存 Claim への追加の
