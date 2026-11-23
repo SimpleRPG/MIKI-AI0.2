@@ -18683,9 +18683,9 @@
     },
     {
       "path": "src/miki/core/services/bridgeExchangeService.ts",
-      "bytes": 54091,
-      "lines": 1229,
-      "sha256": "132110f66c595a1231c41fdb63e245fb34b7c273de60a5d7e2cffcbfc2fd71d1",
+      "bytes": 55190,
+      "lines": 1250,
+      "sha256": "a1647f437abc1d6c301d96df8745d35ea85a7a27e780e487451468fdb20ab797",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -18777,9 +18777,9 @@
     },
     {
       "path": "src/miki/core/services/candidateCodeGenerationService.ts",
-      "bytes": 121139,
-      "lines": 2658,
-      "sha256": "19cf0f35bd0b3f811362007d31e557a15987bc787d39e9f397f83ad9b18ec36f",
+      "bytes": 125217,
+      "lines": 2705,
+      "sha256": "b6f81cc7c1747866e54faf339108553e4e4d34c40643c7c13dff405f0a0ae679",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -19004,13 +19004,13 @@
           "resolvedPath": "src/miki/core/data/codeKnowledge/common.ts"
         },
         {
-          "line": 1803,
+          "line": 1838,
           "specifier": "../../research/services/webMaterialPatternExtractor",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webMaterialPatternExtractor.ts"
         },
         {
-          "line": 2253,
+          "line": 2300,
           "specifier": "../../research/services/webMaterialPatternExtractor",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webMaterialPatternExtractor.ts"
@@ -20206,9 +20206,9 @@
     },
     {
       "path": "src/miki/core/services/coreOrchestratorService.ts",
-      "bytes": 122009,
-      "lines": 2151,
-      "sha256": "55eb1ba15615fb60c0ea12b763a81bfc57183c8a25ebee6388324267c0cb6f37",
+      "bytes": 125272,
+      "lines": 2205,
+      "sha256": "d0a263b4f0eb1f8a0e3001b9f33435b330fea607438235c7952c7b9a72c6ac59",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -44046,9 +44046,9 @@
     },
     {
       "path": "src/miki/verification/services/verifierService.ts",
-      "bytes": 15663,
-      "lines": 337,
-      "sha256": "035093f532c8cee47f7059acf4d2c1d91625606ffc1dbaf00b0d326e9861a4f1",
+      "bytes": 16945,
+      "lines": 354,
+      "sha256": "3e234788babdd6ef502c97f139e818a9a005a31106ee9ae54b85d29b61faf804",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -45459,9 +45459,9 @@
     },
     {
       "path": "src/services/systemLogger.ts",
-      "bytes": 44344,
-      "lines": 1088,
-      "sha256": "5651117b52c53517401ae659e54fe9b35b153224eb083c680d6dbf4cd99304d9",
+      "bytes": 45100,
+      "lines": 1099,
+      "sha256": "2414d2768c8d85e543cfd3a167eb7fcfda975c7b34cc30a085c30c9440ef391a",
       "relativeImportCandidates": [
         {
           "line": 1,

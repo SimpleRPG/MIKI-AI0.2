@@ -94,6 +94,11 @@ export class VerifierService {
   }): VerificationResult {
     const claim = claimDatabaseService.getClaim(params.claimId);
     if (!claim) {
+      // P2010: 検証対象が無い異常も UNRESOLVED の理由として残す。
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `[VerifierUnresolved] ${params.claimId}: NOT_FOUND -> UNRESOLVED independent=0 admissible=0 execution=0 reasons=対象Claimが存在しません。`
+      );
       return {
         claimId: params.claimId,
         outcome: 'UNRESOLVED',
@@ -257,6 +262,18 @@ export class VerifierService {
       'SELF_IMPROVEMENT',
       `🔐 [Verifier] ${claim.claim_id}: ${claim.status} -> ${outcome} / independent=${independentClusters.size} / execution=${executionEvidence.length}`
     );
+
+    // P2010: UNRESOLVED の時は、遷移理由と判定に使った値を WARN で
+    // 残す（ユーザーの許可に基づく失敗経路のみのログ拡充）。従来は
+    // 理由が検証台帳と集計カウンタにしか残らず、返送ログからは
+    // 「なぜ確定しなかったか」が読めなかった。昇格・反証の経路は
+    // 従来どおり（上の INFO 行と台帳）で、量は増やさない。
+    if (outcome === 'UNRESOLVED') {
+      systemLogger.warn(
+        'SELF_IMPROVEMENT',
+        `[VerifierUnresolved] ${claim.claim_id}: ${previousStatus} -> UNRESOLVED independent=${independentClusters.size} admissible=${admissible.length} relevant=${relevantAdmissible.length} execution=${executionEvidence.length} contradictions=${contradictionCount} stale=${stale} primaryOrOfficial=${hasPrimaryOrOfficialSource} trustedVerifier=${trustedVerifierAttested} reasons=${reasons.join(' / ').slice(0, 600)}`
+      );
+    }
 
     return {
       claimId: claim.claim_id,

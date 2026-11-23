@@ -257,6 +257,23 @@ const BRIDGE_LIGHT_INTAKE_IMMEDIATE_DEDUPE_MS = 30 * 1000;
 const LOG_BUNDLE_MAX_BYTES = 5 * 1024 * 1024;
 const LOG_TEXT_BUDGET_BYTES = Math.floor(4.5 * 1024 * 1024);
 const LOG_DETAIL_MAX_CHARS = 400;
+/**
+ * P2010: 失敗・異常エントリの詳細だけ上限を広げる（ユーザーの許可
+ * 「問題があるところはログ増やしてもいい」に基づく）。ERROR 級
+ * （本基盤の最高レベルで FATAL 級に相当）と、タスク失敗を表す
+ * マーカーを含むエントリが対象。通常エントリは従来どおり 400 字。
+ * 書き込み側の上限（systemLogger の ERROR 級 4,000 字）と揃えて
+ * あり、失敗の理由連鎖が束の外まで届く。
+ */
+const LOG_DETAIL_MAX_CHARS_FAILURE = 4000;
+const LOG_FAILURE_MESSAGE_MARKERS = [
+  '[RUNTIME_FAILURE]',
+  '[CandidateGenerationRejection]',
+  '[VerifierUnresolved]',
+  'AutonomousLoop drop',
+];
+const isFailureLogEntry = (entry: { level: string; message: string }): boolean =>
+  entry.level === 'ERROR' || LOG_FAILURE_MESSAGE_MARKERS.some((marker) => entry.message.includes(marker));
 /** 同期送出の1束あたり上限。 */
 const SYNC_UP_MAX_CLAIMS = 50;
 const SYNC_UP_MAX_VOCABULARY = 100;
@@ -620,7 +637,8 @@ class BridgeExchangeService {
   /**
    * ランタイムログを診断範囲に切って1束の ZIP にし、out/ へ置く。
    * - CHAT カテゴリは丸ごと除外する（会話本文を持ちうるため）。
-   * - details は1件400字まで、束の本文は新しい側を優先して 4.5MB で切る。
+   * - details は1件400字まで（P2010: 失敗・異常エントリは4,000字
+   *   まで保持）、束の本文は新しい側を優先して 4.5MB で切る。
    * - 定期（SCHEDULED）、アプリ側の依頼フラグ（REQUESTED）、
    *   橋経由の VM 依頼（BRIDGE_REQUESTED、P2008）の3トリガーを受ける。
    *   成功したら最終返送時刻を共通の台帳へ刻み、依頼フラグも落とす
@@ -643,7 +661,10 @@ class BridgeExchangeService {
         } catch {
           detailText = '';
         }
-        if (detailText) line += ` | ${detailText.slice(0, LOG_DETAIL_MAX_CHARS)}`;
+        if (detailText) {
+          const detailLimit = isFailureLogEntry(entry) ? LOG_DETAIL_MAX_CHARS_FAILURE : LOG_DETAIL_MAX_CHARS;
+          line += ` | ${detailText.slice(0, detailLimit)}`;
+        }
       }
       const lineBytes = byteLength(line) + 1;
       if (usedBytes + lineBytes > LOG_TEXT_BUDGET_BYTES) {

@@ -143,6 +143,15 @@ interface RuntimeMemoryDiagnosticsState {
 const MAX_PERSISTED_LOG_CHARS = 512 * 1024;
 const MAX_LOG_MESSAGE_CHARS = 1024;
 const MAX_LOG_DETAIL_CHARS = 768;
+/**
+ * P2010: ERROR 級（本基盤の最高レベル。FATAL 級はここに相当）の
+ * 詳細だけ上限を広げる。従来は詳細が 768 字を超えると、文字列は
+ * 切り捨て、オブジェクトは丸ごと [details omitted] に置換されて
+ * いたため、タスク失敗の理由連鎖（[RUNTIME_FAILURE] の詳細）が
+ * 端末の外から読めなかった。通常レベルの上限は従来どおりで、
+ * 増えるのは失敗・異常の時だけ。
+ */
+const MAX_LOG_DETAIL_CHARS_ERROR = 4000;
 
 /**
  * P410 T6: one-line exception headline (name + message) for log
@@ -660,7 +669,7 @@ class SystemLogger {
       message: message.slice(0, MAX_LOG_MESSAGE_CHARS),
       elapsedMs,
       relativeDeltaMs,
-      details: details ? this.boundedLogDetails(details) : undefined,
+      details: details ? this.boundedLogDetails(details, level) : undefined,
     };
 
     this.logs.push(entry);
@@ -750,13 +759,15 @@ class SystemLogger {
     return stepSnapshot;
   }
 
-  private boundedLogDetails(details: any): any {
-    if (typeof details === 'string') return details.slice(0, MAX_LOG_DETAIL_CHARS);
+  private boundedLogDetails(details: any, level?: SystemLogEntry['level']): any {
+    // P2010: ERROR 級だけ上限を広げる（理由は MAX_LOG_DETAIL_CHARS_ERROR の定義箇所）。
+    const maxChars = level === 'ERROR' ? MAX_LOG_DETAIL_CHARS_ERROR : MAX_LOG_DETAIL_CHARS;
+    if (typeof details === 'string') return details.slice(0, maxChars);
     if (typeof details !== 'object' || details === null) return details;
     try {
       const serialized = JSON.stringify(details, this.getCircularReplacer());
       if (serialized === undefined) return undefined;
-      return serialized.length > MAX_LOG_DETAIL_CHARS ? `[details omitted: ${serialized.length} chars]` : JSON.parse(serialized);
+      return serialized.length > maxChars ? `[details omitted: ${serialized.length} chars]` : JSON.parse(serialized);
     } catch { return '[details omitted]'; }
   }
 

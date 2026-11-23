@@ -487,6 +487,8 @@ class CoreOrchestratorService {
   if(!validation.passed){
    taskBlackboardService.setStatus(taskId,'FAILED');
    const finalTask=taskBlackboardService.get(taskId)!;
+   // P2010: 会話検証の失敗も理由連鎖を残す。
+   this.logTaskFailureChain(finalTask,'CONVERSATION_VALIDATION',validation.failedReasons,{cycles});
    const coreResult=coreResultService.fail(reqId,`CONVERSATION_ANSWER_VALIDATION_FAILED:${validation.failedReasons.join('|')||'UNKNOWN'}`,{result:payload,route:['core'],processedCategories:['conversation']});
    this.recordTaskMemoryOutcome(finalTask,'FAILURE');
    return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
@@ -497,6 +499,54 @@ class CoreOrchestratorService {
   return {task:finalTask,cycles,dispatched:replyRecords.length,coreResult};
  }
 
+ /**
+  * P2010: タスク失敗の理由連鎖を1件の ERROR ログに残す（ユーザー
+  * の許可に基づく、失敗経路のみのログ拡充。挙動は変えない）。
+  * 従来は失敗の内訳がブラックボードと coreResult の中にしか無く、
+  * 返送ログでは詳細が切り捨て・省略されて真因を追えなかった。
+  * 載せるのは失敗段階・理由コード・未解決エラーの発生箇所（分類
+  * ＝サービスとキー）とエラー本文・証拠数・関連する gap／claim
+  * の ID。詳細は ERROR 級の上限（4,000字）に収まるよう各部を
+  * 切り詰める。
+  */
+ private logTaskFailureChain(task:BlackboardTask,stage:string,reasons:string[],extra?:Record<string,unknown>):void{
+  const unresolved=unresolvedTaskErrors(task);
+  const failedSteps=unresolved.slice(0,5).map(entry=>{
+   const record=entry.value&&typeof entry.value==='object'&&!Array.isArray(entry.value)?entry.value as Record<string,unknown>:undefined;
+   const rawError=record?.error??record?.headline??record?.reason??record?.message??(typeof entry.value==='string'?entry.value:undefined);
+   return {
+    domain:entry.domain,
+    key:entry.key,
+    ...(rawError!==undefined?{error:String(rawError).replace(/[\r\n]+/g,' ').slice(0,160)}:{}),
+    ...(typeof record?.operationInstanceId==='string'?{operationInstanceId:record.operationInstanceId}:{}),
+   };
+  });
+  const evidenceIds=[...new Set(task.entries.flatMap(entry=>entry.evidenceIds||[]))];
+  const payloadValue=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
+  let relatedIds:string[]=[];
+  try{
+   const idScanText=JSON.stringify([payloadValue??null,...unresolved.map(entry=>entry.value??null),...reasons]);
+   relatedIds=[...new Set(idScanText.match(/\b(?:GAP|CLM)-[A-Za-z0-9-]+\b/g)??[])];
+  }catch{/* ID走査は補助。失敗しても連鎖ログ自体は残す */}
+  systemLogger.error('SYSTEM',`[RUNTIME_FAILURE] CORE task failed: ${task.taskId} (${stage})`,{
+   taskId:task.taskId,
+   stage,
+   source:task.source,
+   goal:task.goal.slice(0,120),
+   reasons:reasons.slice(0,8),
+   failedSteps,
+   unresolvedErrorCount:unresolved.length,
+   evidenceCount:evidenceIds.length,
+   evidenceIds:evidenceIds.slice(0,20),
+   gapIds:relatedIds.filter(id=>id.startsWith('GAP-')).slice(0,10),
+   claimIds:relatedIds.filter(id=>id.startsWith('CLM-')).slice(0,10),
+   visitedDomains:[...task.visitedDomains],
+   pendingDomains:[...task.pendingDomains],
+   revision:task.revision,
+   lastCycle:task.lastCycle,
+   ...(extra??{}),
+  });
+ }
  private recordTaskMemoryOutcome(task:BlackboardTask,outcome:'SUCCESS'|'FAILURE'):void{
   const memoryIds=new Set<string>();
   for(const entry of task.entries){
@@ -1929,6 +1979,8 @@ class CoreOrchestratorService {
    const completion=adaptiveRoutePlannerService.assessCompletion(finalTask);
    const waitingResult=this.buildIncompleteCirculationResult(finalTask,cycles,dispatched,completion);
    if(hasError){
+    // P2010: 未解決エラーを抱えた失敗は、理由連鎖を ERROR ログに残す。
+    this.logTaskFailureChain(finalTask,'UNRESOLVED_ERRORS',completion.reasons,{cycles,dispatched});
     coreResultService.fail(reqId,'Core domain execution encountered errors',{...waitingResult,route:[...finalTask.visitedDomains] as any,processedCategories:[...finalTask.visitedDomains] as any});
    }else{
     coreResultService.waiting(reqId,{...waitingResult,route:[...finalTask.visitedDomains] as any,processedCategories:[...finalTask.visitedDomains] as any});
@@ -1937,6 +1989,8 @@ class CoreOrchestratorService {
    const completion=adaptiveRoutePlannerService.assessCompletion(finalTask);
    if(!completion.businessCompletion){
     taskBlackboardService.setStatus(taskId,'FAILED');
+    // P2010: 完了ゲートで落ちた失敗も、ゲートの判定材料ごと残す。
+    this.logTaskFailureChain(finalTask,'COMPLETION_GATE',completion.reasons,{cycles,dispatched,failedDomains:completion.failedDomains,missingDomains:completion.missingDomains,missingReceipts:completion.missingReceipts});
     coreResultService.fail(reqId,`CORE_COMPLETION_GATE_FAILED:${completion.reasons.join('|')}`);
    }else{
     coreResultService.complete(reqId,this.buildRuntimeCirculationResult(finalTask,cycles,dispatched,completion.requiredDomains),{route:[...finalTask.visitedDomains] as any,processedCategories:[...finalTask.visitedDomains] as any});

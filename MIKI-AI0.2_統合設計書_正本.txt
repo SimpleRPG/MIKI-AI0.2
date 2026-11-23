@@ -13707,3 +13707,21 @@ P2009（2026-11-23）会話入力欄の非制御化：IME 変換を再描画に�
 検証：全体 tsc エラー0、check_imports 未解決0（1,288ファイル／4,552 import、新規ファイルなし）。製品外ハーネス harness114（新規）19項目 ALL PASS：applyProgrammaticText がストアと入力欄を同時に更新すること、入力欄が無い場合もストアが更新されること、ストアへの書き込みが入力欄の変換中文字列を一切変更しないこと（旧機構の書き戻しに相当する経路が存在しないことのモジュールレベルの確認）、下書きの復元とクリアの契約が保たれること、ChatPanel の配線（非制御化・同期ハンドラ撤去・onChange 直接同期・変換中 Enter ガード・クリア箇所が送信経路の1箇所のみ・プログラム挿入4箇所の同期点経由）。回帰：harness110・111 ALL PASS（harness111 の H5 配線チェックは P2009 の新契約に合わせて更新）。
 
 実機確認は未実施（導入後の確認が残る）。証明点：(a) 背景活動（調査・初期化）がある状態で日本語入力し、変換中の文字列が入力欄に表示され続けること、(b) 確定した文字がその後の再描画で消えないこと、(c) 変換確定の Enter で誤送信されないこと、(d) 下書きの復元（タブ切り替え）と送信時クリアが P2006 と同じに働くこと。systemLogger 購読による再描画そのものは残るが、非制御化により入力欄へは無害になった。再描画頻度の削減自体が要るかは、体感と負荷の実測を見て別途判断する。
+
+P2010（2026-11-23）失敗・異常経路のログ拡充：理由連鎖を端末の外から追えるようにする
+
+位置付け：2026-11-23 22:41 の橋ログ束（BRIDGE_REQUESTED）で CORE タスク2件の連続失敗（RUNTIME_FAILURE／UNRESOLVED_ERROR_PRESENT、証拠0）が観測されたが、真因が見えなかった。これを受けてユーザーが「問題があるところはログ増やしてもいい」と明言した（2026-11-23）。本束はその許可に基づく、失敗・異常経路に限ったログ拡充であり、挙動は一切変えない。通常経路のログ量は増やさない。変更は製品5ファイル＋本書追記。新規ファイルなし。
+
+真因側の事情（切り捨ての連鎖）：失敗の内訳が読めなかったのは3段の切り捨ての積み重ねだった。(1) systemLogger の書き込み側で詳細は768字が上限で、オブジェクト詳細は JSON が上限を超えると丸ごと [details omitted: N chars] に置換される（[RUNTIME_FAILURE] の詳細はほぼ常時これに該当し、中身が記録自体されていなかった）。(2) 橋の返送束（P2001）で詳細はさらに400字に切られる。(3) そもそもログに理由連鎖を出す経路が、タスク失敗の確定箇所・Claim の UNRESOLVED 判定・生成候補の却下には無かった（内訳はブラックボード・検証台帳・生成台帳の中だけにあった）。
+
+（1）書き込み側と返送側の上限（systemLogger／bridgeExchangeService）：systemLogger は ERROR 級（本基盤の最高レベル。FATAL 級はここに相当）だけ詳細上限を 768 字から 4,000 字へ広げた（文字列の切り詰め・オブジェクトの省略置換の semantics は不変、上限値だけが違う）。橋の返送束は、ERROR 級とタスク失敗マーカー（[RUNTIME_FAILURE]／[CandidateGenerationRejection]／[VerifierUnresolved]／AutonomousLoop drop）を含むエントリの詳細を 4,000 字まで保持し、通常エントリは従来どおり 400 字。ZIP 5MB 上限・CHAT カテゴリ除外は不変。
+
+（2）CORE タスク失敗の理由連鎖（coreOrchestratorService.logTaskFailureChain）：タスクが FAILED に確定する全経路（未解決エラーを抱えた終了＝UNRESOLVED_ERRORS、完了ゲート不合格＝COMPLETION_GATE、会話回答の検証不合格＝CONVERSATION_VALIDATION）に、失敗1件につき1件の ERROR ログ [RUNTIME_FAILURE] CORE task failed: を追加した。載せるのは、タスク種別（source 分類と goal）、失敗段階、理由コード群、未解決エラーの発生箇所（分類＝サービスとキー、エラー本文、operationInstanceId）、証拠数と証拠 ID、関連する gap／claim の ID（payload とエラー値からの抽出）、訪問・未訪問の分類、revision／lastCycle、段階ごとの追加材料（サイクル数・dispatch 数、ゲートの failedDomains／missingDomains／missingReceipts）。詳細は ERROR 級の上限に収まるよう各部を切り詰める。
+
+（3）Claim の UNRESOLVED 判定（verifierService）：verifyClaim が UNRESOLVED に終わった時、WARN [VerifierUnresolved] を1件追加した。載せるのは遷移前状態、独立証拠クラスター数、ADMISSIBLE 数、関連証拠数、実行証拠数、反証数、鮮度切れか、一次・公式情報の有無、信頼検証者の証言の有無、判定理由の文面。対象 Claim が存在しない場合も NOT_FOUND として同じ形で残す。昇格（SUPPORTED／DEVICE_VERIFIED）と反証（CONTRADICTED）の経路は従来どおりで増やさない。
+
+（4）生成候補の却下内訳（candidateCodeGenerationService.logGenerationRejection）：GENERATE_CANDIDATE が却下される全段階（INTAKE／SOURCE_SNAPSHOT／SOURCE_CONTEXT／TARGET_RESOLUTION／INTEGRATED_PLAN／INFORMATION_HANDOFF／COMPOSITION_PLAN／COMPONENT_RESOLUTION／COMPOSITION_VERIFICATION／MATERIALIZATION／WORKSPACE_PREPARATION／DUPLICATE_EXPORTS）に、WARN [CandidateGenerationRejection] を1件追加した。段階と理由コードを必ず含み、段階ごとの材料（未解決の対象パス、未解決の部品 ID、合成の deterministic／verified／executable 等）も載せる。特に COMPOSITION_PLAN（CODE_COMPOSITION_PLAN_UNAVAILABLE）では、仕様導出件数・候補作成件数・レジストリ却下件数に加え、却下の判定種別ごとの内訳（rejectionDecisions）と合成の gapReason／blockedReason、次の一手（nextStep）まで含める（却下内訳が台帳の中だけにあった旧世代からの積み残しの解消）。成功・検証待ち（AWAITING_VERIFICATION）の経路では出さない。
+
+検証：全体 tsc エラー0、check_imports 未解決0（1,288ファイル／4,552 import、新規ファイルなし）。製品外ハーネス harness115（新規）41項目 ALL PASS：返送束で通常エントリの詳細が400字で切られ、ERROR エントリの詳細が4,000字まで保持されること、768字超の ERROR オブジェクト詳細が省略置換されず中身が届くこと、失敗マーカー付き WARN の詳細が400字を超えて残ること、CHAT 除外と 5MB 上限が保たれること。検証フィクスチャで、証拠不足の Claim の UNRESOLVED 判定に判定値と理由文面が残ること、対象不在も NOT_FOUND で残ること。タスク失敗フィクスチャ（ブラックボードに ERROR エントリ＋payload に GAP／CLM ID を置き、会話検証不合格で FAILED 確定）で、理由連鎖（段階・理由コード・失敗ステップの分類／キー／エラー本文・証拠数・関連 ID）が ERROR ログに残ること。生成却下は未知の runId で INTAKE 却下が段階・理由付きで残ること、残りの段階は配線確認。回帰：harness104・110・111・112・113・114 ALL PASS。
+
+実機確認は未実施（導入後の確認が残る）。証明点：実機で次のタスク失敗・UNRESOLVED 判定・生成却下が起きた時に、橋で届くログ束から理由連鎖（どの段階で・何が理由で・証拠がいくつで・関連 ID は何か）が読み取れること。拡充は失敗・異常の発生時に限られ、通常経路のログ量と挙動は変えていない。

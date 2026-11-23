@@ -90,7 +90,8 @@ export interface CandidateGenerationLedgerSummary {
 
 class CandidateCodeGenerationService {
  async generate(runId:string):Promise<CandidateGenerationOutcome>{
-  const run=improvementIntakeRouterService.get(runId);if(!run)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};
+  const run=improvementIntakeRouterService.get(runId);
+  if(!run){this.logGenerationRejection(runId,'INTAKE',['IMPROVEMENT_RUN_NOT_FOUND']);return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND']};}
   // P1133: 全体の内容は組み立てない。空かどうかは目録で判定し、
   // 目録に出ない旧・不完全な状態の時だけ従来の全体読みで確かめる。
   let currentSourceFiles:ReturnType<typeof selfCodeSpaceService.listSourceFiles>=[];
@@ -98,7 +99,7 @@ class CandidateCodeGenerationService {
   const lightMode=classicEmpty&&Boolean(selfCodeSpaceService.getLightManifest());
   if(classicEmpty&&!lightMode){
    currentSourceFiles=selfCodeSpaceService.listSourceFiles();
-   if(currentSourceFiles.length===0)return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_EMPTY']};
+   if(currentSourceFiles.length===0){this.logGenerationRejection(runId,'SOURCE_SNAPSHOT',['SOURCE_SNAPSHOT_EMPTY']);return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_EMPTY']};}
   }
 
   const currentSourceSnapshotSha256=selfCodeSpaceService.getSourceSnapshotSha256();
@@ -109,6 +110,7 @@ class CandidateCodeGenerationService {
       : '';
 
   if(!runSourceSnapshotSha256){
+    this.logGenerationRejection(runId,'SOURCE_CONTEXT',['SOURCE_CONTEXT_CONTRACT_REQUIRED']);
     return {
       accepted:false,
       runId,
@@ -118,6 +120,7 @@ class CandidateCodeGenerationService {
   }
 
   if(runSourceSnapshotSha256!==currentSourceSnapshotSha256){
+    this.logGenerationRejection(runId,'SOURCE_CONTEXT',['SOURCE_CONTEXT_CONFLICT']);
     return {
       accepted:false,
       runId,
@@ -172,6 +175,7 @@ class CandidateCodeGenerationService {
         missingPaths:probe.missingPaths,
       },[]);
     }
+    this.logGenerationRejection(runId,'TARGET_RESOLUTION',[probe.reason||'TARGET_FILES_NOT_RESOLVED'],{missingPaths:probe.missingPaths.join(',')||'none'});
     return {accepted:false,runId,files:[],reasons:[probe.reason||'TARGET_FILES_NOT_RESOLVED']};
   }
   // P1133: 対象が決まったら、そのファイルだけを読み戻す。
@@ -200,12 +204,13 @@ class CandidateCodeGenerationService {
       requestedTargetPaths:targetPaths,
       missingPaths:targetPaths.filter(path=>!resolvedSnapshotPaths.includes(path)),
     });
+    this.logGenerationRejection(runId,'SOURCE_SNAPSHOT',['SOURCE_SNAPSHOT_INCOMPLETE'],{missingPaths:targetPaths.filter(path=>!resolvedSnapshotPaths.includes(path)).join(',')||'none'});
     return {accepted:false,runId,files:[],reasons:['SOURCE_SNAPSHOT_INCOMPLETE']};
   }
   const preparedRun=improvementIntakeRouterService.get(runId);
-  if(!preparedRun)return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND_AFTER_PREPARATION']};
+  if(!preparedRun){this.logGenerationRejection(runId,'INTAKE',['IMPROVEMENT_RUN_NOT_FOUND_AFTER_PREPARATION']);return {accepted:false,runId,files:[],reasons:['IMPROVEMENT_RUN_NOT_FOUND_AFTER_PREPARATION']};}
   const implementationPlan=preparedRun.implementationPlan;
-  if(preparedRun.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan)return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};
+  if(preparedRun.runType==='AUTONOMOUS_DISCOVERY'&&!implementationPlan){this.logGenerationRejection(runId,'INTAKE',['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']);return {accepted:false,runId,files:[],reasons:['AUTONOMOUS_IMPLEMENTATION_PLAN_REQUIRED']};}
   const failureFeedback =
     run.payload.failureFeedback &&
     typeof run.payload.failureFeedback === 'object'
@@ -275,7 +280,7 @@ class CandidateCodeGenerationService {
       ...failureFeedbackReasons,
     ]
   });
-  if(integratedPlan.unresolved.length>0)return {accepted:false,runId,files:[],reasons:integratedPlan.unresolved};
+  if(integratedPlan.unresolved.length>0){this.logGenerationRejection(runId,'INTEGRATED_PLAN',integratedPlan.unresolved);return {accepted:false,runId,files:[],reasons:integratedPlan.unresolved};}
   const astFallbackReasons:string[]=[];
   const astStep=integratedPlan.steps.find(step=>step.strategy==='AST_TRANSFORM');
   if(astStep){
@@ -291,7 +296,7 @@ class CandidateCodeGenerationService {
       const prepared=await autonomousCandidatePreparationService.prepareForRun(runId,generated,sourceOverride);
       if(prepared.workspaceId){
         const duplicates=this.findDuplicateExports(generated);
-        if(duplicates.length>0)return {accepted:false,runId,files:[],reasons:duplicates,attemptCount:1};
+        if(duplicates.length>0){this.logGenerationRejection(runId,'DUPLICATE_EXPORTS',duplicates);return {accepted:false,runId,files:[],reasons:duplicates,attemptCount:1};}
         return {
           accepted:true,runId,workspaceId:prepared.workspaceId,files:generated,reasons:[],attemptCount:1,
           responseHash:canonicalSha256({
@@ -430,6 +435,8 @@ class CandidateCodeGenerationService {
      * はその部品の素材を要求できる。
      */
     this.recordComponentMissingGap(run,reason,unresolvedKnowledgeComponentIds,targetPaths);
+    // P2010: 知識部品の未解決も段階付きで残す。
+    this.logGenerationRejection(runId,'COMPONENT_RESOLUTION',[reason],{unresolved:unresolvedKnowledgeComponentIds.join(',')});
     return {
       accepted:false,
       runId,
@@ -886,6 +893,7 @@ class CandidateCodeGenerationService {
         candidateInputManifest,
       },acquiredEvidenceIds);
     }
+    this.logGenerationRejection(runId,'INFORMATION_HANDOFF',handoffIssues.map(issue=>`INFORMATION_HANDOFF_BROKEN:${issue}`));
     return {accepted:false,runId,files:[],reasons:handoffIssues.map(issue=>`INFORMATION_HANDOFF_BROKEN:${issue}`),attemptCount:1,responseHash:candidateInputManifestSha256};
   }
   if(run.taskId){
@@ -1507,6 +1515,23 @@ class CandidateCodeGenerationService {
       this.registerStudyBoundariesFromLedger();
       this.runComprehensionSelfTests(targetFiles);
 
+      // P2010: 計画不可の却下は、レジストリ却下の内訳（判定種別
+      // ごとの件数）まで含めて1行に残す。
+      const rejectionDecisionCounts=new Map<string,number>();
+      for(const rejection of specResult.rejections){
+        const key=rejection.decision||'UNSPECIFIED';
+        rejectionDecisionCounts.set(key,(rejectionDecisionCounts.get(key)||0)+1);
+      }
+      this.logGenerationRejection(runId,'COMPOSITION_PLAN',[reason],{
+        specs:missingComponentSpecs.length,
+        created:specCreatedIds.length,
+        rejections:specResult.rejections.length,
+        rejectionDecisions:[...rejectionDecisionCounts.entries()].map(([key,count])=>`${key}:${count}`).join(',')||'none',
+        gapReason:synthesisPlan.source.gapReason||'none',
+        blockedReason:synthesisPlan.blockedReason||'none',
+        nextStep,
+      });
+
       return {
         accepted:false,
         runId,
@@ -1572,6 +1597,8 @@ class CandidateCodeGenerationService {
        * ないため、ブラックボードへも同じ不足を残す。
        */
       this.recordComponentMissingGap(run,reason,unresolved,targetPaths);
+      // P2010: 却下の段階と未解決の部品を残す。
+      this.logGenerationRejection(runId,'COMPONENT_RESOLUTION',[reason],{unresolved:unresolved.join(','),components:componentIds.length});
       return {
         accepted:false,
         runId,
@@ -1592,6 +1619,8 @@ class CandidateCodeGenerationService {
           verified:composition.verified,executable:composition.executable
         }))
       });
+      // P2010: 合成の検証不合格も段階付きで残す。
+      this.logGenerationRejection(runId,'COMPOSITION_VERIFICATION',[reason],{deterministic:synthesisPlan.deterministic,verified:composition.verified===true,executable:composition.executable===true});
       return {accepted:false,runId,files:[],reasons:[reason],attemptCount:1};
     }
 
@@ -1621,6 +1650,8 @@ class CandidateCodeGenerationService {
       if(missingMaterialMatch){
         this.recordComponentMissingGap(run,materializedReason,[missingMaterialMatch[1]],targetPaths);
       }
+      // P2010: 実体化の失敗も段階付きで残す。
+      this.logGenerationRejection(runId,'MATERIALIZATION',[materializedReason],{components:componentIds.length});
       return {
         accepted:false,
         runId,
@@ -1646,6 +1677,8 @@ class CandidateCodeGenerationService {
           runId,componentIds,reason
         }))
       });
+      // P2010: ワークスペース用意の失敗も段階付きで残す。
+      this.logGenerationRejection(runId,'WORKSPACE_PREPARATION',[reason]);
       return {accepted:false,runId,files:[],reasons:[reason],attemptCount:1};
     }
 
@@ -1660,6 +1693,8 @@ class CandidateCodeGenerationService {
           runId,duplicates
         }))
       });
+      // P2010: 重複検知の却下も段階付きで残す。
+      this.logGenerationRejection(runId,'DUPLICATE_EXPORTS',duplicates);
       return {accepted:false,runId,files:[],reasons:duplicates,attemptCount:1};
     }
 
@@ -2248,6 +2283,18 @@ class CandidateCodeGenerationService {
    return summary;
  }
 
+ /*
+  * P2010: 生成候補の却下を、段階と理由の内訳付きで1行の WARN に
+  * 残す（ユーザーの許可に基づく失敗経路のみのログ拡充。挙動は
+  * 変えない）。従来は却下理由が生成台帳とブラックボードの中だけ
+  * にあり、返送ログからは「どの段階で・何が理由で・何回落ちたか」
+  * が数えられなかった（旧世代からの積み残し）。成功・検証待ちの
+  * 経路では出さない。
+  */
+ private logGenerationRejection(runId:string,stage:string,reasons:string[],extra?:Record<string,string|number|boolean>):void{
+  const extraText=extra?Object.entries(extra).map(([key,value])=>`${key}=${value}`).join(' '):'';
+  systemLogger.warn('SELF_IMPROVEMENT',`[CandidateGenerationRejection] runId=${runId} stage=${stage} reasons=${reasons.filter(Boolean).join('|')||'UNKNOWN'}${extraText?` ${extraText}`:''}`);
+ }
  private record(runId:string,value:Record<string,unknown>):void{const key='miki_candidate_generation_ledger_v2';let ledger:Record<string,unknown>;try{const raw=storageService.getItem(key);const parsed:unknown=raw?JSON.parse(raw):{};ledger=parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed as Record<string,unknown>:{};}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_READ:${error instanceof Error?error.message:String(error)}`);}const record={runId,...value};try{storageService.setItem(key,JSON.stringify({...ledger,[runId]:record}));const reloadedRaw=storageService.getItem(key);const reloaded:unknown=reloadedRaw?JSON.parse(reloadedRaw):undefined;if(!reloaded||typeof reloaded!=='object'||Array.isArray(reloaded)||(reloaded as Record<string,unknown>)[runId]===undefined)throw new Error('RELOAD_MISSING');const expected=canonicalSha256(record);const actual=canonicalSha256((reloaded as Record<string,unknown>)[runId]);if(actual!==expected)throw new Error('RELOAD_HASH_MISMATCH');}catch(error){throw new Error(`PERSISTENCE_FAILED:CANDIDATE_LEDGER_WRITE:${error instanceof Error?error.message:String(error)}`);}}
  private parseImplementationMaterials(
   materials: import('../../research/services/webMaterialPatternExtractor').WebImplementationMaterial[],
