@@ -4,6 +4,8 @@ import { systemLogger } from '../../../services/systemLogger';
 import { apiUrl } from '../../../services/api';
 import { evidenceService } from '../../memory/services/evidenceService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
+import { verifierService } from '../../verification/services/verifierService';
 import { japaneseDictionaryService } from '../../research/services/japaneseDictionaryService';
 import { webTermLearningService } from '../../research/services/webTermLearningService';
 import { privacyGuardrailService } from '../../safety/services/privacyGuardrailService';
@@ -77,6 +79,8 @@ export interface BridgeResearchSource {
 
 export interface BridgeResearchResultPayload {
   question?: string;
+  /** 依頼側の sourceRef の写し。gap への接続（P2012）に使う。 */
+  sourceRef?: string;
   /** VM 側の組成した回答（文字列または構造化オブジェクト）。材料として Evidence 化する。 */
   answer?: unknown;
   sources?: BridgeResearchSource[];
@@ -280,6 +284,26 @@ const SYNC_UP_MAX_VOCABULARY = 100;
 
 const textEncoder = new TextEncoder();
 const byteLength = (text: string): number => textEncoder.encode(text).length;
+
+/*
+ * P2012: answer だけの返送から Claim 候補を切り出す（決定論）。
+ * 文字列ならその文、構造化オブジェクトなら summary → meaning の順に
+ * 最初の文字列フィールドを採る。切り出した文は registerUnverifiedClaim
+ * 側で P2007 の整形（診断文除去・切り詰め）を通る。answer の残りの
+ * 項目（語源・用法等）は answer Evidence の材料として残り、ここでは
+ * 主張化しない。
+ */
+const bridgeAnswerClaimCandidate = (answer: unknown): string | undefined => {
+  if (typeof answer === 'string') return answer.trim() || undefined;
+  if (answer && typeof answer === 'object' && !Array.isArray(answer)) {
+    const record = answer as Record<string, unknown>;
+    for (const key of ['summary', 'meaning']) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+    }
+  }
+  return undefined;
+};
 
 const pad2 = (value: number): string => String(value).padStart(2, '0');
 
@@ -908,6 +932,7 @@ class BridgeExchangeService {
       }
     }
     let claimsRegistered = 0;
+    const registeredClaimIds: string[] = [];
     const findings = Array.isArray(payload.findings) ? payload.findings : [];
     for (const finding of findings) {
       const statement = typeof finding?.statement === 'string' ? finding.statement.trim() : '';
@@ -916,8 +941,67 @@ class BridgeExchangeService {
         (typeof finding.sourceIndex === 'number' ? evidenceIds[finding.sourceIndex] : undefined) ?? answerEvidenceId ?? evidenceIds[0];
       if (!evidenceId) continue;
       const claimId = evidenceService.registerUnverifiedClaim(evidenceId, statement);
-      if (claimId) claimsRegistered += 1;
+      if (claimId) {
+        claimsRegistered += 1;
+        registeredClaimIds.push(claimId);
+      }
     }
+
+    // P2012: findings が無く answer だけの返送（VM の組成回答はこの形）
+    // では、従来は Claim が1件も生まれず、材料が検証にも gap の完了
+    // 判定にも一切届かなかった。answer の要約文を Claim 候補として
+    // 発見登録し（登録は従来どおり未検証主張として、P2007 の整形を
+    // 通る）、返送が宣言する出典 Evidence をその Claim へ紐付ける。
+    // 裏付けの成否は検証器が従来どおり独立クラスタ数と関連性で
+    // 判定する（橋の材料を無条件に昇格させることはしない）。
+    if (registeredClaimIds.length === 0 && answerEvidenceId) {
+      const candidate = bridgeAnswerClaimCandidate(payload.answer);
+      if (candidate) {
+        const claimId = evidenceService.registerUnverifiedClaim(answerEvidenceId, candidate);
+        if (claimId) {
+          claimsRegistered += 1;
+          registeredClaimIds.push(claimId);
+          for (const sourceEvidenceId of evidenceIds) {
+            evidenceService.attachEvidenceToClaim(sourceEvidenceId, claimId);
+          }
+        }
+      }
+    }
+
+    // P2012: sourceRef が gap を指す返送は、その gap の調査材料として
+    // 接続する。従来は sourceRef を読まず、材料が gap にも再検証にも
+    // 接続されないまま、ラン側が「主張 DB に変化なし」と判断して
+    // 同じ依頼を出し続けていた（2026-11-23 実機で同一 gap へ5回）。
+    // 検証は acquireEvidence の Claim 経路と同じく verifierService の
+    // 通常判定で行い、登録した Claim が全件確定した場合だけ、
+    // VERIFY_RESEARCH_CLAIMS 経路と同じ意味論で gap を解決する。
+    // 一部でも未確定なら gap は開いたままにし、材料は gap の
+    // researchClaimIds に残して後続の検証に委ねる。
+    let gapResolution: string | undefined;
+    const sourceRef = typeof payload.sourceRef === 'string' ? payload.sourceRef.trim() : '';
+    if (sourceRef && registeredClaimIds.length > 0) {
+      const gap = knowledgeGapService.getById(sourceRef);
+      if (gap && gap.status !== 'RESOLVED') {
+        knowledgeGapService.attachResearchClaims(gap.id, registeredClaimIds);
+        knowledgeGapService.advanceResolutionPlan(gap.id, 'VERIFY');
+        const outcomes = registeredClaimIds.map((claimId) => verifierService.verifyClaim({ claimId }));
+        const allVerified = outcomes.every(
+          (outcome) => outcome.outcome === 'SUPPORTED' || outcome.outcome === 'DEVICE_VERIFIED',
+        );
+        if (allVerified) {
+          knowledgeGapService.advanceResolutionPlan(gap.id, 'RESOLVE');
+          knowledgeGapService.markResolved(gap.id);
+          gapResolution = 'RESOLVED';
+        } else {
+          gapResolution = 'VERIFYING';
+        }
+        systemLogger.info(
+          'SYSTEM',
+          `[P2012] 橋の調査材料を gap へ接続: gap=${gap.id} claims=${registeredClaimIds.join(',')} verification=${outcomes.map((outcome) => outcome.outcome).join(',')} gap=${gapResolution}`,
+        );
+      }
+    }
+
     // 対応する送出があれば pending から外す（結果が届いた）。
     this.state.pendingOut = this.state.pendingOut.filter((record) => record.envelopeId !== envelope.id);
     this.save();
@@ -925,7 +1009,7 @@ class BridgeExchangeService {
       fileName,
       kind: 'research',
       status: 'INTAKEN',
-      note: `Evidence ${evidenceIds.length + (answerEvidenceId ? 1 : 0)} 件 / Claim候補 ${claimsRegistered} 件`,
+      note: `Evidence ${evidenceIds.length + (answerEvidenceId ? 1 : 0)} 件 / Claim候補 ${claimsRegistered} 件${gapResolution ? ` / gap ${sourceRef} ${gapResolution}` : ''}`,
     };
   }
 

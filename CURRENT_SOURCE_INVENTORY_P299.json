@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1908,
     "sourceFileCount": 1460,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1371,
-    "relativeImportCandidateCount": 5018,
-    "resolvedRelativeImportCandidateCount": 5000,
+    "relativeImportCandidateCount": 5020,
+    "resolvedRelativeImportCandidateCount": 5002,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -18683,9 +18683,9 @@
     },
     {
       "path": "src/miki/core/services/bridgeExchangeService.ts",
-      "bytes": 55190,
-      "lines": 1250,
-      "sha256": "a1647f437abc1d6c301d96df8745d35ea85a7a27e780e487451468fdb20ab797",
+      "bytes": 59733,
+      "lines": 1334,
+      "sha256": "f7e14f39c21fd96a66a9d9d9af846fe8a8fc29a162a4c425042efe2dfa7f1b6b",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -18719,43 +18719,55 @@
         },
         {
           "line": 7,
+          "specifier": "../../unknown/services/knowledgeGapService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/unknown/services/knowledgeGapService.ts"
+        },
+        {
+          "line": 8,
+          "specifier": "../../verification/services/verifierService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/verification/services/verifierService.ts"
+        },
+        {
+          "line": 9,
           "specifier": "../../research/services/japaneseDictionaryService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/japaneseDictionaryService.ts"
         },
         {
-          "line": 8,
+          "line": 10,
           "specifier": "../../research/services/webTermLearningService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/research/services/webTermLearningService.ts"
         },
         {
-          "line": 9,
+          "line": 11,
           "specifier": "../../safety/services/privacyGuardrailService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/safety/services/privacyGuardrailService.ts"
         },
         {
-          "line": 10,
+          "line": 12,
           "specifier": "./componentSupplyRequestService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/componentSupplyRequestService.ts"
         },
         {
-          "line": 11,
+          "line": 13,
           "specifier": "./componentSupplyIntakeService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/componentSupplyIntakeService.ts"
         },
         {
-          "line": 12,
+          "line": 14,
           "specifier": "./canonicalSha256Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         }
       ],
-      "relativeImportCandidateCount": 11,
-      "resolvedRelativeImportCount": 11,
+      "relativeImportCandidateCount": 13,
+      "resolvedRelativeImportCount": 13,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -32053,9 +32065,9 @@
     },
     {
       "path": "src/miki/research/services/researchService.ts",
-      "bytes": 102281,
-      "lines": 1856,
-      "sha256": "4eee9438de9d8096cf668a5e9225a15e04b75d17659a91e01315e3c56351568d",
+      "bytes": 104477,
+      "lines": 1890,
+      "sha256": "baa9f8e4fd5f4850b82060873f5dc1acf37fc4a556337aaae3c0315153224695",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -32250,13 +32262,13 @@
           "resolvedPath": "src/miki/core/services/githubCodeMaterialService.ts"
         },
         {
-          "line": 469,
+          "line": 489,
           "specifier": "../../core/services/githubCodeMaterialService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/githubCodeMaterialService.ts"
         },
         {
-          "line": 479,
+          "line": 499,
           "specifier": "../../core/services/stackExchangeMaterialService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/stackExchangeMaterialService.ts"

@@ -58,6 +58,26 @@ export function isEnglishDominantText1146(text: string): boolean {
   return latin > jp * 2;
 }
 
+/*
+ * P2012: 制御トークン支配テキストの判定。P1138 の
+ * isControlTokenDominatedText / P1139 の isControlTokenRequirement
+ * と同じ物差しで、import 循環を避けるためこの層でも局所に持つ
+ * （P1139 の前例どおり）。完了ゲートの理由コード
+ * （EVIDENCE_ID_MISSING 等）や機械向け指示文だけからなる文は、
+ * トークンを除くと主題がほぼ残らず、「知識の質問」ではない。
+ */
+export function gapQueryIsControlTokenDominated(value: string): boolean {
+  const text = String(value || '');
+  if (!/[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+/.test(text)) return false;
+  const stripped = text
+    .replace(/(停滞タスク|改善負債|能力不足|知識不足|実行失敗|18分類未循環|Claim矛盾|CONTRADICTED|UNRESOLVED|必要Evidenceの取得|必要Evidence)[:：]/g, ' ')
+    .replace(/[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+/g, ' ')
+    .replace(/[A-Za-z][A-Za-z0-9]*:/g, ' ')
+    .replace(/[／/|:：、,()（）「」]/g, ' ');
+  const content = stripped.replace(/[\sのをにへがはとや、。]/g, '').trim();
+  return content.length < 4;
+}
+
 export function assessClaimWorthiness(statement: string): { ok: boolean; reason?: string } {
   const text = String(statement || '').trim();
   if (!text) return { ok: false, reason: 'EMPTY' };
@@ -1692,6 +1712,20 @@ export class ResearchService {
     if (!anchor) return undefined;
     const statement = gap.query.trim();
     if (statement.length < 15) return undefined;
+    // P2012: gap のクエリが取得指示文（「必要Evidenceの取得:
+    // EVIDENCE_ID_MISSING」のような完了ゲートの理由コード）だけの
+    // 場合、それは gap の同一性ラベルであって事実の主張ではない。
+    // そのまま Claim 化すると、主張の錨語（理由コード等）が実世界の
+    // 証拠本文に現れないため、検証器の関連性ゲート（P1144）で永久に
+    // UNRESOLVED になる検証不能な Claim が生まれる（実機 2026-11-23
+    // の CLM-000025/26: admissible=4 / relevant=0 / independent=0）。
+    // 未解決のたびに回復リクエストも新規に生まれ、自己持続ループに
+    // なっていた。Claim 化だけを見送り、証拠の gap への追跡は
+    // 従来どおり残す。
+    if (gapQueryIsControlTokenDominated(statement)) {
+      systemLogger.info('SELF_IMPROVEMENT', `[P2012] 制御トークンだけのgap文の主張化を見送り: ${statement.slice(0, 60)}`);
+      return undefined;
+    }
     // P1136: gap の文は「調べるべきこと」の指示文であり、事実の主張
     // とは限らない。通常の Claim 化と同じ主張適格性チェックを通し、
     // 疑問文・修辞などは Claim 化しない（証拠の追跡は gap 側に残る）。
