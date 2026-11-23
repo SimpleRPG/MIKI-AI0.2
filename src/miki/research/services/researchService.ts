@@ -948,6 +948,18 @@ export class ResearchService {
         }
       }
 
+      // P2006: 背景調査の途中譲りの判定。P2005 の譲りは開始
+      // ゲートとページ境界が中心で、開始時点で既に走っていた
+      // ステップのページ内処理（グラフ構築・証拠化・Claim 登録・
+      // 学習の連鎖）のバーストが残った（実機 2026-11-23 21:20）。
+      // 判定を処理内部の確認点（ページ取得・グラフのセクション・
+      // 学習のユニット/語の合間、段階の切れ目）へ渡し、立ったら
+      // その場で CONVERSATION_PRIORITY として駐車する。会話経路
+      // 自身の調査（backgroundWork でない）には渡さない。
+      const conversationStop = options?.backgroundWork
+        ? () => conversationPriorityService.isConversationPriorityActive()
+        : undefined;
+
       // P2005: 未知語の継続ラウンド上限。これを超えたら今回は
       // 検索を発射せず、継続不可で返す（gap は開いたまま残り、
       // 後の新鮮な dispatch で再挑戦できる＝駐車）。
@@ -1047,12 +1059,13 @@ export class ResearchService {
         // is one Research pipeline rather than two disconnected services.
         const readResults = await unifiedWebResearchService.readSearchResultPages(passQuery, orderResultsForReading(results, queryPlan.status === "READY" ? queryPlan.queries[pass] : {}), {
           maxPages: maxPagesPerPass,
+          shouldStop: conversationStop,
         });
         // P803: リンク巡回。読んだページのアンカーが調査対象を含む
         // リンクを、その場で追加の読み対象にする。答えが1リンク先に
         // ある型の調査で、検索し直さずに前へ進むための運転。
         // 予算は1調査あたり成功3件まで（読みは直列で時間を使うため）。
-        if (followReadsUsed < 3) {
+        if (followReadsUsed < 3 && !conversationStop?.()) {
           const followTerms = [
             String(gap.identity?.target || ''),
             ...(queryPlan.status === 'READY' ? (queryPlan.subject?.unknownTerms || []) : []),
@@ -1065,7 +1078,7 @@ export class ResearchService {
           ]);
           const follows = linkFollowService.selectFollowLinks(readResults as any, followTerms, followExclude, Math.min(2, 3 - followReadsUsed));
           if (follows.length > 0) {
-            const followRead = await unifiedWebResearchService.readSearchResultPages(passQuery, follows.map((f) => ({ title: f.title || f.url, snippet: '', source: 'link-follow', url: f.url })) as any, { maxPages: follows.length });
+            const followRead = await unifiedWebResearchService.readSearchResultPages(passQuery, follows.map((f) => ({ title: f.title || f.url, snippet: '', source: 'link-follow', url: f.url })) as any, { maxPages: follows.length, shouldStop: conversationStop });
             let followedOk = 0;
             for (const fp of followRead) {
               followedUrls.add(fp.url);
@@ -1083,8 +1096,11 @@ export class ResearchService {
         // の塊なので、ページの合間に時間予算で譲る。背景調査で
         // 会話優先が立ったら残りのページは次サイクルへ回す。
         const pageBudget = new MainThreadBudget(24);
-        let priorityStopped = false;
+        // P2006: 取得・巡回の間に会話優先が立っていたら、ページ
+        // 処理へ入る前に駐車扱いにする。
+        let priorityStopped = conversationStop?.() === true;
         for (const page of readResults) {
+          if (priorityStopped) break;
           if (!page.success || !page.text.trim()) continue;
           await pageBudget.yieldIfExceeded();
           if (options?.backgroundWork && conversationPriorityService.isConversationPriorityActive()) {
@@ -1109,7 +1125,14 @@ export class ResearchService {
             title: page.result.title,
             text: page.text,
             questionTerms: queryPlan.status === "READY" ? (queryPlan.queries[pass]?.termsIncluded || []) : [],
+            shouldStop: conversationStop,
           });
+          // P2006: グラフ構築が途中で譲ったら、このページの
+          // 後段（証拠化・Claim 登録・学習）ごと次サイクルへ。
+          if (pageGraphBuild.stopped) {
+            priorityStopped = true;
+            break;
+          }
           const pageEvidence = evidenceService.recordWebEvidence({
             title: `${page.result.title} [本文読取]`,
             snippet: content,
@@ -1139,6 +1162,11 @@ export class ResearchService {
             },
           });
           evidence.push(pageEvidence);
+          // P2006: 段階の切れ目でも譲りを確認する。
+          if (conversationStop?.()) {
+            priorityStopped = true;
+            break;
+          }
 
           if (pageEvidence.status === 'REJECTED') continue;
 
@@ -1162,6 +1190,13 @@ export class ResearchService {
             }
           }
 
+          // P2006: グラフ由来 Claim の登録後も、意味学習へ
+          // 進む前に譲りを確認する。
+          if (conversationStop?.()) {
+            priorityStopped = true;
+            break;
+          }
+
           // Understand page content independently from the search-result snippet.
           // Every accepted sentence is checked against the fetched page before its
           // own unverified Claim and structured semantic candidate are created.
@@ -1171,6 +1206,7 @@ export class ResearchService {
               url: page.url,
               evidenceId: pageEvidence.evidence_id,
               sourceTitle: page.result.title,
+              shouldStop: conversationStop,
               maxUnits: Math.max(0, 24 - learnedSemanticComponentClaims.length),
               registerClaim: (statement) => {
                 const normalizedPageStatement = this.normalizeClaimStatement(statement);
@@ -1198,6 +1234,12 @@ export class ResearchService {
               )) {
                 learnedSemanticComponentClaims.push(semantic);
               }
+            }
+            // P2006: 意味学習が途中で譲ったら、このページの
+            // 残りの連鎖（用語学習まで）を次サイクルへ回す。
+            if (semanticLearning.stopped) {
+              priorityStopped = true;
+              break;
             }
           }
 
@@ -1235,7 +1277,14 @@ export class ResearchService {
               claimIds: [pageClaimId],
               sourceTitle: page.result.title,
               priorityTerms: priorityTermsForLearning.length ? priorityTermsForLearning : undefined,
+              shouldStop: conversationStop,
             });
+            // P2006: 用語学習が途中で譲ったら、定義登録・
+            // 深掘りを含む残りの連鎖を次サイクルへ回す。
+            if (termLearning.stopped) {
+              priorityStopped = true;
+              break;
+            }
 
             // P494: 意味が辞書に載ったら、この UNKNOWN_TERM gap は
             // 役目を終える。再調査のたびに同じ語を調べ直さない。
@@ -1305,10 +1354,16 @@ export class ResearchService {
           break;
         }
 
+        let snippetStopped = false;
         for (const result of results) {
         // P2005: 抜粋の証拠化も件数が多いと同期の塊になるため、
         // 同じ予算で合間に譲る。
         await pageBudget.yieldIfExceeded();
+        // P2006: 抜粋の証拠化の途中でも会話優先を確認する。
+        if (conversationStop?.()) {
+          snippetStopped = true;
+          break;
+        }
         const record = evidenceService.recordWebEvidence({
           title: result.title,
           snippet: result.snippet,
@@ -1353,6 +1408,15 @@ export class ResearchService {
         if (claimId && !claimIds.includes(claimId)) claimIds.push(claimId);
 
       }
+
+        // P2006: 抜粋の証拠化の途中で譲ったら、このパスの
+        // 残り（計画前進・結果学習）も次サイクルへ回す。
+        if (snippetStopped) {
+          continuationAvailable = true;
+          continuationReason = 'CONVERSATION_PRIORITY';
+          systemLogger.info('SELF_IMPROVEMENT', `💬 [会話優先] 抜粋の証拠化の途中で背景調査を譲りました (pass=${pass + 1}, gap=${gap.id})`);
+          break;
+        }
 
         // ResearchはEvidence/Claimの収集までを担当し、VerificationはCORE経由で実行する。
         knowledgeGapService.advanceResolutionPlan(gap.id, 'VERIFY', 'RESEARCH');

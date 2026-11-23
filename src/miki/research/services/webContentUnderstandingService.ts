@@ -60,6 +60,9 @@ export interface WebSemanticLearningResult {
   graphNodeIds: string[];
   skippedUnits: number;
   graphFailures: number;
+  // P2006: shouldStop で途中終了した場合に立つ。処理済みの
+  // ユニット分は通常どおり成果に含まれ、残りは次サイクルへ。
+  stopped?: boolean;
 }
 
 interface SentenceSegment {
@@ -342,6 +345,10 @@ export class WebContentUnderstandingService {
     sourceTitle?: string;
     maxUnits?: number;
     registerClaim: (statement: string) => string | undefined;
+    // P2006: 背景調査の途中譲り（背景調査の呼び出し側だけが
+    // 渡す）。ユニットの合間で読み、立ったら残りのユニットを
+    // 処理せず stopped で返す。
+    shouldStop?: () => boolean;
   }): WebSemanticLearningResult {
     const empty: WebSemanticLearningResult = {
       units: [],
@@ -358,8 +365,11 @@ export class WebContentUnderstandingService {
     const componentClaims: WebSemanticComponentClaim[] = [];
     // P440 1-A: ボイラープレートで除いた件数も skippedUnits に数える。
     let skippedUnits = skippedBoilerplate;
+    let stopped = false;
 
     for (const unit of units) {
+      // P2006: ユニット単位が処理の塊。合間で譲りを確認する。
+      if (input.shouldStop?.()) { stopped = true; break; }
       const claimId = input.registerClaim(unit.statement);
       if (!claimId) {
         skippedUnits++;
@@ -434,6 +444,7 @@ export class WebContentUnderstandingService {
     const graphNodeIds: string[] = [];
     let graphFailures = 0;
     for (const component of components) {
+      if (input.shouldStop?.()) { stopped = true; break; }
       const contract = component.interfaceContract;
       const unit = contract.unit as WebSemanticUnit;
       const claimId = component.claimIds[0];
@@ -477,6 +488,7 @@ export class WebContentUnderstandingService {
       graphNodeIds: [...new Set(graphNodeIds)],
       skippedUnits,
       graphFailures,
+      ...(stopped ? { stopped: true } : {}),
     };
   }
 }

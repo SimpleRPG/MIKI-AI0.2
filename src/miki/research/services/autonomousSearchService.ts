@@ -1669,7 +1669,10 @@ export class AutonomousSearchService {
   }>(
     query: string,
     results: T[],
-    options?: { maxPages?: number; timeoutMs?: number; renderWaitMs?: number }
+    // P2006: shouldStop（背景調査の呼び出し側だけが渡す会話
+    // 優先の判定）が立ったら、残りのページ取得を打ち切って
+    // 取得済み分だけを返す。処理側は自前の確認で駐車する。
+    options?: { maxPages?: number; timeoutMs?: number; renderWaitMs?: number; shouldStop?: () => boolean }
   ): Promise<Array<{
     result: T;
     success: boolean;
@@ -1714,6 +1717,9 @@ export class AutonomousSearchService {
     // Native WebView rejects overlapping calls; serialize page reads while preserving input order.
     const outputs: Array<{ result: T; success: boolean; text: string; url: string; error?: string; links?: Array<{ href: string; text: string }> }> = [];
     for (const result of readable) {
+      // P2006: ページ取得の合間でも譲りを確認する（取得は
+      // 直列で1件ずつ時間がかかるため）。
+      if (options?.shouldStop?.()) break;
       try {
         const page = await this.fetchRenderedPage(result.url!, {
           query,

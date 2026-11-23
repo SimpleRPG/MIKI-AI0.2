@@ -2,6 +2,7 @@ import { corePlanRevisionService } from './corePlanRevisionService';
 import { coreLineageReadModelService } from './coreLineageReadModelService';
 import { domainRouterService, type DomainCommand } from './domainRouterService';
 import { taskBlackboardService, unresolvedTaskErrors, type BlackboardTask } from './taskBlackboardService';
+import { conversationPriorityService } from './conversationPriorityService';
 import { adaptiveRoutePlannerService } from './adaptiveRoutePlannerService';
 import { rustCoreDecisionKernelService } from './rustCoreDecisionKernelService';
 import { rustDomainParticipationKernelService } from './rustDomainParticipationKernelService';
@@ -1046,6 +1047,19 @@ class CoreOrchestratorService {
     taskBlackboardService.pause(taskId,'FOREGROUND_USER_REQUEST_ACTIVE');
     taskBlackboardService.append(taskId,'CHECKPOINT','core',`backgroundBudgetCycle:${cycles}`,{revision:currentBeforeState.revision,cycle:cycles,mode:'FOREGROUND_BLOCKED',replanRequired:true});
     coreResultService.waiting(reqId,{error:'Background task paused for foreground user request'});break;
+   }
+   // P2006: 会話優先のサイクル開始確認。P2005 の譲りは自律
+   // ループの実行開始ゲートと調査内部が中心で、実行中の
+   // ステップは CORE のサイクルを回し続けていた。背景タスク
+   // はサイクルの切れ目でも会話優先（画面表示・生成中・直近
+   // の会話活動）を確認し、立っていれば理由
+   // CONVERSATION_PRIORITY で駐車する（自動再開の対象。
+   // 駐車の検出と試行の返却は自律ループ側の事後分類が行う）。
+   // 前景（会話自身）のタスクは対象にしない。
+   if(isBackground&&conversationPriorityService.isConversationPriorityActive()){
+    taskBlackboardService.pause(taskId,'CONVERSATION_PRIORITY');
+    taskBlackboardService.append(taskId,'CHECKPOINT','core',`conversationPriorityPause:${cycles}`,{revision:currentBeforeState.revision,cycle:cycles,mode:'CONVERSATION_PRIORITY',replanRequired:true});
+    coreResultService.waiting(reqId,{error:'Background task paused for conversation priority'});break;
    }
    if(isBackground){
     const budgetCheckedAt=Date.now();

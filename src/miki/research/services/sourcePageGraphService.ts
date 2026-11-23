@@ -168,7 +168,12 @@ url: string;
 title: string;
 text: string;
 questionTerms?: string[];
-}): Promise<{ graph: SourcePageGraph; relevantStatements: SourcePageRelevantStatement[]}> {
+// P2006: 背景調査の途中譲り。呼び出し側（背景調査のみ）が
+// 会話優先の判定を渡すと、セクションの合間で読み、立ったら
+// その場で構築を打ち切って stopped を返す（部分グラフは
+// そのまま保持し、続きは次サイクルの再構築に委ねる）。
+shouldStop?: () => boolean;
+}): Promise<{ graph: SourcePageGraph; relevantStatements: SourcePageRelevantStatement[]; stopped?: boolean}> {
 this.load();
 const text = (params.text || '').trim();
 const pageId = `page_${canonicalSha256Object({ url: params.url}).slice(0, 20)}`;
@@ -181,10 +186,14 @@ const statements: SourcePageStatement[] = [];
 // 実機のメインスレッドを数十秒塞いだ。セクションの合間に時間
 // 予算でイベントループへ返し、入力と描画を通す。
 const sectionBudget = new MainThreadBudget(24);
+let stopped = false;
 for (let sectionIndex = 0; sectionIndex < rawSections.length; sectionIndex++) {
 const raw = rawSections[sectionIndex];
 if (statements.length >= MAX_STATEMENTS_PER_PAGE) break;
 await sectionBudget.yieldIfExceeded();
+// P2006: 予算の譲りだけでは構築自体は走り切ってしまう。
+// 会話優先が立ったら残りのセクションを次サイクルへ回す。
+if (params.shouldStop?.()) { stopped = true; break; }
 const sectionId = `${pageId}:s${sectionIndex}`;
 let contentTerms: string[] = [];
 try {
@@ -212,8 +221,8 @@ statements,
 };
 this.graphs.set(pageId, graph);
 this.save();
-systemLogger.info('SELF_IMPROVEMENT', `[SourcePageGraph] built ${pageId} host=${host} sections=${sections.length} statements=${statements.length} chars=${text.length}`);
-return { graph, relevantStatements: this.relevantStatements(graph, params.questionTerms || [])};
+systemLogger.info('SELF_IMPROVEMENT', `[SourcePageGraph] built ${pageId} host=${host} sections=${sections.length} statements=${statements.length} chars=${text.length}${stopped ? ' (stopped: conversation priority)' : ''}`);
+return { graph, relevantStatements: this.relevantStatements(graph, params.questionTerms || []), ...(stopped ? { stopped: true } : {})};
 }
 
 public attachEvidenceId(pageId: string, evidenceId: string): void {

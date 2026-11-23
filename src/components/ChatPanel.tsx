@@ -136,6 +136,7 @@ import { SnapshotTimeMachineModal } from './chat/SnapshotTimeMachineModal';
 import { AutonomousDevStudioModal } from './chat/AutonomousDevStudioModal';
 import { AutonomousEvolutionCard } from './chat/AutonomousEvolutionCard';
 import JSZip from 'jszip';
+import { chatDraftStore } from '../services/chatDraftStore';
 
 
 interface ChatPanelProps {
@@ -197,7 +198,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onRejectCodeProposal,
   onDeleteMessage,
 }) => {
-  const [inputText, setInputText] = useState('');
+  // P2006: 下書きの正本は chatDraftStore（モジュールレベル）。
+  // タブ切り替え等でアンマウントされても、再マウント時に
+  // 初期値として復元される。変更は下の effect で写し、クリアは
+  // 送信成功時に handleSend が入力を空にすることでのみ起きる。
+  const [inputText, setInputText] = useState(() => chatDraftStore.getDraft());
+  useEffect(() => {
+    chatDraftStore.setDraft(inputText);
+  }, [inputText]);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [appliedId, setAppliedId] = useState<string | null>(null);

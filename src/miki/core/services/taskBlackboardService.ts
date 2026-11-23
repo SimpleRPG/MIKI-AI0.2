@@ -18,6 +18,9 @@ export interface BlackboardTask { taskId:string; title?:string; goal:string; sou
 export function isAutoResumablePauseReason(pausedReason?: string): boolean {
   return pausedReason === 'SELF_IMPROVEMENT_QUEUED'
     || pausedReason === 'CORE_CYCLE_BUDGET_EXHAUSTED'
+    // P2006: 会話優先でサイクル開始に駐車した背景タスクも、
+    // 予算駐車と同じく自動再開の対象（会話が終われば続きを回す）。
+    || pausedReason === 'CONVERSATION_PRIORITY'
     || (typeof pausedReason === 'string' && pausedReason.startsWith('BACKGROUND_BUDGET:'));
 }
 

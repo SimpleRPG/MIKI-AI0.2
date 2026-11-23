@@ -18,6 +18,10 @@ export interface WebTermLearningInput {
   // P494: いま意味を必要としている語（調査を止めている未知語）。
   // 候補抽出の単位から漏れても定義抽出と登録の対象にする。
   priorityTerms?: string[];
+  // P2006: 背景調査の途中譲り（背景調査の呼び出し側だけが
+  // 渡す）。語の処理の合間で読み、立ったら残りの語と定義登録
+  // を次サイクルへ回して stopped で返す。
+  shouldStop?: () => boolean;
 }
 
 export interface LearnedWebTerm {
@@ -45,6 +49,8 @@ export interface WebTermLearningResult {
   needsGlossCount: number;
   // P494: このページの定義文から新しく覚えた意味。
   learnedDefinitions: Array<{ term: string; gloss: string; sense: string }>;
+  // P2006: shouldStop で途中終了した場合に立つ。
+  stopped?: boolean;
 }
 
 const STOP_WORDS = new Set([
@@ -214,7 +220,11 @@ class WebTermLearningService {
       })
       .slice(0, MAX_PAGE_TERMS);
 
+    let stopped = false;
     for (const { term, occurrences, hit } of ranked) {
+      // P2006: 語ごとの部品化が処理の塊。合間で譲りを確認し、
+      // 立ったら定義登録ごと次サイクルへ回す。
+      if (input.shouldStop?.()) { stopped = true; break; }
       if (!hit && occurrences < 2) continue;
       const learnedDef = learnedByTerm.get(normalize(term));
 
@@ -402,19 +412,21 @@ class WebTermLearningService {
         `📖 [意味学習] 「${def.term}」: ${def.gloss.slice(0, 60)} (意味=${sense}, 出所=${input.url})`,
       );
     };
-    const rankedTermKeys = new Set(terms.map((t) => normalize(t.term)));
-    for (const def of learnedByTerm.values()) {
-      if (rankedTermKeys.has(normalize(def.term))) registerDefinition(def);
-    }
-    let overflow = 0;
-    for (const def of extractions.values()) {
-      if (overflow >= 3) break;
-      if (registeredKeys.has(normalize(def.term))) continue;
-      registerDefinition(def);
-      overflow++;
+    if (!stopped) {
+      const rankedTermKeys = new Set(terms.map((t) => normalize(t.term)));
+      for (const def of learnedByTerm.values()) {
+        if (rankedTermKeys.has(normalize(def.term))) registerDefinition(def);
+      }
+      let overflow = 0;
+      for (const def of extractions.values()) {
+        if (overflow >= 3) break;
+        if (registeredKeys.has(normalize(def.term))) continue;
+        registerDefinition(def);
+        overflow++;
+      }
     }
 
-    return { terms, componentIds, glossedCount, duplicateCount, needsGlossCount, learnedDefinitions };
+    return { terms, componentIds, glossedCount, duplicateCount, needsGlossCount, learnedDefinitions, ...(stopped ? { stopped: true } : {}) };
   }
 }
 

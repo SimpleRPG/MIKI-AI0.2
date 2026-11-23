@@ -758,24 +758,7 @@ class AutonomousSelfImprovementLoopService {
         // 解消済み gap の完了のような軽い帳簿処理はこの直前で
         // 済ませてある。
         if (conversationPriorityService.isConversationPriorityActive()) {
-          const parkUntil = Date.now() + CONVERSATION_PARK_MS;
-          for (const item of this.state.queue) {
-            if (!item.nextAttemptAt || item.nextAttemptAt <= now) {
-              item.nextAttemptAt = parkUntil;
-              item.waitKind = 'RETRY';
-              item.waitReason = 'CONVERSATION_PRIORITY';
-            }
-          }
-          this.state.status = 'PAUSED';
-          this.state.lastReason = 'CONVERSATION_PRIORITY';
-          this.state.retryAt = parkUntil;
-          this.state.activeRequestId = undefined;
-          this.save();
-          systemLogger.info(
-            'SELF_IMPROVEMENT',
-            `[RUNTIME] AutonomousLoop park: ${request.id} kind=RETRY reason=CONVERSATION_PRIORITY retryAt=${parkUntil}`,
-          );
-          this.logQueueDigest('park-conversation');
+          this.parkQueueForConversationPriority(request.id, now);
           break;
         }
         // P428: the step record used to carry only the request id,
@@ -1002,6 +985,19 @@ class AutonomousSelfImprovementLoopService {
           this.state.lastReason = 'CORE_CYCLE_BUDGET_CONTINUE';
           this.save();
           continue;
+        }
+        // P2006: 今回の実行が会話優先でサイクル開始に駐車した
+        // （CORE が conversationPriorityPause のチェックポイント
+        // を積んで PAUSED で戻した）場合は、失敗として試行を
+        // 消費せず、実行開始ゲートと同じ駐車に倒す。分類は
+        // P405 と同じく、今回の実行が積んだエントリだけで行う。
+        const conversationPausedThisExecution = workflow.task.status === 'PAUSED' && workflow.task.entries
+          .slice(entriesBeforeExecution)
+          .some(entry => entry.kind === 'CHECKPOINT' && entry.key.startsWith('conversationPriorityPause:'));
+        if (conversationPausedThisExecution) {
+          request.attempts -= 1;
+          this.parkQueueForConversationPriority(request.id, Date.now());
+          break;
         }
         // P410 T4: if research dispatched during THIS execution came
         // back with no admissible evidence because the source backend
@@ -1598,6 +1594,32 @@ class AutonomousSelfImprovementLoopService {
       if (String(error).includes('CORE_TASK_NOT_FOUND')) return undefined;
       throw error;
     }
+  }
+
+  // P2005/P2006: 会話優先の駐車。実行可能な全件を短い駐車
+  // （waitKind=RETRY、理由 CONVERSATION_PRIORITY）にして会話へ
+  // 譲る。試行回数も資源／証拠の待ち梯子も消費しない。実行
+  // 開始ゲート（P2005）と、実行中ステップがサイクル開始で
+  // 駐車して戻った場合の事後分類（P2006）の両方から使う。
+  private parkQueueForConversationPriority(requestId: string, now: number): void {
+    const parkUntil = Date.now() + CONVERSATION_PARK_MS;
+    for (const item of this.state.queue) {
+      if (!item.nextAttemptAt || item.nextAttemptAt <= now) {
+        item.nextAttemptAt = parkUntil;
+        item.waitKind = 'RETRY';
+        item.waitReason = 'CONVERSATION_PRIORITY';
+      }
+    }
+    this.state.status = 'PAUSED';
+    this.state.lastReason = 'CONVERSATION_PRIORITY';
+    this.state.retryAt = parkUntil;
+    this.state.activeRequestId = undefined;
+    this.save();
+    systemLogger.info(
+      'SELF_IMPROVEMENT',
+      `[RUNTIME] AutonomousLoop park: ${requestId} kind=RETRY reason=CONVERSATION_PRIORITY retryAt=${parkUntil}`,
+    );
+    this.logQueueDigest('park-conversation');
   }
 
   private dropCurrent(reason: string): void {
