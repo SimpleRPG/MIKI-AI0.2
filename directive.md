@@ -8,6 +8,6 @@
   例: bust_cy, groove_w
 - note: 自由記述 (レビュー回で読みます)
 
-emphasis: balanced
+emphasis: code
 focus:
-note:
+note: とりあえずはみきのコードを育てる
