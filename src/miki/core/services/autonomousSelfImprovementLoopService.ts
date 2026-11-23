@@ -2,6 +2,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger, errorHeadline } from '../../../services/systemLogger';
 import { coreTaskIngressService } from './coreTaskIngressService';
 import { taskBlackboardService, isAutoResumablePauseReason } from './taskBlackboardService';
+import { conversationPriorityService } from './conversationPriorityService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
 import { requiredAssetAcquisitionService } from './requiredAssetAcquisitionService';
@@ -105,6 +106,10 @@ export const DISCOVERY_UNSTARTED_TTL_MS = 24 * 60 * 60 * 1000;
 // visibly instead of stalling the queue forever (see waitForResource).
 const MAX_RESOURCE_WAITS = 30;
 const RECOVERY_POLL_MS = 60_000;
+// P2005: 会話優先で駐車する際の再確認間隔。試行・待ち梯子を
+// 消費しない短い駐車を繰り返し、会話が終われば速やかに再開
+// する（会話画面が開いている間は開いたまま駐車し続ける）。
+const CONVERSATION_PARK_MS = 10_000;
 const RESOURCE_WAIT_MS = [2 * 60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000];
 const EVIDENCE_WAIT_MS = [2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60_000];
 
@@ -744,6 +749,34 @@ class AutonomousSelfImprovementLoopService {
         if (linkedGapId && knowledgeGapService.getById(linkedGapId)?.status === 'RESOLVED') {
           this.completeCurrent('KNOWLEDGE_GAP_RESOLVED');
           continue;
+        }
+        // P2005: 会話優先ゲート。会話画面が開いている／応答生成
+        // 中／直近の会話活動あり／前景タスク進行中のいずれか
+        // なら、このリクエストを実行せず、実行可能だった全件を
+        // 短く駐車して会話へ譲る。試行回数も待ち梯子も消費し
+        // ない（会話は彼女の主目的で、自律側が譲るのが既定）。
+        // 解消済み gap の完了のような軽い帳簿処理はこの直前で
+        // 済ませてある。
+        if (conversationPriorityService.isConversationPriorityActive()) {
+          const parkUntil = Date.now() + CONVERSATION_PARK_MS;
+          for (const item of this.state.queue) {
+            if (!item.nextAttemptAt || item.nextAttemptAt <= now) {
+              item.nextAttemptAt = parkUntil;
+              item.waitKind = 'RETRY';
+              item.waitReason = 'CONVERSATION_PRIORITY';
+            }
+          }
+          this.state.status = 'PAUSED';
+          this.state.lastReason = 'CONVERSATION_PRIORITY';
+          this.state.retryAt = parkUntil;
+          this.state.activeRequestId = undefined;
+          this.save();
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            `[RUNTIME] AutonomousLoop park: ${request.id} kind=RETRY reason=CONVERSATION_PRIORITY retryAt=${parkUntil}`,
+          );
+          this.logQueueDigest('park-conversation');
+          break;
         }
         // P428: the step record used to carry only the request id,
         // so a request that was never selected (queue starvation)

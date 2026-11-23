@@ -444,12 +444,24 @@ class DomainIntegrationBootstrapService{
    const gapId=String(envelope.payload.gapId||'');
    const gap=gapId?knowledgeGapService.getById(gapId):undefined;
    const query=typeof envelope.payload.query==='string'?envelope.payload.query.trim():'';
+   // P2005: 会話優先の譲りは背景タスクからの調査にだけ効かせる。
+   // 発行元タスクの入力ペイロードの背景印（P2004 の coreTaskShape
+   // が付ける background / orchestrationMode / executionPriority）
+   // で判定する。会話の応答経路からの調査はここを通らない。
+   const dispatchTaskId=String(envelope.payload.taskId||'');
+   const dispatchTask=dispatchTaskId?taskBlackboardService.get(dispatchTaskId):undefined;
+   const dispatchInput=dispatchTask?.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload')?.value;
+   const dispatchPayload=(dispatchInput&&typeof dispatchInput==='object'&&!Array.isArray(dispatchInput))?dispatchInput as Record<string,unknown>:{};
+   const backgroundWork = dispatchPayload.background===true
+     || dispatchPayload.orchestrationMode==='AUTONOMOUS_KNOWLEDGE_GAP'
+     || dispatchPayload.orchestrationMode==='SELF_IMPROVEMENT_WORKER'
+     || dispatchPayload.executionPriority==='BACKGROUND';
    if(!gap&&!query)return {accepted:false,domain,command:envelope.command,error:'RESEARCH_QUERY_OR_GAP_REQUIRED',completedAt:Date.now()};
    if(!gap&&query){
     // P439: 不足の焦点（gapFocus）がペイロードにあれば、材料探索クエリの
     // ために researchService へ渡す。無ければ従来どおり。
     const gapFocus=this.parseGapFocus(envelope.payload.gapFocus);
-    const result=await researchService.executeSearch(query, {...(typeof envelope.payload.options==='object'&&envelope.payload.options!==null ? envelope.payload.options as any : {}), ...(gapFocus?{gapFocus}:{})});
+    const result=await researchService.executeSearch(query, {...(typeof envelope.payload.options==='object'&&envelope.payload.options!==null ? envelope.payload.options as any : {}), backgroundWork, ...(gapFocus?{gapFocus}:{})});
     return done({
       operation:'EXECUTE_AUTONOMOUS_SEARCH',
       operationClass:'BUSINESS',
@@ -473,6 +485,7 @@ class DomainIntegrationBootstrapService{
    const gapFocus = this.parseGapFocus(envelope.payload.gapFocus);
    return done(await researchService.researchGap(gap,{
      adaptive,
+     backgroundWork,
      query: requestedQuery || undefined,
      continuationRound: requestedRound,
      maxPasses: Number.isFinite(Number(envelope.payload.maxPasses)) ? Number(envelope.payload.maxPasses) : undefined,

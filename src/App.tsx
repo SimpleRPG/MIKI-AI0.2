@@ -62,6 +62,7 @@ import { taskPlanService } from './miki/strategy/services/taskPlanService';
 import { sendChatMessage, autoSyncServerEnvKeysIfEmpty } from './services/api';
 import { deterministicRuntimeService } from './miki/safety/services/deterministicRuntimeService';
 import { systemLogger } from './services/systemLogger';
+import { userActivityService } from './services/userActivityService';
 import { worldModelService } from './miki/selfAwareness/services/worldModelService';
 import { storageService } from './services/storageService';
 import { completionJudgeService } from './miki/verification/services/completionJudgeService';
@@ -406,6 +407,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // P2005: 会話画面が開いている間は自律側の重い仕事を開始
+    // しないための刻み（判定は conversationPriorityService）。
+    userActivityService.setConversationScreenOpen(mobileTab === 'chat');
     systemLogger.recordRuntimeBreadcrumb('UI_NAV_STATE_COMMITTED', { tab: mobileTab, visibility: document.visibilityState });
     const memory = (performance as any).memory;
     systemLogger.info('SYSTEM', '[UI_NAV] mobile tab state changed', {

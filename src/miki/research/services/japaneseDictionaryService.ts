@@ -79,6 +79,13 @@ class JapaneseDictionaryService {
   private imported = new Map<JapaneseDictionarySource, JapaneseDictionaryEntry[]>();
   private packageInfo = new Map<JapaneseDictionarySource, JapaneseDictionaryPackageInfo>();
   private builtinEntries: JapaneseDictionaryEntry[] = BUILTIN.map(makeEntry);
+  // P2005: normalized キー→輸入エントリの索引。以前は lookup の
+  // たびに輸入辞書全体（実機で 67,283 件）を複写して走査して
+  // いたため、形態素解析のトークン毎・学習候補毎の参照が合算で
+  // 数十秒級の同期占有になっていた（2026-11-23 実機の固まりの
+  // 主因。JMdict 取り込みが届くようになった P2004 で顕在化）。
+  // 輸入辞書が変わる地点で破棄され、次回参照時に作り直される。
+  private importedIndex: Map<string, JapaneseDictionaryEntry[]> | null = null;
   private semanticIndex: Map<string, Set<string>> | null = null;
   private constructor() { this.loadPersonal(); this.loadPackages(); }
   public static getInstance(): JapaneseDictionaryService { return this.instance ||= new JapaneseDictionaryService(); }
@@ -159,6 +166,7 @@ class JapaneseDictionaryService {
     const normalized = pkg.entries.filter(e => e?.surface).map(e => ({ ...e, normalized: normalize(e.surface), source: pkg.source, priority: e.priority ?? 60 }));
     if (!normalized.length) return 0;
     this.semanticIndex = null;
+    this.importedIndex = null;
     this.imported.set(pkg.source, normalized);
     this.packageInfo.set(pkg.source, { source: pkg.source, version: pkg.version, dictionaryName: pkg.dictionaryName, entryCount: normalized.length, importedAt: Date.now() });
     this.savePackages();
@@ -191,6 +199,7 @@ class JapaneseDictionaryService {
     }
     if (added > 0) {
       this.semanticIndex = null;
+      this.importedIndex = null;
       this.imported.set(source, existing);
       const info = this.packageInfo.get(source);
       if (info) info.entryCount = existing.length;
@@ -289,7 +298,20 @@ class JapaneseDictionaryService {
 
   public getPackageInfo(): JapaneseDictionaryPackageInfo[] { return [...this.packageInfo.values()]; }
 
-  private importedEntries(key: string): JapaneseDictionaryEntry[] { return [...this.imported.values()].flat().filter(e => e.normalized === key); }
+  private importedEntries(key: string): JapaneseDictionaryEntry[] {
+    if (!this.importedIndex) {
+      const index = new Map<string, JapaneseDictionaryEntry[]>();
+      for (const entries of this.imported.values()) {
+        for (const entry of entries) {
+          const bucket = index.get(entry.normalized);
+          if (bucket) bucket.push(entry);
+          else index.set(entry.normalized, [entry]);
+        }
+      }
+      this.importedIndex = index;
+    }
+    return this.importedIndex.get(key) || [];
+  }
   private loadPersonal() { try { const arr = storageService.getJson<JapaneseDictionaryEntry[]>(PERSONAL_KEY, []); if (Array.isArray(arr)) for (const e of arr) if (e?.normalized) this.personal.set(e.normalized, e); } catch { /* conservative empty dictionary */ } }
   private savePersonal() {
     // P499: 保存を短い窓でまとめる（意味学習は1ページで複数語を

@@ -23,6 +23,7 @@ import { researchQueryPlanningService, buildShortResearchQuery, isLongResearchIn
 import type { GapFocusMaterialInput, ResearchQueryExclusion, IndependentEvidenceFocus } from './researchQueryPlanningService';
 import { storageService } from '../../../services/storageService';
 import { collectionSourceRegistryService } from '../../core/services/collectionSourceRegistryService';
+import { conversationPriorityService, MainThreadBudget } from '../../core/services/conversationPriorityService';
 import type { VerificationResult } from '../../verification/services/verifierService';
 import { researchQueryOutcomeLearningService } from './researchQueryOutcomeLearningService';
 import { webResearchPolicyService, WebResearchProgress } from './webResearchPolicyService';
@@ -226,6 +227,15 @@ export function orderResultsForReading<T extends { url?: string; title?: string;
   return [...results].sort((a, b) => (rank(a) - rank(b)) || (scoreResultRelevance1143(b, terms) - scoreResultRelevance1143(a, terms)));
 }
 
+// P2005: 未知語1件への調査の上限。実機（2026-11-23）では1語の
+// 調査が adaptive の継続ラウンドで無制限に回り続け、検索側が
+// レート制限で止まっている間も再発射され、会話を圧迫した。
+// 1回の呼び出しでは最大3パス、継続ラウンドは最大4回まで。
+// 上限に達しても gap は捨てず、後の新鮮な dispatch で再挑戦
+// できる（駐車であって破棄ではない）。
+const UNKNOWN_TERM_MAX_PASSES_PER_INVOCATION = 3;
+const UNKNOWN_TERM_MAX_CONTINUATION_ROUNDS = 4;
+
 export class ResearchService {
   private static instance: ResearchService;
 
@@ -238,11 +248,11 @@ export class ResearchService {
     return ResearchService.instance;
   }
 
-  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string; lane?: SearchLane; gapFocus?: GapFocusMaterialInput }): Promise<ResearchResult> {
+  public async executeSearch(query: string, options?: { maxResults?: number; sourceRequestId?: string; lane?: SearchLane; gapFocus?: GapFocusMaterialInput; backgroundWork?: boolean }): Promise<ResearchResult> {
     const text = query.trim();
     if (!text) throw new Error("RESEARCH_QUERY_REQUIRED");
     const gap = knowledgeGapService.detect({ query: text, type: "INSUFFICIENT_EVIDENCE", reason: "通常のWeb知識探索要求をResearchServiceへ統合", priority: 50, sourceRequestId: options?.sourceRequestId });
-    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)), lane: options?.lane, ...(options?.gapFocus ? { gapFocus: options.gapFocus } : {}) });
+    return this.researchGap(gap, { forceRoute: "WEB_SEARCH", query: text, maxPagesPerPass: Math.max(1, Math.min(3, options?.maxResults || 2)), lane: options?.lane, backgroundWork: options?.backgroundWork, ...(options?.gapFocus ? { gapFocus: options.gapFocus } : {}) });
   }
 
   /*
@@ -531,6 +541,42 @@ export class ResearchService {
     return materials;
   }
 
+  /**
+   * P2005: 未知語の表記揺れの軽い解決。対象そのものに gloss が
+   * 無く、厳密な表記変換（長音記号「ー」の除去、連続する同一
+   * 母音かなの圧縮）で得た候補に gloss 付きの辞書エントリが
+   * ある場合だけ、その候補を正規語として個人辞書へ紐付け、
+   * gap を解消する。変換は決定的で範囲が狭く、無関係な語へ
+   * 誤って結ぶ余地を残さない。例：「たーだいま」→「ただいま」。
+   * 紐付けは個人辞書（端末側の辞書が正本）への登録であり、
+   * 意味の出所は既存エントリの gloss そのものである。
+   */
+  private tryResolveUnknownTermVariant(gap: KnowledgeGap): { target: string; variant: string } | null {
+    const target = (gap.identity?.target || '').trim();
+    if (!target || target.length < 2) return null;
+    if (japaneseDictionaryService.lookup(target).some((entry) => !!entry.gloss)) return null;
+    const variants = new Set<string>();
+    const withoutLongMark = target.replace(/ー/g, '');
+    if (withoutLongMark && withoutLongMark !== target) variants.add(withoutLongMark);
+    const collapsedVowels = target.replace(/([あいうえお])\1+/g, '$1');
+    if (collapsedVowels !== target) variants.add(collapsedVowels);
+    for (const variant of variants) {
+      const glossed = japaneseDictionaryService.lookup(variant).find((entry) => !!entry.gloss);
+      if (!glossed?.gloss) continue;
+      japaneseDictionaryService.addPersonal(target, {
+        lemma: variant,
+        gloss: glossed.gloss,
+        reading: glossed.reading,
+        pos: glossed.pos,
+        aliases: [variant],
+      });
+      knowledgeGapService.markResolved(gap.id);
+      systemLogger.info('SELF_IMPROVEMENT', `📖 [表記揺れ] 「${target}」を既知の語「${variant}」へ紐付けて意味を共有しました (gap=${gap.id})`);
+      return { target, variant };
+    }
+    return null;
+  }
+
   public async researchGap(gap: KnowledgeGap, options?: {
     forceRoute?: ResearchRoute;
     requireFresh?: boolean;
@@ -542,6 +588,12 @@ export class ResearchService {
     continuationRound?: number;
     // P418: SearXNG gate lane, threaded to every search pass below.
     lane?: SearchLane;
+    // P2005: 背景タスクからの調査かどうか。true のときだけ会話
+    // 優先の譲り（パス開始・ページ間の打ち切り）が効く。会話の
+    // 応答経路からの調査（unknownResearchConversationBridge）は
+    // 渡さない＝ゲートしない（会話自身の調査を会話優先で止める
+    // ことはしない）。
+    backgroundWork?: boolean;
     // P439: 候補生成の不足記録から来た研究の焦点（不足スロット名・対象
     // ファイル）。ある場合はスロット向けの材料探索クエリを1本足す。
     gapFocus?: GapFocusMaterialInput;
@@ -646,6 +698,12 @@ export class ResearchService {
       queryPlan.policy.maxQueriesPerPlan,
       adaptive ? Math.max(requestedPasses, queryPlan.queries.length) : Math.min(3, requestedPasses),
     );
+    // P2005: 未知語の意味調査は1回の呼び出しで最大3パスまで
+    // （計画が何パスあっても）。残りは継続ラウンド側で回すが、
+    // そちらにも回数上限がある（UNKNOWN_TERM_MAX_CONTINUATION_ROUNDS）。
+    const passLimit = gap.type === 'UNKNOWN_TERM'
+      ? Math.min(invocationPassLimit, UNKNOWN_TERM_MAX_PASSES_PER_INVOCATION)
+      : invocationPassLimit;
     const maxPagesPerPass = Math.max(1, Math.min(3, options?.maxPagesPerPass ?? 2));
     // P440 D6: 試行済み戦略を避けて経路を選ぶ（ローテーション）。
     // 強制経路の場合は記録しない。
@@ -839,22 +897,82 @@ export class ResearchService {
       // 示している間は、調査を回しても検索層で止まるだけなので、
       // 計画段で証拠待ちに倒す。診断は彼女自身の結論であり、
       // それに従って行動を変えることが「活用」である。
-      let liveSearchDiagnosis: string | null = null;
-      try {
-        const diagnosis = autonomousSearchService.getSearchSelfDiagnosis();
-        if (
-          (diagnosis.cause === 'UPSTREAM_SUSPENDED' || diagnosis.cause === 'BUDGET_EXHAUSTED') &&
-          (!diagnosis.until || diagnosis.until > Date.now())
-        ) {
-          liveSearchDiagnosis = `${diagnosis.cause}: ${diagnosis.detail}`;
+      // P2005: 診断の読みを関数化し、パスごとに読み直す。従来は
+      // ループ前の一度きりだったため、途中でレート制限（429・
+      // エンジン停止）が立っても残りのパスが回り続けていた。
+      const readLiveSearchDiagnosis = (): string | null => {
+        try {
+          const diagnosis = autonomousSearchService.getSearchSelfDiagnosis();
+          if (
+            (diagnosis.cause === 'UPSTREAM_SUSPENDED' || diagnosis.cause === 'BUDGET_EXHAUSTED') &&
+            (!diagnosis.until || diagnosis.until > Date.now())
+          ) {
+            return `${diagnosis.cause}: ${diagnosis.detail}`;
+          }
+        } catch {
+          // 診断が読めなければ通常運転を続ける。
         }
-      } catch {
-        // 診断が読めなければ通常運転を続ける。
+        return null;
+      };
+      let liveSearchDiagnosis: string | null = readLiveSearchDiagnosis();
+
+      // P2005: 表記揺れの軽い解決。未知語が既知の語の表記揺れ
+      // （長音の有無・母音の重なり）なら、全開の調査をかけず、
+      // 個人辞書へ紐付けて意味を共有し、gap を解消して返す。
+      if (gap.type === 'UNKNOWN_TERM') {
+        const variantResolution = this.tryResolveUnknownTermVariant(gap);
+        if (variantResolution) {
+          return {
+            gapId: gap.id,
+            results: [],
+            route: 'LOCAL_CLAIM',
+            routes: ['LOCAL_CLAIM'],
+            localClaimIds,
+            learnedTermComponentClaims,
+            learnedSemanticComponentClaims,
+            performed: false,
+            evidence,
+            claimIds,
+            resolved: true,
+            outcome: 'EVIDENCE_FOUND',
+            verification,
+            summary,
+            roundsCompleted: 0,
+            continuationAvailable: false,
+            continuationReason: 'VARIANT_RESOLVED',
+            nextQuery,
+            researchQuery: baseQuery,
+            continuationRound,
+            reason: `表記揺れ「${variantResolution.target}」は既知の語「${variantResolution.variant}」の変形として辞書へ紐付け、意味を共有しました。`,
+          };
+        }
       }
 
-      for (let pass = 0; pass < invocationPassLimit; pass++) {
+      // P2005: 未知語の継続ラウンド上限。これを超えたら今回は
+      // 検索を発射せず、継続不可で返す（gap は開いたまま残り、
+      // 後の新鮮な dispatch で再挑戦できる＝駐車）。
+      let roundLimitReached = false;
+      if (gap.type === 'UNKNOWN_TERM' && continuationRound >= UNKNOWN_TERM_MAX_CONTINUATION_ROUNDS) {
+        roundLimitReached = true;
+        systemLogger.info('SELF_IMPROVEMENT', `🔎 [調査上限] 未知語「${gap.identity?.target || gap.query}」の継続ラウンドが上限（${UNKNOWN_TERM_MAX_CONTINUATION_ROUNDS}）に達したため、今回は調査を駐車します (gap=${gap.id})`);
+      }
+
+      for (let pass = 0; pass < passLimit && !roundLimitReached; pass++) {
+        if (pass > 0) {
+          const refreshedDiagnosis = readLiveSearchDiagnosis();
+          if (refreshedDiagnosis) liveSearchDiagnosis = refreshedDiagnosis;
+        }
         if (liveSearchDiagnosis) {
           systemLogger.info('SELF_IMPROVEMENT', `🩺 [自己診断を活用] 検索基盤の自己診断（${liveSearchDiagnosis}）のため、この調査は証拠待ちにします`);
+          break;
+        }
+        // P2005: 会話優先ゲート（背景調査のみ）。パス境界で会話
+        // 優先が立っていたら、残りのパスを継続ラウンドへ回して
+        // ここで譲る。
+        if (options?.backgroundWork && conversationPriorityService.isConversationPriorityActive()) {
+          continuationAvailable = true;
+          continuationReason = 'CONVERSATION_PRIORITY';
+          systemLogger.info('SELF_IMPROVEMENT', `💬 [会話優先] 背景調査を次のサイクルへ回します (pass=${pass + 1}, gap=${gap.id})`);
           break;
         }
         roundsCompleted = pass + 1;
@@ -961,8 +1079,18 @@ export class ResearchService {
           queryPlan.status === 'READY' &&
           queryPlan.queries[pass]?.intentType === 'COUNTEREVIDENCE';
 
+        // P2005: ページ処理（グラフ構築＋理解＋用語学習）は同期
+        // の塊なので、ページの合間に時間予算で譲る。背景調査で
+        // 会話優先が立ったら残りのページは次サイクルへ回す。
+        const pageBudget = new MainThreadBudget(24);
+        let priorityStopped = false;
         for (const page of readResults) {
           if (!page.success || !page.text.trim()) continue;
+          await pageBudget.yieldIfExceeded();
+          if (options?.backgroundWork && conversationPriorityService.isConversationPriorityActive()) {
+            priorityStopped = true;
+            break;
+          }
           const itemSource = String(page.result.source || '').toLowerCase();
           const sourceProvider = itemSource.includes('searxng')
             ? 'searxng'
@@ -976,7 +1104,7 @@ export class ResearchService {
           // per-source graph before recording evidence, so claims
           // can come from anywhere in the page and the page stays
           // traversable for later research on the same source.
-          const pageGraphBuild = sourcePageGraphService.buildFromPage({
+          const pageGraphBuild = await sourcePageGraphService.buildFromPage({
             url: page.url,
             title: page.result.title,
             text: page.text,
@@ -1168,8 +1296,19 @@ export class ResearchService {
           }
         }
 
+        // P2005: 会話優先でページ処理を打ち切った場合は、この
+        // パスの残り（抜粋の証拠化・計画前進）も次サイクルへ回す。
+        if (priorityStopped) {
+          continuationAvailable = true;
+          continuationReason = 'CONVERSATION_PRIORITY';
+          systemLogger.info('SELF_IMPROVEMENT', `💬 [会話優先] ページ処理の途中で背景調査を譲りました (pass=${pass + 1}, gap=${gap.id})`);
+          break;
+        }
 
         for (const result of results) {
+        // P2005: 抜粋の証拠化も件数が多いと同期の塊になるため、
+        // 同じ予算で合間に譲る。
+        await pageBudget.yieldIfExceeded();
         const record = evidenceService.recordWebEvidence({
           title: result.title,
           snippet: result.snippet,
@@ -1314,12 +1453,19 @@ export class ResearchService {
           break;
         }
 
-        continuationAvailable = adaptive && pass + 1 >= invocationPassLimit;
+        continuationAvailable = adaptive && pass + 1 >= passLimit;
         continuationReason = continuationAvailable
           ? 'NEXT_CORE_CYCLE_REQUIRED'
           : 'INSUFFICIENT_VERIFICATION';
 
         if (!adaptive) break;
+      }
+
+      // P2005: 継続ラウンド上限で駐車した場合は、継続理由を
+      // 上限到達として確定させる（汎用の不十分理由に化けない）。
+      if (roundLimitReached) {
+        continuationAvailable = false;
+        continuationReason = 'RESEARCH_ROUND_LIMIT';
       }
 
       /*
@@ -1390,7 +1536,7 @@ export class ResearchService {
           ? 'INSUFFICIENT_SEARCH'
           : continuationReason === 'INSUFFICIENT_VERIFICATION'
             ? 'INSUFFICIENT_VERIFICATION'
-            : continuationReason === 'NO_NEW_EVIDENCE' || continuationReason === 'LOW_INFORMATION_GAIN'
+            : continuationReason === 'NO_NEW_EVIDENCE' || continuationReason === 'LOW_INFORMATION_GAIN' || continuationReason === 'RESEARCH_ROUND_LIMIT'
             ? 'INSUFFICIENT_SEARCH'
             : hasAnyResults
               ? (coverageSatisfied ? 'NOT_FOUND_AFTER_COVERAGE' : 'INSUFFICIENT_SEARCH')

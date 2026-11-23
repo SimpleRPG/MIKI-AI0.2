@@ -12,6 +12,7 @@ import { worldModelService } from '../../selfAwareness/services/worldModelServic
 import { selfImprovementService } from '../../improvement/services/selfImprovementService';
 import { selfImprovementIngressService } from '../../core/services/selfImprovementIngressService';
 import { systemLogger } from '../../../services/systemLogger';
+import { userActivityService } from '../../../services/userActivityService';
 import { calculateDomainVector, calculateCosineSimilarity } from '../../../utils/memoryRetrieval';
 import { nativeBackgroundService } from './nativeBackgroundService';
 import { nativeWorkManagerService } from './nativeWorkManagerService';
@@ -446,6 +447,9 @@ export class BackgroundWorkerService {
    */
   public recordUserActivity(): void {
     this.lastUserActivityTimestamp = Date.now();
+    // P2005: 会話優先の判定材料として葉レジストリにも刻む
+    // （自律ループ・調査側は循環回避のためこちらを参照する）。
+    userActivityService.recordUserActivity();
     this.isUserIdle = false;
     if (this.currentSleepState === 'deep') {
       this.abortDeepSleepExecution('ユーザーのチャット操作が検知されたため、深い睡眠処理を安全に中断しました');
@@ -457,6 +461,8 @@ export class BackgroundWorkerService {
    */
   public setChatGenerating(isGenerating: boolean): void {
     this.isChatGenerating = isGenerating;
+    // P2005: 会話生成中フラグを葉レジストリにも刻む。
+    userActivityService.setConversationBusy(isGenerating);
     if (isGenerating) {
       this.recordUserActivity();
       if (this.currentSleepState === 'deep' || this.isExecutingNow) {

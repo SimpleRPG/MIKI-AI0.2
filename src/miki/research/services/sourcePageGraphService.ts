@@ -1,6 +1,7 @@
 import { storageService} from '../../../services/storageService';
 import { systemLogger} from '../../../services/systemLogger';
 import { canonicalSha256Object} from '../../core/services/canonicalSha256Service';
+import { MainThreadBudget} from '../../core/services/conversationPriorityService';
 import { contentTermsFromTokens} from './japaneseAnalysisService';
 import { japaneseAnalysisCompositionService} from '../../conversation/services/japaneseAnalysisCompositionService';
 import { lexicalRelationService} from '../../memory/services/lexicalRelationService';
@@ -162,12 +163,12 @@ storageService.setItem(STORAGE_KEY, JSON.stringify({ version: 1, graphs}));
 } catch { /* persistence is best-effort; the in-memory graph still serves this session */}
 }
 
-public buildFromPage(params: {
+public async buildFromPage(params: {
 url: string;
 title: string;
 text: string;
 questionTerms?: string[];
-}): { graph: SourcePageGraph; relevantStatements: SourcePageRelevantStatement[]} {
+}): Promise<{ graph: SourcePageGraph; relevantStatements: SourcePageRelevantStatement[]}> {
 this.load();
 const text = (params.text || '').trim();
 const pageId = `page_${canonicalSha256Object({ url: params.url}).slice(0, 20)}`;
@@ -176,8 +177,14 @@ try { host = new URL(params.url).hostname.toLowerCase().replace(/^www\./, '');} 
 const rawSections = splitIntoSections(text);
 const sections: SourcePageSection[] = [];
 const statements: SourcePageStatement[] = [];
-rawSections.forEach((raw, sectionIndex) => {
-if (statements.length >= MAX_STATEMENTS_PER_PAGE) return;
+// P2005: セクション毎の形態素解析は同期の塊で、長いページ1件で
+// 実機のメインスレッドを数十秒塞いだ。セクションの合間に時間
+// 予算でイベントループへ返し、入力と描画を通す。
+const sectionBudget = new MainThreadBudget(24);
+for (let sectionIndex = 0; sectionIndex < rawSections.length; sectionIndex++) {
+const raw = rawSections[sectionIndex];
+if (statements.length >= MAX_STATEMENTS_PER_PAGE) break;
+await sectionBudget.yieldIfExceeded();
 const sectionId = `${pageId}:s${sectionIndex}`;
 let contentTerms: string[] = [];
 try {
@@ -192,7 +199,7 @@ statements.push({ id, text: item.text, kind: item.kind, sectionId});
 statementIds.push(id);
 });
 sections.push({ id: sectionId, heading: raw.heading, contentTerms, statementIds});
-});
+}
 const graph: SourcePageGraph = {
 pageId,
 url: params.url,
