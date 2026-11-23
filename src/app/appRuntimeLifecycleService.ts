@@ -101,6 +101,18 @@ class AppRuntimeLifecycleService {
       },
       { name: 'capabilityLearningService.initialize', run: () => capabilityLearningService.initialize() },
       { name: 'dictionaryBootstrapService.initialize', run: () => dictionaryBootstrapService.initialize() },
+      {
+        name: 'bridgeExchangeService.runLightIntake',
+        run: async () => {
+          // P2004: 橋の返送取り込みは起動時にも即時1回（段梯子の
+          // 最上段）。動的 import で起動時の静的グラフに乗せない
+          // （P1122 の作法）。失敗しても起動は止めない。
+          try {
+            const m = await import('../miki/core/services/bridgeExchangeService');
+            void m.bridgeExchangeService.runLightIntake({ immediate: true });
+          } catch { /* 橋は補助線 */ }
+        },
+      },
       { name: 'initializeChapter69to90', run: async () => { const m = await import('../miki'); await m.initializeChapter69to90(); } },
       {
         name: 'componentArtifactStoreService.reconcile',

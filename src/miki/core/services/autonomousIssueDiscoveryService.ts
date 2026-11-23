@@ -450,7 +450,22 @@ class AutonomousIssueDiscoveryService{
      // keys the capability revalidation loop writes and reads
      // (autonomousKnowledgeGapId / gapId). Without them the loop could not
      // see discovery-dispatched tasks and dispatched the same gap twice.
-     ...(issue.kind==='KNOWLEDGE_GAP'?{gapId:issue.sourceId,autonomousKnowledgeGapId:issue.sourceId}:{}),
+     // P2004: 調査への経路決定（adaptiveRoutePlannerService）は
+     // payload.operation === 'EXECUTE_AUTONOMOUS_SEARCH' の場合だけ
+     // research 分類へ進む。再検証ループの投入形に operation / query /
+     // useSearch / requiredEvidence まで揃えないと、知識不足タスクは
+     // CORE 循環で ASSESS_DOMAIN だけを回し、調査に届かないまま
+     // 証拠0件で完了ゲートに落ち続けていた（行き止まりの実因）。
+     ...(issue.kind==='KNOWLEDGE_GAP'
+      ?(()=>{const gap=knowledgeGapService.getById(issue.sourceId);return {
+        gapId:issue.sourceId,
+        autonomousKnowledgeGapId:issue.sourceId,
+        operation:'EXECUTE_AUTONOMOUS_SEARCH',
+        query:gap?.query||issue.title,
+        useSearch:true,
+        requiredEvidence:gap?[...gap.requiredEvidence]:[],
+       };})()
+      :{}),
      // P431 R2: a CLAIM_CONTRADICTION issue's sourceId IS the claim id
      // (recordContradiction is called with it), so the claim context
      // the direct-submit path carries (domainIntegrationBootstrap:

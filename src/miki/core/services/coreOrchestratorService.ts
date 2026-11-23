@@ -1905,7 +1905,12 @@ class CoreOrchestratorService {
   if(finalTask.status==='ROUTING'){
    const hasError=unresolvedTaskErrors(finalTask).length>0;
    const finalStatus=hasError?'FAILED':cycleBudget>=cycleLimit?'PAUSED':'WAITING';
-   taskBlackboardService.setStatus(taskId,finalStatus);
+   // P2004: サイクル予算による一時停止には理由を残す。理由の無い
+   // PAUSED は機械的な停止かどうかを判定できず、所有者不在時の
+   // 復旧・再キュー条件（isAutoResumablePauseReason）から外れて
+   // 行き止まりになっていた。
+   if(finalStatus==='PAUSED') taskBlackboardService.pause(taskId,'CORE_CYCLE_BUDGET_EXHAUSTED');
+   else taskBlackboardService.setStatus(taskId,finalStatus);
    if(finalStatus==='PAUSED') taskBlackboardService.append(taskId,'CHECKPOINT','core','coreCycleBudgetExhausted',{cycle:cycles,cycleBudget,cycleLimit,resumeRequired:true});
    const completion=adaptiveRoutePlannerService.assessCompletion(finalTask);
    const waitingResult=this.buildIncompleteCirculationResult(finalTask,cycles,dispatched,completion);

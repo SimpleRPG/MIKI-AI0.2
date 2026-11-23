@@ -1,7 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { selfImprovementIngressService } from './selfImprovementIngressService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
-import { taskBlackboardService } from './taskBlackboardService';
+import { taskBlackboardService, isAutoResumablePauseReason } from './taskBlackboardService';
 import type { ChangeSetID } from '../../../types/evidenceSelfImprovementTypes';
 import type { AutonomousImplementationPlan } from './autonomousCandidatePreparationService';
 export type ImprovementRunType='AUTONOMOUS_DISCOVERY'|'EXTERNAL_DIRECTIVE'|'USER_REQUEST'|'EXECUTION_FAILURE'|'REVALIDATION';
@@ -99,8 +99,11 @@ class ImprovementIntakeRouterService{
     raw.issueKind!==input.issueKind||
     raw.fingerprint!==input.fingerprint||
     raw.sourceId!==input.issueId||
-    raw.orchestrationMode!=='SELF_IMPROVEMENT_WORKER'||
-    raw.kind!=='SELF_IMPROVEMENT'||
+    // P2004: 知識不足タスクは再検証形（SYSTEM_TASK /
+    // AUTONOMOUS_KNOWLEDGE_GAP）で作られるため、復旧の同一性判定
+    // では両形を受ける。
+    !((raw.orchestrationMode==='SELF_IMPROVEMENT_WORKER'&&raw.kind==='SELF_IMPROVEMENT')
+      ||(raw.orchestrationMode==='AUTONOMOUS_KNOWLEDGE_GAP'&&raw.kind==='SYSTEM_TASK'&&raw.issueKind==='KNOWLEDGE_GAP'))||
     typeof raw.runId!=='string'||!raw.runId.trim()||
     typeof raw.sourceSnapshotSha256!=='string'||!raw.sourceSnapshotSha256.trim()||
     task.goal.trim()!==input.objective.trim())return undefined;
@@ -111,7 +114,7 @@ class ImprovementIntakeRouterService{
   const computedSourceHash=await this.sha(JSON.stringify({sourceId,objective:input.objective,payload:recoveredPayload}));
   const previous=this.runs.get(runId);
   if(previous&&(previous.runType!=='AUTONOMOUS_DISCOVERY'||previous.sourceId!==sourceId||previous.payload.issueId!==input.issueId||previous.payload.issueKind!==input.issueKind||previous.payload.fingerprint!==input.fingerprint))return undefined;
-  if(task.status==='PAUSED'&&task.pausedReason!=='SELF_IMPROVEMENT_QUEUED')return undefined;
+  if(task.status==='PAUSED'&&!isAutoResumablePauseReason(task.pausedReason))return undefined;
   const payload=previous?{...previous.payload}:recoveredPayload;
   const sourceHash=previous?.sourceHash||computedSourceHash;
   const changeSetId=(typeof raw.changeSetId==='string'?raw.changeSetId:previous?.changeSetId) as ChangeSetID|undefined;
@@ -119,7 +122,7 @@ class ImprovementIntakeRouterService{
     ?Math.max(0,Math.min(100,raw.priority))
     :input.priority;
   const recoverable=task.status==='OPEN'||
-    (task.status==='PAUSED'&&task.pausedReason==='SELF_IMPROVEMENT_QUEUED');
+    (task.status==='PAUSED'&&isAutoResumablePauseReason(task.pausedReason));
   let recovered:ImprovementIntakeRun={
     runId,
     changeSetId,

@@ -1,7 +1,7 @@
 import { storageService } from '../../../services/storageService';
 import { systemLogger, errorHeadline } from '../../../services/systemLogger';
 import { coreTaskIngressService } from './coreTaskIngressService';
-import { taskBlackboardService } from './taskBlackboardService';
+import { taskBlackboardService, isAutoResumablePauseReason } from './taskBlackboardService';
 import { evidenceQualityGateService } from './evidenceQualityGateService';
 import { resourceGovernanceService } from '../../safety/services/resourceGovernanceService';
 import { requiredAssetAcquisitionService } from './requiredAssetAcquisitionService';
@@ -16,6 +16,7 @@ import { reviewReflectionService } from '../../selfAwareness/services/reviewRefl
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { associationGraphService } from '../../memory/services/associationGraphService';
 import { knowledgeConsolidationService } from '../../selfAwareness/services/knowledgeConsolidationService';
+import { knowledgeGapService } from '../../unknown/services/knowledgeGapService';
 
 export type AutonomousLoopStatus = 'IDLE' | 'RUNNING' | 'WAITING_RESOURCE' | 'WAITING_EVIDENCE' | 'PAUSED' | 'FAILED';
 
@@ -144,6 +145,27 @@ function normalizeDiscoveryIssuePayload(payload:Record<string,unknown>|undefined
     delete normalized.kind;
   }
   return normalized;
+}
+
+// P2004: 知識不足（KNOWLEDGE_GAP）の発見リクエストかどうか。発見
+// dispatch が再検証ループと同じリンクキー（gapId /
+// autonomousKnowledgeGapId）を刻んだものだけを対象にする。
+function isKnowledgeGapDiscoveryPayload(payload:Record<string,unknown>|undefined):boolean{
+  if(!payload||payload.issueKind!=='KNOWLEDGE_GAP')return false;
+  return (typeof payload.autonomousKnowledgeGapId==='string'&&payload.autonomousKnowledgeGapId.length>0)
+    ||(typeof payload.gapId==='string'&&payload.gapId.length>0);
+}
+
+// P2004: ループが作る CORE タスクの形。知識不足リクエストは再検証
+// ループと同じ形（SYSTEM_TASK / AUTONOMOUS_KNOWLEDGE_GAP / 背景
+// 実行）にする。SELF_IMPROVEMENT 形ではプランナ
+// （adaptiveRoutePlannerService.plan）が候補生成の計画へ固定され、
+// payload.operation が EXECUTE_AUTONOMOUS_SEARCH でも調査へ
+// 進まない（実証済み: ASSESS_DOMAIN の繰り返しで NO_PROGRESS）。
+function coreTaskShape(payload:Record<string,unknown>|undefined):Record<string,unknown>{
+  return isKnowledgeGapDiscoveryPayload(payload)
+    ? {orchestrationMode:'AUTONOMOUS_KNOWLEDGE_GAP',kind:'SYSTEM_TASK',background:true,executionPriority:'BACKGROUND'}
+    : {orchestrationMode:'SELF_IMPROVEMENT_WORKER',kind:'SELF_IMPROVEMENT'};
 }
 
 // P453: 教師（外部AI）から返ってきた素材で生まれた run／キュー項目の
@@ -358,8 +380,7 @@ class AutonomousSelfImprovementLoopService {
       runType:meta.runType,
       sourceId:meta.sourceId,
       priority:meta.priority,
-      orchestrationMode:'SELF_IMPROVEMENT_WORKER',
-      kind:'SELF_IMPROVEMENT'
+      ...coreTaskShape(normalizedPayload)
     });
     if(!orphanedTask||task.status==='OPEN'){
       taskBlackboardService.pause(task.taskId,'SELF_IMPROVEMENT_QUEUED');
@@ -386,7 +407,7 @@ class AutonomousSelfImprovementLoopService {
     return taskBlackboardService.list(200).find(task=>{
       if(task.goal.trim()!==trigger.trim())return false;
       if(task.status!=='OPEN'&&task.status!=='PAUSED')return false;
-      if(task.status==='PAUSED'&&task.pausedReason!=='SELF_IMPROVEMENT_QUEUED')return false;
+      if(task.status==='PAUSED'&&!isAutoResumablePauseReason(task.pausedReason))return false;
       const payloadEntry=task.entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload');
       const value=payloadEntry?.value;
       if(!value||typeof value!=='object'||Array.isArray(value))return false;
@@ -394,8 +415,11 @@ class AutonomousSelfImprovementLoopService {
       return payload.runId===meta.runId&&
         payload.runType===meta.runType&&
         payload.sourceId===meta.sourceId&&
-        payload.orchestrationMode==='SELF_IMPROVEMENT_WORKER'&&
-        payload.kind==='SELF_IMPROVEMENT'&&
+        // P2004: 知識不足タスクは再検証形（SYSTEM_TASK /
+        // AUTONOMOUS_KNOWLEDGE_GAP）で作られるため、復旧の同一性
+        // 判定では両形を受ける。
+        ((payload.orchestrationMode==='SELF_IMPROVEMENT_WORKER'&&payload.kind==='SELF_IMPROVEMENT')
+          ||(payload.orchestrationMode==='AUTONOMOUS_KNOWLEDGE_GAP'&&payload.kind==='SYSTEM_TASK'&&payload.issueKind==='KNOWLEDGE_GAP'))&&
         payload.issueId===meta.payload?.issueId&&
         payload.fingerprint===meta.payload?.fingerprint;
     });
@@ -712,6 +736,15 @@ class AutonomousSelfImprovementLoopService {
         this.state.retryAt=undefined;
         const normalizedPayload=normalizeDiscoveryIssuePayload(request.payload);
         if(normalizedPayload)request.payload=normalizedPayload;
+        // P2004: 知識不足リクエストの対象 gap が（背景の再検証などで）
+        // 既に解消していれば、実行せずに完了とする。タスクの完了と
+        // gap の解消が結び付いていなかったため、解消済みの仕事でも
+        // 空回りして試行を消費し続けていた。
+        const linkedGapId = this.linkedKnowledgeGapId(request);
+        if (linkedGapId && knowledgeGapService.getById(linkedGapId)?.status === 'RESOLVED') {
+          this.completeCurrent('KNOWLEDGE_GAP_RESOLVED');
+          continue;
+        }
         // P428: the step record used to carry only the request id,
         // so a request that was never selected (queue starvation)
         // left no trace in the runtime log and its taskId never
@@ -781,7 +814,7 @@ class AutonomousSelfImprovementLoopService {
         const workflow = request.taskId
           ? await this.resumeOwnedTask(request.taskId)
           : await coreTaskIngressService.submit({
-              kind: 'SELF_IMPROVEMENT',
+              kind: isKnowledgeGapDiscoveryPayload(request.payload) ? 'SYSTEM_TASK' : 'SELF_IMPROVEMENT',
               goal: request.trigger,
               source: 'core',
               payload: {
@@ -793,8 +826,7 @@ class AutonomousSelfImprovementLoopService {
               runType: request.runType,
               sourceId: request.sourceId,
               priority: request.priority,
-              orchestrationMode: 'SELF_IMPROVEMENT_WORKER',
-              kind: 'SELF_IMPROVEMENT',
+              ...coreTaskShape(request.payload),
               },
             });
         if (!this.isGenerationCurrent(generation)) return;
@@ -845,6 +877,19 @@ class AutonomousSelfImprovementLoopService {
           return value.operationClass === 'BUSINESS';
         });
         const evidenceGateRequired = hasBusinessResult;
+        // P2004: 今回の実行（調査 dispatch を含む）で対象 gap が解消
+        // した場合は、汎用の証拠ゲートより先に「gap の解消＝この
+        // リクエストの成果」として完了に結ぶ。
+        if (linkedGapId && knowledgeGapService.getById(linkedGapId)?.status === 'RESOLVED') {
+          this.finishRecoverySubgoals(
+            workflow.task.taskId,
+            'RESOLVED',
+            'KNOWLEDGE_GAP_RESOLVED',
+            quality.evidenceIds,
+          );
+          this.completeCurrent('KNOWLEDGE_GAP_RESOLVED');
+          continue;
+        }
         if (workflow.task.status === 'COMPLETED' && (!evidenceGateRequired || quality.passed)) {
           this.finishRecoverySubgoals(
             workflow.task.taskId,
@@ -1255,6 +1300,19 @@ class AutonomousSelfImprovementLoopService {
    * undefined. Only the current execution's entries are inspected so
    * a stale outage in the task history cannot reclassify later pauses.
    */
+  /**
+   * P2004: リクエストに結び付いた知識 gap の id。発見 dispatch が
+   * 再検証ループと同じ payload キー（gapId / autonomousKnowledgeGapId）
+   * で結んだものだけを対象にする（推測で結ばない）。
+   */
+  private linkedKnowledgeGapId(request: AutonomousImprovementRequest): string | undefined {
+    const payload = request.payload;
+    if (!payload) return undefined;
+    if (typeof payload.autonomousKnowledgeGapId === 'string' && payload.autonomousKnowledgeGapId) return payload.autonomousKnowledgeGapId;
+    if (typeof payload.gapId === 'string' && payload.gapId) return payload.gapId;
+    return undefined;
+  }
+
   private researchUnavailableOutcomeThisExecution(
     task: { entries: Array<{ domain: string; kind: string; value: unknown; evidenceIds?: string[] }> },
     entriesBeforeExecution: number,

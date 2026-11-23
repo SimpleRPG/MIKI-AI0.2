@@ -75,6 +75,13 @@ document.addEventListener('visibilitychange', () => {
     systemLogger.recordRuntimeBreadcrumb('APP_VISIBILITY_HIDDEN', { visibility: document.visibilityState });
     flushOnHide();
   }
+  if (document.visibilityState === 'visible') {
+    // P2004: 前景復帰時に橋の返送取り込みを即時1回（段梯子の最上段。
+    // 周期の管理は bridgeExchangeService 側）。
+    void import('./miki/core/services/bridgeExchangeService')
+      .then((m) => m.bridgeExchangeService.runLightIntake({ immediate: true }))
+      .catch(() => undefined);
+  }
 });
 window.addEventListener('pagehide', () => {
   systemLogger.recordRuntimeBreadcrumb('APP_PAGEHIDE', { visibility: document.visibilityState });

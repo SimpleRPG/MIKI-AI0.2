@@ -401,6 +401,12 @@ export class KnowledgeGapService {
   }
 
   public markResearching(id: string): KnowledgeGap | undefined {
+    // P2004: RESOLVED は detect/merge でも終端扱い（再検出は新規 gap を
+    // 作る）。調査の継続パスが解決済み gap を RESEARCHING へ戻すと、
+    // 学習で意味が届いた後も「未解決」に見え続け、タスク側の完了
+    // 接続が成立しない。解決済みなら状態を変えない。
+    const current = this.getById(id);
+    if (current?.status === 'RESOLVED') return current;
     return this.update(id, { status: 'RESEARCHING', lastResearchAt: Date.now(), attempts: (this.getById(id)?.attempts || 0) + 1 });
   }
 

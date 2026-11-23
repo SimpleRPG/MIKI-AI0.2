@@ -42,6 +42,9 @@ import { sha256HexFromText } from './canonicalSha256Service';
  *    本サービスへも同じクエリを投げる（端末 SearXNG と VM の両方へ）。
  *  - 定期巡回: backgroundWorkerService の背景サイクルが
  *    runBackgroundExchange() を呼ぶ（返送取り込み・ログ返送・同期送出）。
+ *  - 軽い取り込み: アプリ起動時・前景復帰時と段梯子タイマーが
+ *    runLightIntake() を呼ぶ（返送取り込みのみ。P2004 で深い
+ *    サイクル相乗りから分離）。
  */
 
 export type BridgeEnvelopeKind = 'research' | 'parts' | 'fieldtest' | 'teacher' | 'sync' | 'log';
@@ -211,6 +214,17 @@ const MAX_FIELD_TEST_RECORDS = 50;
 
 /** ログ返送の定期間隔（設計メモ: 定期トリガー。電池配慮で日次級）。 */
 export const BRIDGE_LOG_EXPORT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/**
+ * P2004: 軽い取り込み（pollInbox のみ）の段梯子周期。前景にいる間は
+ * 約10分、背景では約30分。起動時・前景復帰時は即時（runLightIntake
+ * の immediate）。深い背景サイクルの電池適応（15〜60分）は重い仕事
+ * のためのもので、取り込み自体は端末内サーバーへの軽い読みに
+ * 過ぎないため、ここでは梯子を独立に持つ。
+ */
+export const BRIDGE_LIGHT_INTAKE_FOREGROUND_MS = 10 * 60 * 1000;
+export const BRIDGE_LIGHT_INTAKE_BACKGROUND_MS = 30 * 60 * 1000;
+const BRIDGE_LIGHT_INTAKE_TICK_MS = 60 * 1000;
+const BRIDGE_LIGHT_INTAKE_IMMEDIATE_DEDUPE_MS = 30 * 1000;
 /** ログ束の上限（プロトコル: 1束 5MB）。本文組み立ては余裕を見て 4.5MB で切る。 */
 const LOG_BUNDLE_MAX_BYTES = 5 * 1024 * 1024;
 const LOG_TEXT_BUDGET_BYTES = Math.floor(4.5 * 1024 * 1024);
@@ -269,6 +283,9 @@ class BridgeExchangeService {
   };
   private fieldTestRunners = new Map<string, BridgeFieldTestRunner>();
   private transportDownLogged = false;
+  private lightIntakeRunning = false;
+  private lastLightIntakeAt = 0;
+  private lightIntakeTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.load();
@@ -1038,6 +1055,60 @@ class BridgeExchangeService {
   // ------------------------------------------------------------------
   // 背景サイクル用の一括交換（backgroundWorkerService から呼ばれる）
   // ------------------------------------------------------------------
+  // ------------------------------------------------------------------
+  // 軽い取り込み（P2004）: 返送取り込みだけを深い背景サイクルから分離
+  // ------------------------------------------------------------------
+  /**
+   * 段梯子: 起動時・前景復帰時は即時、前景にいる間は約10分間隔、
+   * 背景では約30分間隔で pollInbox だけを回す。従来は取り込みが
+   * 深いサイクル（電池適応15〜60分＋ユーザー操作中は停止）相乗りで、
+   * 通常使用では長時間止まっていた。ログ返送・同期送出は従来どおり
+   * runBackgroundExchange（深いサイクル）だけが行う。
+   * 背景の30分は WebView の JS が生きている範囲での周期であり、
+   * OS に止められた場合は前景復帰時の即時取り込みで回収する。
+   * 失敗しても呼び出し元へは投げない（橋は補助線）。
+   */
+  public async runLightIntake(options?: { immediate?: boolean }): Promise<BridgePollResult | null> {
+    this.ensureLightIntakeSchedule();
+    if (this.lightIntakeRunning) return null;
+    const now = Date.now();
+    const elapsed = now - this.lastLightIntakeAt;
+    if (options?.immediate) {
+      // 起動と前景復帰が重なっても二重に走らせない。
+      if (elapsed < BRIDGE_LIGHT_INTAKE_IMMEDIATE_DEDUPE_MS) return null;
+    } else if (elapsed < this.lightIntakeIntervalMs()) {
+      return null;
+    }
+    this.lightIntakeRunning = true;
+    this.lastLightIntakeAt = now;
+    try {
+      this.requestCourierNow();
+      return await this.pollInbox();
+    } catch {
+      return null;
+    } finally {
+      this.lightIntakeRunning = false;
+    }
+  }
+
+  private lightIntakeIntervalMs(): number {
+    try {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return BRIDGE_LIGHT_INTAKE_BACKGROUND_MS;
+      }
+    } catch { /* DOM の無い環境では前景扱い */ }
+    return BRIDGE_LIGHT_INTAKE_FOREGROUND_MS;
+  }
+
+  private ensureLightIntakeSchedule(): void {
+    if (this.lightIntakeTimer) return;
+    try {
+      this.lightIntakeTimer = setInterval(() => { void this.runLightIntake(); }, BRIDGE_LIGHT_INTAKE_TICK_MS);
+      const timer = this.lightIntakeTimer as unknown as { unref?: () => void };
+      if (typeof timer.unref === 'function') timer.unref();
+    } catch { /* タイマーが張れない環境では即時発火口だけが働く */ }
+  }
+
   public async runBackgroundExchange(): Promise<BridgeBackgroundResult> {
     // 取り込みの開始時に即時運搬を頼み、新着が in/ へ届く機会を増やす
     // （fire-and-forget。今回の pollInbox に間に合わなくても次回に回る）。

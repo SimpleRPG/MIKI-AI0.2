@@ -7273,10 +7273,45 @@ export class ConversationCoreService {
       return undefined;
     }
     let term: string | undefined;
+    let candidates: string[] = [];
     try {
       const features = utteranceFeatureService.analyze(prompt);
-      term = features.contentTokens.find((t) => t.length >= 2 && !/(?:覚え|分か|知って|忘れ)/.test(t));
+      candidates = features.contentTokens.filter((t) => t.length >= 2 && !/(?:覚え|分か|知って|忘れ)/.test(t));
     } catch { return undefined; }
+    // P2004: この受け口が答えるのは、質問の焦点が特定の語そのもの
+    // である場合だけ。P672（「僕の名前覚えてる？」）の同型事故に
+    // 加え、「こんばんは、それとも初めましてかな？覚えてる？」で
+    // 先頭トークンの挨拶語を語と誤認し、関係質問への応答全体を
+    // 語彙テンプレートに置き換えた事故への対処。焦点の判定根拠は
+    // 次のいずれか: (a) 語が引用符で示されている (b) 「言葉・単語・
+    // 用語・意味」として言及されている (c) その語と記憶動詞の述語
+    // だけからなる短い単独の問いである（語と述語と助詞・句読点を
+    // 除いた残りが空）。挨拶等の FUNCTION 語は内容トークンに混ざって
+    // も語彙確認の対象にしない（(a)(b) の明示がある場合を除く）。
+    // 焦点が定まらなければ、この受け口は答えず、関係・想起など
+    // 本来の受け口へ譲る。
+    const referredAsWord = /(?:言葉|単語|用語|意味)/.test(prompt);
+    const isFunctionToken = (t: string): boolean => {
+      try { return japaneseDictionaryService.lookup(t).some((e: any) => e.pos === 'FUNCTION'); } catch { return false; }
+    };
+    // 「Xって言葉」の枠そのものである名詞（言葉・単語・用語・意味）は、
+    // 引用で示された場合を除き、問われている語ではない。未知語は
+    // 解析で1文字ずつに割れて候補に残らず、枠の名詞だけが残って
+    // 「『言葉』は、まだ知らないです」と答える誤爆があった。
+    const frameWords = new Set(['言葉', '単語', '用語', '意味']);
+    const wordCandidates = candidates.filter((t) => {
+      if (frameWords.has(t) && !prompt.includes(`「${t}」`) && !prompt.includes(`『${t}』`)) return false;
+      return referredAsWord || !isFunctionToken(t);
+    });
+    const remainderAfterFocus = (t: string): string => prompt
+      .split(t).join('')
+      .replace(/(?:覚えた|覚えてる|覚えている|知ってる|知っている|忘れた|忘れて|分かった|わかるようになった|分かるようになった)/g, '')
+      .replace(/[、。，．？?！!・…〜\sってのにはがをへとやねよか]/g, '');
+    term = wordCandidates.find((t) => {
+      if (prompt.includes(`「${t}」`) || prompt.includes(`『${t}』`)) return true;
+      if (referredAsWord) return true;
+      return remainderAfterFocus(t) === '';
+    });
     if (!term) return undefined;
     // P672: 相手の属性の言葉（名前・住所等）は、語彙の確認ではない。
     // 「僕の名前覚えてる？」に「『名前』はまだ知らないです」と

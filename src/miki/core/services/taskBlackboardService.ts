@@ -6,6 +6,21 @@ export type BlackboardEntryKind='INPUT'|'OBSERVATION'|'EVIDENCE'|'CLAIM'|'DECISI
 export interface BlackboardEntry { id:string; taskId:string; kind:BlackboardEntryKind; domain:MikiDomain; key:string; value:unknown; evidenceIds:string[]; createdAt:number; }
 export interface BlackboardTask { taskId:string; title?:string; goal:string; source:MikiDomain; status:BlackboardStatus; revision:number; createdAt:number; updatedAt:number; visitedDomains:MikiDomain[]; pendingDomains:MikiDomain[]; entries:BlackboardEntry[]; pausedReason?:string; resumeCount:number; lastCycle:number; }
 
+/**
+ * P2004: 機械的な一時停止かどうか。キュー待ち・サイクル予算・
+ * 背景予算による停止は、所有者（ループのキュー項目）が失われても
+ * 再キュー・復旧してよい。人為・外部要因の停止（USER_REQUESTED、
+ * FOREGROUND_USER_REQUEST_ACTIVE 等）は含めない。復旧可否の判定は
+ * この関数に一本化し、判定箇所ごとに理由の解釈がずれないように
+ * する。以前はサイクル予算の PAUSED が理由を持たず（setStatus
+ * 経由）、どの復旧条件にも一致しない行き止まりになっていた。
+ */
+export function isAutoResumablePauseReason(pausedReason?: string): boolean {
+  return pausedReason === 'SELF_IMPROVEMENT_QUEUED'
+    || pausedReason === 'CORE_CYCLE_BUDGET_EXHAUSTED'
+    || (typeof pausedReason === 'string' && pausedReason.startsWith('BACKGROUND_BUDGET:'));
+}
+
 function entryRecord(entry:BlackboardEntry):Record<string,unknown>|undefined{
  const value=entry.value;
  return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:undefined;
