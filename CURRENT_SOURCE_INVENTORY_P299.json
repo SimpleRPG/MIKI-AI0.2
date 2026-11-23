@@ -11774,9 +11774,9 @@
     },
     {
       "path": "src/components/ChatPanel.tsx",
-      "bytes": 214693,
-      "lines": 3706,
-      "sha256": "a5bf48f551669f8908293c335be437465011a0b1fbef6f4b65852ca84b41a9b5",
+      "bytes": 215980,
+      "lines": 3721,
+      "sha256": "69a98c60f99cb7446e98226e6343e7b93222f06c02d0d4c987a61f38ee53fbb3",
       "relativeImportCandidates": [
         {
           "line": 82,

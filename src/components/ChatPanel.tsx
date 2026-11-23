@@ -207,6 +207,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   // 同期は onChange からストアへ直接書き、クリアは送信成功時に
   // handleSend がストアと DOM を空にする場合のみ（chatDraftStore
   // のコメント参照）。
+  // P2011: 初期下書きはマウント時に一度だけ確定させる。React 19 の
+  // textarea 更新処理（updateTextarea）は、非制御でも再描画のたびに
+  // defaultValue prop を DOM ノードへ書き込む。defaultValue に
+  // ストアの現在値（入力のたびに変わる）を渡すと、変換中の input
+  // イベントでストアが更新されるたび、次の再描画（systemLogger
+  // 購読で常時発生）が node.defaultValue を書き換え、textarea の
+  // テキスト実体が差し替わって変換が欄に映らなくなっていた
+  // （実機 2026-11-23 23:04：確定・送信は通るが変換中が一切表示
+  // されない。確定済みテキストは dirty フラグで書き換えの影響を
+  // 受けないため、P2009 で「消える」は直り「変換中だけ映らない」
+  // が残った）。useState の初期化子でマウント時点の下書きに固定
+  // すれば、再描画で prop は変わらず、書き込みは同値の no-op に
+  // なる。再マウント（タブ切り替え）では新しい初期化子がストアの
+  // 最新値を読むため、P2006 の復元契約はそのまま保たれる。
+  const [initialDraft] = useState(() => chatDraftStore.getDraft());
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string; type: string; size: number }[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [appliedId, setAppliedId] = useState<string | null>(null);
@@ -3522,7 +3537,7 @@ ${diag.comparisonWithPrevious ? `【連続実行TTFT比較判定】\n${diag.comp
 
           <textarea
             ref={textareaRef}
-            defaultValue={chatDraftStore.getDraft()}
+            defaultValue={initialDraft}
             onChange={(e) => chatDraftStore.setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={`${persona.name}にメッセージを入力...`}
