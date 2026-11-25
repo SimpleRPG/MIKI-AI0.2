@@ -272,6 +272,9 @@ class CompositionDrillService {
     // 生成・探索・（結果経由の）再構成の全部で同じ一覧を使う。
     const resolved = this.resolveExtraParts(extraParts ?? this.snapshotRegisteredParts());
     const effective = resolved.map((p) => ({ name: p.name, arity: p.arity }));
+    // P2014: 後からの再生成・検証が生成時と寸分違わぬ文脈を引けるよう、
+    // 実スナップショットをセッション文脈として台帳側へ残す。
+    codeDrillService.recordSessionContext(seed, effective);
     const tasks = drillTaskGenerationService.generateTasks(seed, count, resolved);
     const results: Array<{ taskId: string; solved: boolean; expression?: string; reason?: string }> = [];
     let solved = 0;
@@ -330,6 +333,8 @@ class CompositionDrillService {
     // 再生成する側）が同じ一覧をそのまま使える。仕様の課題は対象外。
     const resolved = this.resolveExtraParts(extraParts ?? this.snapshotRegisteredParts());
     const effective = resolved.map((p) => ({ name: p.name, arity: p.arity }));
+    // P2014: 自動セッションと同じく、実スナップショットを文脈として残す。
+    codeDrillService.recordSessionContext(seed, effective);
     const exprCount = Math.ceil(count / 2);
     const specCount = count - exprCount;
     const exprTasks = drillTaskGenerationService.generateTasks(seed, exprCount, resolved);

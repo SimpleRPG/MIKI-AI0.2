@@ -41,7 +41,24 @@ export interface CodeDrillAttemptResult {
   evidence: PureExecutionEvidence;
 }
 
+/*
+ * P2014: セッション文脈の記録。式の課題生成はセッション開始時点の
+ * 登録部品スナップショット（extraParts）に依存するため、後から課題を
+ * 再生成して候補を検証する側（梯子ドライバー）が、生成時と寸分違わぬ
+ * 文脈を引けるよう、セッションの実スナップショットを台帳と同じ保存層へ
+ * 残す。記録は名前＋arity だけ（評価器は成果物正本から解決する）。
+ * 記録できなくてもセッション自体は落とさない。
+ */
+export interface CodeDrillSessionContext {
+  seed: number;
+  /** セッション終了時刻（候補の saved_at と対応づけて引くための印） */
+  at: number;
+  extraParts: Array<{ name: string; arity: number }>;
+}
+
 const LEDGER_KEY = 'miki_code_drill_ledger_v1';
+const SESSION_CONTEXTS_KEY = 'miki_drill_session_contexts_v1';
+const SESSION_CONTEXTS_MAX = 300;
 
 class CodeDrillService {
   private loadLedger(): Record<string, CodeDrillTaskRecord> {
@@ -71,6 +88,31 @@ class CodeDrillService {
     ledger[task.taskId] = record;
     this.saveLedger(ledger);
     return { record, evidence };
+  }
+
+  /** P2014: セッションの実スナップショット（解決後の名前＋arity）を文脈として残す。 */
+  public recordSessionContext(seed: number, extraParts: Array<{ name: string; arity: number }>): void {
+    try {
+      const list = this.getSessionContexts();
+      list.push({
+        seed,
+        at: Date.now(),
+        extraParts: (extraParts ?? []).map((p) => ({ name: p.name, arity: p.arity })),
+      });
+      storageService.setItem(SESSION_CONTEXTS_KEY, JSON.stringify(list.slice(-SESSION_CONTEXTS_MAX)));
+    } catch {
+      // 文脈の記録失敗でセッション結果は落とさない
+    }
+  }
+
+  public getSessionContexts(): CodeDrillSessionContext[] {
+    try {
+      const raw = storageService.getJson<CodeDrillSessionContext[]>(SESSION_CONTEXTS_KEY, []);
+      if (!Array.isArray(raw)) return [];
+      return raw.filter((c) => c && typeof c.seed === 'number' && typeof c.at === 'number' && Array.isArray(c.extraParts));
+    } catch {
+      return [];
+    }
   }
 
   public getRecord(taskId: string): CodeDrillTaskRecord | undefined {

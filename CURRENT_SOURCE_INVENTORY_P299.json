@@ -39,8 +39,8 @@
     "trackedPathCountExcludingControlPaths": 1909,
     "sourceFileCount": 1461,
     "ecmascriptSourceFileCountScannedForRelativeImports": 1372,
-    "relativeImportCandidateCount": 5031,
-    "resolvedRelativeImportCandidateCount": 5013,
+    "relativeImportCandidateCount": 5032,
+    "resolvedRelativeImportCandidateCount": 5014,
     "unresolvedRelativeImportCandidateCount": 18
   },
   "records": [
@@ -30984,9 +30984,9 @@
     },
     {
       "path": "src/miki/promotion/services/componentLadderDriverService.ts",
-      "bytes": 23417,
-      "lines": 516,
-      "sha256": "86c579f7d7a279fcd238d65c455273fa4e156e157ffdb232540d56fdb1030abe",
+      "bytes": 37130,
+      "lines": 774,
+      "sha256": "322188abb80db311e88a1fcc5981c3371ed9961d1ad812c8305876d705a798b6",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -31032,31 +31032,37 @@
         },
         {
           "line": 9,
+          "specifier": "../../selfDevelopment/services/codeDrillService",
+          "resolution": "RESOLVED",
+          "resolvedPath": "src/miki/selfDevelopment/services/codeDrillService.ts"
+        },
+        {
+          "line": 10,
           "specifier": "../../selfDevelopment/services/specDraftService",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/selfDevelopment/services/specDraftService.ts"
         },
         {
-          "line": 10,
+          "line": 11,
           "specifier": "../../core/services/canonicalSha256Service",
           "resolution": "RESOLVED",
           "resolvedPath": "src/miki/core/services/canonicalSha256Service.ts"
         },
         {
-          "line": 11,
+          "line": 12,
           "specifier": "../../../services/systemLogger",
           "resolution": "RESOLVED",
           "resolvedPath": "src/services/systemLogger.ts"
         },
         {
-          "line": 12,
+          "line": 13,
           "specifier": "../../../types",
           "resolution": "RESOLVED",
           "resolvedPath": "src/types.ts"
         }
       ],
-      "relativeImportCandidateCount": 11,
-      "resolvedRelativeImportCount": 11,
+      "relativeImportCandidateCount": 12,
+      "resolvedRelativeImportCount": 12,
       "unresolvedRelativeImportCount": 0
     },
     {
@@ -37201,9 +37207,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/codeDrillService.ts",
-      "bytes": 3129,
-      "lines": 89,
-      "sha256": "5bc122806d17d29425391060a1a94823561d29e8faa12e65f1887d6c98683c6d",
+      "bytes": 5037,
+      "lines": 131,
+      "sha256": "f24a1ba3ef67ebf24f631960f4d5ba9bd37711ce880a7f7bcbb6f134fc8e922f",
       "relativeImportCandidates": [
         {
           "line": 1,
@@ -37456,9 +37462,9 @@
     },
     {
       "path": "src/miki/selfDevelopment/services/compositionDrillService.ts",
-      "bytes": 18902,
-      "lines": 368,
-      "sha256": "cdb6d23ad1ed75049d96a51e448b3f8522a7691c504166df8d0a198d24c42268",
+      "bytes": 19318,
+      "lines": 373,
+      "sha256": "e8a1649e91d93563165eab0d4f73022a7cf7022d2debb2d215b659dcac7a9f8f",
       "relativeImportCandidates": [
         {
           "line": 1,
