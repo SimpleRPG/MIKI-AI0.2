@@ -11638,9 +11638,9 @@
     },
     {
       "path": "src/components/AutonomousImprovementHome.tsx",
-      "bytes": 131673,
-      "lines": 2494,
-      "sha256": "dce4a2523c813b37e9f2757592daff4d1a1077ad97c880825ab23d0ffb263f0a",
+      "bytes": 132183,
+      "lines": 2499,
+      "sha256": "81e610e8c337ee4dee46c5850ebc78d06ba43eac57d6958821e24dc86b80db98",
       "relativeImportCandidates": [
         {
           "line": 51,
@@ -19605,9 +19605,9 @@
     },
     {
       "path": "src/miki/core/services/componentSupplyIntakeService.ts",
-      "bytes": 51840,
-      "lines": 974,
-      "sha256": "e1ddb7d0631891a04081dd7d85faf61995bc09650b338b104abbb4e312e3e92f",
+      "bytes": 58432,
+      "lines": 1062,
+      "sha256": "af55df8bf73dfad09ddf488ea15becbbd343cf24203aaa84d47f8354d60fd006",
       "relativeImportCandidates": [
         {
           "line": 2,
@@ -19688,9 +19688,9 @@
     },
     {
       "path": "src/miki/core/services/componentSupplyRequestService.ts",
-      "bytes": 48704,
-      "lines": 923,
-      "sha256": "3dc3e9347e840c8389389772acd5fb337b0f7ed15aa8cc77f8f3470be7b30aab",
+      "bytes": 51533,
+      "lines": 978,
+      "sha256": "8eda9b533182ae76865be9ebcb6d25aaa05182d242966a4ee2087ceee3d07d52",
       "relativeImportCandidates": [
         {
           "line": 2,
