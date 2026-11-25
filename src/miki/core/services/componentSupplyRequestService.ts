@@ -75,6 +75,14 @@ export interface ComponentSupplyLedgerRecord {
   targetFiles: ComponentSupplyTargetFile[];
   gapReason: string;
   statusNote?: string;
+  /*
+   * P2015: 由来。'PROACTIVE_SUPPLY' は要求（部品不足の Run）から作られた
+   * 記録ではなく、事前供給の受入時に componentSupplyIntakeService が
+   * 生成した内部記録（registerProactiveRequest）。runId は空で、
+   * zipSha256 は要求 ZIP ではなく受信した供給パッケージ自体の
+   * SHA-256（受入側で実測）。未設定は従来の Run 由来の要求。
+   */
+  origin?: 'PROACTIVE_SUPPLY';
 }
 
 export interface ComponentSupplyArtifact extends ComponentSupplyLedgerRecord {
@@ -236,6 +244,53 @@ class ComponentSupplyRequestService {
     if (note) record.statusNote = note;
     this.ledger.set(requestId, record);
     return this.save();
+  }
+
+  /*
+   * P2015: 事前供給（要求に紐づかない教師供給）の内部記録を台帳へ作る。
+   *
+   * 所有者の決定（2026-11-25）: 供給は需要（部品不足で止まった Run）から
+   * 切り離し、欲しくなってからではなく事前に用意して在庫として追加
+   * できるようにする。そのため受入側は、存在しない要求を捏造するの
+   * ではなく、「由来＝事前供給」と明記した監査可能な供給記録を
+   * 受入の時点で台帳へ生成し、従来の返却と同じ結び付け・照合・梯子の
+   * 経路へ載せる。zipSha256 には要求 ZIP の代わりに、受入側が実測した
+   * 供給パッケージ自体の SHA-256 を刻む（供給者が申告する値ではない）。
+   * targetFiles の baselineSha256 は供給マニフェストの宣言値であり、
+   * 受入側のベースライン照合（現在内容との比較）で実際に検証される。
+   */
+  public registerProactiveRequest(input: {
+    targetFiles: ComponentSupplyTargetFile[];
+    objective: string;
+    gapReason: string;
+    /** 受入側で実測した供給パッケージ全体の SHA-256。 */
+    packageSha256: string;
+    packageSizeBytes: number;
+    fileName: string;
+  }): ComponentSupplyLedgerRecord {
+    const issuedAt = Date.now();
+    this.sequence += 1;
+    const requestId = `SUP-PRO-${issuedAt}-${String(this.sequence).padStart(3, '0')}`;
+    const record: ComponentSupplyLedgerRecord = {
+      requestId,
+      runId: '',
+      objective: input.objective,
+      status: 'ISSUED',
+      issuedAt,
+      updatedAt: issuedAt,
+      fileName: input.fileName,
+      zipSha256: input.packageSha256,
+      zipSizeBytes: input.packageSizeBytes,
+      base64Length: 0,
+      targetFiles: input.targetFiles.map((file) => ({ path: file.path, baselineSha256: file.baselineSha256 })),
+      gapReason: input.gapReason,
+      origin: 'PROACTIVE_SUPPLY',
+      statusNote: 'P2015: 事前供給の受入時に生成した内部記録（要求なし・由来=事前供給）',
+    };
+    this.ledger.set(requestId, record);
+    this.save();
+    systemLogger.info('SELF_IMPROVEMENT', `[P2015] 事前供給の内部記録を生成: ${requestId} targets=${record.targetFiles.map((f) => f.path).join(', ')}`);
+    return this.clone(record);
   }
 
   // ------------------------------------------------------------------

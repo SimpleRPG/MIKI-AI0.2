@@ -39,6 +39,22 @@ import { sha256HexFromText } from './canonicalSha256Service';
  * 信頼水準は externalReviewIntakeService の先例どおり
  * 'SEMI_TRUSTED_EXTERNAL_AI'（半信頼の外部AI素材）として受入記録と
  * run の payload に刻む。出所（supplier の申告）は受入台帳に残す。
+ *
+ * P2015: 事前供給（要求に紐づかない教師供給）の受入。所有者の決定
+ * （2026-11-25）で、供給は需要から切り離し「欲しくなってからではなく
+ * 事前に用意して追加できる」形にする。supply_reply.json に
+ * proactiveSupply: true を宣言したパッケージは、要求への返却ではなく
+ * 事前供給として受け付ける:
+ *  - requestId / requestSha256 は付けない（付けたら MANIFEST_INVALID）。
+ *    代わりに受入の時点で、由来＝事前供給と明記した内部の供給記録を
+ *    要求台帳へ生成し（registerProactiveRequest）、それへ結び付ける。
+ *    記録の zipSha256 は受入側が実測したパッケージ自体の SHA-256。
+ *  - 候補ごとの baselineSha256（供給者が「どの現在内容に対して作ったか」
+ *    の宣言）が必須で、ベースライン照合は従来どおり現在内容と突き合わせる。
+ *  - 教師検証証拠（TVE）は全候補に必須（返却経路では任意）。無い候補は
+ *    候補単位で落とし、1件も残らなければ TEACHER_VERIFICATION_INVALID。
+ *  - それ以外の関門（ハッシュ照合・対象範囲・実体・必須項目・梯子・
+ *    証拠ゲート・Canary）は返却経路と完全に同一で、一切緩めない。
  */
 
 /**
@@ -107,6 +123,8 @@ export interface ComponentSupplyIntakeRecord {
   manifestSha256: string;
   supplier?: ComponentSupplySupplier;
   trustLevel: 'SEMI_TRUSTED_EXTERNAL_AI';
+  /** P2015: 事前供給（要求に紐づかない教師供給）として受けた受入に付く印。 */
+  proactiveSupply?: boolean;
   candidatePaths: string[];
   originRunId?: string;
   newRunId?: string;
@@ -166,6 +184,8 @@ interface ReplyCandidate {
   teacherVerification?: unknown;
   /** P449: 追加の TVE ラウンド（Canary 用の新規検証ラウンド等）。任意。 */
   teacherVerificationRounds?: unknown;
+  /** P2015: 事前供給でのみ使う、候補を作った時点の現在内容の SHA-256（宣言値）。 */
+  baselineSha256?: unknown;
 }
 
 const LEDGER_KEY = 'miki_component_supply_intake_ledger_v1';
@@ -349,6 +369,7 @@ class ComponentSupplyIntakeService {
         manifestSha256: ctx.manifestSha256 ?? '',
         supplier: ctx.supplier,
         trustLevel: 'SEMI_TRUSTED_EXTERNAL_AI',
+        ...(ctx.proactiveSupply ? { proactiveSupply: true } : {}),
         candidatePaths: ctx.candidatePaths ?? [],
         originRunId: ctx.originRunId,
         receivedAt,
@@ -443,16 +464,26 @@ class ComponentSupplyIntakeService {
     } catch {
       return reject('MANIFEST_INVALID', 'supply_reply.json が JSON として読めませんでした。', ['JSON パースに失敗しました'], manifestCtx);
     }
-    const requestId = typeof manifest.requestId === 'string' ? manifest.requestId.trim() : '';
-    const identifiedCtx = { ...manifestCtx, requestId };
+    let requestId = typeof manifest.requestId === 'string' ? manifest.requestId.trim() : '';
+    // P2015: 事前供給の宣言。要求への返却ではなく、要求なしで事前に
+    // 用意された教師供給として受け付ける経路（詳細はファイル冒頭）。
+    const proactiveSupply = manifest.proactiveSupply === true;
+    const identifiedCtx = { ...manifestCtx, requestId, ...(proactiveSupply ? { proactiveSupply: true } : {}) };
     if (manifest.formatVersion !== 1) {
       return reject('MANIFEST_INVALID', `supply_reply.json の formatVersion が対応範囲外です（受け取った値: ${String(manifest.formatVersion)}）。`, ['formatVersion は 1 でなければなりません'], identifiedCtx);
     }
-    if (!requestId) {
+    if (proactiveSupply) {
+      // 事前供給に要求の識別子が付いていると、どちらの経路の供給か
+      // 曖昧になる。結び付けは受入時に生成する内部記録で行うため、
+      // requestId / requestSha256 は付けないことが形式要件。
+      if (requestId || (typeof manifest.requestSha256 === 'string' && manifest.requestSha256.trim())) {
+        return reject('MANIFEST_INVALID', '事前供給（proactiveSupply: true）の supply_reply.json には requestId / requestSha256 を付けないでください。結び付けは受入時に生成する内部の供給記録で行います。', ['事前供給に要求の識別子が付いています'], identifiedCtx);
+      }
+    } else if (!requestId) {
       return reject('MANIFEST_INVALID', 'supply_reply.json に requestId がありません。要求の requestId をそのまま返してください。', ['requestId が空です'], manifestCtx);
     }
     const requestSha256 = typeof manifest.requestSha256 === 'string' ? manifest.requestSha256.trim().toLowerCase() : '';
-    if (!requestSha256) {
+    if (!proactiveSupply && !requestSha256) {
       return reject('MANIFEST_INVALID', 'supply_reply.json に requestSha256 がありません。受け取った要求 ZIP（Base64 復号後）の SHA-256 を入れてください。', ['requestSha256 が空です'], identifiedCtx);
     }
     const rawSupplier = manifest.supplier && typeof manifest.supplier === 'object' && !Array.isArray(manifest.supplier)
@@ -482,16 +513,58 @@ class ComponentSupplyIntakeService {
       if (path) seenPaths.add(path);
     }
 
+    /*
+     * P2015: 事前供給の場合は、結び付け先の内部記録をここで生成する。
+     * 候補ごとの baselineSha256（供給者が候補を作った時点の現在内容の
+     * SHA-256 の宣言）が必須で、後段のベースライン照合が現在内容と
+     * 突き合わせて実際に検証する。宣言が無い・形式が違う候補が1件でも
+     * あれば、パッケージ全体を形式不正として却下する（どの候補を
+     * どの前提で作ったか分からない供給は受けない）。
+     */
+    if (proactiveSupply) {
+      const baselineReasons: string[] = [];
+      const proactiveBaselines = new Map<string, string>();
+      for (const candidate of candidates) {
+        const path = typeof candidate.path === 'string' ? candidate.path.trim() : '';
+        if (!path) continue;
+        const declared = typeof candidate.baselineSha256 === 'string' ? candidate.baselineSha256.trim().toLowerCase() : '';
+        if (!/^[0-9a-f]{64}$/.test(declared)) {
+          baselineReasons.push(`${path}: 事前供給では候補ごとの baselineSha256（候補を作った時点の対象ファイル内容の SHA-256）が必須です`);
+          continue;
+        }
+        proactiveBaselines.set(path, declared);
+      }
+      if (baselineReasons.length > 0) {
+        return reject('MANIFEST_INVALID', '事前供給の候補に baselineSha256 の宣言が不足しています。', baselineReasons, supplierCtx);
+      }
+      const created = componentSupplyRequestService.registerProactiveRequest({
+        targetFiles: [...proactiveBaselines.entries()].map(([path, baselineSha256]) => ({ path, baselineSha256 })),
+        objective: `部品の事前供給（教師供給・要求なし）: ${[...proactiveBaselines.keys()].join(', ')}`,
+        gapReason: 'P2015 事前供給: 部品不足の Run に紐づかない教師供給（所有者の決定 2026-11-25: 需要から切り離し、事前に用意して在庫として追加する）',
+        packageSha256,
+        packageSizeBytes: input.bytes.length,
+        fileName: sourceFileName,
+      });
+      requestId = created.requestId;
+    }
+
     // ---- 結び付け検証（台帳との照合） ----
     const request = componentSupplyRequestService.get(requestId);
     if (!request) {
       return reject('REQUEST_NOT_FOUND', `要求ID ${requestId} は MIKI の部品供給台帳にありません。別の端末・別の要求への返却ではないか確認してください。`, [`台帳に無い requestId: ${requestId}`], supplierCtx);
     }
-    const boundCtx = { ...supplierCtx, originRunId: request.runId };
+    const boundCtx = { ...supplierCtx, requestId, originRunId: request.runId };
     if (request.status !== 'ISSUED') {
       return reject('REQUEST_NOT_ISSUED', `要求ID ${requestId} は受付可能な状態ではありません（現在の状態: ${request.status}）。既に受入済み、または却下・取消済みの要求への返却は受け付けません。`, [`要求の状態が ${request.status} です`], boundCtx);
     }
-    if (requestSha256 !== request.zipSha256.toLowerCase()) {
+    /*
+     * P2015: requestSha256 照合は「MIKI が出した要求 ZIP への返却か」の
+     * 結び付けであり、事前供給には要求 ZIP が存在しないため対象外。
+     * 事前供給の結び付けは、受入時に生成した内部記録（zipSha256 =
+     * 受入側が実測したパッケージ自体の SHA-256）で行い、改変検出は
+     * 候補ごとの TVE implementationSha256 照合とベースライン照合が担う。
+     */
+    if (!proactiveSupply && requestSha256 !== request.zipSha256.toLowerCase()) {
       return reject('REQUEST_HASH_MISMATCH', 'requestSha256 が要求パッケージと一致しません。返却が、MIKI が出した要求に対するものか確認してください（要求 .zip.txt を Base64 復号した ZIP 全体の SHA-256 が必要です）。', [`manifest: ${requestSha256}`, `台帳: ${request.zipSha256}`], boundCtx);
     }
 
@@ -594,6 +667,17 @@ class ComponentSupplyIntakeService {
           continue;
         }
         verifiedTve.set(path, { round: parsed.round, extraRounds });
+      } else if (proactiveSupply) {
+        /*
+         * P2015: 事前供給では TVE が必須（返却経路では任意）。要求という
+         * 文脈が無い分、教師が検証した証拠の無い候補は在庫に入れない。
+         * 落とし方は TVE 検証失敗と同じ（候補単位で落とす）。
+         */
+        tveReasons.push(`${path}: 事前供給では教師検証証拠（TVE）が必須ですが、付いていません`);
+        contents.delete(path);
+        const at = candidatePaths.indexOf(path);
+        if (at >= 0) candidatePaths.splice(at, 1);
+        continue;
       }
     }
     if (scopeReasons.length > 0) {
@@ -675,6 +759,8 @@ class ComponentSupplyIntakeService {
       implementationCandidates,
       supplyRequestId: requestId,
       supplyIntakeId: intakeId,
+      // P2015: 事前供給の run には由来の印を payload にも残す。
+      ...(proactiveSupply ? { proactiveSupply: true } : {}),
       // P453: 教師返却由来の刻印。キュー側（ループ）が同点時の並び順と
       // 復元時の引き上げで識別するための印。
       teacherReturn: true,
@@ -702,7 +788,7 @@ class ComponentSupplyIntakeService {
     try {
       const supplyEvidence = evidenceService.recordExecutionEvidence({
         title: `部品供給の受入 ${intakeId}`,
-        snippet: `供給要求 ${requestId} の返却パッケージ ${sourceFileName} を受け付け、候補 ${implementationCandidates.length} 件を検証待ちとして新規実行へ接続した（供給者: ${supplier.name}）。${isClaudeVerifierName(supplier.name) ? '供給者は Muse のため、ユーザー信頼ルール（P476）により検証済み TVE はクラウド検証として扱われる。' : ''}`,
+        snippet: `${proactiveSupply ? `事前供給（要求なし・内部記録 ${requestId}）` : `供給要求 ${requestId} の返却パッケージ`} ${sourceFileName} を受け付け、候補 ${implementationCandidates.length} 件を検証待ちとして新規実行へ接続した（供給者: ${supplier.name}）。${isClaudeVerifierName(supplier.name) ? '供給者は Muse のため、ユーザー信頼ルール（P476）により検証済み TVE はクラウド検証として扱われる。' : ''}`,
         source: 'component_supply_intake',
         sourceId: intakeId,
       });
@@ -717,12 +803,13 @@ class ComponentSupplyIntakeService {
       run = await improvementIntakeRouterService.receive({
         runType: 'USER_REQUEST',
         sourceId: requestId,
-        objective: originRun?.objective ?? `部品供給の受入（要求 ${requestId}）`,
+        objective: originRun?.objective ?? (proactiveSupply ? `部品の事前供給の受入（内部記録 ${requestId}）` : `部品供給の受入（要求 ${requestId}）`),
         // P453: 教師から返ってきた素材の run は優先度を返却帯
         // （TEACHER_RETURN_PRIORITY）以上にする。元 run の優先度が
         // それより高い場合は元の値を尊重する。
         priority: Math.max(originRun?.priority ?? 50, TEACHER_RETURN_PRIORITY),
-        relatedRunIds: [request.runId],
+        // P2015: 事前供給には元 run が無い（request.runId は空）。
+        relatedRunIds: request.runId ? [request.runId] : [],
         payload,
       });
     } catch (error) {
@@ -742,6 +829,7 @@ class ComponentSupplyIntakeService {
       manifestSha256,
       supplier,
       trustLevel: 'SEMI_TRUSTED_EXTERNAL_AI',
+      ...(proactiveSupply ? { proactiveSupply: true } : {}),
       candidatePaths,
       originRunId: request.runId,
       newRunId: run.runId,

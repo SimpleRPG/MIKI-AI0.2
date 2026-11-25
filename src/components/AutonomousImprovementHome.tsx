@@ -1363,6 +1363,10 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                       <div key={request.requestId} className="p-3 bg-slate-900/40 text-xs space-y-1">
                         <div className="flex items-center justify-between gap-2">
                           <span className="font-mono text-emerald-300 text-[11px] truncate">{request.requestId}</span>
+                          {/* P2015: 事前供給（要求なし）の内部記録には由来の印を出す */}
+                          {request.origin === 'PROACTIVE_SUPPLY' && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 bg-sky-500/20 text-sky-300 border border-sky-500/40">事前供給</span>
+                          )}
                           <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold shrink-0 ${badge}`}>{statusLabel}</span>
                         </div>
                         <div className="text-slate-200 font-medium truncate">{request.objective}</div>
@@ -1400,6 +1404,7 @@ export const AutonomousImprovementHome: React.FC<AutonomousImprovementHomeProps>
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
                           <span>供給者: {intake.supplier?.name || '不明'}</span>
+                          {intake.proactiveSupply && <span className="text-sky-300/80">事前供給（要求なし）</span>}
                           <span>受入: {fmtTime(intake.receivedAt)}</span>
                           {intake.newRunId && <span>新しい実行: {intake.newRunId}</span>}
                         </div>
