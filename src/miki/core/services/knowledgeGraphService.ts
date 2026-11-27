@@ -29,7 +29,7 @@
 // 後段（ここでは作らない）: 連鎖の上での予測→結果比較→リンク改訂、
 // 具体リンクの抽象化、計画の後方連鎖。
 import { componentRepositoryCacheService } from '../../memory/services/componentRepositoryCacheService';
-import { teacherLessonRecallService } from '../../memory/services/teacherLessonRecallService';
+import { teacherLessonRecallService, titleKeys } from '../../memory/services/teacherLessonRecallService';
 import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { diagnosisTaskService } from './diagnosisTaskService';
 import { canonicalSha256 } from './canonicalSha256Service';
@@ -393,15 +393,28 @@ export const knowledgeGraphService = {
   // 質問文に合うレッスンを、グラフのノードとして順位つきで返す。
   // 照合は実績のある teacherLessonRecallService の基準をそのまま使い、
   // グラフ側は「ノードとしての位置づけと検証状態」を付けて返す。
+  // 並びはグラフ側で付け直す: パッケージ主題そのもののキー（例:
+  // 主題「EFR…」に対するキー「EFR」）は、そのパッケージの全レッスンに
+  // 共通で判別力がない。想起の素点では主題キーが長い分だけ「○○とは
+  // 何か」の概要レッスンが手順の質問でも勝ってしまう（EFR-L01 が
+  // 脱出の質問で L08 に勝った実測）。主題キーを除いた判別キーの
+  // 一致数で並べ替え、同数は想起の順序に従う。
   findLessonNodesFor(text: string): GroundedLessonNode[] {
     const { lessonByComponentId } = learnedProjection();
     const ranked = teacherLessonRecallService.findRanked(text);
-    const out: GroundedLessonNode[] = [];
+    const grounded: GroundedLessonNode[] = [];
     for (const view of ranked) {
-      const grounded = lessonByComponentId.get(view.componentId);
-      if (grounded) out.push(grounded);
+      const g = lessonByComponentId.get(view.componentId);
+      if (g) grounded.push(g);
     }
-    return out;
+    const scored = grounded.map((g, idx) => {
+      const hits = titleKeys(g.title)
+        .filter((key) => key !== g.subject && !(g.subject && g.subject.includes(key)))
+        .filter((key) => text.includes(key)).length;
+      return { g, idx, hits };
+    });
+    scored.sort((a, b) => b.hits - a.hits || a.idx - b.idx);
+    return scored.map((s) => s.g);
   },
 
   // 連結モードの基本動作: 起点の文から CAUSES エッジを前方へたどり、

@@ -96,7 +96,9 @@ function expandText(text: string): string {
   }
   return out;
 }
-function titleKeys(title: string): string[] {
+// P3012: グラフ層（knowledgeGraphService）が同じキー抽出で判別力を
+// 数えるため公開する。抽出規則の正本はここ。
+export function titleKeys(title: string): string[] {
   const chunks = title
     .split(/[（）()「」、・／/\s：:はがをにのもへとや]/)
     .map((s) => s.trim().replace(/(?:する|した|して|なる|ある|いる|です|ます)$/u, ''))
