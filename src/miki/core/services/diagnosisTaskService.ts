@@ -31,6 +31,17 @@ import {
  *    後続のケースでは、型と選択子の形が一致するパターンを先に参照し、
  *    その文面（スロットに今回の証拠の値を入れたもの）で機構を述べる。
  *    スコアや正解が彼女に渡ることはない（採点は外部の試験側だけが行う）。
+ *
+ * P3008（2026-11-27 21:15-21:22、きりあの設計追加）: 理解は二様式の併用で作る
+ * ——(1) 選択（状況→行動のスコア規則。彼女の既存の流儀）と (2) 連結
+ * （因果文「◯◯だから◯◯」の連鎖。事実は理由を小さな検証済み因果リンク
+ * として持ち、説明・診断はその連鎖を複数段たどる）。その上に予測ループ
+ * （行動前に連鎖で予測→実結果と比較→誤ったリンクを改訂）と、反復する
+ * 具体リンクの抽象化（転移可能な機構へ）、計画の後方連鎖が載る（後段）。
+ * 本スライスの実装範囲: 診断結果を平文の機構だけでなく因果連鎖
+ * （DiagnosisCausalLink の列、前提→結論）としても台帳とパターン部品に
+ * 残すところまで。予測・改訂・後方連鎖の機械はここでは作らない
+ * （LAB_NOTES の設計記録に実施範囲を明記）。
  */
 
 export interface DiagnosisCaseInput {
@@ -43,10 +54,20 @@ export interface DiagnosisCaseInput {
   codeRegion: { text: string; startLine?: number; endLine?: number };
 }
 
+// P3008: 因果リンク（前提→結論）。診断の機構は平文だけでなく、この
+// 「◯◯だから◯◯」の連鎖としても台帳に残す（きりあの二様式設計:
+// 選択＝状況→行動のスコア規則、連結＝因果文の連鎖。診断・説明は
+// 連鎖をたどる行為であり、予測・改訂の層はこの連鎖の上に載る）。
+export interface DiagnosisCausalLink {
+  premise: string;
+  conclusion: string;
+}
+
 export interface DiagnosisResult {
   status: 'diagnosed' | 'undiagnosable';
   location?: string;
   mechanism?: string;
+  causalChain?: DiagnosisCausalLink[];
   evidence?: string;
   reason?: string;
   at: string;
@@ -82,6 +103,7 @@ interface Finding {
   location: string;
   slots: Record<string, string>;
   defaultMechanism: string;
+  causalChain: DiagnosisCausalLink[];
   evidenceNotes: string[];
 }
 
@@ -230,12 +252,18 @@ function findConfirmNeverClicked(ctx: AnalysisContext): Finding | null {
   const mechanism =
     `「${openerTerm}」は${dialogWord}を開く操作であり、このコードは${dialogWord}を開いた時点で処理を終えており、` +
     `${confirmRef}を押していない。そのため${ctx.family}は実行されず、状態が変わらない（no_effect が ${ctx.fails} 回記録されている）。`;
+  const causalChain: DiagnosisCausalLink[] = [
+    { premise: `「${openerTerm}」は${dialogWord}を開く操作であり、このコードは${dialogWord}を開いた時点で処理を終えている`, conclusion: `${confirmRef}は押されない` },
+    { premise: `${confirmRef}が押されない`, conclusion: `${ctx.family}は実行されない` },
+    { premise: `${ctx.family}が実行されない`, conclusion: `状態が変わらず、no_effect が ${ctx.fails} 回記録される` },
+  ];
   return {
     kind: 'CONFIRM_NEVER_CLICKED',
     stepLine: step.lineIndex,
     location: actBlock(ctx.lines, step.lineIndex),
     slots,
     defaultMechanism: mechanism,
+    causalChain,
     evidenceNotes: ctx.sentences.filter((s) => s.includes('モーダル') || s.includes('ダイアログ') || s.includes('フッター')),
   };
 }
@@ -264,12 +292,18 @@ function findLabelAbsent(ctx: AnalysisContext): Finding | null {
       `クリック対象の探索文言「${term}」は、観測された画面文言の中に無く、${absencePhrase}。` +
       `${realRef}「${term}」を探すクリックは永遠に見つからない。` +
       `そのため${ctx.family}の操作は実行されず、状態が変わらない（no_effect が ${ctx.fails} 回記録されている）。`;
+    const causalChain: DiagnosisCausalLink[] = [
+      { premise: `探索文言「${term}」は観測された画面文言の中に無く、${absencePhrase}`, conclusion: `「${term}」を探すクリックは対象を見つけられない` },
+      { premise: `クリックが対象を見つけられない`, conclusion: `${ctx.family}の操作は実行されない` },
+      { premise: `${ctx.family}の操作が実行されない`, conclusion: `状態が変わらず、no_effect が ${ctx.fails} 回記録される` },
+    ];
     return {
       kind: 'LABEL_ABSENT',
       stepLine: step.lineIndex,
       location: actBlock(ctx.lines, step.lineIndex),
       slots,
       defaultMechanism: mechanism,
+      causalChain,
       evidenceNotes: absenceSentence ? [absenceSentence, ...ctx.notes] : [...ctx.notes],
     };
   }
@@ -292,23 +326,38 @@ function findTermHitsNonTarget(ctx: AnalysisContext): Finding | null {
         term, roleAction, realAction, family: ctx.family, fails: String(ctx.fails),
       };
       let mechanism: string;
+      let firstLink: DiagnosisCausalLink;
       if (isModeToggle) {
         mechanism =
           `includes の「${term}」は、商品ボタンではなく売買モード切替ボタン${roleAction ? `（data-action="${roleAction}"）` : ''}の文言に一致する。` +
           `クリックしてもモードが切り替わるだけで、${realAction ? `商品の購入ボタン（data-action="${realAction}"）` : '本来の対象ボタン'}には到達せず、何も買わない。` +
           `そのため${ctx.family}は実行されず、状態が変わらない（no_effect が ${ctx.fails} 回記録されている）。`;
+        firstLink = {
+          premise: `includes の「${term}」は売買モード切替ボタン${roleAction ? `（data-action="${roleAction}"）` : ''}の文言に一致する`,
+          conclusion: `クリックはモード切替に当たり、本来の対象ボタンに到達しない`,
+        };
       } else {
         mechanism =
           `includes の「${term}」は、パネルのタブボタン自体の文言でもある。` +
           `テキスト一致のクリックはタブボタン自体に一致し、タブを切り替えるだけで、本来の対象ボタンには到達しない。` +
           `そのため${ctx.family}は実行されず、状態が変わらない（no_effect が ${ctx.fails} 回記録されている）。`;
+        firstLink = {
+          premise: `includes の「${term}」はパネルのタブボタン自体の文言でもある`,
+          conclusion: `クリックはタブボタン自体に当たり、本来の対象ボタンに到達しない`,
+        };
       }
+      const causalChain: DiagnosisCausalLink[] = [
+        firstLink,
+        { premise: `本来の対象ボタンに到達しない`, conclusion: `${ctx.family}は実行されない` },
+        { premise: `${ctx.family}が実行されない`, conclusion: `状態が変わらず、no_effect が ${ctx.fails} 回記録される` },
+      ];
       return {
         kind: 'TERM_HITS_NON_TARGET',
         stepLine: step.lineIndex,
         location: step.line.trim(),
         slots,
         defaultMechanism: mechanism,
+        causalChain,
         evidenceNotes: [roleSentence, ...ctx.notes],
       };
     }
@@ -350,12 +399,18 @@ function findFirstFreshPlaced(ctx: AnalysisContext): Finding | null {
     `新たに現れたボタンの先頭（${listVar}[0]）は、観測では繰り返し「${firstText}」であり、これは最初から配置済みの${facilityName}である。` +
     `設置済みの施設のボタンをクリックしても選択されるだけで配置にはならず、状態が変わらない（no_effect が ${ctx.fails} 回記録されている）。` +
     `欠陥は、設置済みのものを候補から除外していないことにある。`;
+  const causalChain: DiagnosisCausalLink[] = [
+    { premise: `新たに現れたボタンの先頭（${listVar}[0]）は繰り返し「${firstText}」であり、最初から配置済みの${facilityName}である`, conclusion: `クリックは設置済みの施設ボタンに当たる` },
+    { premise: `設置済みの施設ボタンがクリックされる`, conclusion: `選択されるだけで配置にはならず、状態が変わらない（no_effect が ${ctx.fails} 回記録される）` },
+    { premise: `設置済みのものが候補に残り続ける`, conclusion: `欠陥は、設置済みのものを候補から除外していないことにある` },
+  ];
   return {
     kind: 'FIRST_FRESH_PREPLACED',
     stepLine: pickLine,
     location: ctx.lines.slice(pickLine, endLine + 1).join('\n').trim(),
     slots,
     defaultMechanism: mechanism,
+    causalChain,
     evidenceNotes: ctx.sentences.filter((s) => s.includes('先頭')),
   };
 }
@@ -380,10 +435,30 @@ function fillTemplate(template: string, slots: Record<string, string>): string |
   return out;
 }
 
+// 因果連鎖も機構文と同じスロット一般化で型として残す（P3008）。
+function generalizeChain(chain: DiagnosisCausalLink[], slots: Record<string, string>): DiagnosisCausalLink[] {
+  return chain.map((link) => ({
+    premise: generalizeMechanism(link.premise, slots),
+    conclusion: generalizeMechanism(link.conclusion, slots),
+  }));
+}
+
+function fillChainTemplate(template: DiagnosisCausalLink[], slots: Record<string, string>): DiagnosisCausalLink[] | null {
+  const out: DiagnosisCausalLink[] = [];
+  for (const link of template) {
+    const premise = fillTemplate(link.premise, slots);
+    const conclusion = fillTemplate(link.conclusion, slots);
+    if (premise === null || conclusion === null) return null;
+    out.push({ premise, conclusion });
+  }
+  return out;
+}
+
 interface DiagnosisPattern {
   findingKind: string;
   selectorShape: string;
   mechanismTemplate: string;
+  causalChainTemplate?: DiagnosisCausalLink[];
 }
 
 class DiagnosisTaskService {
@@ -448,6 +523,7 @@ class DiagnosisTaskService {
         findingKind: finding.kind,
         selectorShape,
         mechanismTemplate: generalizeMechanism(finding.defaultMechanism, finding.slots),
+        causalChainTemplate: generalizeChain(finding.causalChain, finding.slots),
       };
       const body = {
         componentKind: 'KNOWLEDGE' as const,
@@ -539,6 +615,7 @@ class DiagnosisTaskService {
       // 文面に今回の証拠の値を入れて機構を述べる（彼女自身の過去の診断
       // の一般化であり、外部の正解ではない）。
       let mechanism = finding.defaultMechanism;
+      let causalChain = finding.causalChain;
       const stored = this.storedPatterns();
       const matched = stored.find((x) => x.pattern.findingKind === finding.kind && x.pattern.selectorShape === selectorShape);
       if (matched) {
@@ -546,6 +623,10 @@ class DiagnosisTaskService {
         if (filled) {
           mechanism = filled;
           patternBasisIds = [matched.componentId];
+          if (matched.pattern.causalChainTemplate) {
+            const filledChain = fillChainTemplate(matched.pattern.causalChainTemplate, finding.slots);
+            if (filledChain) causalChain = filledChain;
+          }
         }
       }
 
@@ -566,6 +647,7 @@ class DiagnosisTaskService {
           status: 'diagnosed',
           location: finding.location,
           mechanism,
+          causalChain,
           evidence,
           at: new Date(at).toISOString(),
         };
