@@ -1306,12 +1306,23 @@ class CoreOrchestratorService {
     break;
    }
    const planEnvironment=executionEnvironmentRouterService.capture(this.readEnvironmentHints(current));
-   // 非ネイティブ環境では Rust コア決定カーネルが使えないため、
-   // 同一規則のJS実装 (adaptiveRoutePlannerService) へ劣化させる。
+   // ネイティブ環境では Rust コア決定カーネルを使う。非ネイティブ環境
+   // でも、Web実装経由で本物の Rust コアに届く場合があるためまず試し、
+   // 拒否された場合だけ同一規則のJS実装 (adaptiveRoutePlannerService)
+   // へ劣化させる。どちらの経路で決めたかは ruleVersion に正直に残す。
    const nativeCoreAvailable=Capacitor.isNativePlatform();
-   const goalDecision=nativeCoreAvailable
-     ? await rustCoreDecisionKernelService.resolveGoalConflicts(current)
-     : adaptiveRoutePlannerService.resolveGoalConflicts(current);
+   let goalDecision:Awaited<ReturnType<typeof adaptiveRoutePlannerService.resolveGoalConflicts>>;
+   let coreKernelRustUsed=nativeCoreAvailable;
+   if(nativeCoreAvailable){
+    goalDecision=await rustCoreDecisionKernelService.resolveGoalConflicts(current);
+   }else{
+    try{
+     goalDecision=await rustCoreDecisionKernelService.resolveGoalConflicts(current);
+     coreKernelRustUsed=true;
+    }catch{
+     goalDecision=adaptiveRoutePlannerService.resolveGoalConflicts(current);
+    }
+   }
    if(goalDecision.conflictDetected){
     taskBlackboardService.append(taskId,'DECISION','core',`goalConflictResolution:${cycles}`,{
       selectedGoalId:goalDecision.selectedGoalId,
@@ -1319,7 +1330,7 @@ class CoreOrchestratorService {
       pausedGoalIds:goalDecision.pausedGoalIds,
       blockedGoalIds:goalDecision.blockedGoalIds,
       decisions:goalDecision.decisions,
-      ruleVersion:nativeCoreAvailable?'RUST_CORE_KERNEL_V1':'JS_CORE_KERNEL_FALLBACK_V1'
+      ruleVersion:coreKernelRustUsed?'RUST_CORE_KERNEL_V1':'JS_CORE_KERNEL_FALLBACK_V1'
     });
    }
    const planningTask=goalDecision.selectedGoal&&goalDecision.selectedGoal!==current.goal
@@ -1415,16 +1426,25 @@ class CoreOrchestratorService {
        retryReason
      );
    });
-   const domainParticipation=nativeCoreAvailable
-     ? await rustDomainParticipationKernelService.rank(routes)
-     : rankDomainRoutesWithoutNative(routes);
+   let domainParticipation:Awaited<ReturnType<typeof rustDomainParticipationKernelService.rank>>;
+   let domainKernelRustUsed=nativeCoreAvailable;
+   if(nativeCoreAvailable){
+    domainParticipation=await rustDomainParticipationKernelService.rank(routes);
+   }else{
+    try{
+     domainParticipation=await rustDomainParticipationKernelService.rank(routes);
+     domainKernelRustUsed=true;
+    }catch{
+     domainParticipation=rankDomainRoutesWithoutNative(routes);
+    }
+   }
    if(taskBlackboardService.get(taskId)?.status==='CANCELLED')break coreCycle;
    routes=domainParticipation.routes;
    taskBlackboardService.append(taskId,'DECISION','core',`rustDomainParticipation:${cycles}`,{
      participatingDomains:domainParticipation.participatingDomains,
      skippedDuplicateIndexes:domainParticipation.skippedDuplicateIndexes,
      workerDomainCount:17,
-     ruleVersion:nativeCoreAvailable?'RUST_DOMAIN_KERNEL_V1':'JS_DOMAIN_KERNEL_FALLBACK_V1'
+     ruleVersion:domainKernelRustUsed?'RUST_DOMAIN_KERNEL_V1':'JS_DOMAIN_KERNEL_FALLBACK_V1'
    });
    for(const route of routes) route.payload={...route.payload,environmentSignature:planEnvironment.signature};
    taskBlackboardService.append(taskId,'DECISION','core',`coreEnvironmentPlan:${cycles}`,planEnvironment);
