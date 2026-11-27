@@ -5891,10 +5891,22 @@ export class ConversationCoreService {
     if (!hit) return undefined;
     this.recordComponentCitation(hit.componentId, 'lesson-howto-consult');
     const ruleText = this.lessonRuleExcerpt(hit.rule);
-    if (hit.verification === 'CLAUDE_VERIFIED') {
-      return `教わったところでは、${ruleText}（「${hit.title}」というレッスンで教わりました）`;
-    }
-    return `まだ候補として教わった知識ですけど、「${hit.title}」には、こうあります。${ruleText}`;
+    // P3015: この返答も逐次合成で組み立てる（文末＝引用は先に予約し、
+    // 開き方は検証状態に条件づけて選ぶ）。グラフは素材を渡し、合成の
+    // 段取りは phraseComposerService が持つ。出力は従来の固定文字列の
+    // 組み立てと一致する（検証済みは教わった言い方＋引用、未検証は
+    // 候補の開示）。素材が無ければ合成結果は空になり、従来どおり
+    // 後段の経路へ落ちる。
+    const facts = {
+      verification: hit.verification,
+      lessonTitle: hit.title,
+      ruleText,
+    };
+    const composed = phraseComposerService.composeSentences(
+      phraseComposerService.lessonHowToPlan(facts),
+      facts,
+    );
+    return composed.text || undefined;
   }
 
   // P3013: 統合グラフの一般想起で Claim の知識から答える。種になった
