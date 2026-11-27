@@ -320,10 +320,14 @@ function buildCodeProjection(): Projection {
     for (const rel of entry.relations) {
       const from = resolve(rel.from, entry.path);
       const to = resolve(rel.to, entry.path);
-      if (!p.nodes.has(from)) {
+      // CONCEPT 端点だけここで作る。ファイル／シンボルの端点は各
+      // エントリの処理で正しい種別のノードが入るので、処理順の
+      // 都合で CONCEPT として先に作ってしまうと種別が固定されて
+      // しまう（addNode は先勝ち）。
+      if (from.startsWith('concept:') && !p.nodes.has(from)) {
         addNode(p, { id: from, kind: 'CONCEPT', label: rel.from, verification: 'STRUCTURAL' });
       }
-      if (!p.nodes.has(to)) {
+      if (to.startsWith('concept:') && !p.nodes.has(to)) {
         addNode(p, { id: to, kind: 'CONCEPT', label: rel.to, verification: 'STRUCTURAL' });
       }
       addEdge(p, {
