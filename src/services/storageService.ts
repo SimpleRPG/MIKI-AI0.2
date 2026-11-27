@@ -51,6 +51,20 @@ export const GIANT_FLUSH_MIN_INTERVAL_MS = 30 * 1000;
 export const IDB_TX_MAX_KEYS = 48;
 export const IDB_TX_MAX_CHARS = 1_500_000;
 
+/**
+ * P3009: IndexedDB 初期化のソフト/ハード上限。
+ * initIndexedDb はストア全件をカーソルで読み切ってから解決する。
+ * 2026-11-27 のラボでは 4,104 キー／約1億文字の読み切りが、VM の
+ * 負荷競合下では約19秒（無負荷時は約3〜5秒）かかり、従来の 8 秒
+ * 上限を超えると backend='memory' にそのセッション中固定されて、
+ * 画面上は取り込みが成功するのに書き込みが一切 IndexedDB に届か
+ * ない障害になった（競合を再現して実証済み）。「遅い」と「壊れて
+ * いる」は別物なので、ソフト上限は遅延の申告にだけ使い、初期化
+ * の試行自体は捨てずにハード上限まで待ち続ける。
+ */
+export const IDB_INIT_SOFT_TIMEOUT_MS = 8 * 1000;
+export const IDB_INIT_HARD_TIMEOUT_MS = 180 * 1000;
+
 export function partitionFlushTxKeys(
   sizes: Array<{ key: string; chars: number }>
 ): string[][] {
@@ -98,6 +112,10 @@ class StorageService {
   private lastDiagnosticFlushAt = new Map<string, number>();
   private lastDeferredFlushDiagnosticAt = 0;
   private backend: 'sqlite' | 'indexeddb' | 'memory' = 'memory';
+  // P3009: ハード上限超過で見捨てた IndexedDB 初期化が後から完了
+  // した場合に、backend を引き上げて未保存分を書き直すための武装
+  // フラグ（initIndexedDbResilient が使う）。
+  private idbLateUpgradeArmed = false;
   private ftsAvailable: boolean = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private sqlite: any = null; // SQLiteDBConnection (native only, loaded dynamically)
@@ -150,7 +168,7 @@ class StorageService {
       } catch (e) {
         console.warn('storageService: native SQLite unavailable, falling back to IndexedDB', e);
         try {
-          await this.withTimeout(this.initIndexedDb(), 8000, 'INDEXEDDB_INIT');
+          await this.initIndexedDbResilient();
           this.backend = 'indexeddb';
         } catch (e2) {
           console.warn('storageService: IndexedDB also unavailable, using in-memory storage', e2);
@@ -159,7 +177,7 @@ class StorageService {
       }
     } else {
       try {
-        await this.withTimeout(this.initIndexedDb(), 8000, 'INDEXEDDB_INIT');
+        await this.initIndexedDbResilient();
         this.backend = 'indexeddb';
       } catch (e) {
         console.warn('storageService: IndexedDB unavailable, using in-memory storage', e);
@@ -308,6 +326,51 @@ class StorageService {
       }
       this.cache.set(row.key, pieces.join(''));
       this.dirtyKeys.add(row.key);
+    }
+  }
+
+  /**
+   * P3009: IndexedDB 初期化を「遅さ」で諦めない。
+   * ソフト上限（従来の 8 秒）を超えたら INIT_SLOW を診断に出して、
+   * 同じ試行の完了をハード上限まで待ち続ける（withTimeout は試行を
+   * 中止しないので、裏側の open + 全件読みはそのまま進んでいる）。
+   * ハード上限も超えた場合だけ呼び出し側のフォールバックに委ねる
+   * が、その場合でも試行が後から完了したら backend を 'indexeddb'
+   * に引き上げ、未保存の dirty キーを書き直す（恒久的なメモリ固定
+   * にしない）。本物のエラー（req.onerror 等）は即時に投げる。
+   */
+  private async initIndexedDbResilient(): Promise<void> {
+    const initPromise = this.initIndexedDb();
+    initPromise.then(
+      () => {
+        if (this.idbLateUpgradeArmed && this.backend === 'memory' && this.idb) {
+          this.idbLateUpgradeArmed = false;
+          this.backend = 'indexeddb';
+          this.emitFlushDiagnostic('BACKEND_UPGRADED', {
+            backend: this.backend,
+            keyCount: this.cache.size,
+          });
+          if (this.dirtyKeys.size) this.scheduleFlush();
+        }
+      },
+      () => { /* 本物の初期化失敗では引き上げるものがない */ }
+    );
+    try {
+      await this.withTimeout(initPromise, IDB_INIT_SOFT_TIMEOUT_MS, 'INDEXEDDB_INIT');
+    } catch (e) {
+      if (!(e instanceof Error) || !e.message.startsWith('INDEXEDDB_INIT_TIMEOUT')) throw e;
+      this.idbLateUpgradeArmed = true;
+      this.emitFlushDiagnostic('INIT_SLOW', {
+        backend: this.backend,
+        softTimeoutMs: IDB_INIT_SOFT_TIMEOUT_MS,
+        keyCount: this.cache.size,
+      });
+      await this.withTimeout(initPromise, IDB_INIT_HARD_TIMEOUT_MS, 'INDEXEDDB_INIT_HARD');
+      this.idbLateUpgradeArmed = false;
+      this.emitFlushDiagnostic('INIT_RECOVERED', {
+        backend: 'indexeddb',
+        keyCount: this.cache.size,
+      });
     }
   }
 
