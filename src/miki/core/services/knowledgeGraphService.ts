@@ -30,20 +30,24 @@
 // 具体リンクの抽象化、計画の後方連鎖。
 import { componentRepositoryCacheService } from '../../memory/services/componentRepositoryCacheService';
 import { teacherLessonRecallService, titleKeys } from '../../memory/services/teacherLessonRecallService';
+import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
+import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { diagnosisTaskService } from './diagnosisTaskService';
 import { canonicalSha256 } from './canonicalSha256Service';
 
 export type KnowledgeNodeKind =
   | 'FILE' | 'SYMBOL' | 'LESSON' | 'COMPONENT' | 'DIAGNOSIS_PATTERN'
-  | 'DIAGNOSIS_ATTEMPT' | 'DIAGNOSIS_CASE' | 'STATEMENT' | 'VERIFIER' | 'CONCEPT';
+  | 'DIAGNOSIS_ATTEMPT' | 'DIAGNOSIS_CASE' | 'STATEMENT' | 'VERIFIER' | 'CONCEPT'
+  | 'CLAIM' | 'ENTITY';
 
 export type KnowledgeEdgeKind =
   | 'IMPORTS' | 'CALLS' | 'IMPLEMENTS' | 'EXTENDS'
   | 'READS_STORAGE' | 'WRITES_STORAGE'
   | 'DECLARES_COMMAND' | 'USES_COMMAND'
   | 'PUBLISHES_EVENT' | 'SUBSCRIBES_EVENT'
-  | 'CONTAINS' | 'CAUSES' | 'EXPLAINS' | 'DERIVED_FROM' | 'VERIFIED_BY' | 'SUPPORTS';
+  | 'CONTAINS' | 'CAUSES' | 'EXPLAINS' | 'DERIVED_FROM' | 'VERIFIED_BY' | 'SUPPORTS'
+  | 'IS_A' | 'PART_OF' | 'ENABLES' | 'USED_FOR';
 
 // CLAUDE_VERIFIED: Muse（教師）が実際に確認したもの（P3007 のスタンプ）。
 // SELF_GATED: 彼女自身の検証ゲートを通ったもの。
@@ -68,6 +72,17 @@ export interface KnowledgeEdge {
   kind: KnowledgeEdgeKind;
   verification: KnowledgeVerification;
   evidence?: string;
+}
+
+export interface ActivatedNode {
+  node: KnowledgeNode;
+  depth: number;
+}
+
+export interface ActivationResult {
+  seeds: KnowledgeNode[];
+  activated: ActivatedNode[];
+  edges: KnowledgeEdge[];
 }
 
 export interface GroundedLessonNode {
@@ -134,6 +149,7 @@ let learnedCache: {
 function buildLearnedProjection(): { projection: Projection; lessonByComponentId: Map<string, GroundedLessonNode> } {
   const p = emptyProjection();
   const lessonByComponentId = new Map<string, GroundedLessonNode>();
+  const pendingClaimEdges: Array<{ from: string; to: string }> = [];
   const items = componentRepositoryCacheService.readAll();
   for (const raw of items) {
     if (!raw || typeof raw !== 'object') continue;
@@ -197,7 +213,81 @@ function buildLearnedProjection(): { projection: Projection; lessonByComponentId
       payloadRef: { store: 'componentRepository', key: componentId },
       componentId,
     });
+    // 知識部品の根拠 Claim への由来（実在する Claim ノードだけに張る。
+    // Claim 射影はこの後に走るので、端点の有無は後段で確認する）。
+    const claimIds = Array.isArray(item.claimIds) ? item.claimIds : [];
+    for (const cid of claimIds) {
+      if (typeof cid === 'string' && cid) {
+        pendingClaimEdges.push({ from: `component:${componentId}`, to: `claim:${cid}` });
+      }
+    }
   }
+
+  // P3013: Claim 台帳の射影。彼女の事実のストックはここが正本で、
+  // 調査・会話出力など既存の生産経路がここへ書くものは、射影によって
+  // 自動的にグラフの知識になる（新しい書き込み経路は作らない）。
+  // 検証状態の対応: SUPPORTED / DEVICE_VERIFIED は彼女の検証ゲートを
+  // 通ったものとして SELF_GATED、それ以外は UNVERIFIED。
+  // CONTEXT_ONLY（創作の文脈だけの文）と FICTION 世界の Claim は知識
+  // として扱わないので射影しない。
+  let claims: Array<Record<string, unknown>> = [];
+  try { claims = claimDatabaseService.getAllClaims() as Array<Record<string, unknown>>; } catch { claims = []; }
+  const claimNodeIds = new Set<string>();
+  for (const claim of claims) {
+    const claimId = typeof claim.claim_id === 'string' ? claim.claim_id : '';
+    const statement = typeof claim.statement === 'string' ? claim.statement : '';
+    if (!claimId || !statement) continue;
+    if (claim.status === 'CONTEXT_ONLY' || claim.world === 'FICTION') continue;
+    const nodeId = `claim:${claimId}`;
+    claimNodeIds.add(nodeId);
+    addNode(p, {
+      id: nodeId,
+      kind: 'CLAIM',
+      label: statement,
+      verification: (claim.status === 'SUPPORTED' || claim.status === 'DEVICE_VERIFIED') ? 'SELF_GATED' : 'UNVERIFIED',
+      payloadRef: { store: 'claimDb', key: claimId },
+    });
+    // 出典（origin_source_id）は由来の事実として射影する。同じ出典を
+    // 持つ Claim 同士は、このノードを介して「同じ出典の関連知識」
+    // としてたどれる（意味の近さで勝手に結ぶことはしない）。
+    const origin = typeof claim.origin_source_id === 'string' ? claim.origin_source_id : '';
+    if (origin) {
+      const sourceId = `source:${origin}`;
+      addNode(p, { id: sourceId, kind: 'CONCEPT', label: origin, verification: 'STRUCTURAL' });
+      addEdge(p, { from: nodeId, to: sourceId, kind: 'DERIVED_FROM', verification: 'STRUCTURAL' });
+    }
+  }
+  for (const e of pendingClaimEdges) {
+    if (claimNodeIds.has(e.to)) {
+      addEdge(p, { from: e.from, to: e.to, kind: 'DERIVED_FROM', verification: 'STRUCTURAL' });
+    }
+  }
+
+  // P3013: 世界モデルの射影。実体＝ENTITY ノード、型つき関係＝そのまま
+  // エッジ。仮の関係（provisional、未検証 Claim 由来）は UNVERIFIED、
+  // 確定した関係は彼女の検証を経たものとして SELF_GATED。関係の由来
+  // Claim は evidence に残す。
+  try {
+    for (const entity of worldModelGraphService.entities()) {
+      if (!entity || typeof entity.name !== 'string' || !entity.name) continue;
+      addNode(p, {
+        id: `entity:${entity.name}`, kind: 'ENTITY', label: entity.name,
+        verification: 'STRUCTURAL', payloadRef: { store: 'worldModel', key: entity.name },
+      });
+    }
+    for (const rel of worldModelGraphService.relations()) {
+      if (!rel || typeof rel.from !== 'string' || typeof rel.to !== 'string') continue;
+      const fromId = `entity:${rel.from}`;
+      const toId = `entity:${rel.to}`;
+      if (!p.nodes.has(fromId)) addNode(p, { id: fromId, kind: 'ENTITY', label: rel.from, verification: 'STRUCTURAL' });
+      if (!p.nodes.has(toId)) addNode(p, { id: toId, kind: 'ENTITY', label: rel.to, verification: 'STRUCTURAL' });
+      addEdge(p, {
+        from: fromId, to: toId, kind: rel.type as KnowledgeEdgeKind,
+        verification: rel.provisional ? 'UNVERIFIED' : 'SELF_GATED',
+        evidence: (rel.sourceClaimIds || []).length ? `claims:${(rel.sourceClaimIds || []).join(',')}` : undefined,
+      });
+    }
+  } catch { /* 世界モデルが読めなくても他の射影は成立させる */ }
 
   // 診断台帳: 試行・ケース・因果連鎖・由来・証拠。
   let attempts: ReturnType<typeof diagnosisTaskService.listAttempts> = [];
@@ -270,14 +360,24 @@ function learnedProjection(): { projection: Projection; lessonByComponentId: Map
     const last = attempts[attempts.length - 1];
     attemptsFingerprint = `${attempts.length}:${last ? `${last.attemptId}:${last.at}` : ''}`;
   } catch { attemptsFingerprint = 'err'; }
+  // P3013: Claim 台帳と世界モデルも射影対象になったので、その変化も
+  // 指紋に含める（件数＋末尾 ID の軽い指紋）。
+  let knowledgeFingerprint = '';
+  try {
+    const claims = claimDatabaseService.getAllClaims() as Array<Record<string, unknown>>;
+    const lastClaim = claims[claims.length - 1];
+    const rels = worldModelGraphService.relations();
+    knowledgeFingerprint = `c${claims.length}:${lastClaim ? String(lastClaim.claim_id || '') : ''}:r${rels.length}`;
+  } catch { knowledgeFingerprint = 'err'; }
+  const fullFingerprint = `${attemptsFingerprint}|${knowledgeFingerprint}`;
   if (learnedCache && learnedCache.itemsRef === (items as unknown)
-    && learnedCache.attemptsFingerprint === attemptsFingerprint) {
+    && learnedCache.attemptsFingerprint === fullFingerprint) {
     return learnedCache;
   }
   const built = buildLearnedProjection();
   learnedCache = {
     itemsRef: items as unknown,
-    attemptsFingerprint,
+    attemptsFingerprint: fullFingerprint,
     projection: built.projection,
     lessonByComponentId: built.lessonByComponentId,
   };
@@ -419,6 +519,75 @@ export const knowledgeGraphService = {
     });
     scored.sort((a, b) => b.hits - a.hits || a.idx - b.idx);
     return scored.map((s) => s.g);
+  },
+
+  // ノードの「中身」を返す（消費側が答えを組み立てるための素材。
+  // 文の生成そのものは消費側＝会話の仕組みの仕事で、グラフは
+  // 何を知っていて何とつながっているかだけを渡す）。
+  contentFor(nodeId: string): { text: string; verification: KnowledgeVerification } | undefined {
+    const { projection, lessonByComponentId } = learnedProjection();
+    const node = projection.nodes.get(nodeId);
+    if (!node) return undefined;
+    if (node.kind === 'LESSON' && node.componentId) {
+      const g = lessonByComponentId.get(node.componentId);
+      if (g) return { text: g.rule, verification: node.verification };
+    }
+    // CLAIM はラベルが主張文そのもの。COMPONENT は目的文、ENTITY /
+    // STATEMENT は名前・文がラベルに入っている。
+    return { text: node.label, verification: node.verification };
+  },
+
+  // P3013: 一般想起のための活性化。入力文で言及された話題・実体を
+  // 種ノードとして起こし、知識のエッジ（因果・説明・由来・根拠・
+  // 世界モデルの関係）を最大 maxDepth 段までたどって、つながった
+  // 知識ごと返す。コード射影は対象外（重さと性質が違うため）。
+  // 種の取り方: レッスンは findLessonNodesFor の照合、実体は名前の
+  // 出現、Claim は主張文の内容キーの一致（2件以上、または4文字以上
+  // のキー1件）。文（STATEMENT）は断片的なので直接の種にはしない。
+  activateFor(text: string, maxDepth = 2): ActivationResult {
+    const { projection } = learnedProjection();
+    const seeds: KnowledgeNode[] = [];
+    const seenSeed = new Set<string>();
+    const push = (n: KnowledgeNode | undefined) => {
+      if (n && !seenSeed.has(n.id)) { seenSeed.add(n.id); seeds.push(n); }
+    };
+    for (const g of this.findLessonNodesFor(text)) push(g.node);
+    for (const node of projection.nodes.values()) {
+      if (node.kind === 'ENTITY') {
+        if (node.label.length >= 2 && text.includes(node.label)) push(node);
+      } else if (node.kind === 'CLAIM') {
+        const hits = titleKeys(node.label).filter((k) => k.length >= 2 && text.includes(k));
+        if (hits.length >= 2 || hits.some((k) => k.length >= 4)) push(node);
+      }
+    }
+    const WALK_KINDS = new Set<KnowledgeEdgeKind>([
+      'CAUSES', 'EXPLAINS', 'DERIVED_FROM', 'VERIFIED_BY', 'SUPPORTS',
+      'IS_A', 'PART_OF', 'ENABLES', 'USED_FOR',
+    ]);
+    const depthOf = new Map<string, number>();
+    for (const s of seeds) depthOf.set(s.id, 0);
+    let frontier = seeds.map((s) => s.id);
+    for (let d = 1; d <= maxDepth && frontier.length > 0; d += 1) {
+      const next: string[] = [];
+      for (const id of frontier) {
+        const incident = [...(projection.out.get(id) || []), ...(projection.into.get(id) || [])];
+        for (const e of incident) {
+          if (!WALK_KINDS.has(e.kind)) continue;
+          const other = e.from === id ? e.to : e.from;
+          if (!depthOf.has(other)) { depthOf.set(other, d); next.push(other); }
+        }
+      }
+      frontier = next;
+    }
+    const activated: ActivatedNode[] = [];
+    for (const [id, depth] of depthOf) {
+      const node = projection.nodes.get(id);
+      if (node) activated.push({ node, depth });
+    }
+    activated.sort((a, b) => a.depth - b.depth);
+    const idSet = new Set(depthOf.keys());
+    const edges = projection.edges.filter((e) => idSet.has(e.from) && idSet.has(e.to) && WALK_KINDS.has(e.kind));
+    return { seeds, activated, edges };
   },
 
   // 連結モードの基本動作: 起点の文から CAUSES エッジを前方へたどり、

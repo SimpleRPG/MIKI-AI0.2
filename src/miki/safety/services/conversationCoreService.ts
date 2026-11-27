@@ -665,6 +665,13 @@ export class ConversationCoreService {
       if (lessonHowTo) {
         return this.buildResult('RESOLVED', 'lesson_howto_answer', this.applyPersonaVoice(lessonHowTo), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
+      // P3013: 事実の質問は、統合グラフの一般想起（言及された話題を
+      // 起こしてエッジをたどる）で、Claim の知識から答える。レッスン
+      // 以外の知識（調査で得た Claim 等）にも会話の受け口を付ける。
+      const graphRecall = multiPart ? undefined : this.graphRecallAnswer(prompt);
+      if (graphRecall) {
+        return this.buildResult('RESOLVED', 'graph_recall_answer', this.applyPersonaVoice(graphRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
       // P878: 関係性の相談では、教わった会話例をお手本として引く。
       const exampleAnswer = multiPart ? undefined : this.relationshipConsultAnswer(prompt);
       if (exampleAnswer) {
@@ -5887,6 +5894,35 @@ export class ConversationCoreService {
       return `教わったところでは、${ruleText}（「${hit.title}」というレッスンで教わりました）`;
     }
     return `まだ候補として教わった知識ですけど、「${hit.title}」には、こうあります。${ruleText}`;
+  }
+
+  // P3013: 統合グラフの一般想起で Claim の知識から答える。種になった
+  // Claim の主張を本体にし、エッジを1段たどって着いた関連 Claim を
+  // 「同じ出典の話」として短く添える（連想も想起の一部）。検証状態は
+  // 出し方で区別する: 未検証は裏取りが済んでいないことを明示し、
+  // 彼女の検証を通ったものは「分かっている」と言い切る。グラフは
+  // 素材（何を知っていて何とつながっているか）を渡すだけで、文の
+  // 組み立てはここ（会話の仕組み）の仕事。
+  private graphRecallAnswer(prompt: string): string | undefined {
+    if (!/[？?]/.test(prompt) && !/(?:教えて|知ってる|知っている)/.test(prompt)) return undefined;
+    if (!/(?:何|なぜ|どうして|本当|知ってる|知っている|教えて|ある|起き|遅い|速い|なる|って)/.test(prompt)) return undefined;
+    let act: ReturnType<typeof knowledgeGraphService.activateFor>;
+    try { act = knowledgeGraphService.activateFor(prompt, 2); } catch { return undefined; }
+    const claimSeed = act.seeds.find((s) => s.kind === 'CLAIM');
+    if (!claimSeed) return undefined;
+    const main = knowledgeGraphService.contentFor(claimSeed.id);
+    if (!main) return undefined;
+    const verified = claimSeed.verification === 'SELF_GATED';
+    const closing = verified ? 'と分かっています。' : 'とされています。';
+    let text = verified
+      ? `前に調べた話では、${main.text}、${closing}`
+      : `まだ裏取りはできていない話ですけど、前に調べた話では、${main.text}、${closing}`;
+    const assoc = act.activated.find((a) => a.depth >= 1 && a.node.kind === 'CLAIM' && a.node.id !== claimSeed.id);
+    if (assoc) {
+      const c = knowledgeGraphService.contentFor(assoc.node.id);
+      if (c) text += `同じ出典の話では、${c.text}、とされています。`;
+    }
+    return text;
   }
 
   // レッスンの規則文から、手順の答えに要る範囲を取り出す。文単位で
