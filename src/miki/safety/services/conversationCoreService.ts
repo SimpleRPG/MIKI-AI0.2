@@ -74,6 +74,7 @@ import { knowledgeGapService } from '../../unknown/services/knowledgeGapService'
 import { researchService } from '../../research/services/researchService';
 import { verifierService } from '../../verification/services/verifierService';
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
+import { knowledgeGraphService, type GroundedLessonNode } from '../../core/services/knowledgeGraphService';
 import { capabilityReuseService } from '../../capability/services/capabilityReuseService';
 import { failureMemoryService } from '../../memory/services/failureMemoryService';
 import { conversationComponentPipelineService } from '../../conversation/services/conversationComponentPipelineService';
@@ -654,6 +655,15 @@ export class ConversationCoreService {
       const principleAnswer = multiPart ? undefined : this.designPrincipleAnswer(prompt);
       if (principleAnswer) {
         return this.buildResult('RESOLVED', 'design_principle_answer', this.applyPersonaVoice(principleAnswer), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
+      }
+      // P3012: 手順・やり方の質問は、統合知識グラフ経由で教わった
+      // レッスンから答える。設計の話題ゲート（designPrincipleAnswer）
+      // に掛からない事実の手順質問でも、検証済みの教材が使えるように
+      // する（従来は属性質問の「やり方」に落ちて、教材を持っていても
+      // 「やり方はまだ知らない」と答えていた）。
+      const lessonHowTo = multiPart ? undefined : this.lessonHowToAnswer(prompt);
+      if (lessonHowTo) {
+        return this.buildResult('RESOLVED', 'lesson_howto_answer', this.applyPersonaVoice(lessonHowTo), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P878: 関係性の相談では、教わった会話例をお手本として引く。
       const exampleAnswer = multiPart ? undefined : this.relationshipConsultAnswer(prompt);
@@ -5857,6 +5867,49 @@ export class ConversationCoreService {
     const firstSentence = lesson.rule.split('。')[0];
     const ruleText = firstSentence.length > 110 ? `${firstSentence.slice(0, 107)}…` : `${firstSentence}。`;
     return `教わったゲーム作りの原則に、こういうのがあります。「${lesson.title}」${ruleText}まだ候補として教わった知識ですけど、観点としてどうでしょう。`;
+  }
+
+  // P3012: 手順・やり方の質問に、統合知識グラフのレッスンノードから
+  // 答える。照合はグラフ経由（findLessonNodesFor＝teacherLessonRecall
+  // の基準＋ノードの検証状態）。事実の手順は引用の回転をせず最上位を
+  // 使う（原則の観点出しと違い、正しさ優先）。検証状態は出し方で
+  // 区別する: 教師検証済みは教わった内容として、未検証は候補として
+  // 明示する（グラフの規律: 検証状態を消費側が見分けられること）。
+  private lessonHowToAnswer(prompt: string): string | undefined {
+    if (!/(?:どうすれば|どうしたら|どうやって|するには|やり方|手順)/.test(prompt)) return undefined;
+    let ranked: GroundedLessonNode[] = [];
+    try { ranked = knowledgeGraphService.findLessonNodesFor(prompt); } catch { return undefined; }
+    const hit = ranked[0];
+    if (!hit) return undefined;
+    this.recordComponentCitation(hit.componentId, 'lesson-howto-consult');
+    const ruleText = this.lessonRuleExcerpt(hit.rule);
+    if (hit.verification === 'CLAUDE_VERIFIED') {
+      return `教わったところでは、${ruleText}（「${hit.title}」というレッスンで教わりました）`;
+    }
+    return `まだ候補として教わった知識ですけど、「${hit.title}」には、こうあります。${ruleText}`;
+  }
+
+  // レッスンの規則文から、手順の答えに要る範囲を取り出す。文単位で
+  // 積み、括弧の対応が閉じるまでは文を割らない。短い規則は全文。
+  private lessonRuleExcerpt(rule: string): string {
+    const text = rule.trim();
+    if (text.length <= 200) return text;
+    const sentences: string[] = [];
+    let buf = '';
+    let depth = 0;
+    for (const ch of text) {
+      buf += ch;
+      if (ch === '（' || ch === '(') depth += 1;
+      else if (ch === '）' || ch === ')') depth = Math.max(0, depth - 1);
+      else if (ch === '。' && depth === 0) { sentences.push(buf); buf = ''; }
+    }
+    if (buf) sentences.push(buf);
+    let out = '';
+    for (const s of sentences) {
+      out += s;
+      if (out.length >= 140) break;
+    }
+    return out || text.slice(0, 200);
   }
 
   // P878: 関係性の相談で、教師から教わった会話例をお手本として出す。
