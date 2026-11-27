@@ -40,6 +40,39 @@ import type { MemoryItem, MemoryType, MemoryDestination } from '../types';
 export const GIANT_VALUE_CHARS = 2 * 1024 * 1024;
 export const GIANT_FLUSH_MIN_INTERVAL_MS = 30 * 1000;
 
+/**
+ * P3003: IndexedDB フラッシュのトランザクション分割上限。
+ * Seed 適用時は約1850キー／22MB が1トランザクションに載り、完了が
+ * 記録される前にレンダラがメモリ圧で死ぬと全量が巻き戻って、次回
+ * 起動も同じ適用を繰り返すループになった（2026-11-27 ラボで実証）。
+ * 1回のフラッシュを複数の小さなトランザクションに分ければ、途中
+ * で落ちても確定済みの塊は残り、未確定分だけが次回に回る。
+ */
+export const IDB_TX_MAX_KEYS = 48;
+export const IDB_TX_MAX_CHARS = 1_500_000;
+
+export function partitionFlushTxKeys(
+  sizes: Array<{ key: string; chars: number }>
+): string[][] {
+  const chunks: string[][] = [];
+  let current: string[] = [];
+  let currentChars = 0;
+  for (const { key, chars } of sizes) {
+    if (
+      current.length > 0 &&
+      (current.length >= IDB_TX_MAX_KEYS || currentChars + chars > IDB_TX_MAX_CHARS)
+    ) {
+      chunks.push(current);
+      current = [];
+      currentChars = 0;
+    }
+    current.push(key);
+    currentChars += chars;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
+
 export function partitionGiantFlushKeys(
   sizes: Array<{ key: string; chars: number }>,
   now: number,
@@ -525,41 +558,49 @@ class StorageService {
           }
         }
       } else if (this.backend === 'indexeddb' && this.idb) {
-        await new Promise<void>((resolve, reject) => {
-          const tx = this.idb!.transaction(
-            this.idb!.objectStoreNames.contains(this.MEMORIES_STORE)
-              ? [this.STORE, this.MEMORIES_STORE]
-              : [this.STORE],
-            'readwrite'
-          );
-          const store = tx.objectStore(this.STORE);
-          const memoriesStore = this.idb!.objectStoreNames.contains(this.MEMORIES_STORE)
-            ? tx.objectStore(this.MEMORIES_STORE)
-            : null;
+        // P3003: 1フラッシュを複数のトランザクションに分割する
+        // （partitionFlushTxKeys）。強制フラッシュでも全キーを書く
+        // 点は変えず、確定の単位だけを小さくする。
+        const txChunks = partitionFlushTxKeys(
+          keys.map((key) => ({ key, chars: this.cache.get(key)?.length ?? 0 }))
+        );
+        for (const chunkKeys of txChunks) {
+          await new Promise<void>((resolve, reject) => {
+            const tx = this.idb!.transaction(
+              this.idb!.objectStoreNames.contains(this.MEMORIES_STORE)
+                ? [this.STORE, this.MEMORIES_STORE]
+                : [this.STORE],
+              'readwrite'
+            );
+            const store = tx.objectStore(this.STORE);
+            const memoriesStore = this.idb!.objectStoreNames.contains(this.MEMORIES_STORE)
+              ? tx.objectStore(this.MEMORIES_STORE)
+              : null;
 
-          for (const key of keys) {
-            if (this.cache.has(key)) {
-              const val = this.cache.get(key)!;
-              store.put(val, key);
+            for (const key of chunkKeys) {
+              if (this.cache.has(key)) {
+                const val = this.cache.get(key)!;
+                store.put(val, key);
 
-              // If updating memories, sync structured IndexedDB store
-              if (key === 'gamecraft_memories' && memoriesStore) {
-                try {
-                  const memList: MemoryItem[] = JSON.parse(val);
-                  if (Array.isArray(memList)) {
-                    for (const mem of memList) {
-                      memoriesStore.put(mem);
+                // If updating memories, sync structured IndexedDB store
+                if (key === 'gamecraft_memories' && memoriesStore) {
+                  try {
+                    const memList: MemoryItem[] = JSON.parse(val);
+                    if (Array.isArray(memList)) {
+                      for (const mem of memList) {
+                        memoriesStore.put(mem);
+                      }
                     }
-                  }
-                } catch {}
+                  } catch {}
+                }
+              } else {
+                store.delete(key);
               }
-            } else {
-              store.delete(key);
             }
-          }
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => reject(tx.error);
-        });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          });
+        }
       }
       if (wroteGiant) this.lastGiantFlushAt = Date.now();
       // backend === 'memory': nothing to persist beyond the in-memory cache.

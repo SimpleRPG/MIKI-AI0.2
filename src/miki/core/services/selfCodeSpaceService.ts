@@ -62,6 +62,13 @@ const LIGHT_KEY = 'miki_self_code_light_manifest_v1';
 const LIGHT_CHANGESET_KEY = 'miki_self_code_light_changeset_v1';
 const SETTINGS_KEY = 'miki_self_code_github_settings_v1';
 const SEED_APPLIED_KEY = 'miki_self_code_seed_revision_v1';
+// P3003: 理解索引の背景更新を遅らせる時間。ensure() は全ツリーを
+// 同期的に解析する重い処理で、Seed 適用のフラッシュと同じ窓で走る
+// とメインスレッドを占有し、フラッシュ完了前にレンダラがメモリ圧
+// で死んで適用が毎回やり直しになる（2026-11-27 ラボで実証）。
+// Seed の永続化はマーカー順序で先に確定するため、索引が遅れても
+// 状態は壊れない。
+const LIGHT_INDEX_REFRESH_DELAY_MS = 30_000;
 const DEFAULT_REPOSITORY = 'SimpleRPG/MIKI-AI0.2';
 const DEFAULT_BRANCH = 'main';
 export interface SelfCodeGitHubSettings { repository:string; branch:string; commitMessage:string; }
@@ -395,7 +402,57 @@ class SelfCodeSpaceService {
       const total = manifest.files.length;
       manifestFileCount = total;
       checkpoint('MANIFEST_VALIDATED', { fileCount: total, zipBytes: bytes.byteLength });
-      const files: SelfCodeFile[] = [];
+      const settings = this.getGitHubSettings();
+      const appliedRevision =
+        storageService.getItem(SEED_APPLIED_KEY) || '';
+
+      // P3003 高速路: 適用済みマーカーと保存済み分割マニフェストの
+      // treeSha（Seed 適用では seedRevision が入る）と既存
+      // スナップショットのリビジョンが、同梱 Seed のリビジョンと
+      // 全部一致するなら、全ファイルの展開・検証をせず最新とみなす。
+      // リビジョンが変わった時だけ下の全検証へ進む。
+      if (
+        existing &&
+        appliedRevision === manifest.seedRevision &&
+        existing.repoSha256 === manifest.seedRevision &&
+        existing.files.every(file => Boolean(file.blobSha))
+      ) {
+        const storedManifest = githubSyncService.manifest(
+          settings.repository,
+          settings.branch
+        );
+        if (
+          storedManifest?.complete &&
+          storedManifest.treeSha === manifest.seedRevision &&
+          storedManifest.files.length === total
+        ) {
+          checkpoint('ALREADY_CURRENT', { fileCount: total, fastPath: true });
+          report({
+            phase: 'COMPLETE',
+            completed: total,
+            total,
+            detail: `Seedは最新状態です（${total}ファイル）。`,
+          });
+
+          return {
+            status: 'ALREADY_CURRENT',
+            seedRevision: manifest.seedRevision,
+          };
+        }
+      }
+
+      const metaFiles: Array<{ path: string; sha256: string; blobSha?: string }> = [];
+      // P3003: 保存済みマニフェストとハッシュが違うファイルだけ、
+      // 後段の保存のために内容を保持する。全ファイルの内容
+      // （約20MB）とその複製を同時に保持し続けない。
+      const storedManifestForDiff = githubSyncService.manifest(
+        settings.repository,
+        settings.branch
+      );
+      const storedShaByPath = new Map(
+        (storedManifestForDiff?.files || []).map(file => [file.path, file.sha256])
+      );
+      const changedContents = new Map<string, string>();
 
       report({
         phase: 'VERIFY',
@@ -441,15 +498,17 @@ class SelfCodeSpaceService {
           );
         }
 
-        files.push({
+        metaFiles.push({
           path: filePath,
-          content,
           sha256: actualSha,
           blobSha,
         });
-        if (files.length === 1 || files.length % 100 === 0 || files.length === total) {
+        if (storedShaByPath.get(filePath) !== actualSha) {
+          changedContents.set(filePath, content);
+        }
+        if (metaFiles.length === 1 || metaFiles.length % 100 === 0 || metaFiles.length === total) {
           checkpoint('VERIFY_PROGRESS', {
-            completedCount: files.length,
+            completedCount: metaFiles.length,
             totalCount: total,
             fileCount: total,
             totalContentChars,
@@ -458,15 +517,15 @@ class SelfCodeSpaceService {
         }
 
         if (
-          files.length === 1 ||
-          files.length % 25 === 0 ||
-          files.length === total
+          metaFiles.length === 1 ||
+          metaFiles.length % 25 === 0 ||
+          metaFiles.length === total
         ) {
           report({
             phase: 'VERIFY',
-            completed: files.length,
+            completed: metaFiles.length,
             total,
-            detail: `Seed検証 ${files.length}/${total}`,
+            detail: `Seed検証 ${metaFiles.length}/${total}`,
           });
 
           // UIへ描画機会を返す。
@@ -476,14 +535,14 @@ class SelfCodeSpaceService {
         }
       }
 
-      if (!files.length) {
+      if (!metaFiles.length) {
         throw new Error(
           'BUNDLED_SELF_CODE_SEED_EMPTY'
         );
       }
 
       const repoSha256 = canonicalSha256(
-        files.map(file => ({
+        metaFiles.map(file => ({
           path: file.path,
           sha256: file.sha256,
         }))
@@ -496,9 +555,6 @@ class SelfCodeSpaceService {
           'BUNDLED_SELF_CODE_SEED_REVISION_MISMATCH'
         );
       }
-
-      const appliedRevision =
-        storageService.getItem(SEED_APPLIED_KEY) || '';
 
       if (
         existing &&
@@ -528,20 +584,27 @@ class SelfCodeSpaceService {
       });
 
       checkpoint('APPLY_BEGIN', { fileCount: total, totalContentChars, maxFileChars });
-      const settings = this.getGitHubSettings();
 
-      githubSyncService.applyBundledSeed(
+      githubSyncService.applyBundledSeedState(
         settings.repository,
         settings.branch,
         {
-          files,
+          files: metaFiles,
+          changedContents,
           commitSha: String(manifest.commitSha),
           seedRevision: String(manifest.seedRevision),
         }
       );
-      this.recordLightManifest(files);
+      this.recordLightManifest(metaFiles);
       checkpoint('APPLY_COMPLETE', { fileCount: total, totalContentChars, maxFileChars });
 
+      // P3003: 状態（分割ファイル＋マニフェスト＋軽量マニフェスト）を
+      // 先に確定させてから、適用マーカーだけを単独の小さな
+      // フラッシュで書く。途中で落ちても、マーカーが先行して
+      // 「未適用なのに適用済み」になることはない（逆に、状態だけ
+      // 新しくてマーカーが古い場合は次回起動の全検証で自己修復する）。
+      await storageService.flushNow();
+      checkpoint('SEED_STATE_FLUSH_COMPLETE', { fileCount: total, totalContentChars });
       storageService.setItem(
         SEED_APPLIED_KEY,
         String(manifest.seedRevision)
@@ -890,7 +953,9 @@ class SelfCodeSpaceService {
   // the light manifest so index-first consumers can work without a
   // separate light sync. The understanding index is refreshed in
   // the background and never blocks the sync itself.
-  private recordLightManifest(files: SelfCodeFile[]): void {
+  // P3003: 使うのは path と blobSha だけなので、その形で受ける
+  // （Seed 適用側は内容を持たないメタだけで呼べるようになる）。
+  private recordLightManifest(files: Array<{ path: string; blobSha?: string }>): void {
     try {
       const settings = this.getGitHubSettings();
       const sync = githubSyncService.get(
@@ -923,20 +988,25 @@ class SelfCodeSpaceService {
   private refreshLightIndexInBackground(): void {
     if (this.lightIndexRefreshInFlight) return;
     this.lightIndexRefreshInFlight = true;
-    void (async () => {
-      try {
-        const { selfCodeUnderstandingService } = await import(
-          './selfCodeUnderstandingService'
-        );
-        selfCodeUnderstandingService.ensure([]);
-        const manifestCommit = this.getLightManifest()?.commitSha;
-        if (manifestCommit) selfCodeUnderstandingService.stampSourceCommit(manifestCommit);
-      } catch {
-        // Background indexing is best-effort.
-      } finally {
-        this.lightIndexRefreshInFlight = false;
-      }
-    })();
+    // P3003: 起動・同期の窓を空けるため遅延起動にする
+    // （LIGHT_INDEX_REFRESH_DELAY_MS のコメント参照）。in-flight
+    // フラグは遅延の間も保持し、二重に積まれないようにする。
+    setTimeout(() => {
+      void (async () => {
+        try {
+          const { selfCodeUnderstandingService } = await import(
+            './selfCodeUnderstandingService'
+          );
+          selfCodeUnderstandingService.ensure([]);
+          const manifestCommit = this.getLightManifest()?.commitSha;
+          if (manifestCommit) selfCodeUnderstandingService.stampSourceCommit(manifestCommit);
+        } catch {
+          // Background indexing is best-effort.
+        } finally {
+          this.lightIndexRefreshInFlight = false;
+        }
+      })();
+    }, LIGHT_INDEX_REFRESH_DELAY_MS);
   }
 
   // P354: the light manifest may stand in for the classic source

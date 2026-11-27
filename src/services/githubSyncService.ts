@@ -336,18 +336,29 @@ class GitHubSyncService {
    * 壊さない）。読みのディスク優先化は、実機ログで写しの一致が
    * 確認できてから別段で行う。
    */
-  private mirrorToNative(state: GitHubSyncState, prevFiles: Array<{ path: string; sha256: string }>): void {
+  private mirrorToNative(
+    state: {
+      repository: string;
+      branch: string;
+      files: Array<{ path: string; content?: string; sha256: string }>;
+    },
+    prevFiles: Array<{ path: string; sha256: string }>,
+    nextPaths?: Set<string>
+  ): void {
     void (async () => {
       try {
         const { nativeWorkspaceBridgeService } = await import('../miki/execution/services/nativeWorkspaceBridgeService');
         if (!(await nativeWorkspaceBridgeService.available())) return;
         const prev = new Map(prevFiles.map((file) => [file.path, file.sha256]));
-        const next = new Set(state.files.map((file) => file.path));
+        const next = nextPaths ?? new Set(state.files.map((file) => file.path));
         let written = 0;
         let deleted = 0;
         let failed = 0;
         for (const file of state.files) {
           if (prev.get(file.path) === file.sha256) continue;
+          // P3003: メタのみの項目（Seed の未変更ファイル）は写す内容が
+          // 無いので対象外。呼び出し側が変更分だけを渡す。
+          if (typeof file.content !== 'string') continue;
           const result = await nativeWorkspaceBridgeService.writeFile(file.path, file.content);
           if (result && result.sha256 === file.sha256) written++;
           else failed++;
@@ -730,6 +741,96 @@ class GitHubSyncService {
       syncedAt: Date.now(),
       source: 'BUNDLED_SEED',
     });
+  }
+
+  /**
+   * P3003: Seed 適用の分割保存（メタ＋変更ファイルのみ）。
+   *
+   * 従来の applyBundledSeed は全ファイルの内容を保持したまま
+   * normalizeFiles で全件再ハッシュし、save→writeSplit へ渡していた。
+   * Seed 検証側で既に内容とハッシュの一致を確認済みなので、ここでは
+   * 検証済みメタ（パス＋sha256＋blobSha）と、保存済みマニフェストと
+   * ハッシュが違うファイルの内容だけを受け取り、分割保存へ直接書く。
+   * 全量（約20MB）とその複製を同時に保持しないための形。
+   *
+   * 書き順: 変更ファイルキー → 削除キー → マニフェストキーを最後。
+   * マニフェストが分割保存の確定点なので、途中で落ちても旧
+   * マニフェスト＋旧ファイル群（と一部の新ファイル）に戻るだけで、
+   * 適用済みマーカーは呼び出し側が状態の確定後に別フラッシュで
+   * 書くため、未適用を適用済みと誤認することはない。
+   */
+  applyBundledSeedState(
+    repository: string,
+    branch: string,
+    input: {
+      files: Array<{ path: string; sha256: string; blobSha?: string }>;
+      changedContents: Map<string, string>;
+      commitSha: string;
+      seedRevision: string;
+    }
+  ): SplitManifest {
+    const normalizedRepository = normalizeRepository(repository);
+    const normalizedBranch = branch.trim();
+    let prevFiles: Array<{ path: string; sha256: string }> = [];
+    try {
+      prevFiles = this.readManifest(normalizedRepository, normalizedBranch)?.files ?? [];
+    } catch {
+      prevFiles = [];
+    }
+    const prevSha = new Map(prevFiles.map((file) => [file.path, file.sha256]));
+    const nextPaths = new Set<string>();
+    const changedForMirror: Array<{ path: string; content: string; sha256: string }> = [];
+
+    for (const file of input.files) {
+      nextPaths.add(file.path);
+      const content = input.changedContents.get(file.path);
+      if (content !== undefined) {
+        storageService.setItem(
+          makeFileKey(normalizedRepository, normalizedBranch, file.path),
+          JSON.stringify({ content })
+        );
+        changedForMirror.push({ path: file.path, content, sha256: file.sha256 });
+      } else if (!prevSha.has(file.path)) {
+        // 前マニフェストに無く変更内容も無いのは呼び出し側の不整合。
+        // 内容の無いファイルを黙って作らない。
+        throw new Error(`BUNDLED_SEED_CONTENT_MISSING:${file.path}`);
+      }
+    }
+    for (const old of prevFiles) {
+      if (!nextPaths.has(old.path)) {
+        storageService.removeItem(makeFileKey(normalizedRepository, normalizedBranch, old.path));
+      }
+    }
+
+    const manifest: SplitManifest = {
+      repository: normalizedRepository,
+      branch: normalizedBranch,
+      commitSha: String(input.commitSha || ''),
+      treeSha: String(input.seedRevision || ''),
+      complete: true,
+      source: 'BUNDLED_SEED',
+      syncedAt: Date.now(),
+      files: input.files.map((file) => ({
+        path: file.path,
+        sha256: file.sha256,
+        blobSha: file.blobSha,
+      })),
+    };
+    storageService.setItem(
+      makeManifestKey(normalizedRepository, normalizedBranch),
+      JSON.stringify(manifest)
+    );
+    try {
+      if (storageService.getItem(makeKey(normalizedRepository, normalizedBranch))) {
+        storageService.removeItem(makeKey(normalizedRepository, normalizedBranch));
+      }
+    } catch { /* 旧キーの掃除は補助経路 */ }
+    this.mirrorToNative(
+      { repository: normalizedRepository, branch: normalizedBranch, files: changedForMirror },
+      prevFiles,
+      nextPaths
+    );
+    return manifest;
   }
 
   preparePush(
