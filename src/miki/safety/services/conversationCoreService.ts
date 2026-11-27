@@ -75,6 +75,7 @@ import { researchService } from '../../research/services/researchService';
 import { verifierService } from '../../verification/services/verifierService';
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
 import { knowledgeGraphService, type GroundedLessonNode } from '../../core/services/knowledgeGraphService';
+import { phraseComposerService } from '../../core/services/phraseComposerService';
 import { capabilityReuseService } from '../../capability/services/capabilityReuseService';
 import { failureMemoryService } from '../../memory/services/failureMemoryService';
 import { conversationComponentPipelineService } from '../../conversation/services/conversationComponentPipelineService';
@@ -5912,17 +5913,22 @@ export class ConversationCoreService {
     if (!claimSeed) return undefined;
     const main = knowledgeGraphService.contentFor(claimSeed.id);
     if (!main) return undefined;
-    const verified = claimSeed.verification === 'SELF_GATED';
-    const closing = verified ? 'と分かっています。' : 'とされています。';
-    let text = verified
-      ? `前に調べた話では、${main.text}、${closing}`
-      : `まだ裏取りはできていない話ですけど、前に調べた話では、${main.text}、${closing}`;
     const assoc = act.activated.find((a) => a.depth >= 1 && a.node.kind === 'CLAIM' && a.node.id !== claimSeed.id);
-    if (assoc) {
-      const c = knowledgeGraphService.contentFor(assoc.node.id);
-      if (c) text += `同じ出典の話では、${c.text}、とされています。`;
-    }
-    return text;
+    const assocContent = assoc ? knowledgeGraphService.contentFor(assoc.node.id) : undefined;
+    // P3014: この返答は逐次合成で組み立てる（文末は先に予約し、
+    // 一節ごとに文脈と既出の前半へ条件づけて選ぶ）。グラフは素材を
+    // 渡し、合成の段取りは phraseComposerService が持つ。
+    const plan = phraseComposerService.claimRecallPlan({
+      verification: claimSeed.verification,
+      mainText: main.text,
+      assocText: assocContent?.text,
+    });
+    const composed = phraseComposerService.composePhraseReply(plan, {
+      verification: claimSeed.verification,
+      mainText: main.text,
+      assocText: assocContent?.text,
+    });
+    return composed.text || undefined;
   }
 
   // レッスンの規則文から、手順の答えに要る範囲を取り出す。文単位で
