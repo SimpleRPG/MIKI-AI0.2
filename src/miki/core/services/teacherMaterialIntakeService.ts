@@ -9,6 +9,7 @@ import {
 import { definitionPatternService } from '../../research/services/definitionPatternService';
 import { lexicalRelationService, type LexicalRelationType } from '../../memory/services/lexicalRelationService';
 import { missedFormLearningService } from '../../conversation/services/missedFormLearningService';
+import { diagnosisTaskService, type DiagnosisCaseInput } from './diagnosisTaskService';
 
 /*
  * P472: 教師教材パッケージの受け口。
@@ -38,6 +39,10 @@ import { missedFormLearningService } from '../../conversation/services/missedFor
  * される。レッスンが空でも、有効な定義形があれば受け付ける。
  * 語彙ルール（P495）も任意の追加分。type は PARAPHRASE と SYNONYM
  * のみ受け付ける（言い換え・同義の供給用）。
+ * 診断ケース（P3006）も任意の追加分。diagnosisCases:
+ * [{ id, family, targetFile, gateMetric?, failEvidence, evidencePack,
+ *    codeRegion: { text } }] を彼女自身の診断タスク
+ * （diagnosisTaskService）へ出題し、試行は診断台帳に残る。
  * 参照画像は references/ 以下に .png / .jpg / .jpeg / .webp で同梱できる。
  */
 
@@ -83,6 +88,9 @@ export interface TeacherMaterialIntakeRecord {
   exampleCount?: number;
   // P914: このパッケージで登録された言い回しの形の件数。
   formCount?: number;
+  // P3006: このパッケージで出題された診断ケースの件数と試行ID。
+  diagnosisCaseCount?: number;
+  diagnosisAttemptIds?: string[];
   componentIds: string[];
   references: TeacherMaterialReferenceRecord[];
   receivedAt: number;
@@ -432,9 +440,54 @@ class TeacherMaterialIntakeService {
         dialogueFormCount++;
       }
     }
+    // P3006: 診断ケースの出題（任意）。欠陥の証拠（証拠パック＋壊れた
+    // コード領域）を彼女自身の診断タスクへ渡す。教材の他のセクションと
+    // 同じく、出題は素材の供給であり、診断は彼女の仕組みが行い、試行は
+    // 彼女の台帳に残る。形式が不正なケースは理由を添えてスキップする。
+    const rawDiagnosisCases = Array.isArray((manifest as any).diagnosisCases)
+      ? (manifest as any).diagnosisCases as unknown[]
+      : [];
+    const diagnosisAttemptIds: string[] = [];
+    const diagnosisNotes: string[] = [];
+    for (const item of rawDiagnosisCases.slice(0, 20)) {
+      const c = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : {};
+      const id = typeof c.id === 'string' ? c.id.trim() : '';
+      const family = typeof c.family === 'string' ? c.family.trim() : '';
+      const targetFile = typeof c.targetFile === 'string' ? c.targetFile.trim() : '';
+      const codeRegion = c.codeRegion && typeof c.codeRegion === 'object' && !Array.isArray(c.codeRegion)
+        ? c.codeRegion as Record<string, unknown>
+        : {};
+      const codeText = typeof codeRegion.text === 'string' ? codeRegion.text : '';
+      const failEvidence = c.failEvidence && typeof c.failEvidence === 'object' && !Array.isArray(c.failEvidence)
+        ? c.failEvidence as Record<string, unknown>
+        : null;
+      const evidencePack = c.evidencePack && typeof c.evidencePack === 'object' && !Array.isArray(c.evidencePack)
+        ? c.evidencePack as Record<string, unknown>
+        : null;
+      if (!id || !family || !targetFile || !codeText || !failEvidence || !evidencePack) {
+        diagnosisNotes.push(`診断ケース ${id || '(id無し)'}: 形式が不正です（id/family/targetFile/codeRegion.text/failEvidence/evidencePack が必要です）`);
+        continue;
+      }
+      const caseInput: DiagnosisCaseInput = {
+        id,
+        family,
+        targetFile,
+        gateMetric: c.gateMetric,
+        failEvidence,
+        evidencePack,
+        codeRegion: {
+          text: codeText,
+          startLine: typeof codeRegion.startLine === 'number' ? codeRegion.startLine : undefined,
+          endLine: typeof codeRegion.endLine === 'number' ? codeRegion.endLine : undefined,
+        },
+      };
+      const attempt = diagnosisTaskService.submitCase(caseInput, { intakeId });
+      diagnosisAttemptIds.push(attempt.attemptId);
+    }
+    const diagnosisCaseCount = diagnosisAttemptIds.length;
     const rawLessons = manifest.lessons;
-    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0 && lexicalRelationCount === 0 && dialogueExamples.length === 0 && dialogueFormCount === 0) {
-      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形・語彙ルール・会話例・言い回しの形）を入れてください。', ['lessons が空配列または未設定で、有効な定義形・語彙ルール・会話例・言い回しの形もありません', ...patternNotes, ...relationNotes, ...exampleNotes, ...formNotes], identifiedCtx);
+    if ((!Array.isArray(rawLessons) || rawLessons.length === 0) && definitionPatternCount === 0 && lexicalRelationCount === 0 && dialogueExamples.length === 0 && dialogueFormCount === 0 && diagnosisCaseCount === 0) {
+      return reject('MANIFEST_INVALID', 'teacher_material.json の lessons が空です。少なくとも1件のレッスン（または有効な定義形・語彙ルール・会話例・言い回しの形・診断ケース）を入れてください。', ['lessons が空配列または未設定で、有効な定義形・語彙ルール・会話例・言い回しの形・診断ケースもありません', ...patternNotes, ...relationNotes, ...exampleNotes, ...formNotes, ...diagnosisNotes], identifiedCtx);
     }
     const lessons: TeacherLesson[] = [];
     for (const item of Array.isArray(rawLessons) ? rawLessons : []) {
@@ -589,14 +642,16 @@ class TeacherMaterialIntakeService {
       lexicalRelationCount,
       exampleCount: dialogueExamples.length,
       formCount: dialogueFormCount,
+      diagnosisCaseCount,
+      diagnosisAttemptIds,
       componentIds,
       references,
       receivedAt,
     };
     this.ledger.set(intakeId, record);
     this.save();
-    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount} relations=${lexicalRelationCount} examples=${dialogueExamples.length} forms=${dialogueFormCount}`, { subject });
-    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件、語彙ルール ${lexicalRelationCount} 件、会話例 ${dialogueExamples.length} 件、言い回しの形 ${dialogueFormCount} 件）。`, reasons: [...patternNotes, ...relationNotes, ...exampleNotes, ...formNotes], record: { ...record } };
+    systemLogger.info('SELF_IMPROVEMENT', `[教師教材 受入] ${intakeId} teacher=${teacherName} lessons=${lessons.length} refs=${references.length} patterns=${definitionPatternCount} relations=${lexicalRelationCount} examples=${dialogueExamples.length} forms=${dialogueFormCount} diagnosisCases=${diagnosisCaseCount}`, { subject });
+    return { ok: true, code: 'OK', message: `教師教材を受け付けました（レッスン ${lessons.length} 件、参照画像 ${references.length} 件、定義形 ${definitionPatternCount} 件、語彙ルール ${lexicalRelationCount} 件、会話例 ${dialogueExamples.length} 件、言い回しの形 ${dialogueFormCount} 件、診断ケース ${diagnosisCaseCount} 件）。`, reasons: [...patternNotes, ...relationNotes, ...exampleNotes, ...formNotes, ...diagnosisNotes], record: { ...record } };
   }
 }
 
