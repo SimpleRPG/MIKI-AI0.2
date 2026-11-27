@@ -65,6 +65,30 @@ export const IDB_TX_MAX_CHARS = 1_500_000;
 export const IDB_INIT_SOFT_TIMEOUT_MS = 8 * 1000;
 export const IDB_INIT_HARD_TIMEOUT_MS = 180 * 1000;
 
+/**
+ * P3010: IndexedDB ハイドレーションの効率化。
+ * ラボ実測（2026-11-27）: 全 4,519 キー／105,769,871 文字のうち
+ * `miki_code_understanding_entry_v1:` が 1,136 キー／59,309,119 文字
+ * （56.1%）を占める。この理解エントリはワークスペースのファイル
+ * から ensure() が再構築できる再生可能なデータで、唯一の読み手
+ * loadSnapshot() は「1件でも欠ければスナップショット無し」を返し
+ * て再構築に落ちる設計（欠落＝破損ではない）。そこでこのファミリ
+ * だけは起動時ハイドレーション（ready が待つ分）から外し、ready
+ * 解決後に背景で読み込む。背景読み込みは書き込み側と同じ規律で
+ * dirtyKeys を尊重する: ハイドレーション中に対象キーが書かれた／
+ * 消された場合、そのキーはキャッシュ側（＝フラッシュ側）が正本
+ * なので背景読み込みは触らない。
+ * それ以外のキーは従来の1件ずつカーソルをやめ、キー範囲ごとの
+ * getAll でまとめて読む（窓ごとにイベントループへ譲るので、読み
+ * 込み中もメインスレッドが長時間固まらない）。
+ */
+export const IDB_HYDRATE_WINDOW_KEYS = 256;
+export const IDB_DEFERRED_HYDRATION_PREFIX = 'miki_code_understanding_entry_v1:';
+
+export function isIdbDeferredHydrationKey(key: string): boolean {
+  return key.startsWith(IDB_DEFERRED_HYDRATION_PREFIX);
+}
+
 export function partitionFlushTxKeys(
   sizes: Array<{ key: string; chars: number }>
 ): string[][] {
@@ -116,6 +140,10 @@ class StorageService {
   // した場合に、backend を引き上げて未保存分を書き直すための武装
   // フラグ（initIndexedDbResilient が使う）。
   private idbLateUpgradeArmed = false;
+  // P3010: 背景ハイドレーション（再生可能な理解エントリ）の進捗。
+  // deferredHydration は完了／失敗を保持するだけで、ready は待たない。
+  private deferredHydration: Promise<void> | null = null;
+  private deferredHydrationKeyCount = 0;
   private ftsAvailable: boolean = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private sqlite: any = null; // SQLiteDBConnection (native only, loaded dynamically)
@@ -191,6 +219,10 @@ class StorageService {
     this.emitFlushDiagnostic('INVENTORY', {
       backend: this.backend,
       keyCount: this.cache.size,
+      // P3010: 背景ハイドレーションに回したキー数（この時点の
+      // keyCount には含まれない。完了時は HYDRATION_COMPLETE が
+      // 全件数を出し直す）。
+      deferredKeys: this.deferredHydrationKeyCount,
       largestKeys: this.describeLargestKeys(8),
       largestKeysSummary: this.describeLargestKeysSummary(8),
     });
@@ -391,23 +423,126 @@ class StorageService {
       };
       req.onsuccess = () => {
         this.idb = req.result;
-        const tx = this.idb.transaction(this.STORE, 'readonly');
-        const store = tx.objectStore(this.STORE);
-        const cursorReq = store.openCursor();
-        cursorReq.onsuccess = () => {
-          const cursor = cursorReq.result;
-          if (cursor) {
-            const key = String(cursor.key);
-            if (!this.dirtyKeys.has(key)) this.cache.set(key, cursor.value as string);
-            cursor.continue();
-          } else {
-            resolve();
-          }
-        };
-        cursorReq.onerror = () => reject(cursorReq.error);
+        this.hydrateIndexedDb().then(resolve, reject);
       };
       req.onerror = () => reject(req.error);
     });
+  }
+
+  private idbGetAllKeys(db: IDBDatabase): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(this.STORE, 'readonly').objectStore(this.STORE).getAllKeys();
+      req.onsuccess = () => resolve((req.result || []).map((k) => String(k)));
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  private idbGetWindow(db: IDBDatabase, firstKey: string, lastKey: string): Promise<unknown[]> {
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(this.STORE, 'readonly').objectStore(this.STORE)
+        .getAll(IDBKeyRange.bound(firstKey, lastKey));
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  private idbGetOne(db: IDBDatabase, key: string): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(this.STORE, 'readonly').objectStore(this.STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /** メインスレッドへ1マクロタスク譲る（タイマ抑制の影響を受けない経路を優先）。 */
+  private yieldToMainThread(): Promise<void> {
+    return new Promise((resolve) => {
+      try {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = () => resolve();
+        channel.port2.postMessage(undefined);
+      } catch {
+        setTimeout(resolve, 0);
+      }
+    });
+  }
+
+  /**
+   * P3010: 指定キー集合を窓単位の getAll でキャッシュへ読み込む。
+   * 窓の件数が合わない場合（読み込み中にキーが増減した異常系）だけ
+   * その窓を1件ずつ読み直す。キャッシュへの反映は旧カーソル版と
+   * 同じ規律: dirtyKeys にあるキー（書き込み／削除が先行）は触らない。
+   */
+  private async hydrateIdbKeySet(
+    db: IDBDatabase,
+    keys: string[]
+  ): Promise<{ hydratedKeys: number; hydratedChars: number }> {
+    let hydratedKeys = 0;
+    let hydratedChars = 0;
+    for (let i = 0; i < keys.length; i += IDB_HYDRATE_WINDOW_KEYS) {
+      const windowKeys = keys.slice(i, i + IDB_HYDRATE_WINDOW_KEYS);
+      const values = await this.idbGetWindow(db, windowKeys[0], windowKeys[windowKeys.length - 1]);
+      if (values.length === windowKeys.length) {
+        for (let j = 0; j < windowKeys.length; j++) {
+          const key = windowKeys[j];
+          if (this.dirtyKeys.has(key)) continue;
+          const value = values[j] as string;
+          this.cache.set(key, value);
+          hydratedKeys++;
+          hydratedChars += typeof value === 'string' ? value.length : 0;
+        }
+      } else {
+        for (const key of windowKeys) {
+          const value = await this.idbGetOne(db, key);
+          if (value === undefined || this.dirtyKeys.has(key)) continue;
+          this.cache.set(key, value as string);
+          hydratedKeys++;
+          hydratedChars += typeof value === 'string' ? value.length : 0;
+        }
+      }
+      if (i + IDB_HYDRATE_WINDOW_KEYS < keys.length) await this.yieldToMainThread();
+    }
+    return { hydratedKeys, hydratedChars };
+  }
+
+  /**
+   * P3010: 起動時ハイドレーション本体。ready が待つのは「遅延対象
+   * 以外」の全キーまで。遅延対象（再生可能な理解エントリ）は解決を
+   * 待たずに背景読み込みを開始し、完了時に HYDRATION_COMPLETE を
+   * 診断へ出す。背景読み込みの失敗は致命ではない（読み手は欠落を
+   * 再構築で吸収する）ので、警告に留めて ready へは伝播しない。
+   */
+  private async hydrateIndexedDb(): Promise<void> {
+    const db = this.idb;
+    if (!db) throw new Error('IndexedDB handle missing during hydration');
+    const allKeys = await this.idbGetAllKeys(db);
+    const tier1Keys: string[] = [];
+    const deferredKeys: string[] = [];
+    for (const key of allKeys) {
+      if (isIdbDeferredHydrationKey(key)) deferredKeys.push(key);
+      else tier1Keys.push(key);
+    }
+    this.deferredHydrationKeyCount = deferredKeys.length;
+    await this.hydrateIdbKeySet(db, tier1Keys);
+    if (deferredKeys.length > 0 && !this.deferredHydration) {
+      const startedAt = Date.now();
+      this.deferredHydration = this.hydrateIdbKeySet(db, deferredKeys)
+        .then(({ hydratedKeys, hydratedChars }) => {
+          let totalChars = 0;
+          for (const value of this.cache.values()) totalChars += value.length;
+          this.emitFlushDiagnostic('HYDRATION_COMPLETE', {
+            backend: this.backend,
+            keyCount: this.cache.size,
+            totalValueChars: totalChars,
+            deferredKeys: hydratedKeys,
+            deferredChars: hydratedChars,
+            elapsedMs: Date.now() - startedAt,
+          });
+        })
+        .catch((e) => {
+          console.warn('storageService: deferred hydration failed (regenerable family; consumers rebuild on demand)', e);
+        });
+    }
   }
 
   private async migrateFromLegacyLocalStorage(): Promise<void> {
