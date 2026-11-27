@@ -119,6 +119,24 @@ interface TeacherLesson {
 }
 
 const LEDGER_KEY = 'miki_teacher_material_intake_ledger_v1';
+
+// 台帳の永続形（受領記録の配列）を読む。配列でない・解釈できない場合は
+// null を返し、呼び出し側が「読めなかった」と「空だった」を区別できる
+// ようにする。intakeId を持たない混入エントリは落とす。
+const parseTeacherMaterialLedger = (raw: string): TeacherMaterialIntakeRecord[] | null => {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(
+      (record): record is TeacherMaterialIntakeRecord =>
+        !!record &&
+        typeof record === 'object' &&
+        typeof (record as TeacherMaterialIntakeRecord).intakeId === 'string',
+    );
+  } catch {
+    return null;
+  }
+};
 const REF_KEY_PREFIX = 'miki_teacher_material_ref_v1:';
 const MAX_INPUT_BYTES = 8_000_000;
 const MAX_FILES = 100;
@@ -154,8 +172,10 @@ class TeacherMaterialIntakeService {
     try {
       const raw = storageService.getItem(LEDGER_KEY);
       if (raw) {
-        const records = JSON.parse(raw) as TeacherMaterialIntakeRecord[];
-        for (const record of records) this.ledger.set(record.intakeId, record);
+        const records = parseTeacherMaterialLedger(raw);
+        if (records) {
+          for (const record of records) this.ledger.set(record.intakeId, record);
+        }
       }
     } catch {
       // 台帳が読めなくても受け口自体は動かす
@@ -164,7 +184,25 @@ class TeacherMaterialIntakeService {
 
   private save(): void {
     try {
-      const records = [...this.ledger.values()].slice(-100);
+      // 構築時の読み取りが一時的に空振り・化けていると、メモリ側の台帳が
+      // 不完全なまま書き戻され、保存済みの受領記録が消える（ラボ boot 4
+      // で実績あり）。書き戻す前に永続側を読み直し、メモリ側に無い記録は
+      // intakeId で合体して残す。永続側が解釈できない場合は、壊れた読み
+      // のまま上書きしないよう今回の保存自体を見送る。
+      const raw = storageService.getItem(LEDGER_KEY);
+      if (raw) {
+        const persisted = parseTeacherMaterialLedger(raw);
+        if (!persisted) {
+          systemLogger.warn('SELF_IMPROVEMENT', '[教師教材 台帳] 永続側の台帳が解釈できないため、今回の保存を見送りました');
+          return;
+        }
+        for (const record of persisted) {
+          if (!this.ledger.has(record.intakeId)) this.ledger.set(record.intakeId, record);
+        }
+      }
+      const records = [...this.ledger.values()]
+        .sort((a, b) => a.receivedAt - b.receivedAt)
+        .slice(-100);
       storageService.setItem(LEDGER_KEY, JSON.stringify(records));
     } catch {
       // 保存失敗は受入結果に影響させない
