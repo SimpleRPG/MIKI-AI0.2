@@ -1,3 +1,7 @@
+// Must stay the first import: registers the web implementation of the
+// MIKINativeRunner plugin before any wrapper module registers the name
+// (Capacitor keeps the first registration's implementations).
+import './miki/execution/services/mikiNativeRunnerWeb';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { storageService } from './services/storageService';

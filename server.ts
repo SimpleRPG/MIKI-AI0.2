@@ -88,6 +88,90 @@ app.get('/api/health', (_req, res) => {
   res.json({ status:'ok', service:'miki-ai', phase:'INSTRUCTION_TO_ADOPTION', timestamp:new Date().toISOString() });
 });
 
+// ===== Rust native core bridge (web/lab deployments only) =====
+// On Android the MIKINativeRunner Capacitor plugin talks to the Rust
+// crate directly. On web there is no native plugin, so the web
+// implementation of the plugin forwards the pure-function methods to
+// this endpoint, which relays them to a persistent sidecar binary built
+// from the same crate (env MIKI_NATIVE_CORE_SIDECAR_BIN). The endpoint
+// is disabled unless that env var points at an existing binary: without
+// it the web implementation rejects and the app's honest JS degradation
+// paths take over. Only genuine sidecar output is ever returned, so
+// engine:'RUST' markers always come from the real crate.
+const NATIVE_CORE_METHODS = new Set([
+  'analyzeOwnedDomain',
+  'decideCoreGoals',
+  'rankDomainRoutes',
+  'verifyVbaCode',
+  'processDataRecords',
+  'planExecution',
+  'searchMemory',
+  'analyzeCandidate',
+  'health',
+]);
+type NativeCorePending = { resolve: (value: any) => void; reject: (error: Error) => void };
+let nativeCoreProc: ReturnType<typeof spawn> | null = null;
+let nativeCoreBuffer = '';
+let nativeCoreSeq = 0;
+const nativeCorePending = new Map<number, NativeCorePending>();
+function failNativeCorePending(error: Error) {
+  for (const pending of nativeCorePending.values()) pending.reject(error);
+  nativeCorePending.clear();
+}
+function ensureNativeCoreProc(bin: string) {
+  if (nativeCoreProc && !nativeCoreProc.killed && nativeCoreProc.exitCode === null) return nativeCoreProc;
+  const proc = spawn(bin, [], { stdio: ['pipe', 'pipe', 'pipe'] });
+  nativeCoreProc = proc;
+  nativeCoreBuffer = '';
+  proc.stdout?.on('data', (chunk: Buffer) => {
+    nativeCoreBuffer += chunk.toString('utf8');
+    let idx = nativeCoreBuffer.indexOf('\n');
+    while (idx >= 0) {
+      const line = nativeCoreBuffer.slice(0, idx);
+      nativeCoreBuffer = nativeCoreBuffer.slice(idx + 1);
+      idx = nativeCoreBuffer.indexOf('\n');
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line);
+        const pending = nativeCorePending.get(Number(msg.id));
+        if (pending) {
+          nativeCorePending.delete(Number(msg.id));
+          if (msg.ok) pending.resolve(msg.result);
+          else pending.reject(new Error(String(msg.error || 'RUST_SIDECAR_ERROR')));
+        }
+      } catch { /* ignore malformed sidecar lines */ }
+    }
+  });
+  proc.on('error', (error) => { if (nativeCoreProc === proc) nativeCoreProc = null; failNativeCorePending(error instanceof Error ? error : new Error(String(error))); });
+  proc.on('exit', () => { if (nativeCoreProc === proc) nativeCoreProc = null; failNativeCorePending(new Error('RUST_SIDECAR_EXITED')); });
+  return proc;
+}
+function callNativeCore(bin: string, method: string, domain: string | undefined, request: unknown): Promise<any> {
+  const proc = ensureNativeCoreProc(bin);
+  const id = ++nativeCoreSeq;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { nativeCorePending.delete(id); reject(new Error('RUST_SIDECAR_TIMEOUT')); }, 120000);
+    nativeCorePending.set(id, {
+      resolve: (value) => { clearTimeout(timer); resolve(value); },
+      reject: (error) => { clearTimeout(timer); reject(error); },
+    });
+    proc.stdin?.write(`${JSON.stringify({ id, method, ...(domain ? { domain } : {}), request })}\n`);
+  });
+}
+app.post('/api/native-core', async (req, res) => {
+  const bin = String(process.env.MIKI_NATIVE_CORE_SIDECAR_BIN || '');
+  if (!bin || !fs.existsSync(bin)) { res.status(501).json({ error: 'NATIVE_CORE_NOT_CONFIGURED' }); return; }
+  const method = String(req.body?.method || '');
+  if (!NATIVE_CORE_METHODS.has(method)) { res.status(400).json({ error: 'NATIVE_CORE_METHOD_NOT_WIRED' }); return; }
+  const domain = typeof req.body?.domain === 'string' ? req.body.domain : undefined;
+  try {
+    const result = await callNativeCore(bin, method, domain, req.body?.request ?? {});
+    res.json(result);
+  } catch (error) {
+    res.status(502).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 // ===== P385: server-side dictionary store (JMdict) =====
 // The large dictionary lives outside the app, on this server. The
 // server fetches and converts it in the background, once per upstream
