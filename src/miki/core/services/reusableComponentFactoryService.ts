@@ -35,7 +35,7 @@ import { reactUiAccessibilityCodeKnowledge, reactUiAccessibilityCodeComponents }
 export type ReusableComponentKind='KNOWLEDGE'|'CODE'|'CONVERSATION';
 export type ReusableComponentLifecycle='DRAFT'|'CANDIDATE'|'VERIFIED'|'USER_APPROVED'|'MIKI_APPROVED'|'ACTIVE'|'REVALIDATION_REQUIRED'|'CONFLICT'|'SUSPENDED'|'SUPERSEDED'|'ARCHIVED';
 export type ComponentSelectionMode='REUSE_AS_IS'|'ADAPT_EXISTING'|'COMPOSE_MULTIPLE'|'CREATE_NEW'|'ESCALATE_UNKNOWN';
-export interface ReusableComponentArtifact {componentId:string;registryComponentId?:string;componentKind:ReusableComponentKind;componentType:string;purpose:string;interfaceContract:Record<string,unknown>;inputs:string[];outputs:string[];prerequisites:string[];dependencies:string[];appliesWhen:string[];doesNotApplyWhen:string[];sourceEpisodeIds:string[];sourceLearningArtifactIds:string[];canonicalSha256:string;environmentFingerprint:string;lifecycleStatus:ReusableComponentLifecycle;usageCount:number;successCount:number;failureCount:number;lastUsedAt?:number;lastConfirmedAt?:number;supersededBy?:string;createdAt:number;updatedAt:number;}
+export interface ReusableComponentArtifact {componentId:string;registryComponentId?:string;componentKind:ReusableComponentKind;componentType:string;purpose:string;interfaceContract:Record<string,unknown>;inputs:string[];outputs:string[];prerequisites:string[];dependencies:string[];appliesWhen:string[];doesNotApplyWhen:string[];sourceEpisodeIds:string[];sourceLearningArtifactIds:string[];canonicalSha256:string;environmentFingerprint:string;lifecycleStatus:ReusableComponentLifecycle;usageCount:number;successCount:number;failureCount:number;lastUsedAt?:number;lastConfirmedAt?:number;supersededBy?:string;createdAt:number;updatedAt:number;teacherVerification?:{verifiedBy:string;verifiedAt:number;how:string};}
 export interface KnowledgeComponentArtifact extends ReusableComponentArtifact {componentKind:'KNOWLEDGE';claimIds:string[];evidenceRefs:string[];sourceUrls:string[];sourceArtifactIds:string[];verificationStatus:'UNVERIFIED'|'VERIFIED'|'CONFLICT';contradictionRefs:string[];freshnessPolicy:string;constructionProfile?:CodeConstructionProfile;}
 export interface CodeComponentArtifact extends ReusableComponentArtifact {componentKind:'CODE';exports:string[];imports:string[];publicInterfaces:string[];coreIngressPoints:string[];domainOwnership:string[];persistenceKeys:string[];uiEventEntrypoints:string[];testReferences:string[];requiredValidation:string[];}
 export interface ConversationComponentArtifact extends ReusableComponentArtifact {componentKind:'CONVERSATION';atomic:boolean;conversationState:string[];requiredInformation:string[];responseStructure:string[];prohibitedPatterns:string[];clarificationConditions:string[];verbosityConditions:string[];toolResultOrder:string[];}
@@ -1813,6 +1813,21 @@ class ReusableComponentFactoryService{
   return {accepted:true,componentId:linked.componentId,reason:'CODE_REUSABLE_MIKI_APPROVED_FROM_VERIFIED_REGISTRY'};
  }
 
+ // P3007: 教師（Muse）確認済みの本登録。きりあのルール（2026-11-27）:
+ // Muse が確かめたものは、出所（教師教材・教師製の部品・7Bの下書き・
+ // 彼女自身の生成物・Web素材・未検証だったもの）を問わず、彼女の候補
+ // ゲートを飛ばして本登録に直通してよい。根拠は「教師検証＝Muse
+ // のみ信頼」であり、ゲートの役割は検証そのものなので、Muse の確認が
+ // 入れば二重になる。Muse が確かめていないものは従来どおり候補＋
+ // 検証ゲートを通る（本メソッドは呼ばれない）。直通の根拠は
+ // teacherVerification スタンプ（誰が・いつ・どう確認したか）として
+ // 部品自体に残す。知識部品は彼女自身の検証成功時と同じ状態
+ // （lifecycle VERIFIED / verificationStatus VERIFIED）へ移し、
+ // 「未検証」を理由とする doesNotApplyWhen を外す。コード・会話部品は
+ // 採用状態（USER_APPROVED＝きりあの常設ルールによる承認）へ移す。
+ // 型検査・テスト等の機械的な結線チェックは本メソッドの対象外で、
+ // 通常の採用フロー側に残る。
+ registerTeacherVerified(componentIds:string[],how:string):{updatedComponentIds:string[]}{const items=this.read<AnyReusableComponent>(COMPONENT_KEY);const idSet=new Set(componentIds);const updatedComponentIds:string[]=[];const verifiedAt=Date.now();for(const item of items){if(!idSet.has(item.componentId))continue;item.teacherVerification={verifiedBy:'Claude',verifiedAt,how};if(item.componentKind==='KNOWLEDGE'){item.lifecycleStatus='VERIFIED';(item as KnowledgeComponentArtifact).verificationStatus='VERIFIED';item.doesNotApplyWhen=item.doesNotApplyWhen.filter(entry=>!/not yet verified/i.test(entry));}else{item.lifecycleStatus='USER_APPROVED';}item.updatedAt=verifiedAt;updatedComponentIds.push(item.componentId);}if(updatedComponentIds.length>0)storageService.setItem(COMPONENT_KEY,JSON.stringify(items));return{updatedComponentIds};}
  updateLifecycle(componentId:string,status:ReusableComponentLifecycle,supersededBy?:string):AnyReusableComponent|undefined{const items=this.read<AnyReusableComponent>(COMPONENT_KEY);const item=items.find(x=>x.componentId===componentId);if(!item)return undefined;if(status==='ACTIVE'&&!['VERIFIED','USER_APPROVED','MIKI_APPROVED','REVALIDATION_REQUIRED'].includes(item.lifecycleStatus))throw new Error('COMPONENT_ACTIVE_GATE_FAILED');item.lifecycleStatus=status;item.supersededBy=supersededBy;item.updatedAt=Date.now();storageService.setItem(COMPONENT_KEY,JSON.stringify(items));return item;}
  approveByCore(componentIds?:string[]):{approvedComponentIds:string[];rejectedComponentIds:string[];reasons:Record<string,string>;changed:boolean}{const approvedComponentIds:string[]=[],rejectedComponentIds:string[]=[],reasons:Record<string,string>={};const requestedIds=componentIds&&componentIds.length>0?new Set(componentIds):undefined;const artifacts=reviewLearningArtifactService.list();const activeGeneralized=(id:string)=>{const a=artifacts.find(x=>x.artifactId===id);return Boolean(a&&a.lifecycleStatus!=='ARCHIVED'&&a.artifactType==='ACCEPTED_PATTERN'&&a.lifecycleStatus==='ACTIVE'&&a.scope==='GENERALIZED');};for(const item of this.list()){
 if(requestedIds&&!requestedIds.has(item.componentId))continue;

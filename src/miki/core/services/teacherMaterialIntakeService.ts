@@ -22,9 +22,13 @@ import { diagnosisTaskService, type DiagnosisCaseInput } from './diagnosisTaskSe
  * 教材の INSTRUCTIONS.md に書かれていた「同じ受け口で受け取ってください」
  * は未検証の前提であり、本サービスがその受け口を実装する。
  *
- * 線引き（他の受け口と同じ）:
- *  - 教材は素材であり、レッスンは CANDIDATE / UNVERIFIED の知識部品として
- *    登録するだけ。教材が届いたこと自体で主張が確定することはない。
+ * 線引き:
+ *  - 教材は素材として届く。ただし教師（Muse）の教材は、きりあのルール
+ *    （2026-11-27、P3007）により「Muse が確かめたもの」として本登録
+ *    される（教師検証＝Muse のみ信頼の帰結。候補ゲートは出所が教師で
+ *    ないもの——7B・Web・彼女自身の未検証の推論——のためのもの）。
+ *    登録の直通は reusableComponentFactoryService.registerTeacherVerified
+ *    が teacherVerification スタンプ付きで行う。
  *  - 要求への結び付けは無い代わりに、出所（teacher.name、パッケージの
  *    SHA-256、マニフェストの SHA-256）を台帳へ必ず記録する。
  *  - 同梱の参照画像は data URL として保管し、観察（目）の材料にする。
@@ -509,7 +513,10 @@ class TeacherMaterialIntakeService {
       });
     }
 
-    // ---- レッスンを知識部品（候補・未検証）として登録 ----
+    // ---- レッスンを知識部品として登録 ----
+    // 部品の同一性（canonicalSha256）は候補形のボディで保ち、登録後に
+    // P3007 の状態遷移で本登録へ移す（既存の候補部品も同じ部品として
+    // そのまま本登録になる）。
     const componentIds: string[] = [];
     for (const lesson of lessons) {
       const body = {
@@ -604,6 +611,17 @@ class TeacherMaterialIntakeService {
       } as unknown as KnowledgeComponentArtifact;
       reusableComponentFactoryService.storeCandidates([component]);
       componentIds.push(component.componentId);
+    }
+
+    // P3007: 教師教材は Muse（教師）が作り、確かめたものとして届く。
+    // きりあのルール（2026-11-27）により候補に滞留させず、教師確認済み
+    // の本登録へ直通させる。既に候補として保管済みの同じ部品（再取り
+    // 込み時）も、同一の部品のまま状態遷移で本登録になる。
+    if (componentIds.length > 0) {
+      reusableComponentFactoryService.registerTeacherVerified(
+        componentIds,
+        `teacher-material package intake ${intakeId} (teacher: ${teacherName})`,
+      );
     }
 
     // ---- 参照画像を保管（観察の材料） ----
