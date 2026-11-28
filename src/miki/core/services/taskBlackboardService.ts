@@ -84,6 +84,96 @@ export function isVerifiedTaskOutcome(task:BlackboardTask):boolean{
  });
 }
 
+/**
+ * P3036: 終了タスクの圧縮（蒸留→圧縮→冷却）。台帳は 2026-11-28 の
+ * 1日で 25.5MB → 64.5MB まで育ち、状態に触る全操作（起動時の
+ * JSON.parse、保存、走査）を増幅させた。終了したタスクの per-cycle
+ * 診断は誰も読み返さないが、読み手が実際に使う部分は残す必要が
+ * あるため、単純な削除ではなく形を変えて残す：
+ *  - DECISION / RESULT / ERROR と conversationResponseFinalized は
+ *    「骨格」として残す（id・kind・domain・key・evidenceIds・
+ *    createdAt は無変更、value は読み手が見るスカラー項目だけに
+ *    蒸留）。unresolvedTaskErrors / isVerifiedTaskOutcome / 系譜の
+ *    DECISION id 照合 / 会話想起（同一 goal の前回応答・最新
+ *    cognitiveState・evidence union）は圧縮後も同じ答えを返す。
+ *  - INPUT / OBSERVATION / EVIDENCE / CLAIM / CHECKPOINT は
+ *    要約エントリ1件（key=blackboardCompactionSummary）に畳む。
+ *    evidenceIds の union は要約エントリが引き継ぐ。
+ * 猶予：終了から通常 6 時間。実働の読み手（完了ゲート・再開・
+ * 再検証の重複判定）は分単位で終わり、24h 窓のメトリクスは骨格の
+ * kind/key/createdAt で回答できる。ストア全体が
+ * COMPACT_SIZE_TRIGGER_BYTES を超えたら猶予を 30 分に縮める
+ * （台帳が育ちすぎた時の圧力バルブ）。稼働中・最近のタスクには
+ * 一切触らない。冪等：要約済みタスクは再圧縮しない。
+ */
+export const COMPACTION_SUMMARY_KEY='blackboardCompactionSummary';
+const COMPACT_GRACE_MS=6*60*60*1000;
+const COMPACT_PRESSURE_GRACE_MS=30*60*1000;
+const COMPACT_SIZE_TRIGGER_BYTES=16*1024*1024;
+const COMPACT_MIN_ENTRIES=12;
+const DISTILL_STRING_MAX=2048;
+const DISTILL_LIST_MAX=200;
+
+function isTerminalStatus(status:BlackboardStatus):boolean{
+ return status==='COMPLETED'||status==='FAILED'||status==='CANCELLED';
+}
+function distillScalar(value:unknown):unknown{
+ if(typeof value==='string')return value.length>DISTILL_STRING_MAX?`${value.slice(0,DISTILL_STRING_MAX)}…[distilled]`:value;
+ if(typeof value==='number'||typeof value==='boolean'||value===null)return value;
+ return undefined;
+}
+function distillStringList(value:unknown,cap:number):string[]|undefined{
+ if(!Array.isArray(value))return undefined;
+ return value.slice(0,cap).map(item=>String(item));
+}
+/**
+ * 読み手が実際に見る項目だけを残して entry の value を蒸留する。
+ * 残すのは：全てのスカラー項目、RESULT の reply.status、
+ * supersedesOperationInstanceIds、answerValidation.passed、
+ * cognitiveState のリスト項目（制約・未知・証拠・能力・学習参照）、
+ * 会話の確定応答そのもの（conversationResponseFinalized /
+ * conversationFinalResponse の response は想起が読む本文なので全文）。
+ * それ以外の入れ子構造は落とし、落とした場合は __distilled を付ける。
+ */
+export function distillEntryValue(entry:BlackboardEntry):unknown{
+ const value=entry.value;
+ if(!value||typeof value!=='object'||Array.isArray(value)){
+  const serialized=typeof value==='string'?value:JSON.stringify(value??null);
+  if(serialized.length<=DISTILL_STRING_MAX)return value;
+  return {__distilled:true,originalChars:serialized.length};
+ }
+ const record=value as Record<string,unknown>;
+ const out:Record<string,unknown>={};
+ let dropped=false;
+ for(const [field,fieldValue] of Object.entries(record)){
+  if((entry.key==='conversationResponseFinalized'||entry.key==='conversationFinalResponse')&&field==='response'&&typeof fieldValue==='string'){out[field]=fieldValue;continue;}
+  const scalar=distillScalar(fieldValue);
+  if(scalar!==undefined){out[field]=scalar;continue;}
+  if(field==='reply'&&fieldValue&&typeof fieldValue==='object'&&!Array.isArray(fieldValue)){
+   const replyStatus=distillScalar((fieldValue as Record<string,unknown>).status);
+   if(replyStatus!==undefined){out[field]={status:replyStatus};continue;}
+  }
+  if(field==='supersedesOperationInstanceIds'){
+   const list=distillStringList(fieldValue,50);
+   if(list){out[field]=list;continue;}
+  }
+  if(field==='answerValidation'&&fieldValue&&typeof fieldValue==='object'&&!Array.isArray(fieldValue)){
+   out[field]={passed:(fieldValue as Record<string,unknown>).passed===true};continue;
+  }
+  if(entry.key.startsWith('cognitiveState:')&&['constraints','unknowns','evidenceIds','capabilityRefs','learningRefs'].includes(field)){
+   const list=distillStringList(fieldValue,DISTILL_LIST_MAX);
+   if(list){out[field]=list;continue;}
+  }
+  dropped=true;
+ }
+ if(dropped)out.__distilled=true;
+ return out;
+}
+function isPreservedEntry(entry:BlackboardEntry):boolean{
+ return entry.kind==='DECISION'||entry.kind==='RESULT'||entry.kind==='ERROR'
+  ||entry.key==='conversationResponseFinalized';
+}
+
 const KEY='miki_task_blackboard_v1';
 // P3034: 永続化バッチ化の窓。変更が続く間は最大でも
 // SAVE_MAX_WAIT_MS に1回、静まれば最後の変更から
@@ -255,6 +345,79 @@ class TaskBlackboardService{
   }
   return false;
  }
+ /**
+  * P3036: 終了して猶予を過ぎたタスクを圧縮する（設計は
+  * COMPACTION_SUMMARY_KEY のコメント参照）。updatedAt / revision /
+  * status には触らない（年齢判定とメトリクスの窓を汚さないため）。
+  * 冪等：要約済みのタスクは数に入らない。戻り値は検証・記録用。
+  */
+ compactTerminalTasks(now=Date.now(),pressure=false):{tasksCompacted:number;entriesBefore:number;entriesAfter:number;bytesBefore:number;bytesAfter:number}{
+  const grace=pressure?COMPACT_PRESSURE_GRACE_MS:COMPACT_GRACE_MS;
+  let tasksCompacted=0,entriesBefore=0,entriesAfter=0,bytesBefore=0,bytesAfter=0;
+  for(const task of this.tasks.values()){
+   if(!isTerminalStatus(task.status))continue;
+   if(now-task.updatedAt<grace)continue;
+   if(task.entries.length<=COMPACT_MIN_ENTRIES)continue;
+   if(task.entries.some(entry=>entry.key===COMPACTION_SUMMARY_KEY))continue;
+   const beforeBytes=JSON.stringify(task).length;
+   const beforeEntries=task.entries.length;
+   if(!this.compactTask(task,now))continue;
+   tasksCompacted+=1;entriesBefore+=beforeEntries;entriesAfter+=task.entries.length;bytesBefore+=beforeBytes;bytesAfter+=JSON.stringify(task).length;
+  }
+  return {tasksCompacted,entriesBefore,entriesAfter,bytesBefore,bytesAfter};
+ }
+ private compactTask(task:BlackboardTask,now:number):boolean{
+  const entries=task.entries;
+  const unresolvedCount=unresolvedTaskErrors(task).length;
+  const verified=isVerifiedTaskOutcome(task);
+  const evidenceUnion=[...new Set(entries.flatMap(entry=>entry.evidenceIds).filter(Boolean))];
+  const kindCounts:Record<string,number>={};
+  for(const entry of entries)kindCounts[entry.kind]=(kindCounts[entry.kind]||0)+1;
+  const inputEntry=entries.find(entry=>entry.kind==='INPUT'&&entry.key==='payload');
+  const inputRecord=inputEntry?.value&&typeof inputEntry.value==='object'&&!Array.isArray(inputEntry.value)?inputEntry.value as Record<string,unknown>:undefined;
+  const inputFlags:Record<string,unknown>={};
+  if(inputRecord){
+   for(const field of ['kind','background','foreground','orchestrationMode','executionPriority','autonomousKnowledgeGapId','gapId']){
+    const scalar=distillScalar(inputRecord[field]);
+    if(scalar!==undefined)inputFlags[field]=scalar;
+   }
+  }
+  const summary:BlackboardEntry={
+   id:`BBE-COMPACT-${task.taskId}`,
+   taskId:task.taskId,
+   kind:'RESULT',
+   domain:'core',
+   key:COMPACTION_SUMMARY_KEY,
+   value:{
+    compacted:true,
+    version:1,
+    compactedAt:now,
+    outcomeStatus:task.status,
+    originalEntryCount:entries.length,
+    originalBytes:entries.reduce((sum,entry)=>sum+JSON.stringify(entry).length,0),
+    kindCounts,
+    cycleCount:task.lastCycle,
+    resumeCount:task.resumeCount,
+    unresolvedErrorCount:unresolvedCount,
+    verifiedOutcome:verified,
+    errorKeys:entries.filter(entry=>entry.kind==='ERROR').map(entry=>entry.key).slice(-20),
+    resultKeys:entries.filter(entry=>entry.kind==='RESULT').map(entry=>entry.key).slice(-20),
+    capabilityRefs:[...new Set(entries.filter(entry=>/capability/i.test(entry.key)).map(entry=>entry.key))].slice(-20),
+    decisionIds:entries.filter(entry=>entry.domain==='core'&&entry.kind==='DECISION').map(entry=>entry.id).slice(0,500),
+    checkpointCount:kindCounts['CHECKPOINT']||0,
+    contributingDomains:[...new Set(entries.filter(entry=>entry.kind==='EVIDENCE'||entry.kind==='CLAIM'||entry.kind==='RESULT').map(entry=>entry.domain))],
+    evidenceIdCount:evidenceUnion.length,
+    inputFlags,
+    firstEntryAt:entries[0]?.createdAt??task.createdAt,
+    lastEntryAt:entries.at(-1)?.createdAt??task.updatedAt,
+   },
+   evidenceIds:evidenceUnion.slice(0,1000),
+   createdAt:task.updatedAt,
+  };
+  const preserved=entries.filter(isPreservedEntry).map(entry=>({...entry,value:distillEntryValue(entry),evidenceIds:[...entry.evidenceIds]}));
+  task.entries=[...preserved,summary];
+  return true;
+ }
  get(taskId:string):BlackboardTask|undefined{const task=this.tasks.get(taskId);return task?this.clone(task):undefined;}
  list(limit=50):BlackboardTask[]{return [...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,limit).map(t=>this.clone(t));}
  private clone(t:BlackboardTask):BlackboardTask{return {...t,visitedDomains:[...t.visitedDomains],pendingDomains:[...t.pendingDomains],entries:t.entries.map(e=>({...e,evidenceIds:[...e.evidenceIds]}))};}
@@ -276,7 +439,18 @@ class TaskBlackboardService{
   if(this.saveTimer){clearTimeout(this.saveTimer);this.saveTimer=null;}
   if(this.saveMaxTimer){clearTimeout(this.saveMaxTimer);this.saveMaxTimer=null;}
   if(this.persistenceBlocked)return;
-  const all=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);storageService.setItem(KEY,JSON.stringify(all));
+  const all=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);
+  let payload=JSON.stringify(all);
+  // P3036: 台帳が育ちすぎたら、書く前に圧力モード（猶予30分）で
+  // 終了タスクを圧縮してから書き直す。1回の flush で試行は1度だけ。
+  if(payload.length>COMPACT_SIZE_TRIGGER_BYTES&&!this.persistenceBlocked){
+   const stats=this.compactTerminalTasks(Date.now(),true);
+   if(stats.tasksCompacted>0){
+    const compacted=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);
+    payload=JSON.stringify(compacted);
+   }
+  }
+  storageService.setItem(KEY,payload);
  }
  private load():void{
   let raw:string|null=null;
@@ -302,7 +476,11 @@ class TaskBlackboardService{
     }
     this.tasks.set(task.taskId,task);
    }
-   if(migrated)this.save();
+   // P3036: 読み込めた正本に対して、終了タスクの圧縮を起動時に
+   // 1回かける。読めなかった（隔離された）場合は save 側の
+   // persistenceBlocked が書き込みを止めるので、ここでは何もしない。
+   const compacted=this.compactTerminalTasks();
+   if(migrated||compacted.tasksCompacted>0)this.save();
   }catch(error){
    this.tasks.clear();
    // Preserve the original bytes before any later save can overwrite the only copy.
