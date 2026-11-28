@@ -5930,16 +5930,20 @@ export class ConversationCoreService {
     // P3014: この返答は逐次合成で組み立てる（文末は先に予約し、
     // 一節ごとに文脈と既出の前半へ条件づけて選ぶ）。グラフは素材を
     // 渡し、合成の段取りは phraseComposerService が持つ。
-    const plan = phraseComposerService.claimRecallPlan({
+    // P3016: 複文の計画にした。第1文＝本体、第2文＝連想（関門つきの
+    // 任意文）。第2文の文末は連想側の検証状態で予約する。条件づけは
+    // 文をまたいでも全文に対して効く（第1文と重なる連想は関門で
+    // 落ちる）。素材が無ければ合成結果は空になり、後段へ落ちる。
+    const facts = {
       verification: claimSeed.verification,
       mainText: main.text,
       assocText: assocContent?.text,
-    });
-    const composed = phraseComposerService.composePhraseReply(plan, {
-      verification: claimSeed.verification,
-      mainText: main.text,
-      assocText: assocContent?.text,
-    });
+      assocVerification: assocContent?.verification,
+    };
+    const composed = phraseComposerService.composeSentences(
+      phraseComposerService.claimRecallMultiPlan(facts),
+      facts,
+    );
     return composed.text || undefined;
   }
 

@@ -18,7 +18,10 @@
 // P3015: 合成を「文の列」へ一般化する土台（ComposeSentencePlan /
 // composeSentences）を入れ、レッスンのやり方回答（P3012
 // lessonHowToAnswer）も合成に載せた。文末は文ごとに予約する。
-// この段階では文は1文だけの計画が中心で、複文の計画は次段。
+// P3016: 複文の合成。文計画に関門（gate）を追加し、グラフ想起の
+// 答えを複文計画（claimRecallMultiPlan）にした。文をまたいでも
+// emitted（既出の全文）が条件づけに効く: 第2文の関門は第1文を含む
+// 全文で採点され、接続の言い回しも前半を見て選ばれる。
 import { titleKeys } from '../../memory/services/teacherLessonRecallService';
 
 export interface ComposeFacts {
@@ -56,10 +59,13 @@ export interface ComposePlan {
 
 // 1文分の計画。closing は文ごとに予約する。文を列にすれば複文の
 // 合成になる（emitted は全文が積み上がるので、後の文の採点は
-// 前の文すべてに条件づけられる）。
+// 前の文すべてに条件づけられる）。gate がある文は任意文で、
+// 関門候補のスコアが 0 を超えた時だけ文全体を合成する（スコアは
+// emitted 全文＝前の文すべて＋今の文の前半で計算される）。
 export interface ComposeSentencePlan {
   closing: string;
   steps: ComposeStep[];
+  gate?: PhraseCandidate;
 }
 
 export interface ComposeTraceStep {
@@ -85,6 +91,7 @@ class ComposeRun {
   private readonly trace: ComposeTraceStep[] = [];
   private sentenceIdx = -1;
   private stepIdx = 0;
+  private gateDone = false;
   private sentenceActive = false;
 
   constructor(plans: ComposeSentencePlan[], facts: ComposeFacts) {
@@ -115,9 +122,22 @@ class ComposeRun {
         if (this.sentenceIdx + 1 >= this.queue.length) return null;
         this.sentenceIdx += 1;
         this.stepIdx = 0;
+        this.gateDone = false;
         this.sentenceActive = true;
       }
       const plan = this.queue[this.sentenceIdx];
+      if (!this.gateDone) {
+        this.gateDone = true;
+        if (plan.gate) {
+          const s = this.score(plan.gate);
+          const pass = s > 0;
+          this.record('GATE', [{ id: plan.gate.id, score: s }], pass ? plan.gate.id : null);
+          if (!pass) {
+            this.sentenceActive = false;
+            continue;
+          }
+        }
+      }
       if (this.stepIdx >= plan.steps.length) {
         this.sentenceActive = false;
         continue;
@@ -265,9 +285,107 @@ export function lessonHowToPlan(facts: ComposeFacts): ComposeSentencePlan[] {
   }];
 }
 
+// 連想文（第2文）の関門スコア。第1文を含む全文への条件づけ:
+// 内容キーが既出なら重複として落とし、長くなりすぎたら簡潔さを優先。
+function assocGateScore(ctx: ComposeStepContext, assocText: string): number {
+  if (!assocText) return -10;
+  let s = 2;
+  const assocKeys = titleKeys(assocText).filter((k) => k.length >= 3);
+  if (assocKeys.some((k) => ctx.emitted.includes(k))) s -= 3;
+  if (ctx.emitted.length > 110) s -= 1;
+  return s;
+}
+
+// P3016: グラフ想起の答えを複文で合成する計画。
+// 第1文＝本体の Claim（開示＋本文＋検証状態で予約した文末）。
+// 第2文＝連想の Claim（任意文・関門つき）。接続の言い回しは前半を
+// 見て選ぶ: 第1文で既に「調べた話では」と言っていたら繰り返さない。
+// 第2文の文末は連想側の検証状態で予約する（本体とは独立）。
+export function claimRecallMultiPlan(facts: ComposeFacts): ComposeSentencePlan[] {
+  const verified = facts.verification === 'SELF_GATED';
+  const closing = verified ? '、と分かっています。' : '、とされています。';
+  const assocText = String(facts.assocText || '');
+  const assocVerified = facts.assocVerification === 'SELF_GATED';
+  const assocClosing = assocVerified ? '、と分かっています。' : '、とされています。';
+  return [
+    {
+      closing,
+      steps: [
+        {
+          role: 'OPENER',
+          required: true,
+          candidates: [
+            {
+              id: 'unverified-disclosure',
+              text: 'まだ裏取りはできていない話ですけど、前に調べた話では、',
+              score: () => (verified ? -10 : 10),
+            },
+            {
+              id: 'plain-research',
+              text: '前に調べた話では、',
+              score: () => (verified ? 10 : -10),
+            },
+          ],
+        },
+        {
+          role: 'BODY',
+          required: true,
+          candidates: [
+            {
+              id: 'main-claim',
+              text: String(facts.mainText || ''),
+              score: () => (facts.mainText ? 10 : Number.NEGATIVE_INFINITY),
+            },
+          ],
+        },
+      ],
+    },
+    {
+      closing: assocClosing,
+      gate: {
+        id: 'assoc-gate',
+        text: '',
+        score: (ctx) => assocGateScore(ctx, assocText),
+      },
+      steps: [
+        {
+          role: 'OPENER',
+          required: true,
+          candidates: [
+            {
+              id: 'same-source',
+              text: '同じ出典の話では、',
+              // 続きの文として出す時だけ意味を持つ言い回し。
+              score: (ctx) => (ctx.emitted ? 10 : -10),
+            },
+            {
+              id: 'repeat-research',
+              text: '前に調べた話では、',
+              // 第1文で既に言った言い回しは繰り返さない。
+              score: (ctx) => (ctx.emitted.includes('調べた話では') ? -5 : 3),
+            },
+          ],
+        },
+        {
+          role: 'BODY',
+          required: true,
+          candidates: [
+            {
+              id: 'assoc-claim',
+              text: assocText,
+              score: () => (assocText ? 10 : Number.NEGATIVE_INFINITY),
+            },
+          ],
+        },
+      ],
+    },
+  ];
+}
+
 export const phraseComposerService = {
   composePhraseReply,
   composeSentences,
   claimRecallPlan,
   lessonHowToPlan,
+  claimRecallMultiPlan,
 };
