@@ -2091,7 +2091,13 @@ class CoreOrchestratorService {
     ? payload.branch.trim()
     : 'main';
 
-  const sync=githubSyncService.get(repository,branch);
+  // P3034: ここで必要なのは complete 判定・commitSha・ファイルの
+  // path/sha256 一覧だけで、ファイル内容は使わない。従来は get()
+  // 経由で全ファイル内容（約22MB）を毎サイクル2回読み直して
+  // JSON パースしており、サイクルが回る限りメインスレッドを
+  // 占有していた。マニフェストだけを読む manifest() に替える。
+  // 得られる gitHead / targetSnapshotSha256 は従来と同一。
+  const sync=githubSyncService.manifest(repository,branch);
   if(sync?.complete&&sync.files.length){
     const targetSnapshotSha256=sha256HexFromText(
       JSON.stringify(
