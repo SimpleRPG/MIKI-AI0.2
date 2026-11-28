@@ -128,7 +128,26 @@ export class ClaimDatabaseService {
     this.migrateLegacySeedVerification();
     this.foldDuplicateClaims();
     if (this.claims.size === 0) {
-      this.initSeedClaims();
+      // P3020: 空読みの切り分け。採番 high-water が 5 より先に進んで
+      // いるということは、このインストールには主張ストアが存在した
+      // はず。それなのに本体が空で読めたのは「新規インストール」
+      // ではなく「未ハイドレーション等で読めなかった」側である。
+      // ここでシード＋全体保存を走らせると本物の主張を上書きして
+      // しまう（2026-11-28 に 3 回発火した喪失の機構そのもの）。
+      // シードも保存もせず、警告だけ残して空で開始する（読み直しは
+      // 次回構築／再読込に委ねる）。採番カウンタだけは high-water
+      // まで進め、このセッションで新規登録があっても発行済み ID を
+      // 再配布しない。
+      const highWater = this.readClaimIdHighWater();
+      if (highWater > 5) {
+        this.counter = Math.max(this.counter, highWater);
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `🔐 [P3020 主張DB保護] 主張本体が空で読み込まれましたが、採番 high-water は ${highWater} まで進んでいます。既存ストアが未ハイドレーション等で読めなかった可能性が高いため、シード投入と保存を見送り空で開始します`
+        );
+      } else {
+        this.initSeedClaims();
+      }
     }
   }
 
@@ -210,7 +229,9 @@ export class ClaimDatabaseService {
     for (const c of seedClaims) {
       this.claims.set(c.claim_id, c);
     }
-    this.counter = 5;
+    // P3020: 採番は high-water より後ろに戻さない（通常経路でも
+    // 発行済み番号の再配布を防ぐ）。
+    this.counter = Math.max(5, this.readClaimIdHighWater());
     this.saveToStorage();
   }
 
@@ -1457,12 +1478,7 @@ export class ClaimDatabaseService {
           // 2026-11-05 に CLM-000080〜105 が二重発番された事故は、本体
           // 配列の保存が間に合わない状態で再起動し、最大値が巻き戻った
           // ことが原因。high-water mark と最大値の大きい方から進める。
-          let highWater = 0;
-          try {
-            highWater = parseInt(storageService.getItem(CLAIM_ID_HIGH_WATER_KEY) || '0', 10) || 0;
-          } catch {
-            highWater = 0;
-          }
+          const highWater = this.readClaimIdHighWater();
           if (highWater > maxIdNum + 1) {
             this.integrityFindings.push(
               `claim id high-water (${highWater}) exceeds stored max id (${maxIdNum}); a past rollback likely overwrote claims`
@@ -1546,6 +1562,18 @@ export class ClaimDatabaseService {
     return [...partners];
   }
 
+  /**
+   * P492: 採番の high-water mark を読む。キー不在・読解不能は 0
+   * （＝進んだ採番の痕跡なし）として扱う。
+   */
+  private readClaimIdHighWater(): number {
+    try {
+      return parseInt(storageService.getItem(CLAIM_ID_HIGH_WATER_KEY) || '0', 10) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
   private saveToStorage(): void {
     // P499: 保存を短い窓でまとめる。調査は Claim を連続で登録
     // するため、従来は1件ごとに全件を JSON 化して保存しており、
@@ -1555,6 +1583,26 @@ export class ClaimDatabaseService {
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
       try {
+        // P3020: P3011 と同型の書込拒否ガード。永続側に既存値が
+        // あるのに Claim 配列として読めない場合、その値をメモリ像
+        // で上書きしない。メモリ上の主張は保持され、永続側が読める
+        // 状態に戻れば後続の保存で改めて書き込まれる。
+        const persistedRaw = storageService.getItem(CLAIMS_STORAGE_KEY);
+        if (persistedRaw) {
+          let persistedIsClaimArray = false;
+          try {
+            persistedIsClaimArray = Array.isArray(JSON.parse(persistedRaw));
+          } catch {
+            persistedIsClaimArray = false;
+          }
+          if (!persistedIsClaimArray) {
+            systemLogger.warn(
+              'SELF_IMPROVEMENT',
+              '🔐 [P3020 主張DB保護] 永続側の主張データが配列として読めないため、上書き保存を見送りました（メモリ上の主張は保持されます）'
+            );
+            return;
+          }
+        }
         storageService.setItem(CLAIMS_STORAGE_KEY, JSON.stringify(Array.from(this.claims.values())));
       } catch {
         // Ignore
