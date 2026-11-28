@@ -6,6 +6,10 @@ import {
   ComponentTestCategory,
 } from '../../../types';
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 import { componentArtifactStoreService } from './componentArtifactStoreService';
 import { componentVersionHistoryService } from './componentVersionHistoryService';
@@ -64,8 +68,32 @@ export class ComponentRegistryService {
   // セッションでは true。この間の全体保存は本物のレジストリを
   // 部分像で上書きする危険があるため拒否する（メモリ像は保持）。
   private storeUnreadable = false;
+  // P3022: 権威ある初回読み込みが済むまでは true。この間は全体
+  // 保存を行わない（provisional な空の像で動き、登録はメモリに
+  // だけ残る）。
+  private loadPending = false;
 
   private constructor() {
+    if (isStorageAuthoritativeNow()) {
+      this.initializeFromStorage();
+    } else {
+      // P3022: ストレージ初期化より先に構築された。P3021 の存在
+      // マーカーガードはマーカー自体が未ハイドレーションの起動
+      // では盲目になるため、初期化手順自体を権威ある状態まで
+      // 遅らせる（ensure* 群の保存も含め、破壊は起きない）。
+      this.loadPending = true;
+      runWhenStorageAuthoritative(() => {
+        this.loadPending = false;
+        this.initializeFromStorage();
+      });
+    }
+  }
+
+  private initializeFromStorage(): void {
+    // P3022: 保留中に登録された部品があれば退避し、権威ある読み
+    // 込みの後で（読み込めた側に無いものだけ）合体させる。
+    const provisional = new Map(this.components);
+    this.components.clear();
     this.loadFromStorage();
     this.migrateLegacyCodeHashes();
     this.migrateIllustrativeSeedVerification();
@@ -92,6 +120,16 @@ export class ComponentRegistryService {
         this.reconcileArtifactIndex();
       }
     }
+    // P3022: 保留中の登録を合体させる（読み込めた側が土台。同 ID
+    // は読み込めた側を正とする）。シード分岐は読み込めた側だけで
+    // 判定済みなので、新規インストールのシード挙動は変わらない。
+    let mergedProvisional = false;
+    for (const [id, pkg] of provisional) {
+      if (!this.components.has(id)) {
+        this.components.set(id, pkg);
+        mergedProvisional = true;
+      }
+    }
     // Android実機E2E用の最小・安全なSmoke Adapterを常設する。
     // 任意コード実行はせず、Native側のallow-list Adapterとの契約だけを検証する。
     this.ensureAndroidNativeSmokeComponent();
@@ -101,6 +139,13 @@ export class ComponentRegistryService {
     this.reconcileArtifactIndex();
     // 既存インストールを含め、Registryの現行版をversion ledgerへ同期する。
     componentVersionHistoryService.reconcileCurrent(this.getAllComponents());
+    if (mergedProvisional && !this.storeUnreadable) {
+      this.saveToStorage();
+      systemLogger.info(
+        'TOOLS',
+        '🔐 [P3022 部品レジストリ] 保留中に登録された部品を、権威ある読み込みへ合体しました'
+      );
+    }
   }
 
   public static getInstance(): ComponentRegistryService {
@@ -1057,6 +1102,9 @@ ${outputComp.implementation_txt}
   }
 
   private saveToStorage(): void {
+    // P3022: 権威ある読み込みが済むまでの保存は、provisional な
+    // 部分像で実ストアを上書きするため拒否する。
+    if (this.loadPending) return;
     // P3021: 「読めなかった」セッションでは全体保存を拒否する。
     // 構築直後の ensure* 群も含め、このセッションの保存はすべて
     // ここを通るため、部分像で本物のレジストリを上書きしない。

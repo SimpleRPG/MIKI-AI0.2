@@ -1,4 +1,8 @@
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 import { canonicalSha256Object } from './canonicalSha256Service';
 import {
@@ -464,9 +468,42 @@ interface DiagnosisPattern {
 class DiagnosisTaskService {
   private ledger = new Map<string, DiagnosisAttemptRecord>();
   private sequence = 0;
+  // P3022: 権威ある初回読み込みが済むまでは true。この間は台帳の
+  // 保存を行わない（保留中の試行記録はメモリにだけ残る）。
+  private loadPending = false;
 
   constructor() {
-    this.load();
+    if (isStorageAuthoritativeNow()) {
+      this.load();
+    } else {
+      // P3022: ストレージ初期化より先に構築された。P3021 の保存時
+      // 合体は「保存の瞬間に永続側が読める」ことが前提で、未ハイ
+      // ドレーションの窓では読み直しも null になるため守り切れ
+      // ない。読み込み自体を権威ある状態まで遅らせる。
+      this.loadPending = true;
+      runWhenStorageAuthoritative(() => {
+        // 保留中に記録された試行を退避し、権威ある読み込みの後で
+        // （読み込めた側に無いものだけ）合体させる。
+        const provisional = [...this.ledger.values()];
+        this.ledger.clear();
+        this.load();
+        let mergedProvisional = false;
+        for (const record of provisional) {
+          if (!this.ledger.has(record.attemptId)) {
+            this.ledger.set(record.attemptId, record);
+            mergedProvisional = true;
+          }
+        }
+        this.loadPending = false;
+        if (mergedProvisional) {
+          this.save();
+          systemLogger.info(
+            'SELF_IMPROVEMENT',
+            '🔐 [P3022 診断台帳] 保留中に記録された試行を、権威ある読み込みへ合体しました'
+          );
+        }
+      });
+    }
   }
 
   private load(): void {
@@ -482,6 +519,10 @@ class DiagnosisTaskService {
   }
 
   private save(): void {
+    // P3022: 権威ある読み込みが済むまでの保存は、provisional な
+    // 部分像で実台帳を上書きするため拒否する（P3021 の保存時合体
+    // は保存時点の再読込が前提で、その前提が崩れる窓がここ）。
+    if (this.loadPending) return;
     try {
       // P3021: 保存時の再読込＋合体（P3011 の台帳保護と同型の
       // 保存側バリアント）。このサービスにはシード分岐が無く、

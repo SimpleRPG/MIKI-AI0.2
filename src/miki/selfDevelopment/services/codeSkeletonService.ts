@@ -9,6 +9,10 @@
 
 import { CodeSkeletonTemplate } from '../../../types';
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 import { vbaStaticVerifierService } from '../../verification/services/vbaStaticVerifierService';
 import { failureCatalogService } from '../../memory/services/failureCatalogService';
@@ -90,9 +94,53 @@ export class CodeSkeletonService {
   // ト（登録済み骨格・累積した成功回数）を部分像で上書きする危険
   // があるため拒否する（メモリ像は保持）。
   private storeUnreadable = false;
+  // P3022: 権威ある初回読み込みが済むまでは true。この間は全体
+  // 保存を行わない。
+  private loadPending = false;
 
   constructor() {
+    if (isStorageAuthoritativeNow()) {
+      this.loadTemplates();
+    } else {
+      // P3022: ストレージ初期化より先に構築された。P3021 のマー
+      // カーガードはマーカー自体が未ハイドレーションの起動では
+      // 盲目になるため、読み込み自体を権威ある状態まで遅らせる。
+      // 保留中は P3021 の保護状態と同じく、コード定数のシードを
+      // メモリにだけ置いて最低限の機能を保つ。
+      this.templates = [...INITIAL_SKELETONS];
+      this.loadPending = true;
+      runWhenStorageAuthoritative(() => {
+        this.loadPending = false;
+        this.reloadAuthoritative();
+      });
+    }
+  }
+
+  /**
+   * P3022: 権威ある状態になってから実テンプレートを読み直す。保
+   * 留中に実行時登録されたテンプレート（コード定数でないもの）は
+   * 退避し、読み込めた側に無いものだけ合体させる。定数シードへの
+   * 成功回数の加算は保留中の分は失われる（定数は読み込めた側の
+   * 累積値を正とする）。
+   */
+  private reloadAuthoritative(): void {
+    const initialIds = new Set(INITIAL_SKELETONS.map((t) => t.id));
+    const provisional = this.templates.filter((t) => !initialIds.has(t.id));
     this.loadTemplates();
+    let mergedProvisional = false;
+    for (const t of provisional) {
+      if (!this.templates.some((x) => x.id === t.id)) {
+        this.templates.unshift(t);
+        mergedProvisional = true;
+      }
+    }
+    if (mergedProvisional && !this.storeUnreadable) {
+      this.saveTemplates();
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        '🔐 [P3022 骨格テンプレート] 保留中に登録されたテンプレートを、権威ある読み込みへ合体しました'
+      );
+    }
   }
 
   // P3021: 存在マーカーの件数を読む。読めない・壊れている場合
@@ -145,6 +193,9 @@ export class CodeSkeletonService {
   }
 
   private saveTemplates() {
+    // P3022: 権威ある読み込みが済むまでの保存は、provisional な
+    // 部分像で実ストアを上書きするため拒否する。
+    if (this.loadPending) return;
     // P3021: 「読めなかった」セッションでは全体保存を拒否する。
     if (this.storeUnreadable) return;
     try {

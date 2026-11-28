@@ -140,6 +140,11 @@ class StorageService {
   // した場合に、backend を引き上げて未保存分を書き直すための武装
   // フラグ（initIndexedDbResilient が使う）。
   private idbLateUpgradeArmed = false;
+  // P3022: ready の解決を同期的に知るためのフラグと、遅延アップ
+  // グレードの決着（成功／断念）を購読者へ知らせるコールバック。
+  // deferredStoreLoad が「権威ある読み込み」のタイミング判定に使う。
+  private readySettledFlag = false;
+  private backendUpgradeSettledCallbacks: Array<() => void> = [];
   // P3010: 背景ハイドレーション（再生可能な理解エントリ）の進捗。
   // deferredHydration は完了／失敗を保持するだけで、ready は待たない。
   private deferredHydration: Promise<void> | null = null;
@@ -163,6 +168,11 @@ class StorageService {
     this.ready = this.init().catch((e) => {
       console.warn('storageService: init failed, continuing with in-memory storage only', e);
       this.backend = 'memory';
+    });
+    // P3022: 購読側より先にこのコールバックを登録し、ready 解決後は
+    // isReadySettled() が同期的に true を返すようにする。
+    void this.ready.then(() => {
+      this.readySettledFlag = true;
     });
     // P499: 書き込みは 400ms 遅延で永続化されるため、アプリが
     // その間に落とされると直近の学習が消える。背景化・終了の
@@ -375,17 +385,34 @@ class StorageService {
     const initPromise = this.initIndexedDb();
     initPromise.then(
       () => {
-        if (this.idbLateUpgradeArmed && this.backend === 'memory' && this.idb) {
+        if (this.idbLateUpgradeArmed) {
           this.idbLateUpgradeArmed = false;
-          this.backend = 'indexeddb';
-          this.emitFlushDiagnostic('BACKEND_UPGRADED', {
+          if (this.backend === 'memory' && this.idb) {
+            this.backend = 'indexeddb';
+            this.emitFlushDiagnostic('BACKEND_UPGRADED', {
+              backend: this.backend,
+              keyCount: this.cache.size,
+            });
+            if (this.dirtyKeys.size) this.scheduleFlush();
+          }
+          // P3022: 決着を購読者へ知らせる（キャッシュはこの時点で
+          // ハイドレーション済み＝権威ある状態）。
+          this.notifyBackendUpgradeSettled();
+        }
+      },
+      () => {
+        // 本物の初期化失敗では引き上げるものがない。ただし武装中
+        // だった場合は「メモリ backend で確定」として購読者へ決着
+        // を知らせる（待ち続けるとストアが永久に保留になるため）。
+        if (this.idbLateUpgradeArmed) {
+          this.idbLateUpgradeArmed = false;
+          this.emitFlushDiagnostic('BACKEND_UPGRADE_ABANDONED', {
             backend: this.backend,
             keyCount: this.cache.size,
           });
-          if (this.dirtyKeys.size) this.scheduleFlush();
+          this.notifyBackendUpgradeSettled();
         }
-      },
-      () => { /* 本物の初期化失敗では引き上げるものがない */ }
+      }
     );
     try {
       await this.withTimeout(initPromise, IDB_INIT_SOFT_TIMEOUT_MS, 'INDEXEDDB_INIT');
@@ -877,6 +904,46 @@ class StorageService {
 
   public getBackendName(): 'sqlite' | 'indexeddb' | 'memory' {
     return this.backend;
+  }
+
+  /**
+   * P3022: ready が解決済みかどうかを同期的に返す。コンストラクタで
+   * 同期読み込みを行うストア群が「キャッシュが権威ある状態か」を
+   * 判定するために使う（読み取りは発生しない）。
+   */
+  public isReadySettled(): boolean {
+    return this.readySettledFlag;
+  }
+
+  /**
+   * P3022: P3009 の遅延アップグレード（ハード上限超過後に裏で続く
+   * IndexedDB 初期化）がまだ決着していないかどうか。この間は
+   * backend が 'memory' でも実ストアが読み込み中かもしれない。
+   */
+  public isBackendUpgradePending(): boolean {
+    return this.idbLateUpgradeArmed;
+  }
+
+  /**
+   * P3022: 遅延アップグレードが決着した（引き上げ成功、または本物
+   * の失敗で断念した）ときに一度だけ呼ばれるコールバックを登録
+   * する。武装されていない状態で登録されたコールバックは呼ばれ
+   * ない（その場合キャッシュは既に権威ある状態）。
+   */
+  public onBackendUpgradeSettled(cb: () => void): void {
+    this.backendUpgradeSettledCallbacks.push(cb);
+  }
+
+  private notifyBackendUpgradeSettled(): void {
+    const callbacks = this.backendUpgradeSettledCallbacks;
+    this.backendUpgradeSettledCallbacks = [];
+    for (const cb of callbacks) {
+      try {
+        cb();
+      } catch {
+        // 購読側の失敗はストレージ層へ伝播させない
+      }
+    }
   }
 
   /**

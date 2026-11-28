@@ -40,6 +40,10 @@
  * 中で走り、結果はこの台帳とグラフ射影にだけ現れる）。
  */
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 import { canonicalSha256 } from './canonicalSha256Service';
 import { componentRepositoryCacheService } from '../../memory/services/componentRepositoryCacheService';
@@ -424,6 +428,8 @@ class ContentDecompositionService {
   private static instance: ContentDecompositionService;
   private records = new Map<string, ContentDecompositionRecord>();
   private loaded = false;
+  // P3022: 権威ある読み込みの遅延コールバックを登録済みか。
+  private loadDeferred = false;
   private queuedGapTerms = new Set<string>();
 
   public static getInstance(): ContentDecompositionService {
@@ -432,7 +438,29 @@ class ContentDecompositionService {
 
   private load(): void {
     if (this.loaded) return;
+    if (!isStorageAuthoritativeNow()) {
+      // P3022: この台帳は無防備だった（初回呼び出しが未ハイドレー
+      // ションの窓に当たると loaded=true のまま空で固定され、後続
+      // の保存が実台帳を上書きする）。権威ある状態になるまで読み
+      // 込み自体を固定せず、provisional な空の像で動く。権威ある
+      // 状態になったら performLoad が実台帳を読み、保留中の記録
+      // を合体させる。
+      if (!this.loadDeferred) {
+        this.loadDeferred = true;
+        runWhenStorageAuthoritative(() => this.performLoad());
+      }
+      return;
+    }
+    this.performLoad();
+  }
+
+  private performLoad(): void {
+    if (this.loaded) return;
     this.loaded = true;
+    // P3022: 保留中に作られた分解記録を退避し、実台帳の後で（実
+    // 台帳に無いものだけ）合体させる。
+    const provisional = [...this.records.values()];
+    this.records.clear();
     try {
       const raw = storageService.getItem(LEDGER_KEY);
       const saved = raw ? JSON.parse(raw) : [];
@@ -444,10 +472,46 @@ class ContentDecompositionService {
         }
       }
     } catch { /* 台帳が読めなくても本体は壊さない */ }
+    let mergedProvisional = false;
+    for (const rec of provisional) {
+      if (!this.records.has(rec.recordId)) {
+        this.records.set(rec.recordId, rec);
+        mergedProvisional = true;
+      }
+    }
+    if (mergedProvisional) {
+      this.save();
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        '🔐 [P3022 分解台帳] 保留中に作られた分解記録を、権威ある読み込みへ合体しました'
+      );
+    }
   }
 
   private save(): void {
+    // P3022: 権威ある読み込みが済むまでの保存は、provisional な
+    // 部分像で実台帳を上書きするため拒否する。
+    if (!this.loaded) return;
     try {
+      // P3022: P3011/P3020 と同型の書込拒否ガード（この台帳には
+      // 従来ガードが無かった）。永続側に既存値があるのに配列とし
+      // て読めない場合、その値をメモリ像で上書きしない。
+      const persistedRaw = storageService.getItem(LEDGER_KEY);
+      if (persistedRaw) {
+        let persistedIsArray = false;
+        try {
+          persistedIsArray = Array.isArray(JSON.parse(persistedRaw));
+        } catch {
+          persistedIsArray = false;
+        }
+        if (!persistedIsArray) {
+          systemLogger.warn(
+            'SELF_IMPROVEMENT',
+            '🔐 [P3022 分解台帳保護] 永続側の分解台帳が配列として読めないため、上書き保存を見送りました（メモリ上の記録は保持されます）'
+          );
+          return;
+        }
+      }
       storageService.setItem(LEDGER_KEY, JSON.stringify([...this.records.values()]));
     } catch { /* 同上 */ }
   }

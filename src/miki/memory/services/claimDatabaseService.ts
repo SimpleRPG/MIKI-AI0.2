@@ -9,6 +9,10 @@ import type {
   ClaimScope,
 } from '../../../types';
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 import { knowledgeHalfLifeService, type KnowledgeStability } from './knowledgeHalfLifeService';
 import { lexicalRelationService } from './lexicalRelationService';
@@ -122,8 +126,33 @@ export class ClaimDatabaseService {
   private normalizedStatementCache: Map<string, string> = new Map();
   // P492: 読み込み時に検出した採番まわりの整合性所見。
   private integrityFindings: string[] = [];
+  // P3022: 権威ある初回読み込みが済むまでは true。この間はシード
+  // 投入も全体保存も high-water の書き込みも行わない（provisional
+  // な空の像で動き、登録はメモリにだけ残る）。
+  private loadPending = false;
 
   private constructor() {
+    if (isStorageAuthoritativeNow()) {
+      this.initializeFromStorage();
+    } else {
+      // P3022: ストレージ初期化より先に構築された。P3020 の存在
+      // シグナルガードはシグナル自体が未ハイドレーションの起動で
+      // は盲目になるため、読み込み自体を権威ある状態まで遅らせる。
+      // 権威ある状態になったら従来の初期化手順をそのまま実行する。
+      this.loadPending = true;
+      runWhenStorageAuthoritative(() => {
+        this.loadPending = false;
+        this.initializeFromStorage();
+      });
+    }
+  }
+
+  private initializeFromStorage(): void {
+    // P3022: 保留中に登録された主張があれば退避し、権威ある読み
+    // 込みの後で合体させる（実データ側が土台。ID が衝突した保留
+    // 分は採番し直す）。
+    const provisional = [...this.claims.values()];
+    this.claims.clear();
     this.loadFromStorage();
     this.migrateLegacySeedVerification();
     this.foldDuplicateClaims();
@@ -148,6 +177,61 @@ export class ClaimDatabaseService {
       } else {
         this.initSeedClaims();
       }
+    }
+    if (provisional.length > 0) {
+      this.mergeProvisionalClaims(provisional);
+    }
+  }
+
+  /**
+   * P3022: 保留中（権威ある読み込み前）に登録された主張を、読み込
+   * めた実データへ合体させる。ID が空いていればそのまま取り込み、
+   * 同一 ID・同一文面は重複として捨て、同一 ID・別文面は新規 ID を
+   * 採番し直して取り込む（保留中の採番は counter=1 起点のため実
+   * データと衝突しうる）。合体したら high-water を進めて保存する。
+   */
+  private mergeProvisionalClaims(provisional: ClaimRecord[]): void {
+    let merged = 0;
+    for (const p of provisional) {
+      const existing = this.claims.get(p.claim_id);
+      if (!existing) {
+        this.claims.set(p.claim_id, p);
+        const match = p.claim_id.match(/CLM-(\d+)/);
+        if (match) {
+          this.counter = Math.max(this.counter, parseInt(match[1], 10) + 1);
+        }
+        merged += 1;
+      } else if (existing.statement !== p.statement) {
+        const oldId = p.claim_id;
+        let n = this.counter;
+        while (this.claims.has(`CLM-${String(n).padStart(6, '0')}`)) n += 1;
+        p.claim_id = `CLM-${String(n).padStart(6, '0')}`;
+        this.counter = n + 1;
+        // 正規化キャッシュは claim_id キーなので付け替える。
+        const cached = this.normalizedStatementCache.get(oldId);
+        if (cached !== undefined) {
+          this.normalizedStatementCache.delete(oldId);
+          this.normalizedStatementCache.set(p.claim_id, cached);
+        }
+        this.claims.set(p.claim_id, p);
+        merged += 1;
+      }
+      // 同一 ID・同一文面は重複として捨てる（何もしない）。
+    }
+    if (merged > 0) {
+      try {
+        const highWater = this.readClaimIdHighWater();
+        if (this.counter > highWater) {
+          storageService.setItem(CLAIM_ID_HIGH_WATER_KEY, String(this.counter));
+        }
+      } catch {
+        // high-water が書けなくても、本体配列の最大値から回復できる。
+      }
+      this.saveToStorage();
+      systemLogger.info(
+        'SELF_IMPROVEMENT',
+        `🔐 [P3022 主張DB] 保留中に登録された主張 ${merged} 件を、権威ある読み込みへ合体しました`
+      );
     }
   }
 
@@ -288,10 +372,16 @@ export class ClaimDatabaseService {
       );
     }
     this.counter = allocatedNum + 1;
-    try {
-      storageService.setItem(CLAIM_ID_HIGH_WATER_KEY, String(allocatedNum + 1));
-    } catch {
-      // high-water が書けなくても、読み込み時に Claim 配列の最大値から回復できる。
+    // P3022: 保留中は high-water も書かない。未ハイドレーションの
+    // キャッシュへ書くとそのキーが dirty になり、後から届く実値
+    // がハイドレーションで弾かれてフラッシュ時に巻き戻る。採番は
+    // メモリ上の counter で進め、合体時に high-water を進める。
+    if (!this.loadPending) {
+      try {
+        storageService.setItem(CLAIM_ID_HIGH_WATER_KEY, String(allocatedNum + 1));
+      } catch {
+        // high-water が書けなくても、読み込み時に Claim 配列の最大値から回復できる。
+      }
     }
     const claim_id = `CLM-${String(allocatedNum).padStart(6, '0')}`;
     const now = Date.now();
@@ -1582,6 +1672,10 @@ export class ClaimDatabaseService {
     if (this.saveTimer) return;
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null;
+      // P3022: 権威ある読み込みが済むまでの保存は、provisional な
+      // 部分像で実ストアを上書きするため切り捨てる。読み込み完了
+      // 時の合体（mergeProvisionalClaims）が改めて保存する。
+      if (this.loadPending) return;
       try {
         // P3020: P3011 と同型の書込拒否ガード。永続側に既存値が
         // あるのに Claim 配列として読めない場合、その値をメモリ像

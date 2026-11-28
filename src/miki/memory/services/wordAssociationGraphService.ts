@@ -1,5 +1,9 @@
 import { ClaimRecord } from '../../../types';
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 
 const STORAGE_KEY = 'miki_word_association_graph_v1';
@@ -57,11 +61,44 @@ export class WordAssociationGraphService {
   // セッションでは true。この間の全体保存は本物のグラフを部分像
   // で上書きする危険があるため拒否する（メモリ像は保持）。
   private storeUnreadable = false;
+  // P3022: 権威ある初回読み込みが済むまでは true。この間は全体
+  // 保存を行わない（provisional な空の像で動き、辺の追加はメモリ
+  // にだけ残る）。
+  private loadPending = false;
   // P440 1-C: 学習済み用語（gloss 付き）のキャッシュ。extractKeywords
   // の認識語に使う。load() 時に一度だけ読む。
   private learnedTerms: Set<string> = new Set();
 
   private constructor() {
+    if (isStorageAuthoritativeNow()) {
+      this.loadAndSeed();
+    } else {
+      // P3022: このサービスはモジュール import 時点で構築される
+      // ため、ストレージ初期化より先に走るのが通常経路に近い。
+      // P3021 のマーカーガードはマーカー自体が未ハイドレーショ
+      // ンの起動では盲目になるため、読み込み自体を権威ある状態
+      // まで遅らせる。
+      this.loadPending = true;
+      runWhenStorageAuthoritative(() => {
+        this.loadPending = false;
+        this.loadAndSeed();
+      });
+    }
+  }
+
+  private loadAndSeed(): void {
+    // P3022: 保留中に追加された辺・学習済み用語を退避し、権威ある
+    // 読み込みの後で（読み込めた側に無いものだけ）合体させる。
+    const provisionalEdges: Array<{ from: string; to: string; weight: number }> = [];
+    for (const [from, map] of this.adjacency) {
+      for (const [to, weight] of map) {
+        if (from < to) provisionalEdges.push({ from, to, weight });
+      }
+    }
+    const provisionalTerms = new Set(this.learnedTerms);
+    this.adjacency.clear();
+    this.learnedTerms.clear();
+    this.isLoaded = false;
     this.load();
     if (this.adjacency.size === 0) {
       // P3021: 空読みの切り分け。存在マーカーに辺の件数が残って
@@ -82,6 +119,29 @@ export class WordAssociationGraphService {
       } else {
         this.seedDefaultGraph();
       }
+    }
+    // P3022: 保留中の辺・用語を合体させる（読み込めた側が土台。
+    // 既にある辺の重みは読み込めた側を正とする）。
+    let mergedProvisional = false;
+    for (const e of provisionalEdges) {
+      if (!this.adjacency.get(e.from)?.has(e.to)) {
+        this.addEdgeInternal(e.from, e.to, e.weight);
+        mergedProvisional = true;
+      }
+    }
+    for (const t of provisionalTerms) {
+      if (!this.learnedTerms.has(t)) {
+        this.learnedTerms.add(t);
+        mergedProvisional = true;
+      }
+    }
+    if (mergedProvisional && !this.storeUnreadable) {
+      this.save();
+      this.saveLearnedTerms();
+      systemLogger.info(
+        'PERSISTENCE',
+        '🔐 [P3022 連想グラフ] 保留中の辺・学習済み用語を、権威ある読み込みへ合体しました'
+      );
     }
   }
 
@@ -137,6 +197,9 @@ export class WordAssociationGraphService {
   }
 
   private save(): void {
+    // P3022: 権威ある読み込みが済むまでの保存は、provisional な
+    // 部分像で実ストアを上書きするため拒否する。
+    if (this.loadPending) return;
     // P3021: 「読めなかった」セッションでは全体保存を拒否する。
     if (this.storeUnreadable) return;
     try {
@@ -183,6 +246,8 @@ export class WordAssociationGraphService {
   }
 
   private saveLearnedTerms(): void {
+    // P3022: 権威ある読み込みが済むまでは保存しない。
+    if (this.loadPending) return;
     // P3021: 学習済み用語の一覧も全体上書き形式のため、「読めな
     // かった」セッションでは同じく保存を拒否する。
     if (this.storeUnreadable) return;
