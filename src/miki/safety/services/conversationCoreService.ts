@@ -75,7 +75,7 @@ import { researchService } from '../../research/services/researchService';
 import { verifierService } from '../../verification/services/verifierService';
 import { reusableComponentFactoryService } from '../../core/services/reusableComponentFactoryService';
 import { knowledgeGraphService, type GroundedLessonNode } from '../../core/services/knowledgeGraphService';
-import { phraseComposerService } from '../../core/services/phraseComposerService';
+import { phraseComposerService, type ComposeUnitInfo } from '../../core/services/phraseComposerService';
 import { capabilityReuseService } from '../../capability/services/capabilityReuseService';
 import { failureMemoryService } from '../../memory/services/failureMemoryService';
 import { conversationComponentPipelineService } from '../../conversation/services/conversationComponentPipelineService';
@@ -164,6 +164,16 @@ function isFactualQuestionForm(prompt: string): boolean {
 }
 
 /**
+ * P3018: 逐次合成の段階表示の受け口。合成される返答（レッスン／
+ * グラフ想起）の単位が出るたびに、その時点までの全文が渡る。
+ * 渡されなければ合成は同期で走り、従来どおり全文だけが返る。
+ */
+type ComposeStreamHooks = {
+  onUnit?: (info: ComposeUnitInfo) => void | Promise<void>;
+  paceMs?: number;
+};
+
+/**
  * 設計思想書の概念地図を実行経路へ落とす中央オーケストレーター。
  *
  * 入力 → 会話状態/参照解決 → 記憶/主張 → 要求型 → 判断 → 部品 → 検証 → Answer IR → 表層
@@ -192,6 +202,10 @@ export class ConversationCoreService {
     messageId?: string;
     /** P456: 当ターンの P452 事実取り込み結果（受領応答 B に使う）。 */
     userFactIntake?: UserFactIntakeSummary;
+    /** P3018: 逐次合成の段階表示。合成の単位が出るたびに、その時点
+     * までの全文が呼ばれる（チャット画面の段階表示用）。合成される
+     * 返答以外では呼ばれない。最終の replyText が正式な答え。 */
+    onPhraseUnit?: (partialText: string) => void;
   }): Promise<ConversationCoreResult> {
     const started = performance.now();
     let prompt = params.prompt.trim().replace(/\s+/g, ' ');
@@ -662,14 +676,25 @@ export class ConversationCoreService {
       // に掛からない事実の手順質問でも、検証済みの教材が使えるように
       // する（従来は属性質問の「やり方」に落ちて、教材を持っていても
       // 「やり方はまだ知らない」と答えていた）。
-      const lessonHowTo = multiPart ? undefined : this.lessonHowToAnswer(prompt);
+      // P3018: 段階表示の受け口（チャット画面から execute 経由で渡る）。
+      // 合成される返答だけが単位ごとに途中経過を流す。それ以外の
+      // 経路は従来どおり一括で返す。
+      const composeStream: ComposeStreamHooks | undefined = params.onPhraseUnit
+        ? {
+            onUnit: (info: ComposeUnitInfo) => {
+              try { params.onPhraseUnit!(info.emitted); } catch { /* 表示は補助経路 */ }
+            },
+            paceMs: 120,
+          }
+        : undefined;
+      const lessonHowTo = multiPart ? undefined : await this.lessonHowToAnswer(prompt, composeStream);
       if (lessonHowTo) {
         return this.buildResult('RESOLVED', 'lesson_howto_answer', this.applyPersonaVoice(lessonHowTo), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
       // P3013: 事実の質問は、統合グラフの一般想起（言及された話題を
       // 起こしてエッジをたどる）で、Claim の知識から答える。レッスン
       // 以外の知識（調査で得た Claim 等）にも会話の受け口を付ける。
-      const graphRecall = multiPart ? undefined : this.graphRecallAnswer(prompt);
+      const graphRecall = multiPart ? undefined : await this.graphRecallAnswer(prompt, composeStream);
       if (graphRecall) {
         return this.buildResult('RESOLVED', 'graph_recall_answer', this.applyPersonaVoice(graphRecall), state, dialogueAct, 0, ['conversationCoreService'], started, stages);
       }
@@ -5883,7 +5908,7 @@ export class ConversationCoreService {
   // 使う（原則の観点出しと違い、正しさ優先）。検証状態は出し方で
   // 区別する: 教師検証済みは教わった内容として、未検証は候補として
   // 明示する（グラフの規律: 検証状態を消費側が見分けられること）。
-  private lessonHowToAnswer(prompt: string): string | undefined {
+  private async lessonHowToAnswer(prompt: string, stream?: ComposeStreamHooks): Promise<string | undefined> {
     if (!/(?:どうすれば|どうしたら|どうやって|するには|やり方|手順)/.test(prompt)) return undefined;
     let ranked: GroundedLessonNode[] = [];
     try { ranked = knowledgeGraphService.findLessonNodesFor(prompt); } catch { return undefined; }
@@ -5902,10 +5927,12 @@ export class ConversationCoreService {
       lessonTitle: hit.title,
       ruleText,
     };
-    const composed = phraseComposerService.composeSentences(
-      phraseComposerService.lessonHowToPlan(facts),
-      facts,
-    );
+    // P3018: 段階表示の受け口があれば非同期合成（単位ごとに表示側へ
+    // 渡る）。無ければ同期合成で、結果は同一。
+    const plan = phraseComposerService.lessonHowToPlan(facts);
+    const composed = stream?.onUnit
+      ? await phraseComposerService.composeSentencesAsync(plan, facts, stream)
+      : phraseComposerService.composeSentences(plan, facts);
     return composed.text || undefined;
   }
 
@@ -5916,7 +5943,7 @@ export class ConversationCoreService {
   // 彼女の検証を通ったものは「分かっている」と言い切る。グラフは
   // 素材（何を知っていて何とつながっているか）を渡すだけで、文の
   // 組み立てはここ（会話の仕組み）の仕事。
-  private graphRecallAnswer(prompt: string): string | undefined {
+  private async graphRecallAnswer(prompt: string, stream?: ComposeStreamHooks): Promise<string | undefined> {
     if (!/[？?]/.test(prompt) && !/(?:教えて|知ってる|知っている)/.test(prompt)) return undefined;
     if (!/(?:何|なぜ|どうして|本当|知ってる|知っている|教えて|ある|起き|遅い|速い|なる|って)/.test(prompt)) return undefined;
     let act: ReturnType<typeof knowledgeGraphService.activateFor>;
@@ -5964,11 +5991,13 @@ export class ConversationCoreService {
         mainText: content.text,
       });
     };
-    const composed = phraseComposerService.composeSentences(
-      phraseComposerService.claimRecallMultiPlan(facts),
-      facts,
-      { reconsult },
-    );
+    // P3018: 段階表示の受け口があれば非同期合成（再参照と併せて
+    // 使える）。無ければ同期合成で、結果は同一。
+    const hooks = { reconsult, onUnit: stream?.onUnit, paceMs: stream?.paceMs };
+    const plans = phraseComposerService.claimRecallMultiPlan(facts);
+    const composed = stream?.onUnit
+      ? await phraseComposerService.composeSentencesAsync(plans, facts, hooks)
+      : phraseComposerService.composeSentences(plans, facts, hooks);
     return composed.text || undefined;
   }
 

@@ -28,6 +28,13 @@
 // 文を種にして初めて関係が見えることがある——そのための受け口。
 // 再参照で入った文も通常の関門・スコア条件づけを受ける（既出と
 // 重なる内容は関門で落ちる）。再参照の記録は結果の events に残る。
+// P3018: 非同期合成（composeSentencesAsync）と単位の受け口
+// （hooks.onUnit）。単位が出るたびに、その時点までの全文が表示側へ
+// 渡り、チャット画面が文節単位で段階表示できる。合成そのもの
+// （候補・スコア・順序）は同期版と同一の状態機械（ComposeRun）が
+// 担い、非同期版は「単位ごとに間を置いて渡す」だけ。文字単位の
+// 疑似ストリーミングではない。受け口が無ければ従来どおり同期で
+// 合成して全文だけを返す。
 import { titleKeys } from '../../memory/services/teacherLessonRecallService';
 
 export interface ComposeFacts {
@@ -95,11 +102,26 @@ export interface ComposeResult {
   events: ComposeTraceEvent[];
 }
 
+export interface ComposeUnitInfo {
+  // この単位を出した直後の全文（表示側はこれを段階表示する）。
+  emitted: string;
+  // 今回出た単位そのもの（BODY は予約した文末を含む）。
+  unit: string;
+  role: string;
+  sentence: number;
+}
+
 export interface ComposeHooks {
   // 文が1つ終わるたびに呼ばれる再参照の受け口（P3017）。新しい
   // 文の計画を返せばキューの末尾に足される。返された文も通常の
   // 関門・スコア条件づけを受ける。
   reconsult?: (ctx: { emitted: string; facts: ComposeFacts; sentenceIndex: number }) => ComposeSentencePlan[] | undefined;
+  // 単位が出るたびに呼ばれる受け口（P3018 の段階表示用）。同期版
+  // では戻り値の Promise は待たない。非同期版では await する。
+  onUnit?: (info: ComposeUnitInfo) => void | Promise<void>;
+  // 非同期版で単位と単位の間に置く間隔（ms）。表示が段階として
+  // 目に見えるための間隔であり、合成の内容には影響しない。
+  paceMs?: number;
 }
 
 // 合成の状態機械。文を1つずつ、段を1つずつ進め、単位が出るたびに
@@ -157,7 +179,7 @@ class ComposeRun {
   }
 
   // 次の単位を出す。もう出なければ null。
-  nextUnit(): { emitted: string; unit: string; role: string; sentence: number } | null {
+  nextUnit(): ComposeUnitInfo | null {
     for (;;) {
       if (!this.sentenceActive) {
         if (this.sentenceIdx + 1 >= this.queue.length) return null;
@@ -215,7 +237,34 @@ class ComposeRun {
 
 function composeSentences(plans: ComposeSentencePlan[], facts: ComposeFacts, hooks: ComposeHooks = {}): ComposeResult {
   const run = new ComposeRun(plans, facts, hooks);
-  while (run.nextUnit()) { /* 単位は捨て、全文とトレースだけ返す */ }
+  for (;;) {
+    const unit = run.nextUnit();
+    if (!unit) break;
+    if (hooks.onUnit) {
+      try {
+        const r = hooks.onUnit(unit);
+        if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => {});
+      } catch { /* 表示は補助経路 */ }
+    }
+  }
+  return run.result();
+}
+
+// P3018: 非同期版。単位ごとに onUnit を await し、paceMs の間を
+// 置くので、表示側は単位の境界で実際に画面を更新できる。合成の
+// 中身は同期版と同一（同じ ComposeRun）。受け口が無い呼び出しは
+// 従来どおり同期版でよく、こちらは段階表示が要る経路専用。
+async function composeSentencesAsync(plans: ComposeSentencePlan[], facts: ComposeFacts, hooks: ComposeHooks = {}): Promise<ComposeResult> {
+  const run = new ComposeRun(plans, facts, hooks);
+  const pace = hooks.paceMs && hooks.paceMs > 0 ? hooks.paceMs : 0;
+  for (;;) {
+    const unit = run.nextUnit();
+    if (!unit) break;
+    if (hooks.onUnit) {
+      try { await hooks.onUnit(unit); } catch { /* 表示は補助経路 */ }
+    }
+    if (pace > 0) await new Promise((r) => setTimeout(r, pace));
+  }
   return run.result();
 }
 
@@ -478,6 +527,7 @@ export function claimFollowupPlan(facts: ComposeFacts): ComposeSentencePlan[] {
 export const phraseComposerService = {
   composePhraseReply,
   composeSentences,
+  composeSentencesAsync,
   claimRecallPlan,
   lessonHowToPlan,
   claimRecallMultiPlan,

@@ -1306,6 +1306,17 @@ export default function App() {
         recentMessages: messages,
         messageId: userMsg.id,
         userFactIntake: userFactIntakeForCore,
+        // P3018: 逐次合成の段階表示。合成される返答（レッスン／グラフ
+        // 想起）の単位が出るたびに、その時点までの全文で吹き出しを
+        // 更新する。最終確定は従来どおり finalize の結果で置き換わる
+        // （合成される返答では合成結果と一致する）。
+        onPhraseUnit: (partial) => {
+          if (abortController.signal.aborted) return;
+          setMessages((prev) => prev.map((msg) => msg.id === fastAssistantId
+            ? { ...msg, content: partial }
+            : msg
+          ));
+        },
       });
 
       if (abortController.signal.aborted) return;
