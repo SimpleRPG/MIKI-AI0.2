@@ -89,6 +89,14 @@ export function isControlTokenDominatedText(value:string):boolean{
 class AutonomousIssueDiscoveryService{
  private issues=new Map<string,DiscoveredIssue>();private config:DiscoveryConfig={...DEFAULT_CONFIG};private timer:ReturnType<typeof setInterval>|null=null;private retryTimer:ReturnType<typeof setTimeout>|null=null;private scanning=false;private activeScanGeneration:number|null=null;private lifecycleGeneration=0;
   private disposed=false;
+ // P3042: スキャン内バッチ保存。save() は最大500件の全量文字列化で、
+ // スキャン1回の中で候補ごと・dispatch の分岐ごとに何度も呼ばれて
+ // いた。スキャン中は保留印だけ立て、終了時（finally）に1回だけ
+ // 書く。スキャン外の save()（recordContradiction 等）は従来どおり
+ // 即時保存で、失敗時の throw・巻き戻し意味論もそのまま。
+ private saveBatchDepth=0;private saveBatchPending=false;
+ private beginSaveBatch():void{this.saveBatchDepth+=1;}
+ private endSaveBatch():void{if(this.saveBatchDepth>0)this.saveBatchDepth-=1;if(this.saveBatchDepth===0&&this.saveBatchPending){this.saveBatchPending=false;this.save();}}
  private persistenceStatus:DiscoveryPersistenceStatus='READY';private persistenceReason?:string;private writesBlocked=false;
  constructor(){this.load();}
  private isCurrentGeneration(generation:number):boolean{return !this.disposed&&generation===this.lifecycleGeneration;}
@@ -120,6 +128,7 @@ class AutonomousIssueDiscoveryService{
   this.assertWritable();
   const generation=this.lifecycleGeneration;
   if(this.scanning)return {scannedAt:Date.now(),mode,discovered:0,queued:0,skipped:0,issues:[]};this.scanning=true;this.activeScanGeneration=generation;
+  this.beginSaveBatch();
   try{
    await this.reconcileQueuedIssues(generation);
    // P493: 生きている矛盾リンクが無い Claim の contradiction issue を
@@ -201,7 +210,7 @@ class AutonomousIssueDiscoveryService{
     skipped:Math.max(0,issues.filter(x=>!x.resolvedAt&&!x.queuedAt).length),
     issues
    };
-  }finally{if(this.activeScanGeneration===generation){this.scanning=false;this.activeScanGeneration=null;}if(this.isCurrentGeneration(generation))this.scheduleRetryWakeup();}
+  }finally{this.endSaveBatch();if(this.activeScanGeneration===generation){this.scanning=false;this.activeScanGeneration=null;}if(this.isCurrentGeneration(generation))this.scheduleRetryWakeup();}
  }
 
  private async reconcileQueuedIssues(generation:number):Promise<void>{
@@ -777,7 +786,7 @@ class AutonomousIssueDiscoveryService{
  private recoverCorruptSnapshot(sourceKey:string,raw:string,error:unknown):void{const reason=String(error instanceof Error?error.message:error).slice(0,500);if(this.quarantine(sourceKey,raw,reason)){if(this.writesBlocked)return;this.persistenceStatus='RECOVERED_QUARANTINED';this.persistenceReason=`${sourceKey}_QUARANTINED:${reason}`;if(sourceKey===KEY)this.issues.clear();}else this.blockStore(`${sourceKey}_QUARANTINE_FAILED:${reason}`);}
  private parseIssueSnapshot(raw:string):DiscoveredIssue[]{const parsed:unknown=JSON.parse(raw);if(!Array.isArray(parsed)||parsed.length>500)throw new Error('DISCOVERY_SNAPSHOT_INVALID_ROOT_OR_LIMIT');const ids=new Set<string>();const fingerprints=new Set<string>();for(const item of parsed){if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('DISCOVERY_SNAPSHOT_INVALID_RECORD');const row=item as Record<string,unknown>;if(typeof row.id!=='string'||!row.id.trim()||typeof row.fingerprint!=='string'||!row.fingerprint.trim()||typeof row.kind!=='string'||!ISSUE_KINDS.includes(row.kind as DiscoveredIssueKind)||typeof row.title!=='string'||!row.title.trim()||typeof row.detail!=='string'||typeof row.sourceId!=='string'||!row.sourceId.trim()||typeof row.priority!=='number'||!Number.isFinite(row.priority)||row.priority<0||row.priority>100||typeof row.discoveredAt!=='number'||!Number.isFinite(row.discoveredAt)||row.discoveredAt<0||typeof row.lastSeenAt!=='number'||!Number.isFinite(row.lastSeenAt)||row.lastSeenAt<0||typeof row.occurrences!=='number'||!Number.isInteger(row.occurrences)||row.occurrences<1)throw new Error('DISCOVERY_SNAPSHOT_INVALID_FIELDS');if(ids.has(row.id)||fingerprints.has(row.fingerprint))throw new Error('DISCOVERY_SNAPSHOT_DUPLICATE_IDENTITY');ids.add(row.id);fingerprints.add(row.fingerprint);for(const key of ['changeSetId','requirementContractId','improvementRunId','taskId','lastOutcome'])if(row[key]!==undefined&&typeof row[key]!=='string')throw new Error('DISCOVERY_SNAPSHOT_INVALID_OPTIONAL_STRING');for(const key of ['queuedAt','lastQueuedAt','resolvedAt','nextRetryAt'])if(row[key]!==undefined&&(typeof row[key]!=='number'||!Number.isFinite(row[key])||(row[key] as number)<0))throw new Error('DISCOVERY_SNAPSHOT_INVALID_OPTIONAL_TIME');if(row.retryCount!==undefined&&(typeof row.retryCount!=='number'||!Number.isInteger(row.retryCount)||row.retryCount<0))throw new Error('DISCOVERY_SNAPSHOT_INVALID_RETRY_COUNT');if(row.exhausted!==undefined&&typeof row.exhausted!=='boolean')throw new Error('DISCOVERY_SNAPSHOT_INVALID_EXHAUSTED_FLAG');if(row.lastDiagnosis!==undefined&&(typeof row.lastDiagnosis!=='object'||row.lastDiagnosis===null||Array.isArray(row.lastDiagnosis)))throw new Error('DISCOVERY_SNAPSHOT_INVALID_DIAGNOSIS');}return parsed as DiscoveredIssue[];}
  private parseConfig(raw:string):DiscoveryConfig{const value:unknown=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('DISCOVERY_CONFIG_INVALID_ROOT');const merged={...DEFAULT_CONFIG,...value as Partial<DiscoveryConfig>};if(typeof merged.enabled!=='boolean'||typeof merged.intervalMinutes!=='number'||!Number.isInteger(merged.intervalMinutes)||merged.intervalMinutes<15||merged.intervalMinutes>10080||typeof merged.maxIssuesPerScan!=='number'||!Number.isInteger(merged.maxIssuesPerScan)||merged.maxIssuesPerScan<1||merged.maxIssuesPerScan>20||typeof merged.minimumPriority!=='number'||!Number.isInteger(merged.minimumPriority)||merged.minimumPriority<0||merged.minimumPriority>100)throw new Error('DISCOVERY_CONFIG_INVALID_FIELDS');return merged;}
- private save():void{this.writeRaw(KEY,JSON.stringify(this.list(500)),'DISCOVERY_SNAPSHOT');}
+ private save():void{if(this.saveBatchDepth>0){this.saveBatchPending=true;return;}this.writeRaw(KEY,JSON.stringify(this.list(500)),'DISCOVERY_SNAPSHOT');}
  private load():void{try{const raw=storageService.getItem(KEY);if(raw!==null){try{this.issues.clear();for(const item of this.parseIssueSnapshot(raw))this.issues.set(item.fingerprint,{...item});}catch(error){this.recoverCorruptSnapshot(KEY,raw,error);}}const configRaw=storageService.getItem(CONFIG_KEY);if(configRaw!==null){try{this.config=this.parseConfig(configRaw);}catch(error){this.recoverCorruptSnapshot(CONFIG_KEY,configRaw,error);this.config={...DEFAULT_CONFIG};}}}catch(error){this.blockStore(`DISCOVERY_STORE_READ_FAILED:${String(error instanceof Error?error.message:error)}`);}}
 }
 export const autonomousIssueDiscoveryService=new AutonomousIssueDiscoveryService();
