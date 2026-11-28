@@ -110,6 +110,12 @@ const RECOVERY_POLL_MS = 60_000;
 // 消費しない短い駐車を繰り返し、会話が終われば速やかに再開
 // する（会話画面が開いている間は開いたまま駐車し続ける）。
 const CONVERSATION_PARK_MS = 10_000;
+// P3040: 背景リクエストの実行開始の最小間隔（ドライバ側ペーシング）。
+// サイクル内の譲り（P3034 の 300ms）は continueTask 側にあるが、
+// 即座に終わる実行（再開不能・事前条件落ち・完了済み）が続くと
+// drain がキューを無制限の速さで回し続けていた。実作業の実行は
+// これより桁違いに長いため、実効速度は落とさず churn だけを止める。
+const BACKGROUND_EXECUTION_MIN_INTERVAL_MS = 2_000;
 const RESOURCE_WAIT_MS = [2 * 60_000, 5 * 60_000, 15 * 60_000, 30 * 60_000];
 const EVIDENCE_WAIT_MS = [2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60_000];
 
@@ -213,6 +219,8 @@ class AutonomousSelfImprovementLoopService {
   // P480/P482: 世界モデル成長の最終実行時刻（メモリ上。enqueue の
   // たびに判定し、30分に1回だけ回す）。
   private lastWorldModelGrowthAt = 0;
+  // P3040: 背景リクエストの最終実行開始時刻（ドライバ側ペーシング）。
+  private lastBackgroundExecutionStartedAt = 0;
   private lastLogSelfReviewAt = 0;
   private lastKnowledgeSelfInspectionAt = 0;
   private lastDigestSignature = '';
@@ -819,6 +827,20 @@ class AutonomousSelfImprovementLoopService {
         }
 
         this.replaceLegacyMisclassifiedTask(request);
+        // P3040: ドライバ側ペーシング。背景リクエストの実行開始に
+        // 最小間隔を入れ、即座に終わる実行がキューを無制限の速さで
+        // churn するのを止める。UI 由来（利用者の作業）は対象外で、
+        // 帳簿だけの分岐（解消済み gap の完了・試行上限など）は
+        // この直前で処理済みのため待たない。
+        if (request.source !== 'UI') {
+          const sinceLastExecution = Date.now() - this.lastBackgroundExecutionStartedAt;
+          if (this.lastBackgroundExecutionStartedAt > 0 && sinceLastExecution < BACKGROUND_EXECUTION_MIN_INTERVAL_MS) {
+            await new Promise(resolve => setTimeout(resolve, BACKGROUND_EXECUTION_MIN_INTERVAL_MS - sinceLastExecution));
+            if (!this.isGenerationCurrent(generation)) return;
+          }
+          this.lastBackgroundExecutionStartedAt = Date.now();
+        }
+
         // P405: remember where this execution's blackboard entries
         // start; the budget-pause classification below may only look
         // at entries appended by THIS execution.
