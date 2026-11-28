@@ -85,6 +85,11 @@ export function isVerifiedTaskOutcome(task:BlackboardTask):boolean{
 }
 
 const KEY='miki_task_blackboard_v1';
+// P3034: 永続化バッチ化の窓。変更が続く間は最大でも
+// SAVE_MAX_WAIT_MS に1回、静まれば最後の変更から
+// SAVE_DEBOUNCE_MS 後に書き込む。
+const SAVE_DEBOUNCE_MS=1500;
+const SAVE_MAX_WAIT_MS=15000;
 
 function summarizeTaskTitle(
  goal:string,
@@ -132,6 +137,8 @@ function summarizeTaskTitle(
 const MAX_TASKS=200;
 class TaskBlackboardService{
  private tasks=new Map<string,BlackboardTask>(); private sequence=0; private persistenceBlocked=false;
+ private saveTimer: ReturnType<typeof setTimeout> | null = null;
+ private saveMaxTimer: ReturnType<typeof setTimeout> | null = null;
  constructor(){this.load();}
  create(goal:string,source:MikiDomain,payload?:Record<string,unknown>):BlackboardTask{
   const now=Date.now();this.sequence+=1;const taskId=`TASK-${now}-${String(this.sequence).padStart(6,'0')}`;
@@ -251,7 +258,26 @@ class TaskBlackboardService{
  get(taskId:string):BlackboardTask|undefined{const task=this.tasks.get(taskId);return task?this.clone(task):undefined;}
  list(limit=50):BlackboardTask[]{return [...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,limit).map(t=>this.clone(t));}
  private clone(t:BlackboardTask):BlackboardTask{return {...t,visitedDomains:[...t.visitedDomains],pendingDomains:[...t.pendingDomains],entries:t.entries.map(e=>({...e,evidenceIds:[...e.evidenceIds]}))};}
- private save():void{if(this.persistenceBlocked)return;const all=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);storageService.setItem(KEY,JSON.stringify(all));}
+ private save():void{
+  if(this.persistenceBlocked)return;
+  // P3034: 保存を短い窓でまとめる（claim 台帳の P499 と同型）。
+  // 従来は append・setCycle 等の変更のたびに全タスクを JSON 化
+  // して保存しており、台帳が 25MB 級まで育った結果、CORE の
+  // サイクルが回る間ずっとメインスレッドの大半を JSON 化が
+  // 占有し、会話ターンの着地が数分〜数十分まで遅れていた。
+  // メモリ上の Map が正で、永続化だけをバッチ化する。変更が
+  // 続く間も SAVE_MAX_WAIT_MS に1回は書き込むため、失われる
+  // 変更は最大でその窓の分までに限られる。
+  if(this.saveTimer)clearTimeout(this.saveTimer);
+  this.saveTimer=setTimeout(()=>this.flushSave(),SAVE_DEBOUNCE_MS);
+  if(!this.saveMaxTimer)this.saveMaxTimer=setTimeout(()=>this.flushSave(),SAVE_MAX_WAIT_MS);
+ }
+ private flushSave():void{
+  if(this.saveTimer){clearTimeout(this.saveTimer);this.saveTimer=null;}
+  if(this.saveMaxTimer){clearTimeout(this.saveMaxTimer);this.saveMaxTimer=null;}
+  if(this.persistenceBlocked)return;
+  const all=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);storageService.setItem(KEY,JSON.stringify(all));
+ }
  private load():void{
   let raw:string|null=null;
   try{
