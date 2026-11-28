@@ -15,6 +15,10 @@ import {
   ProactiveSuggestionLevel,
 } from '../../../types';
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 
 const TASKBOARD_STORAGE_KEY = 'miki_conversation_tasks_v1';
@@ -48,9 +52,45 @@ export class ConversationTaskboardService {
   private tasks: ConversationTaskCard[] = [];
   private proactiveLevel: ProactiveSuggestionLevel = 'STANDARD';
   private explanationOverride: ManualExplanationOverride = 'AUTO';
+  // P3037: 権威ある初回読み込みが済むまでは true。この間は保存を
+  // 行わない（保留中のカード追加・設定変更はメモリにだけ残り、
+  // 着地時にカード id で合体、設定は変更があった分だけ引き継ぐ）。
+  // 未ハイドレーション起動の空読み＋保存が実ボードを上書きする
+  // P3022 型喪失への対策（P3037 センサスで同型と判定）。
+  private loadPending = false;
+  private scalarsDirtyWhilePending = false;
 
   constructor() {
-    this.loadState();
+    if (isStorageAuthoritativeNow()) {
+      this.loadState();
+    } else {
+      this.loadPending = true;
+      runWhenStorageAuthoritative(() => {
+        const provisionalTasks = this.tasks;
+        const provisionalLevel = this.proactiveLevel;
+        const provisionalOverride = this.explanationOverride;
+        const scalarsDirty = this.scalarsDirtyWhilePending;
+        this.tasks = [];
+        this.proactiveLevel = 'STANDARD';
+        this.explanationOverride = 'AUTO';
+        this.loadState();
+        let merged = false;
+        const known = new Set(this.tasks.map((t) => t.id));
+        for (const card of provisionalTasks) {
+          if (!known.has(card.id)) {
+            this.tasks.unshift(card);
+            merged = true;
+          }
+        }
+        if (scalarsDirty) {
+          this.proactiveLevel = provisionalLevel;
+          this.explanationOverride = provisionalOverride;
+          merged = true;
+        }
+        this.loadPending = false;
+        if (merged) this.saveState();
+      });
+    }
   }
 
   private loadState() {
@@ -73,6 +113,9 @@ export class ConversationTaskboardService {
   }
 
   private saveState() {
+    // P3037: 権威ある読み込みが済むまでの保存は、provisional な
+    // 部分像で実ボード・設定を上書きするため見送る。
+    if (this.loadPending) return;
     try {
       storageService.setItem(TASKBOARD_STORAGE_KEY, JSON.stringify(this.tasks));
       storageService.setItem(PROACTIVE_LEVEL_KEY, this.proactiveLevel);
@@ -92,6 +135,7 @@ export class ConversationTaskboardService {
 
   public setProactiveLevel(level: ProactiveSuggestionLevel) {
     this.proactiveLevel = level;
+    if (this.loadPending) this.scalarsDirtyWhilePending = true;
     this.saveState();
     systemLogger.info('SELF_IMPROVEMENT', `[第31.14章] 自発提案強度を [${level}] に変更しました。`);
   }
@@ -102,6 +146,7 @@ export class ConversationTaskboardService {
 
   public setExplanationOverride(override: ManualExplanationOverride) {
     this.explanationOverride = override;
+    if (this.loadPending) this.scalarsDirtyWhilePending = true;
     this.saveState();
     systemLogger.info('SELF_IMPROVEMENT', `[第31.15章] 説明レベル手動上書きを [${override}] に設定しました。`);
   }

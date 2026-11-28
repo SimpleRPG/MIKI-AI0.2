@@ -1,4 +1,8 @@
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import type { MikiDomain } from './crossDomainCirculationService';
 
 export type BlackboardStatus='OPEN'|'ROUTING'|'WAITING'|'PAUSED'|'COMPLETED'|'FAILED'|'CANCELLED';
@@ -229,7 +233,51 @@ class TaskBlackboardService{
  private tasks=new Map<string,BlackboardTask>(); private sequence=0; private persistenceBlocked=false;
  private saveTimer: ReturnType<typeof setTimeout> | null = null;
  private saveMaxTimer: ReturnType<typeof setTimeout> | null = null;
- constructor(){this.load();}
+ // P3037: 権威ある初回読み込みが済むまでは true。この間は全体保存
+ // を行わない（provisional な空の像で動き、作成・追記はメモリに
+ // だけ残る）。P3022 の6ストアから漏れていたため、未ハイドレー
+ // ション起動で空の像＋ループの初回追記が実台帳を上書きした
+ // （2026-11-28 に2回発火、64.5MB の台帳喪失を含む）。
+ private loadPending=false;
+ constructor(){
+  if(isStorageAuthoritativeNow()){this.load();return;}
+  this.loadPending=true;
+  runWhenStorageAuthoritative(()=>{
+   // 保留中に作成・追記されたタスクを退避し、権威ある読み込み
+   // （従来手順そのまま）の後で taskId／エントリ id で合体させる。
+   const provisional=[...this.tasks.values()];
+   this.tasks.clear();
+   this.loadPending=false;
+   this.load();
+   if(this.mergeProvisionalTasks(provisional))this.save();
+  });
+ }
+ /**
+  * P3037: 保留中のタスクを、読み込めた実データへ合体させる。実
+  * データ側が土台。同一 taskId はエントリ id で合体し（読み込み
+  * 側に無いエントリだけ足す）、状態は新しい方を採る。
+  */
+ private mergeProvisionalTasks(provisional:BlackboardTask[]):boolean{
+  let merged=false;
+  for(const p of provisional){
+   const existing=this.tasks.get(p.taskId);
+   if(!existing){this.tasks.set(p.taskId,p);merged=true;continue;}
+   const known=new Set(existing.entries.map(entry=>entry.id));
+   let added=0;
+   for(const entry of p.entries){
+    if(known.has(entry.id))continue;
+    existing.entries.push(entry);added+=1;
+   }
+   if(added>0){
+    merged=true;
+    existing.entries.sort((a,b)=>a.createdAt-b.createdAt);
+    if(p.updatedAt>existing.updatedAt){existing.status=p.status;existing.updatedAt=p.updatedAt;}
+    existing.revision=Math.max(existing.revision,p.revision);
+    for(const domain of p.visitedDomains)if(!existing.visitedDomains.includes(domain))existing.visitedDomains.push(domain);
+   }
+  }
+  return merged;
+ }
  create(goal:string,source:MikiDomain,payload?:Record<string,unknown>):BlackboardTask{
   const now=Date.now();this.sequence+=1;const taskId=`TASK-${now}-${String(this.sequence).padStart(6,'0')}`;
   const task:BlackboardTask={taskId,title:summarizeTaskTitle(goal,payload),goal:goal.trim(),source,status:'OPEN',revision:1,createdAt:now,updatedAt:now,visitedDomains:[],pendingDomains:[],entries:[],resumeCount:0,lastCycle:0};
@@ -422,6 +470,9 @@ class TaskBlackboardService{
  list(limit=50):BlackboardTask[]{return [...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,limit).map(t=>this.clone(t));}
  private clone(t:BlackboardTask):BlackboardTask{return {...t,visitedDomains:[...t.visitedDomains],pendingDomains:[...t.pendingDomains],entries:t.entries.map(e=>({...e,evidenceIds:[...e.evidenceIds]}))};}
  private save():void{
+  // P3037: 権威ある読み込みが済むまでの保存は、provisional な
+  // 部分像で実台帳を上書きするため見送る（合体時に改めて保存）。
+  if(this.loadPending)return;
   if(this.persistenceBlocked)return;
   // P3034: 保存を短い窓でまとめる（claim 台帳の P499 と同型）。
   // 従来は append・setCycle 等の変更のたびに全タスクを JSON 化
@@ -438,6 +489,7 @@ class TaskBlackboardService{
  private flushSave():void{
   if(this.saveTimer){clearTimeout(this.saveTimer);this.saveTimer=null;}
   if(this.saveMaxTimer){clearTimeout(this.saveMaxTimer);this.saveMaxTimer=null;}
+  if(this.loadPending)return;
   if(this.persistenceBlocked)return;
   const all=[...this.tasks.values()].sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,MAX_TASKS);
   let payload=JSON.stringify(all);

@@ -1,6 +1,10 @@
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { systemLogger } from '../../../services/systemLogger';
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 
 export interface FailureRiskAssessment {
   component_id: string;
@@ -34,7 +38,27 @@ export class FailureMemoryService {
   private static instance: FailureMemoryService;
   private records: FailureMemoryRecord[] = [];
   private readonly storageKey = 'miki_failure_memory_v1';
-  private constructor() { this.load(); }
+  // P3037: 権威ある初回読み込みが済むまでは true。この間は保存を
+  // 行わない（保留中の記録はメモリにだけ残り、着地時に
+  // failure_id で合体する）。未ハイドレーション起動の空読み＋
+  // 保存が実記録を上書きする P3022 型喪失への対策。
+  private loadPending = false;
+  private constructor() {
+    if (isStorageAuthoritativeNow()) { this.load(); return; }
+    this.loadPending = true;
+    runWhenStorageAuthoritative(() => {
+      const provisional = this.records;
+      this.records = [];
+      this.load();
+      let merged = false;
+      const known = new Set(this.records.map(r => r.failure_id));
+      for (const record of provisional) {
+        if (!known.has(record.failure_id)) { this.records.push(record); merged = true; }
+      }
+      this.loadPending = false;
+      if (merged) this.save();
+    });
+  }
   public static getInstance(): FailureMemoryService {
     if (!this.instance) this.instance = new FailureMemoryService();
     return this.instance;
@@ -117,6 +141,6 @@ export class FailureMemoryService {
   private normalize(value: string): string { return value.toLowerCase().replace(/\d+/g, '#').replace(/\s+/g, ' ').trim().slice(0, 240); }
   private hash(raw: string): string { let h=2166136261; for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619);} return (h>>>0).toString(16).padStart(8,'0'); }
   private load(): void { try { const raw=storageService.getItem(this.storageKey); if(raw) this.records=JSON.parse(raw); } catch { this.records=[]; } }
-  private save(): void { try { storageService.setItem(this.storageKey,JSON.stringify(this.records)); } catch { /* optional */ } }
+  private save(): void { if (this.loadPending) return; try { storageService.setItem(this.storageKey,JSON.stringify(this.records)); } catch { /* optional */ } }
 }
 export const failureMemoryService = FailureMemoryService.getInstance();

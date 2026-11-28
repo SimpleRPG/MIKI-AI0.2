@@ -1,4 +1,8 @@
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 export type GovernedMemoryKind='FACT'|'DECISION'|'PREFERENCE'|'CONSTRAINT'|'HYPOTHESIS'|'TASK'|'EVIDENCE'|'ARTIFACT';
 export type GovernedMemoryStatus='ACTIVE'|'UNVERIFIED'|'SUPERSEDED'|'REJECTED'|'EXPIRED'|'INVALIDATED';
@@ -11,7 +15,28 @@ const KEY='miki_scoped_versioned_memory_v1';
 const RETRIEVAL_STATS_KEY='miki_scoped_versioned_memory_retrieval_v1';
 interface MemoryRetrievalStats{memoryId:string;retrievalCount:number;successCount:number;failureCount:number;lastRetrievedAt:number;lastOutcomeAt:number;outcomeTaskIds:string[];}
 class ScopedVersionedMemoryService{
- private records=new Map<string,GovernedMemoryRecord>();private retrievalStats=new Map<string,MemoryRetrievalStats>();private pendingStatsWrites=0;private lastStatsPersistAt=0;constructor(){this.load();this.loadRetrievalStats();}
+ private records=new Map<string,GovernedMemoryRecord>();private retrievalStats=new Map<string,MemoryRetrievalStats>();private pendingStatsWrites=0;private lastStatsPersistAt=0;
+ // P3037: 権威ある初回読み込みが済むまでは true。この間は保存を
+ // 行わない（保留中の提案・統計はメモリにだけ残り、着地時に
+ // record id / memoryId で合体する）。未ハイドレーション起動の
+ // 空読み＋保存が実記録を上書きする P3022 型喪失への対策。
+ private loadPending=false;
+ constructor(){
+  if(isStorageAuthoritativeNow()){this.load();this.loadRetrievalStats();return;}
+  this.loadPending=true;
+  runWhenStorageAuthoritative(()=>{
+   const provisionalRecords=[...this.records.values()];
+   const provisionalStats=[...this.retrievalStats.values()];
+   this.records.clear();this.retrievalStats.clear();
+   this.load();this.loadRetrievalStats();
+   let merged=false;let statsMerged=false;
+   for(const record of provisionalRecords){if(!this.records.has(record.id)){this.records.set(record.id,record);merged=true;}}
+   for(const stats of provisionalStats){if(this.records.has(stats.memoryId)&&!this.retrievalStats.has(stats.memoryId)){this.retrievalStats.set(stats.memoryId,stats);statsMerged=true;}}
+   this.loadPending=false;
+   if(merged)this.save();
+   if(statsMerged)this.saveRetrievalStats();
+  });
+ }
  propose(input:Omit<GovernedMemoryRecord,'id'|'status'|'createdAt'|'updatedAt'>):GovernedMemoryRecord{const now=Date.now();const record:GovernedMemoryRecord={...input,id:`MEM-${canonicalSha256({subject:input.subject,content:input.content,scope:input.scope,source:input.source}).slice(0,24)}`,status:input.kind==='HYPOTHESIS'?'UNVERIFIED':'ACTIVE',confidence:Math.max(0,Math.min(1,input.confidence)),createdAt:now,updatedAt:now};this.records.set(record.id,record);this.save();return record;}
  supersede(previousId:string,next:Omit<GovernedMemoryRecord,'id'|'status'|'createdAt'|'updatedAt'|'supersedes'>):GovernedMemoryRecord|undefined{const previous=this.records.get(previousId);if(!previous||!['ACTIVE','UNVERIFIED'].includes(previous.status))return undefined;const replacement=this.propose({...next,supersedes:previousId});previous.status='SUPERSEDED';previous.supersededBy=replacement.id;previous.updatedAt=Date.now();this.records.set(previous.id,previous);this.save();return replacement;}
  invalidate(id:string,reason:string):GovernedMemoryRecord|undefined{const record=this.records.get(id);if(!record)return undefined;record.status='INVALIDATED';record.invalidationReason=reason;record.updatedAt=Date.now();this.records.set(id,record);this.save();return record;}
@@ -64,7 +89,7 @@ class ScopedVersionedMemoryService{
   const activation=Math.log1p(retrievalCount)*0.12-Math.log1p(elapsedDays)*0.15+Math.log1p(successCount)*0.20-failureRate*0.50;
   return base+Math.max(-1,Math.min(1,activation));
  }
- private save():void{storageService.setItem(KEY,JSON.stringify(this.list().slice(0,5000)));}
+ private save():void{if(this.loadPending)return;storageService.setItem(KEY,JSON.stringify(this.list().slice(0,5000)));}
  private load():void{try{const parsed=JSON.parse(storageService.getItem(KEY)||'[]') as GovernedMemoryRecord[];for(const item of parsed)this.records.set(item.id,item);}catch{}}
  private loadRetrievalStats():void{
   try{
@@ -82,6 +107,7 @@ class ScopedVersionedMemoryService{
   }catch{/* Optional retrieval statistics never block memory startup. */}
  }
  private saveRetrievalStats():void{
+  if(this.loadPending)return;
   try{
    const snapshot=[...this.retrievalStats.values()].sort((a,b)=>b.lastRetrievedAt-a.lastRetrievedAt).slice(0,5000);
    storageService.setItem(RETRIEVAL_STATS_KEY,JSON.stringify(snapshot));

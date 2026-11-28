@@ -1,4 +1,8 @@
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 import type { PotentialUnknownBasis, PotentialUnknownCandidate } from '../../../types';
 import { canonicalSha256Object } from '../../core/services/canonicalSha256Service';
@@ -104,9 +108,33 @@ export interface KnowledgeGap {
  */
 export class KnowledgeGapService {
   private gaps: KnowledgeGap[] = [];
+  // P3037: 権威ある初回読み込みが済むまでは true。この間は保存を
+  // 行わない（保留中の検出はメモリにだけ残り、着地時に gap id で
+  // 合体する）。未ハイドレーション起動で空読みした像のまま保存
+  // すると、調査待ち行列の実データを上書きする（P3022 と同型）。
+  private loadPending = false;
 
   constructor() {
-    this.load();
+    if (isStorageAuthoritativeNow()) {
+      this.load();
+    } else {
+      this.loadPending = true;
+      runWhenStorageAuthoritative(() => {
+        const provisional = this.gaps;
+        this.gaps = [];
+        this.load();
+        let merged = false;
+        const known = new Set(this.gaps.map((g) => g.id));
+        for (const gap of provisional) {
+          if (!known.has(gap.id)) {
+            this.gaps.push(gap);
+            merged = true;
+          }
+        }
+        this.loadPending = false;
+        if (merged) this.save();
+      });
+    }
   }
 
   private load(): void {
@@ -123,6 +151,9 @@ export class KnowledgeGapService {
   }
 
   private save(): void {
+    // P3037: 権威ある読み込みが済むまでの保存は、provisional な
+    // 部分像で実キューを上書きするため見送る。
+    if (this.loadPending) return;
     try {
       // P499: 保存上限を超えるときは未解決の gap を優先して残す。
       // 従来は新しい順の単純切りで、古い未解決 gap（学習の

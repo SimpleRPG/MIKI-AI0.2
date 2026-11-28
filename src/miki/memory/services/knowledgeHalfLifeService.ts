@@ -1,11 +1,35 @@
 /** 設計思想 第161章: 知識半減期・陳腐化予測。再検証優先度だけを計算し、VERIFIED状態を直接変更しない。 */
 import { storageService } from '../../../services/storageService';
+import {
+  isStorageAuthoritativeNow,
+  runWhenStorageAuthoritative,
+} from '../../../services/deferredStoreLoad';
 export type KnowledgeStability='FIXED'|'ENVIRONMENT'|'VERSION'|'TIME'|'USER_POLICY'|'HYPOTHESIS';
 export interface HalfLifeRecord { key:string; stability:KnowledgeStability; importance:number; uses:number; failures:number; lastVerifiedAt:number; lastObservedAt:number; changeRisk:number; halfLifeDays:number; dueAt:number; revalidationRequired:boolean; }
 const KEY='miki_knowledge_half_life_v1';
 class KnowledgeHalfLifeService {
- private records:Record<string,HalfLifeRecord>={}; constructor(){try{const r=storageService.getItem(KEY);if(r)this.records=JSON.parse(r)}catch{}}
- private save(){storageService.setItem(KEY,JSON.stringify(this.records))}
+ private records:Record<string,HalfLifeRecord>={};
+ // P3037: 権威ある初回読み込みが済むまでは true。この間は保存を
+ // 行わない（保留中の記録はメモリにだけ残り、着地時にキー単位で
+ // 合体する。読み込めた側が土台で、保留分は新規キーだけ足す）。
+ // 未ハイドレーション起動の空読み＋保存が実記録を上書きする
+ // P3022 型喪失への対策（P3037 センサスで同型と判定）。
+ private loadPending=false;
+ constructor(){
+  if(isStorageAuthoritativeNow()){this.load();return;}
+  this.loadPending=true;
+  runWhenStorageAuthoritative(()=>{
+   const provisional=this.records;
+   this.records={};
+   this.load();
+   let merged=false;
+   for(const [key,record] of Object.entries(provisional)){if(!(key in this.records)){this.records[key]=record;merged=true;}}
+   this.loadPending=false;
+   if(merged)this.save();
+  });
+ }
+ private load(){try{const r=storageService.getItem(KEY);if(r)this.records=JSON.parse(r)}catch{}}
+ private save(){if(this.loadPending)return;storageService.setItem(KEY,JSON.stringify(this.records))}
  public classify(key:string, input:{stability?:KnowledgeStability;importance?:number;changeRisk?:number;verifiedAt?:number}={}){
   const now=Date.now(), old=this.records[key]; const stability=input.stability||old?.stability||this.infer(key); const importance=Math.max(0,Math.min(100,input.importance??old?.importance??50)); const changeRisk=Math.max(0,Math.min(100,input.changeRisk??old?.changeRisk??40));
   const base={FIXED:3650,ENVIRONMENT:30,VERSION:45,TIME:14,USER_POLICY:21,HYPOTHESIS:7}[stability]; const halfLifeDays=Math.max(1,Math.round(base*(1.25-importance/200)*(1.2-changeRisk/250)));
