@@ -22,6 +22,12 @@
 // 答えを複文計画（claimRecallMultiPlan）にした。文をまたいでも
 // emitted（既出の全文）が条件づけに効く: 第2文の関門は第1文を含む
 // 全文で採点され、接続の言い回しも前半を見て選ばれる。
+// P3017: 文の合間のグラフ再参照（hooks.reconsult）。文が1つ終わる
+// たびに再参照の受け口が呼ばれ、返ってきた文計画がキューの末尾に
+// 足される。合成開始時点の活性化では届かなかったノードが、既出の
+// 文を種にして初めて関係が見えることがある——そのための受け口。
+// 再参照で入った文も通常の関門・スコア条件づけを受ける（既出と
+// 重なる内容は関門で落ちる）。再参照の記録は結果の events に残る。
 import { titleKeys } from '../../memory/services/teacherLessonRecallService';
 
 export interface ComposeFacts {
@@ -77,9 +83,23 @@ export interface ComposeTraceStep {
   emittedAfter: string;
 }
 
+export interface ComposeTraceEvent {
+  type: 'reconsult';
+  afterSentence: number;
+  admitted: number;
+}
+
 export interface ComposeResult {
   text: string;
   trace: ComposeTraceStep[];
+  events: ComposeTraceEvent[];
+}
+
+export interface ComposeHooks {
+  // 文が1つ終わるたびに呼ばれる再参照の受け口（P3017）。新しい
+  // 文の計画を返せばキューの末尾に足される。返された文も通常の
+  // 関門・スコア条件づけを受ける。
+  reconsult?: (ctx: { emitted: string; facts: ComposeFacts; sentenceIndex: number }) => ComposeSentencePlan[] | undefined;
 }
 
 // 合成の状態機械。文を1つずつ、段を1つずつ進め、単位が出るたびに
@@ -87,16 +107,23 @@ export interface ComposeResult {
 class ComposeRun {
   private queue: ComposeSentencePlan[];
   private readonly facts: ComposeFacts;
+  private readonly hooks: ComposeHooks;
   private emitted = '';
   private readonly trace: ComposeTraceStep[] = [];
+  private readonly events: ComposeTraceEvent[] = [];
   private sentenceIdx = -1;
   private stepIdx = 0;
   private gateDone = false;
   private sentenceActive = false;
+  private reconsultUsed = 0;
+  private readonly maxSentences: number;
 
-  constructor(plans: ComposeSentencePlan[], facts: ComposeFacts) {
+  constructor(plans: ComposeSentencePlan[], facts: ComposeFacts, hooks: ComposeHooks = {}) {
     this.queue = [...plans];
     this.facts = facts;
+    this.hooks = hooks;
+    // 再参照で際限なく文が増えないための上限（当初の文＋3文まで）。
+    this.maxSentences = plans.length + 3;
   }
 
   private score(candidate: PhraseCandidate): number {
@@ -115,11 +142,26 @@ class ComposeRun {
     });
   }
 
+  // 文の終わりで再参照を1回かけ、返ってきた文計画をキューへ足す。
+  private reconsultIfAny(): void {
+    if (!this.hooks.reconsult) return;
+    if (this.reconsultUsed >= 3) return;
+    let extra: ComposeSentencePlan[] | undefined;
+    try {
+      extra = this.hooks.reconsult({ emitted: this.emitted, facts: this.facts, sentenceIndex: this.sentenceIdx });
+    } catch { extra = undefined; }
+    const admitted = extra && extra.length > 0 ? extra.length : 0;
+    if (extra) for (const p of extra) this.queue.push(p);
+    this.reconsultUsed += 1;
+    this.events.push({ type: 'reconsult', afterSentence: this.sentenceIdx, admitted });
+  }
+
   // 次の単位を出す。もう出なければ null。
   nextUnit(): { emitted: string; unit: string; role: string; sentence: number } | null {
     for (;;) {
       if (!this.sentenceActive) {
         if (this.sentenceIdx + 1 >= this.queue.length) return null;
+        if (this.sentenceIdx + 1 >= this.maxSentences) return null;
         this.sentenceIdx += 1;
         this.stepIdx = 0;
         this.gateDone = false;
@@ -134,12 +176,14 @@ class ComposeRun {
           this.record('GATE', [{ id: plan.gate.id, score: s }], pass ? plan.gate.id : null);
           if (!pass) {
             this.sentenceActive = false;
+            this.reconsultIfAny();
             continue;
           }
         }
       }
       if (this.stepIdx >= plan.steps.length) {
         this.sentenceActive = false;
+        this.reconsultIfAny();
         continue;
       }
       const stepDef = plan.steps[this.stepIdx];
@@ -165,12 +209,12 @@ class ComposeRun {
   }
 
   result(): ComposeResult {
-    return { text: this.emitted, trace: this.trace };
+    return { text: this.emitted, trace: this.trace, events: this.events };
   }
 }
 
-function composeSentences(plans: ComposeSentencePlan[], facts: ComposeFacts): ComposeResult {
-  const run = new ComposeRun(plans, facts);
+function composeSentences(plans: ComposeSentencePlan[], facts: ComposeFacts, hooks: ComposeHooks = {}): ComposeResult {
+  const run = new ComposeRun(plans, facts, hooks);
   while (run.nextUnit()) { /* 単位は捨て、全文とトレースだけ返す */ }
   return run.result();
 }
@@ -382,10 +426,60 @@ export function claimRecallMultiPlan(facts: ComposeFacts): ComposeSentencePlan[]
   ];
 }
 
+// P3017: 合成の途中の再参照で初めて入ってきた Claim の文計画。
+// 関門は連想文と同じ規律（既出と重なれば落とす）。言い回しは
+// 「関連する話」——再参照は、既に出した内容とつながる話題として
+// ノードを拾うので、その関係をそのまま出す。
+export function claimFollowupPlan(facts: ComposeFacts): ComposeSentencePlan[] {
+  const verified = facts.verification === 'SELF_GATED';
+  const closing = verified ? '、と分かっています。' : '、とされています。';
+  const text = String(facts.mainText || '');
+  return [{
+    closing,
+    gate: {
+      id: 'followup-gate',
+      text: '',
+      score: (ctx) => {
+        if (!text) return -10;
+        let s = 2;
+        const keys = titleKeys(text).filter((k) => k.length >= 3);
+        if (keys.some((k) => ctx.emitted.includes(k))) s -= 3;
+        if (ctx.emitted.length > 160) s -= 1;
+        return s;
+      },
+    },
+    steps: [
+      {
+        role: 'OPENER',
+        required: true,
+        candidates: [
+          {
+            id: 'related',
+            text: '関連する話では、',
+            score: (ctx) => (ctx.emitted ? 10 : -10),
+          },
+        ],
+      },
+      {
+        role: 'BODY',
+        required: true,
+        candidates: [
+          {
+            id: 'followup-claim',
+            text,
+            score: () => (text ? 10 : Number.NEGATIVE_INFINITY),
+          },
+        ],
+      },
+    ],
+  }];
+}
+
 export const phraseComposerService = {
   composePhraseReply,
   composeSentences,
   claimRecallPlan,
   lessonHowToPlan,
   claimRecallMultiPlan,
+  claimFollowupPlan,
 };

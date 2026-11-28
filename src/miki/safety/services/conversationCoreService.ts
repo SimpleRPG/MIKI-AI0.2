@@ -5940,9 +5940,34 @@ export class ConversationCoreService {
       assocText: assocContent?.text,
       assocVerification: assocContent?.verification,
     };
+    // P3017: 文の合間にグラフを再参照する。種は「元の質問＋既に出した
+    // 文」で、開始時点の活性化では届かなかった Claim が、既出の文の
+    // 語を種にして初めて拾えることがある。拾えた Claim は関連の文
+    // として最大1文だけ足す（足した文も関門の条件づけを受ける）。
+    // 使ったノードは使い回さない。再参照は合成の受け口（hooks）に
+    // 閉じてあり、合成器自体はグラフを知らない。
+    const usedNodeIds = new Set<string>([claimSeed.id]);
+    if (assoc) usedNodeIds.add(assoc.node.id);
+    let followupAdmitted = 0;
+    const reconsult = (ctx: { emitted: string }): ReturnType<typeof phraseComposerService.claimFollowupPlan> | undefined => {
+      if (followupAdmitted >= 1) return undefined;
+      let act2: ReturnType<typeof knowledgeGraphService.activateFor>;
+      try { act2 = knowledgeGraphService.activateFor(`${prompt} ${ctx.emitted}`, 2); } catch { return undefined; }
+      const cand = act2.activated.find((a) => a.node.kind === 'CLAIM' && !usedNodeIds.has(a.node.id));
+      if (!cand) return undefined;
+      const content = knowledgeGraphService.contentFor(cand.node.id);
+      if (!content) return undefined;
+      usedNodeIds.add(cand.node.id);
+      followupAdmitted += 1;
+      return phraseComposerService.claimFollowupPlan({
+        verification: content.verification,
+        mainText: content.text,
+      });
+    };
     const composed = phraseComposerService.composeSentences(
       phraseComposerService.claimRecallMultiPlan(facts),
       facts,
+      { reconsult },
     );
     return composed.text || undefined;
   }
