@@ -17,6 +17,11 @@ import {
 import { canonicalSha256 } from '../../core/services/canonicalSha256Service';
 
 const COMPONENT_REGISTRY_STORAGE_KEY = 'miki_component_registry_v1';
+// P3021: レジストリの存在マーカー。本体（大きい値）の保存が成功する
+// たびに件数だけを小さな別キーへ書く。構築時に本体が空で読めても、
+// マーカーが残っていれば「新規」ではなく「読めなかった」側と切り
+// 分けられる（P3020 の主張 high-water と同じ役割）。
+const COMPONENT_REGISTRY_MARKER_KEY = 'miki_component_registry_marker_v1';
 
 /**
  * P441(B): コードハッシュは canonical SHA-256 に統一する。
@@ -55,6 +60,10 @@ function normalizeCode(code: string): string {
 export class ComponentRegistryService {
   private static instance: ComponentRegistryService;
   private components: Map<string, ComponentTxtPackage> = new Map();
+  // P3021: 構築時に「ストアは存在したが読めなかった」と判定した
+  // セッションでは true。この間の全体保存は本物のレジストリを
+  // 部分像で上書きする危険があるため拒否する（メモリ像は保持）。
+  private storeUnreadable = false;
 
   private constructor() {
     this.loadFromStorage();
@@ -62,9 +71,26 @@ export class ComponentRegistryService {
     this.migrateIllustrativeSeedVerification();
     this.reconcileArtifactIndex();
     if (this.components.size === 0) {
-      this.initSeedComponents();
-      // 初期部品もTXT正本アーティファクトを必ず作成する。
-      this.reconcileArtifactIndex();
+      // P3021: 空読みの切り分け。存在マーカーに件数が残っていると
+      // いうことは、このインストールにはレジストリが存在したはず。
+      // それなのに本体が空で読めたのは「新規インストール」では
+      // なく「未ハイドレーション等で読めなかった」側である。ここ
+      // でシード＋全体保存を走らせると本物の部品群を上書きしてし
+      // まう（P3020 で主張に 3 回発火した喪失と同型）。シードは
+      // 見送り、保存もこのセッション中は拒否して空で開始する。
+      // ensure* 群はメモリ上では従来どおり動く（保存だけが止まる）。
+      const markerCount = this.readRegistryMarkerCount();
+      if (markerCount > 0) {
+        this.storeUnreadable = true;
+        systemLogger.warn(
+          'TOOLS',
+          `🔐 [P3021 部品レジストリ保護] レジストリ本体が空で読み込まれましたが、存在マーカーには ${markerCount} 件の記録があります。既存ストアが未ハイドレーション等で読めなかった可能性が高いため、シード投入を見送り、このセッションの全体保存を拒否します`
+        );
+      } else {
+        this.initSeedComponents();
+        // 初期部品もTXT正本アーティファクトを必ず作成する。
+        this.reconcileArtifactIndex();
+      }
     }
     // Android実機E2E用の最小・安全なSmoke Adapterを常設する。
     // 任意コード実行はせず、Native側のallow-list Adapterとの契約だけを検証する。
@@ -1017,9 +1043,54 @@ ${outputComp.implementation_txt}
     }
   }
 
-  private saveToStorage(): void {
+  // P3021: 存在マーカーの件数を読む。読めない・壊れている場合は
+  // 「存在の証拠なし」として 0 を返す（新規インストール側に倒す）。
+  private readRegistryMarkerCount(): number {
     try {
+      const raw = storageService.getItem(COMPONENT_REGISTRY_MARKER_KEY);
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw) as { count?: unknown };
+      return typeof parsed.count === 'number' && parsed.count > 0 ? parsed.count : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private saveToStorage(): void {
+    // P3021: 「読めなかった」セッションでは全体保存を拒否する。
+    // 構築直後の ensure* 群も含め、このセッションの保存はすべて
+    // ここを通るため、部分像で本物のレジストリを上書きしない。
+    if (this.storeUnreadable) return;
+    try {
+      // P3021: P3011/P3020 と同型の書込拒否ガード。永続側に既存値
+      // があるのに配列として読めない場合、その値をメモリ像で上
+      // 書きしない。
+      const persistedRaw = storageService.getItem(COMPONENT_REGISTRY_STORAGE_KEY);
+      if (persistedRaw) {
+        let persistedIsArray = false;
+        try {
+          persistedIsArray = Array.isArray(JSON.parse(persistedRaw));
+        } catch {
+          persistedIsArray = false;
+        }
+        if (!persistedIsArray) {
+          systemLogger.warn(
+            'TOOLS',
+            '🔐 [P3021 部品レジストリ保護] 永続側のレジストリデータが配列として読めないため、上書き保存を見送りました（メモリ上の部品は保持されます）'
+          );
+          return;
+        }
+      }
       storageService.setItem(COMPONENT_REGISTRY_STORAGE_KEY, JSON.stringify(Array.from(this.components.values())));
+      // P3021: 本体の保存が成功したら存在マーカーも更新する。
+      try {
+        storageService.setItem(
+          COMPONENT_REGISTRY_MARKER_KEY,
+          JSON.stringify({ count: this.components.size, updatedAt: Date.now() })
+        );
+      } catch {
+        // マーカーの失敗は本体保存の成否に影響させない
+      }
     } catch {
       // Ignore
     }

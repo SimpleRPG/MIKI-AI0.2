@@ -483,6 +483,44 @@ class DiagnosisTaskService {
 
   private save(): void {
     try {
+      // P3021: 保存時の再読込＋合体（P3011 の台帳保護と同型の
+      // 保存側バリアント）。このサービスにはシード分岐が無く、
+      // 喪失の形は「構築時に台帳が空で読めた（未ハイドレーショ
+      // ン）まま診断が走り、その回の記録だけで全体を上書きする」
+      // もの。存在を証明するカウンタ類も無いため、構築側ガード
+      // ではなく保存側で守る：保存の瞬間に永続側を読み直し、読
+      // めるなら既存記録と合体してから書くことで、構築時に読み
+      // 損ねた記録を巻き込まない。永続側に値があるのに配列とし
+      // て読めない場合は、上書き自体を拒否する（P3020 の拒否
+      // ガードと同じ）。
+      const persistedRaw = storageService.getItem(LEDGER_KEY);
+      if (persistedRaw) {
+        let persistedRecords: DiagnosisAttemptRecord[] | null = null;
+        try {
+          const parsed = JSON.parse(persistedRaw);
+          if (Array.isArray(parsed)) persistedRecords = parsed as DiagnosisAttemptRecord[];
+        } catch {
+          persistedRecords = null;
+        }
+        if (persistedRecords === null) {
+          systemLogger.warn(
+            'SELF_IMPROVEMENT',
+            '🔐 [P3021 診断台帳保護] 永続側の診断台帳が配列として読めないため、上書き保存を見送りました（メモリ上の記録は保持されます）'
+          );
+          return;
+        }
+        // 既存記録を土台に、メモリ側の記録を attemptId で重ねる
+        // （同一 attemptId はメモリ側が新しい。attemptId は時刻＋
+        // 連番で発行されるため、セッションを跨いだ衝突は実質ない）。
+        const merged = new Map<string, DiagnosisAttemptRecord>();
+        for (const record of persistedRecords) {
+          if (record && typeof record.attemptId === 'string') merged.set(record.attemptId, record);
+        }
+        for (const record of this.ledger.values()) merged.set(record.attemptId, record);
+        const records = [...merged.values()].slice(-MAX_LEDGER);
+        storageService.setItem(LEDGER_KEY, JSON.stringify(records));
+        return;
+      }
       const records = [...this.ledger.values()].slice(-MAX_LEDGER);
       storageService.setItem(LEDGER_KEY, JSON.stringify(records));
     } catch {

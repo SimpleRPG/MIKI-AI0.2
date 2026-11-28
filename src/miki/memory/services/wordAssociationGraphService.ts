@@ -3,6 +3,11 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 
 const STORAGE_KEY = 'miki_word_association_graph_v1';
+// P3021: グラフの存在マーカー。本体（辺一覧）の保存が成功するたび
+// に辺の件数だけを小さな別キーへ書く。構築時に本体が空で読めても、
+// マーカーが残っていれば「新規」ではなく「読めなかった」側と切り
+// 分けられる（P3020 の主張 high-water と同じ役割）。
+const GRAPH_MARKER_KEY = 'miki_word_association_graph_marker_v1';
 // P440 1-C: 学習済み用語の一覧（gloss 付き用語）。extractKeywords の
 // 認識語を動的に広げるためのキャッシュ。load() 時に一度だけ読む。
 const LEARNED_TERMS_KEY = 'miki_word_association_learned_terms_v1';
@@ -48,6 +53,10 @@ export class WordAssociationGraphService {
   private static instance: WordAssociationGraphService;
   private adjacency: Map<string, Map<string, number>> = new Map();
   private isLoaded = false;
+  // P3021: 構築時に「ストアは存在したが読めなかった」と判定した
+  // セッションでは true。この間の全体保存は本物のグラフを部分像
+  // で上書きする危険があるため拒否する（メモリ像は保持）。
+  private storeUnreadable = false;
   // P440 1-C: 学習済み用語（gloss 付き）のキャッシュ。extractKeywords
   // の認識語に使う。load() 時に一度だけ読む。
   private learnedTerms: Set<string> = new Set();
@@ -55,7 +64,24 @@ export class WordAssociationGraphService {
   private constructor() {
     this.load();
     if (this.adjacency.size === 0) {
-      this.seedDefaultGraph();
+      // P3021: 空読みの切り分け。存在マーカーに辺の件数が残って
+      // いるということは、このインストールには学習済みグラフが
+      // 存在したはず。それなのに本体が空で読めたのは「新規イン
+      // ストール」ではなく「未ハイドレーション等で読めなかった」
+      // 側である。ここでシード＋全体保存を走らせると、学習で育っ
+      // た辺をシード33辺で上書きしてしまう（P3020 で主張に 3 回
+      // 発火した喪失と同型）。シードは見送り、保存もこのセッショ
+      // ン中は拒否して空で開始する。
+      const markerCount = this.readGraphMarkerCount();
+      if (markerCount > 0) {
+        this.storeUnreadable = true;
+        systemLogger.warn(
+          'PERSISTENCE',
+          `🔐 [P3021 連想グラフ保護] グラフ本体が空で読み込まれましたが、存在マーカーには ${markerCount} 辺の記録があります。既存ストアが未ハイドレーション等で読めなかった可能性が高いため、シード投入を見送り、このセッションの全体保存を拒否します`
+        );
+      } else {
+        this.seedDefaultGraph();
+      }
     }
   }
 
@@ -97,8 +123,42 @@ export class WordAssociationGraphService {
     }
   }
 
-  private save(): void {
+  // P3021: 存在マーカーの辺件数を読む。読めない・壊れている場合
+  // は「存在の証拠なし」として 0 を返す（新規側に倒す）。
+  private readGraphMarkerCount(): number {
     try {
+      const raw = storageService.getItem(GRAPH_MARKER_KEY);
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw) as { edgeCount?: unknown };
+      return typeof parsed.edgeCount === 'number' && parsed.edgeCount > 0 ? parsed.edgeCount : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private save(): void {
+    // P3021: 「読めなかった」セッションでは全体保存を拒否する。
+    if (this.storeUnreadable) return;
+    try {
+      // P3021: P3011/P3020 と同型の書込拒否ガード。永続側に既存
+      // 値があるのに配列として読めない場合、その値をメモリ像で
+      // 上書きしない。
+      const persistedRaw = storageService.getItem(STORAGE_KEY);
+      if (persistedRaw) {
+        let persistedIsArray = false;
+        try {
+          persistedIsArray = Array.isArray(JSON.parse(persistedRaw));
+        } catch {
+          persistedIsArray = false;
+        }
+        if (!persistedIsArray) {
+          systemLogger.warn(
+            'PERSISTENCE',
+            '🔐 [P3021 連想グラフ保護] 永続側のグラフデータが配列として読めないため、上書き保存を見送りました（メモリ上の辺は保持されます）'
+          );
+          return;
+        }
+      }
       const list: AssociationEdge[] = [];
       for (const [from, map] of this.adjacency) {
         for (const [to, weight] of map) {
@@ -108,12 +168,24 @@ export class WordAssociationGraphService {
         }
       }
       storageService.setItem(STORAGE_KEY, JSON.stringify(list));
+      // P3021: 本体の保存が成功したら存在マーカーも更新する。
+      try {
+        storageService.setItem(
+          GRAPH_MARKER_KEY,
+          JSON.stringify({ edgeCount: list.length, updatedAt: Date.now() })
+        );
+      } catch {
+        // マーカーの失敗は本体保存の成否に影響させない
+      }
     } catch (e) {
       systemLogger.warn('PERSISTENCE', 'Failed to save word association graph', e);
     }
   }
 
   private saveLearnedTerms(): void {
+    // P3021: 学習済み用語の一覧も全体上書き形式のため、「読めな
+    // かった」セッションでは同じく保存を拒否する。
+    if (this.storeUnreadable) return;
     try {
       storageService.setItem(
         LEARNED_TERMS_KEY,

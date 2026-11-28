@@ -14,6 +14,11 @@ import { vbaStaticVerifierService } from '../../verification/services/vbaStaticV
 import { failureCatalogService } from '../../memory/services/failureCatalogService';
 
 const SKELETON_TEMPLATES_KEY = 'miki_code_skeleton_templates_v1';
+// P3021: テンプレートの存在マーカー。本体の保存が成功するたびに
+// 件数と ID 一覧だけを小さな別キーへ書く。読み込み時に本体が空で
+// 読めても、マーカーが残っていれば「新規」ではなく「読めなかった」
+// 側と切り分けられる（P3020 の主張 high-water と同じ役割）。
+const SKELETON_MARKER_KEY = 'miki_code_skeleton_templates_marker_v1';
 
 // 初期シードテンプレート (実績ある堅牢な構造)
 const INITIAL_SKELETONS: CodeSkeletonTemplate[] = [
@@ -80,9 +85,27 @@ async function fetchWithRetry<T>(url: string, retries = 3, delayMs = 1000): Prom
 
 export class CodeSkeletonService {
   private templates: CodeSkeletonTemplate[] = [];
+  // P3021: 読み込み時に「ストアは存在したが読めなかった」と判定
+  // したセッションでは true。この間の全体保存は本物のテンプレー
+  // ト（登録済み骨格・累積した成功回数）を部分像で上書きする危険
+  // があるため拒否する（メモリ像は保持）。
+  private storeUnreadable = false;
 
   constructor() {
     this.loadTemplates();
+  }
+
+  // P3021: 存在マーカーの件数を読む。読めない・壊れている場合
+  // は「存在の証拠なし」として 0 を返す（新規側に倒す）。
+  private readSkeletonMarkerCount(): number {
+    try {
+      const raw = storageService.getItem(SKELETON_MARKER_KEY);
+      if (!raw) return 0;
+      const parsed = JSON.parse(raw) as { count?: unknown };
+      return typeof parsed.count === 'number' && parsed.count > 0 ? parsed.count : 0;
+    } catch {
+      return 0;
+    }
   }
 
   private loadTemplates() {
@@ -95,6 +118,25 @@ export class CodeSkeletonService {
           return;
         }
       }
+      // P3021: 空読みの切り分け。存在マーカーに件数が残っている
+      // ということは、このインストールにはテンプレートのストア
+      // が存在したはず。それなのに本体が空で読めたのは「新規イ
+      // ンストール」ではなく「未ハイドレーション等で読めなかっ
+      // た」側である。ここでシード＋全体保存を走らせると、実行
+      // 時に登録された骨格や累積カウントをシード2件で上書きし
+      // てしまう（P3020 で主張に 3 回発火した喪失と同型）。
+      // シードはコード定数なのでメモリ上にだけ置いて最低限の
+      // 機能は保ち、保存はこのセッション中は拒否する。
+      const markerCount = this.readSkeletonMarkerCount();
+      if (markerCount > 0) {
+        this.storeUnreadable = true;
+        this.templates = [...INITIAL_SKELETONS];
+        systemLogger.warn(
+          'SELF_IMPROVEMENT',
+          `🔐 [P3021 骨格テンプレート保護] テンプレート本体が空で読み込まれましたが、存在マーカーには ${markerCount} 件の記録があります。既存ストアが未ハイドレーション等で読めなかった可能性が高いため、シードの保存を見送り、このセッションの全体保存を拒否します`
+        );
+        return;
+      }
       this.templates = [...INITIAL_SKELETONS];
       this.saveTemplates();
     } catch {
@@ -103,8 +145,43 @@ export class CodeSkeletonService {
   }
 
   private saveTemplates() {
+    // P3021: 「読めなかった」セッションでは全体保存を拒否する。
+    if (this.storeUnreadable) return;
     try {
+      // P3021: P3011/P3020 と同型の書込拒否ガード。永続側に既存
+      // 値があるのに配列として読めない場合、その値をメモリ像で
+      // 上書きしない（読み込み時の catch 経路でメモリシードだけ
+      // が載った場合の後続保存もここで止まる）。
+      const persistedRaw = storageService.getItem(SKELETON_TEMPLATES_KEY);
+      if (persistedRaw) {
+        let persistedIsArray = false;
+        try {
+          persistedIsArray = Array.isArray(JSON.parse(persistedRaw));
+        } catch {
+          persistedIsArray = false;
+        }
+        if (!persistedIsArray) {
+          systemLogger.warn(
+            'SELF_IMPROVEMENT',
+            '🔐 [P3021 骨格テンプレート保護] 永続側のテンプレートデータが配列として読めないため、上書き保存を見送りました（メモリ上のテンプレートは保持されます）'
+          );
+          return;
+        }
+      }
       storageService.setItem(SKELETON_TEMPLATES_KEY, JSON.stringify(this.templates));
+      // P3021: 本体の保存が成功したら存在マーカーも更新する。
+      try {
+        storageService.setItem(
+          SKELETON_MARKER_KEY,
+          JSON.stringify({
+            count: this.templates.length,
+            ids: this.templates.map((t) => t.id),
+            updatedAt: Date.now(),
+          })
+        );
+      } catch {
+        // マーカーの失敗は本体保存の成否に影響させない
+      }
     } catch (e) {
       console.warn('Failed to save code skeleton templates:', e);
     }
