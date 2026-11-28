@@ -34,6 +34,7 @@ import { claimDatabaseService } from '../../memory/services/claimDatabaseService
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
 import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { diagnosisTaskService } from './diagnosisTaskService';
+import { contentDecompositionService } from './contentDecompositionService';
 import { canonicalSha256 } from './canonicalSha256Service';
 
 export type KnowledgeNodeKind =
@@ -47,7 +48,9 @@ export type KnowledgeEdgeKind =
   | 'DECLARES_COMMAND' | 'USES_COMMAND'
   | 'PUBLISHES_EVENT' | 'SUBSCRIBES_EVENT'
   | 'CONTAINS' | 'CAUSES' | 'EXPLAINS' | 'DERIVED_FROM' | 'VERIFIED_BY' | 'SUPPORTS'
-  | 'IS_A' | 'PART_OF' | 'ENABLES' | 'USED_FOR';
+  | 'IS_A' | 'PART_OF' | 'ENABLES' | 'USED_FOR'
+  // P3019: 分解リンク。本文が明示した条件・順序（CAUSES は P3014 から）。
+  | 'CONDITION' | 'SEQUENCE';
 
 // CLAUDE_VERIFIED: Muse（教師）が実際に確認したもの（P3007 のスタンプ）。
 // SELF_GATED: 彼女自身の検証ゲートを通ったもの。
@@ -223,6 +226,69 @@ function buildLearnedProjection(): { projection: Projection; lessonByComponentId
     }
   }
 
+  // P3019: 分解台帳の射影。取り込み時に割り出された原子文を STATEMENT
+  // ノードとして親（レッスン／辞書の語）から DERIVED_FROM でぶら下げ、
+  // 本文が明示した関係（因果・条件・順序）を文どうしの辺にする。
+  // 文の検証状態は親から引き継ぐ：教師スタンプつきレッスンの文は
+  // CLAUDE_VERIFIED（抽出は機械的で、主張しているのは検証済みの
+  // 本文自身）。診断連鎖の文が UNVERIFIED のままなのは、あちらが
+  // 彼女自身の一般化だからで、扱いの違いは意図的。
+  // Claim 射影より前に置く：同一文が診断連鎖にも現れた場合、
+  // addNode の先勝ちでレッスン側（検証済み）の射影を残すため。
+  try {
+    for (const rec of contentDecompositionService.allRecords()) {
+      const verification = rec.verification as KnowledgeVerification;
+      let parentNodeId = '';
+      if (rec.parentKind === 'TEACHER_LESSON') {
+        const lessonNode = lessonByComponentId.get(rec.parentComponentId);
+        if (!lessonNode) continue;
+        parentNodeId = lessonNode.node.id;
+      } else if (rec.parentKind === 'DICTIONARY') {
+        parentNodeId = `term:${rec.parentId}`;
+        addNode(p, {
+          id: parentNodeId, kind: 'CONCEPT', label: rec.parentTitle,
+          verification: 'UNVERIFIED',
+          payloadRef: { store: 'contentDecomposition', key: rec.recordId },
+        });
+        if (rec.sourceRef) {
+          const sourceId = `source:${rec.sourceRef}`;
+          addNode(p, {
+            id: sourceId, kind: 'CONCEPT', label: rec.sourceRef,
+            verification: 'STRUCTURAL',
+            payloadRef: { store: 'contentDecomposition', key: rec.recordId },
+          });
+          addEdge(p, { from: parentNodeId, to: sourceId, kind: 'DERIVED_FROM', verification: 'STRUCTURAL' });
+        }
+      } else if (rec.parentComponentId && p.nodes.has(`component:${rec.parentComponentId}`)) {
+        // 一般形（P3019）：レッスン以外の登録項目が部品に属する
+        // 場合は、その部品ノードを親にする。親ノードが射影に
+        // 無いレコードはぶら下げ先が無いので射影しない。
+        parentNodeId = `component:${rec.parentComponentId}`;
+      } else {
+        continue;
+      }
+      const stmtIds: string[] = [];
+      rec.statements.forEach((text) => {
+        const id = statementId(text);
+        stmtIds.push(id);
+        addNode(p, {
+          id, kind: 'STATEMENT', label: text, verification,
+          payloadRef: { store: 'contentDecomposition', key: rec.recordId },
+        });
+        addEdge(p, { from: id, to: parentNodeId, kind: 'DERIVED_FROM', verification: 'STRUCTURAL' });
+      });
+      for (const link of rec.links) {
+        const from = stmtIds[link.fromIndex];
+        const to = stmtIds[link.toIndex];
+        if (!from || !to || from === to) continue;
+        addEdge(p, {
+          from, to, kind: link.kind, verification,
+          evidence: link.marker,
+        });
+      }
+    }
+  } catch { /* 分解台帳が読めなくても他の射影は成立させる */ }
+
   // P3013: Claim 台帳の射影。彼女の事実のストックはここが正本で、
   // 調査・会話出力など既存の生産経路がここへ書くものは、射影によって
   // 自動的にグラフの知識になる（新しい書き込み経路は作らない）。
@@ -369,7 +435,10 @@ function learnedProjection(): { projection: Projection; lessonByComponentId: Map
     const rels = worldModelGraphService.relations();
     knowledgeFingerprint = `c${claims.length}:${lastClaim ? String(lastClaim.claim_id || '') : ''}:r${rels.length}`;
   } catch { knowledgeFingerprint = 'err'; }
-  const fullFingerprint = `${attemptsFingerprint}|${knowledgeFingerprint}`;
+  // P3019: 分解台帳の変化も指紋に含める。
+  let decompositionFingerprint = '';
+  try { decompositionFingerprint = contentDecompositionService.fingerprint(); } catch { decompositionFingerprint = 'err'; }
+  const fullFingerprint = `${attemptsFingerprint}|${knowledgeFingerprint}|${decompositionFingerprint}`;
   if (learnedCache && learnedCache.itemsRef === (items as unknown)
     && learnedCache.attemptsFingerprint === fullFingerprint) {
     return learnedCache;
@@ -521,6 +590,79 @@ export const knowledgeGraphService = {
     return scored.map((s) => s.g);
   },
 
+  // P3019: レッスンの分解文（原子文）を返す。消費側が「レッスンの
+  // 中の1つの事実だけを聞かれた」場合に、レッスン全体ではなく
+  // その文だけを根拠にできるようにするための読み口。分解されて
+  // いないレッスンでは undefined。
+  decomposedStatementsFor(componentId: string): {
+    recordId: string;
+    statements: Array<{ nodeId: string; text: string }>;
+    links: Array<{ fromNodeId: string; toNodeId: string; kind: KnowledgeEdgeKind; marker: string }>;
+  } | undefined {
+    const rec = contentDecompositionService.recordForComponent(componentId);
+    if (!rec || !rec.statements.length) return undefined;
+    const statements = rec.statements.map((text) => ({ nodeId: statementId(text), text }));
+    const links = rec.links.flatMap((link) => {
+      const from = statements[link.fromIndex];
+      const to = statements[link.toIndex];
+      return from && to ? [{ fromNodeId: from.nodeId, toNodeId: to.nodeId, kind: link.kind as KnowledgeEdgeKind, marker: link.marker }] : [];
+    });
+    return { recordId: rec.recordId, statements, links };
+  },
+
+  // P3019: 質問がレッスン内の「1つの事実だけ」を狙っているかを
+  // 判定する。文ごとに、その文にだけ現れる判別キー（標題キー抽出
+  // と同じ規則で、他の文に出ないもの）を取り、質問に含まれる
+  // 判別キーの長さ合計で競わせる。最良の文が単独で、2位に差を
+  // つけて、最低限の強さ（3）を超えたときだけ「その文が答え」。
+  // それ以外は決定的でない＝レッスン全体で答える側に倒す。
+  // 数値つきのキー（「3秒間静止」）は、数値を外した核（「静止」）
+  // でも照合する：数を聞く質問は、その数自体が未知であることが
+  // 多い（「何秒間静止すれば」）。核は元の文の中でのみ判別キーに
+  // なる（他の文に出る核は落とす）。
+  findDecisiveStatement(
+    text: string,
+    componentId: string,
+  ): { nodeId: string; text: string } | undefined {
+    const decomposed = this.decomposedStatementsFor(componentId);
+    if (!decomposed || decomposed.statements.length < 2) return undefined;
+    const expandKeys = (keys: string[]): string[] => {
+      const out = new Set<string>();
+      for (const key of keys) {
+        out.add(key);
+        // 先頭の数値＋単位を外した核（「3秒間静止」→「静止」ではなく
+        // 「秒間静止」になる場合もあるので、以下の派生と併用する）。
+        const core = key.replace(/^[0-9０-９]+(?:秒|分|時間|日|年|月|回|個|つ|人|本|枚|円|％|%)?/u, '');
+        if (core.length >= 2 && core !== key) out.add(core);
+        // 数値を全部外した形（「中で3秒間静止」→「中で秒間静止」）：
+        // 「何秒間静止すれば」のように数を伏せて聞く形に当てる。
+        const noDigits = key.replace(/[0-9０-９]+/gu, '');
+        if (noDigits.length >= 2 && noDigits !== key) out.add(noDigits);
+        // 最後の数値の後ろの部分（「中で3秒間静止」→「静止」）：
+        // 内容語そのもので聞く形に当てる。
+        const tail = key.replace(/^.*[0-9０-９]+(?:秒|分|時間|日|年|月|回|個|つ|人|本|枚|円|％|%)?/u, '');
+        if (tail.length >= 2 && tail !== key) out.add(tail);
+      }
+      return [...out];
+    };
+    const keySets = decomposed.statements.map((s) => expandKeys(titleKeys(s.text).filter((k) => k.length >= 2)));
+    const distinctive = keySets.map((keys, i) =>
+      keys.filter((key) => !decomposed.statements.some((other, j) => j !== i && other.text.includes(key))));
+    const scores = distinctive.map((keys) =>
+      keys.filter((key) => text.includes(key)).reduce((sum, key) => sum + key.length, 0));
+    let best = -1;
+    let bestScore = 0;
+    let secondScore = 0;
+    scores.forEach((score, i) => {
+      if (score > bestScore) { secondScore = bestScore; bestScore = score; best = i; }
+      else if (score > secondScore) { secondScore = score; }
+    });
+    // 閾値は4：話題語1つ（「レイド」=3）だけでは決定的にしない。
+    // 内容語の組（「ゾーン」+「静止」等）で初めて1事実とみなす。
+    if (best < 0 || bestScore < 4 || bestScore <= secondScore) return undefined;
+    return decomposed.statements[best];
+  },
+
   // ノードの「中身」を返す（消費側が答えを組み立てるための素材。
   // 文の生成そのものは消費側＝会話の仕組みの仕事で、グラフは
   // 何を知っていて何とつながっているかだけを渡す）。
@@ -563,6 +705,7 @@ export const knowledgeGraphService = {
     const WALK_KINDS = new Set<KnowledgeEdgeKind>([
       'CAUSES', 'EXPLAINS', 'DERIVED_FROM', 'VERIFIED_BY', 'SUPPORTS',
       'IS_A', 'PART_OF', 'ENABLES', 'USED_FOR',
+      'CONDITION', 'SEQUENCE',
     ]);
     const depthOf = new Map<string, number>();
     for (const s of seeds) depthOf.set(s.id, 0);

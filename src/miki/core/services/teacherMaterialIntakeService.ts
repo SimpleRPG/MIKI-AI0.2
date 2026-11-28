@@ -10,6 +10,7 @@ import { definitionPatternService } from '../../research/services/definitionPatt
 import { lexicalRelationService, type LexicalRelationType } from '../../memory/services/lexicalRelationService';
 import { missedFormLearningService } from '../../conversation/services/missedFormLearningService';
 import { diagnosisTaskService, type DiagnosisCaseInput } from './diagnosisTaskService';
+import { contentDecompositionService } from './contentDecompositionService';
 
 /*
  * P472: 教師教材パッケージの受け口。
@@ -95,6 +96,9 @@ export interface TeacherMaterialIntakeRecord {
   // P3006: このパッケージで出題された診断ケースの件数と試行ID。
   diagnosisCaseCount?: number;
   diagnosisAttemptIds?: string[];
+  // P3019: このパッケージで分解されたレッスン数と、割れた原子文の総数。
+  decompositionCount?: number;
+  decomposedStatementCount?: number;
   componentIds: string[];
   references: TeacherMaterialReferenceRecord[];
   receivedAt: number;
@@ -556,6 +560,7 @@ class TeacherMaterialIntakeService {
     // P3007 の状態遷移で本登録へ移す（既存の候補部品も同じ部品として
     // そのまま本登録になる）。
     const componentIds: string[] = [];
+    const lessonComponentIds: string[] = [];
     for (const lesson of lessons) {
       const body = {
         componentKind: 'KNOWLEDGE' as const,
@@ -600,6 +605,7 @@ class TeacherMaterialIntakeService {
       } as unknown as KnowledgeComponentArtifact;
       reusableComponentFactoryService.storeCandidates([component]);
       componentIds.push(component.componentId);
+      lessonComponentIds.push(component.componentId);
     }
 
     // P878: 会話例を部品（候補・未検証）として登録。会話そのものと、
@@ -662,6 +668,23 @@ class TeacherMaterialIntakeService {
       );
     }
 
+    // P3019: 分解は取り込みの一般工程。本登録されたレッスンの本文を
+    // 原子文へ割り、本文が明示する関係と未解決参照（概念の穴）を
+    // 分解台帳へ記録する。検証状態は部品から文へ引き継がれる
+    // （教師スタンプつき＝CLAUDE_VERIFIED の文になる）。分解は
+    // 彼女自身の取り込み経路の中で走る（直接 DB 注入はしない）。
+    let decompositionCount = 0;
+    let decomposedStatementCount = 0;
+    for (const lessonComponentId of lessonComponentIds) {
+      try {
+        const rec = contentDecompositionService.decomposeComponent(lessonComponentId, { intakeId });
+        if (rec) {
+          decompositionCount++;
+          decomposedStatementCount += rec.statements.length;
+        }
+      } catch { /* 分解に失敗しても受入自体は成立させる */ }
+    }
+
     // ---- 参照画像を保管（観察の材料） ----
     const references: TeacherMaterialReferenceRecord[] = [];
     for (const image of imageFiles) {
@@ -700,6 +723,8 @@ class TeacherMaterialIntakeService {
       formCount: dialogueFormCount,
       diagnosisCaseCount,
       diagnosisAttemptIds,
+      decompositionCount,
+      decomposedStatementCount,
       componentIds,
       references,
       receivedAt,

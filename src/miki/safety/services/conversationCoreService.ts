@@ -5915,7 +5915,15 @@ export class ConversationCoreService {
     const hit = ranked[0];
     if (!hit) return undefined;
     this.recordComponentCitation(hit.componentId, 'lesson-howto-consult');
-    const ruleText = this.lessonRuleExcerpt(hit.rule);
+    // P3019: 質問がレッスン内の1つの事実だけを狙っている場合は、
+    // レッスン全体を引用せず、その原子文だけを根拠にする（親レッスン
+    // の引用は合成側の文末予約がそのまま付ける）。決定的でなければ
+    // 従来どおり規則文全体の抜粋で答える。
+    let decisive: { nodeId: string; text: string } | undefined;
+    try { decisive = knowledgeGraphService.findDecisiveStatement(prompt, hit.componentId); } catch { decisive = undefined; }
+    const ruleText = decisive
+      ? (/[。！？]$/.test(decisive.text) ? decisive.text : `${decisive.text}。`)
+      : this.lessonRuleExcerpt(hit.rule);
     // P3015: この返答も逐次合成で組み立てる（文末＝引用は先に予約し、
     // 開き方は検証状態に条件づけて選ぶ）。グラフは素材を渡し、合成の
     // 段取りは phraseComposerService が持つ。出力は従来の固定文字列の
