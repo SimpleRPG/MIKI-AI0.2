@@ -83,6 +83,13 @@ export interface UnifiedCognitiveStateSnapshot {
 }
 
 const DIAGNOSTIC_COMMANDS=new Set(['ASSESS_DOMAIN','HEALTH_CHECK','DESCRIBE','GET_STATUS','PARTICIPATE','VERIFY_CONNECTION','DISCOVER_IMPROVEMENT_ISSUE','RUN_SELF_IMPROVEMENT']);
+// P3034: 背景タスクのサイクル間隔。背景サイクルは実時間の譲りが
+// なく、1サイクルの単価が下がるほど回転数が上がって結局メイン
+// スレッドを占有し続けた（会話ターンの着地が数分〜数十分に悪化）。
+// 予算（サイクル数・総時間）の内側で、サイクルごとに実時間を
+// 空け、会話と描画が割り込める窓を常時確保する。前景（会話自身）
+// のタスクには適用しない。
+const BACKGROUND_CYCLE_PACE_MS=300;
 
 // 非ネイティブ環境 (web等) では MIKINativeRunner が実装されておらず、
 // Rustドメイン参加カーネル rankDomainRoutes を呼ぶと例外になる。
@@ -1208,6 +1215,9 @@ class CoreOrchestratorService {
       break;
     }
    }
+   // P3034: 背景サイクルの実時間ペーシング（BACKGROUND_CYCLE_PACE_MS）。
+   // 駐車・予算の判定を通過したサイクルだけがここで譲る。
+   if(isBackground)await new Promise(resolve=>setTimeout(resolve,BACKGROUND_CYCLE_PACE_MS));
    taskBlackboardService.append(taskId,'CHECKPOINT','core',`coreCycle:${cycles}`,{revision:currentBeforeState.revision,cycle:cycles});
    const stateBase=taskBlackboardService.get(taskId)!;
    const rawCognitiveState=this.buildUnifiedCognitiveState(stateBase,cycles);
