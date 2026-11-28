@@ -141,6 +141,14 @@ class SelfCodeUnderstandingService {
     snapshot:CodeUnderstandingSnapshot;
   }>();
   private resultCache=new Map<string,CodeUnderstandingResult>();
+  // P3038: the manifest -> (filtered files, repoSha256) derivation
+  // that precedes the result-cache lookup re-hashed the whole tree
+  // on every call (pure-JS sha256, ~43ms at 1,300 files) just to
+  // learn the tree had not changed. selfCodeSpaceService hands out
+  // a token whose identity changes exactly when the manifest's
+  // source value changes; while the token is identical the
+  // derivation is reused verbatim.
+  private manifestDerivationCache:{token:object;files:Array<{path:string;content?:string;contentHash:string}>;repoSha256:string}|null=null;
 
   private entryKey(path:string):string{return ENTRY_PREFIX+encodeURIComponent(path);}
 
@@ -504,12 +512,31 @@ class SelfCodeUnderstandingService {
   ensure(targetPaths:string[],sourceFiles?:Array<{path:string;content?:string;contentHash:string}>):CodeUnderstandingResult {
     // P1123: 既定の入力はマニフェスト（パス＋ハッシュ）のみ。内容は
     // parse が必要なファイルだけ readSourceFileContent で読む。
-    const providedFiles:Array<{path:string;content?:string;contentHash:string}>=sourceFiles||selfCodeSpaceService.listSourceFileManifest();
-    const files=providedFiles.filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
+    // P3038: 既定経路では (files, repoSha256) の導出をマニフェストの
+    // token でメモ化する。token が同一ならマニフェストは不変で、
+    // 拡張子フィルタも canonical ハッシュも再計算しない。override
+    // 経路（sourceFiles 指定）は従来どおり毎回導出する。
+    let files:Array<{path:string;content?:string;contentHash:string}>;
+    let repoSha256:string;
     const empty:CodeUnderstandingResult={ready:false,reused:false,repoSha256:'',targetPaths,relatedPaths:[],reasons:[],symbolIds:[],executionRelations:[],contractValues:[],executionPaths:[],impactScopes:[],unresolvedEdges:[]};
-    if(!files.length)return {...empty,reasons:['SOURCE_SNAPSHOT_EMPTY']};
+    if(sourceFiles){
+      files=sourceFiles.filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
+      if(!files.length)return {...empty,reasons:['SOURCE_SNAPSHOT_EMPTY']};
+      repoSha256=canonicalSha256(files.map(file=>({path:file.path,sha256:file.contentHash})));
+    } else {
+      const {files:manifestFiles,token}=selfCodeSpaceService.listSourceFileManifestWithToken();
+      const cachedDerivation=token!==null&&this.manifestDerivationCache&&this.manifestDerivationCache.token===token?this.manifestDerivationCache:null;
+      if(cachedDerivation){
+        files=cachedDerivation.files;
+        repoSha256=cachedDerivation.repoSha256;
+      } else {
+        files=manifestFiles.filter(file=>/\.(?:ts|tsx|js|jsx)$/.test(file.path));
+        if(!files.length)return {...empty,reasons:['SOURCE_SNAPSHOT_EMPTY']};
+        repoSha256=canonicalSha256(files.map(file=>({path:file.path,sha256:file.contentHash})));
+        if(token!==null)this.manifestDerivationCache={token,files,repoSha256};
+      }
+    }
 
-    const repoSha256=canonicalSha256(files.map(file=>({path:file.path,sha256:file.contentHash})));
     const targets=[...new Set(targetPaths.filter(Boolean))].sort();
 
     // P401: the repository-wide assembly — parsed entries with

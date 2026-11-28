@@ -134,26 +134,50 @@ class GitHubSyncService {
   // 内容アドレス化されているので、マニフェスト原文のハッシュが
   // 一致する限り組み立て結果は同一。検証はマニフェスト1件の
   // 読み＋ハッシュだけで済む。
-  private stateCache: { manifestKey: string; fingerprint: string; state: GitHubSyncState } | null = null;
+  private stateCache: { manifestKey: string; fingerprint: string; rawRef: string | null; state: GitHubSyncState } | null = null;
+
+  /** P3038: マニフェスト原文そのもの（検証用）。storageService は
+   * setItem で差し替えられるまで同一の文字列オブジェクトを返す
+   * ため、参照の同一性が「内容が変わっていない」ことの証明になる。 */
+  manifestRaw(repository: string, branch: string): string | null {
+    try {
+      return storageService.getItem(makeManifestKey(repository, branch));
+    } catch { return null; }
+  }
 
   get(repository: string, branch: string): GitHubSyncState | undefined {
     const manifestKey = makeManifestKey(repository, branch);
-    let fingerprint: string | null = null;
+    let rawManifest: string | null = null;
     try {
-      const rawManifest = storageService.getItem(manifestKey);
-      if (rawManifest) fingerprint = sha256HexFromText(rawManifest);
-    } catch { fingerprint = null; }
-    if (fingerprint && this.stateCache && this.stateCache.manifestKey === manifestKey && this.stateCache.fingerprint === fingerprint) {
+      rawManifest = storageService.getItem(manifestKey);
+    } catch { rawManifest = null; }
+    // P3038: 高速路。マニフェスト原文の参照が前回と同一なら内容は
+    // 不変（文字列は不変で、storageService は差し替えまで同じ
+    // オブジェクトを返す）。純JS sha256 は 26ms 級のコストがあり、
+    // 検証そのものが支配的になっていたため、ハッシュ照合は
+    // 「同じ内容・別オブジェクト」の場合のフォールバックに降格。
+    if (rawManifest !== null && this.stateCache && this.stateCache.manifestKey === manifestKey && this.stateCache.rawRef === rawManifest) {
       const cached = this.stateCache.state;
       // 呼び出し側が配列を書き換えてもキャッシュが汚れないよう、
       // 外側のオブジェクトと配列だけは毎回新しく返す。
+      return { ...cached, files: [...cached.files] };
+    }
+    let fingerprint: string | null = null;
+    try {
+      if (rawManifest) fingerprint = sha256HexFromText(rawManifest);
+    } catch { fingerprint = null; }
+    if (fingerprint && this.stateCache && this.stateCache.manifestKey === manifestKey && this.stateCache.fingerprint === fingerprint) {
+      // 内容が同じ別オブジェクトだった場合は参照を更新し、次回から
+      // 高速路に入れるようにする。
+      this.stateCache = { ...this.stateCache, rawRef: rawManifest };
+      const cached = this.stateCache.state;
       return { ...cached, files: [...cached.files] };
     }
     // P1118: 分割保存があればそちらから読む。無ければ旧キー（丸ごと
     // 保存）を読み、初回に分割へ移行して旧キーを消す。
     const split = this.readSplitState(repository, branch);
     if (split) {
-      if (fingerprint) this.stateCache = { manifestKey, fingerprint, state: split };
+      if (fingerprint) this.stateCache = { manifestKey, fingerprint, rawRef: rawManifest, state: split };
       return split;
     }
     const legacy = this.readLegacyState(repository, branch);

@@ -106,6 +106,18 @@ export interface SelfCodeWorkspaceDiagnostic {
 class SelfCodeSpaceService {
   private lightContentCache = new Map<string, string>();
   private lightIndexRefreshInFlight = false;
+  // P3038: clean スナップショットのメモ。repoSha256 の canonical
+  // ハッシュ（純JS sha256 で全ファイル分）は 43ms 級で、get() の
+  // たびに再計算されていた。検証は githubSync マニフェスト原文の
+  // 参照同一性（storageService は差し替えまで同じ文字列を返す）。
+  // マニフェストが変われば参照が変わり、メモは自動的に外れる。
+  private snapshotMemo: { repository: string; branch: string; manifestRawRef: string; snapshot: SelfCodeSnapshot } | null = null;
+  // P3038: listSourceFileManifest のメモ。導出元になった保存値の
+  // 原文参照で検証する。token はメモが差し替わるたびに新しい
+  // オブジェクトになり、下流（理解サービスの導出キャッシュ）が
+  // 「マニフェストが変わっていない」ことを同一性で判定できる。
+  private manifestMemo: { source: 'dirty' | 'legacy' | 'github'; rawRef: string; files: Array<{ path: string; contentHash: string }> } | null = null;
+  private manifestMemoToken: object | null = null;
 
   getGitHubSettings(): SelfCodeGitHubSettings {
     try {
@@ -803,6 +815,25 @@ class SelfCodeSpaceService {
 
       // clean状態はGitHub同期サービスを唯一の正本として読む。
       const settings = this.getGitHubSettings();
+      // P3038: マニフェスト原文の参照が前回と同一なら、前回組み立てた
+      // スナップショットがそのまま正しい（ファイルは sha256 で内容
+      // アドレス化され、マニフェストが内容の目録）。repoSha256 の
+      // 全ファイル再ハッシュを省略する。dirty は上の分岐で常に
+      // 優先されるため、このメモが dirty を隠すことはない。
+      const manifestRawRef = githubSyncService.manifestRaw(
+        settings.repository,
+        settings.branch
+      );
+      if (
+        manifestRawRef !== null &&
+        this.snapshotMemo &&
+        this.snapshotMemo.repository === settings.repository &&
+        this.snapshotMemo.branch === settings.branch &&
+        this.snapshotMemo.manifestRawRef === manifestRawRef
+      ) {
+        const cached = this.snapshotMemo.snapshot;
+        return { ...cached, files: [...cached.files] };
+      }
       const sync = githubSyncService.get(
         settings.repository,
         settings.branch
@@ -822,7 +853,7 @@ class SelfCodeSpaceService {
       // githubSyncService が保持する正規化済みファイル配列をそのまま利用する。
       // SelfCodeFile と GitHubSyncFile は path/content/sha256 が共通で、
       // clean PULL状態ではここで再コピーする必要がない。
-      return {
+      const snapshot: SelfCodeSnapshot = {
         repository: settings.repository,
         branch: settings.branch,
         repoSha256,
@@ -832,6 +863,18 @@ class SelfCodeSpaceService {
         baseRepoSha256: repoSha256,
         source: sync.source === 'BUNDLED_SEED' ? 'BUNDLED_SEED' : 'GITHUB',
       };
+      // syncedAt が 0 の場合は従来どおり呼び出しごとに Date.now() が
+      // 入るため、メモ化すると値が固定されてしまう。その場合だけ
+      // メモに入れない（従来挙動と完全一致を優先）。
+      if (manifestRawRef !== null && sync.syncedAt) {
+        this.snapshotMemo = {
+          repository: settings.repository,
+          branch: settings.branch,
+          manifestRawRef,
+          snapshot,
+        };
+      }
+      return snapshot;
     } catch {
       return undefined;
     }
@@ -864,23 +907,74 @@ class SelfCodeSpaceService {
   // 既定の入力で、全体の内容を組み立てない。dirty な作業状態がある間は
   // そちらが正本。
   listSourceFileManifest(): Array<{ path: string; contentHash: string }> {
+    return this.listSourceFileManifestWithToken().files;
+  }
+
+  // P3038: メモつき版。導出は従来どおり3系統（dirty分割 → 旧単一
+  // キーの dirty → githubSync マニフェスト）だが、導出元になった
+  // 保存値の原文参照が前回と同一なら前回の結果を返す。検証は
+  // 優先順位どおりに原文を読み直すだけで、パースは勝った系統の
+  // 1回分しか走らない（従来は毎回全系統を試していた）。
+  listSourceFileManifestWithToken(): { files: Array<{ path: string; contentHash: string }>; token: object | null } {
+    const memo = this.manifestMemo;
+    if (memo) {
+      // dirty 分割が最優先。原文参照が一致すればそれが正本。
+      let dirtyRaw: string | null = null;
+      try { dirtyRaw = storageService.getItem(DIRTY_MANIFEST_KEY); } catch { dirtyRaw = null; }
+      if (dirtyRaw !== null) {
+        if (memo.source === 'dirty' && memo.rawRef === dirtyRaw) {
+          return { files: memo.files.map(file => ({ ...file })), token: this.manifestMemoToken };
+        }
+      } else {
+        let legacyRaw: string | null = null;
+        try { legacyRaw = storageService.getItem(KEY); } catch { legacyRaw = null; }
+        let legacyDirty = false;
+        if (legacyRaw !== null) {
+          try {
+            const value = JSON.parse(legacyRaw);
+            legacyDirty = Boolean(value?.files && value?.dirty === true);
+          } catch { legacyDirty = false; }
+        }
+        if (legacyDirty) {
+          if (memo.source === 'legacy' && memo.rawRef === legacyRaw) {
+            return { files: memo.files.map(file => ({ ...file })), token: this.manifestMemoToken };
+          }
+        } else if (memo.source === 'github') {
+          const settings = this.getGitHubSettings();
+          const rawRef = githubSyncService.manifestRaw(settings.repository, settings.branch);
+          if (rawRef !== null && memo.rawRef === rawRef) {
+            return { files: memo.files.map(file => ({ ...file })), token: this.manifestMemoToken };
+          }
+        }
+      }
+    }
     // P1127: dirty はマニフェストだけから返す（内容は読まない）。
     const splitManifest = this.readDirtyManifest();
     if (splitManifest) {
-      return splitManifest.files.map(file => ({
+      const files = splitManifest.files.map(file => ({
         path: file.path,
         contentHash: file.sha256,
       }));
+      let rawRef: string | null = null;
+      try { rawRef = storageService.getItem(DIRTY_MANIFEST_KEY); } catch { rawRef = null; }
+      if (rawRef !== null) {
+        this.manifestMemo = { source: 'dirty', rawRef, files };
+        this.manifestMemoToken = {};
+      }
+      return { files, token: this.manifestMemoToken };
     }
     try {
       const raw = storageService.getItem(KEY);
       if (raw) {
         const value = JSON.parse(raw);
         if (value?.files && value?.dirty === true) {
-          return (value.files as SelfCodeFile[]).map(file => ({
+          const files = (value.files as SelfCodeFile[]).map(file => ({
             path: file.path,
             contentHash: file.sha256,
           }));
+          this.manifestMemo = { source: 'legacy', rawRef: raw, files };
+          this.manifestMemoToken = {};
+          return { files, token: this.manifestMemoToken };
         }
       }
     } catch { /* clean 側へ */ }
@@ -889,11 +983,24 @@ class SelfCodeSpaceService {
       settings.repository,
       settings.branch
     );
-    if (!manifest?.complete || !manifest.files.length) return [];
-    return manifest.files.map(file => ({
+    if (!manifest?.complete || !manifest.files.length) {
+      this.manifestMemo = null;
+      this.manifestMemoToken = null;
+      return { files: [], token: null };
+    }
+    const files = manifest.files.map(file => ({
       path: file.path,
       contentHash: file.sha256,
     }));
+    const rawRef = githubSyncService.manifestRaw(settings.repository, settings.branch);
+    if (rawRef !== null) {
+      this.manifestMemo = { source: 'github', rawRef, files };
+      this.manifestMemoToken = {};
+    } else {
+      this.manifestMemo = null;
+      this.manifestMemoToken = null;
+    }
+    return { files, token: this.manifestMemoToken };
   }
 
   // P1123: 1ファイルの内容だけを読む（全体の組み立てをしない）。
