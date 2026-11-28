@@ -127,11 +127,35 @@ function normalizeFiles(
 }
 
 class GitHubSyncService {
+  // P3034: get() の組み立て結果キャッシュ。従来は呼び出しのたびに
+  // 全ファイル（約1,858件・22MB）の保存値を JSON パースし直して
+  // おり、CORE の計画系が1サイクルに何度も呼ぶためメインスレッド
+  // を占有し続けていた。ファイル内容はマニフェストの sha256 で
+  // 内容アドレス化されているので、マニフェスト原文のハッシュが
+  // 一致する限り組み立て結果は同一。検証はマニフェスト1件の
+  // 読み＋ハッシュだけで済む。
+  private stateCache: { manifestKey: string; fingerprint: string; state: GitHubSyncState } | null = null;
+
   get(repository: string, branch: string): GitHubSyncState | undefined {
+    const manifestKey = makeManifestKey(repository, branch);
+    let fingerprint: string | null = null;
+    try {
+      const rawManifest = storageService.getItem(manifestKey);
+      if (rawManifest) fingerprint = sha256HexFromText(rawManifest);
+    } catch { fingerprint = null; }
+    if (fingerprint && this.stateCache && this.stateCache.manifestKey === manifestKey && this.stateCache.fingerprint === fingerprint) {
+      const cached = this.stateCache.state;
+      // 呼び出し側が配列を書き換えてもキャッシュが汚れないよう、
+      // 外側のオブジェクトと配列だけは毎回新しく返す。
+      return { ...cached, files: [...cached.files] };
+    }
     // P1118: 分割保存があればそちらから読む。無ければ旧キー（丸ごと
     // 保存）を読み、初回に分割へ移行して旧キーを消す。
     const split = this.readSplitState(repository, branch);
-    if (split) return split;
+    if (split) {
+      if (fingerprint) this.stateCache = { manifestKey, fingerprint, state: split };
+      return split;
+    }
     const legacy = this.readLegacyState(repository, branch);
     if (legacy) {
       try {
