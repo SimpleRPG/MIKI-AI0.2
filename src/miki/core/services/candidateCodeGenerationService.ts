@@ -15,6 +15,7 @@ import { nonLlmCodeSynthesisService } from '../../selfDevelopment/services/nonLl
 import { componentArtifactStoreService } from '../../capability/services/componentArtifactStoreService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { teacherVerificationEvidenceService } from '../../verification/services/teacherVerificationEvidenceService';
+import { isTrustedVerifierName } from './trustedVerifier';
 import { ComponentCompositionService } from '../../capability/services/componentCompositionService';
 import { codeConstructionRendererService } from './codeConstructionRendererService';
 import { astCandidateTransformationService, type AstCandidateOperation } from '../../selfDevelopment/services/astCandidateTransformationService';
@@ -2582,7 +2583,7 @@ class CandidateCodeGenerationService {
   // DEVICE_TESTED 以降は実機カナリア（保存済みラウンドの再生）が
   // 担う。VERIFIED の意味（実機で動き、使われて測れた証拠）は、
   // 信頼ルールでも変えない。
-  if(candidate.trustedVerifier==='Claude'){
+  if(isTrustedVerifierName(candidate.trustedVerifier ?? '')){
     const cloud=componentRegistryService.advanceComponentStatus(
       componentId,
       'CLOUD_TESTED',

@@ -5,6 +5,7 @@ import { storageService } from '../../../services/storageService';
 import { systemLogger } from '../../../services/systemLogger';
 import { claimVerificationEventService } from './claimVerificationEventService';
 import { lexicalRelationService } from '../../memory/services/lexicalRelationService';
+import { isTrustedVerifierName } from '../../core/services/trustedVerifier';
 
 // P440 D5: 勉強の測定値の置き場所（reusableComponentFactoryService・
 // domainIntegrationBootstrapService・researchService と同じキー・同じ形）。
@@ -167,7 +168,7 @@ export class VerifierService {
     const trustedVerifierAttested = admissible.some(
       (e) =>
         e.kind === 'CLOUD_AI' &&
-        e.metadata?.trusted_verifier === 'Claude' &&
+        isTrustedVerifierName(e.metadata?.trusted_verifier ?? '') &&
         e.metadata?.teacher_constraint !== true,
     );
 

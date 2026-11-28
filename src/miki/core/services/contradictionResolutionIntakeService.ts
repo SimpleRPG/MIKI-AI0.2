@@ -8,7 +8,7 @@ import { contradictionResolutionRequestService } from './contradictionResolution
 import { autonomousSelfImprovementLoopService } from './autonomousSelfImprovementLoopService';
 import { autonomousIssueDiscoveryService } from './autonomousIssueDiscoveryService';
 import { sha256HexFromText } from './canonicalSha256Service';
-import { isClaudeVerifierName, TRUSTED_VERIFIER_NAME } from './trustedVerifier';
+import { isTrustedVerifierName, TRUSTED_VERIFIER_NAME } from './trustedVerifier';
 
 /*
  * P453（矛盾解決2）: 教師の一括回答の受入・結び付け検証・証拠への提出。
@@ -233,12 +233,12 @@ class ContradictionResolutionIntakeService {
   }
 
   /** P477: Muse の検証証言（信頼刻印つき・制約保留と反証を除く）が候補に attach されているか。 */
-  private hasClaudeAttestation(claimId: string): boolean {
+  private hasTrustedVerifierAttestation(claimId: string): boolean {
     return evidenceService.list({ claimId }).some(
       (record) =>
         record.status === 'ADMISSIBLE' &&
         record.kind === 'CLOUD_AI' &&
-        record.metadata?.trusted_verifier === TRUSTED_VERIFIER_NAME &&
+        isTrustedVerifierName(record.metadata?.trusted_verifier ?? '') &&
         record.metadata?.teacher_constraint !== true &&
         record.metadata?.research_source_role !== 'COUNTEREVIDENCE',
     );
@@ -261,7 +261,7 @@ class ContradictionResolutionIntakeService {
     candidateEvidenceQuality: number;
   } {
     const clusters = this.independentClustersOf(candidateClaimId);
-    const attested = this.hasClaudeAttestation(candidateClaimId);
+    const attested = this.hasTrustedVerifierAttestation(candidateClaimId);
     return {
       independentlyObservedClusterIds: clusters,
       candidateVerified: clusters.length >= 2 || attested,
@@ -337,7 +337,7 @@ class ContradictionResolutionIntakeService {
           // 証言として扱う。制約保留（判断ではない）と BOTH_WRONG
           // （反証）と NO_CONTRADICTION（ペアの判断）には付けない。
           // 他の AI の回答には付かない。
-          ...(isClaudeVerifierName(teacherName) && !isTeacherConstraint && verdict !== 'BOTH_WRONG' && verdict !== 'NO_CONTRADICTION'
+          ...(isTrustedVerifierName(teacherName) && !isTeacherConstraint && verdict !== 'BOTH_WRONG' && verdict !== 'NO_CONTRADICTION'
             ? { trusted_verifier: TRUSTED_VERIFIER_NAME }
             : {}),
         },

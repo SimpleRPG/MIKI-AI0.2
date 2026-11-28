@@ -9,8 +9,8 @@ import { autonomousSelfImprovementLoopService, TEACHER_RETURN_PRIORITY } from '.
 import { taskBlackboardService } from './taskBlackboardService';
 import { componentRegistryService } from '../../capability/services/componentRegistryService';
 import { selfCodeSpaceService } from './selfCodeSpaceService';
-import { isClaudeVerifierName } from './trustedVerifier';
-export { isClaudeVerifierName };
+import { isClaudeVerifierName, isTrustedVerifierName, TRUSTED_VERIFIER_NAME } from './trustedVerifier';
+export { isClaudeVerifierName, isTrustedVerifierName };
 import { sha256HexFromText } from './canonicalSha256Service';
 
 /*
@@ -748,7 +748,7 @@ class ComponentSupplyIntakeService {
         if (tve.extraRounds.length > 0) entry.teacherVerificationRounds = tve.extraRounds;
         // P476: 供給者が Muse の場合のみ、信頼の刻印を候補へ載せる。
         // 生成段はこの刻印がある候補の TVE をクラウド検証として扱う。
-        if (isClaudeVerifierName(supplier.name)) entry.trustedVerifier = 'Claude';
+        if (isTrustedVerifierName(supplier.name)) entry.trustedVerifier = TRUSTED_VERIFIER_NAME;
       }
       return entry;
     });
@@ -766,7 +766,7 @@ class ComponentSupplyIntakeService {
       teacherReturn: true,
       supplier: { name: supplier.name, ...(supplier.model ? { model: supplier.model } : {}), ...(supplier.suppliedAt ? { suppliedAt: supplier.suppliedAt } : {}) },
       // P476: Muse からの供給はユーザー信頼ルールにより区分する。
-      supplyTrustLevel: isClaudeVerifierName(supplier.name) ? 'TRUSTED_VERIFIER_CLAUDE' : 'SEMI_TRUSTED_EXTERNAL_AI',
+      supplyTrustLevel: isTrustedVerifierName(supplier.name) ? 'TRUSTED_VERIFIER_CLAUDE' : 'SEMI_TRUSTED_EXTERNAL_AI',
       ...(typeof manifest.notes === 'string' && manifest.notes.trim() ? { supplyNotes: manifest.notes.trim() } : {}),
     };
     // 元 run の制約（要件・禁止事項・不変条件・検証/納品条件）は新しい
@@ -788,7 +788,7 @@ class ComponentSupplyIntakeService {
     try {
       const supplyEvidence = evidenceService.recordExecutionEvidence({
         title: `部品供給の受入 ${intakeId}`,
-        snippet: `${proactiveSupply ? `事前供給（要求なし・内部記録 ${requestId}）` : `供給要求 ${requestId} の返却パッケージ`} ${sourceFileName} を受け付け、候補 ${implementationCandidates.length} 件を検証待ちとして新規実行へ接続した（供給者: ${supplier.name}）。${isClaudeVerifierName(supplier.name) ? '供給者は Muse のため、ユーザー信頼ルール（P476）により検証済み TVE はクラウド検証として扱われる。' : ''}`,
+        snippet: `${proactiveSupply ? `事前供給（要求なし・内部記録 ${requestId}）` : `供給要求 ${requestId} の返却パッケージ`} ${sourceFileName} を受け付け、候補 ${implementationCandidates.length} 件を検証待ちとして新規実行へ接続した（供給者: ${supplier.name}）。${isTrustedVerifierName(supplier.name) ? `供給者は ${supplier.name} のため、ユーザー信頼ルール（P476）により検証済み TVE はクラウド検証として扱われる。` : ''}`,
         source: 'component_supply_intake',
         sourceId: intakeId,
       });

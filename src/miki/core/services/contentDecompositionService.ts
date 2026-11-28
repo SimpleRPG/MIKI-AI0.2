@@ -46,6 +46,7 @@ import {
 } from '../../../services/deferredStoreLoad';
 import { systemLogger } from '../../../services/systemLogger';
 import { canonicalSha256 } from './canonicalSha256Service';
+import { isTrustedVerifierName } from './trustedVerifier';
 import { componentRepositoryCacheService } from '../../memory/services/componentRepositoryCacheService';
 import { claimDatabaseService } from '../../memory/services/claimDatabaseService';
 import { worldModelGraphService } from '../../selfAwareness/services/worldModelGraphService';
@@ -749,7 +750,7 @@ class ContentDecompositionService {
     if (!lesson || typeof lesson.rule !== 'string' || typeof lesson.title !== 'string') return undefined;
     const tv = item.teacherVerification as { verifiedBy?: unknown } | undefined;
     const verification: DecompositionVerification =
-      tv && typeof tv.verifiedBy === 'string' && tv.verifiedBy
+      tv && typeof tv.verifiedBy === 'string' && isTrustedVerifierName(tv.verifiedBy)
         ? 'CLAUDE_VERIFIED'
         : item.verificationStatus === 'VERIFIED' || item.lifecycleStatus === 'VERIFIED'
           ? 'SELF_GATED'

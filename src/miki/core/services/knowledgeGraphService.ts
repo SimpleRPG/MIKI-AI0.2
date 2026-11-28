@@ -36,6 +36,7 @@ import { selfCodeUnderstandingService } from './selfCodeUnderstandingService';
 import { diagnosisTaskService } from './diagnosisTaskService';
 import { contentDecompositionService } from './contentDecompositionService';
 import { canonicalSha256 } from './canonicalSha256Service';
+import { isTrustedVerifierName } from './trustedVerifier';
 
 export type KnowledgeNodeKind =
   | 'FILE' | 'SYMBOL' | 'LESSON' | 'COMPONENT' | 'DIAGNOSIS_PATTERN'
@@ -130,12 +131,12 @@ function mergeInto(base: Projection, extra: Projection): void {
 
 function componentVerification(item: Record<string, unknown>): KnowledgeVerification {
   const tv = item.teacherVerification as { verifiedBy?: unknown } | undefined;
-  if (tv && typeof tv.verifiedBy === 'string' && tv.verifiedBy) return 'CLAUDE_VERIFIED';
+  if (tv && typeof tv.verifiedBy === 'string' && isTrustedVerifierName(tv.verifiedBy)) return 'CLAUDE_VERIFIED';
   if (item.verificationStatus === 'VERIFIED' || item.lifecycleStatus === 'VERIFIED') return 'SELF_GATED';
   return 'UNVERIFIED';
 }
 
-const VERIFIER_CLAUDE_ID = 'verifier:Claude';
+const VERIFIER_MUSE_ID = 'verifier:Muse';
 
 function statementId(text: string): string {
   return `stmt:${canonicalSha256(text).slice(0, 16)}`;
@@ -185,10 +186,10 @@ function buildLearnedProjection(): { projection: Projection; lessonByComponentId
         verification,
       });
       const tv = item.teacherVerification as { verifiedBy?: unknown; how?: unknown } | undefined;
-      if (tv && typeof tv.verifiedBy === 'string' && tv.verifiedBy) {
-        addNode(p, { id: VERIFIER_CLAUDE_ID, kind: 'VERIFIER', label: 'Claude（教師検証）', verification: 'CLAUDE_VERIFIED' });
+      if (tv && typeof tv.verifiedBy === 'string' && isTrustedVerifierName(tv.verifiedBy)) {
+        addNode(p, { id: VERIFIER_MUSE_ID, kind: 'VERIFIER', label: 'Muse（教師検証）', verification: 'CLAUDE_VERIFIED' });
         addEdge(p, {
-          from: node.id, to: VERIFIER_CLAUDE_ID, kind: 'VERIFIED_BY', verification: 'CLAUDE_VERIFIED',
+          from: node.id, to: VERIFIER_MUSE_ID, kind: 'VERIFIED_BY', verification: 'CLAUDE_VERIFIED',
           evidence: typeof tv.how === 'string' ? tv.how : undefined,
         });
       }
