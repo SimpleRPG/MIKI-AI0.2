@@ -32,7 +32,10 @@ export interface UnifiedUnknownResult {
   unresolvedRequirements?: string[];
   effectiveText: string;
   resolution: ReturnType<typeof unknownResolutionService.open>;
-  status: 'REUSED_SUPPORTED' | 'LOCAL_EVIDENCE' | 'RESEARCHED_UNVERIFIED' | 'NO_EVIDENCE' | 'RESEARCH_REQUIRED' | 'SEARCH_FAILED' | 'USER_STOPPED';
+  // HELD_LESSON は調整役自身は返さない。会話橋（P3023）が、未知と
+  // 宣言する前に彼女のレッスン在庫から決定的な文を引けた場合に、
+  // 調整役の結果へ上書きして使う状態。
+  status: 'REUSED_SUPPORTED' | 'LOCAL_EVIDENCE' | 'RESEARCHED_UNVERIFIED' | 'NO_EVIDENCE' | 'RESEARCH_REQUIRED' | 'SEARCH_FAILED' | 'USER_STOPPED' | 'HELD_LESSON';
   evidenceCount: number;
   query?: string;
   provider?: string;

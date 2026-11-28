@@ -1381,7 +1381,7 @@ export class ConversationCoreService {
           explicitUnknownInquiry,
       });
       const nextState = { ...state, currentTopic: unknownTerms.join('、') };
-      const status: ConversationCoreResult['status'] = ['REUSED_SUPPORTED', 'LOCAL_EVIDENCE'].includes(researched.status) ? 'RESOLVED' : 'UNRESOLVED';
+      const status: ConversationCoreResult['status'] = ['REUSED_SUPPORTED', 'LOCAL_EVIDENCE', 'HELD_LESSON'].includes(researched.status) ? 'RESOLVED' : 'UNRESOLVED';
       const result = this.buildResult(status, `unknown_research_${researched.status.toLowerCase()}`, researched.surfaceText, nextState, dialogueAct, researched.resolution.evidenceCount, ['unknownResearchConversationBridgeService'], started, stages);
       result.researchPerformed = researched.status === 'RESEARCHED_UNVERIFIED' || researched.resolution.evidenceCount > 0;
       result.researchEvidenceCount = researched.resolution.evidenceCount;

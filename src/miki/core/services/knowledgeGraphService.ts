@@ -663,6 +663,72 @@ export const knowledgeGraphService = {
     return decomposed.statements[best];
   },
 
+  // P3023: 語についてのレッスン（標題がその語を立てる教材）から、
+  // 質問に決定的な分解文を引く。未知語の会話経路が「彼女が既に
+  // 持っている語のレッスン」を引くための読み口（P3041 プローブの
+  // 消費者配線）。照合の根拠は標題への語の含有だけにする——本文に
+  // 語が出るだけのレッスンは「その語についてのレッスン」ではない。
+  // 文の選択は質問の狙いに合わせる: 目的の質問は「ために／ための
+  // ／目的」を明示する文、1つの事実を狙う質問は
+  // findDecisiveStatement、それ以外（意味・定義の質問）は定義の
+  // 形をした文（「X」とは…のこと／Xは…のこと。主の定義に別の
+  // 義を1つまで添える）。どれにも当たらなければ undefined
+  // （持っていない側＝正直な未知の返しに倒す）。
+  findTermLessonStatements(
+    term: string,
+    questionText: string,
+  ): { lesson: GroundedLessonNode; statements: Array<{ nodeId: string; text: string }> } | undefined {
+    const raw = String(term || '').trim();
+    if (!raw) return undefined;
+    const variants = [...new Set([
+      raw,
+      raw.replace(/(?:し|する|ます|です)$/u, ''),
+    ])].filter((v) => v.length >= 2);
+    if (!variants.length) return undefined;
+    const { lessonByComponentId } = learnedProjection();
+    const candidates: GroundedLessonNode[] = [];
+    for (const g of lessonByComponentId.values()) {
+      if (variants.some((v) => g.title.includes(v))) candidates.push(g);
+    }
+    if (!candidates.length) return undefined;
+    // 標題の中で語が先に立つレッスン（「棚卸の意味」型）を優先し、
+    // 同点は標題の短い方（語に特化している方）を取る。
+    const headScore = (g: GroundedLessonNode): number => {
+      let best = Number.POSITIVE_INFINITY;
+      for (const v of variants) {
+        const idx = g.title.indexOf(v);
+        if (idx >= 0) best = Math.min(best, idx);
+      }
+      return best;
+    };
+    candidates.sort((a, b) => headScore(a) - headScore(b) || a.title.length - b.title.length);
+    const isDefinitional = (text: string): boolean => {
+      for (const v of variants) {
+        if (text.includes(`「${v}」とは`) || text.includes(`${v}とは`)) return true;
+        const idx = text.indexOf(`${v}は`);
+        if (idx >= 0 && idx <= 12 && /(?:のこと|である|ことだ)/.test(text)) return true;
+      }
+      return false;
+    };
+    for (const lesson of candidates) {
+      const decomposed = this.decomposedStatementsFor(lesson.componentId);
+      if (!decomposed || !decomposed.statements.length) continue;
+      const stmts = decomposed.statements;
+      // 目的の質問: 目的を明示する文が答えの核。
+      if (/(?:何のため|ためには|目的|どうして|なぜ|理由)/.test(questionText)) {
+        const purpose = stmts.filter((s) => /(?:ために|ための|目的)/.test(s.text)).slice(0, 2);
+        if (purpose.length) return { lesson, statements: purpose };
+      }
+      // 1つの事実を狙う質問は既存の決定的文の判定に委ねる。
+      const decisive = this.findDecisiveStatement(questionText, lesson.componentId);
+      if (decisive) return { lesson, statements: [decisive] };
+      // 意味・定義の質問: 定義の形をした文。
+      const definitional = stmts.filter((s) => isDefinitional(s.text)).slice(0, 2);
+      if (definitional.length) return { lesson, statements: definitional };
+    }
+    return undefined;
+  },
+
   // ノードの「中身」を返す（消費側が答えを組み立てるための素材。
   // 文の生成そのものは消費側＝会話の仕組みの仕事で、グラフは
   // 何を知っていて何とつながっているかだけを渡す）。

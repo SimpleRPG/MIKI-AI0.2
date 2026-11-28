@@ -1,6 +1,8 @@
 import { unifiedUnknownResolutionCoordinatorService, type UnifiedUnknownResult } from '../../unknown/services/unifiedUnknownResolutionCoordinatorService';
 import { runtimeConversationCompositionService } from './runtimeConversationCompositionService';
 import { researchService } from '../../research/services/researchService';
+import { knowledgeGraphService } from '../../core/services/knowledgeGraphService';
+import { phraseComposerService } from '../../core/services/phraseComposerService';
 import type { EvidenceRecord } from '../../memory/services/evidenceService';
 
 export interface UnknownResearchConversationResult {
@@ -137,6 +139,22 @@ class UnknownResearchConversationBridgeService {
     let researchedEvidenceCount = resolution.evidenceCount;
 
     /*
+     * P3023: 未知と宣言する前に、彼女が既に持っている在庫を引く。
+     * 語についての教師レッスン（取り込み時に分解済み）に、質問への
+     * 決定的な文があれば、Web 調査にも未知の返しにも進まず、その
+     * 文から答える。P3041 プローブの所見への配線: 供給された
+     * レッスンが在庫にあっても、意味・目的の質問がそこへ届かず、
+     * 「まだ確認できていない」と返していた。検証状態の開示は
+     * レッスン想起（P3015）と同じ合成計画に委ねる（検証済みは
+     * 教わった言い方＋引用、未検証は候補としての開示）。
+     */
+    let heldLessonText = '';
+    if (status !== 'REUSED_SUPPORTED') {
+      heldLessonText = this.findHeldLessonAnswer(input.question, input.unknownTerms[0] || '');
+      if (heldLessonText) status = 'HELD_LESSON';
+    }
+
+    /*
      * P457 (G): 調査が必要と判定されたら、会話の場で実際に調査まで実行する。
      * 従来は RESEARCH_REQUIRED（調査待ち）のまま「確認できません」で終わり、
      * 検索自体が発動しなかった。
@@ -169,6 +187,22 @@ class UnknownResearchConversationBridgeService {
       // 検証済みの過去調査の再利用。本文（タイトル・snippet・URL 付き）をそのまま提示する。
       ir = {
         conclusion: resolution.effectiveText || resolution.researchQuestion || input.question,
+        target: input.unknownTerms[0] || '',
+        reasons: [],
+        conditions: [],
+        exceptions: [],
+        next_actions: [],
+        certainty: 'LIKELY',
+        detail_level: 'STANDARD',
+        interaction_mode: 'NORMAL',
+        world_scope: 'REAL',
+      };
+    } else if (status === 'HELD_LESSON' && heldLessonText) {
+      // P3023: 保持済みレッスンの決定的文からの答え。本文は合成側で
+      // 検証状態の開示と引用まで済んでいるので、そのまま結論にする
+      // （検証済みの過去調査の再利用と同じ扱い）。
+      ir = {
+        conclusion: heldLessonText,
         target: input.unknownTerms[0] || '',
         reasons: [],
         conditions: [],
@@ -233,6 +267,38 @@ class UnknownResearchConversationBridgeService {
       returnedToConversation: true,
       ...(unverifiedSources ? { unverifiedSources } : {}),
     };
+  }
+
+  /**
+   * P3023: 対象語について彼女が保持している教師レッスンの決定的文
+   * から、レッスン想起（P3015）と同じ合成で答えを作る。引けなければ
+   * 空文字（未知の返しに倒す）。グラフは素材（どのレッスンのどの文
+   * が決定的かと検証状態）を渡し、文の組み立ては合成器の仕事、と
+   * いう既存の分担に従う。
+   */
+  private findHeldLessonAnswer(question: string, term: string): string {
+    if (!term) return '';
+    try {
+      const found = knowledgeGraphService.findTermLessonStatements(term, question);
+      if (!found) return '';
+      const ruleText = found.statements
+        .map((s) => (/[。！？]$/.test(s.text) ? s.text : `${s.text}。`))
+        .join('');
+      if (!ruleText) return '';
+      const facts = {
+        verification: found.lesson.verification,
+        lessonTitle: found.lesson.title,
+        ruleText,
+      };
+      const composed = phraseComposerService.composeSentences(
+        phraseComposerService.lessonHowToPlan(facts),
+        facts,
+      );
+      return composed.text || '';
+    } catch {
+      // 在庫が引けなくても会話は止めない（従来の未知の返しに倒す）。
+      return '';
+    }
   }
 }
 
